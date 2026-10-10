@@ -47,6 +47,10 @@ var compare: ItemInstance
 var price := 0
 ## The "If you replace this item:" block (Y toggles it on the character panel).
 var comparison_visible := true
+## Shared screens (the shop): whose tooltip this is – a "P2" tag in the player's colour on top
+## and the frame border in that colour. Empty = none.
+var owner_tag := ""
+var owner_color := Color.WHITE
 
 var _box: VBoxContainer
 static var _italic: FontVariation
@@ -92,6 +96,15 @@ func show_item(p_item: ItemInstance, p_viewer: ClassData = null, p_compare: Item
 	price = p_price
 	_rebuild()
 	visible = item != null
+
+
+func set_owner_tag(tag: String, color: Color) -> void:
+	if tag == owner_tag and color == owner_color:
+		return
+	owner_tag = tag
+	owner_color = color
+	if item != null:
+		_rebuild()
 
 
 func set_comparison_visible(value: bool) -> void:
@@ -391,7 +404,12 @@ func _rebuild() -> void:
 		c.queue_free()
 	if item == null:
 		return
-	add_theme_stylebox_override(&"panel", frame_style(item.rarity))
+	var style := frame_style(item.rarity)
+	if owner_tag != "":
+		style.border = owner_color
+		style.border_width = 3
+		_line(owner_tag, owner_color, SMALL_SIZE, UiTheme.bold_font())
+	add_theme_stylebox_override(&"panel", style)
 	var rarity := clampi(item.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)
 
 	var title := _line(item.display_name, UiTheme.RARITY_COLORS[rarity], NAME_SIZE, UiTheme.bold_font())

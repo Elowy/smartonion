@@ -1,8 +1,8 @@
 extends TestCase
 ## ShopPanel (GDD 10 / 12): offer cards, one cursor per player (starts near the player's corner,
 ## moves on the grid), A buys (hold A when the price is more than half the wallet), X locks,
-## R3 pings, Y votes for a reroll (humans only), feedback lines, tooltips beside the stall on
-## the player's own side, bot helpers. Uses a recording FakeShop (test_ui_market_fakes.gd).
+## R3 pings, Y votes for a reroll (humans only), feedback lines, tooltips on the stall beside
+## the hovered card, bot helpers. Uses a recording FakeShop (test_ui_market_fakes.gd).
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
@@ -236,16 +236,37 @@ func test_bots_and_unplugged_players_never_block_a_reroll() -> void:
 
 # --- Tooltips ---------------------------------------------------------------------------
 
-func test_tooltips_beside_the_stall_on_the_player_side() -> void:
+func _tip_rect(tip: ItemTooltip) -> Rect2:
+	return Rect2(tip.global_position, tip.get_combined_minimum_size().max(tip.size) * tip.scale)
+
+
+## Lays the containers out now (top-down) instead of waiting for the deferred sort.
+func _layout(node: Node) -> void:
+	if node is Container:
+		node.notification(Container.NOTIFICATION_SORT_CHILDREN)
+	for child in node.get_children():
+		_layout(child)
+
+
+func test_tooltips_on_the_stall_beside_the_hovered_card() -> void:
+	_layout(panel)
 	panel._process(DT)
 	var t1 := panel.tooltip_of(0)
 	var t2 := panel.tooltip_of(1)
 	check(t1 != null and t2 != null, "one tooltip per player")
 	check(t1.visible and t2.visible, "shown for the hovered offers")
-	var stall_mid := panel.global_position.x + panel.size.x * 0.5
-	check(t1.global_position.x + t1.size.x * 0.5 < stall_mid, "P1's tooltip on the left")
-	check(t2.global_position.x + t2.size.x * 0.5 > stall_mid, "P2's tooltip on the right")
-	check(t2.position.x >= panel.size.x, "P2's tooltip does not cover the stall")
+	var stall := panel.get_global_rect()
+	for tip in [t1, t2]:
+		var r := _tip_rect(tip)
+		check(stall.grow(0.5).encloses(r), "inside the stall, never over the corner panels: %s in %s" % [r, stall])
+	var c1 := panel.cards[panel.cursor_of(0)].get_global_rect()
+	var c2 := panel.cards[panel.cursor_of(1)].get_global_rect()
+	check(not _tip_rect(t1).intersects(c1), "P1's tooltip leaves its card visible")
+	check(not _tip_rect(t2).intersects(c2), "P2's tooltip leaves its card visible")
+	check(_tip_rect(t1).position.x >= c1.end.x, "left-column card: tooltip to its right")
+	check(_tip_rect(t2).end.x <= c2.position.x, "right-column card: tooltip to its left")
+	check(t1.find_line("P1", true) != null and t2.find_line("P2", true) != null, "owner tag on top")
+	check_eq(t2.owner_color, PlayerManager.get_slot(1).color, "P2's colour")
 	panel.set_cursor_active(0, false)
 	panel._process(DT)
 	check(not t1.visible, "hidden while P1's focus is the own panel")
