@@ -18,10 +18,12 @@
 | Fegyverek | **WoW-szerű: Main Hand + Off Hand** (kétkezes fegyver mindkét slotot foglalja) |
 | Aktív képességek | **Igen**, kasztonként saját erőforrással (Rage, Mana, Energy, Holy Power, Soul Shard) |
 | Menet hossza | **25 hullám** |
-| Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 8.1) |
+| Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 9.1) |
 | Szintlépés | **Abilityk** (3 véletlen közül) **és** véletlen statok közül lehet választani; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
-| Loot / erőforrás | **Közös**: a gold és az XP a csapaté, mindenki osztozik rajta (részletek: 9. fejezet) |
-| Grafika | WoW-szerű stilizált low-poly 3D, felülnézeti kamera (részletek: 12. fejezet) |
+| Talentek | WoW-szerű **talentfák** (kasztonként 3); a **10. szinttől szintenként 1 talentpont**, a hullámok között költhető (lásd 7. fejezet) |
+| Fegyverkovácsolás | Brotato-szerűen: **2 azonos fegyver, azonos ritkaságban → 1, eggyel magasabb ritkaságú** (lásd 4.1) |
+| Loot / erőforrás | **Közös**: a gold és az XP a csapaté, mindenki osztozik rajta (részletek: 10. fejezet) |
+| Grafika | WoW-szerű stilizált low-poly 3D, felülnézeti kamera (részletek: 13. fejezet) |
 | Kasztok (MVP) | Warrior, Mage, Paladin, Rogue, Warlock – adatvezérelten bővíthető |
 
 ---
@@ -215,9 +217,41 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 | Tome | Off Hand | – | – | +Int, +Crit |
 
 - A fegyverek is **ritkaságot** kapnak (lásd 5.2): magasabb ritkaság = nagyobb alapsebzés + bónusz stat.
-- **Egyesítés:** 2 egyforma fegyver, azonos ritkaságban → 1 fegyver eggyel magasabb ritkaságban
-  (Legendary-ig).
 - A bolt minden játékosnak **csak olyan fegyvert kínál, amit a kasztja használhat**.
+
+### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
+
+**Szabály:** **2 azonos típusú fegyver, azonos ritkaságban → 1 fegyver eggyel magasabb ritkaságban.**
+
+> Példa: 2 × Uncommon Dagger → 1 × Rare Dagger.
+
+**Hol lehet kovácsolni:**
+- **Karakterpanel / backpack:** a fegyvert kiválasztva (A) megjelenő menüben „Forge”
+  opció, ha van hozzá párja a backpackben vagy a felszerelt slotok között.
+- **Boltban, automatikusan:** ha a backpack tele van, és olyan fegyvert veszel, amiből van
+  azonos ritkaságú példányod, a vásárlás egyből kovácsol (mint a Brotatóban).
+- **Bolti jelzés:** az ilyen ajánlatot üllő-ikon jelöli.
+
+**Költség:** **ingyenes**.
+
+**Ritkaság-szorzók (alapsebzés):**
+
+| Ritkaság | Alapsebzés | Bónusz |
+|---|---|---|
+| Common | ×1,0 | – |
+| Uncommon | ×1,3 | +1 véletlen stat |
+| Rare | ×1,7 | +2 stat |
+| Epic | ×2,2 | +2 stat, +10% támadási sebesség |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** (pl. Dagger: minden 4. találat mérgező pengét lő) |
+
+**Korlátok:**
+- Legendary fölé nem lehet kovácsolni.
+- **Artifact** fegyver nem kovácsolható (az hullámonként magától fejlődik, lásd 5.5).
+- A kovácsolt fegyver új véletlen bónusz statokat kap a ritkaságának megfelelően.
+
+**Dual Wield szinergia:** két azonos fegyver felszerelve (pl. 2 tőr) erős a Rogue-nak,
+de kovácsolva egy erősebb fegyver lesz belőlük. Ez Brotato-szerű döntés:
+**szélesség vagy erő?**
 
 ---
 
@@ -326,7 +360,7 @@ Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 | Lucky Rabbit Foot | +8 Fortune |
 | Heart of the Mountain | +8 Max HP, −3% Speed |
 
-\* Munkanevek – a végleges nevek nem utalhatnak Blizzard-márkákra (lásd 13. fejezet).
+\* Munkanevek – a végleges nevek nem utalhatnak Blizzard-márkákra (lásd 14. fejezet).
 
 #### Legendary itemek (8 db)
 
@@ -467,12 +501,116 @@ Kasztonként 6 saját ability + 6 általános, amit minden kaszt megkaphat.
 | Általános | Spirit Wolf | Auto (pet) | Szellemfarkas társ |
 | Általános | Berserking | Active | 6 mp-ig +20% Haste |
 
-> A korábbi talent-ötletek beolvadtak az ability-készletbe és a Rank V specializációkba,
-> ezért **külön talentrendszer nincs**.
+**Iskolák (tagek):** minden ability kap egy iskola-taget:
+- Physical,
+- Fire,
+- Frost,
+- Arcane,
+- Holy,
+- Shadow,
+- Nature.
+
+A talentek ezekre az iskolákra is hatnak (pl. „+10% Fire sebzés”), így az ability-választás
+és a talentfa összeépül.
 
 ---
 
-## 7. Ellenségek
+## 7. Talentrendszer (WoW-szerű talentfák)
+
+A szintlépési kártyák mellett **külön talentpontok** is járnak, a klasszikus WoW
+talentfák mintájára.
+
+### 7.1 Pontok
+
+- **A 10. szinttől minden szintlépés +1 talentpontot ad**, a kártyaválasztás mellé.
+- A pontok **a hullámok között**, a **Talents** fülön költhetők el. Nem kötelező
+  azonnal elkölteni.
+- **Várható pontszám egy menet alatt:** kb. 15–20 (a menet végére a 25.–30. szint körül).
+- **XP-skálázás co-opban:** az XP-igény a játékosszámmal nő (`× (1 + 0,6 × (játékosok − 1))`),
+  hogy a szintlépés üteme 1–4 játékossal hasonló legyen.
+
+### 7.2 A fák felépítése
+
+Minden kasztnak **3 fája** van (a WoW-os specializációk szerint):
+
+| Kaszt | Fa 1 | Fa 2 | Fa 3 |
+|---|---|---|---|
+| Warrior | Arms | Fury | Protection |
+| Mage | Arcane | Fire | Frost |
+| Paladin | Holy | Protection | Retribution |
+| Rogue | Assassination | Combat | Subtlety |
+| Warlock | Affliction | Demonology | Destruction |
+
+Egy fa **5 szintből (tier)** áll:
+
+| Tier | Feltétel (pont ebben a fában) | Tartalom |
+|---|---|---|
+| 1 | 0 | 2 talent, egyenként max 3 pont |
+| 2 | 3 | 2 talent, egyenként max 3 pont |
+| 3 | 6 | 1 talent (max 2 pont) + 1 **képesség-módosító** (1 pont) |
+| 4 | 9 | 2 talent, egyenként max 3 pont |
+| 5 | 12 | **Capstone** (1 pont) – nagy, buildet meghatározó hatás |
+
+- Egy fa teljes kitöltése **22 pont**, tehát egy menetben **egy fát lehet majdnem
+  végigvinni**, vagy két fa között el lehet osztani a pontokat (hibrid build), ahogy a
+  klasszikus WoW-ban.
+- Egyes talentek **előfeltételhez** kötöttek (nyíl a fában, mint a WoW-ban).
+
+### 7.3 Respec
+
+- A Talents fülön „Reset Talents”: minden pont visszajár.
+- **Ár:** az első reset 20 gold, utána minden reset az előző ár duplája
+  (a WoW-os respec-díj mintájára).
+
+### 7.4 Példa: Warrior – Arms fa
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Deflection | 3 | +2% Dodge |
+| 1 | Tactical Mastery | 3 | +5 Rage induláskor és +3% Rage-termelés |
+| 2 | Improved Charge | 3 | A Charge +0,3 mp kábítás és −1 mp CD |
+| 2 | Deep Wounds | 3 | A krit 3 mp-es vérzést okoz (a sebzés 10%-a) |
+| 3 | Two-Handed Specialization | 2 | +5% sebzés kétkezes fegyverrel |
+| 3 | *Sweeping Strikes* (módosító) | 1 | A Whirlwind után 5 mp-ig a csapások +1 célpontot érnek |
+| 4 | Impale | 3 | +10% krit sebzés |
+| 4 | Sudden Death | 3 | 3% esély találatkor, hogy az Execute CD-je lenulláz |
+| 5 | **Mortal Strike** (capstone) | 1 | Minden 5. fegyvertalálat 250%-os csapás, ami a célpontot −50% gyógyulásra ítéli; Execute-tal szinergiában |
+
+### 7.5 Capstone-ok (minden kaszt, minden fa)
+
+| Kaszt | Fa | Capstone | Hatás |
+|---|---|---|---|
+| Warrior | Arms | Mortal Strike | lásd 7.4 |
+| Warrior | Fury | Rampage | Ölésenként +2% sebzés (max 20%), 5 mp-ig tart |
+| Warrior | Protection | Last Stand | Halálos találat helyett +30% Max HP 10 mp-re (hullámonként 1×) |
+| Mage | Arcane | Arcane Power | A Mana-költségek +30%-kal nőnek, de minden sebzés +25% |
+| Mage | Fire | Combustion | Minden krit tűzbe borítja a célpont környékét |
+| Mage | Frost | Ice Lance | A fagyott célpontokra tett minden találat dupla és garantált krit |
+| Paladin | Holy | Holy Shock | Automatikus: 4 mp-enként gyógyítja a legsérültebb társat, vagy sebzi a legközelebbi ellenséget |
+| Paladin | Protection | Holy Shield | +20% Block, és a blokkolt találat szent sebzést ad vissza |
+| Paladin | Retribution | Seal of Command | 15% esély találatkor 70%-os extra szent csapásra |
+| Rogue | Assassination | Cold Blood | A Fan of Knives minden 3. használata garantált krit, +50% krit sebzéssel |
+| Rogue | Combat | Adrenaline Rush | Az Energy-regeneráció dupla, ha 3+ ellenség van közel |
+| Rogue | Subtlety | Shadow Dance | A Vanish után 5 mp-ig minden találat krit |
+| Warlock | Affliction | Unstable Affliction | Ha egy DoT-ot lejárat előtt eltávolít egy ellenség, AoE-robbanás és 1 mp-es Silence |
+| Warlock | Demonology | Soul Link | A sebzés 20%-át a pet viseli el; a pet +30% sebzés |
+| Warlock | Destruction | Conflagrate | A Rain of Fire égő földet hagy, és minden kritje +1 Soul Shardot ad (10% eséllyel) |
+
+> **MVP-terjedelem:** mind az 5 kaszt × 3 fa váza, és mind a 15 capstone. A részletes
+> tier 1–4 talenteket a Warrior Arms mintája alapján, fánként egyenként tervezzük ki a
+> fejlesztés során (`TalentTreeData` adatfájlokban).
+
+### 7.6 Kapcsolat a többi rendszerrel
+
+- A szintlépési **ability-kártyák** szélességet adnak: új eszközöket.
+- A **Trainer-rangok** goldért erősítik az abilityket.
+- A **talentfa** az irányt adja meg: a kaszt identitását és a buildet.
+- Az ability-iskolák (tagek) miatt a talentek a tanult abilitykre is hatnak
+  (pl. a Fire fa erősíti a Fireball és a Meteor abilityt).
+
+---
+
+## 8. Ellenségek
 
 A fajok WoW-hangulatúak, de saját nevűek.
 
@@ -508,7 +646,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - Az 5. hullámtól véletlenszerűen jelennek meg, ezüst sárkányos portrékerettel és névvel.
 - 3× HP, 1 véletlen affix (Shielding, Enraged, Frenzied, Vampiric).
 - Garantált itemet dobnak (Uncommon+), amit a hullám végén **Need / Greed / Pass** dobással
-  osztunk el (lásd 9. fejezet).
+  osztunk el (lásd 10. fejezet).
 
 **Bossok**
 
@@ -527,7 +665,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 ---
 
-## 8. Hullámok és skálázás
+## 9. Hullámok és skálázás
 
 - **25 hullám**; a hullámhossz a 9. hullámtól 60 mp.
 
@@ -541,7 +679,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
-### 8.1 Nehézségi szintek
+### 9.1 Nehézségi szintek
 
 - **MVP:** csak **Normal**.
 - **Adatvezérelt:** a nehézség egy `DifficultyData` fájl, ami tartalmazza:
@@ -557,7 +695,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 ---
 
-## 9. Közös loot és gazdaság
+## 10. Közös loot és gazdaság
 
 **Gold**
 
@@ -567,7 +705,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - **Miért így:** mindenki osztozik a lootban, de a boltban senki nem költheti el a másik
   részét. (Alternatíva: egyetlen közös pénztárca, amiből bárki vásárol – a
   playtesteken eldönthetjük.)
-- **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 7. fejezet. A Gold Findet minden játékos
+- **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 8. fejezet. A Gold Findet minden játékos
   külön adja hozzá a felszedéshez.
 
 **XP**
@@ -601,7 +739,7 @@ szintlépési reroll, bolti reroll.
 
 ---
 
-## 10. Irányítás
+## 11. Irányítás
 
 ### Kontroller (Xbox-elnevezéssel)
 
@@ -636,7 +774,7 @@ indulnak.
 
 ---
 
-## 11. Felület (UI)
+## 12. Felület (UI)
 
 **Csatlakozási képernyő**
 
@@ -658,9 +796,16 @@ indulnak.
 - **Elrendezés:** a képernyő 1/2/3/4 panelre oszlik (játékosonként egy).
 - **Szintlépés:** előbb egy szintlépés-képernyő jön (3 ability + 2 stat kártya,
   szintenként), utána a fülek.
-- **Fülek:** **Shop | Trainer | Character**.
+- **Fülek:** **Shop | Trainer | Talents | Character**.
 - **Trainer fül:** a megtanult abilityk listája, a jelenlegi rang, a következő rang
   hatása, ára és egy „Train” gomb. A Rank V-nél a 2 specializáció közül lehet választani.
+- **Talents fül:** WoW-szerű elrendezés – a 3 fa egymás mellett, tierenként sorokban.
+  - Kontrollerrel rácsban lehet lépkedni; „A” = pont elköltése, „X” = pont visszavétele
+    a fül bezárása előtt.
+  - Felül a szabad pontok száma, alul a „Reset Talents” gomb és az ára.
+- **Kovácsolás:** a Character fülön a fegyvert kiválasztva (A) egy műveletmenü jelenik meg:
+  Equip / Forge / Sell. A Forge csak akkor aktív, ha van azonos párja. A boltban üllő-ikon
+  jelzi a kovácsolható ajánlatot.
 - **Character fül:** WoW-szerű karakterpanel – bal oldalon a páncélslotok, jobb oldalon az
   ékszerek és trinketek, alul a fegyverek, középen a karakter 3D modellje, alatta a statlista.
 - **Backpack:** 10 hely a panel alján.
@@ -671,7 +816,7 @@ indulnak.
 
 ---
 
-## 12. Grafikai irány
+## 13. Grafikai irány
 
 - **Stílus:** WoW-szerű stilizált fantasy.
   - Zömök, nagyfejű, „chibi” arányú hősök (a Brotato-féle kis karakterek hangulata).
@@ -695,7 +840,7 @@ indulnak.
 
 ---
 
-## 13. Jogi megjegyzés (szellemi tulajdon)
+## 14. Jogi megjegyzés (szellemi tulajdon)
 
 - **Szabadon használható:** a stílus, a kasztnevek (Warrior, Mage, …), az általános
   stat-nevek és a ritkaság-színek.
@@ -705,13 +850,14 @@ indulnak.
 
 ---
 
-## 14. Technikai architektúra (terv, nem kód)
+## 15. Technikai architektúra (terv, nem kód)
 
 **Adatvezérelt felépítés:** Godot Custom Resource-ok (`.tres`) a tartalomhoz.
 
 - `ClassData`: alapstatok, páncéltípus, jártasságok, erőforrás, alap képességek, ability-készlet.
 - `WeaponData`, `ItemData` (alaptípus + kézzel tervezett itemek), `AffixData` (utótagok).
-- `AbilityData`: típus (Active / Auto), rangok, specializációk, kaszt-kötés.
+- `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
+- `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
 - `SetData`, `EnemyData`, `WaveData`, `BossData`, `DifficultyData`.
 
 **Fő rendszerek**
@@ -720,10 +866,12 @@ indulnak.
 |---|---|
 | `PlayerManager` | Eszközök (kontroller / billentyűzet) játékoshoz rendelése, csatlakozás / kilépés |
 | `RunState` | Hullámszám, közös kassza, közös XP, játékosállapotok |
-| `StatBlock` | Alapstatok + módosítók (item, ability, buff) → végső statok |
+| `StatBlock` | Alapstatok + módosítók (item, ability, talent, buff) → végső statok |
 | `CombatSystem` | Sebzés képlete, krit, DoT, gyógyítás, procok |
 | `AbilitySystem` | Erőforrások, cooldownok, slotok, rangok, auto-cast, képességek végrehajtása |
-| `LevelUpSystem` | Ability- és stat-kártyák húzása, reroll |
+| `LevelUpSystem` | Ability- és stat-kártyák húzása, reroll, talentpontok kiosztása |
+| `TalentSystem` | Talentfák, pontköltés, előfeltételek, respec |
+| `ForgeSystem` | Fegyverkovácsolás (azonos típus + ritkaság → eggyel magasabb ritkaság) |
 | `Spawner` / `WaveDirector` | Hullámok, spawnolás, skálázás |
 | `LootSystem` | Item-generálás, ritkaság, Need/Greed |
 | `ShopSystem` | Ajánlatok, lock, reroll, árak |
@@ -734,7 +882,7 @@ indulnak.
 
 ```
 /project.godot
-/data/        classes/ abilities/ weapons/ items/ affixes/ sets/ enemies/ waves/ difficulties/
+/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ waves/ difficulties/
 /scenes/      main/ arena/ player/ enemies/ ui/
 /scripts/     systems/ abilities/ ai/
 /assets/      models/ textures/ icons/ audio/ fonts/
@@ -746,7 +894,7 @@ indulnak.
 
 ---
 
-## 15. Mérföldkövek
+## 16. Mérföldkövek
 
 | # | Mérföldkő | Tartalom |
 |---|---|---|
@@ -755,13 +903,13 @@ indulnak.
 | M2 | Felszerelés | Statrendszer, item-generálás, ritkaság, bolt, backpack, karakterpanel, tooltip |
 | M3 | Kasztok | 5 kaszt, erőforrások, 2-2 alap képesség, Mastery |
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
-| M5 | Mélység | Setek, elitek, Loot Goblin, Need/Greed, közös kassza |
+| M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, Need/Greed, közös kassza |
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
 
 ---
 
-## 16. Nyitott kérdések
+## 17. Nyitott kérdések
 
 1. **Karakterek kinézete:** a repó neve *smartonion* – a Brotato burgonyáihoz hasonlóan a
    hősök **hagymák** legyenek WoW-páncélban, vagy maradjanak kis chibi humanoidok?
