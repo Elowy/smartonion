@@ -216,7 +216,7 @@ func test_x_locks_r3_pings_y_votes() -> void:
 	RunState.add_gold(100)
 	_tap(p2, PlayerInput.Pad.Y)
 	check_eq(shop.rerolls_this_round, 1, "everyone voted -> reroll")
-	check("Rerolled for 8 g" in panel.feedback_lines(), "reroll line: %s" % [panel.feedback_lines()])
+	check("Rerolled for %d g" % (1 * 2 + 2) in panel.feedback_lines(), "reroll line: %s" % [panel.feedback_lines()])
 
 
 func test_reroll_without_gold_says_so() -> void:

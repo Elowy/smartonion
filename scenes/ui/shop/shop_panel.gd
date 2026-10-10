@@ -20,11 +20,11 @@ extends Control
 ## A purchase went through (also used for bots and the smoke statistics).
 signal item_bought(slot_index: int, item: ItemInstance)
 
-const STALL_SIZE := Vector2(784, 800)
+const STALL_SIZE := Vector2(704, 800)
 ## Where the stall body starts below the awning (ShopMerchant draws above it).
 const BODY_TOP := 96.0
 const MAX_COLUMNS := 5
-const CARD_GAP := 9
+const CARD_GAP := 8
 ## GDD 10: a purchase that takes more than HOLD_SHARE of the wallet needs A held this long.
 const HOLD_TIME := 1.0
 const HOLD_SHARE := 0.5
@@ -349,7 +349,7 @@ func _build() -> void:
 	_gold_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 28)
 	_gold_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.add_child(_gold_label)
-	var shared := UiTheme.label("shared gold", UiTheme.SMALL, 17)
+	var shared := UiTheme.label("shared gold", UiTheme.SMALL, 15)
 	shared.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.add_child(shared)
 	info.add_child(UiTheme.spacer())
@@ -360,7 +360,7 @@ func _build() -> void:
 	_pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_pips.draw.connect(_draw_pips)
 	info.add_child(_pips)
-	_reroll_label = UiTheme.label("", &"", 18, UiTheme.TEXT)
+	_reroll_label = UiTheme.label("", &"", 16, UiTheme.TEXT)
 	_reroll_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.add_child(_reroll_label)
 
@@ -530,7 +530,7 @@ func _update_info() -> void:
 	var cost := shop.reroll_cost()
 	_reroll_label.text = "Reroll: %d g – all players must vote (Y)" % cost
 	_reroll_label.add_theme_color_override(&"font_color", UiTheme.TEXT if RunState.gold >= cost else UiTheme.RED.lightened(0.1))
-	_pips.custom_minimum_size = Vector2(maxi(1, _slots.size()) * 24.0, 24.0)
+	_pips.custom_minimum_size = Vector2(maxi(1, _slots.size()) * 22.0, 24.0)
 	_pips.queue_redraw()
 
 
@@ -728,7 +728,7 @@ func _draw_pips() -> void:
 		elif auto:
 			_pips.draw_circle(c, 7.0, Color(s.color, 0.3))
 		_pips.draw_arc(c, 9.0, 0.0, TAU, 24, s.color.lightened(0.2), 2.0, true)
-		x += 24.0
+		x += 22.0
 
 
 func _draw_cursors() -> void:

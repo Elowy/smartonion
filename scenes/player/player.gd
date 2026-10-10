@@ -12,6 +12,10 @@ extends CharacterBody3D
 ## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
+## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
+## (refreshed on equipment.changed); weapon hits report to on_hit_dealt(), kills to
+## notify_kill() (Life on Kill, on-kill procs); take_damage() handles Parry (riposte), Block
+## Value, proc shields, cheat-death, Thorns and the when-struck / low-HP procs.
 
 signal hp_changed(hp: float, max_hp: float)
 signal downed_changed(is_downed: bool)

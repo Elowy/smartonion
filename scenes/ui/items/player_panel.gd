@@ -42,12 +42,15 @@ const BOTTOM_SLOTS: Array[Items.EquipSlot] = [
 	Items.EquipSlot.OFF_HAND, Items.EquipSlot.TRINKET_1, Items.EquipSlot.TRINKET_2,
 ]
 const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents"]
-## Always listed; every other non-zero stat follows (up to MAX_EXTRA_STATS).
+## Stat list (two columns, at most MAX_STAT_ROWS rows so the panel never grows): the class's
+## primary stat, then these, then the other primary stats and every other non-zero stat.
+## Stamina is shown as Max HP (10 + Stamina).
 const LISTED_STATS: Array[StringName] = [
-	Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT, Stats.STAMINA,
 	&"max_hp", Stats.ARMOR, Stats.CRIT, Stats.HASTE, Stats.VERSATILITY, Stats.DODGE,
 ]
-const MAX_EXTRA_STATS := 6
+const PRIMARY_STATS: Array[StringName] = [Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT]
+const UNLISTED_STATS: Array[StringName] = [Stats.STAMINA]
+const MAX_STAT_ROWS := 6
 const SHORT_STAT_NAMES := {
 	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Damage",
 	Stats.COOLDOWN_REDUCTION: "Cooldowns", Stats.EXTRA_PROJECTILE: "Projectiles",
@@ -87,6 +90,9 @@ var mode := Mode.BROWSE
 var active_tab := 0
 ## Plain text of the last message ("+12 gold", "P1 gave you Iron Helm" ...).
 var last_message := ""
+## Whether the last handle_input() used a press (navigation, A / B / X / Y / LT / RT). B is
+## only used while a menu is open, so the owner may treat an unconsumed B as its own (unready).
+var last_input_consumed := false
 
 var _cells: Array[Cell] = []
 var _focused := false
@@ -170,24 +176,33 @@ func has_input_focus() -> bool:
 
 ## Called every _process frame by the Intermission while this panel has focus.
 func handle_input(input: PlayerInput) -> void:
+	last_input_consumed = false
 	if input == null:
 		return
 	if mode == Mode.MENU:
+		last_input_consumed = input.nav_just_pressed() != Vector2i.ZERO or input.just_pressed(PlayerInput.Pad.A) \
+			or input.just_pressed(PlayerInput.Pad.B)
 		_menu_input(input)
 		return
 	var nav := input.nav_just_pressed()
 	if nav != Vector2i.ZERO:
 		move_selection(nav)
+		last_input_consumed = true
 	if input.just_pressed(PlayerInput.Pad.A):
 		open_menu()
+		last_input_consumed = true
 	elif input.just_pressed(PlayerInput.Pad.X) and _cells[selected].bag_index >= 0:
 		open_menu(true)
+		last_input_consumed = true
 	if input.just_pressed(PlayerInput.Pad.Y):
 		toggle_comparison()
+		last_input_consumed = true
 	if input.just_pressed(PlayerInput.Pad.LT):
 		switch_tab(-1)
+		last_input_consumed = true
 	elif input.just_pressed(PlayerInput.Pad.RT):
 		switch_tab(1)
+		last_input_consumed = true
 
 
 # --- Queries ---------------------------------------------------------------------------------
@@ -885,18 +900,7 @@ func _refresh_stats(cls: ClassData) -> void:
 		_stats_grid.remove_child(c)
 		c.queue_free()
 	var stats := _stat_block()
-	var rows: Array[Array] = []
-	for stat in LISTED_STATS:
-		rows.append([stat, _stat_value(stats, stat)])
-	var extra := 0
-	for stat in Stats.ALL:
-		if stat in LISTED_STATS or extra >= MAX_EXTRA_STATS:
-			continue
-		var v := _stat_value(stats, stat)
-		if absf(v) >= 0.05:
-			rows.append([stat, v])
-			extra += 1
-	for row in rows:
+	for row in stat_rows(stats, cls):
 		var stat: StringName = row[0]
 		var v: float = row[1]
 		var cell := UiTheme.hbox(6)
@@ -909,6 +913,31 @@ func _refresh_stats(cls: ClassData) -> void:
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		cell.add_child(value_label)
 		_stats_grid.add_child(cell)
+
+
+## [stat id, value] pairs of the compact stat list ("max_hp" = Max HP).
+static func stat_rows(stats: StatBlock, cls: ClassData) -> Array[Array]:
+	var order: Array[StringName] = []
+	var primary: StringName = cls.primary_stat if cls != null else Stats.STRENGTH
+	order.append(primary)
+	order.append_array(LISTED_STATS)
+	var rows: Array[Array] = []
+	for stat in order:
+		rows.append([stat, _stat_value(stats, stat)])
+	var limit := MAX_STAT_ROWS * 2
+	var extras: Array[StringName] = []
+	extras.append_array(PRIMARY_STATS)
+	extras.append_array(Stats.ALL)
+	for stat in extras:
+		if rows.size() >= limit:
+			break
+		if stat in order or stat in UNLISTED_STATS:
+			continue
+		var v := _stat_value(stats, stat)
+		if absf(v) >= 0.05:
+			rows.append([stat, v])
+			order.append(stat)
+	return rows
 
 
 func _refresh_side(eq: Equipment, cls: ClassData) -> void:
@@ -927,7 +956,7 @@ func _refresh_side(eq: Equipment, cls: ClassData) -> void:
 			_spec_label.text = "%s 8/8 · +10%% %s" % [armor_name, Stats.display_name(cls.primary_stat)]
 			_spec_label.add_theme_color_override(&"font_color", UiTheme.GREEN)
 		else:
-			_spec_label.text = "%s set %d / 8" % [armor_name, worn]
+			_spec_label.text = "%s armor %d / 8" % [armor_name, worn]
 			_spec_label.add_theme_color_override(&"font_color", UiTheme.TEXT_DIM)
 		_preview.show_class(cls, slot.color)
 		if _preview.model != null:
@@ -942,7 +971,7 @@ func _stat_block() -> StatBlock:
 	return slot.player.get(&"stats") as StatBlock
 
 
-func _stat_value(stats: StatBlock, stat: StringName) -> float:
+static func _stat_value(stats: StatBlock, stat: StringName) -> float:
 	if stats == null:
 		return 0.0
 	if stat == &"max_hp":
@@ -1085,7 +1114,8 @@ func _place_menu() -> void:
 	var ms := _menu_panel.size
 	var x := r.end.x + 8.0 if r.get_center().x < size.x * 0.5 else r.position.x - 8.0 - ms.x
 	var y := r.position.y - 4.0
-	_menu_panel.position = Vector2(clampf(x, 6.0, size.x - ms.x - 6.0), clampf(y, 6.0, size.y - ms.y - 6.0))
+	# Keep it inside the panel and above the prompt row.
+	_menu_panel.position = Vector2(clampf(x, 6.0, size.x - ms.x - 6.0), clampf(y, 6.0, size.y - ms.y - 44.0))
 
 
 ## The tooltip floats beside the panel on the side facing the screen centre, level with the

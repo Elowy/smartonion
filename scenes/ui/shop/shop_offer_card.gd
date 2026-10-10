@@ -6,9 +6,9 @@ extends Control
 ## usable-by pip per player (crossed out when that class cannot use it, a green arrow when it
 ## is an upgrade for that player) and a "SOLD" stamp once bought.
 
-const CARD_SIZE := Vector2(138, 216)
-const ICON_SIZE := 72.0
-const PIP_SIZE := Vector2(26, 18)
+const CARD_SIZE := Vector2(124, 212)
+const ICON_SIZE := 64.0
+const PIP_SIZE := Vector2(24, 18)
 
 var index := -1
 var offer: Shop.Offer
@@ -73,7 +73,7 @@ func _build() -> void:
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.add_child(icon)
-	name_label = UiTheme.centered_label("", &"", 17)
+	name_label = UiTheme.centered_label("", &"", 16)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.max_lines_visible = 2
 	name_label.custom_minimum_size = Vector2(CARD_SIZE.x - 12, 44)
@@ -100,7 +100,7 @@ func _build() -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	_lock = UiIcon.create(UiIcon.Kind.LOCK, Vector2(20, 20))
-	_lock.position = Vector2(CARD_SIZE.x - 30, 8)
+	_lock.position = Vector2(CARD_SIZE.x - 28, 8)
 	_lock.visible = false
 	_overlay.add_child(_lock)
 

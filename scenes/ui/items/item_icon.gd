@@ -8,9 +8,9 @@ extends Control
 
 const BACKGROUND := Color(0.07, 0.06, 0.055)
 const EMPTY_BORDER := Color(0.32, 0.26, 0.18)
-const EMPTY_SILHOUETTE := Color(0.62, 0.56, 0.48, 0.2)
+const EMPTY_SILHOUETTE := Color(0.62, 0.56, 0.48, 0.24)
 const COMMON_BORDER := Color(0.66, 0.64, 0.6)
-const UNUSABLE_TINT := Color(0.9, 0.06, 0.04, 0.45)
+const UNUSABLE_TINT := Color(0.9, 0.06, 0.04, 0.4)
 
 var item: ItemInstance
 ## Items.EquipSlot shown as a faint silhouette while [member item] is null (-1 = plain slot).
@@ -127,7 +127,7 @@ func _draw() -> void:
 	draw_style_box(shade, inner)
 
 	# Silhouette.
-	var art := r.grow(-s * 0.1)
+	var art := r.grow(-s * 0.065)
 	if item != null:
 		ItemArt.draw_item(self, art, item)
 	elif empty_slot >= 0:

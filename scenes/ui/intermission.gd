@@ -36,12 +36,13 @@ const AUTO_CONTINUE_TIME := 60.0
 const COUNTDOWN_WARN_TIME := 10.0
 ## Smoke / demo bots buy something with this chance once per round.
 const BOT_BUY_CHANCE := 0.5
-## Screen margin of the corner panels and their size (1920x1080 canvas).
+## Screen margin of the corner panels and the corner area each one is scaled to fit into
+## (1920x1080 canvas: the stall takes the middle, ShopPanel.STALL_SIZE).
 const MARGIN := 14.0
-const PANEL_SIZE := Vector2(536, 518)
+const PANEL_AREA := Vector2(580, 518)
 ## Vertical shift of the stall (between the header and the ready chips).
 const STALL_OFFSET_Y := -8.0
-const CHIP_SIZE := Vector2(188, 56)
+const CHIP_SIZE := Vector2(176, 56)
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -201,11 +202,11 @@ func _sync_panels(slots: Array[PlayerSlot]) -> void:
 		if panel == null:
 			panel = PlayerPanel.create(s)
 			panel.name = "PlayerPanel%d" % (s.index + 1)
-			_place_panel(panel, s.index)
 			_panel_layer.add_child(panel)
 			panel.trade_done.connect(_on_trade_done)
 			panels[s.index] = panel
 		panel.refresh()
+		_place_panel(panel, s.index)
 	for i: int in panels.keys():
 		if not keep.has(i):
 			_free_panel(i)
@@ -221,29 +222,36 @@ func _free_panel(index: int) -> void:
 		panel.queue_free()
 
 
-## Corner rect of [param index] (like the HUD unit frames).
-static func panel_rect_offsets(index: int) -> Rect2:
-	var right := index % 2 == 1
-	var bottom := index >= 2
-	var x := -MARGIN - PANEL_SIZE.x if right else MARGIN
-	var y := -MARGIN - PANEL_SIZE.y if bottom else MARGIN
-	return Rect2(Vector2(x, y), PANEL_SIZE)
+## Scale that fits a panel of [param design] size into PANEL_AREA (never above 1).
+static func panel_scale(design: Vector2) -> float:
+	if design.x <= 0.0 or design.y <= 0.0:
+		return 1.0
+	return minf(1.0, minf(PANEL_AREA.x / design.x, PANEL_AREA.y / design.y))
 
 
+## Anchors [param panel] to its player's screen corner (like the HUD unit frames: P1 top-left,
+## P2 top-right, P3 bottom-left, P4 bottom-right), scaled to fit PANEL_AREA. The pivot is the
+## top-left corner, so the offsets hold the unscaled size and the scaled panel ends MARGIN
+## from the screen edges.
 func _place_panel(panel: Control, index: int) -> void:
 	var right := index % 2 == 1
 	var bottom := index >= 2
-	var r := panel_rect_offsets(index)
+	var design := panel.get_combined_minimum_size()
+	if design.x <= 0.0 or design.y <= 0.0:
+		design = PANEL_AREA
+	var s := panel_scale(design)
+	var shown := design * s
+	panel.scale = Vector2(s, s)
 	panel.anchor_left = 1.0 if right else 0.0
 	panel.anchor_right = panel.anchor_left
 	panel.anchor_top = 1.0 if bottom else 0.0
 	panel.anchor_bottom = panel.anchor_top
-	panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN if right else Control.GROW_DIRECTION_END
-	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN if bottom else Control.GROW_DIRECTION_END
-	panel.offset_left = r.position.x
-	panel.offset_right = r.end.x
-	panel.offset_top = r.position.y
-	panel.offset_bottom = r.end.y
+	panel.grow_horizontal = Control.GROW_DIRECTION_END
+	panel.grow_vertical = Control.GROW_DIRECTION_END
+	panel.offset_left = -MARGIN - shown.x if right else MARGIN
+	panel.offset_right = panel.offset_left + design.x
+	panel.offset_top = -MARGIN - shown.y if bottom else MARGIN
+	panel.offset_bottom = panel.offset_top + design.y
 
 
 # --- Build ---------------------------------------------------------------------------

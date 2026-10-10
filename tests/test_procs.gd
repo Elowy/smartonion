@@ -222,7 +222,7 @@ func test_bolt_scales_with_spell_power_and_school_and_never_chains() -> void:
 	check_eq(e.fake_hits(), 3, "weapon + bolt + chain")
 	if e.fake_hits() == 3:
 		check_near(e.fake_damage_log[1], (20.0 + 10.0) * 1.5, 0.0001, "(20 + SP) x fire %")
-		check_near(e.fake_damage_log[2], 4.0 + 10.0, 0.0001, "physical chain: + Attack Power (0) only")
+		check_near(e.fake_damage_log[2], 4.0, 0.0001, "physical chain: + Attack Power (0), no Spell Power")
 		check(not e.fake_crit_log[1], "procs never crit")
 		check(e.fake_attacker_log[1] == p, "proc damage credited to the player")
 	check(RunState.damage_by_player.get(0, 0.0) > dealt[0] if not dealt.is_empty() else false,
@@ -360,12 +360,14 @@ func test_heal_drain_and_smite_heal_target_the_right_hero() -> void:
 	var e := _real(Vector3(1.5, 0, 0), 25)
 	p.procs.on_hit(e, 1.0, p.main_hand, false)
 	check_eq(ally.hp, 16.0, "the most injured ally was healed")
+	p.equipment.unequip(Items.EquipSlot.TRINKET_1)
 	p.equipment.equip(unique(&"drain", {"trigger": "on_hit", "chance": 100.0, "damage": 8.0, "school": "shadow"}))
 	var before := p.hp
 	var hp_e := e.hp
 	p.procs.on_hit(e, 1.0, p.main_hand, false)
 	check_near(hp_e - e.hp, 8.0, 0.0001, "drained 8")
 	check_near(p.hp - before, 8.0, 0.0001, "healed the wearer by the same")
+	p.equipment.unequip(Items.EquipSlot.TRINKET_1)
 	p.equipment.equip(unique(&"smite_heal", {"trigger": "on_hit", "chance": 100.0, "damage": 5.0,
 			"heal": 3.0, "school": "holy"}))
 	hp_e = e.hp

@@ -369,19 +369,22 @@ static func _chest(pen: Pen, pal: Palette) -> void:
 
 
 static func _bracer(pen: Pen, pal: Palette) -> void:
-	var shape: Array = _arc(Vector2(0.5, 0.2), Vector2(0.22, 0.06), 180.0, 360.0, 8)
-	shape.append_array(_arc(Vector2(0.5, 0.8), Vector2(0.28, 0.07), 0.0, 180.0, 8))
-	pen.poly(shape, pen.c(pal.main))
-	var top: Array = _arc(Vector2(0.5, 0.2), Vector2(0.22, 0.06), 0.0, 180.0, 8)
-	for i in top.size() - 1:
-		pen.line(top[i], top[i + 1], Color(0, 0, 0, 0.5), 0.025)
-	for y: float in [0.34, 0.66]:
-		var hw := lerpf(0.23, 0.28, (y - 0.2) / 0.6)
-		pen.poly([Vector2(0.5 - hw, y - 0.035), Vector2(0.5 + hw, y - 0.035), Vector2(0.5 + hw, y + 0.035),
-			Vector2(0.5 - hw, y + 0.035)], pen.c(pal.trim), false)
-	pen.gem(Vector2(0.5, 0.5), 0.07, pal.gem)
-	pen.line(Vector2(0.34, 0.26), Vector2(0.32, 0.74), Color(1, 1, 1, 0.35), 0.03)
-	_material_marks(pen, pal, [Vector2(0.36, 0.5), Vector2(0.64, 0.5)])
+	# A forearm guard lying diagonally: narrow wrist end bottom-left, flared elbow end top-right.
+	var o := Vector2(0.2, 0.8)
+	var u := DIAG
+	var shape: Array = [Pen.along(o, u, 0.0, -0.13), Pen.along(o, u, 0.0, 0.13)]
+	for i in 7:
+		var t := float(i) / 6.0
+		shape.append(Pen.along(o, u, 0.84 + sin(t * PI) * 0.06, lerpf(0.21, -0.21, t)))
+	pen.poly(shape, pen.c(pal.main), true, 0.22)
+	for a: float in [0.16, 0.62]:
+		var hw := lerpf(0.13, 0.21, a / 0.84) + 0.01
+		pen.poly([Pen.along(o, u, a - 0.04, -hw), Pen.along(o, u, a + 0.04, -hw), Pen.along(o, u, a + 0.04, hw),
+			Pen.along(o, u, a - 0.04, hw)], pen.c(pal.trim))
+	pen.line(Pen.along(o, u, 0.06, -0.08), Pen.along(o, u, 0.8, -0.13), Color(1, 1, 1, 0.4), 0.025)
+	pen.gem(Pen.along(o, u, 0.39, 0.0), 0.065, pal.gem)
+	_material_marks(pen, pal, [Pen.along(o, u, 0.3, 0.1), Pen.along(o, u, 0.5, 0.12), Pen.along(o, u, 0.3, -0.1),
+		Pen.along(o, u, 0.5, -0.12)])
 
 
 static func _glove(pen: Pen, pal: Palette) -> void:
@@ -396,18 +399,22 @@ static func _glove(pen: Pen, pal: Palette) -> void:
 
 
 static func _belt(pen: Pen, pal: Palette) -> void:
-	var top: Array = _arc(Vector2(0.5, -0.4), Vector2(0.62, 0.78), 130.0, 50.0, 12)
-	var bottom: Array = _arc(Vector2(0.5, -0.22), Vector2(0.62, 0.8), 50.0, 130.0, 12)
 	var band: Array = []
-	band.append_array(top)
-	band.append_array(bottom)
-	pen.poly(band, pen.c(pal.main if pal.armor_type != ClassData.ArmorType.PLATE else pal.main.darkened(0.1)))
-	_material_marks(pen, pal, [Vector2(0.16, 0.42), Vector2(0.26, 0.44), Vector2(0.74, 0.44), Vector2(0.84, 0.42)])
+	for i in 9:
+		var t := float(i) / 8.0
+		band.append(Vector2(lerpf(0.04, 0.96, t), 0.34 + sin(t * PI) * 0.08))
+	for i in 9:
+		var t := 1.0 - float(i) / 8.0
+		band.append(Vector2(lerpf(0.04, 0.96, t), 0.58 + sin(t * PI) * 0.08))
+	pen.poly(band, pen.c(pal.main if pal.armor_type != ClassData.ArmorType.PLATE else pal.main.darkened(0.1)), true, 0.2)
+	pen.line(Vector2(0.06, 0.4), Vector2(0.3, 0.44), Color(1, 1, 1, 0.3), 0.02)
+	_material_marks(pen, pal, [Vector2(0.14, 0.47), Vector2(0.24, 0.5), Vector2(0.76, 0.5), Vector2(0.86, 0.47)])
 	# Hanging strap end, then the big buckle.
-	pen.poly([Vector2(0.6, 0.5), Vector2(0.68, 0.5), Vector2(0.7, 0.84), Vector2(0.62, 0.86)], pen.c(pal.main.darkened(0.15)))
-	pen.poly([Vector2(0.37, 0.24), Vector2(0.63, 0.24), Vector2(0.63, 0.66), Vector2(0.37, 0.66)], pen.c(pal.trim))
-	pen.poly([Vector2(0.43, 0.32), Vector2(0.57, 0.32), Vector2(0.57, 0.58), Vector2(0.43, 0.58)], pen.c(OUTLINE.lightened(0.1)), false)
-	pen.gem(Vector2(0.5, 0.45), 0.05, pal.gem)
+	pen.poly([Vector2(0.62, 0.6), Vector2(0.7, 0.6), Vector2(0.72, 0.9), Vector2(0.64, 0.92)], pen.c(pal.main.darkened(0.15)))
+	pen.poly([Vector2(0.35, 0.28), Vector2(0.65, 0.28), Vector2(0.65, 0.76), Vector2(0.35, 0.76)], pen.c(pal.trim))
+	pen.poly([Vector2(0.42, 0.37), Vector2(0.58, 0.37), Vector2(0.58, 0.67), Vector2(0.42, 0.67)], pen.c(OUTLINE.lightened(0.1)), false)
+	pen.line(Vector2(0.5, 0.4), Vector2(0.5, 0.64), pal.trim.lightened(0.2), 0.03)
+	pen.gem(Vector2(0.5, 0.52), 0.045, pal.gem)
 
 
 static func _legs(pen: Pen, pal: Palette) -> void:
@@ -473,22 +480,22 @@ static func _sword(pen: Pen, pal: Palette, length: float) -> void:
 	var u := DIAG
 	var guard := 0.22
 	var tip := 0.96 * length
-	var hw := 0.068 if length >= 1.0 else 0.08
-	pen.capsule(Pen.along(o, u, 0.03, 0.0), Pen.along(o, u, guard, 0.0), 0.04, pal.grip)
-	pen.circle(Pen.along(o, u, 0.02, 0.0), 0.055, pal.trim)
+	var hw := 0.085 if length >= 1.0 else 0.1
+	pen.capsule(Pen.along(o, u, 0.03, 0.0), Pen.along(o, u, guard, 0.0), 0.05, pal.grip)
+	pen.circle(Pen.along(o, u, 0.02, 0.0), 0.065, pal.trim)
 	pen.poly([Pen.along(o, u, guard, -hw), Pen.along(o, u, tip - 0.14 * length, -hw),
 		Pen.along(o, u, tip, 0.0), Pen.along(o, u, tip - 0.14 * length, hw), Pen.along(o, u, guard, hw)], pen.c(pal.main), true, 0.2)
 	pen.line(Pen.along(o, u, guard + 0.04, 0.0), Pen.along(o, u, tip - 0.16 * length, 0.0), Color(0, 0, 0, 0.3), 0.022)
 	pen.line(Pen.along(o, u, guard + 0.04, -hw * 0.55), Pen.along(o, u, tip - 0.18 * length, -hw * 0.55), Color(1, 1, 1, 0.5), 0.015)
-	pen.poly([Pen.along(o, u, guard - 0.035, -0.17), Pen.along(o, u, guard + 0.035, -0.17),
-		Pen.along(o, u, guard + 0.035, 0.17), Pen.along(o, u, guard - 0.035, 0.17)], pen.c(pal.trim))
+	pen.poly([Pen.along(o, u, guard - 0.04, -0.19), Pen.along(o, u, guard + 0.04, -0.19),
+		Pen.along(o, u, guard + 0.04, 0.19), Pen.along(o, u, guard - 0.04, 0.19)], pen.c(pal.trim))
 	pen.gem(Pen.along(o, u, guard, 0.0), 0.035, pal.gem)
 
 
 static func _axe(pen: Pen, pal: Palette) -> void:
 	var o := Vector2(0.14, 0.86)
 	var u := DIAG
-	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.98, 0.0), 0.038, pal.wood)
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.98, 0.0), 0.046, pal.wood)
 	pen.capsule(Pen.along(o, u, 0.04, 0.0), Pen.along(o, u, 0.24, 0.0), 0.044, pal.grip)
 	var blade: Array = [Pen.along(o, u, 0.62, 0.03)]
 	for i in 9:
@@ -506,7 +513,7 @@ static func _axe(pen: Pen, pal: Palette) -> void:
 static func _mace(pen: Pen, pal: Palette) -> void:
 	var o := Vector2(0.18, 0.82)
 	var u := DIAG
-	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.66, 0.0), 0.038, pal.wood)
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.66, 0.0), 0.046, pal.wood)
 	pen.capsule(Pen.along(o, u, 0.03, 0.0), Pen.along(o, u, 0.22, 0.0), 0.045, pal.grip)
 	var head := Pen.along(o, u, 0.76, 0.0)
 	for i in 8:
@@ -564,7 +571,7 @@ static func _gun(pen: Pen, pal: Palette) -> void:
 static func _wand(pen: Pen, pal: Palette) -> void:
 	var o := Vector2(0.18, 0.82)
 	var u := DIAG
-	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.7, 0.0), 0.03, Color(0.9, 0.85, 0.72))
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.7, 0.0), 0.04, Color(0.9, 0.85, 0.72))
 	for a: float in [0.08, 0.22, 0.6]:
 		pen.capsule(Pen.along(o, u, a, -0.045), Pen.along(o, u, a, 0.045), 0.02, pal.trim)
 	var tip := Pen.along(o, u, 0.8, 0.0)
@@ -583,7 +590,7 @@ static func _wand(pen: Pen, pal: Palette) -> void:
 static func _staff(pen: Pen, pal: Palette) -> void:
 	var o := Vector2(0.12, 0.9)
 	var u := DIAG
-	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.84, 0.0), 0.036, pal.wood)
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.84, 0.0), 0.046, pal.wood)
 	pen.capsule(Pen.along(o, u, 0.36, 0.0), Pen.along(o, u, 0.5, 0.0), 0.042, pal.grip)
 	var head := Pen.along(o, u, 0.97, 0.0)
 	var cp := pen.p(head)

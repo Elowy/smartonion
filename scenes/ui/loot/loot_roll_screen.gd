@@ -157,7 +157,10 @@ func need_reason(slot: PlayerSlot) -> String:
 		return ""
 	if roll.can_need(slot):
 		return ""
-	var why := roll.item.unusable_reason(slot.class_data)
+	var why := roll.need_blocked_reason(slot)
+	if why != "":
+		return why
+	why = roll.item.unusable_reason(slot.class_data)
 	if why != "":
 		return why
 	var eq := ShopPanel.equipment_of(slot)
@@ -241,9 +244,23 @@ func _log_results(item: ItemInstance) -> void:
 	var link := ShopPanel.item_link(item)
 	var name := "[%s]" % (item.display_name if item != null else "?")
 	if not is_solo():
+		# Every roll in order (tie-breaks included) when the roll keeps a history.
+		var logged: Dictionary[int, bool] = {}
+		for entry in roll.roll_history:
+			var s := _slot_of(int(entry.get("slot", -1)))
+			if s == null:
+				continue
+			logged[s.index] = true
+			var kind := "Need" if choice_of(s.index) == LootRoll.Choice.NEED else "Greed"
+			var extra := " – tie-break" if int(entry.get("round", 0)) > 0 else ""
+			var n := int(entry.get("roll", 0))
+			_log("%s rolls %d (%s) for %s%s" % [ShopPanel.player_tag(s), n, kind, link, extra],
+				"%s rolls %d (%s) for %s%s" % [s.label(), n, kind, name, extra])
 		for s in slots:
 			var c := choice_of(s.index)
 			if c == LootRoll.Choice.NEED or c == LootRoll.Choice.GREED:
+				if logged.has(s.index):
+					continue
 				var kind := "Need" if c == LootRoll.Choice.NEED else "Greed"
 				if roll.rolls.has(s.index):
 					var n: int = roll.rolls[s.index]
@@ -263,8 +280,12 @@ func _log_results(item: ItemInstance) -> void:
 func _winner_slot() -> PlayerSlot:
 	if roll == null:
 		return null
+	return _slot_of(roll.winner)
+
+
+func _slot_of(slot_index: int) -> PlayerSlot:
 	for s in slots:
-		if s.index == roll.winner:
+		if s.index == slot_index:
 			return s
 	return null
 

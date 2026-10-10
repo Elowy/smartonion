@@ -10,10 +10,11 @@ extends Node
 ## Trigger keys: "trigger": "on_hit" | "on_kill" | "when_struck" | "low_hp" | "periodic" |
 ## "equip" (uniques; enchants take it from EnchantData.kind), "ppm" (on_hit: chance per hit =
 ## ppm x weapon cooldown / 60), "chance" (% – on_kill / when_struck / low_hp / periodic, or
-## on_hit without ppm; default 100), "icd" (internal cooldown, s), "threshold" (low_hp: HP %,
-## default 30 – fires when HP drops below it, re-arms once HP is back above), "interval"
-## (periodic, s, default 5), "per_wave" (extension: max fires per wave, 0 = unlimited;
-## cheat_death defaults to 1).
+## on_hit without ppm; default 100), "icd" (internal cooldown, s), "threshold" (low_hp: HP
+## PERCENT 0..100, not a 0..1 ratio – 25 fires when HP drops below 25% of Max HP; default 30;
+## re-arms once HP is back at or above it), "interval" (periodic, s, default 5), "per_wave"
+## (max fires per wave, 0 = unlimited; cheat_death defaults to 1 – e.g. Bulwark of the Last
+## Stand: low_hp shield with per_wave 1). Cooldowns and per-wave counts reset at wave start.
 ##
 ## Blocks (effect id {params}):
 ##   bolt {damage, school}            – the hit target (else the nearest enemy)
@@ -85,6 +86,8 @@ const TARGET_RANGE := 9.0
 ## Chain lightning jumps at most this far (m).
 const CHAIN_RANGE := 5.0
 const DOT_TICK := 0.5
+## Timers within this of zero count as run out (float steps of 1/60 s).
+const TIME_EPSILON := 0.0001
 const DEFAULT_DOT_DURATION := 3.0
 const DEFAULT_SLOW_DURATION := 2.0
 const DEFAULT_SHIELD_DURATION := 5.0
@@ -217,7 +220,7 @@ func refresh() -> void:
 
 ## A weapon hit landed (not called for proc damage). [param is_extra]: a hit of an extra
 ## attack – it cannot trigger extra_attack procs.
-func on_hit(target: Node3D, damage: float, weapon: WeaponData, is_crit: bool, is_extra: bool = false) -> void:
+func on_hit(target: Node3D, _damage: float, weapon: WeaponData, _is_crit: bool, is_extra: bool = false) -> void:
 	if _on_hit.is_empty() or not _active():
 		return
 	var cd := weapon.cooldown if weapon != null else 1.0
@@ -238,7 +241,7 @@ func on_kill(enemy: Node3D) -> void:
 
 
 ## The player took a hit (after dodge / block).
-func on_struck(attacker: Node3D, damage: float) -> void:
+func on_struck(attacker: Node3D, _damage: float) -> void:
 	if not _active():
 		return
 	if not _when_struck.is_empty():
@@ -775,10 +778,10 @@ func _tick_dots(delta: float) -> void:
 				_spread(d)
 			continue
 		d.last_pos = e.global_position
-		d.owed += d.rate * d.stacks * minf(delta, d.left)
+		d.owed += d.rate * d.stacks * clampf(d.left, 0.0, delta)
 		d.left -= delta
 		d.tick_left -= delta
-		if d.tick_left > 0.0 and d.left > 0.0:
+		if d.tick_left > TIME_EPSILON and d.left > TIME_EPSILON:
 			continue
 		d.tick_left += DOT_TICK
 		var amount := d.owed
@@ -786,7 +789,7 @@ func _tick_dots(delta: float) -> void:
 		if amount > 0.0:
 			deal_raw(e, amount, d.school, true)
 		var died := not _is_live(e)
-		if d.left <= 0.0 or died:
+		if d.left <= TIME_EPSILON or died:
 			if i < _dots.size() and _dots[i] == d:
 				_dots.remove_at(i)
 			else:

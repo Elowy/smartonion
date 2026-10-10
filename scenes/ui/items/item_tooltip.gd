@@ -90,10 +90,11 @@ func line_texts() -> PackedStringArray:
 	return out
 
 
-## The first label whose text contains [param fragment] (null if none).
-func find_line(fragment: String) -> Label:
+## The first label whose text contains [param fragment] (equals it with [param exact]);
+## null if none.
+func find_line(fragment: String, exact: bool = false) -> Label:
 	for l in _labels(self):
-		if fragment in l.text:
+		if (l.text == fragment) if exact else (fragment in l.text):
 			return l
 	return null
 
@@ -293,10 +294,15 @@ static func fmt_number(v: float, decimals: int = 1) -> String:
 	return ("%." + str(decimals) + "f") % v
 
 
-## Stats in Stats.ALL order (unknown ids last, alphabetically).
+## WoW line order: primary stats, then Stamina, then the rest in Stats.ALL order (unknown ids
+## last, alphabetically).
 static func _ordered(keys: Array) -> Array[StringName]:
 	var out: Array[StringName] = []
-	for stat in Stats.ALL:
+	var order: Array[StringName] = [Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT]
+	order.append_array(Stats.ALL)
+	for stat in order:
+		if stat in out:
+			continue
 		if stat in keys:
 			out.append(stat)
 	var rest: Array[StringName] = []
@@ -392,7 +398,7 @@ func _comparison_block() -> void:
 	_box.add_child(rule)
 	_line("If you replace this item:", YELLOW, SMALL_SIZE)
 	var rc := UiTheme.RARITY_COLORS[clampi(compare.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)]
-	_line("Equipped: %s (%d)" % [compare.display_name, compare.item_level], rc.lerp(DIM, 0.35), SMALL_SIZE)
+	_line("Equipped: %s (ilvl %d)" % [compare.display_name, compare.item_level], rc.lerp(DIM, 0.35), SMALL_SIZE)
 	var any := false
 	if item.is_weapon() or compare.is_weapon():
 		var dps := weapon_dps(item) - weapon_dps(compare)

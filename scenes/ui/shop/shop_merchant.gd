@@ -9,7 +9,7 @@ const STRIPE_WIDTH := 52.0
 const AWNING_TOP := 14.0
 const AWNING_BOTTOM := 66.0
 const SCALLOP_RADIUS := 26.0
-const SIGN_SIZE := Vector2(400, 54)
+const SIGN_SIZE := Vector2(360, 54)
 const SIGN_TOP := 60.0
 
 const AWNING_RED := Color(0.55, 0.12, 0.09)
@@ -43,9 +43,9 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var w := size.x
 	_draw_awning(w)
-	_draw_lantern(Vector2(78.0, AWNING_BOTTOM + 8.0))
+	_draw_lantern(Vector2(64.0, AWNING_BOTTOM + 8.0))
 	_draw_sign(Vector2(w * 0.5, SIGN_TOP))
-	_draw_goblin(Vector2(w - 112.0, AWNING_BOTTOM + 30.0 + sin(_t * 1.7) * 1.5))
+	_draw_goblin(Vector2(w - 92.0, AWNING_BOTTOM + 30.0 + sin(_t * 1.7) * 1.5))
 
 
 # --- Awning ------------------------------------------------------------------------
