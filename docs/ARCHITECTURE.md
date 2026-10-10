@@ -65,14 +65,20 @@ the new screen never sees the button press that closed the old one.
    players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
    return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
    - A player at 0 HP is **downed**; a living teammate standing within `REVIVE_RADIUS` for
-     `REVIVE_TIME` revives them at 30% HP (cast bar in the reviver's colour, channel beam,
-     `Vfx.resurrect_column`). Everybody downed at once → GAME_OVER (defeat).
-     Solo: downed = defeat.
+     `REVIVE_TIME` (5 s) revives them at 30% HP. Every additional living reviver in the
+     circle adds +50% speed (`Player.revive_speed(n)`: 1 → 1×, 2 → 1.5×, 3 → 2×); with
+     nobody in the circle the progress drains slowly (`REVIVE_DECAY_PER_SECOND`); taking
+     damage never interrupts it. Cast bar in the reviver's colour with the time left at the
+     current speed (`Player.revive_seconds_left()`), channel beam; on completion
+     `Vfx.resurrect_column` at the feet, "Resurrected!" and `INVULNERABLE_AFTER_REVIVE`
+     (1 s). Everybody downed at once → GAME_OVER (defeat). Solo: downed = defeat.
 4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
    move) → if n == 25 → GAME_OVER (victory), else **INTERMISSION** (tree paused,
    `Intermission.open(n, RunState.pending_level_ups)`, players ready with A, bots and unplugged
-   devices auto-ready) → `pending_level_ups = 0` (choices arrive in M4) → wave n+1.
+   devices auto-ready; after `Intermission.auto_continue_time` – default
+   `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
+   everyone is ready) → `pending_level_ups = 0` (choices arrive in M4) → wave n+1.
 5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
    `GameOverScreen.open(victory)`. A / START → **LOBBY with the same players** (ready again);
    the main menu only through the lobby's Back.
@@ -110,7 +116,9 @@ the new screen never sees the button press that closed the old one.
 
 ## Waves (WaveDirector)
 
-- Duration `RunState.wave_duration(w)`. Spawn budget per second
+- Duration `RunState.wave_duration(w)` (GDD 1): waves 1–10 `min(60, 20 + 5 * (w - 1))` s,
+  above 10 `60 + 10 * (w - 10)` s (11 → 70 s, 15 → 110 s, 20 → 160 s, 25 → 210 s; a full
+  run is 42 minutes of fighting). Spawn budget per second
   `(0.9 + 0.22 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
   `first_wave <= w`; group size in `[group_min, group_max]`; position = random arena point
   ≥ 6 m from every living player; `Vfx.spawn_telegraph` 1 s before the group appears.
@@ -164,8 +172,13 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     glowing hands and a light beam connects it to the ghost.
   - `Vfx.resurrect_column(feet_pos)` – shaft of light from the sky when a revive completes.
   - `CameraRig.get_walk_rect(player)` – shared screen (GDD 13): the rectangle a player may
-    walk in so nobody leaves the screen once the camera is fully zoomed out (in the MVP
-    arena it never binds: the whole arena fits at `MAX_DISTANCE`).
+    walk in so nobody leaves the screen once the camera is fully zoomed out. `Player` clamps
+    its motion to it every tick (when `Arena.current.camera` is in the tree) and slides
+    along the edge (`Player.clamp_motion_to_rect`: a body already outside is never pushed,
+    only kept from going further out). For living players it binds only when the team
+    spreads wider than the fully zoomed-out view (never in the MVP arena: the whole arena
+    fits at `MAX_DISTANCE`); a ghost, which the camera does not follow, is kept inside the
+    current view.
   - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
 - Art showcase (dev tool, renders a PNG under Xvfb):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
@@ -202,6 +215,9 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   ignore the input of the frame they were opened on (Game Over: the first
   `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with
   A / START, unready with B; bots (`is_bot()`) and unplugged devices are auto-ready.
+  A "Next wave in 42 s" line counts down `Intermission.auto_continue_time` (static setting,
+  default 60 s, ≤ 0 = off and hidden – the settings menu comes later); at 0 it emits
+  `continue_requested` without the stragglers.
   PauseMenu: `process_mode` ALWAYS, only the pausing player navigates, their B or any
   player's START resumes; it hides itself when it emits. Intermission / Game Over / Pause
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
