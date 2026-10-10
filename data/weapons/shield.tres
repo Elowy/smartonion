@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shield"
+display_name = "Shield"
+description = "+2 Armor, 10% chance to block half of a hit."
+weapon_type = &"shield"
+hand = 2
+attack_kind = 2
+base_damage = 0.0
+scaling = Dictionary[StringName, float]({})
+cooldown = 1.0
+crit_mult = 2.0
+knockback = 2.0
+stun_chance = 0.0
+attack_range = 0.0
+arc_degrees = 100.0
+projectile_speed = 18.0
+pierce = 0
+aoe_radius = 0.0
+bonus_stats = Dictionary[StringName, float]({
+&"armor": 2.0
+})
+block_chance = 10.0
+base_price = 20
+color = Color(0.6, 0.6, 0.7, 1)

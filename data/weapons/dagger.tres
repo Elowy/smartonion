@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"dagger"
+display_name = "Dagger"
+description = "Very fast. Critical strikes deal x2.5 damage."
+weapon_type = &"dagger"
+hand = 0
+attack_kind = 0
+base_damage = 4.0
+scaling = Dictionary[StringName, float]({
+&"agility": 1.0
+})
+cooldown = 0.5
+crit_mult = 2.5
+knockback = 1.0
+stun_chance = 0.0
+attack_range = 1.9
+arc_degrees = 70.0
+projectile_speed = 18.0
+pierce = 0
+aoe_radius = 0.0
+bonus_stats = Dictionary[StringName, float]({})
+block_chance = 0.0
+base_price = 18
+color = Color(0.75, 0.78, 0.8, 1)
