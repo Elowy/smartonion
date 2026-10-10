@@ -13,8 +13,9 @@ extends Control
 ##
 ## Input (MARKET, per slot, through PlayerSlot.input): each player's focus is either the shop
 ## cursor (ShopPanel.handle_input) or their own panel (PlayerPanel.handle_input); LB / RB
-## switch it. START toggles ready (A buys in the shop), B in the shop unreadies (B is checked
-## before START: the keyboard's Esc is both). Bots and players whose controller is unplugged
+## switch it. START toggles ready (A buys in the shop), B unreadies unless the focused side
+## used it (the panel closes its menu with B; B is checked before START: the keyboard's Esc is
+## both). Bots and players whose controller is unplugged
 ## are ready; with [member bot_shopping] (smoke / demo) every bot buys the cheapest affordable
 ## offer its class can use with [member bot_buy_chance] once per round and equips what
 ## ItemTooltip.upgrade_direction calls an upgrade. Everyone ready -> continue_requested
@@ -42,7 +43,7 @@ const MARGIN := 14.0
 const PANEL_AREA := Vector2(580, 518)
 ## Vertical shift of the stall (between the header and the ready chips).
 const STALL_OFFSET_Y := -8.0
-const CHIP_SIZE := Vector2(176, 56)
+const CHIP_SIZE := Vector2(170, 56)
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -362,10 +363,10 @@ func _build_footer() -> void:
 	countdown_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	countdown_label.visible = false
 	line.add_child(countdown_label)
+	# Keyboard keys are listed on the stall (Q / E panel · P ready).
 	line.add_child(UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.START, 26.0), "Ready"],
 		[UiGlyph.pad(PlayerInput.Pad.LB, 26.0), UiGlyph.pad(PlayerInput.Pad.RB, 26.0), "Shop / own panel"],
-		[UiTheme.label("Keys:", UiTheme.SMALL, 17), UiGlyph.key("P", 24.0), UiGlyph.key("Q", 24.0), UiGlyph.key("E", 24.0)],
 	], 19, UiTheme.TEXT_DIM))
 
 
@@ -519,7 +520,8 @@ func _process(delta: float) -> void:
 
 
 ## One human's input: LB / RB switch the focus, the focused side gets the rest, START toggles
-## ready (B in the shop unreadies; B + START together – the keyboard's Esc – act as B).
+## ready (B unreadies unless the panel used it to close a menu; B + START together – the
+## keyboard's Esc – act as B).
 func _route_input(s: PlayerSlot) -> void:
 	var inp := s.input
 	var has_panel := panels.has(s.index)
@@ -528,7 +530,10 @@ func _route_input(s: PlayerSlot) -> void:
 		return
 	var b := inp.just_pressed(PlayerInput.Pad.B)
 	if has_panel and has_panel_focus(s.index):
-		panels[s.index].handle_input(inp)
+		var panel := panels[s.index]
+		panel.handle_input(inp)
+		if b and not panel.last_input_consumed:
+			s.ready = false
 	else:
 		shop_panel.handle_input(s)
 		if b:
@@ -562,8 +567,9 @@ func _bots_shop() -> void:
 			panels[s.index].refresh()
 
 
-## Equips every backpack item ItemTooltip.upgrade_direction calls an upgrade over what sits in
-## its default slot. Returns how many items were equipped.
+## Equips every backpack item ItemTooltip.upgrade_direction calls an upgrade over the item it
+## would replace (ItemTooltip.equipped_for_compare: the weaker ring / trinket, an empty slot
+## first). Returns how many items were equipped.
 static func bot_equip_upgrades(s: PlayerSlot) -> int:
 	var eq := ShopPanel.equipment_of(s)
 	if eq == null:
@@ -572,8 +578,12 @@ static func bot_equip_upgrades(s: PlayerSlot) -> int:
 	for item in eq.backpack.duplicate():
 		if not eq.can_equip(item):
 			continue
+		var current := ItemTooltip.equipped_for_compare(item, eq)
 		var target := eq.default_slot(item)
-		var current: ItemInstance = eq.get_item(target as Items.EquipSlot) if target >= 0 else null
+		if current != null:
+			for slot_id in eq.target_slots(item):
+				if eq.get_item(slot_id) == current:
+					target = slot_id
 		if ItemTooltip.upgrade_direction(item, current, s.class_data) > 0 and eq.equip(item, target):
 			n += 1
 	return n
@@ -585,8 +595,7 @@ func _bot_make_room(s: PlayerSlot, eq: Equipment) -> void:
 	if eq.has_space():
 		return
 	for item in eq.backpack:
-		var target := eq.default_slot(item)
-		var current: ItemInstance = eq.get_item(target as Items.EquipSlot) if target >= 0 else null
+		var current := ItemTooltip.equipped_for_compare(item, eq)
 		if not eq.can_equip(item) or ItemTooltip.upgrade_direction(item, current, s.class_data) <= 0:
 			if eq.remove_from_backpack(item):
 				RunState.add_gold(item.sell_value())

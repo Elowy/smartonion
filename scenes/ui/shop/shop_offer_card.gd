@@ -123,8 +123,7 @@ func set_offer(p_offer: Shop.Offer, slots: Array[PlayerSlot]) -> void:
 			level = 1
 			var eq := ShopPanel.equipment_of(s)
 			if eq != null:
-				var target := eq.default_slot(item)
-				var current: ItemInstance = eq.get_item(target as Items.EquipSlot) if target >= 0 else null
+				var current := ItemTooltip.equipped_for_compare(item, eq)
 				if ItemTooltip.upgrade_direction(item, current, s.class_data) > 0:
 					level = 2
 		_usable[s.index] = level

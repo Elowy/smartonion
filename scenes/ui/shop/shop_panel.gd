@@ -11,8 +11,8 @@ extends Control
 ## shop): d-pad / stick moves the cursor, A buys (hold A for HOLD_TIME when the price is more
 ## than HOLD_SHARE of the shared wallet – a fill ring shows the progress), X locks, R3 / Tab
 ## pings, Y votes for a reroll (only humans with a working device vote; bots never block it).
-## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with that
-## player's equipped item in the item's default slot, beside the stall on the player's own
+## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with the item it
+## would replace for that player (ItemTooltip.equipped_for_compare), beside the stall on the player's own
 ## side (P1 / P3 left, P2 / P4 right; P1 / P2 from the top of the stall down, P3 / P4 from the
 ## bottom of the screen up) so it never covers the stall; when two tooltips on one side
 ## overlap, the one of the player who acted last is on top.
@@ -692,12 +692,7 @@ func _update_tooltips() -> void:
 			tip.visible = false
 			_tooltip_keys.erase(s.index)
 			continue
-		var eq := equipment_of(s)
-		var compare: ItemInstance = null
-		if eq != null:
-			var target := eq.default_slot(o.item)
-			if target >= 0:
-				compare = eq.get_item(target as Items.EquipSlot)
+		var compare := ItemTooltip.equipped_for_compare(o.item, equipment_of(s))
 		var key := "%d:%d:%d" % [o.item.uid, o.price, compare.uid if compare != null else 0]
 		if _tooltip_keys.get(s.index, "") != key:
 			_tooltip_keys[s.index] = key
@@ -808,7 +803,8 @@ func _draw_corner_tag(layer: Control, r: Rect2, s: PlayerSlot, col: Color, font:
 	var right := s.index % 2 == 1
 	var bottom := s.index >= 2
 	var corner := Vector2(r.end.x if right else r.position.x, r.end.y if bottom else r.position.y)
-	var tag := Rect2(corner + Vector2(-w + 3.0 if right else -3.0, -h + 3.0 if bottom else -3.0), Vector2(w, h))
+	# Inside the card's width (neighbouring cards' tags never collide), across the edge.
+	var tag := Rect2(corner + Vector2(-w - 3.0 if right else 3.0, -h * 0.5), Vector2(w, h))
 	layer.draw_rect(tag, col.darkened(0.25))
 	layer.draw_rect(tag, Color(0, 0, 0, 0.7), false, 1.5)
 	var base := tag.position + Vector2(5.0, h - 4.5)

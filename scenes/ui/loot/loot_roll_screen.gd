@@ -644,12 +644,7 @@ func _refresh_chips(force: bool = false) -> void:
 func _upgrade_direction(s: PlayerSlot) -> int:
 	if roll == null or roll.item == null or not roll.item.can_be_used_by(s.class_data):
 		return 0
-	var eq := ShopPanel.equipment_of(s)
-	var current_item: ItemInstance = null
-	if eq != null:
-		var target := eq.default_slot(roll.item)
-		if target >= 0:
-			current_item = eq.get_item(target as Items.EquipSlot)
+	var current_item := ItemTooltip.equipped_for_compare(roll.item, ShopPanel.equipment_of(s))
 	return ItemTooltip.upgrade_direction(roll.item, current_item, s.class_data)
 
 

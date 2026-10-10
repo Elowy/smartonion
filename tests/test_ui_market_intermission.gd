@@ -218,8 +218,7 @@ func test_smoke_bots_buy_and_equip_upgrades() -> void:
 	for s in [warrior, mage]:
 		var eq := ShopPanel.equipment_of(s)
 		for item in eq.backpack:
-			var target := eq.default_slot(item)
-			var current: ItemInstance = eq.get_item(target as Items.EquipSlot) if target >= 0 else null
+			var current := ItemTooltip.equipped_for_compare(item, eq)
 			check(not eq.can_equip(item) or ItemTooltip.upgrade_direction(item, current, s.class_data) <= 0,
 				"%s left an upgrade in the backpack: %s" % [s.label(), item.display_name])
 
@@ -275,3 +274,32 @@ func test_bots_in_the_loot_roll_then_market() -> void:
 	check_eq(rolled.size(), 2, "both items rolled by the bots")
 	check_eq(screen.phase, Intermission.Phase.MARKET, "market after the loot")
 	check_eq(continues, 1, "and the bots move on")
+
+
+func test_b_in_the_own_panel_unreadies_unless_it_closed_a_menu() -> void:
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	MarketFakes.human_with_hero(world, "pad:b", &"mage")
+	screen.open(1, 0)
+	_step()
+	_tap(a, PlayerInput.Pad.RB)
+	check(screen.has_panel_focus(0), "own panel")
+	var slot := PlayerManager.get_slot(0)
+	_tap(a, PlayerInput.Pad.START)
+	check(slot.ready, "ready")
+	_tap(a, PlayerInput.Pad.B)
+	check(not slot.ready, "B with no menu open unreadies")
+	_tap(a, PlayerInput.Pad.START)
+	var panel := screen.panels[0]
+	# Select an equipped weapon (the warrior starts with one) and open its menu with A.
+	for i in 12:
+		if panel.selected_item() != null:
+			break
+		_tap(a, PlayerInput.Pad.DPAD_DOWN)
+	_tap(a, PlayerInput.Pad.A)
+	var menu := panel.is_menu_open()
+	_tap(a, PlayerInput.Pad.B)
+	if menu:
+		check(slot.ready, "B closed the panel's menu: still ready")
+		check(not panel.is_menu_open(), "menu closed")
+	else:
+		check(not slot.ready, "no menu opened: B unreadies")
