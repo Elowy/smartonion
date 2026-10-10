@@ -272,8 +272,9 @@ static func _skeleton(k: MeshKit, bone: Color) -> void:
 	k.add_sphere(0.025, _xf(Vector3(0, 0.97, -0.195)), DARK, 6, 3)
 	for i in 4:
 		k.add_box(Vector3(0.035, 0.035, 0.02), _xf(Vector3(-0.06 + i * 0.04, 0.9, -0.14)), WHITE)
-	# Dented helmet cap.
-	k.add_sphere(0.215, _xf(Vector3(0, 1.08, 0.01), Vector3(-8, 0, 0), Vector3(1.0, 0.9, 1.0)), RUST.darkened(0.2), 12, 5, true)
+	# Cracks on the skull top.
+	k.add_box(Vector3(0.018, 0.02, 0.12), _xf(Vector3(0.05, 1.21, 0.02), Vector3(0, 25, 0)), bone.darkened(0.45))
+	k.add_box(Vector3(0.016, 0.02, 0.07), _xf(Vector3(0.09, 1.2, -0.05), Vector3(0, -30, 0)), bone.darkened(0.45))
 	k.add_segment(Vector3(0, 0.48, 0.02), Vector3(0, 0.86, 0.02), 0.04, 0.035, shade, 6)
 	for i in 3:
 		var y := 0.62 + i * 0.075

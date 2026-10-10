@@ -64,8 +64,14 @@ const KNOCKBACK_VELOCITY_PER_UNIT := 3.0
 const KNOCKBACK_DECAY := 12.0
 const MAX_KNOCKBACK_SPEED := 14.0
 
-## Collision capsule height (m) at model_scale 1.
-const BODY_HEIGHT := 1.1
+## Height (m) of the collision sphere's centre. All enemies stand on one plane, so their
+## spheres collide like circles of [member radius] – the cheapest crowd separation.
+const BODY_CENTER_HEIGHT := 0.6
+## Crowd throttle: an enemy that got less than this fraction of its intended move (stuck in
+## a clump) skips its next physics move – halves the collision cost of big crowds.
+const CROWD_BLOCKED_RATIO := 0.3
+## move_and_slide iterations: 2 lets enemies slide along walls and each other.
+const MAX_SLIDES := 2
 ## Loot lands up to this far (m) from the death position.
 const LOOT_SCATTER := 0.4
 ## State timers end this close to zero (keeps frame counts exact despite float error).
@@ -108,6 +114,9 @@ var _wander_dir := Vector3.ZERO
 var _wander_left := 0.0
 var _weave_phase := 0.0
 var _age := 0.0
+var _crowd_skip := false
+var _sent_facing := Vector3.ZERO
+var _sent_moving := -1.0
 
 # Frame-cached list of the players in the tree (shared by all enemies and pickups).
 static var _player_cache: Array[Player] = []
@@ -123,7 +132,7 @@ static func create(p_data: EnemyData, p_wave: int) -> Enemy:
 	e.collision_layer = COLLISION_LAYER_ENEMIES
 	e.collision_mask = COLLISION_MASK_WORLD_AND_ENEMIES
 	e.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
-	e.max_slides = 3
+	e.max_slides = MAX_SLIDES
 	e.add_to_group(&"enemies")
 	if p_data == null:
 		push_error("Enemy.create: missing EnemyData")
@@ -145,11 +154,10 @@ static func create(p_data: EnemyData, p_wave: int) -> Enemy:
 
 	var shape := CollisionShape3D.new()
 	shape.name = "Shape"
-	var capsule := CapsuleShape3D.new()
-	capsule.radius = p_data.radius
-	capsule.height = maxf(BODY_HEIGHT * p_data.model_scale, p_data.radius * 2.0 + 0.05)
-	shape.shape = capsule
-	shape.position = Vector3(0.0, capsule.height * 0.5, 0.0)
+	var sphere := SphereShape3D.new()
+	sphere.radius = p_data.radius
+	shape.shape = sphere
+	shape.position = Vector3(0.0, BODY_CENTER_HEIGHT, 0.0)
 	e.add_child(shape)
 
 	e.model = EnemyModel.new()
@@ -294,8 +302,14 @@ func _physics_process(delta: float) -> void:
 				_update_chase(delta, here)
 	_apply_movement(delta)
 	if model != null:
-		model.set_facing(_facing)
-		model.set_moving(clampf(_move_velocity.length() / maxf(0.1, move_speed), 0.0, 1.0))
+		# Only forward noticeable changes (the model smooths them anyway).
+		if _facing.dot(_sent_facing) < 0.9995:
+			_sent_facing = _facing
+			model.set_facing(_facing)
+		var moving := clampf(_move_velocity.length() / maxf(0.1, move_speed), 0.0, 1.0)
+		if absf(moving - _sent_moving) > 0.03:
+			_sent_moving = moving
+			model.set_moving(moving)
 
 
 ## Finds the nearest living player and deals contact damage to the first one touched.
@@ -318,8 +332,8 @@ func _scan_players(here: Vector3, stunned: bool) -> void:
 			p.take_damage(contact_damage, CombatMath.KIND_MELEE, self)
 			if _dead or not is_inside_tree():
 				return
-			if model != null:
-				model.play_attack()
+			if model != null and ai_state == AiState.MOVE:
+				model.play_attack()  # (would cut a lunge / throw wind-up tell short)
 			if not is_instance_valid(p) or not p.is_alive():
 				continue
 		if d_sq < _target_dist_sq:
@@ -457,16 +471,28 @@ func _apply_movement(delta: float) -> void:
 		if knockback_velocity.length_squared() < 0.0025:
 			knockback_velocity = Vector3.ZERO
 	velocity = _move_velocity + knockback_velocity
-	if velocity.length_squared() < 0.000001:
+	var speed_sq := velocity.length_squared()
+	if speed_sq < 0.000001:
 		velocity = Vector3.ZERO
+		_crowd_skip = false
 		return
+	if _crowd_skip:
+		_crowd_skip = false
+		return
+	var before := global_position
 	move_and_slide()
 	var pos := global_position
-	var fixed := Vector3(pos.x, 0.0, pos.z)
-	var arena := Arena.current
-	if arena != null:
-		fixed = arena.clamp_point(fixed, radius)
-	if not fixed.is_equal_approx(pos):
+	var mx := pos.x - before.x
+	var mz := pos.z - before.z
+	var blocked_sq := speed_sq * delta * delta * CROWD_BLOCKED_RATIO * CROWD_BLOCKED_RATIO
+	_crowd_skip = mx * mx + mz * mz < blocked_sq and get_slide_collision_count() > 0
+	# Stay on the ground plane and inside the arena (walls normally take care of that).
+	var half_x := Arena.SIZE.x * 0.5 - radius
+	var half_z := Arena.SIZE.y * 0.5 - radius
+	if pos.y != 0.0 or absf(pos.x) > half_x or absf(pos.z) > half_z:
+		var fixed := Vector3(pos.x, 0.0, pos.z)
+		if Arena.current != null:
+			fixed = Arena.current.clamp_point(fixed, radius)
 		global_position = fixed
 
 

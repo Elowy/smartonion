@@ -28,9 +28,10 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	check_eq(e1.radius, data.radius, "radius from data")
 	check(e1.model != null and e1.model.get_parent() == e1, "has an EnemyModel child")
 	var shape := e1.get_node_or_null(^"Shape") as CollisionShape3D
-	check(shape != null and shape.shape is CapsuleShape3D, "capsule collision")
-	if shape != null and shape.shape is CapsuleShape3D:
-		check_eq((shape.shape as CapsuleShape3D).radius, data.radius, "capsule radius")
+	check(shape != null and shape.shape is SphereShape3D, "sphere collision (circle on the ground plane)")
+	if shape != null and shape.shape is SphereShape3D:
+		check_eq((shape.shape as SphereShape3D).radius, data.radius, "collision radius")
+	check_eq(e1.motion_mode, CharacterBody3D.MOTION_MODE_FLOATING, "floating (top-down) motion")
 	check_near(e1.move_speed, data.move_speed, data.move_speed * Enemy.MOVE_SPEED_JITTER + 0.0001, "speed jitter")
 	e1.free()
 

@@ -632,11 +632,14 @@ static func _fel_eyes_mesh() -> Mesh:
 static func _mouth_mesh() -> Mesh:
 	var k := MeshKit.new()
 	var c := Color(0.25, 0.06, 0.08)
-	for i in 5:
-		var a := lerpf(-22.0, 22.0, i / 4.0)
-		var y := 0.425 - 0.018 * cos(deg_to_rad(a * 4.0))
-		var p := bulb_point(y, a, -0.004)
-		k.add_sphere(0.017, MeshKit.xf(p), c, 6, 3)
+	var pts := PackedVector3Array()
+	for i in 7:
+		var a := lerpf(-20.0, 20.0, i / 6.0)
+		var y := 0.405 + 0.022 * pow(absf(a) / 20.0, 1.6)
+		pts.append(bulb_point(y, a, 0.002))
+	k.add_tube(pts, 0.016, 0.016, c, 6)
+	k.add_sphere(0.016, MeshKit.xf(pts[0]), c, 6, 3)
+	k.add_sphere(0.016, MeshKit.xf(pts[pts.size() - 1]), c, 6, 3)
 	return k.build()
 
 
@@ -746,14 +749,14 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 			_belt(k, LEATHER, acc)
 		&"paladin_helm":
 			var silver := acc.lerp(Color(0.8, 0.82, 0.88), 0.35)
-			_helm_dome(k, silver, GOLD)
+			_helm_dome(k, GOLD, silver)
 			for side: float in [-1.0, 1.0]:
-				for f in 3:
-					var feather := PackedVector2Array([Vector2(0, 0), Vector2(0.05, 0.07), Vector2(0.035, 0.24),
-						Vector2(0.0, 0.3), Vector2(-0.03, 0.18)])
-					var rot := Vector3(-15.0 - f * 22.0, 90.0 * side, -18.0 * side - f * 4.0 * side)
-					k.add_extrusion(feather, 0.025, MeshKit.xf(Vector3(0.31 * side, 0.82, 0.04 + f * 0.03), rot), Color(0.97, 0.97, 0.95), 0.85)
-				k.add_sphere(0.05, MeshKit.xf(Vector3(0.31 * side, 0.82, 0.04)), GOLD, 8, 4)
+				for f in 4:
+					var feather := PackedVector2Array([Vector2(0, 0), Vector2(0.07, 0.1), Vector2(0.05, 0.34),
+						Vector2(0.0, 0.42), Vector2(-0.04, 0.25)])
+					var rot := Vector3(-10.0 - f * 20.0, 90.0 * side, -30.0 * side - f * 6.0 * side)
+					k.add_extrusion(feather, 0.03, MeshKit.xf(Vector3(0.33 * side, 0.8, 0.02 + f * 0.035), rot), Color(0.98, 0.98, 0.96), 0.85)
+				k.add_sphere(0.06, MeshKit.xf(Vector3(0.33 * side, 0.8, 0.03)), silver, 8, 4)
 			_belt(k, GOLD, Color(0.9, 0.2, 0.15))
 		&"wizard_hat":
 			var hat := acc
@@ -775,7 +778,7 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 			for side: float in [-1.0, 1.0]:
 				var horn := PackedVector3Array([Vector3(0.26 * side, 0.86, 0.04), Vector3(0.4 * side, 0.95, 0.1),
 					Vector3(0.47 * side, 1.07, 0.2), Vector3(0.43 * side, 1.14, 0.33), Vector3(0.35 * side, 1.1, 0.4)])
-				k.add_tube(horn, 0.07, 0.012, Color(0.3, 0.24, 0.26), 8)
+				k.add_tube(horn, 0.07, 0.012, Color(0.62, 0.52, 0.48), 8)
 			_belt(k, dark.lightened(0.1), acc)
 		_:
 			_belt(k, LEATHER, GOLD)

@@ -5,7 +5,7 @@ extends RefCounted
 ## (forest chunks, bushes, rocks, props, grass, flowers) so it costs only a few draw calls.
 ## Uses its own seeded RNG – never RunState.rng.
 
-const STONE := Color(0.6, 0.59, 0.56)
+const STONE := Color(0.56, 0.55, 0.53)
 const MOSS := Color(0.42, 0.54, 0.3)
 const WOOD := Color(0.47, 0.31, 0.18)
 const DARK_WOOD := Color(0.34, 0.22, 0.13)
@@ -124,7 +124,7 @@ static func _wall_run(k: MeshKit, a: Vector3, b: Vector3, rng: RandomNumberGener
 	while d2 < length - 0.05:
 		var l := minf(rng.randf_range(0.7, 1.2), length - d2)
 		var c := a + dir * (d2 + l * 0.5)
-		k.add_box(Vector3(WALL_DEPTH + 0.1, 0.13, l - 0.04), Transform3D(Basis(Vector3.UP, yaw), c + Vector3(0, 0.74, 0)), STONE.lightened(0.08).darkened(rng.randf_range(0.0, 0.12)))
+		k.add_box(Vector3(WALL_DEPTH + 0.1, 0.13, l - 0.04), Transform3D(Basis(Vector3.UP, yaw), c + Vector3(0, 0.74, 0)), STONE.darkened(rng.randf_range(0.0, 0.12)))
 		if rng.randf() < 0.22:
 			k.add_sphere(rng.randf_range(0.18, 0.3), MeshKit.xf(c + Vector3(rng.randf_range(-0.1, 0.1), 0.8, 0), Vector3.ZERO, Vector3(1.4, 0.45, 1.0)), MOSS.darkened(rng.randf_range(0.0, 0.15)), 8, 4)
 		d2 += l

@@ -49,19 +49,22 @@ func _update(t: float) -> void:
 			_update_telegraph(t)
 		Kind.LEVEL_UP:
 			if main != null:
-				main.scale = Vector3(1.0 + 0.3 * t, 0.2 + 2.6 * smoothstep(0.0, 0.35, t), 1.0 + 0.3 * t)
-				(main as GeometryInstance3D).set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.4, 1.0, t))
+				main.scale = Vector3(1.0 + 0.3 * t, 0.3 + 3.4 * smoothstep(0.0, 0.3, t), 1.0 + 0.3 * t)
+				(main as GeometryInstance3D).set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.45, 1.0, t))
+			if flash != null:
+				flash.scale = Vector3.ONE * size * lerpf(0.4, 1.3, smoothstep(0.0, 0.2, t))
+				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.1, 0.5, t))
 			_update_ring(t, 0.3, 2.6)
 		Kind.EXPLOSION:
 			if flash != null:
 				var e := smoothstep(0.0, 0.3, t)
-				flash.scale = Vector3.ONE * size * lerpf(0.25, 1.0, e)
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.15, 0.6, t))
+				flash.scale = Vector3.ONE * size * lerpf(0.3, 1.0, e)
+				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.25, 0.85, t))
 			_update_ring(t, size * 0.4, size * 1.25)
 		_:
 			if flash != null:
-				flash.scale = Vector3.ONE * size * lerpf(1.0, 0.2, t)
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.0, 0.5, t))
+				flash.scale = Vector3.ONE * size * lerpf(1.0, 0.3, t)
+				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.05, 0.6, t))
 			_update_ring(t, size * 0.3, size * 1.4)
 
 

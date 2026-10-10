@@ -85,7 +85,7 @@ void light() {
 	float shadow = mix(1.0, ATTENUATION, 0.85);
 	DIFFUSE_LIGHT += (lit * 0.82 + top * 0.18) * shadow * LIGHT_COLOR / PI;
 	vec3 h = normalize(VIEW + LIGHT);
-	float spec = smoothstep(0.965, 0.985, dot(NORMAL, h)) * lit * ATTENUATION;
+	float spec = smoothstep(0.986, 0.996, dot(NORMAL, h)) * lit * ATTENUATION;
 	SPECULAR_LIGHT += spec * spec_strength * LIGHT_COLOR / PI;
 }
 """
@@ -249,7 +249,6 @@ static func particle(additive: bool = false, billboard: bool = false) -> Materia
 	m.vertex_color_use_as_albedo = true
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.shadow_mode = 0
 	if additive:
 		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	if billboard:

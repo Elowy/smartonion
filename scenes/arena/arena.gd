@@ -70,9 +70,12 @@ void fragment() {
 	g = mix(g, grass_light.rgb, smoothstep(0.5, 0.74, big + (mid - 0.5) * 0.45) * 0.85);
 	g = mix(g, grass_warm.rgb, smoothstep(0.64, 0.82, mid) * 0.3);
 	g *= 0.92 + 0.14 * stroke;
-	// Clover-like speckles.
-	float speck = step(0.965, hash(floor(p * 3.0))) * (0.5 + 0.5 * noise(p * 9.0));
-	g = mix(g, grass_light.rgb * 1.12, speck * 0.5);
+	// Clover-like round speckles (one jittered dot per cell).
+	vec2 cell = floor(p * 2.2);
+	vec2 dot_center = cell + 0.25 + 0.5 * vec2(hash(cell), hash(cell + 7.1));
+	float dot_r = 0.12 + 0.12 * hash(cell + 3.3);
+	float speck = step(0.8, hash(cell + 1.7)) * (1.0 - smoothstep(dot_r * 0.6, dot_r, length(p * 2.2 - dot_center)));
+	g = mix(g, mix(grass_light.rgb, grass_warm.rgb, hash(cell + 9.0)), speck * 0.4);
 	// Slightly darker, lusher grass along the inside of the walls.
 	vec2 edge = arena_half - abs(p);
 	float inside = step(0.0, min(edge.x, edge.y));
@@ -97,8 +100,10 @@ void fragment() {
 	rim = max(rim, smoothstep(0.75, 0.95, rd) * (1.0 - smoothstep(0.95, 1.2, rd)) * (1.0 - smoothstep(-arena_half.y - 1.0, -arena_half.y + 0.2, p.y)));
 	dirt = max(dirt, on_road);
 	vec3 dc = mix(dirt_dark.rgb, dirt_light.rgb, smoothstep(0.25, 0.7, mid) * 0.75 + stroke * 0.25);
-	float pebble = step(0.92, hash(floor(p * 4.0 + 0.5))) * step(0.3, noise(p * 7.0));
-	dc = mix(dc, dirt_light.rgb * 1.2, pebble * 0.6);
+	vec2 pc = floor(p * 3.0);
+	vec2 pcen = pc + 0.3 + 0.4 * vec2(hash(pc + 2.0), hash(pc + 5.0));
+	float pebble = step(0.7, hash(pc)) * (1.0 - smoothstep(0.1, 0.16, length(p * 3.0 - pcen)));
+	dc = mix(dc, dirt_light.rgb * 1.25, pebble * 0.7);
 	g *= 1.0 - rim * 0.25;
 	ALBEDO = mix(g, dc, dirt);
 	ROUGHNESS = 1.0;

@@ -10,7 +10,8 @@ extends RefCounted
 
 ## Floating texts alive at once; extra non-crit texts are dropped when the screen is busy.
 const MAX_TEXTS := 70
-const TEXT_PIXEL_SIZE := 0.0062
+## Label3D uses fixed_size: pixel_size is the world size at 1 m, i.e. constant on screen.
+const TEXT_PIXEL_SIZE := 0.00046
 const TEXT_FONT_SIZE := 64
 
 const _ARC_CODE := """
@@ -22,11 +23,11 @@ instance uniform float arc_fade = 1.0;
 void fragment() {
 	float head = arc_progress;
 	float behind = head - UV.x;
-	float trail = step(0.0, behind) * clamp(1.0 - behind / 0.75, 0.0, 1.0);
+	float trail = step(0.0, behind) * clamp(1.0 - behind / 0.95, 0.0, 1.0);
 	float body = smoothstep(0.0, 0.45, UV.y) * (1.0 - smoothstep(0.9, 1.0, UV.y));
 	float core = smoothstep(0.6, 0.85, UV.y) * (1.0 - smoothstep(0.88, 1.0, UV.y));
-	ALBEDO = mix(arc_color.rgb, vec3(1.0), core * 0.75);
-	ALPHA = clamp(trail * (body * 0.75 + core * 0.6) * arc_fade * arc_color.a, 0.0, 1.0);
+	ALBEDO = mix(arc_color.rgb, vec3(1.0), core * 0.8);
+	ALPHA = clamp(trail * (body * 0.95 + core) * arc_fade * arc_color.a, 0.0, 1.0);
 }
 """
 
@@ -113,14 +114,14 @@ static func floating_text(pos: Vector3, text: String, color: Color, size: float 
 	label.text = text
 	label.font_size = TEXT_FONT_SIZE
 	label.pixel_size = TEXT_PIXEL_SIZE * size
-	label.outline_size = 16
+	label.outline_size = 18
 	label.modulate = Color(color.r, color.g, color.b, 1.0)
 	label.outline_modulate = Color(0.08, 0.04, 0.05, 1.0)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.shaded = false
 	label.double_sided = true
-	label.fixed_size = false
+	label.fixed_size = true
 	label.render_priority = 20
 	label.outline_render_priority = 19
 	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -147,7 +148,7 @@ static func slash_arc(pos: Vector3, direction: Vector3, radius: float, arc_degre
 	mi.material_override = _material("arc", _ARC_CODE)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.scale = Vector3.ONE * maxf(radius, 0.1)
-	mi.set_instance_shader_parameter(&"arc_color", Color(color.r, color.g, color.b, 0.9))
+	mi.set_instance_shader_parameter(&"arc_color", Color(color.r, color.g, color.b, 1.0))
 	fx.add_child(mi)
 	fx.main = mi
 	fx.color = color
@@ -163,10 +164,11 @@ static func hit_spark(pos: Vector3, color: Color) -> void:
 	var fx := _effect(VfxEffect.Kind.SPARK, pos, 0.3)
 	if fx == null:
 		return
-	fx.size = 0.35
+	fx.size = 0.5
 	fx.color = color
-	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.4), 0.9)
-	var p := _particles(fx, 7, 0.26, _spark_mesh(), Mats.particle(true))
+	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.4), 1.0)
+	fx.flash.position.y = 0.0
+	var p := _particles(fx, 9, 0.28, _spark_mesh(), Mats.particle(true))
 	p.particle_flag_align_y = true
 	p.direction = Vector3.UP
 	p.spread = 180.0
@@ -284,9 +286,12 @@ static func level_up_burst(pos: Vector3) -> void:
 		return k.build())
 	column.material_override = _material("column", _COLUMN_CODE)
 	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.85, 0.35, 0.85))
+	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.88, 0.42, 1.0))
 	fx.add_child(column)
 	fx.main = column
+	fx.size = 0.9
+	fx.flash = _glow_ball(fx, Color(1.0, 0.9, 0.5), 1.0)
+	fx.flash.position.y = 0.7
 	fx.ring = _ground_ring(fx)
 	var sparks := _particles(fx, 26, 0.9, _star_mesh(), Mats.particle(true))
 	sparks.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
@@ -312,17 +317,18 @@ static func pickup_sparkle(pos: Vector3) -> void:
 	var fx := _effect(VfxEffect.Kind.SPARKLE, pos, 0.4)
 	if fx == null:
 		return
-	fx.size = 0.22
+	fx.size = 0.35
 	fx.color = gold
-	fx.flash = _glow_ball(fx, gold, 0.9)
-	var p := _particles(fx, 6, 0.38, _star_mesh(), Mats.particle(true))
+	fx.flash = _glow_ball(fx, gold, 1.0)
+	fx.flash.position.y = 0.2
+	var p := _particles(fx, 8, 0.4, _star_mesh(), Mats.particle(true))
 	p.direction = Vector3.UP
 	p.spread = 55.0
 	p.initial_velocity_min = 1.8
 	p.initial_velocity_max = 3.2
 	p.gravity = Vector3(0, -5, 0)
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 0.8
+	p.scale_amount_min = 0.8
+	p.scale_amount_max = 1.3
 	p.angular_velocity_min = -300.0
 	p.angular_velocity_max = 300.0
 	p.color_ramp = _fade_gradient(Color(1.0, 0.97, 0.7), Color(1.0, 0.75, 0.2, 0.0))
@@ -447,7 +453,7 @@ static func _particles(fx: VfxEffect, amount: int, lifetime: float, mesh: Mesh, 
 static func _spark_mesh() -> Mesh:
 	return MeshKit.cached("vfx:spark", func() -> Mesh:
 		var k := MeshKit.new()
-		k.add_box(Vector3(0.045, 0.3, 0.045), Transform3D(), Color.WHITE)
+		k.add_box(Vector3(0.07, 0.42, 0.07), Transform3D(), Color.WHITE)
 		return k.build())
 
 
