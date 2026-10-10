@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/blink_effect.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"blink"
+display_name = "Blink"
+description = "Teleports you {distance} m in your movement direction and makes you untouchable for {invulnerable} sec. Charges: {charges}."
+class_id = &"mage"
+school = &"arcane"
+resource = &""
+cost = 0.0
+cooldown = 6.0
+targeting = 3
+cast_range = 6.0
+effect = ExtResource("2_effect")
+params = {
+"charges": 1,
+"distance": 6.0,
+"invulnerable": 0.4
+}
+icon = &"blink"
+color = Color(0.78, 0.52, 1, 1)

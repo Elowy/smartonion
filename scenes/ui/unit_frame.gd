@@ -1,8 +1,11 @@
 class_name UnitFrame
 extends PanelContainer
 ## WoW-style unit frame of one player (GDD 12): round portrait in the player's colour with the
-## class initial, "P1 · Warrior", green HP bar with "hp / max", the class resource bar (a full
-## placeholder bar until abilities arrive in M3) and a DOWNED overlay with the revive progress.
+## class initial, "P1 · Warrior", green HP bar with "hp / max", the class resources
+## (ResourceDisplay: a coloured bar with "value / max", pips for Holy Power / Soul Shards /
+## Combo Points - live from player.abilities), the ability bar underneath (AbilityBar: the core
+## ability icons with this player's button prompts, cooldown sweep and dimming) and a DOWNED
+## overlay with the revive progress over the bars.
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge.
 
 ## Compact (it sits in a screen corner over the playfield): ~340 x 100 reference px.
@@ -19,7 +22,13 @@ var player: Player
 
 var portrait: UiPortrait
 var hp_bar: UiBar
-var resource_bar: UiBar
+var resource_display: ResourceDisplay
+var ability_bar: AbilityBar
+## The first resource shown as a bar (the primary one; null for a class whose resources are all
+## pips, and while no player is bound).
+var resource_bar: UiBar:
+	get:
+		return resource_display.first_bar() if resource_display != null else null
 var name_label: Label
 var downed_overlay: PanelContainer
 var revive_bar: UiBar
@@ -45,7 +54,7 @@ func _build() -> void:
 	style.content_margin_left = 10
 	style.content_margin_right = 12
 	style.content_margin_top = 7
-	style.content_margin_bottom = 8
+	style.content_margin_bottom = 6
 	style.fill = Color(0.1, 0.085, 0.075, PANEL_ALPHA)
 	style.shadow_color = Color(0, 0, 0, 0.4)
 	if mirrored:
@@ -53,8 +62,11 @@ func _build() -> void:
 		style.content_margin_right = 10
 	add_theme_stylebox_override(&"panel", style.rebuild())
 
+	# Portrait + bars on top, the ability bar under them.
+	var outer := UiTheme.vbox(4)
+	add_child(outer)
 	var row := UiTheme.hbox(10)
-	add_child(row)
+	outer.add_child(row)
 	portrait = UiPortrait.create(PORTRAIT_SIZE)
 	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
@@ -80,9 +92,8 @@ func _build() -> void:
 	stack.add_child(bars)
 	hp_bar = UiBar.create(UiTheme.HP_GREEN, 25.0, SMALL_FONT)
 	bars.add_child(hp_bar)
-	resource_bar = UiBar.create(Color(0.85, 0.15, 0.1), 21.0, SMALL_FONT)
-	resource_bar.animated = false
-	bars.add_child(resource_bar)
+	resource_display = ResourceDisplay.create(SMALL_FONT)
+	bars.add_child(resource_display)
 
 	downed_overlay = PanelContainer.new()
 	downed_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -116,6 +127,8 @@ func _build() -> void:
 	else:
 		row.add_child(portrait)
 		row.add_child(col)
+	ability_bar = AbilityBar.create(mirrored)
+	outer.add_child(ability_bar)
 	visible = false
 
 
@@ -134,9 +147,8 @@ func bind(p: Player) -> void:
 	_player_label.text = slot.label() if slot != null else "P%d" % (index + 1)
 	_player_label.add_theme_color_override(&"font_color", color.lightened(0.3))
 	_class_label.text = data.display_name if data != null else "Hero"
-	if data != null:
-		resource_bar.set_fill_color(data.resource_color)
-		resource_bar.set_values(1.0, 1.0, UiTheme.resource_name(data.resource_type))
+	resource_display.bind(p.abilities, data)
+	ability_bar.bind(p.abilities, slot.input if slot != null else null)
 	p.hp_changed.connect(_on_hp_changed)
 	p.downed_changed.connect(_on_downed_changed)
 	p.damage_taken.connect(_on_damage_taken)
@@ -157,6 +169,8 @@ func unbind() -> void:
 			player.damage_taken.disconnect(_on_damage_taken)
 	player = null
 	_bound = false
+	resource_display.unbind()
+	ability_bar.unbind()
 	visible = false
 
 
@@ -184,6 +198,8 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(player) or player.is_queued_for_deletion():
 		player = null
 		_bound = false
+		resource_display.unbind()
+		ability_bar.unbind()
 		visible = false
 		return
 	if player.downed:

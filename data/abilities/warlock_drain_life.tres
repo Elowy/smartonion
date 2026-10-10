@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/drain_life.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"drain_life"
+display_name = "Drain Life"
+description = "Drains the nearest enemy for {duration} sec, dealing Shadow damage and healing you for {heal_pct}% of it. You keep moving; when the target dies the drain jumps to the next enemy."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 1
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_hp": 70.0,
+"damage": 1.0,
+"duration": 2.0,
+"heal_pct": 100.0,
+"intellect_scale": 0.3,
+"range": 8.0,
+"spell_power_scale": 1.0,
+"tick": 0.4
+}
+icon = &"drain_life"
+color = Color(0.55, 0.9, 0.35, 1)

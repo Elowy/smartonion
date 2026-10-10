@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_word_of_glory.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"word_of_glory"
+display_name = "Word of Glory"
+description = "Heals you and the most wounded ally within 8 m. If an ally within 8 m is down, instantly resurrects them at 40% health instead."
+class_id = &"paladin"
+school = &"holy"
+resource = &"holy_power"
+cost = 3.0
+cooldown = 0.0
+targeting = 4
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"cost": 3.0,
+"heal": 3.0,
+"heal_max_hp_pct": 25.0,
+"prefer_downed": true,
+"revive_hp": 0.4,
+"spell_power_scale": 1.0
+}
+icon = &"word_of_glory"
+color = Color(1, 0.88, 0.45, 1)

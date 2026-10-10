@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"soul_shard"
+display_name = "Soul Shards"
+color = Color(0.72, 0.32, 0.95, 1)
+display = 1
+max_value = 5.0
+start_value = 1.0
+gain_per_kills = 12
+gain_per_kills_amount = 1.0

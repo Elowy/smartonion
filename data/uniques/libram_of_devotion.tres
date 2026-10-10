@@ -18,15 +18,14 @@ stats = Dictionary[StringName, float]({
 &"holy_damage": 10.0
 })
 class_restriction = &"paladin"
-unique_effect = &"smite_heal"
+unique_effect = &"ability_mod"
 unique_params = {
-"trigger": "on_hit",
-"ppm": 2.0,
-"damage": 12.0,
-"heal": 3.0,
-"school": "holy"
+"ability": "word_of_glory",
+"mods": {
+"cost_add": -1.0
 }
-unique_text = "Chance on hit: Smites the target for 12 Holy damage and heals your most wounded ally for 3."
+}
+unique_text = "Equip: Your Word of Glory costs 1 less Holy Power."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

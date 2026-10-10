@@ -3,7 +3,7 @@ extends MasteryEffect
 ## Aura of Devotion (GDD 3.3 Mastery): living heroes within [constant RADIUS] of a living
 ## Paladin – the Paladin included – gain Armor and HP regeneration (Spirit) per Mastery point.
 ##
-## Implemented as a StatBlock source ([method source_key], e.g. &"aura:paladin1") on every
+## Implemented as a StatBlock source ([method source_key], e.g. &"aura:paladin0") on every
 ## hero inside, refreshed every [constant REFRESH_INTERVAL] seconds; heroes that leave the
 ## circle or go down lose it, and everybody loses it when the Paladin goes down or leaves.
 ## Several Paladins stack (one source each).

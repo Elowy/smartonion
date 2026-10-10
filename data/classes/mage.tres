@@ -1,7 +1,13 @@
-[gd_resource type="Resource" script_class="ClassData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ClassData" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
 [ext_resource type="Resource" path="res://data/weapons/wand.tres" id="2_mh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="3_resdata"]
+[ext_resource type="Resource" path="res://data/resources/mana.tres" id="4_mana"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="5_abdata"]
+[ext_resource type="Resource" path="res://data/abilities/mage_blizzard.tres" id="6_blizzard"]
+[ext_resource type="Resource" path="res://data/abilities/mage_blink.tres" id="7_blink"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_mastery.gd" id="8_mastery"]
 
 [resource]
 script = ExtResource("1_script")
@@ -20,6 +26,10 @@ main_hand = ExtResource("2_mh")
 proficiencies = Array[StringName]([&"wand", &"staff", &"sword", &"dagger", &"tome"])
 resource_type = &"mana"
 resource_color = Color(0.2, 0.45, 1.0, 1)
+resources = Array[ExtResource("3_resdata")]([ExtResource("4_mana")])
+abilities = Array[ExtResource("5_abdata")]([ExtResource("6_blizzard"), ExtResource("7_blink")])
+mastery = ExtResource("8_mastery")
+mastery_text = "Ignite: critical hits set the target burning for 1% of their damage per Mastery point over 3 sec."
 onion_color = Color(0.55, 0.28, 0.68, 1)
 accent_color = Color(0.25, 0.35, 0.85, 1)
 headgear = &"wizard_hat"

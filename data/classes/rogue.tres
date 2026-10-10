@@ -1,8 +1,15 @@
-[gd_resource type="Resource" script_class="ClassData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="ClassData" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
 [ext_resource type="Resource" path="res://data/weapons/dagger.tres" id="2_mh"]
 [ext_resource type="Resource" path="res://data/weapons/dagger.tres" id="3_oh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="4_resdata"]
+[ext_resource type="Resource" path="res://data/resources/energy.tres" id="5_energy"]
+[ext_resource type="Resource" path="res://data/resources/combo_points.tres" id="6_combo"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="7_abilitydata"]
+[ext_resource type="Resource" path="res://data/abilities/rogue_fan_of_knives.tres" id="8_fan"]
+[ext_resource type="Resource" path="res://data/abilities/rogue_vanish.tres" id="9_vanish"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_mastery.gd" id="10_mastery"]
 
 [resource]
 script = ExtResource("1_script")
@@ -23,6 +30,10 @@ off_hand = ExtResource("3_oh")
 proficiencies = Array[StringName]([&"dagger", &"sword", &"mace", &"bow", &"gun", &"dual_wield"])
 resource_type = &"energy"
 resource_color = Color(1.0, 0.9, 0.2, 1)
+resources = Array[ExtResource("4_resdata")]([ExtResource("5_energy"), ExtResource("6_combo")])
+abilities = Array[ExtResource("7_abilitydata")]([ExtResource("8_fan"), ExtResource("9_vanish")])
+mastery = ExtResource("10_mastery")
+mastery_text = "Deadly Poison: critical hits poison the target for 20% of the hit's damage (+1% per Mastery) over 4 sec. Stacks up to 5 times."
 onion_color = Color(0.9, 0.92, 0.78, 1)
 accent_color = Color(0.43, 0.5, 0.28, 1)
 headgear = &"hood"

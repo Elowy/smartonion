@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/blizzard_effect.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"blizzard"
+display_name = "Blizzard"
+description = "Calls down hail on the densest group of enemies for {duration} sec, dealing Frost damage every {tick} sec and slowing them by {slow}%."
+class_id = &"mage"
+school = &"frost"
+resource = &"mana"
+cost = 50.0
+cooldown = 0.0
+targeting = 2
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"damage": 3.0,
+"duration": 3.0,
+"int_scaling": 0.5,
+"radius": 3.5,
+"slow": 40.0,
+"tick": 0.5
+}
+icon = &"blizzard"
+color = Color(0.55, 0.85, 1, 1)
