@@ -17,7 +17,6 @@ targeting = 4
 cast_range = 8.0
 effect = ExtResource("2_effect")
 params = {
-"cost": 3.0,
 "heal": 3.0,
 "heal_max_hp_pct": 25.0,
 "prefer_downed": true,

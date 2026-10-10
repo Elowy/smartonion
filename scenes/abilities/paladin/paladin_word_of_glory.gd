@@ -5,8 +5,8 @@ extends AbilityEffect
 ## instant revive in the game. Otherwise it heals the Paladin and the most hurt living teammate
 ## in range (AbilityRunner ALLY targeting with prefer_downed picks the target).
 ##
-## Params: cost (Holy Power; Libram of Devotion: cost_add -1), prefer_downed, revive_hp,
-## heal (flat), heal_max_hp_pct (% of the healed hero's max HP), spell_power_scale.
+## Params: prefer_downed, revive_hp, heal (flat), heal_max_hp_pct (% of the healed hero's max
+## HP), spell_power_scale; "cost" is seeded from AbilityData.cost (Libram of Devotion: cost_add -1).
 
 const HOLY_COLOR := Color(1.0, 0.88, 0.45)
 ## Bots heal when a hero in range is below this share of max HP.
