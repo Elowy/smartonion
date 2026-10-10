@@ -23,3 +23,8 @@ func cast(_ctx: AbilityContext) -> bool:
 ## Called every physics frame while the player lives (channels, stateful effects).
 func tick(_ctx: AbilityContext, _delta: float) -> void:
 	pass
+
+
+## Wave start (after cooldowns and resources were reset): drop per-wave state.
+func begin_wave(_ctx: AbilityContext) -> void:
+	pass

@@ -54,7 +54,7 @@ func test_blink_moves_six_metres_in_the_movement_direction() -> void:
 	check(p.abilities.try_cast(1), "cast")
 	check_near(p.global_position.distance_to(Vector3(7, 0, 2)), 0.0, 0.001, "6 m east")
 	_move(p, Vector2(0, -1))
-	p.abilities._cooldown_left.clear()
+	p.abilities.set_cooldown(p.abilities.slots[1], 0.0)
 	check(p.abilities.try_cast(1), "cast again after the cooldown")
 	check_near(p.global_position.distance_to(Vector3(7, 0, -4)), 0.0, 0.001, "6 m north (-Z)")
 	check_near(p.abilities.remaining(1), 6.0, 0.001, "6 s cooldown")
@@ -90,7 +90,7 @@ func test_blink_stays_inside_the_arena() -> void:
 	check_near(p.global_position.x, edge - margin, 0.001, "stopped at the wall")
 	check(arena.is_inside(p.global_position), "inside")
 	# Wedged against the wall: nothing happens, nothing is spent.
-	p.abilities._cooldown_left.clear()
+	p.abilities.set_cooldown(p.abilities.slots[1], 0.0)
 	check(not p.abilities.try_cast(1), "no room to blink")
 	check_eq(p.abilities.remaining(1), 0.0, "no cooldown for a refused blink")
 	_move(p, Vector2(0, -1))

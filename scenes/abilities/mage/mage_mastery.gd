@@ -76,14 +76,6 @@ func burn_rate(enemy: Node3D) -> float:
 func begin_wave() -> void:
 	_burns.clear()
 	sync_mana(true)
-	var runner := player.abilities if player != null else null
-	if runner == null:
-		return
-	# Blink's charges come back with the wave (the runner already cleared the cooldowns).
-	for ability in runner.slots:
-		var blink := runner.effect_for(ability) as BlinkEffect
-		if blink != null:
-			blink.refill()
 
 
 func tick(delta: float) -> void:
@@ -105,7 +97,7 @@ func tick(delta: float) -> void:
 		var amount := burn.owed
 		burn.owed = 0.0
 		if amount > 0.0 and player != null and player.procs != null:
-			player.procs.deal_raw(enemy, amount, FIRE, true, &"dot")
+			player.procs.deal_raw(enemy, amount, FIRE, false, &"dot")
 		if burn.left <= EPSILON or not _is_live(enemy):
 			_burns.erase(id)
 

@@ -32,11 +32,14 @@ func can_afford(amount: float) -> bool:
 
 
 ## Adds [param amount] (scaled by gain_mult when [param scaled]). Negative values drain.
+## Pip resources (Combo Points, Holy Power, Soul Shards) move in whole points only: their
+## gains ignore gain_mult (Resource Regen speeds up the bar resources).
 func add(amount: float, scaled: bool = true) -> void:
 	if data == null or amount == 0.0:
 		return
 	var before := value
-	value = clampf(value + (amount * gain_mult if scaled and amount > 0.0 else amount), 0.0, max_value())
+	var pips := data.display == ResourceData.Display.PIPS
+	value = clampf(value + (amount * gain_mult if scaled and amount > 0.0 and not pips else amount), 0.0, max_value())
 	if not is_equal_approx(before, value):
 		changed.emit(value, max_value())
 

@@ -89,6 +89,11 @@ func _tick() -> void:
 			var e := node as Enemy
 			if e == null or e.is_dead():
 				continue
+			var reach := radius + e.radius
+			var dx := e.global_position.x - center.x
+			var dz := e.global_position.z - center.z
+			if dx * dx + dz * dz > reach * reach:
+				continue  # (the grid hands out a square)
 			if slow_pct > 0.0:
 				e.apply_slow(slow_pct, tick_interval + 0.2)
 			if stun > 0.0 and not _stunned.has(e.get_instance_id()):
@@ -100,5 +105,5 @@ func _tick() -> void:
 	if heal_per_tick > 0.0:
 		for node in tree.get_nodes_in_group(&"players"):
 			var p := node as Player
-			if p != null and p.is_alive() and p.global_position.distance_to(center) <= radius:
+			if p != null and p.is_alive() and WeaponRunner.flat(p.global_position - center).length() <= radius:
 				p.heal(heal_per_tick)

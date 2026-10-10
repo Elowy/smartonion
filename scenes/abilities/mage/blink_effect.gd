@@ -5,10 +5,7 @@ extends AbilityEffect
 ## invulnerability and arcane flashes at both ends. Params (data/abilities/mage_blink.tres):
 ## distance (m), invulnerable (s), charges.
 ##
-## Charges (Band of the Blinking Star: charges_add +1): with one charge the runner's cooldown
-## is the whole story. With more, this effect keeps the charge count and the recharge timer
-## and publishes them as the runner's cooldown (0 while a charge is left, else the time until
-## the next one), so the HUD sweep, the readiness check and cooldown reduction keep working.
+## Charges (Band of the Blinking Star: charges_add +1) are kept by the AbilityRunner.
 
 const DEFAULT_DISTANCE := 6.0
 const DEFAULT_INVULNERABLE := 0.4
@@ -21,16 +18,8 @@ const ESCAPE_HP_RATIO := 0.5
 ## ... and only to a spot that is at least this far (m) away.
 const ESCAPE_MIN_DISTANCE := 2.5
 
-var _max_charges := 1
-var _charges := 1
-var _recharge_left := 0.0
 var _player: Player
 var _ability: AbilityData
-
-
-func can_cast(ctx: AbilityContext) -> bool:
-	_sync(ctx)
-	return _max_charges <= 1 or _charges > 0
 
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
@@ -50,9 +39,10 @@ func wants_auto_cast(ctx: AbilityContext) -> bool:
 
 
 func cast(ctx: AbilityContext) -> bool:
-	_sync(ctx)
+	_player = ctx.player
+	_ability = ctx.ability
 	var player := ctx.player
-	if player == null or (_max_charges > 1 and _charges <= 0):
+	if player == null:
 		return false
 	var dir := Vector3(ctx.direction.x, 0.0, ctx.direction.z)
 	if dir.length_squared() < 0.0001:
@@ -61,10 +51,6 @@ func cast(ctx: AbilityContext) -> bool:
 	var dest := destination(from, dir, ctx.num("distance", DEFAULT_DISTANCE), player)
 	if Vector2(dest.x - from.x, dest.z - from.z).length() < MIN_DISTANCE:
 		return false
-	if _max_charges > 1:
-		_charges -= 1
-		if _recharge_left <= 0.0:
-			_recharge_left = _recharge_time()
 	if player.is_inside_tree():
 		player.global_position = dest
 	else:
@@ -74,37 +60,22 @@ func cast(ctx: AbilityContext) -> bool:
 	return true
 
 
-func tick(ctx: AbilityContext, delta: float) -> void:
-	_sync(ctx)
-	if _max_charges <= 1:
-		return
-	if _charges < _max_charges:
-		_recharge_left -= delta
-		if _recharge_left <= 0.0:
-			_charges += 1
-			_recharge_left = _recharge_time() + _recharge_left if _charges < _max_charges else 0.0
-	# Publish: the runner's cooldown is "time until a blink is possible".
-	var left := 0.0 if _charges > 0 else maxf(0.0, _recharge_left)
-	var cooldowns := _cooldowns()
-	if left > 0.0 or cooldowns.get(_ability.id, 0.0) > 0.0:
-		cooldowns[_ability.id] = left
+func tick(ctx: AbilityContext, _delta: float) -> void:
+	_player = ctx.player
+	_ability = ctx.ability
 
 
-## All charges back (wave start; the runner clears the cooldown itself).
-func refill() -> void:
-	_charges = _max_charges
-	_recharge_left = 0.0
-
-
-## Blinks available right now (HUD pips; 0 or 1 without the extra charge).
+## Blinks available right now (0 or 1 without the extra charge).
 func charges_available() -> int:
-	if _max_charges > 1:
-		return _charges
-	return 1 if _cooldown_left() <= 0.0 else 0
+	return _player.abilities.charges_available(_ability) if _runner_known() else 1
 
 
 func charges_max() -> int:
-	return _max_charges
+	return _player.abilities.charges_max(_ability) if _runner_known() else 1
+
+
+func _runner_known() -> bool:
+	return _player != null and is_instance_valid(_player) and _player.abilities != null and _ability != null
 
 
 ## Where a blink from [param from] along [param dir] lands: [param distance] metres, clamped
@@ -135,43 +106,6 @@ static func destination(from: Vector3, dir: Vector3, distance: float, player: Pl
 				to = from
 	to.y = from.y
 	return to
-
-
-## Brings the charge bookkeeping in line with the params (item mods can change "charges"
-## at any time). The extra charges of a new multi-charge state start full.
-func _sync(ctx: AbilityContext) -> void:
-	_player = ctx.player
-	_ability = ctx.ability
-	var m := maxi(1, roundi(ctx.num("charges", 1.0)))
-	if m == _max_charges:
-		return
-	if m > 1 and _max_charges <= 1:
-		var cd := _cooldown_left()
-		_charges = (m - 1) + (1 if cd <= 0.0 else 0)
-		_recharge_left = cd
-	elif m > _max_charges:
-		_charges += m - _max_charges
-	_charges = mini(_charges, m)
-	_max_charges = m
-
-
-## Seconds a charge takes to come back (Haste / Cooldown Reduction included).
-func _recharge_time() -> float:
-	return _player.abilities.cooldown_of(_ability) if _player != null and _player.abilities != null else 6.0
-
-
-## What the runner's cooldown for this ability still has to run.
-func _cooldown_left() -> float:
-	return _cooldowns().get(_ability.id, 0.0) if _ability != null else 0.0
-
-
-## The runner's cooldown table (the one place that needs the runner's internals, see the
-## class comment).
-func _cooldowns() -> Dictionary[StringName, float]:
-	var table: Dictionary[StringName, float] = {}
-	if _player != null and _player.abilities != null:
-		table = _player.abilities._cooldown_left
-	return table
 
 
 ## Living enemies within ESCAPE_RADIUS of [param center].

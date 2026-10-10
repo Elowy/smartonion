@@ -6,6 +6,10 @@ extends Node
 ## Input edges are read in _process (PlayerInput rule); cooldowns, resources and effects
 ## tick in _physics_process. Bots (BotInput) auto-cast when AbilityEffect.wants_auto_cast.
 ## All targeting is automatic.
+##
+## Charges: the "charges" param (default 1, item mods: "charges_add") lets an ability be cast
+## that many times in a row; spent charges come back one per cooldown, in sequence. With one
+## charge this is the plain cooldown.
 
 signal ability_cast(slot_index: int, ability: AbilityData)
 signal slots_changed
@@ -28,7 +32,10 @@ var mastery: MasteryEffect
 var auto_cast := false
 
 var _effects: Dictionary[StringName, AbilityEffect] = {}
+## Ability id -> seconds until the next spent charge comes back.
 var _cooldown_left: Dictionary[StringName, float] = {}
+## Ability id -> charges spent and not yet back.
+var _charges_spent: Dictionary[StringName, int] = {}
 var _auto_timer := 0.0
 
 
@@ -96,9 +103,37 @@ func cooldown_of(ability: AbilityData, ctx: AbilityContext = null) -> float:
 	return base * mult * (1.0 - cdr / 100.0)
 
 
+## Seconds until slot [param index] can be cast again (0 while a charge is left).
 func remaining(index: int) -> float:
 	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
-	return _cooldown_left.get(a.id, 0.0) if a != null else 0.0
+	if a == null or charges_available(a) > 0:
+		return 0.0
+	return _cooldown_left.get(a.id, 0.0)
+
+
+func charges_max(ability: AbilityData) -> int:
+	if ability == null:
+		return 0
+	return maxi(1, roundi(float(params_for(ability).get("charges", 1.0))))
+
+
+## Casts of [param ability] possible right now, ignoring the resource (HUD pips).
+func charges_available(ability: AbilityData) -> int:
+	if ability == null:
+		return 0
+	return maxi(0, charges_max(ability) - int(_charges_spent.get(ability.id, 0)))
+
+
+## Sets the running recharge of [param ability] (effects that shorten / reset a cooldown).
+func set_cooldown(ability: AbilityData, seconds: float) -> void:
+	if ability == null:
+		return
+	if seconds <= 0.0:
+		_cooldown_left.erase(ability.id)
+		_charges_spent.erase(ability.id)
+	else:
+		_cooldown_left[ability.id] = seconds
+		_charges_spent[ability.id] = maxi(1, int(_charges_spent.get(ability.id, 0)))
 
 
 ## 0..1 share of the cooldown still running (HUD sweep).
@@ -136,8 +171,9 @@ func can_cast(index: int) -> bool:
 	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
 	if a == null or player == null or not player.is_alive() or remaining(index) > 0.0:
 		return false
-	var ctx := build_context(a)
-	return can_afford(a, ctx) and effect_for(a) != null and effect_for(a).can_cast(ctx)
+	if effect_for(a) == null or not can_afford(a, _light_context(a)):
+		return false  # (cheap checks first: targeting scans the enemies)
+	return effect_for(a).can_cast(build_context(a))
 
 
 func try_cast(index: int) -> bool:
@@ -150,7 +186,11 @@ func try_cast(index: int) -> bool:
 		return false
 	if a.resource != &"":
 		get_resource(a.resource).spend(cost_of(a, ctx))
-	_cooldown_left[a.id] = cooldown_of(a, ctx)
+	var full := cooldown_of(a, ctx)
+	if full > 0.0:
+		_charges_spent[a.id] = int(_charges_spent.get(a.id, 0)) + 1
+		if _cooldown_left.get(a.id, 0.0) <= 0.0:
+			_cooldown_left[a.id] = full
 	ability_cast.emit(index, a)
 	return true
 
@@ -204,10 +244,10 @@ func _light_context(ability: AbilityData) -> AbilityContext:
 	return ctx
 
 
-## The ability's params with "cooldown" / "cost" filled in from the data (unless the params
+## The ability's params with "cooldown", "cost" and "charges" (1) filled in (unless the params
 ## set them) and the player's item mods applied – so "cooldown_add": -5 works on any ability.
 func params_for(ability: AbilityData) -> Dictionary:
-	var base := {"cooldown": ability.cooldown, "cost": ability.cost}
+	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1}
 	base.merge(ability.params, true)
 	return apply_mods(base, player.ability_mods(ability.id) if player != null else {})
 
@@ -233,8 +273,12 @@ static func apply_mods(base: Dictionary, mods: Dictionary) -> Dictionary:
 
 func begin_wave() -> void:
 	_cooldown_left.clear()
+	_charges_spent.clear()
 	for id in resource_order:
 		resources[id].reset()
+	for a in slots:
+		if a != null and _effects.has(a.id):
+			_effects[a.id].begin_wave(_light_context(a))
 	if mastery != null:
 		mastery.begin_wave()
 
@@ -279,8 +323,7 @@ func _process(_delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if player == null:
 		return
-	for id in _cooldown_left.keys():
-		_cooldown_left[id] = maxf(0.0, _cooldown_left[id] - delta)
+	_tick_cooldowns(delta)
 	var regen := 1.0 + player.stats.get_raw(Stats.RESOURCE_REGEN) / 100.0
 	var haste := player.stats.attack_speed_mult()
 	for id in resource_order:
@@ -300,6 +343,31 @@ func _physics_process(delta: float) -> void:
 			for i in MAX_SLOTS:
 				if can_cast(i) and effect_for(slots[i]).wants_auto_cast(build_context(slots[i])):
 					try_cast(i)
+
+
+## Recharges: the timer runs while charges are spent; each expiry returns one charge and
+## restarts the timer (with the current cooldown) while more are missing.
+func _tick_cooldowns(delta: float) -> void:
+	for id in _cooldown_left.keys():
+		var left: float = _cooldown_left[id] - delta
+		if left > 0.0:
+			_cooldown_left[id] = left
+			continue
+		var spent := int(_charges_spent.get(id, 0)) - 1
+		var ability := _slot_ability(id)
+		if spent > 0 and ability != null:
+			_charges_spent[id] = spent
+			_cooldown_left[id] = maxf(0.001, cooldown_of(ability) + left)
+		else:
+			_charges_spent.erase(id)
+			_cooldown_left.erase(id)
+
+
+func _slot_ability(id: StringName) -> AbilityData:
+	for a in slots:
+		if a != null and a.id == id:
+			return a
+	return null
 
 
 # --- Targeting -------------------------------------------------------------------------------
@@ -327,25 +395,31 @@ func _densest_cluster(here: Vector3, reach: float, radius: float) -> Node3D:
 	return best
 
 
-## Downed teammate in range (if [param prefer_downed]), else the most hurt living teammate,
-## else the player itself.
+## The nearest downed teammate in range (if [param prefer_downed]), else the most hurt
+## living teammate, else the player itself.
 func _ally_target(here: Vector3, reach: float, prefer_downed: bool) -> Node3D:
 	if player == null or not player.is_inside_tree():
 		return player
 	var best: Player = null
 	var best_ratio := 2.0
+	var downed: Player = null
+	var downed_dist := INF
 	for node in player.get_tree().get_nodes_in_group(&"players"):
 		var p := node as Player
 		if p == null or p == player or not p.is_inside_tree():
 			continue
-		if p.global_position.distance_to(here) > reach:
+		var dist := WeaponRunner.flat(p.global_position - here).length()
+		if dist > reach:
 			continue
 		if p.downed:
-			if prefer_downed:
-				return p
+			if prefer_downed and dist < downed_dist:
+				downed_dist = dist
+				downed = p
 			continue
 		var ratio := p.hp / p.max_hp() if p.max_hp() > 0.0 else 1.0
 		if ratio < best_ratio:
 			best_ratio = ratio
 			best = p
+	if downed != null:
+		return downed
 	return best if best != null else player

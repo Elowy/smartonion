@@ -78,7 +78,7 @@ func tick(delta: float) -> void:
 		if p.acc >= TICK - TIME_EPSILON or p.left <= TIME_EPSILON:
 			var amount := p.dps * p.acc
 			p.acc = 0.0
-			player.procs.deal_raw(enemy, amount, SCHOOL, true, &"dot")
+			player.procs.deal_raw(enemy, amount, SCHOOL, false, &"dot")
 		if p.left <= TIME_EPSILON:
 			_poisons.erase(id)
 

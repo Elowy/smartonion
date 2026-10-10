@@ -133,3 +133,75 @@ func test_forced_crits() -> void:
 	check(p.consume_forced_crit(), "1")
 	check(p.consume_forced_crit(), "2")
 	check(not p.consume_forced_crit(), "used up")
+
+
+class WaveCountingEffect extends AbilityEffect:
+	var waves := 0
+	func begin_wave(_ctx: AbilityContext) -> void:
+		waves += 1
+
+
+func test_charges_recharge_one_at_a_time() -> void:
+	var p := _make_player()
+	var a := p.abilities.slots[0]
+	a.params["charges"] = 2
+	p.abilities.get_resource(&"test_rage").set_value(100.0)
+	check_eq(p.abilities.charges_max(a), 2, "two charges")
+	check(p.abilities.try_cast(0), "first")
+	check_eq(p.abilities.remaining(0), 0.0, "a charge is left")
+	check(p.abilities.try_cast(0), "second in a row")
+	check_eq(p.abilities.charges_available(a), 0, "empty")
+	check_near(p.abilities.remaining(0), 2.0, 0.001, "next charge in one cooldown")
+	for i in 121:
+		p.abilities._physics_process(DT)
+	check_eq(p.abilities.charges_available(a), 1, "one back after 2 s")
+	check_near(p.abilities.remaining(0), 0.0, 0.001, "castable")
+	for i in 120:
+		p.abilities._physics_process(DT)
+	check_eq(p.abilities.charges_available(a), 2, "both back after 4 s")
+
+
+func test_charges_mod_and_set_cooldown() -> void:
+	var p := _make_player()
+	var a := p.abilities.slots[0]
+	var item := ItemInstance.new()
+	item.slot_type = Items.SlotType.HEAD
+	item.armor_type = Items.NO_ARMOR
+	item.unique_effect = &"ability_mod"
+	item.unique_params = {"ability": "test_strike", "mods": {"charges_add": 1.0, "cooldown_add": -1.0}}
+	check(p.equipment.equip(item), "equip")
+	check_eq(p.abilities.charges_max(a), 2, "+1 charge from the item")
+	check_near(p.abilities.cooldown_of(a), 1.0, 0.001, "-1 s from the item")
+	p.abilities.get_resource(&"test_rage").set_value(100.0)
+	check(p.abilities.try_cast(0) and p.abilities.try_cast(0), "two casts")
+	check(not p.abilities.try_cast(0), "out of charges")
+	p.abilities.set_cooldown(a, 0.0)
+	check_eq(p.abilities.charges_available(a), 2, "set_cooldown(0) refills")
+	p.abilities.set_cooldown(a, 5.0)
+	check_eq(p.abilities.charges_available(a), 1, "a running recharge spends one charge")
+
+
+func test_begin_wave_reaches_effects() -> void:
+	var p := _make_player()
+	var a := _ability(0.0, 1.0)
+	a.id = &"test_wave"
+	a.effect = WaveCountingEffect
+	p.abilities.set_slot(1, a)
+	p.begin_wave()
+	check_eq((p.abilities.effect_for(a) as WaveCountingEffect).waves, 1, "effect told about the wave")
+
+
+func test_pip_gains_ignore_resource_regen() -> void:
+	var data := ResourceData.new()
+	data.id = &"test_pips"
+	data.display = ResourceData.Display.PIPS
+	data.max_value = 5.0
+	data.gain_on_crit = 1.0
+	var res := ClassResource.new(data)
+	res.gain_mult = 1.3
+	res.on_weapon_hit(true)
+	check_eq(res.value, 1.0, "a whole pip, not 1.3")
+	var bar := ClassResource.new(_resource())
+	bar.gain_mult = 1.5
+	bar.on_weapon_hit(false)
+	check_eq(bar.value, 15.0, "bars still scale")
