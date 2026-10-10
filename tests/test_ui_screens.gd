@@ -128,7 +128,8 @@ func test_hud_frames_follow_players() -> void:
 	for f in hud.frames:
 		f._process(0.016)
 	check(not hud.frames[1].visible, "freed player's frame hides")
-	hud.bind_players([] as Array[Player])
+	var nobody: Array[Player] = []
+	hud.bind_players(nobody)
 	check(not hud.frames[0].visible, "rebinding with nobody hides all")
 
 

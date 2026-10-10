@@ -21,6 +21,7 @@ var revive_bar: UiBar
 
 var _player_label: Label
 var _class_label: Label
+var _bound := false
 
 
 static func create(p_index: int, p_mirrored: bool = false) -> UnitFrame:
@@ -115,11 +116,10 @@ func _build() -> void:
 ## damage_taken and hide themselves when the player is freed.
 func bind(p: Player) -> void:
 	unbind()
-	player = p
-	if p == null or not is_instance_valid(p):
-		player = null
-		visible = false
+	if not is_instance_valid(p):
 		return
+	player = p
+	_bound = true
 	var slot := p.slot
 	var color := slot.color if slot != null else PlayerManager.PLAYER_COLORS[index % PlayerManager.PLAYER_COLORS.size()]
 	var data := p.class_data
@@ -141,7 +141,7 @@ func bind(p: Player) -> void:
 
 
 func unbind() -> void:
-	if player != null and is_instance_valid(player):
+	if is_instance_valid(player):
 		if player.hp_changed.is_connected(_on_hp_changed):
 			player.hp_changed.disconnect(_on_hp_changed)
 		if player.downed_changed.is_connected(_on_downed_changed):
@@ -149,6 +149,7 @@ func unbind() -> void:
 		if player.damage_taken.is_connected(_on_damage_taken):
 			player.damage_taken.disconnect(_on_damage_taken)
 	player = null
+	_bound = false
 	visible = false
 
 
@@ -171,10 +172,11 @@ func _on_damage_taken(_amount: float, _source: Node3D) -> void:
 
 
 func _process(_delta: float) -> void:
-	if player == null:
+	if not _bound:
 		return
 	if not is_instance_valid(player) or player.is_queued_for_deletion():
 		player = null
+		_bound = false
 		visible = false
 		return
 	if player.downed:

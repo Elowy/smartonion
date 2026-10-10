@@ -139,8 +139,11 @@ without rewrites:
   item won by Need, legendary looted, player downed / revived, wave cleared, run won / lost,
   difficulty) go through `RunState` signals / counters, so Class XP, Valor and achievements
   can be computed from them later. Keep `RunState` per-player stats keyed by slot index.
-- **Profiles.** `PlayerSlot` will gain a `profile` (or Guest). Anything persistent must be
-  keyed by profile, never by slot index or device.
+- **One main profile.** All persistent progress lives in a single main profile (the game
+  save) and is keyed **by class id** (Class Level, glyphs, heirlooms) or account-wide
+  (achievements, transmog, Valor) – never by slot index or device. Any player who picks a
+  class gets that class's level and unlocks; Class XP from a run is credited per class played
+  (summed when two players used the same class).
 - **Run start loadout.** Starting a run goes through one function (class, starting weapon,
   heirloom, glyphs, transmog) so M9 can inject choices from the lobby.
 - **Versioned saves.** The end-of-wave autosave and future profile saves use a versioned

@@ -50,7 +50,7 @@ func bind_players(players: Array[Player]) -> void:
 		f.unbind()
 	for i in players.size():
 		var p := players[i]
-		if p == null or not is_instance_valid(p):
+		if not is_instance_valid(p):
 			continue
 		var idx := p.slot.index if p.slot != null else i
 		if idx >= 0 and idx < frames.size():
@@ -92,7 +92,7 @@ func show_banner(text: String, color: Color = UiTheme.GOLD) -> void:
 
 
 func is_banner_visible() -> bool:
-	return _banner.visible and _banner.modulate.a > 0.0
+	return _banner.visible
 
 
 ## e.g. "Controller disconnected – P2: reconnect or press A on another controller".

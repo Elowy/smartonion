@@ -1403,7 +1403,7 @@ indulnak.
 - **automatikus mentés minden hullám végén** (a teljes menet állapota: hullám, kassza,
   XP, játékosok felszerelése, abilityk, talentek), így egy 25 hullámos menet félbehagyható és
   folytatható;
-- profilonként a meta-progresszió (17. fejezet).
+- a fő profil meta-progressziója (17. fejezet).
 
 ---
 
@@ -1420,7 +1420,7 @@ indulnak.
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
 | M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
-| M9 | Meta-progresszió (utolsó) | Profilok, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
+| M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
 ---
 
@@ -1430,11 +1430,18 @@ indulnak.
 nehézség 0 meta-fejlődéssel is végigjátszható és élvezetes marad. A nyers erő-bónusz
 összesen **legfeljebb kb. +10%**.
 
-### 17.1 Profilok
+### 17.1 Fő profil
 
-- Helyi co-opban mindenki **saját profilt** választ a lobbyban, csatlakozáskor
-  (név + kedvenc szín). Alternatíva a **Guest**: nem ment, és nem kap meta-fejlődést.
-- Minden meta-fejlődés a profilhoz kötött.
+- **Egyetlen fő profil (a játék mentése).** Minden meta-fejlődés ehhez tartozik:
+  - kasztonként a Class Level,
+  - glyphek, heirloomok,
+  - achievementek, transmog, Valor.
+- **Bárki, aki egy kaszttal játszik, a fő profil adott kaszthoz tartozó szintjét és
+  feloldásait kapja.** Ha pl. a fő profilon a Warrior 12-es szintű, akkor a Warriort választó
+  játékos (akár P1, akár P3) a 12-es Warrior minden feloldásával indul.
+- **Class XP:** a menet végén minden kaszt, amivel játszottak, Class XP-t kap a fő profilon.
+  Ha ketten játszottak ugyanazzal a kaszttal, az XP-jük összeadódik.
+- **Későbbi opció:** több mentési hely (pl. 3 fő profil) a főmenüben.
 
 ### 17.2 Class Level (kasztonként 1–30)
 
@@ -1528,7 +1535,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
 | Mentés | Automatikus, minden hullám végén |
-| Meta-progresszió | Profilok, Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
+| Meta-progresszió | Egy fő profil (a kaszt szintjét bárki megkapja, aki azzal a kaszttal játszik), Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
 | Zene | Egyelőre nincs |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
