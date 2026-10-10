@@ -155,6 +155,22 @@ static func toon_vc(outline: bool = true, tint: Color = Color.WHITE) -> Material
 	return _toon_variant("vc", tint, outline)
 
 
+## Vertex-colour toon material with a faint emissive glow (epic / legendary gear).
+static func toon_vc_glow(emission: Color, energy: float = 0.5) -> Material:
+	var key := "vc_glow:%s:%.2f" % [emission.to_html(), energy]
+	if _cache.has(key):
+		return _cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = _toon_shader("vc")
+	m.set_shader_parameter("albedo", Color.WHITE)
+	m.set_shader_parameter("emission_color", emission)
+	m.set_shader_parameter("emission_energy", energy)
+	m.set_shader_parameter("rim_strength", 0.6)
+	m.next_pass = outline()
+	_cache[key] = m
+	return m
+
+
 ## Double-sided toon material for capes, hoods and banners (no outline).
 static func toon_cloth(color: Color) -> Material:
 	return _toon_variant("cloth", color, false)
@@ -175,10 +191,12 @@ static func toon_emissive(color: Color, emission: Color, energy: float = 1.0) ->
 	var key := "toon_em:%s:%s:%.2f" % [color.to_html(), emission.to_html(), energy]
 	if _cache.has(key):
 		return _cache[key]
-	var m := _toon_variant("toon", color, true).duplicate() as ShaderMaterial
+	var m := ShaderMaterial.new()
+	m.shader = _toon_shader("toon")
+	m.set_shader_parameter("albedo", color)
 	m.set_shader_parameter("emission_color", emission)
 	m.set_shader_parameter("emission_energy", energy)
-	m.next_pass = _toon_variant("toon", color, true).next_pass
+	m.next_pass = outline()
 	_cache[key] = m
 	return m
 

@@ -116,7 +116,7 @@ func _melee(origin: Vector3, dir: Vector3) -> void:
 	var base := CombatMath.weapon_hit_damage(weapon, player.stats)
 	var nodes := player.get_tree().get_nodes_in_group(&"enemies")
 	var hits := enemies_in_arc(nodes, origin, dir, weapon.attack_range, weapon.arc_degrees)
-	Vfx.slash_arc(origin + Vector3.UP * 0.45, dir, weapon.attack_range, weapon.arc_degrees, _slash_color())
+	Vfx.slash_arc(origin + Vector3.UP * 0.3, dir, weapon.attack_range, weapon.arc_degrees, _slash_color())
 	for e in hits:
 		if not is_instance_valid(e) or e.is_dead():
 			continue

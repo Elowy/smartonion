@@ -7,12 +7,12 @@ extends RefCounted
 ## An Enemy that only records what happens to it – no AI, model or loot, so the player
 ## tests do not depend on the enemies module.
 class FakeEnemy extends Enemy:
-	var damage_log: Array[float] = []
-	var crit_log: Array[bool] = []
-	var attacker_log: Array[Node3D] = []
-	var knockback_log: Array[Vector3] = []
-	var stun_count := 0
-	var dead := false
+	var fake_damage_log: Array[float] = []
+	var fake_crit_log: Array[bool] = []
+	var fake_attacker_log: Array[Node3D] = []
+	var fake_knockback_log: Array[Vector3] = []
+	var fake_stun_count := 0
+	var fake_dead := false
 
 	func _init() -> void:
 		hp = 1000.0
@@ -32,21 +32,21 @@ class FakeEnemy extends Enemy:
 		pass
 
 	func is_dead() -> bool:
-		return dead
+		return fake_dead
 
 	func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 			knockback: Vector3 = Vector3.ZERO) -> void:
-		damage_log.append(amount)
-		crit_log.append(is_crit)
-		attacker_log.append(attacker)
-		knockback_log.append(knockback)
+		fake_damage_log.append(amount)
+		fake_crit_log.append(is_crit)
+		fake_attacker_log.append(attacker)
+		fake_knockback_log.append(knockback)
 		hp -= amount
 
 	func apply_stun(_duration: float) -> void:
-		stun_count += 1
+		fake_stun_count += 1
 
-	func hits() -> int:
-		return damage_log.size()
+	func fake_hits() -> int:
+		return fake_damage_log.size()
 
 
 ## A Node3D under the root that is also the current scene (Vfx falls back to it).

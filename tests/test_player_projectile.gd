@@ -37,8 +37,8 @@ func test_single_target_stops_at_first_enemy() -> void:
 	var b := Fakes.spawn_enemy(world, Vector3(3, 0, 0))
 	var proj := _launch(Projectile.TEAM_PLAYERS, 5.0, Vector3.RIGHT, 10.0)
 	_fly(proj, 1.0)
-	check_eq(a.hits(), 1, "first enemy hit")
-	check_eq(b.hits(), 0, "second enemy not hit")
+	check_eq(a.fake_hits(), 1, "first enemy hit")
+	check_eq(b.fake_hits(), 0, "second enemy not hit")
 	check(proj.is_done() and proj.is_queued_for_deletion(), "projectile removed")
 
 
@@ -49,10 +49,10 @@ func test_pierce_counts_extra_targets() -> void:
 	var off_line := Fakes.spawn_enemy(world, Vector3(3, 0, 2))
 	var proj := _launch(Projectile.TEAM_PLAYERS, 5.0, Vector3.RIGHT, 10.0, 1)
 	_fly(proj, 1.0)
-	check_eq(a.hits(), 1, "first hit")
-	check_eq(b.hits(), 1, "pierced into the second")
-	check_eq(c.hits(), 0, "pierce 1 stops at the second")
-	check_eq(off_line.hits(), 0, "enemy off the line untouched")
+	check_eq(a.fake_hits(), 1, "first hit")
+	check_eq(b.fake_hits(), 1, "pierced into the second")
+	check_eq(c.fake_hits(), 0, "pierce 1 stops at the second")
+	check_eq(off_line.fake_hits(), 0, "enemy off the line untouched")
 	check_eq(proj.hit_count, 2, "two hits")
 	check(proj.is_done(), "finished")
 
@@ -63,7 +63,7 @@ func test_fast_projectile_does_not_tunnel() -> void:
 	world.add_child(proj)
 	proj.global_position = Vector3(0, 0.7, 0)
 	proj.advance(DT)  # 2 m in one tick: jumps over the enemy centre
-	check_eq(a.hits(), 1, "swept hit test")
+	check_eq(a.fake_hits(), 1, "swept hit test")
 
 
 func test_aoe_explosion_hits_everything_in_radius() -> void:
@@ -73,13 +73,13 @@ func test_aoe_explosion_hits_everything_in_radius() -> void:
 	var outside := Fakes.spawn_enemy(world, Vector3(3, 0, 3))
 	var proj := _launch(Projectile.TEAM_PLAYERS, 6.0, Vector3.RIGHT, 10.0, 0, 1.6)
 	_fly(proj, 1.0)
-	check_eq(direct.hits(), 1, "direct target")
-	check_eq(near.hits(), 1, "neighbour in radius")
-	check_eq(behind.hits(), 1, "enemy behind in radius")
-	check_eq(outside.hits(), 0, "outside radius")
+	check_eq(direct.fake_hits(), 1, "direct target")
+	check_eq(near.fake_hits(), 1, "neighbour in radius")
+	check_eq(behind.fake_hits(), 1, "enemy behind in radius")
+	check_eq(outside.fake_hits(), 0, "outside radius")
 	check_eq(proj.hit_count, 3, "three victims")
 	check(proj.is_done(), "explodes once")
-	check(near.knockback_log[0].z > 0.0, "explosion pushes outwards")
+	check(near.fake_knockback_log[0].z > 0.0, "explosion pushes outwards")
 
 
 func test_max_range() -> void:
@@ -89,7 +89,7 @@ func test_max_range() -> void:
 	check(proj.is_done(), "freed at the end of its range")
 	check_near(proj.travelled, 5.0, 0.001, "flew exactly its range")
 	check_near(proj.global_position.y, 0.7, 0.001, "kept its height")
-	check_eq(far.hits(), 0, "enemy beyond range untouched")
+	check_eq(far.fake_hits(), 0, "enemy beyond range untouched")
 
 
 func test_leaves_arena() -> void:
@@ -114,10 +114,10 @@ func test_player_projectile_credit_and_leech() -> void:
 	var proj := _launch(Projectile.TEAM_PLAYERS, 7.0, Vector3.RIGHT, 10.0, 0, 0.0, p)
 	proj.knockback = 3.0
 	_fly(proj, 1.0)
-	check(e.attacker_log[0] == p, "attacker passed for kill credit")
+	check(e.fake_attacker_log[0] == p, "attacker passed for kill credit")
 	check_eq(RunState.damage_by_player.get(0, 0.0), 7.0, "damage recorded for P1")
 	check_eq(p.hp, hp + 1.0, "leech on projectile hit")
-	check(e.knockback_log[0].is_equal_approx(Vector3.RIGHT * 3.0), "knockback along the shot")
+	check(e.fake_knockback_log[0].is_equal_approx(Vector3.RIGHT * 3.0), "knockback along the shot")
 
 
 func test_enemy_projectile_hits_only_living_players() -> void:
@@ -128,7 +128,7 @@ func test_enemy_projectile_hits_only_living_players() -> void:
 	check(ghost.downed, "ghost downed")
 	var proj := _launch(Projectile.TEAM_ENEMIES, 6.0, Vector3.RIGHT, 10.0, 0, 0.0, bystander)
 	_fly(proj, 1.0)
-	check_eq(bystander.hits(), 0, "enemy projectiles ignore enemies")
+	check_eq(bystander.fake_hits(), 0, "enemy projectiles ignore enemies")
 	var expected := target.max_hp() - CombatMath.incoming_damage(6.0, target.stats, CombatMath.KIND_PROJECTILE)
 	check_eq(target.hp, expected, "living player takes projectile damage")
 	check(proj.is_done(), "used up")

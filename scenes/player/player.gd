@@ -302,7 +302,7 @@ func _move_body(motion: Vector3) -> void:
 		position += motion
 		return
 	var remaining := motion
-	for i in 3:
+	for _i in 3:
 		var col := move_and_collide(remaining)
 		if col == null:
 			break
@@ -359,7 +359,6 @@ func _has_reviver() -> bool:
 
 func _go_down() -> void:
 	downed = true
-	hp = 0.0
 	revive_progress = 0.0
 	_regen_accum = 0.0
 	invulnerable_left = 0.0

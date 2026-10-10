@@ -242,3 +242,4 @@ func _build_visual() -> void:
 	_visual.basis = Basis.looking_at(direction, Vector3.UP)
 	add_child(_visual)
 	_spinner = _visual.get_node_or_null(^"Spinner") as Node3D
+	set_process(_spinner != null)

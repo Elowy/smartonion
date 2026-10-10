@@ -86,7 +86,7 @@ func test_dodge_avoids_whole_hit() -> void:
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	p.stats.set_source(&"test", {Stats.DODGE: 60.0})
 	var dodged := 0
-	for i in 200:
+	for _i in 200:
 		p.hp = p.max_hp()
 		p.invulnerable_left = 0.0
 		p.take_damage(1.0)
@@ -96,7 +96,7 @@ func test_dodge_avoids_whole_hit() -> void:
 	check(dodged > 90 and dodged < 150, "about 60%% dodged (got %d)" % dodged)
 
 	var never := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))
-	for i in 50:
+	for _i in 50:
 		never.hp = never.max_hp()
 		never.invulnerable_left = 0.0
 		never.take_damage(1.0)
@@ -132,7 +132,7 @@ func test_downed_and_revive_timing() -> void:
 	check_eq(p1.hp, 0.0, "downed players cannot be healed")
 
 	# A living teammate 1 m away revives after REVIVE_TIME seconds.
-	for i in 29:
+	for _i in 29:
 		p1._physics_process(0.1)
 	check(p1.downed, "still downed after 2.9 s")
 	check_near(p1.revive_progress, 2.9, 0.01, "progress")
