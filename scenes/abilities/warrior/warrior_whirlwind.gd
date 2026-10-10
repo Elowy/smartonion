@@ -106,12 +106,13 @@ func _pulse() -> void:
 	for e in WarriorKit.enemies_within(_player, _radius):
 		if not is_instance_valid(e) or e.is_dead():
 			continue
+		var spot := e.global_position + Vector3.UP * SPARK_HEIGHT
 		_player.procs.deal_raw(e, damage, _school, true, &"ability")
-		if _slow > 0.0:
+		if _slow > 0.0 and is_instance_valid(e):
 			e.apply_slow(_slow, _slow_duration)
 		if sparks < MAX_SPARKS:
 			sparks += 1
-			Vfx.hit_spark(e.global_position + Vector3.UP * SPARK_HEIGHT, SPARK_COLOR)
+			Vfx.hit_spark(spot, SPARK_COLOR)
 
 
 func _on_downed_changed(is_downed: bool) -> void:

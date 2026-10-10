@@ -16,18 +16,16 @@ stats = Dictionary[StringName, float]({
 &"crit": 3.0
 })
 class_restriction = &"warrior"
-unique_effect = &"nova"
+unique_effect = &"ability_mod"
 unique_params = {
-"trigger": "on_hit",
-"ppm": 3.0,
-"icd": 2.0,
-"damage": 15.0,
-"radius": 3.0,
-"school": "physical",
-"at": "self",
-"slow": 30.0
+"ability": "whirlwind",
+"mods": {
+"duration_add": 1.0,
+"slow": 30.0,
+"slow_duration": 1.5
 }
-unique_text = "Chance on hit: You spin, striking enemies around you for 15 Physical damage and slowing them by 30%."
+}
+unique_text = "Whirlwind lasts 1 sec longer and slows enemies by 30%."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0
