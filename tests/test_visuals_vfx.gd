@@ -47,13 +47,14 @@ func test_every_effect_spawns_and_frees_itself() -> void:
 	Vfx.spawn_telegraph(p, 1.0, 1.0)
 	Vfx.level_up_burst(p)
 	Vfx.pickup_sparkle(p)
+	Vfx.resurrect_column(p)
 	var fx := _effects()
-	check_eq(fx.size(), 9, "nine effects under Arena.current.entities")
+	check_eq(fx.size(), 10, "ten effects under Arena.current.entities")
 	for e in fx:
 		check(e.global_position.distance_to(p) < 1.0, "%s near its world position" % e.name)
 		check(e.get_child_count() <= 4, "%s is cheap (%d children)" % [e.name, e.get_child_count()])
 	_run_all(0.5)
-	check(_effects().size() > 0 and _effects().size() < 9, "short effects already gone, long ones alive")
+	check(_effects().size() > 0 and _effects().size() < 10, "short effects already gone, long ones alive")
 	_run_all(1.5)
 	check_eq(_effects().size(), 0, "everything freed itself")
 
@@ -129,10 +130,20 @@ func test_ground_rings_snap_to_the_ground() -> void:
 	Vfx.explosion(Vector3(1, 0.9, 2), 1.5, Color.ORANGE)
 	Vfx.death_puff(Vector3(-1, 0.5, 0), Color.GRAY, 1.0)
 	Vfx.level_up_burst(Vector3(3, 0, 1))
+	Vfx.resurrect_column(Vector3(-2, 0.6, 1))
 	var fx := _effects()
-	check_eq(fx.size(), 3, "three effects")
+	check_eq(fx.size(), 4, "four effects")
 	for e in fx:
 		var ring := e.get_node_or_null("Ring") as Node3D
 		check(ring != null, "%s has a shock ring" % e.name)
 		if ring != null:
 			check_near(ring.global_position.y, Vfx.GROUND_Y, 0.001, "%s ring on the ground" % e.name)
+
+
+func test_resurrect_column_comes_from_the_sky() -> void:
+	Vfx.resurrect_column(Vector3(2, 0, 2))
+	var fx := _effects()[0]
+	fx._process(0.3)
+	var column := fx.get_node("Column") as Node3D
+	check(column.scale.y >= Vfx.RESURRECT_HEIGHT - 0.001, "tall shaft of light")
+	check(column.global_position.distance_to(Vector3(2, 0, 2)) < 0.001, "standing on the revived player")

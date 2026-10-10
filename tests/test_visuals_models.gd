@@ -273,6 +273,59 @@ func test_onion_setup_twice_and_weapon_swap() -> void:
 	check_eq(live, 0, "off hand emptied")
 
 
+func test_onion_revive_cast_bar() -> void:
+	var m := _onion(&"rogue")
+	m.set_revive_progress(0.5)
+	check(not m.is_cast_bar_visible(), "no cast bar while alive")
+	m.set_downed(true)
+	check(not m.is_cast_bar_visible(), "no cast bar before anyone revives")
+	var reviver := Color(1.0, 0.3, 0.2)
+	m.set_revive_progress(0.4, reviver, 3.0)
+	check(m.is_cast_bar_visible(), "cast bar while being revived")
+	var bar := m.get_node("CastBar") as GeometryInstance3D
+	check_near(bar.global_position.y if bar.is_inside_tree() else bar.position.y, OnionModel.CAST_BAR_Y, 0.001, "above the head")
+	check_near(bar.get_instance_shader_parameter(&"bar_progress"), 0.4, 0.0001, "bar fill = progress")
+	check(bar.get_instance_shader_parameter(&"bar_color") == Color(reviver, 1.0), "reviver's colour")
+	var label := m.get_node("CastLabel") as Label3D
+	check(label.text.begins_with("Resurrecting") and label.text.contains("3.0"), "cast text with time (%s)" % label.text)
+	var arc: Variant = (m.get_node("ReviveArc") as GeometryInstance3D).get_instance_shader_parameter(&"ring_color")
+	check(arc is Color and (arc as Color).r > 0.9 and (arc as Color).g < 0.5, "ring in the reviver's colour")
+	m.set_revive_progress(0.0)
+	check(not m.is_cast_bar_visible(), "hidden when progress drops to zero")
+	m.set_revive_progress(0.7, reviver)
+	m.set_downed(false)
+	check(not m.is_cast_bar_visible(), "hidden after the revive")
+
+
+func test_onion_channels_a_revive_beam() -> void:
+	var root := _keep(Node3D.new()) as Node3D
+	tree.root.add_child(root)
+	var healer := _onion(&"paladin")
+	var ghost := _onion(&"mage")
+	root.add_child(healer)
+	root.add_child(ghost)
+	ghost.position = Vector3(1.5, 0, 0)
+	ghost.set_downed(true)
+	var hand := healer.get_node("Yaw/Body/HandMain") as Node3D
+	var rest_y := hand.position.y
+	healer.set_channel_target(ghost)
+	check(healer.is_channeling(), "channeling")
+	for i in 10:
+		healer._process(1.0 / 60.0)
+	check(hand.position.y > rest_y + 0.3, "hands raised")
+	var beam := healer.get_node("ChannelBeam") as Node3D
+	check(beam.visible, "light beam shown")
+	var end := beam.global_transform * Vector3(0, 1, 0)
+	check(end.distance_to(ghost.global_position + Vector3.UP * OnionModel.CHANNEL_TARGET_HEIGHT) < 0.01, "beam ends on the ghost")
+	check((hand.get_node("ChannelGlow") as Node3D).visible, "hands glow")
+	healer.set_channel_target(null)
+	check(not healer.is_channeling() and not beam.visible, "stopped")
+	healer.set_channel_target(ghost)
+	ghost.free()
+	healer._process(1.0 / 60.0)
+	check(not healer.is_channeling(), "stops when the target disappears")
+
+
 # --- EnemyModel ---------------------------------------------------------------
 
 func test_enemy_models_share_meshes() -> void:
