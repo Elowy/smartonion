@@ -1,7 +1,10 @@
 class_name Enemy
 extends CharacterBody3D
-## A hostile unit (GDD 8). Group &"enemies". Collision layer 3 ("enemies"),
-## mask 1 | 3 (world + other enemies, for natural crowd separation).
+## A hostile unit (GDD 8). Group &"enemies". Collision layer 3 ("enemies"), mask 1 (world
+## only): enemies do not collide with each other in the physics engine – that made every
+## move_and_slide of a big horde expensive. Crowd separation comes from the shared
+## [EnemyGrid] instead (built once per physics tick): an enemy slides along the neighbours it
+## touches and pushes itself out of overlaps ([method EnemyGrid.crowd_velocity]).
 ##
 ## Behaviours (EnemyData.Behavior), always against the nearest living player:
 ##   CHASE  – walk straight at the target.
@@ -15,12 +18,16 @@ extends CharacterBody3D
 ## radius + Player.RADIUS) deals contact damage, at most once per CONTACT_COOLDOWN.
 ## Damage taken by the enemy is recorded by the attacker side (WeaponRunner); the enemy only
 ## handles knockback, hit flash and death (kill credit, death puff, loot, [signal died]).
+## Players are looked up through the shared per-tick [LivingPlayers] snapshot.
 
 signal died(enemy: Enemy, killer_index: int)
 
 enum AiState { MOVE, WINDUP, LEAP, THROW_WINDUP }
 
 const COLLISION_LAYER_ENEMIES := 1 << 2
+## Enemies collide with the world only (crowd separation: [EnemyGrid]).
+const COLLISION_MASK_WORLD := 1
+## The old mask (world + other enemies); no longer used by enemies (kept for tools / ablations).
 const COLLISION_MASK_WORLD_AND_ENEMIES := 1 | (1 << 2)
 ## Seconds between two contact hits of the same enemy.
 const CONTACT_COOLDOWN := 1.0
@@ -64,13 +71,11 @@ const KNOCKBACK_VELOCITY_PER_UNIT := 3.0
 const KNOCKBACK_DECAY := 12.0
 const MAX_KNOCKBACK_SPEED := 14.0
 
-## Height (m) of the collision sphere's centre. All enemies stand on one plane, so their
-## spheres collide like circles of [member radius] – the cheapest crowd separation.
+## Height (m) of the collision sphere's centre. All enemies stand on one plane, so they meet
+## the walls (and each other, in [EnemyGrid]) like circles of [member radius].
 const BODY_CENTER_HEIGHT := 0.6
-## Crowd throttle: an enemy that got less than this fraction of its intended move (stuck in
-## a clump) skips its next physics move – halves the collision cost of big crowds.
-const CROWD_BLOCKED_RATIO := 0.3
-## move_and_slide iterations: 2 lets enemies slide along walls and each other.
+## move_and_slide iterations: 2 lets enemies slide along a wall (they only collide with the
+## world, so a second slide is only ever needed in a corner).
 const MAX_SLIDES := 2
 ## Loot lands up to this far (m) from the death position.
 const LOOT_SCATTER := 0.4
@@ -114,9 +119,14 @@ var _wander_dir := Vector3.ZERO
 var _wander_left := 0.0
 var _weave_phase := 0.0
 var _age := 0.0
-var _crowd_skip := false
 var _sent_facing := Vector3.ZERO
 var _sent_moving := -1.0
+## Serial of the LivingPlayers snapshot this enemy last read.
+var _players_serial := -1
+## Bookkeeping of the shared EnemyGrid (written by it): build serial * MAX_ENEMIES + index of
+## this enemy in that build, and the last build this enemy moved with.
+var _grid_tag := -1
+var _grid_used := -1
 
 # Frame-cached list of the players in the tree (shared by all enemies and pickups).
 static var _player_cache: Array[Player] = []
@@ -130,7 +140,7 @@ static func create(p_data: EnemyData, p_wave: int) -> Enemy:
 	e.data = p_data
 	e.wave = maxi(1, p_wave)
 	e.collision_layer = COLLISION_LAYER_ENEMIES
-	e.collision_mask = COLLISION_MASK_WORLD_AND_ENEMIES
+	e.collision_mask = COLLISION_MASK_WORLD
 	e.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	e.max_slides = MAX_SLIDES
 	e.add_to_group(&"enemies")
@@ -165,6 +175,17 @@ static func create(p_data: EnemyData, p_wave: int) -> Enemy:
 	e.add_child(e.model)
 	e.model.setup(p_data)
 	return e
+
+
+func _enter_tree() -> void:
+	EnemyGrid.mark_dirty()
+
+
+func _exit_tree() -> void:
+	# Dead enemies already left the group (the grid skips them until its next build); one
+	# that leaves alive (wave end, tests) must not linger in the grid.
+	if not _dead:
+		EnemyGrid.mark_dirty()
 
 
 func is_dead() -> bool:
@@ -241,10 +262,12 @@ static func cached_players(tree: SceneTree) -> Array[Player]:
 	return _player_cache
 
 
-## Forces the next [method cached_players] call to rebuild the list (tests).
+## Forces the next [method cached_players] call (and [LivingPlayers] snapshot) to rebuild
+## the list (tests).
 static func invalidate_player_cache() -> void:
 	_player_cache_frame = -1
 	_player_cache_count = -1
+	LivingPlayers.mark_dirty()
 
 
 ## True for a Player that is valid (not freed), inside the tree and not downed.
@@ -313,7 +336,7 @@ func _physics_process(delta: float) -> void:
 				_update_ranged(delta, here)
 			_:
 				_update_chase(delta, here)
-	_apply_movement(delta)
+	_apply_movement(delta, stunned)
 	if model != null:
 		# Only forward noticeable changes (the model smooths them anyway).
 		if _facing.dot(_sent_facing) < 0.9995:
@@ -326,33 +349,46 @@ func _physics_process(delta: float) -> void:
 
 
 ## Finds the nearest living player and deals contact damage to the first one touched.
+## Reads the shared [LivingPlayers] snapshot (positions as packed floats); the player that is
+## hit is re-checked first, and a hit marks the snapshot dirty (the player may have gone down).
 func _scan_players(here: Vector3, stunned: bool) -> void:
 	_target = null
 	_target_dist_sq = INF
+	_players_serial = LivingPlayers.refresh(get_tree(), _players_serial)
+	var n := LivingPlayers.count
+	if n == 0:
+		return
+	var players := LivingPlayers.players
+	var xs := LivingPlayers.pos_x
+	var zs := LivingPlayers.pos_z
 	var reach := radius + Player.RADIUS
 	var reach_sq := reach * reach
 	var can_hit := not stunned and contact_cooldown_left <= 0.0
-	for p in cached_players(get_tree()):
-		if not is_instance_valid(p) or not p.is_alive() or not p.is_inside_tree():
-			continue
-		var pos := p.global_position
-		var dx := pos.x - here.x
-		var dz := pos.z - here.z
+	var best := -1
+	for i in n:
+		var dx := xs[i] - here.x
+		var dz := zs[i] - here.z
 		var d_sq := dx * dx + dz * dz
 		if can_hit and d_sq <= reach_sq:
+			if not is_living_player(players[i]):
+				continue  # went down (or away) since the snapshot
+			var p := players[i]
 			can_hit = false
 			contact_cooldown_left = CONTACT_COOLDOWN
 			p.take_damage(contact_damage, CombatMath.KIND_MELEE, self)
+			LivingPlayers.mark_dirty()
 			if _dead or not is_inside_tree():
 				return
 			if model != null and ai_state == AiState.MOVE:
 				model.play_attack()  # (would cut a lunge / throw wind-up tell short)
-			if not is_instance_valid(p) or not p.is_alive():
+			if not is_living_player(players[i]):
 				continue
 		if d_sq < _target_dist_sq:
 			_target_dist_sq = d_sq
-			_target = p
-			_target_pos = pos
+			best = i
+	if best >= 0 and is_instance_valid(players[best]):
+		_target = players[best]
+		_target_pos = Vector3(xs[best], 0.0, zs[best])
 
 
 func _update_chase(delta: float, here: Vector3) -> void:
@@ -478,27 +514,20 @@ func _steer(desired: Vector3, delta: float) -> void:
 	_move_velocity = _move_velocity.move_toward(desired, STEER_ACCELERATION * delta)
 
 
-func _apply_movement(delta: float) -> void:
+## Walk + knockback, adjusted by the crowd ([method EnemyGrid.crowd_velocity]: slides along
+## touching neighbours, pushes out of overlaps – not while stunned), then one move_and_slide
+## against the world.
+func _apply_movement(delta: float, stunned: bool) -> void:
 	if knockback_velocity != Vector3.ZERO:
 		knockback_velocity *= exp(-KNOCKBACK_DECAY * delta)
 		if knockback_velocity.length_squared() < 0.0025:
 			knockback_velocity = Vector3.ZERO
-	velocity = _move_velocity + knockback_velocity
-	var speed_sq := velocity.length_squared()
-	if speed_sq < 0.000001:
+	velocity = EnemyGrid.crowd_velocity(self, _move_velocity + knockback_velocity, delta, not stunned)
+	if velocity.length_squared() < 0.000001:
 		velocity = Vector3.ZERO
-		_crowd_skip = false
 		return
-	if _crowd_skip:
-		_crowd_skip = false
-		return
-	var before := global_position
 	move_and_slide()
 	var pos := global_position
-	var mx := pos.x - before.x
-	var mz := pos.z - before.z
-	var blocked_sq := speed_sq * delta * delta * CROWD_BLOCKED_RATIO * CROWD_BLOCKED_RATIO
-	_crowd_skip = mx * mx + mz * mz < blocked_sq and get_slide_collision_count() > 0
 	# Stay on the ground plane and inside the arena (walls normally take care of that).
 	var half_x := Arena.SIZE.x * 0.5 - radius
 	var half_z := Arena.SIZE.y * 0.5 - radius

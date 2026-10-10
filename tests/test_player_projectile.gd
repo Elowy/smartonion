@@ -162,3 +162,29 @@ func test_all_styles_build() -> void:
 	check_eq(WeaponRunner.projectile_style(Db.get_weapon(&"staff")), &"fireball", "staff style")
 	check_eq(WeaponRunner.projectile_style(Db.get_weapon(&"bow")), &"arrow", "bow style")
 	check_eq(WeaponRunner.projectile_style(Db.get_weapon(&"gun")), &"bullet", "gun style")
+
+
+func test_enemy_projectiles_look_dangerous() -> void:
+	var axe := Projectile.create(Projectile.TEAM_ENEMIES, 2.0, false, Vector3.RIGHT, 10.0, 10.0, 0, 0.0, null,
+		&"axe", Projectile.default_color(&"axe"))
+	world.add_child(axe)
+	var visual := axe.get_node("Visual") as Node3D
+	check(visual.get_node_or_null("Halo") != null, "red-orange halo")
+	check(visual.get_node_or_null("Trail") != null, "short trail")
+	var body := visual.get_node("Body") as Node3D
+	check_near(body.scale.x, ProjectileVisual.ENEMY_SCALE, 0.001, "drawn bigger")
+	var spinner := visual.find_child("Spinner", true, false) as Node3D
+	check(spinner != null, "spinner found")
+	var before := spinner.rotation.y
+	axe._process(0.05)
+	check(absf(angle_difference(spinner.rotation.y, before)) > 0.5, "enemy axe spins fast")
+	var halo := visual.get_node("Halo") as GeometryInstance3D
+	var hc := (halo.material_override as StandardMaterial3D).albedo_color
+	check(hc.r > 0.9 and hc.g < 0.5 and hc.b < 0.3, "red-orange hue family")
+	# Hero projectiles keep their own look (class colours), no threat glow.
+	var bolt := Projectile.create(Projectile.TEAM_PLAYERS, 2.0, false, Vector3.RIGHT, 10.0, 10.0, 0, 0.0, null,
+		&"bolt", Color(0.4, 0.6, 1.0))
+	world.add_child(bolt)
+	check(bolt.get_node("Visual").get_node_or_null("Halo") == null, "no enemy halo on hero bolts")
+	axe.free()
+	bolt.free()

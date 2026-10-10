@@ -22,7 +22,7 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	var e1 := Enemy.create(data, 1)
 	check(e1.is_in_group(&"enemies"), "in enemies group")
 	check_eq(e1.collision_layer, 4, "layer 3 (enemies)")
-	check_eq(e1.collision_mask, 5, "mask world | enemies")
+	check_eq(e1.collision_mask, 1, "mask world only (crowd separation: EnemyGrid)")
 	check_eq(e1.max_hp, data.hp_at_wave(1), "wave 1 hp")
 	check_eq(e1.hp, e1.max_hp, "starts at full hp")
 	check_eq(e1.radius, data.radius, "radius from data")

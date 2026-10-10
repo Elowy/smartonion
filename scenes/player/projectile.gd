@@ -2,7 +2,8 @@ class_name Projectile
 extends Node3D
 ## Owned by the "player" module (used by enemies too).
 ## Moves in a straight line on the XZ plane; hits by distance checks against
-## group &"enemies" (TEAM_PLAYERS) or &"players" (TEAM_ENEMIES).
+## group &"enemies" (TEAM_PLAYERS – only the ones the shared [EnemyGrid] finds near the
+## travelled segment / blast) or &"players" (TEAM_ENEMIES).
 ##
 ## The caller adds the node to the scene (Arena.current.entities) and sets its
 ## global_position (y ~ Player.CHEST_HEIGHT); the height is kept while flying.
@@ -126,16 +127,18 @@ func advance(delta: float) -> void:
 
 
 func _sweep(from: Vector3, to: Vector3) -> void:
-	# Hot path (every projectile x every enemy each tick): plain float maths first, the
-	# validity checks only for the few bodies close to the segment.
+	# Hot path (every projectile each tick): only the targets near the segment (EnemyGrid),
+	# plain float maths first, the validity checks only for the few bodies close to it.
 	var sx := to.x - from.x
 	var sz := to.z - from.z
 	var seg_len_sq := sx * sx + sz * sz
 	var inv_len_sq := 1.0 / seg_len_sq if seg_len_sq > 0.0 else 0.0
 	var vs_enemies := team == TEAM_PLAYERS
 	var candidates: Array[Array] = []
-	for node in get_tree().get_nodes_in_group(_target_group()):
-		var body := node as Node3D
+	var nodes := _targets_near(minf(from.x, to.x) - HIT_RADIUS, minf(from.z, to.z) - HIT_RADIUS,
+			maxf(from.x, to.x) + HIT_RADIUS, maxf(from.z, to.z) + HIT_RADIUS)
+	for order in nodes.size():
+		var body := nodes[order] as Node3D
 		if body == null:
 			continue
 		var pos := body.global_position
@@ -149,14 +152,17 @@ func _sweep(from: Vector3, to: Vector3) -> void:
 		if dx * dx + dz * dz > reach * reach:
 			continue
 		if _is_valid_target(body):
-			candidates.append([t, body])
+			candidates.append([t, order, body])
 	if candidates.is_empty():
 		return
-	candidates.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	if candidates.size() > 1:
+		# Along the flight path; equal positions in group order (deterministic).
+		candidates.sort_custom(func(a: Array, b: Array) -> bool:
+			return float(a[0]) < float(b[0]) or (float(a[0]) == float(b[0]) and int(a[1]) < int(b[1])))
 	for c in candidates:
 		if _done:
 			return
-		var body := c[1] as Node3D
+		var body := c[2] as Node3D
 		if not _is_valid_target(body):
 			continue
 		var t := float(c[0])
@@ -180,7 +186,8 @@ func _impact(body: Node3D, at: Vector3) -> void:
 func _explode(center: Vector3) -> void:
 	Vfx.explosion(center, aoe_radius, color)
 	var victims: Array[Node3D] = []
-	for node in get_tree().get_nodes_in_group(_target_group()):
+	for node in _targets_near(center.x - aoe_radius, center.z - aoe_radius, center.x + aoe_radius,
+			center.z + aoe_radius):
 		var body := node as Node3D
 		if not _is_valid_target(body):
 			continue
@@ -205,10 +212,19 @@ func _apply_hit(body: Node3D, kb_dir: Vector3, from_explosion: bool) -> void:
 	else:
 		var p := body as Player
 		p.take_damage(damage, CombatMath.KIND_AOE if from_explosion else CombatMath.KIND_PROJECTILE, source)
+		LivingPlayers.mark_dirty()  # the player may have gone down
 
 
 func _target_group() -> StringName:
 	return &"enemies" if team == TEAM_PLAYERS else &"players"
+
+
+## Possible targets whose body may touch the rectangle (XZ): the enemies the shared
+## [EnemyGrid] finds there (group order) for player shots, every player for enemy throws.
+func _targets_near(min_x: float, min_z: float, max_x: float, max_z: float) -> Array[Node]:
+	if team == TEAM_PLAYERS:
+		return EnemyGrid.gather_touching(get_tree(), min_x, min_z, max_x, max_z)
+	return get_tree().get_nodes_in_group(&"players")
 
 
 func _is_valid_target(body: Node3D) -> bool:

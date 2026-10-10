@@ -321,3 +321,52 @@ func test_spawned_enemies_fight() -> void:
 	check(nodes.size() >= 2, "opening group spawned")
 	EFakes.step_all(nodes, 4.0)
 	check(player.fake_hits.size() > 0, "enemies reached the player and dealt contact damage")
+
+
+## Spawn telegraphs prefer the HUD-safe visible ground (still >= 6 m from every player) and
+## fall back to the whole arena when nothing on screen is far enough.
+func test_spawn_point_prefers_the_screen() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var players: Array[Vector3] = [Vector3(10.0, 0.0, 0.0)]
+	var view := Rect2(-12.0, -6.0, 14.0, 10.0)
+	var area := arena.get_bounds().grow(-WaveDirector.SPAWN_MARGIN)
+	for _i in 100:
+		var p := WaveDirector.pick_spawn_point(arena, rng, players, WaveDirector.MIN_PLAYER_DISTANCE,
+			WaveDirector.SPAWN_POINT_TRIES, view)
+		check(view.grow(0.001).has_point(Vector2(p.x, p.z)), "on screen (%s)" % p)
+		check(area.grow(0.001).has_point(Vector2(p.x, p.z)), "inside the arena margin (%s)" % p)
+		check(Vector2(p.x - 10.0, p.z).length() >= WaveDirector.MIN_PLAYER_DISTANCE, "away from the player (%s)" % p)
+	# The visible part sticks out of the arena: only the overlap is used.
+	var half_out := Rect2(area.end.x - 3.0, -2.0, 20.0, 4.0)
+	for _i in 30:
+		var q := WaveDirector.pick_spawn_point(arena, rng, [] as Array[Vector3], WaveDirector.MIN_PLAYER_DISTANCE,
+			WaveDirector.SPAWN_POINT_TRIES, half_out)
+		check(q.x <= area.end.x + 0.001 and q.x >= area.end.x - 3.001, "clipped to the arena (%s)" % q)
+	# The whole view is too close to the player: fall back to the arena (scripted candidates).
+	var crowded := Rect2(9.0, -1.0, 2.0, 2.0)
+	arena.scripted_points = [Vector3(9.0, 0.0, 0.0), Vector3(-8.0, 0.0, 3.0)]
+	var f := WaveDirector.pick_spawn_point(arena, rng, players, WaveDirector.MIN_PLAYER_DISTANCE,
+		WaveDirector.SPAWN_POINT_TRIES, crowded)
+	check(f.is_equal_approx(Vector3(-8.0, 0.0, 3.0)), "falls back to anywhere far enough (%s)" % f)
+
+
+func test_director_spawns_where_the_camera_looks() -> void:
+	var rig := CameraRig.new()
+	arena.add_child(rig)
+	arena.camera = rig
+	EFakes.spawn_player(world, Vector3(-12.0, 0.0, 6.0))
+	rig.snap()
+	# Pin the view (headless viewports are square): the hero stands outside its safe part.
+	rig.focus = Vector3.ZERO
+	rig.distance = 30.0
+	var safe := rig.get_safe_ground_rect()
+	check(safe.has_area(), "camera has a safe area")
+	var inside := 0
+	for _i in 40:
+		var p := director.find_spawn_point()
+		if safe.grow(0.001).has_point(Vector2(p.x, p.z)):
+			inside += 1
+	check_eq(inside, 40, "telegraphs land on screen outside the HUD")
+	arena.camera = null
+	rig.free()

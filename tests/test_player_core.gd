@@ -466,3 +466,33 @@ func test_no_screen_wall_without_a_camera() -> void:
 	input.move = Vector2(1, 0)
 	Fakes.step(p, 10.0, 0.1)
 	check(p.global_position.x > 30.0, "free movement without Arena.current / camera")
+
+
+func test_heroes_softly_separate() -> void:
+	# Pure step: on the same spot -> pushed apart; touching -> a little; apart -> nothing.
+	var none: Array[Vector3] = [Vector3(3, 0, 0)]
+	check_eq(Player.separation_offset(Vector3.ZERO, none, 0.1), Vector3.ZERO, "far apart: no push")
+	var same: Array[Vector3] = [Vector3.ZERO]
+	var push := Player.separation_offset(Vector3.ZERO, same, 0.1, 0.0)
+	check_near(push.length(), Player.SEPARATION_SPEED * 0.1, 0.0001, "full push when on top of each other")
+	var near: Array[Vector3] = [Vector3(0.5, 0, 0)]
+	var nudge := Player.separation_offset(Vector3.ZERO, near, 0.1)
+	check(nudge.x < 0.0 and nudge.length() < push.length(), "weaker push when only touching, away from the other")
+	# In the game: two heroes dropped on one spot drift apart but stay close (no hard collision).
+	var a := Fakes.spawn_player(world, 0, &"warrior", Vector3(1, 0, 1))
+	var b := Fakes.spawn_player(world, 1, &"mage", Vector3(1, 0, 1))
+	for i in 120:
+		a._physics_process(1.0 / 60.0)
+		b._physics_process(1.0 / 60.0)
+	var d := Vector2(a.global_position.x - b.global_position.x, a.global_position.z - b.global_position.z).length()
+	check(d > 0.6, "no longer overlapping (%.2f m)" % d)
+	check(d <= Player.SEPARATION_DISTANCE + 0.05, "a soft push, not a shove (%.2f m)" % d)
+
+
+func test_own_numbers_beside_the_head_and_tagged_marker() -> void:
+	var p := Fakes.spawn_player(world, 1, &"warrior", Vector3(2, 0, 3))
+	check_eq(p.model.tag, "P2", "marker shows the slot label")
+	var right := p.self_text_position(1.0)
+	var left := p.self_text_position(-1.0)
+	check(right.x > 2.3 and left.x < 1.7, "numbers start beside the hero, not on it")
+	check(right.y > Player.CHEST_HEIGHT + 0.5, "at head height")

@@ -182,7 +182,7 @@ static func roll_group_size(data: EnemyData, rng: RandomNumberGenerator) -> int:
 
 ## A random arena point (SPAWN_MARGIN from the walls) at least [param min_distance] from
 ## every position in [param avoid]. With a [param preferred] rect (XZ; the camera's
-## HUD-safe visible ground, see CameraRig.safe_ground_rect) the first [param tries]
+## HUD-safe visible ground, see CameraRig.safe_ground_rect) the first 2 x [param tries]
 ## candidates are drawn inside it, so the telegraph is seen; if none is far enough from
 ## the players, [param tries] more come from the whole arena; after those the farthest
 ## candidate.
@@ -195,7 +195,9 @@ static func pick_spawn_point(p_arena: Arena, rng: RandomNumberGenerator, avoid: 
 	var on_screen := _spawn_area(p_arena).intersection(preferred) if preferred.has_area() else Rect2()
 	var rounds := 2 if on_screen.has_area() else 1
 	for r in rounds:
-		for i in maxi(1, tries):
+		# The on-screen round gets twice the tries: four spread-out heroes' 6 m circles
+		# cover much of the view.
+		for i in maxi(1, tries) * (2 if r == 0 and rounds == 2 else 1):
 			var p := _random_point_in(on_screen, rng) if r == 0 and rounds == 2 else _random_arena_point(p_arena, rng)
 			var d := INF
 			for a in avoid:

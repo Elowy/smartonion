@@ -9,6 +9,11 @@ extends Node3D
 ## collector's Gold Find ([method RunState.add_gold_for] keeps the fraction per player slot),
 ## XP to the shared bar. Loot banked at the wave end has no collector, so no Gold Find.
 ## When many pickups lie around, new drops merge into a nearby idle one ([method drop]).
+## Idle pickups read the collectors from the shared per-tick [LivingPlayers] snapshot (positions
+## and pickup range squared as packed floats) instead of calling into every player each tick;
+## with IDLE_STAGGER_THRESHOLD+ pickups around, an idle one only looks every IDLE_CHECK_TICKS
+## ticks (phases spread by the pickup count when it lands, so the work is spread evenly and
+## the run stays deterministic).
 
 const COLLECT_DISTANCE := 0.5
 ## Speed (m/s) when a player starts pulling the pickup, acceleration and top speed.
@@ -21,6 +26,10 @@ const MERGE_THRESHOLD := 120
 const MERGE_RADIUS := 3.0
 ## From this many pickups on, new drops merge into the nearest idle pickup at any distance.
 const HARD_CAP := 220
+## From this many pickups on, idle ones look for a collector only every IDLE_CHECK_TICKS
+## physics ticks (a pickup starts flying at most (IDLE_CHECK_TICKS - 1) / 60 s late).
+const IDLE_STAGGER_THRESHOLD := 64
+const IDLE_CHECK_TICKS := 3
 
 const HOVER_HEIGHT := 0.32
 const BOB_HEIGHT := 0.06
@@ -46,6 +55,10 @@ var _time := 0.0
 var _visual: Node3D
 var _body: MeshInstance3D
 var _is_coin := true
+## Serial of the LivingPlayers snapshot this pickup last read.
+var _players_serial := -1
+## Idle ticks left until the next collector check while the stagger is on.
+var _idle_wait := 0
 
 static var _coin_mesh: CylinderMesh
 static var _orb_mesh: SphereMesh
@@ -154,18 +167,27 @@ func collect_to_bank() -> void:
 
 # --- Frame update ----------------------------------------------------------------
 
+func _enter_tree() -> void:
+	# Stagger phase (only used with many pickups): consecutive drops get different phases.
+	_idle_wait = get_tree().get_node_count_in_group(&"pickups") % IDLE_CHECK_TICKS
+
+
 func _physics_process(delta: float) -> void:
 	if _collected or not is_inside_tree():
 		return
-	var here := global_position
 	if target != null and not Enemy.is_living_player(target):
 		target = null
 		speed = 0.0
 	if target == null:
-		target = _find_collector(here)
+		if _idle_wait > 0 and get_tree().get_node_count_in_group(&"pickups") >= IDLE_STAGGER_THRESHOLD:
+			_idle_wait -= 1
+			return
+		_idle_wait = IDLE_CHECK_TICKS - 1
+		target = _find_collector(global_position)
 		if target == null:
 			return
 		speed = START_SPEED
+	var here := global_position
 	var goal := target.global_position
 	var dx := goal.x - here.x
 	var dz := goal.z - here.z
@@ -191,8 +213,32 @@ func _process(delta: float) -> void:
 	_visual.rotate_y(SPIN_SPEED * delta)
 
 
-## Nearest living player whose pickup range reaches [param here].
+## Nearest living player whose pickup range reaches [param here] (from the shared
+## [LivingPlayers] snapshot; the winner is re-checked, a stale one falls back to a live scan).
 func _find_collector(here: Vector3) -> Player:
+	_players_serial = LivingPlayers.refresh(get_tree(), _players_serial)
+	var xs := LivingPlayers.pos_x
+	var zs := LivingPlayers.pos_z
+	var ranges := LivingPlayers.pickup_range_sq
+	var best_i := -1
+	var best_d := INF
+	for i in LivingPlayers.count:
+		var dx := xs[i] - here.x
+		var dz := zs[i] - here.z
+		var d := dx * dx + dz * dz
+		if d < best_d and d <= ranges[i]:
+			best_d = d
+			best_i = i
+	if best_i < 0:
+		return null
+	var players := LivingPlayers.players
+	if Enemy.is_living_player(players[best_i]):
+		return players[best_i]
+	return _find_collector_live(here)
+
+
+## [method _find_collector] without the snapshot (every player checked now).
+func _find_collector_live(here: Vector3) -> Player:
 	var best: Player = null
 	var best_d := INF
 	for p in Enemy.cached_players(get_tree()):

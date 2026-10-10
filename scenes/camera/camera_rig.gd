@@ -16,8 +16,14 @@ const MAX_DISTANCE := 36.0
 ## covers more at the top (unit frames + wave / timer plaque) and the bottom (unit frames +
 ## XP strip) than at the sides, so heroes never sit under it.
 const FRAME_MARGIN := 3.2
-const FRAME_MARGIN_TOP := 4.8
 const FRAME_MARGIN_BOTTOM := 3.8
+## The top margin grows with the distance (the wave / timer plaque covers a fixed share of
+## the screen, i.e. more ground when zoomed out; heads stick up into it too): FRAME_MARGIN_TOP
+## at MIN_DISTANCE, + TOP_MARGIN_SLOPE per metre further out, at most FRAME_MARGIN_TOP_MAX
+## (so the whole MVP arena still fits at MAX_DISTANCE). See [method top_margin].
+const FRAME_MARGIN_TOP := 5.2
+const TOP_MARGIN_SLOPE := 0.2
+const FRAME_MARGIN_TOP_MAX := 7.0
 const FOLLOW_SHARPNESS := 4.5
 const ZOOM_SHARPNESS := 2.2
 const SHAKE_DECAY := 1.8
@@ -196,11 +202,17 @@ static func half_width_at(dist: float, aspect: float, dz: float) -> float:
 	return width_factor(aspect) * (dist - dz * cos(deg_to_rad(PITCH_DEG)))
 
 
+## Ground metres kept free between the northmost player and the top screen edge at
+## [param dist] (see FRAME_MARGIN_TOP).
+static func top_margin(dist: float) -> float:
+	return minf(FRAME_MARGIN_TOP + TOP_MARGIN_SLOPE * maxf(0.0, dist - MIN_DISTANCE), FRAME_MARGIN_TOP_MAX)
+
+
 ## Largest player spread (x = across the screen, y = along Z) that [method compute_framing]
 ## can still fit on screen at MAX_DISTANCE with the frame margins.
 static func max_spread(aspect: float) -> Vector2:
 	var ext := ground_extents(MAX_DISTANCE, aspect)
-	return Vector2(2.0 * (ext.x - FRAME_MARGIN), ext.y + ext.z - FRAME_MARGIN_TOP - FRAME_MARGIN_BOTTOM)
+	return Vector2(2.0 * (ext.x - FRAME_MARGIN), ext.y + ext.z - top_margin(MAX_DISTANCE) - FRAME_MARGIN_BOTTOM)
 
 
 ## The part of the ground a camera focused on [param center] at [param dist] shows outside
@@ -212,7 +224,7 @@ static func safe_ground_rect(center: Vector3, dist: float, aspect: float) -> Rec
 	var half_w := half_width_at(dist, aspect, south)
 	var x0 := center.x - half_w + FRAME_MARGIN
 	var x1 := center.x + half_w - FRAME_MARGIN
-	var z0 := center.z - north + FRAME_MARGIN_TOP
+	var z0 := center.z - north + top_margin(dist)
 	var z1 := center.z + south - FRAME_MARGIN_BOTTOM
 	return Rect2(x0, z0, maxf(x1 - x0, 0.0), maxf(z1 - z0, 0.0))
 
@@ -261,7 +273,7 @@ static func walk_rect(center: Vector3, dist: float, aspect: float, margin: float
 
 
 ## Distance needed to keep all [param points] on screen with the frame margins
-## (FRAME_MARGIN at the sides, FRAME_MARGIN_TOP / FRAME_MARGIN_BOTTOM).
+## (FRAME_MARGIN at the sides, [method top_margin] / FRAME_MARGIN_BOTTOM).
 static func required_distance(points: Array[Vector3], aspect: float) -> float:
 	if points.is_empty():
 		return MIN_DISTANCE
@@ -271,8 +283,22 @@ static func required_distance(points: Array[Vector3], aspect: float) -> float:
 		lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
 		hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
 	var dx := ((hi.x - lo.x) * 0.5 + FRAME_MARGIN) / width_factor(aspect)
-	var dz := ((hi.y - lo.y) + FRAME_MARGIN_TOP + FRAME_MARGIN_BOTTOM) / (north_factor() + south_factor())
+	var dz := depth_distance(hi.y - lo.y)
 	return clampf(maxf(dx, dz), MIN_DISTANCE, MAX_DISTANCE)
+
+
+## Smallest distance whose visible depth holds [param spread_z] (metres along Z) plus the
+## top ([method top_margin], which grows with the distance) and bottom margins.
+static func depth_distance(spread_z: float) -> float:
+	var k := north_factor() + south_factor()
+	var d := (spread_z + FRAME_MARGIN_TOP + FRAME_MARGIN_BOTTOM) / k
+	if d <= MIN_DISTANCE:
+		return d
+	# Sloped part: k * d = spread + FRAME_MARGIN_TOP + slope * (d - MIN) + bottom.
+	d = (spread_z + FRAME_MARGIN_TOP - TOP_MARGIN_SLOPE * MIN_DISTANCE + FRAME_MARGIN_BOTTOM) / (k - TOP_MARGIN_SLOPE)
+	if top_margin(d) < FRAME_MARGIN_TOP_MAX:
+		return d
+	return (spread_z + FRAME_MARGIN_TOP_MAX + FRAME_MARGIN_BOTTOM) / k
 
 
 ## Moves [param target] so the visible ground stays inside [param rect] (XZ) when possible.
@@ -293,7 +319,7 @@ static func clamp_to_view(target: Vector3, dist: float, aspect: float, rect: Rec
 ## Target framing for a set of player positions: {target: Vector3, distance: float}.
 ## Follows the centroid, respects the view rect, and finally guarantees (within
 ## MAX_DISTANCE) that every player stays inside the screen margins (so out from under the
-## HUD: FRAME_MARGIN_TOP / FRAME_MARGIN_BOTTOM / FRAME_MARGIN).
+## HUD: [method top_margin] / FRAME_MARGIN_BOTTOM / FRAME_MARGIN).
 static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 = Rect2()) -> Dictionary:
 	var centroid := Vector3.ZERO
 	var lo := Vector2(INF, INF)
@@ -313,6 +339,6 @@ static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 =
 	var hi_x := lo.x - FRAME_MARGIN + ext.x
 	target.x = clampf(target.x, lo_x, hi_x) if lo_x <= hi_x else (lo.x + hi.x) * 0.5
 	var lo_z := hi.y + FRAME_MARGIN_BOTTOM - ext.z
-	var hi_z := lo.y - FRAME_MARGIN_TOP + ext.y
+	var hi_z := lo.y - top_margin(dist) + ext.y
 	target.z = clampf(target.z, lo_z, hi_z) if lo_z <= hi_z else (lo_z + hi_z) * 0.5
 	return {"target": target, "distance": dist}

@@ -221,3 +221,67 @@ func test_rig_walk_rect_for_players_and_ghosts() -> void:
 	var rg := rig.get_walk_rect(ghost)
 	check(rg.has_point(Vector2(2, 3)), "ghost may stay where it is")
 	check(rg.size.x < spread.x, "ghost is kept inside the current (closer) view")
+
+
+## The HUD (unit frames, wave / timer plaque, XP strip) must never cover a hero: every
+## framed player keeps the per-side margins – more room at the top, where the plaque sits.
+func test_framing_keeps_heroes_out_from_under_the_hud() -> void:
+	check(CameraRig.FRAME_MARGIN_TOP > CameraRig.FRAME_MARGIN_BOTTOM, "top margin is the biggest")
+	check(CameraRig.FRAME_MARGIN_BOTTOM > CameraRig.FRAME_MARGIN, "bottom margin above the sides")
+	var layouts: Array = [
+		[Vector3(0, 0, 0)],
+		[Vector3(-6, 0, -4), Vector3(6, 0, 4)],
+		[Vector3(-12, 0, -8), Vector3(12, 0, 8), Vector3(0, 0, 0)],
+		[Vector3(3, 0, -10), Vector3(-3, 0, 10)],
+		[Vector3(-16, 0, -10), Vector3(16, 0, 10), Vector3(-16, 0, 10), Vector3(16, 0, -10)],
+	]
+	var arena_view := Rect2(-25, -19, 50, 38)
+	for layout in layouts:
+		var pts: Array[Vector3] = []
+		pts.assign(layout)
+		for rect: Rect2 in [Rect2(), arena_view]:
+			var f := CameraRig.compute_framing(pts, ASPECT, rect)
+			var target: Vector3 = f["target"]
+			var dist: float = f["distance"]
+			var ext := CameraRig.ground_extents(dist, ASPECT)
+			for p in pts:
+				var top := p.z - (target.z - ext.y)
+				var bottom := (target.z + ext.z) - p.z
+				var side := ext.x - absf(p.x - target.x)
+				check(top >= CameraRig.top_margin(dist) - 0.001, "%s: %.2f m below the top edge (d %.1f)" % [p, top, dist])
+				check(bottom >= CameraRig.FRAME_MARGIN_BOTTOM - 0.001, "%s: %.2f m above the bottom edge" % [p, bottom])
+				check(side >= CameraRig.FRAME_MARGIN - 0.001, "%s: %.2f m from the side edge" % [p, side])
+
+
+func test_top_margin_grows_with_distance_and_is_capped() -> void:
+	check_near(CameraRig.top_margin(CameraRig.MIN_DISTANCE), CameraRig.FRAME_MARGIN_TOP, 0.0001, "base at min distance")
+	check_near(CameraRig.top_margin(10.0), CameraRig.FRAME_MARGIN_TOP, 0.0001, "never below the base")
+	check(CameraRig.top_margin(25.0) > CameraRig.top_margin(21.0), "grows when zoomed out (the plaque covers more ground)")
+	check_near(CameraRig.top_margin(CameraRig.MAX_DISTANCE), CameraRig.FRAME_MARGIN_TOP_MAX, 0.0001, "capped")
+	# depth_distance solves k * d = spread + top_margin(d) + bottom exactly (between the clamps).
+	var k := CameraRig.north_factor() + CameraRig.south_factor()
+	for spread: float in [8.0, 12.0, 16.0, 20.0]:
+		var d := CameraRig.depth_distance(spread)
+		if d > CameraRig.MIN_DISTANCE and d < CameraRig.MAX_DISTANCE:
+			check_near(k * d, spread + CameraRig.top_margin(d) + CameraRig.FRAME_MARGIN_BOTTOM, 0.001,
+				"spread %.0f fits exactly at d %.2f" % [spread, d])
+	check(CameraRig.depth_distance(16.0) > CameraRig.depth_distance(12.0), "monotonic")
+
+
+func test_safe_ground_rect_lies_inside_the_view_outside_the_hud() -> void:
+	var center := Vector3(2, 0, -1)
+	for dist: float in [CameraRig.MIN_DISTANCE, 26.0, CameraRig.MAX_DISTANCE]:
+		var r := CameraRig.safe_ground_rect(center, dist, ASPECT)
+		check(r.has_area(), "usable area at d %.1f" % dist)
+		var ext := CameraRig.ground_extents(dist, ASPECT)
+		check_near(r.position.y - (center.z - ext.y), CameraRig.top_margin(dist), 0.001, "top HUD margin")
+		check_near((center.z + ext.z) - r.end.y, CameraRig.FRAME_MARGIN_BOTTOM, 0.001, "bottom HUD margin")
+		for corner: Vector2 in [r.position, r.end, Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.position.y)]:
+			var dz := corner.y - center.z
+			check(absf(corner.x - center.x) <= CameraRig.half_width_at(dist, ASPECT, dz) - CameraRig.FRAME_MARGIN + 0.001,
+				"corner %s on screen, clear of the side edge" % corner)
+	var rig := _rig()
+	_player(Vector3(3, 0, 1))
+	rig.snap()
+	var live := rig.get_safe_ground_rect()
+	check(live.has_point(Vector2(3, 1)), "the framed hero stands inside the safe rect")

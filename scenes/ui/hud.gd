@@ -159,34 +159,36 @@ func _build() -> void:
 func _build_top() -> void:
 	var plaque := UiTheme.panel()
 	var style := UiTheme.stone_style()
-	style.content_margin_top = 8
-	style.content_margin_bottom = 10
-	style.content_margin_left = 30
-	style.content_margin_right = 30
+	style.content_margin_top = 4
+	style.content_margin_bottom = 6
+	style.content_margin_left = 26
+	style.content_margin_right = 26
 	style.fill = Color(0.1, 0.085, 0.075, UnitFrame.PANEL_ALPHA)
 	style.shadow_color = Color(0, 0, 0, 0.4)
 	plaque.add_theme_stylebox_override(&"panel", style.rebuild())
-	plaque.custom_minimum_size = Vector2(240, 0)
+	plaque.custom_minimum_size = Vector2(220, 0)
 	plaque.anchor_left = 0.5
 	plaque.anchor_right = 0.5
 	plaque.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	plaque.offset_top = MARGIN - 6
+	plaque.offset_top = MARGIN - 8
 	add_child(plaque)
-	var col := UiTheme.vbox(0)
+	# Compact (it sits over the far / top part of the playfield): tight line spacing.
+	var col := UiTheme.vbox(-6)
 	plaque.add_child(col)
-	wave_label = UiTheme.centered_label("Wave 1 / %d" % RunState.TOTAL_WAVES, UiTheme.GOLD_LABEL, 24)
+	wave_label = UiTheme.centered_label("Wave 1 / %d" % RunState.TOTAL_WAVES, UiTheme.GOLD_LABEL, 22)
 	col.add_child(wave_label)
 	wave_tag_label = UiTheme.centered_label("", UiTheme.HEADING, 18, UiTheme.RED)
 	wave_tag_label.visible = false
 	col.add_child(wave_tag_label)
-	timer_label = UiTheme.centered_label("20", UiTheme.BIG_NUMBER, 56)
+	timer_label = UiTheme.centered_label("20", UiTheme.BIG_NUMBER, 52)
 	col.add_child(timer_label)
-	col.add_child(UiTheme.divider(180))
+	col.add_child(UiTheme.divider(160))
 	var gold_row := UiTheme.hbox(8)
 	gold_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_coin = UiIcon.create(UiIcon.Kind.COIN, Vector2(28, 28))
+	_coin = UiIcon.create(UiIcon.Kind.COIN, Vector2(24, 24))
+	_coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(_coin)
-	gold_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 30)
+	gold_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 26)
 	gold_row.add_child(gold_label)
 	col.add_child(gold_row)
 

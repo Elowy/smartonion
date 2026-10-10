@@ -147,3 +147,70 @@ func test_resurrect_column_comes_from_the_sky() -> void:
 	var column := fx.get_node("Column") as Node3D
 	check(column.scale.y >= Vfx.RESURRECT_HEIGHT - 0.001, "tall shaft of light")
 	check(column.global_position.distance_to(Vector3(2, 0, 2)) < 0.001, "standing on the revived player")
+
+
+func test_damage_numbers_merge_per_target() -> void:
+	var a := Node3D.new()
+	var b := Node3D.new()
+	_extra.append(a)
+	_extra.append(b)
+	var white := Color(1, 1, 1, 0.75)
+	Vfx.damage_number(a, Vector3.ZERO, 3.0, white, 0.6)
+	Vfx.damage_number(a, Vector3.ZERO, 4.2, white, 0.6)
+	check_eq(_effects().size(), 1, "two quick hits on one enemy -> one number")
+	var label := _effects()[0].get_node("Label") as Label3D
+	check_eq(label.text, "7", "the number adds up")
+	check(label.modulate.a <= 0.75 + 0.001, "normal hits are slightly transparent")
+	Vfx.damage_number(b, Vector3.ZERO, 2.0, white, 0.6)
+	check_eq(_effects().size(), 2, "another enemy gets its own number")
+	# A crit landing on a normal number upgrades it.
+	Vfx.damage_number(a, Vector3.ZERO, 10.0, Color.YELLOW, 1.1)
+	check_eq(label.text, "17", "crit merged")
+	check_near(label.pixel_size, Vfx.TEXT_PIXEL_SIZE * 1.1, 0.000001, "upgraded to the crit size")
+	# After the merge window a new number starts.
+	for fx in _effects():
+		fx._process(Vfx.MERGE_WINDOW + 0.02)
+	Vfx.damage_number(a, Vector3.ZERO, 5.0, white, 0.6)
+	check_eq(_effects().size(), 3, "late hit -> new number")
+	# No target: never merged.
+	Vfx.damage_number(null, Vector3.ZERO, 1.0, white, 0.6)
+	Vfx.damage_number(null, Vector3.ZERO, 1.0, white, 0.6)
+	check_eq(_effects().size(), 5, "untargeted numbers stay separate")
+	_arena.free()
+	check(Vfx._merge.is_empty(), "merge table released with the numbers")
+
+
+func test_damage_numbers_are_small_and_capped() -> void:
+	check(WeaponRunner.NORMAL_TEXT_SIZE <= 0.7, "normal hits small")
+	check(WeaponRunner.CRIT_TEXT_SIZE > WeaponRunner.NORMAL_TEXT_SIZE * 1.5, "crits clearly bigger")
+	check(WeaponRunner.NORMAL_TEXT_COLOR.a < 1.0, "normal hits translucent")
+	check(Vfx.MAX_TEXTS <= 30, "a busy screen shows at most ~28 numbers")
+	var before := Vfx.text_count()
+	for i in 60:
+		Vfx.floating_text(Vector3.ZERO, "C", Color.YELLOW, WeaponRunner.CRIT_TEXT_SIZE)
+	check_eq(Vfx.text_count(), maxi(before, Vfx.MAX_TEXTS + Vfx.CRIT_EXTRA_TEXTS), "even crits have a hard cap")
+
+
+func test_text_arcs_sideways() -> void:
+	Vfx.floating_text(Vector3(0, 1, 0), "9", Color.RED, 0.85, 1.0)
+	Vfx.floating_text(Vector3(0, 1, 0), "9", Color.RED, 0.85, -1.0)
+	var fx := _effects()
+	fx[0]._process(0.5)
+	fx[1]._process(0.5)
+	check(fx[0].position.x > 0.15, "side +1 arcs to the right (%.2f)" % fx[0].position.x)
+	check(fx[1].position.x < -0.15, "side -1 arcs to the left (%.2f)" % fx[1].position.x)
+	check(fx[0].position.y > 1.4, "and up")
+
+
+func test_explosion_flash_is_short_and_faint() -> void:
+	Vfx.explosion(Vector3(0, 0.5, 0), 2.0, Color.PURPLE)
+	var fx := _effects()[0]
+	var flash := fx.get_node("Flash") as GeometryInstance3D
+	var c: Variant = (flash.material_override as ShaderMaterial).get_shader_parameter(&"fx_color")
+	check(c is Color and (c as Color).a <= 0.5, "flash starts faint")
+	fx._process(0.05)
+	check(flash.scale.x <= 2.0 * Vfx.EXPLOSION_FLASH_SCALE + 0.001, "flash smaller than the blast radius")
+	fx._process(Vfx.EXPLOSION_FLASH_TIME)
+	check(not flash.visible, "flash gone after %.2f s" % Vfx.EXPLOSION_FLASH_TIME)
+	var ring := fx.get_node("Ring") as Node3D
+	check(ring.scale.x > 1.0, "the ground ring carries the blast")

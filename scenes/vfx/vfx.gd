@@ -339,9 +339,9 @@ static func explosion(pos: Vector3, radius: float, color: Color) -> void:
 	embers.gravity = Vector3(0, -4, 0)
 	embers.damping_min = 4.0
 	embers.damping_max = 7.0
-	embers.scale_amount_min = 0.35
-	embers.scale_amount_max = 0.8
-	embers.color_ramp = _fade_gradient(color.lerp(Color.WHITE, 0.6), Color(color.r, color.g, color.b, 0.0))
+	embers.scale_amount_min = 0.25
+	embers.scale_amount_max = 0.55
+	embers.color_ramp = _fade_gradient(color.lerp(Color.WHITE, 0.3), Color(color.r, color.g, color.b, 0.0))
 	_start(fx)
 
 

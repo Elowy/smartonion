@@ -9,9 +9,15 @@ extends Node3D
 ##   PROJECTILE – fires a Projectile (TEAM_PLAYERS) at it.
 ## Main hand and off hand run independently; the off hand starts half a cooldown late so
 ## dual-wielded weapons alternate.
+## Targets and melee arcs come from the shared [EnemyGrid] (only the enemies near the player
+## are looked at). While nothing is in range the runner looks again every NO_TARGET_RETRY
+## seconds – or at once when the number of enemies changes.
 
 ## Fraction of the cooldown the off hand waits at wave start / after idling.
 const OFF_HAND_PHASE := 0.5
+## Seconds between two target searches while no enemy is in range (a new or removed enemy
+## triggers a search at once).
+const NO_TARGET_RETRY := 0.1
 ## Projectiles fly this much further than the targeting range.
 const PROJECTILE_EXTRA_RANGE := 3.0
 ## Fraction of the target's velocity used to lead projectile shots.
@@ -31,6 +37,10 @@ var is_off_hand := false
 var cooldown_left := 0.0
 
 var _waiting_for_target := false
+## Seconds until the next target search while waiting for a target.
+var _retry_left := 0.0
+## Enemies in the tree at the last failed search (-1 = none yet).
+var _retry_enemy_count := -1
 
 
 static func create(p_weapon: WeaponData, owner_player: Player, p_off_hand: bool) -> WeaponRunner:
@@ -46,6 +56,8 @@ static func create(p_weapon: WeaponData, owner_player: Player, p_off_hand: bool)
 ## Wave start: main hand ready at once, off hand half a cooldown later.
 func reset() -> void:
 	_waiting_for_target = false
+	_retry_left = 0.0
+	_retry_enemy_count = -1
 	cooldown_left = cooldown() * OFF_HAND_PHASE if is_off_hand else 0.0
 
 
@@ -69,10 +81,19 @@ func tick(delta: float) -> bool:
 	cooldown_left -= delta
 	if cooldown_left > 0.0:
 		return false
+	if _waiting_for_target:
+		# Nothing was in range: search again only every NO_TARGET_RETRY s (or at once when
+		# enemies came or went), not every tick.
+		_retry_left -= delta
+		if _retry_left > 0.0 and _enemy_count() == _retry_enemy_count:
+			cooldown_left = 0.0
+			return false
 	var target := find_target()
 	if target == null:
 		cooldown_left = 0.0
 		_waiting_for_target = true
+		_retry_left = NO_TARGET_RETRY
+		_retry_enemy_count = _enemy_count()
 		return false
 	if _waiting_for_target:
 		_waiting_for_target = false
@@ -87,11 +108,16 @@ func tick(delta: float) -> bool:
 	return true
 
 
-## Nearest living enemy within the weapon's attack range (null if none).
+## Nearest living enemy within the weapon's attack range (null if none) – the same result as
+## [method nearest_enemy] over the whole group, found through the shared [EnemyGrid].
 func find_target() -> Enemy:
 	if weapon == null or player == null or not player.is_inside_tree():
 		return null
-	return nearest_enemy(player.get_tree().get_nodes_in_group(&"enemies"), player.global_position, weapon.attack_range)
+	return EnemyGrid.nearest(player.get_tree(), player.global_position, weapon.attack_range)
+
+
+func _enemy_count() -> int:
+	return player.get_tree().get_node_count_in_group(&"enemies") if player.is_inside_tree() else 0
 
 
 ## Attacks [param target] right now (no cooldown check).
@@ -116,7 +142,8 @@ func attack(target: Enemy) -> void:
 
 func _melee(origin: Vector3, dir: Vector3) -> void:
 	var base := CombatMath.weapon_hit_damage(weapon, player.stats)
-	var nodes := player.get_tree().get_nodes_in_group(&"enemies")
+	# Only the enemies the grid finds within reach (+ their radius) – same hits, same order.
+	var nodes := EnemyGrid.gather_around(player.get_tree(), origin, weapon.attack_range)
 	var hits := enemies_in_arc(nodes, origin, dir, weapon.attack_range, weapon.arc_degrees)
 	Vfx.slash_arc(origin + Vector3.UP * 0.3, dir, weapon.attack_range, weapon.arc_degrees, _slash_color())
 	for e in hits:

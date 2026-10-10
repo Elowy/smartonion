@@ -436,3 +436,73 @@ func test_unknown_enemy_style_falls_back() -> void:
 	var e := _keep(EnemyModel.new()) as EnemyModel
 	e.setup(data)
 	check_eq(e.style, &"skeleton", "fallback style")
+
+
+func test_onion_player_marker() -> void:
+	var m := _onion(&"warrior")
+	check(not m.is_marker_visible(), "no marker without a tag (lobby previews)")
+	m.set_tag("P2")
+	check(m.is_marker_visible(), "marker shown")
+	var label := m.get_node("Marker/Tag") as Label3D
+	check_eq(label.text, "P2", "player tag")
+	check(label.no_depth_test and label.fixed_size, "drawn through crowds at a fixed screen size")
+	var diamond := m.get_node("Marker/Diamond") as Sprite3D
+	check(diamond.no_depth_test, "diamond on top too")
+	check(diamond.modulate.is_equal_approx(Color(0.2, 0.5, 1.0)), "diamond in the player colour")
+	var marker := m.get_node("Marker") as Node3D
+	check(marker.position.y >= OnionModel.MARKER_Y - 0.001, "above the head")
+	check(OnionModel.marker_texture() == OnionModel.marker_texture(), "diamond texture built once")
+
+
+func test_onion_ghost_stays_findable() -> void:
+	var m := _onion(&"mage")
+	m.set_tag("P3")
+	var ring := m.get_node("Ring") as GeometryInstance3D
+	check_near(_param(ring, &"ring_stroke"), 1.0, 0.0001, "player ring has the dark outline + white stroke")
+	m.set_downed(true)
+	check(ring.visible, "player-colour ring stays under the ghost")
+	var area_color: Variant = _param(m.get_node("ReviveArea") as GeometryInstance3D, &"ring_color")
+	check(area_color is Color and (area_color as Color).b > 0.9 and (area_color as Color).r < 0.3,
+		"revive circle in the downed player's colour")
+	check_near((area_color as Color).a, OnionModel.REVIVE_AREA_ALPHA, 0.001, "revive circle alpha")
+	var bulb := m.get_node("Yaw/Body/Bulb") as GeometryInstance3D
+	var ghost: Variant = (bulb.material_override as ShaderMaterial).get_shader_parameter(&"color")
+	check(ghost is Color and is_equal_approx((ghost as Color).a, OnionModel.GHOST_ALPHA), "ghost alpha ~0.6")
+	# The ring breathes.
+	var sizes: Array[float] = []
+	for i in 40:
+		m._process(1.0 / 30.0)
+		sizes.append(ring.scale.x)
+	check(sizes.max() - sizes.min() > 0.1, "ring pulses while downed")
+	var marker := m.get_node("Marker") as Node3D
+	check(m.is_marker_visible(), "marker over the ghost")
+	check(marker.position.y > OnionModel.MARKER_Y, "higher over the floating ghost")
+	var heights: Array[float] = []
+	for i in 30:
+		m._process(1.0 / 30.0)
+		heights.append(marker.position.y)
+	check(heights.max() - heights.min() > OnionModel.MARKER_GHOST_BOB, "marker bobs")
+	m.set_revive_progress(0.5, Color.RED, 2.0)
+	m._process(0.01)
+	check(marker.position.y > OnionModel.CAST_BAR_Y + 0.8, "lifted above the Resurrecting cast bar")
+	m.set_downed(false)
+	m._process(0.01)
+	check_near(ring.scale.x, OnionModel.RING_SIZE, 0.001, "normal ring after the revive")
+	check_near(marker.position.y, OnionModel.MARKER_Y, 0.001, "marker back above the head")
+
+
+func test_rogue_and_warlock_read_from_above() -> void:
+	var rogue := Db.get_class_data(&"rogue")
+	check(rogue.accent_color.get_luminance() > 0.35, "rogue cowl is a light olive leather, not black")
+	check(rogue.onion_color.get_luminance() > 0.8, "pale spring onion")
+	var r := _onion(&"rogue")
+	check(r.get_node_or_null("Yaw/Body/Sprout") != null, "green stalk")
+	var w := _onion(&"warlock")
+	var flames := 0
+	for n: String in ["Yaw/Body/HornFlameL", "Yaw/Body/HornFlameR"]:
+		if w.get_node_or_null(n) != null and (w.get_node(n) as Node3D).visible:
+			flames += 1
+	check_eq(flames, 2, "purple flames on both horns")
+	check(OnionModel.WARLOCK_HOOD.get_luminance() > 0.2, "warlock hood light enough to read")
+	w.set_downed(true)
+	check(not (w.get_node("Yaw/Body/HornFlameL") as Node3D).visible, "no flames on the ghost")

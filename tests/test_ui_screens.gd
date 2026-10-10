@@ -206,3 +206,43 @@ func test_game_over_summary_and_input_delay() -> void:
 	screen.open(true)
 	check_eq(screen.title_label.text, "Victory!", "victory title")
 	check_eq(screen.waves_value.text, "25 / 25", "all waves")
+
+
+func test_hud_is_compact_and_readable() -> void:
+	var p1 := _player(&"warrior")
+	var hud := _add(Hud.create()) as Hud
+	var players: Array[Player] = [p1]
+	hud.bind_players(players)
+	var f := hud.frames[0]
+	check(f.custom_minimum_size.x <= 345.0, "unit frame ~340 px wide")
+	check(f.resource_bar.font_size >= 18, "resource label >= 18 px")
+	check(f.hp_bar.font_size >= 18, "hp label >= 18 px")
+	check(UnitFrame.SMALL_FONT >= 18, "revive hint >= 18 px")
+	check(UnitFrame.PANEL_ALPHA <= 0.85, "panel lets the battlefield show through")
+	# XP: a thin strip across the whole bottom edge.
+	var strip := hud.xp_bar.get_parent() as Control
+	check_eq(strip.anchor_left, 0.0, "strip starts at the left edge")
+	check_eq(strip.anchor_right, 1.0, "strip ends at the right edge")
+	check(-strip.offset_top <= 30.0, "thin")
+	check_eq(hud.level_label.text, "Level 1", "the team starts at level 1")
+	# Banner: slim and translucent, just below the timer plaque.
+	check_near(hud._banner.anchor_top, Hud.BANNER_ANCHOR, 0.0001, "banner anchored below the plaque")
+	check(hud._banner.offset_bottom - hud._banner.offset_top <= 110.0, "banner ~100 px tall")
+	check(Hud.BANNER_ALPHA <= 0.4, "banner ribbon translucent")
+
+
+func test_gold_floater_accumulates_on_one_label() -> void:
+	var hud := _add(Hud.create()) as Hud
+	var labels_before := hud._fx_layer.get_child_count()
+	for i in 6:
+		RunState.add_gold(1)
+		hud._process(0.1)
+	check_eq(hud._fx_layer.get_child_count(), labels_before, "no new labels per pickup")
+	check(hud.is_gold_floater_visible(), "floater shown")
+	check_eq(hud._floater.text, "+6", "pickups add up while it shows")
+	hud._process(Hud.FLOATER_TIME + 0.01)
+	check(not hud.is_gold_floater_visible(), "gone %.1f s after the last pickup" % Hud.FLOATER_TIME)
+	RunState.add_gold(4)
+	check_eq(hud._floater.text, "+4", "a new run of pickups starts from its own amount")
+	var coin_rect := hud._coin.get_global_rect()
+	check(hud._floater.get_global_rect().position.x > coin_rect.end.x, "right of the coin")

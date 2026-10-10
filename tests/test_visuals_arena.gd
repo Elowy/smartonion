@@ -126,4 +126,4 @@ func test_view_rect_shows_less_outside_towards_the_camera() -> void:
 	var ext := CameraRig.ground_extents(f["distance"], 16.0 / 9.0)
 	var target: Vector3 = f["target"]
 	check(target.z + ext.z <= v.end.y + 0.001, "view stays inside the rect")
-	check(target.z + ext.z >= at_wall[0].z + CameraRig.FRAME_MARGIN - 0.001, "player keeps its frame margin")
+	check(target.z + ext.z >= at_wall[0].z + CameraRig.FRAME_MARGIN_BOTTOM - 0.001, "player keeps its bottom frame margin")

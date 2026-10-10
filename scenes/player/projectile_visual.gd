@@ -46,7 +46,7 @@ static func build(style: StringName, color: Color, is_crit: bool = false, enemy:
 static func _build_threat_glow(root: Node3D) -> void:
 	var halo := _add(root, _cylinder(0.62, 0.62, 0.01, 24), Mats.unshaded(Color(ENEMY_HALO, 0.42)), Vector3(0, -0.05, 0))
 	halo.name = "Halo"
-	var rim := _add(root, _cylinder(0.36, 0.36, 0.012, 20), Mats.glow(Color(ENEMY_CORE, 0.55), 1.8), Vector3(0, -0.04, 0))
+	var rim := _add(root, _cylinder(0.34, 0.34, 0.012, 20), Mats.unshaded(Color(ENEMY_CORE, 0.6)), Vector3(0, -0.04, 0))
 	rim.name = "HaloCore"
 	var trail := _add(root, _cylinder(0.04, 0.3, 1.1, 10), Mats.unshaded(Color(ENEMY_HALO, 0.36)), Vector3(0, 0, 0.75))
 	trail.name = "Trail"
