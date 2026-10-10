@@ -91,6 +91,8 @@ var main_hand: WeaponData
 var off_hand: WeaponData
 ## One runner per equipped weapon that attacks (main hand first).
 var weapons: Array[WeaponRunner] = []
+## Equipped items + backpack (GDD 5). Changes re-apply stat sources and weapons.
+var equipment: Equipment
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
@@ -133,9 +135,10 @@ static func create(p_slot: PlayerSlot) -> Player:
 	if p.class_data != null:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
-		p.equip_weapons(p.class_data.main_hand, p.class_data.off_hand)
-	else:
-		p.equip_weapons(null, null)
+	p.equipment = Equipment.new(p.class_data)
+	p.equipment.equip_starting_weapons()
+	p.apply_equipment()
+	p.equipment.changed.connect(p.apply_equipment)
 	# "P1" nameplate marker above the head (also marks whose ghost it is).
 	p.model.set_tag(p_slot.label() if p_slot != null else "")
 	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
@@ -230,8 +233,31 @@ func on_hit_dealt(damage: float, target: Node3D) -> void:
 
 # --- Extra public helpers ------------------------------------------------------
 
+## Re-applies [member equipment]: one stat source per equipped position (Items.source_for),
+## Armor Specialization (+10% primary stat, GDD 5.3) and the equipped weapons.
+func apply_equipment() -> void:
+	if equipment == null:
+		return
+	var sources := equipment.stat_sources()
+	for s in Items.EquipSlot.values():
+		var source := Items.source_for(s)
+		if sources.has(source):
+			stats.set_source(source, sources[source])
+		else:
+			stats.remove_source(source)
+	stats.remove_source(&"armor_spec")
+	if class_data != null and equipment.armor_spec_active():
+		var primary := stats.get_raw(class_data.primary_stat)
+		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
+	var main := equipment.main_weapon()
+	var off := equipment.off_weapon()
+	if main != main_hand or off != off_hand:
+		equip_weapons(main, off)
+
+
 ## Equips [param p_main] / [param p_off] (null = empty hand): updates the weapon stat
-## sources, rebuilds the WeaponRunners and the weapon models.
+## sources (WeaponData.bonus_stats), rebuilds the WeaponRunners and the weapon models.
+## Normally called by apply_equipment(); tests may call it directly.
 func equip_weapons(p_main: WeaponData, p_off: WeaponData) -> void:
 	main_hand = p_main
 	off_hand = p_off

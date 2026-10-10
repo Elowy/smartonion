@@ -5,12 +5,20 @@ extends Node
 const CLASS_DIR := "res://data/classes/"
 const WEAPON_DIR := "res://data/weapons/"
 const ENEMY_DIR := "res://data/enemies/"
+const ITEM_BASE_DIR := "res://data/item_bases/"
+const AFFIX_DIR := "res://data/affixes/"
+const ENCHANT_DIR := "res://data/enchants/"
+const UNIQUE_DIR := "res://data/uniques/"
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
 var classes: Dictionary[StringName, ClassData] = {}
 var weapons: Dictionary[StringName, WeaponData] = {}
 var enemies: Dictionary[StringName, EnemyData] = {}
+var item_bases: Dictionary[StringName, ItemBase] = {}
+var affixes: Dictionary[StringName, AffixData] = {}
+var enchants: Dictionary[StringName, EnchantData] = {}
+var uniques: Dictionary[StringName, UniqueItemData] = {}
 var class_ids: Array[StringName] = []
 
 
@@ -31,6 +39,22 @@ func reload() -> void:
 	for res in _load_dir(ENEMY_DIR):
 		if res is EnemyData:
 			enemies[res.id] = res
+	item_bases.clear()
+	affixes.clear()
+	enchants.clear()
+	uniques.clear()
+	for res in _load_dir(ITEM_BASE_DIR):
+		if res is ItemBase:
+			item_bases[res.id] = res
+	for res in _load_dir(AFFIX_DIR):
+		if res is AffixData:
+			affixes[res.id] = res
+	for res in _load_dir(ENCHANT_DIR):
+		if res is EnchantData:
+			enchants[res.id] = res
+	for res in _load_dir(UNIQUE_DIR):
+		if res is UniqueItemData:
+			uniques[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -57,6 +81,21 @@ func get_weapon(id: StringName) -> WeaponData:
 
 func get_enemy(id: StringName) -> EnemyData:
 	return enemies.get(id)
+
+
+func get_enchant(id: StringName) -> EnchantData:
+	return enchants.get(id)
+
+
+func get_unique(id: StringName) -> UniqueItemData:
+	return uniques.get(id)
+
+
+## Content-pool gate for meta-progression (ARCHITECTURE "Forward compatibility"): every
+## player-facing pool (shop, loot, level-up cards, lobby) filters through this. All content is
+## unlocked until milestone M9.
+func is_unlocked(_id: StringName) -> bool:
+	return true
 
 
 ## Next / previous class id in lobby order (wraps around).

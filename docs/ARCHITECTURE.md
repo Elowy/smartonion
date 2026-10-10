@@ -343,3 +343,34 @@ without rewrites:
   format (`{"version": N, ...}`) with migration, stored under `user://`.
 - **Power budget.** Balance Normal difficulty with zero meta-progression; meta bonuses add
   at most ~10% power.
+
+## M2: items, loot and the shared shop (in progress)
+
+New code (contracts fixed by the stub scripts, like M1):
+
+```
+core/items/   Items (enums, slot / material / Item Level helpers), ItemInstance, EnchantRoll,
+              Equipment (equipped + 10-slot backpack, strict proficiency), ItemGenerator,
+              ProcSystem (enchant / unique-effect procs)
+core/shop/    Shop (shared stall: offers, locks, pings, reroll vote)
+core/loot/    LootRoll (Need / Greed / Pass), LootDrops (drop rules on enemy death)
+data/items/   ItemBase, AffixData, EnchantData, UniqueItemData resource classes
+data/item_bases/ data/affixes/ data/enchants/ data/uniques/   content (.tres, loaded by Db)
+scenes/pickups/loot_bag.gd             LootBag (item on the ground, rarity light beam)
+scenes/ui/items/   ItemIcon, ItemTooltip, PlayerPanel (paper doll + backpack + trade)
+scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
+```
+
+- Every Player owns an `Equipment`; the class's starting weapons are Common `ItemInstance`s.
+  `Player.apply_equipment()` (on `equipment.changed`) sets one stat source per equipped
+  position (`Items.source_for(slot)`), `&"armor_spec"` (+10% primary stat when all 8 armor
+  slots hold the class's armor type) and calls `equip_weapons(main, off)`, which keeps the
+  weapons' own `bonus_stats` as `&"weapon:main"` / `&"weapon:off"`.
+- Weapon items carry a private `WeaponData` copy with the rarity damage multiplier applied,
+  so `WeaponRunner` is unchanged.
+- Proficiency is strict (GDD 5.3): `ItemInstance.can_be_used_by(class_data)`.
+- `RunState.team_loot` collects looted items during a wave; `RunState.shop` is the shared
+  shop for the whole run.
+- Between waves (Intermission): loot roll (if any loot) → shared shop in the middle + one
+  `PlayerPanel` per player in their corner → everyone ready (START) → next wave.
+- All player-facing content pools filter through `Db.is_unlocked(id)` (M9 hook).
