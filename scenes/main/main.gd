@@ -296,6 +296,8 @@ func open_intermission() -> void:
 		return
 	_set_state(State.INTERMISSION)
 	get_tree().paused = true
+	if hud != null:
+		hud.hide()  # the market has its own summary; start_wave shows the HUD again
 	intermission.open(wave, RunState.pending_level_ups)
 
 

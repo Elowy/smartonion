@@ -45,7 +45,7 @@ func _draw() -> void:
 	_draw_awning(w)
 	_draw_lantern(Vector2(64.0, AWNING_BOTTOM + 8.0))
 	_draw_sign(Vector2(w * 0.5, SIGN_TOP))
-	_draw_goblin(Vector2(w - 92.0, AWNING_BOTTOM + 30.0 + sin(_t * 1.7) * 1.5))
+	_draw_goblin(Vector2(w - 92.0, AWNING_BOTTOM - 12.0 + sin(_t * 1.7) * 1.5))
 
 
 # --- Awning ------------------------------------------------------------------------
@@ -133,13 +133,14 @@ func _draw_lantern(top: Vector2) -> void:
 
 # --- Goblin -----------------------------------------------------------------------
 
-## The merchant's head and shoulders; [param c] is the centre of the head.
+## The merchant's head and shoulders (kept above the stall body, which starts at
+## ShopPanel.BODY_TOP); [param c] is the centre of the head.
 func _draw_goblin(c: Vector2) -> void:
 	# Shoulders / vest behind the head.
-	var vest := PackedVector2Array([c + Vector2(-46, 26), c + Vector2(46, 26), c + Vector2(58, 60), c + Vector2(-58, 60)])
+	var vest := PackedVector2Array([c + Vector2(-40, 22), c + Vector2(40, 22), c + Vector2(50, 40), c + Vector2(-50, 40)])
 	draw_colored_polygon(vest, Color(0.4, 0.17, 0.32))
 	draw_polyline(_closed(vest), LINE, 2.0, true)
-	draw_line(c + Vector2(0, 28), c + Vector2(0, 60), UiTheme.GOLD_BORDER, 2.0)
+	draw_line(c + Vector2(0, 26), c + Vector2(0, 40), UiTheme.GOLD_BORDER, 2.0)
 	# Ears: long and pointy, slightly drooping.
 	for side in [-1.0, 1.0]:
 		var ear := PackedVector2Array([
@@ -184,11 +185,13 @@ func _draw_goblin(c: Vector2) -> void:
 	draw_circle(crown.position + Vector2(crown.size.x - 8, 25), 3.0, UiTheme.GOLD)
 	# A coin flipped in the left hand.
 	var coin_y := -6.0 + absf(sin(_t * 2.6)) * -14.0
-	var coin := c + Vector2(-62, 46 + coin_y)
+	var coin := c + Vector2(-64, 18 + coin_y)
 	var squash := absf(cos(_t * 5.2))
 	draw_colored_polygon(_ellipse_points(coin, Vector2(8.0 * maxf(squash, 0.15), 8.0)), UiTheme.GOLD)
 	draw_polyline(_closed(_ellipse_points(coin, Vector2(8.0 * maxf(squash, 0.15), 8.0))), LINE, 1.5, true)
-	draw_colored_polygon(_ellipse_points(c + Vector2(-58, 60), Vector2(10, 7)), GOBLIN_SKIN)
+	var hand := _ellipse_points(c + Vector2(-60, 32), Vector2(10, 7))
+	draw_colored_polygon(hand, GOBLIN_SKIN)
+	draw_polyline(_closed(hand), LINE, 1.5, true)
 
 
 static func _ellipse_points(center: Vector2, radii: Vector2, steps: int = 24) -> PackedVector2Array:

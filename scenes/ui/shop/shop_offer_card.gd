@@ -46,8 +46,6 @@ static func type_text(item: ItemInstance) -> String:
 			t = "Weapon"
 		if item.is_two_handed():
 			t += " (2H)"
-		elif item.is_off_hand_only():
-			t += " (Off Hand)"
 		return t
 	var slot_name: String = Items.SLOT_NAMES.get(item.slot_type, "")
 	if item.armor_type != Items.NO_ARMOR:
@@ -76,6 +74,7 @@ func _build() -> void:
 	name_label = UiTheme.centered_label("", &"", 16)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.max_lines_visible = 2
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.custom_minimum_size = Vector2(CARD_SIZE.x - 12, 44)
 	name_label.add_theme_font_override(&"font", UiTheme.bold_font())
 	name_label.add_theme_constant_override(&"line_spacing", -3)

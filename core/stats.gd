@@ -54,6 +54,9 @@ const SLAYER := &"slayer"                  ## +% damage vs elites and bosses
 const LIFE_ON_KILL := &"life_on_kill"      ## % chance to heal 1 HP on kill
 const XP_GAIN := &"xp_gain"                ## +% XP
 
+## Whole-number stats (counts): item / enchant values are rounded down for them.
+const INTEGER_STATS: Array[StringName] = [EXTRA_PROJECTILE, PIERCE]
+
 ## School stat per damage school id (spell / proc schools, GDD 6.4).
 const SCHOOL_STATS := {
 	&"fire": FIRE_DAMAGE, &"frost": FROST_DAMAGE, &"arcane": ARCANE_DAMAGE,

@@ -21,8 +21,15 @@ func equip_stats() -> Dictionary[StringName, float]:
 	if enchant == null or enchant.kind != EnchantData.Kind.EQUIP:
 		return out
 	for stat in enchant.equip_stats:
-		out[stat] = enchant.equip_stats[stat] * mult()
+		out[stat] = _scaled_stat(stat, enchant.equip_stats[stat])
 	return out
+
+
+## Rank-scaled stat value; counts (Stats.INTEGER_STATS) are rounded down (rank II of a
+## "+1 Pierce" is still +1, rank III is +2).
+func _scaled_stat(stat: StringName, base: float) -> float:
+	var v := base * mult()
+	return floorf(v + 0.0001) if stat in Stats.INTEGER_STATS else v
 
 
 ## A numeric parameter at this rank (non-numeric values are returned unchanged).
@@ -44,7 +51,7 @@ func description() -> String:
 		var v: Variant = param(key)
 		text = text.replace("{%s}" % key, _fmt(v))
 	for stat in enchant.equip_stats:
-		text = text.replace("{%s}" % stat, _fmt(enchant.equip_stats[stat] * mult()))
+		text = text.replace("{%s}" % stat, _fmt(_scaled_stat(stat, enchant.equip_stats[stat])))
 	return text
 
 
