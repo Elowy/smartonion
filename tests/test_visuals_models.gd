@@ -25,8 +25,12 @@ func _onion(class_id: StringName) -> OnionModel:
 
 
 func _overlay(gi: GeometryInstance3D) -> float:
-	var v: Variant = gi.get_instance_shader_parameter(Mats.OVERLAY_PARAM)
-	return (v as Color).a if v is Color else 0.0
+	return Mats.overlay_amount(gi)
+
+
+func _param(gi: GeometryInstance3D, name: StringName) -> Variant:
+	var m := gi.material_override as ShaderMaterial
+	return m.get_shader_parameter(name) if m != null else null
 
 
 # --- Mats ---------------------------------------------------------------------
@@ -41,6 +45,51 @@ func test_mats_are_cached_and_outlined() -> void:
 	var u := Mats.unshaded(Color(1, 1, 1, 0.5)) as StandardMaterial3D
 	check(u.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED, "alpha unshaded is transparent")
 	check(Mats.glow(Color.GREEN) == Mats.glow(Color.GREEN), "glow cached")
+
+
+func test_no_instance_uniforms() -> void:
+	# The Compatibility renderer fits instance uniforms for only ~256 instances (16 vec4
+	# slots each in a 64 KB buffer) – far fewer than 150 enemies + props need.
+	var materials: Array[Material] = [Mats.toon(Color.RED), Mats.toon_vc(), Mats.onion_skin(Color.RED, 0.5),
+		Mats.toon_cloth_vc(), Mats.ghost(Color.WHITE), Mats.ring(), Mats.cast_bar(), Mats.outline()]
+	for m in materials:
+		var sm := m as ShaderMaterial
+		check(sm != null and not sm.shader.code.contains("instance uniform"), "%s free of instance uniforms" % m)
+	var arena := _keep(Arena.create()) as Arena
+	tree.root.add_child(arena)
+	Vfx.slash_arc(Vector3.ZERO, Vector3.FORWARD, 2.0, 90.0, Color.WHITE)
+	Vfx.explosion(Vector3.ZERO, 1.0, Color.RED)
+	Vfx.spawn_telegraph(Vector3.ZERO, 1.0, 1.0)
+	Vfx.level_up_burst(Vector3.ZERO)
+	Vfx.resurrect_column(Vector3.ZERO)
+	var checked := 0
+	for gi in arena.find_children("*", "GeometryInstance3D", true, false):
+		var sm := (gi as GeometryInstance3D).material_override as ShaderMaterial
+		if sm != null and sm.shader != null:
+			checked += 1
+			check(not sm.shader.code.contains("instance uniform"), "%s free of instance uniforms" % gi.name)
+	check(checked > 10, "arena and vfx materials inspected (%d)" % checked)
+
+
+func test_overlay_variants_are_cached_and_reversible() -> void:
+	var base := Mats.toon_vc()
+	var a := _keep(MeshInstance3D.new()) as MeshInstance3D
+	var b := _keep(MeshInstance3D.new()) as MeshInstance3D
+	a.material_override = base
+	b.material_override = base
+	Mats.set_overlay(a, Color.WHITE, 0.8)
+	Mats.set_overlay(b, Color.WHITE, 0.82)
+	check(a.material_override != base, "tinted variant")
+	check(a.material_override == b.material_override, "variant shared (quantised)")
+	check((a.material_override as ShaderMaterial).next_pass == base.next_pass, "outline kept")
+	check_near(Mats.overlay_amount(a), 0.8, 0.001, "amount")
+	Mats.set_overlay(a, Color.RED, 0.5, 30.0)
+	check(Mats.base_material(a) == base, "base remembered")
+	Mats.set_overlay(a, Color.WHITE, 0.0)
+	check(a.material_override == base, "zero amount restores the base")
+	var ghost := Mats.ghost(Color.WHITE)
+	a.material_override = ghost
+	check(Mats.base_material(a) == ghost, "follows an external material change")
 
 
 # --- MeshKit ------------------------------------------------------------------
@@ -196,9 +245,10 @@ func test_onion_flash_and_hp() -> void:
 		m._process(1.0 / 60.0)
 	check_near(_overlay(bulb), 0.0, 0.001, "flash fades")
 	m.set_hp_ratio(1.0)
-	check_eq(bulb.get_instance_shader_parameter(&"damage"), 0.0, "healthy onion")
+	check_near(m.bulb_damage(), 0.0, 0.001, "healthy onion")
 	m.set_hp_ratio(0.15)
-	check((bulb.get_instance_shader_parameter(&"damage") as float) > 0.5, "peeled at low HP")
+	check(m.bulb_damage() > 0.5, "peeled at low HP")
+	check(bulb.material_override == Mats.onion_skin(Db.get_class_data(&"warrior").onion_color, OnionModel.damage_amount(0.15)), "shared damage material")
 	var visible_peels := 0
 	for i in 3:
 		if (m.get_node("Yaw/Body/Peel%d" % i) as Node3D).visible:
@@ -221,7 +271,7 @@ func test_onion_downed_ghost_and_revive() -> void:
 	check(not (m.get_node("Yaw/Body/HandMain/Grip").get_child(0) as Node3D).visible, "weapon hidden")
 	m.set_revive_progress(0.5)
 	check((m.get_node("ReviveArc") as Node3D).visible, "progress ring")
-	var shape: Variant = (m.get_node("ReviveArc") as GeometryInstance3D).get_instance_shader_parameter(&"ring_shape")
+	var shape: Variant = _param(m.get_node("ReviveArc") as GeometryInstance3D, &"ring_shape")
 	check(shape is Vector4 and is_equal_approx((shape as Vector4).w, 0.5), "ring arc = progress")
 	for i in 30:
 		m._process(1.0 / 30.0)
@@ -284,11 +334,11 @@ func test_onion_revive_cast_bar() -> void:
 	check(m.is_cast_bar_visible(), "cast bar while being revived")
 	var bar := m.get_node("CastBar") as GeometryInstance3D
 	check_near(bar.global_position.y if bar.is_inside_tree() else bar.position.y, OnionModel.CAST_BAR_Y, 0.001, "above the head")
-	check_near(bar.get_instance_shader_parameter(&"bar_progress"), 0.4, 0.0001, "bar fill = progress")
-	check(bar.get_instance_shader_parameter(&"bar_color") == Color(reviver, 1.0), "reviver's colour")
+	check_near(_param(bar, &"bar_progress"), 0.4, 0.0001, "bar fill = progress")
+	check(_param(bar, &"bar_color") == Color(reviver, 1.0), "reviver's colour")
 	var label := m.get_node("CastLabel") as Label3D
 	check(label.text.begins_with("Resurrecting") and label.text.contains("3.0"), "cast text with time (%s)" % label.text)
-	var arc: Variant = (m.get_node("ReviveArc") as GeometryInstance3D).get_instance_shader_parameter(&"ring_color")
+	var arc: Variant = _param(m.get_node("ReviveArc") as GeometryInstance3D, &"ring_color")
 	check(arc is Color and (arc as Color).r > 0.9 and (arc as Color).g < 0.5, "ring in the reviver's colour")
 	m.set_revive_progress(0.0)
 	check(not m.is_cast_bar_visible(), "hidden when progress drops to zero")
@@ -358,8 +408,9 @@ func test_enemy_animation_states() -> void:
 	e.play_windup()
 	check(e.is_winding_up(), "winding up")
 	e._process(0.1)
-	var tint: Color = body.get_instance_shader_parameter(Mats.OVERLAY_PARAM)
+	var tint: Color = _param(body, Mats.OVERLAY_PARAM)
 	check(tint.a > 0.05 and tint.r > tint.g, "red wind-up tell")
+	check(_param(body, &"overlay_pulse") > 0.0, "pulsing")
 	e.play_attack()
 	check(not e.is_winding_up(), "attack ends the wind-up")
 	for i in 30:
