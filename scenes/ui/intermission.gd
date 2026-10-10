@@ -5,11 +5,21 @@ extends Control
 ## Trainer | Talents | Character) as locked headers, and one ready chip per player.
 ## Every joined player presses A (or START) to ready, B to unready; bots and players whose
 ## controller is unplugged count as ready. Everyone ready -> continue_requested (once per open).
+## GDD 12: after [member auto_continue_time] seconds the next wave starts anyway (a "Next wave
+## in N s" countdown is shown); the setting can switch it off.
 ## See docs/ARCHITECTURE.md.
 
 signal continue_requested
 
 const TABS: Array[String] = ["Shop", "Trainer", "Talents", "Character"]
+## GDD 12: seconds after which the next wave starts even if not everyone is ready.
+const AUTO_CONTINUE_TIME := 60.0
+## The countdown turns gold for its last seconds.
+const COUNTDOWN_WARN_TIME := 10.0
+
+## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
+## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
+static var auto_continue_time := AUTO_CONTINUE_TIME
 
 var cleared_wave := 0
 var level_ups := 0
@@ -20,6 +30,10 @@ var gold_value: Label
 var level_value: Label
 var level_ups_value: Label
 var chips_row: HBoxContainer
+## "Next wave in 42 s" (hidden when the auto-continue is switched off).
+var countdown_label: Label
+## Seconds until the next wave starts by itself; -1 = no countdown (switched off).
+var time_left := -1.0
 
 var _done := true
 ## Input is ignored on the first frame after open() (the press that ended the wave).
@@ -29,6 +43,7 @@ var _chip_keys: Dictionary[int, String] = {}
 var _chip_ids := ""
 var _backdrop: TextureRect
 var _t := 0.0
+var _countdown_second := -1
 
 
 static func create() -> Intermission:
@@ -44,9 +59,12 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	level_ups = p_level_ups
 	_done = false
 	_skip_frames = 1
+	time_left = auto_continue_time if auto_continue_time > 0.0 else -1.0
+	_countdown_second = -1
 	for slot in PlayerManager.get_slots():
 		slot.ready = is_auto_ready(slot)
 	_fill()
+	_update_countdown()
 	_refresh_chips(true)
 	show()
 
@@ -125,6 +143,9 @@ func _build() -> void:
 	chips_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	chips_row.custom_minimum_size = Vector2(0, 74)
 	col.add_child(chips_row)
+	countdown_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY + 2)
+	countdown_label.visible = false
+	col.add_child(countdown_label)
 
 	col.add_child(UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.A), "Ready"],
@@ -261,12 +282,32 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:
 	box.add_child(status)
 
 
+func _update_countdown() -> void:
+	countdown_label.visible = time_left >= 0.0
+	if time_left < 0.0:
+		return
+	var whole := maxi(0, ceili(time_left))
+	if whole == _countdown_second:
+		return
+	_countdown_second = whole
+	countdown_label.text = "Next wave in %d s" % whole
+	var warn := time_left <= COUNTDOWN_WARN_TIME
+	countdown_label.add_theme_color_override(&"font_color", UiTheme.GOLD if warn else UiTheme.TEXT_DIM)
+
+
 # --- Frame ---------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	_t += delta
 	if not visible or _done:
 		return
+	if time_left > 0.0:
+		time_left = maxf(0.0, time_left - delta)
+		_update_countdown()
+		if time_left <= 0.0:
+			# GDD 12: time is up – the next wave starts, the stragglers come along anyway.
+			_continue()
+			return
 	if _skip_frames > 0:
 		_skip_frames -= 1
 		return
@@ -285,5 +326,9 @@ func _process(delta: float) -> void:
 			s.ready = true
 	_refresh_chips()
 	if slots.is_empty() or PlayerManager.all_ready():
-		_done = true
-		continue_requested.emit()
+		_continue()
+
+
+func _continue() -> void:
+	_done = true
+	continue_requested.emit()

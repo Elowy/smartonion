@@ -144,16 +144,25 @@ func test_downed_and_revive_timing() -> void:
 	p1.heal(5.0)
 	check_eq(p1.hp, 0.0, "downed players cannot be healed")
 
-	# A living teammate 1 m away revives after REVIVE_TIME seconds.
-	for _i in 29:
+	# A living teammate 1 m away revives after REVIVE_TIME (GDD 1: 5 s).
+	check_eq(Player.REVIVE_TIME, 5.0, "5 s revive")
+	for _i in 49:
 		p1._physics_process(0.1)
-	check(p1.downed, "still downed after 2.9 s")
-	check_near(p1.revive_progress, 2.9, 0.01, "progress")
+	check(p1.downed, "still downed after 4.9 s")
+	check_near(p1.revive_progress, 4.9, 0.01, "progress")
+	check_eq(p1.reviver_count, 1, "one reviver")
+	check_near(p1.revive_seconds_left(), 0.1, 0.01, "0.1 s left")
 	p1._physics_process(0.1)
-	check(not p1.downed, "revived after 3 s")
+	check(not p1.downed, "revived after 5 s")
 	check_eq(p1.hp, roundf(15.0 * Player.REVIVE_HP_RATIO), "revived at 30% hp")
 	check_eq(downed_events, [true, false] as Array[bool], "downed_changed(false)")
-	check(p1.invulnerable_left > 0.0, "short grace after revive")
+	check_eq(Player.INVULNERABLE_AFTER_REVIVE, 1.0, "GDD 1: 1 s invulnerability")
+	check_near(p1.invulnerable_left, Player.INVULNERABLE_AFTER_REVIVE, 0.001, "invulnerable after the revive")
+	check_eq(p1.reviver_count, 0, "no revivers once alive")
+	check_eq(p1.revive_seconds_left(), -1.0, "nothing left to cast")
+	var hp_after := p1.hp
+	p1.take_damage(5.0)
+	check_eq(p1.hp, hp_after, "hits ignored during the grace")
 	check(p2.is_alive(), "reviver unaffected")
 
 
@@ -170,11 +179,69 @@ func test_revive_needs_living_teammate_nearby() -> void:
 	p2.global_position = Vector3(10.0, 0, 0)
 	Fakes.step(p1, 1.0, 0.1)
 	check_near(p1.revive_progress, 1.0 - Player.REVIVE_DECAY_PER_SECOND, 0.01, "decays slowly")
+	check_eq(p1.reviver_count, 0, "nobody in the circle")
+	check_eq(p1.revive_seconds_left(), -1.0, "no cast time while nobody revives")
 	# A downed teammate cannot revive.
 	p2.global_position = Vector3(1.0, 0, 0)
 	p2.take_damage(999.0)
 	Fakes.step(p1, 4.0, 0.1)
 	check(p1.downed, "downed teammate does not revive")
+
+
+func test_more_revivers_revive_faster() -> void:
+	check_eq(Player.revive_speed(0), 0.0, "nobody reviving")
+	check_eq(Player.revive_speed(1), 1.0, "1 reviver = 1x")
+	check_eq(Player.revive_speed(2), 1.5, "2 revivers = 1.5x")
+	check_eq(Player.revive_speed(3), 2.0, "3 revivers = 2x")
+	var ghost := Fakes.spawn_player(world, 0, &"warrior")
+	Fakes.spawn_player(world, 1, &"warrior", Vector3(1.0, 0, 0))
+	Fakes.spawn_player(world, 2, &"warrior", Vector3(-1.0, 0, 0))
+	var third := Fakes.spawn_player(world, 3, &"warrior", Vector3(0, 0, 1.0))
+	ghost.take_damage(999.0)
+	Fakes.step(ghost, 1.0, 0.1)
+	check_eq(ghost.reviver_count, 3, "three revivers in the circle")
+	check_near(ghost.revive_progress, 2.0, 0.01, "2x speed")
+	check_near(ghost.revive_seconds_left(), 1.5, 0.01, "(5 - 2) / 2 s left")
+	var cast_text: String = ghost.model._cast_label.text
+	check("1.5" in cast_text, "the cast bar shows the faster time: %s" % cast_text)
+	# One reviver walks away: 1.5x for the rest.
+	third.global_position = Vector3(10.0, 0, 0)
+	Fakes.step(ghost, 1.0, 0.1)
+	check_eq(ghost.reviver_count, 2, "two revivers left")
+	check_near(ghost.revive_progress, 3.5, 0.01, "1.5x speed")
+	check_near(ghost.revive_seconds_left(), 1.0, 0.01, "1.5 / 1.5 s left")
+	Fakes.step(ghost, 1.05, 0.05)
+	check(not ghost.downed, "revived after 1 + 1 + 1 s instead of 5 s")
+
+
+func test_revive_is_not_interrupted_by_damage_and_ends_with_a_light_column() -> void:
+	var ghost := Fakes.spawn_player(world, 0, &"warrior", Vector3(2.0, 0, -1.0))
+	var reviver := Fakes.spawn_player(world, 1, &"warrior", Vector3(3.0, 0, -1.0))
+	ghost.take_damage(999.0)
+	Fakes.step(ghost, 2.0, 0.1)
+	reviver.take_damage(3.0)
+	check(reviver.is_alive() and reviver.hp < reviver.max_hp(), "the reviver got hit")
+	Fakes.step(ghost, 0.1, 0.1)
+	check_near(ghost.revive_progress, 2.1, 0.01, "taking damage does not interrupt the revive")
+	var feet := ghost.global_position
+	Fakes.step(ghost, 2.9, 0.1)
+	check(not ghost.downed, "revived")
+	var column: VfxEffect = null
+	var resurrected := false
+	for c in world.get_children():
+		var fx := c as VfxEffect
+		if fx == null:
+			continue
+		if fx.kind == VfxEffect.Kind.RESURRECT:
+			column = fx
+		var label := fx.get_node_or_null("Label") as Label3D
+		if label != null and label.text == "Resurrected!":
+			resurrected = true
+	check(column != null, "a column of light from the sky")
+	if column != null:
+		var d := column.global_position - feet
+		check(Vector2(d.x, d.z).length() < 0.01, "at the revived player's feet")
+	check(resurrected, "\"Resurrected!\" floating text")
 
 
 func test_downed_ghost_does_not_attack_and_moves_slowly() -> void:
@@ -279,3 +346,76 @@ func test_movement_clamped_to_arena() -> void:
 	check(p.global_position.x < x0 - 1.0, "walks away from the wall")
 	Arena.current = previous
 	arena.free()
+
+
+func test_clamp_motion_to_rect() -> void:
+	var r := Rect2(-2.0, -1.0, 4.0, 2.0)  # x -2..2, z -1..1
+	check_eq(Player.clamp_motion_to_rect(Vector3(0, 0, 0), Vector3(0.5, 0.2, -0.3), r), Vector3(0.5, 0.2, -0.3), "inside: untouched")
+	check_eq(Player.clamp_motion_to_rect(Vector3(1, 0, 0), Vector3(3, 0, 0.5), r), Vector3(1, 0, 0.5), "x stops at the edge, z slides on")
+	check_eq(Player.clamp_motion_to_rect(Vector3(0, 0, 0.5), Vector3(0, 0, 2), r), Vector3(0, 0, 0.5), "z stops at the edge")
+	# Already outside (the camera moved): never pushed, never further out, free to come back.
+	check_eq(Player.clamp_motion_to_rect(Vector3(5, 0, 0), Vector3(1, 0, 0), r), Vector3(0, 0, 0), "no further out")
+	check_eq(Player.clamp_motion_to_rect(Vector3(5, 0, 0), Vector3(-1, 0, 0), r), Vector3(-1, 0, 0), "walks back in")
+	check_eq(Player.clamp_motion_to_rect(Vector3(5, 0, 0), Vector3(0, 0, 0.5), r), Vector3(0, 0, 0.5), "slides along outside")
+	# A squeezed (zero-size) rect only allows moving towards it.
+	var dot := Rect2(0.0, 0.0, 0.0, 0.0)
+	check_eq(Player.clamp_motion_to_rect(Vector3(3, 0, 0), Vector3(-1, 0, 0), dot), Vector3(-1, 0, 0), "towards the team")
+	check_eq(Player.clamp_motion_to_rect(Vector3(3, 0, 0), Vector3(1, 0, 0), dot), Vector3(0, 0, 0), "not away")
+
+
+## GDD 13: once the camera is fully zoomed out, the screen edge is an invisible wall.
+func test_screen_edge_stops_runaways() -> void:
+	var arena := Arena.new()  # bare arena: bounds only (34 x 22 m)
+	var previous := Arena.current
+	Arena.current = arena
+	var rig := CameraRig.new()
+	world.add_child(rig)
+	arena.camera = rig
+	var spread := CameraRig.max_spread(rig._aspect())
+	# A teammate far west (outside the bare arena, so the wall binds inside it): at full
+	# zoom the camera fits at most spread.x across, so the runner is stopped at x = 5.
+	var runner := Fakes.spawn_player(world, 0, &"warrior", Vector3(0, 0, 0))
+	var mate := Fakes.spawn_player(world, 1, &"warrior", Vector3(5.0 - spread.x, 0, 0))
+	rig.snap()
+	var rect := rig.get_walk_rect(runner)
+	check_near(rect.end.x, 5.0, 0.001, "east limit = teammate + max spread")
+	var input := runner.slot.input as ScriptedInput
+	input.move = Vector2(1, 0)
+	Fakes.step(runner, 2.0)
+	check(runner.global_position.x <= 5.0 + 0.001, "stopped at the screen edge (x %.2f)" % runner.global_position.x)
+	check(runner.global_position.x > 4.0, "walked up to it")
+	check_near(runner.velocity.x, 0.0, 0.001, "no velocity into the screen edge")
+	# Pushing diagonally slides along the edge.
+	input.move = Vector2(1, 1).normalized()
+	var z0 := runner.global_position.z
+	Fakes.step(runner, 0.5)
+	check(runner.global_position.x <= 5.0 + 0.001, "still on screen")
+	check(runner.global_position.z - z0 > runner.stats.move_speed() * 0.707 * 0.5 * 0.7, "slides along the screen edge")
+	# Walking back towards the team is free.
+	input.move = Vector2(-1, 0)
+	var x0 := runner.global_position.x
+	Fakes.step(runner, 0.5)
+	check(runner.global_position.x < x0 - 1.0, "walks back")
+	# A ghost (the camera does not follow it) is kept inside the current view.
+	mate.global_position = Vector3(0, 0, 0)
+	rig.snap()
+	runner.global_position = Vector3(0, 0, 0)
+	runner.take_damage(999.0)
+	var view := rig.get_walk_rect(runner)
+	check(view.end.x < Arena.SIZE.x * 0.5, "the view is narrower than the arena")
+	mate.global_position = Vector3(-6.0, 0, 0)  # out of the revive circle
+	input.move = Vector2(1, 0)
+	Fakes.step(runner, 20.0, 0.1)
+	check(runner.global_position.x <= view.end.x + 0.001, "ghost stays on screen (x %.2f, edge %.2f)" % [runner.global_position.x, view.end.x])
+	check(runner.global_position.x > view.end.x - 0.5, "ghost reached the edge")
+	Arena.current = previous
+	arena.free()
+
+
+func test_no_screen_wall_without_a_camera() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	Fakes.spawn_player(world, 1, &"warrior", Vector3(-60.0, 0, 0))
+	var input := p.slot.input as ScriptedInput
+	input.move = Vector2(1, 0)
+	Fakes.step(p, 10.0, 0.1)
+	check(p.global_position.x > 30.0, "free movement without Arena.current / camera")

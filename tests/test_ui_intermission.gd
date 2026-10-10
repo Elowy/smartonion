@@ -1,6 +1,7 @@
 extends TestCase
 ## Intermission: per-player ready with A / B, bots and unplugged devices auto-ready,
-## continue_requested once when everybody is ready.
+## continue_requested once when everybody is ready, or when the auto-continue countdown
+## (GDD 12, 60 s, can be switched off) runs out.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
@@ -17,6 +18,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	Intermission.auto_continue_time = Intermission.AUTO_CONTINUE_TIME
 	UiFakes.free_node(screen)
 	screen = null
 	UiFakes.reset_players()
@@ -134,3 +136,50 @@ func test_b_and_start_together_act_as_b() -> void:
 	a.press(PlayerInput.Pad.START)
 	UiFakes.step(screen)
 	check(not PlayerManager.get_slot(0).ready, "keyboard Esc (B + START) unreadies")
+
+
+func test_next_wave_starts_by_itself_after_the_countdown() -> void:
+	check_eq(Intermission.AUTO_CONTINUE_TIME, 60.0, "GDD 12: 60 s")
+	var a := _human("pad:a")
+	_human("pad:b")
+	screen.open(1, 0)
+	check(screen.countdown_label.visible, "countdown shown")
+	check_eq(screen.countdown_label.text, "Next wave in 60 s", "full minute")
+	UiFakes.step(screen, 18.0)
+	check_eq(screen.countdown_label.text, "Next wave in 42 s", "counts down")
+	check_eq(screen.countdown_label.get_theme_color(&"font_color"), UiTheme.TEXT_DIM, "calm colour")
+	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	check(PlayerManager.get_slot(0).ready, "P1 ready, P2 dawdles")
+	UiFakes.step(screen, 31.5)
+	check_eq(continues, 0, "still waiting")
+	check_eq(screen.countdown_label.text, "Next wave in 11 s", "11 s left")
+	UiFakes.step(screen, 1.0)
+	check_eq(screen.countdown_label.get_theme_color(&"font_color"), UiTheme.GOLD, "last seconds in gold")
+	UiFakes.step(screen, 9.0)
+	check_eq(continues, 0, "not before the full minute")
+	UiFakes.step(screen, 1.0)
+	check_eq(continues, 1, "the next wave starts without P2")
+	check(not PlayerManager.get_slot(1).ready, "P2 never readied")
+	check_eq(screen.time_left, 0.0, "countdown done")
+	UiFakes.step(screen, 5.0)
+	check_eq(continues, 1, "only once per open")
+	screen.open(2, 0)
+	check_eq(screen.countdown_label.text, "Next wave in 60 s", "restarts on the next open")
+	UiFakes.step(screen, 30.0)
+	check_eq(continues, 1, "fresh minute")
+
+
+func test_auto_continue_setting() -> void:
+	_human("pad:a")
+	Intermission.auto_continue_time = 0.0
+	screen.open(1, 0)
+	check(not screen.countdown_label.visible, "no countdown when switched off")
+	for _i in 10:
+		UiFakes.step(screen, 30.0)
+	check_eq(continues, 0, "waits for everybody's Ready forever")
+	Intermission.auto_continue_time = 5.0
+	screen.open(2, 0)
+	check(screen.countdown_label.visible, "countdown back")
+	check_eq(screen.countdown_label.text, "Next wave in 5 s", "custom length")
+	UiFakes.step(screen, 5.0)
+	check_eq(continues, 1, "custom length honoured")
