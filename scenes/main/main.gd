@@ -254,8 +254,9 @@ func start_wave(n: int) -> void:
 	_set_state(State.WAVE)
 	_wave_perf = RunPerf.new()
 	_wave_start_msec = Time.get_ticks_msec()
-	wave_director.start_wave(wave)
+	# Frame the team first: the opening spawn group picks on-screen points from the camera.
 	arena.camera.snap()
+	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
 		hud.show_banner("Final Wave" if wave >= RunState.TOTAL_WAVES else "Wave %d" % wave)

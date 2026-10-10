@@ -70,8 +70,10 @@ static func add_to_root(tree: SceneTree, node: Node) -> Node:
 	return node
 
 
-static func free_node(node: Node) -> void:
-	if node != null and is_instance_valid(node):
+## Untyped on purpose: callers may pass an already freed node (a typed Node parameter would
+## raise a script error before is_instance_valid() could reject it).
+static func free_node(node: Variant) -> void:
+	if node != null and is_instance_valid(node) and node is Node:
 		if node.get_parent() != null:
 			node.get_parent().remove_child(node)
 		node.free()
