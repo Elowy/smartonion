@@ -697,10 +697,17 @@ func _apply_time_scale(scale: float) -> void:
 	Engine.max_physics_steps_per_frame = maxi(8, ceili(8.0 * scale))
 
 
-## Joins --players bots, classes cycling through Db.class_ids.
+## Joins --players bots, classes cycling through --classes (default: Db.class_ids).
 func _add_bots() -> void:
 	PlayerManager.clear()
-	var ids := Db.class_ids
+	var ids: Array[StringName] = []
+	for id in options.classes:
+		if Db.get_class_data(id) != null:
+			ids.append(id)
+		else:
+			push_warning("--classes: unknown class '%s'" % id)
+	if ids.is_empty():
+		ids = Db.class_ids
 	var base_seed := options.run_seed() if options.run_seed() >= 0 else randi() % 100000
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
