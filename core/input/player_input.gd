@@ -6,7 +6,8 @@ extends RefCounted
 ##   KeyboardInput – keyboard + mouse
 ##   ScriptedInput / BotInput – tests, smoke runs and attract mode
 ##
-## PlayerManager calls poll() once per rendered frame BEFORE any scene node processes.
+## PlayerManager calls poll() once per rendered frame BEFORE any scene node processes, and
+## think() once per UNPAUSED physics tick before any body moves (only bots do anything there).
 ## is_pressed() / get_move() / nav_held() are safe everywhere; just_pressed() /
 ## nav_just_pressed() describe edges of the current rendered frame and must be read from
 ## _process(). swallow() marks everything held right now as already handled (used after a join
@@ -98,7 +99,15 @@ func nav_held() -> Vector2i:
 	return _nav_dir
 
 
-## Called by PlayerManager once per frame.
+## Called by PlayerManager once per unpaused physics tick, before the bodies move. Inputs
+## that decide on their own (BotInput) update their movement here, so the simulation sees the
+## same decisions on the same physics tick on every run (a rendered frame covers a varying
+## number of ticks, and bots must not act while the game is paused). Humans: nothing to do.
+func think(_delta: float) -> void:
+	pass
+
+
+## Called by PlayerManager once per rendered frame (button / navigation edges).
 func poll(delta: float) -> void:
 	_prev = _cur.duplicate()
 	_cur = _read_buttons()

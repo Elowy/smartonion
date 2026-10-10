@@ -56,12 +56,8 @@ func get_device_name() -> String:
 	return "Bot"
 
 
-func poll(delta: float) -> void:
-	_think(delta)
-	super(delta)
-
-
-func _think(delta: float) -> void:
+## The bot's decisions (movement), once per unpaused physics tick: see PlayerInput.think().
+func think(delta: float) -> void:
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 		move = Vector2.ZERO
 		return

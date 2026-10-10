@@ -5,7 +5,8 @@ extends Node
 ## - While [member joining_enabled] is true, pressing A on an unused controller (or one of
 ##   KeyboardInput.JOIN_KEYS on the keyboard) joins a new player. The join press is swallowed
 ##   (PlayerInput.swallow()), so it does not also count as A for the screen that is open.
-## - Polls every slot's PlayerInput once per frame before any scene node runs.
+## - Polls every slot's PlayerInput once per frame before any scene node runs, and lets the
+##   inputs "think" (bot AI) once per unpaused physics tick before any body moves.
 
 signal player_joined(slot: PlayerSlot)
 signal player_left(slot: PlayerSlot)
@@ -33,6 +34,7 @@ func _init() -> void:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -1000
+	process_physics_priority = -1000
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
 
@@ -42,6 +44,17 @@ func _process(delta: float) -> void:
 			slot.input.poll(delta)
 	if joining_enabled:
 		_scan_for_joins()
+
+
+## Bots decide here, once per physics tick and only while the game runs: their movement is a
+## function of the tick, not of how many ticks a rendered frame happened to contain (seeded
+## smoke runs must be reproducible). Runs before every body's own _physics_process.
+func _physics_process(delta: float) -> void:
+	if get_tree().paused:
+		return
+	for slot in _slots:
+		if slot != null:
+			slot.input.think(delta)
 
 
 # --- Queries -----------------------------------------------------------------

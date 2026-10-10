@@ -386,16 +386,21 @@ func living_player_count() -> int:
 
 # --- Frame -----------------------------------------------------------------------
 
-func _process(delta: float) -> void:
-	var paused := get_tree().paused
-	if not paused:
-		_state_time += delta
-		if state == State.WAVE or state == State.WAVE_END:
-			_poll_pause_buttons()
-			if state == State.WAVE:
-				_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
-			elif _state_time >= WAVE_END_DELAY and not get_tree().paused:
-				_after_wave_end()
+## The state timer counts physics ticks, not rendered frames: "Wave cleared!" ends after the
+## same number of ticks on every run (seeded smoke runs must be reproducible).
+func _physics_process(delta: float) -> void:
+	if get_tree().paused:
+		return
+	_state_time += delta
+	if state == State.WAVE_END and _state_time >= WAVE_END_DELAY:
+		_after_wave_end()
+
+
+func _process(_delta: float) -> void:
+	if not get_tree().paused and (state == State.WAVE or state == State.WAVE_END):
+		_poll_pause_buttons()
+		if state == State.WAVE:
+			_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
 	_update_harness()
 
 

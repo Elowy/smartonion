@@ -43,7 +43,7 @@ func _enemy(pos: Vector3) -> Node3D:
 
 func _move(p: Player) -> Vector2:
 	var bot := p.slot.input as BotInput
-	bot.poll(DT)
+	bot.think(DT)  # bots decide once per physics tick (PlayerManager._physics_process)
 	return bot.get_move()
 
 

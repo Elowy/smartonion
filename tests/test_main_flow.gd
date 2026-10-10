@@ -75,7 +75,7 @@ func _clear_wave() -> void:
 ## Clears the wave and lets the "Wave cleared!" pause run out.
 func _clear_wave_and_wait() -> void:
 	_clear_wave()
-	main._process(Main.WAVE_END_DELAY + 0.01)
+	main._physics_process(Main.WAVE_END_DELAY + 0.01)
 
 
 # --- Menu / lobby --------------------------------------------------------------------
@@ -153,9 +153,9 @@ func test_wave_end_intermission_and_next_wave() -> void:
 	check_eq(main.state, Main.State.WAVE_END, "'Wave cleared!' pause first")
 	check_eq(main.waves_completed, 1, "wave counted")
 	check(not tree.paused, "players still move during the banner")
-	main._process(Main.WAVE_END_DELAY * 0.5)
+	main._physics_process(Main.WAVE_END_DELAY * 0.5)
 	check_eq(main.state, Main.State.WAVE_END, "still the banner")
-	main._process(Main.WAVE_END_DELAY)
+	main._physics_process(Main.WAVE_END_DELAY)
 	check_eq(main.state, Main.State.INTERMISSION, "intermission")
 	check(tree.paused, "the arena is frozen behind the intermission")
 	check(main.intermission.is_open(), "intermission open")

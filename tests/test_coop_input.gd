@@ -93,7 +93,7 @@ func _make_main() -> Main:
 func _clear_wave_and_wait() -> void:
 	main.wave_director.time_left = 0.0
 	main.wave_director._physics_process(DT)
-	main._process(Main.WAVE_END_DELAY + 0.01)
+	main._physics_process(Main.WAVE_END_DELAY + 0.01)
 
 
 ## One frame of the open pause menu (its own input polling included).
