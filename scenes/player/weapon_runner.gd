@@ -17,10 +17,12 @@ const PROJECTILE_EXTRA_RANGE := 3.0
 ## Fraction of the target's velocity used to lead projectile shots.
 const PROJECTILE_LEAD := 0.8
 const DAMAGE_TEXT_HEIGHT := 1.2
-const NORMAL_TEXT_COLOR := Color(1.0, 1.0, 1.0)
+## Damage numbers: small, slightly transparent white for normal hits, bigger opaque yellow
+## for crits (hits on the same enemy within Vfx.MERGE_WINDOW add up on one number).
+const NORMAL_TEXT_COLOR := Color(1.0, 1.0, 1.0, 0.75)
 const CRIT_TEXT_COLOR := Color(1.0, 0.84, 0.12)
-const NORMAL_TEXT_SIZE := 1.0
-const CRIT_TEXT_SIZE := 1.5
+const NORMAL_TEXT_SIZE := 0.6
+const CRIT_TEXT_SIZE := 1.1
 
 var weapon: WeaponData
 var player: Player
@@ -253,18 +255,18 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 	if stun_chance > 0.0 and is_instance_valid(enemy) and not enemy.is_dead() \
 			and RunState.rng.randf() < stun_chance:
 		enemy.apply_stun(stun_duration)
-	show_damage_number(text_pos, damage, is_crit)
+	show_damage_number(text_pos, damage, is_crit, enemy)
 	if valid_attacker != null:
 		valid_attacker.on_hit_dealt(damage, enemy)
 
 
-## White number for normal hits, bigger yellow one for crits.
-static func show_damage_number(pos: Vector3, damage: float, is_crit: bool) -> void:
-	var text := str(maxi(1, roundi(damage)))
+## White number for normal hits, bigger yellow one for crits. Hits on the same
+## [param target] in quick succession merge into one number (see Vfx.damage_number).
+static func show_damage_number(pos: Vector3, damage: float, is_crit: bool, target: Object = null) -> void:
 	if is_crit:
-		Vfx.floating_text(pos, text, CRIT_TEXT_COLOR, CRIT_TEXT_SIZE)
+		Vfx.damage_number(target, pos, damage, CRIT_TEXT_COLOR, CRIT_TEXT_SIZE)
 	else:
-		Vfx.floating_text(pos, text, NORMAL_TEXT_COLOR, NORMAL_TEXT_SIZE)
+		Vfx.damage_number(target, pos, damage, NORMAL_TEXT_COLOR, NORMAL_TEXT_SIZE)
 
 
 ## Where spawned projectiles go: the arena's entity root, else next to [param near].

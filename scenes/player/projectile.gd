@@ -19,6 +19,8 @@ const HIT_RADIUS := 0.2
 ## Projectiles further than this outside the arena bounds are removed.
 const ARENA_MARGIN := 1.0
 const AXE_SPIN_SPEED := 14.0
+## Enemy throws spin faster (reads as dangerous).
+const ENEMY_SPIN_SPEED := 24.0
 
 var team := TEAM_PLAYERS
 var damage := 1.0
@@ -104,7 +106,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	if _spinner != null:
-		_spinner.rotate_y(AXE_SPIN_SPEED * delta)
+		_spinner.rotate_y((ENEMY_SPIN_SPEED if team == TEAM_ENEMIES else AXE_SPIN_SPEED) * delta)
 
 
 ## Moves the projectile [param delta] seconds forward and resolves hits along the way.
@@ -246,9 +248,10 @@ func _finish() -> void:
 
 
 func _build_visual() -> void:
-	_visual = ProjectileVisual.build(style, color, is_crit)
+	_visual = ProjectileVisual.build(style, color, is_crit, team == TEAM_ENEMIES)
 	_visual.name = "Visual"
 	_visual.basis = Basis.looking_at(direction, Vector3.UP)
 	add_child(_visual)
-	_spinner = _visual.get_node_or_null(^"Spinner") as Node3D
+	# The spinner sits under a tilt (and, for enemies, a scale) node.
+	_spinner = _visual.find_child("Spinner", true, false) as Node3D
 	set_process(_spinner != null)

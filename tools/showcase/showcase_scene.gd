@@ -54,6 +54,7 @@ func _gameplay() -> void:
 		var m := OnionModel.new()
 		holder.add_child(m)
 		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		m.set_tag("P%d" % (i % PlayerManager.PLAYER_COLORS.size() + 1))
 		m.set_weapons(cd.main_hand, cd.off_hand)
 		m.set_facing(Vector3(_rng.randf_range(-1.0, 1.0), 0, _rng.randf_range(-0.2, 1.0)))
 		m.set_moving(0.7)
@@ -96,6 +97,11 @@ func _gameplay() -> void:
 	Vfx.floating_text(center + Vector3(-1.5, 1.2, 3.0), "+3 gold", Color(1.0, 0.82, 0.25), 0.9)
 	Vfx.hit_spark(center + Vector3(-3.2, 0.6, -1.5), Color(1, 0.9, 0.5))
 	Vfx.pickup_sparkle(center + Vector3(1.5, 0.3, 3.0))
+	# In-flight projectiles: a troll's axe (enemy: red-orange halo) and a fel bolt (hero).
+	_projectile(arena, Projectile.TEAM_ENEMIES, &"axe", Projectile.default_color(&"axe"),
+		center + Vector3(-4.5, 1.0, -2.6), Vector3(1, 0, 0.55))
+	_projectile(arena, Projectile.TEAM_PLAYERS, &"fireball", Color(0.4, 0.9, 0.25).lightened(0.25),
+		center + Vector3(2.4, 0.7, 2.6), Vector3(1, 0, 0.3))
 	if not enemies.is_empty():
 		enemies[0].flash_hit()
 	await _frames(5)
@@ -143,6 +149,8 @@ func _onions() -> void:
 		var m := OnionModel.new()
 		stage.add_child(m)
 		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		if _arg("tags", "0") == "1":
+			m.set_tag("P%d" % (i % PlayerManager.PLAYER_COLORS.size() + 1))
 		m.set_weapons(cd.main_hand, cd.off_hand)
 		m.position = Vector3((i - (ids.size() - 1) * 0.5) * 1.6, 0, 0)
 		m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
@@ -211,6 +219,7 @@ func _revive() -> void:
 		var m := OnionModel.new()
 		holder.add_child(m)
 		m.setup(cd, PlayerManager.PLAYER_COLORS[i])
+		m.set_tag("P%d" % (i + 1))
 		m.set_weapons(cd.main_hand, cd.off_hand)
 		models.append(m)
 	models[1].set_downed(true)
@@ -241,6 +250,14 @@ func _arena_overview() -> void:
 
 
 # --- Helpers -------------------------------------------------------------------
+
+## A projectile frozen in flight (no physics: it only shows its look).
+func _projectile(arena: Arena, team: int, style: StringName, color: Color, at: Vector3, dir: Vector3) -> void:
+	var p := Projectile.create(team, 1.0, false, dir, 0.0, 100.0, 0, 0.0, null, style, color)
+	p.set_physics_process(false)
+	arena.entities.add_child(p)
+	p.global_position = at
+
 
 ## A random point 4.5-9 m around [param center], inside the arena, not on another enemy.
 func _free_spot(arena: Arena, center: Vector3, others: Array[EnemyModel]) -> Vector3:

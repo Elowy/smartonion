@@ -6,7 +6,7 @@ extends CharacterBody3D
 ##
 ## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
 ## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
-## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level). Every equipped weapon that
+## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level gained). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a slow ghost that
 ## does not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME
 ## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
@@ -58,6 +58,17 @@ const DAMAGE_TEXT_COLOR := Color(1.0, 0.27, 0.22)
 const HEAL_TEXT_COLOR := Color(0.35, 1.0, 0.4)
 const DODGE_TEXT_COLOR := Color(0.7, 0.88, 1.0)
 const BLOCK_TEXT_COLOR := Color(0.88, 0.88, 0.95)
+## Damage-taken / heal numbers start beside the head (alternating sides) instead of on the
+## body, so they do not cover the hero or the "P1" marker above it.
+const SELF_TEXT_HEIGHT := 1.45
+const SELF_TEXT_SIDE := 0.6
+const SELF_TEXT_SIZE := 0.85
+
+## Soft player-vs-player separation (no physics collision between heroes): bodies closer than
+## SEPARATION_DISTANCE drift apart at up to SEPARATION_SPEED m/s, so heroes never fully
+## overlap but can still walk through each other.
+const SEPARATION_DISTANCE := 0.95
+const SEPARATION_SPEED := 2.2
 
 ## TEMPORARY placeholder until the M4 level-up cards (GDD 6.1) exist: every team level gives
 ## every player +1 Stamina (= +1 Max HP) and +4% damage through the StatBlock source
@@ -92,6 +103,8 @@ var _regen_accum := 0.0
 var _channelers: Array[Player] = []
 var _attack_look_dir := Vector3.FORWARD
 var _attack_look_left := 0.0
+## Side (+1 / -1) of the next damage-taken number.
+var _text_side := 1.0
 
 
 ## Creates and configures a player for [param p_slot]. Not yet in the tree.
@@ -123,6 +136,8 @@ static func create(p_slot: PlayerSlot) -> Player:
 		p.equip_weapons(p.class_data.main_hand, p.class_data.off_hand)
 	else:
 		p.equip_weapons(null, null)
+	# "P1" nameplate marker above the head (also marks whose ghost it is).
+	p.model.set_tag(p_slot.label() if p_slot != null else "")
 	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
 	# created mid-run.
 	p._apply_level_bonus(RunState.level)
@@ -168,19 +183,20 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	if downed or invulnerable_left > 0.0 or raw <= 0.0:
 		return
 	var rng := RunState.rng
-	var text_pos := get_chest_position() + Vector3.UP * 0.5
+	_text_side = -_text_side
+	var text_pos := self_text_position(_text_side)
 	if stats.get_stat(Stats.DODGE) > 0.0 and CombatMath.roll_dodge(stats, rng):
-		Vfx.floating_text(text_pos, "Dodge", DODGE_TEXT_COLOR, 0.9)
+		Vfx.floating_text(text_pos, "Dodge", DODGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 		return
 	var amount := raw
 	var block := block_chance()
 	if block > 0.0 and CombatMath.roll_block(block, rng):
 		amount *= BLOCK_DAMAGE_MULT
-		Vfx.floating_text(text_pos + Vector3.UP * 0.35, "Block", BLOCK_TEXT_COLOR, 0.9)
+		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
 	var dmg := CombatMath.incoming_damage(amount, stats, kind)
 	hp = maxf(0.0, hp - dmg)
 	invulnerable_left = INVULNERABLE_AFTER_HIT
-	Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, 1.0)
+	Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	if model != null:
 		model.flash_hit()
 	_shake_camera(HIT_SHAKE)
@@ -198,7 +214,8 @@ func heal(amount: float) -> void:
 	var gained := hp - before
 	if gained <= 0.0:
 		return
-	Vfx.floating_text(get_chest_position() + Vector3.UP * 0.5, "+" + _format_amount(gained), HEAL_TEXT_COLOR, 0.9)
+	_text_side = -_text_side
+	Vfx.floating_text(self_text_position(_text_side), "+" + _format_amount(gained), HEAL_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	_hp_updated()
 
 
@@ -293,6 +310,31 @@ func get_chest_position() -> Vector3:
 	return global_position + Vector3.UP * CHEST_HEIGHT if is_inside_tree() else position + Vector3.UP * CHEST_HEIGHT
 
 
+## Where this hero's own numbers (damage taken, heals, Dodge) start: beside the head on
+## [param side] (+1 = screen right, -1 = left).
+func self_text_position(side: float) -> Vector3:
+	var base := global_position if is_inside_tree() else position
+	return base + Vector3(SELF_TEXT_SIDE * signf(side if side != 0.0 else 1.0), SELF_TEXT_HEIGHT, 0.0)
+
+
+## Separation step (XZ metres) that pushes a body at [param here] away from the
+## [param others] closer than SEPARATION_DISTANCE during [param delta] seconds. Bodies on
+## the exact same spot use [param fallback_angle] so they still part. Pure, unit tested.
+static func separation_offset(here: Vector3, others: Array[Vector3], delta: float, fallback_angle: float = 0.0) -> Vector3:
+	var push := Vector3.ZERO
+	for o in others:
+		var d := Vector3(here.x - o.x, 0.0, here.z - o.z)
+		var dist := d.length()
+		if dist >= SEPARATION_DISTANCE:
+			continue
+		var dir := d / dist if dist > 0.0001 else Vector3(cos(fallback_angle), 0.0, sin(fallback_angle))
+		# Linear falloff: full speed when on top of each other, nothing at the edge.
+		push += dir * (1.0 - dist / SEPARATION_DISTANCE)
+	if push.length_squared() > 1.0:
+		push = push.normalized()
+	return push * SEPARATION_SPEED * delta
+
+
 ## Called by weapons: while standing still the model briefly turns towards its target.
 func face_attack(direction: Vector3) -> void:
 	var d := Vector3(direction.x, 0.0, direction.z)
@@ -324,7 +366,7 @@ func _update_movement(delta: float) -> void:
 	var rate := ACCELERATION if move.length() > MOVE_DEADZONE else DECELERATION
 	velocity = Vector3(velocity.x, 0.0, velocity.z).move_toward(target, rate * delta)
 	var arena := Arena.current if is_inside_tree() else null
-	var motion := velocity * delta
+	var motion := velocity * delta + _separation_motion(delta)
 	if arena != null:
 		motion = _clamp_motion_to_arena(arena, motion)
 	# Shared screen (GDD 13): the screen edge of the fully zoomed-out camera is a wall.
@@ -354,6 +396,27 @@ func _update_movement(delta: float) -> void:
 			look = _attack_look_dir
 		model.set_facing(look)
 		model.set_moving(clampf(velocity.length() / maxf(0.01, max_speed), 0.0, 1.0))
+
+
+## Gentle push away from teammates standing (almost) on the same spot (see
+## [method separation_offset]); ghosts and living heroes part alike.
+func _separation_motion(delta: float) -> Vector3:
+	if not is_inside_tree():
+		return Vector3.ZERO
+	var here := global_position
+	var others: Array[Vector3] = []
+	for node in get_tree().get_nodes_in_group(&"players"):
+		var other := node as Node3D
+		if other == null or other == self or not other.is_inside_tree():
+			continue
+		var o := other.global_position
+		if absf(o.x - here.x) < SEPARATION_DISTANCE and absf(o.z - here.z) < SEPARATION_DISTANCE:
+			others.append(o)
+	if others.is_empty():
+		return Vector3.ZERO
+	# Deterministic split for bodies on the exact same spot: by slot index.
+	var idx := slot.index if slot != null else 0
+	return separation_offset(here, others, delta, float(idx) * 2.39996)
 
 
 ## Keeps [param motion] inside the arena bounds (shrunk by RADIUS + WALL_GAP) and stops the
@@ -543,14 +606,16 @@ func _on_stats_changed() -> void:
 
 
 ## TEMPORARY placeholder for the M4 level-up cards: sets the LEVEL_SOURCE stat source for
-## team [param level] (nothing at level 0).
+## team [param level] – one step per level gained since RunState.START_LEVEL (nothing at
+## the starting level).
 func _apply_level_bonus(level: int) -> void:
-	if level <= 0:
+	var gained := level - RunState.START_LEVEL
+	if gained <= 0:
 		stats.remove_source(LEVEL_SOURCE)
 		return
 	stats.set_source(LEVEL_SOURCE, {
-		Stats.STAMINA: LEVEL_STAMINA * level,
-		Stats.DAMAGE_PCT: LEVEL_DAMAGE_PCT * level,
+		Stats.STAMINA: LEVEL_STAMINA * gained,
+		Stats.DAMAGE_PCT: LEVEL_DAMAGE_PCT * gained,
 	})
 
 

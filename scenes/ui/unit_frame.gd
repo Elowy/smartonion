@@ -5,8 +5,13 @@ extends PanelContainer
 ## placeholder bar until abilities arrive in M3) and a DOWNED overlay with the revive progress.
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge.
 
-const WIDTH := 430.0
-const PORTRAIT_SIZE := 96.0
+## Compact (it sits in a screen corner over the playfield): ~340 x 100 reference px.
+const WIDTH := 340.0
+const PORTRAIT_SIZE := 76.0
+## Panel fill opacity – the battlefield shows through a little.
+const PANEL_ALPHA := 0.8
+## Smallest text on the frame (resource name, revive hint): readable at 720p.
+const SMALL_FONT := 18
 
 var index := 0
 var mirrored := false
@@ -37,30 +42,32 @@ func _build() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	custom_minimum_size = Vector2(WIDTH, 0)
 	var style := UiTheme.card_style()
-	style.content_margin_left = 12
-	style.content_margin_right = 14
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
-	style.fill = Color(0.1, 0.085, 0.075, 0.9)
+	style.content_margin_left = 10
+	style.content_margin_right = 12
+	style.content_margin_top = 7
+	style.content_margin_bottom = 8
+	style.fill = Color(0.1, 0.085, 0.075, PANEL_ALPHA)
+	style.shadow_color = Color(0, 0, 0, 0.4)
 	if mirrored:
-		style.content_margin_left = 14
-		style.content_margin_right = 12
+		style.content_margin_left = 12
+		style.content_margin_right = 10
 	add_theme_stylebox_override(&"panel", style.rebuild())
 
-	var row := UiTheme.hbox(12)
+	var row := UiTheme.hbox(10)
 	add_child(row)
 	portrait = UiPortrait.create(PORTRAIT_SIZE)
+	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-	var col := UiTheme.vbox(5)
+	var col := UiTheme.vbox(3)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-	var name_row := UiTheme.hbox(6)
+	var name_row := UiTheme.hbox(5)
 	name_row.alignment = BoxContainer.ALIGNMENT_END if mirrored else BoxContainer.ALIGNMENT_BEGIN
-	_player_label = UiTheme.label("P%d" % (index + 1), UiTheme.GOLD_LABEL, 24)
+	_player_label = UiTheme.label("P%d" % (index + 1), UiTheme.GOLD_LABEL, 21)
 	name_row.add_child(_player_label)
-	name_row.add_child(UiTheme.label("·", UiTheme.DIM, 24))
-	_class_label = UiTheme.label("Warrior", UiTheme.GOLD_LABEL, 24)
+	name_row.add_child(UiTheme.label("·", UiTheme.DIM, 21))
+	_class_label = UiTheme.label("Warrior", UiTheme.GOLD_LABEL, 21)
 	name_row.add_child(_class_label)
 	name_label = _class_label
 	col.add_child(name_row)
@@ -69,11 +76,11 @@ func _build() -> void:
 	var stack := MarginContainer.new()
 	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(stack)
-	var bars := UiTheme.vbox(5)
+	var bars := UiTheme.vbox(3)
 	stack.add_child(bars)
-	hp_bar = UiBar.create(UiTheme.HP_GREEN, 30.0, 19)
+	hp_bar = UiBar.create(UiTheme.HP_GREEN, 25.0, SMALL_FONT)
 	bars.add_child(hp_bar)
-	resource_bar = UiBar.create(Color(0.85, 0.15, 0.1), 17.0, 14)
+	resource_bar = UiBar.create(Color(0.85, 0.15, 0.1), 21.0, SMALL_FONT)
 	resource_bar.animated = false
 	bars.add_child(resource_bar)
 
@@ -84,22 +91,22 @@ func _build() -> void:
 	ds.border_color = UiTheme.RED.darkened(0.25)
 	ds.set_border_width_all(2)
 	ds.set_corner_radius_all(4)
-	ds.content_margin_left = 10
-	ds.content_margin_right = 10
-	ds.content_margin_top = 1
-	ds.content_margin_bottom = 4
+	ds.content_margin_left = 8
+	ds.content_margin_right = 8
+	ds.content_margin_top = 0
+	ds.content_margin_bottom = 2
 	downed_overlay.add_theme_stylebox_override(&"panel", ds)
-	var dbox := UiTheme.vbox(1)
+	var dbox := UiTheme.vbox(0)
 	dbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	downed_overlay.add_child(dbox)
-	var top := UiTheme.hbox(10)
-	top.add_child(UiTheme.label("DOWNED", UiTheme.HEADING, 24, UiTheme.RED))
+	var top := UiTheme.hbox(8)
+	top.add_child(UiTheme.label("DOWNED", UiTheme.HEADING, 21, UiTheme.RED))
 	revive_bar = UiBar.create(Color(0.55, 1.0, 0.45), 12.0, 12)
 	revive_bar.animated = false
 	revive_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(revive_bar)
 	dbox.add_child(top)
-	dbox.add_child(UiTheme.label("Stand next to them to revive", &"", 15, UiTheme.TEXT))
+	dbox.add_child(UiTheme.label("Stand close to revive", &"", SMALL_FONT, UiTheme.TEXT))
 	downed_overlay.visible = false
 	stack.add_child(downed_overlay)
 

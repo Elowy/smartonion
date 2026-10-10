@@ -7,7 +7,8 @@ extends Node
 ## - A spawn budget accumulates at [method spawn_rate] per second (1 budget = 1 enemy).
 ##   The next group (weighted pick among Db.enemies with first_wave <= w, size in
 ##   [group_min, group_max]) is telegraphed once the budget covers it.
-## - Each group gets a point >= MIN_PLAYER_DISTANCE from every living player, a red rune
+## - Each group gets a point >= MIN_PLAYER_DISTANCE from every living player – preferably
+##   on screen outside the HUD (CameraRig.get_safe_ground_rect), else anywhere – a red rune
 ##   (Vfx.spawn_telegraph) and appears TELEGRAPH_TIME later, scattered around the point.
 ## - At most MAX_ENEMIES alive + telegraphed. A small opening group is telegraphed at once.
 ## - When the timer runs out: [method stop] (enemies despawn without loot, telegraphs are
@@ -180,31 +181,45 @@ static func roll_group_size(data: EnemyData, rng: RandomNumberGenerator) -> int:
 
 
 ## A random arena point (SPAWN_MARGIN from the walls) at least [param min_distance] from
-## every position in [param avoid]; after [param tries] failures the farthest candidate.
+## every position in [param avoid]. With a [param preferred] rect (XZ; the camera's
+## HUD-safe visible ground, see CameraRig.safe_ground_rect) the first [param tries]
+## candidates are drawn inside it, so the telegraph is seen; if none is far enough from
+## the players, [param tries] more come from the whole arena; after those the farthest
+## candidate.
 static func pick_spawn_point(p_arena: Arena, rng: RandomNumberGenerator, avoid: Array[Vector3],
-		min_distance: float = MIN_PLAYER_DISTANCE, tries: int = SPAWN_POINT_TRIES) -> Vector3:
+		min_distance: float = MIN_PLAYER_DISTANCE, tries: int = SPAWN_POINT_TRIES,
+		preferred: Rect2 = Rect2()) -> Vector3:
 	var best := Vector3.ZERO
 	var best_d := -1.0
 	var min_sq := min_distance * min_distance
-	for i in maxi(1, tries):
-		var p := _random_arena_point(p_arena, rng)
-		var d := INF
-		for a in avoid:
-			var dx := p.x - a.x
-			var dz := p.z - a.z
-			d = minf(d, dx * dx + dz * dz)
-		if d >= min_sq:
-			return p
-		if d > best_d:
-			best_d = d
-			best = p
+	var on_screen := _spawn_area(p_arena).intersection(preferred) if preferred.has_area() else Rect2()
+	var rounds := 2 if on_screen.has_area() else 1
+	for r in rounds:
+		for i in maxi(1, tries):
+			var p := _random_point_in(on_screen, rng) if r == 0 and rounds == 2 else _random_arena_point(p_arena, rng)
+			var d := INF
+			for a in avoid:
+				var dx := p.x - a.x
+				var dz := p.z - a.z
+				d = minf(d, dx * dx + dz * dz)
+			if d >= min_sq:
+				return p
+			if d > best_d:
+				best_d = d
+				best = p
 	return best
 
 
-## Spawn point for the next group, away from the living players.
+## Spawn point for the next group, away from the living players, preferably where the
+## camera shows it outside the HUD.
 func find_spawn_point() -> Vector3:
 	var tree := get_tree() if is_inside_tree() else null
-	return pick_spawn_point(_arena(), RunState.rng, Enemy.living_player_positions(tree))
+	var a := _arena()
+	var view := Rect2()
+	if a != null and is_instance_valid(a.camera) and a.camera.is_inside_tree():
+		view = a.camera.get_safe_ground_rect()
+	return pick_spawn_point(a, RunState.rng, Enemy.living_player_positions(tree), MIN_PLAYER_DISTANCE,
+		SPAWN_POINT_TRIES, view)
 
 
 ## Enemies currently alive in the tree.
@@ -366,3 +381,13 @@ static func _random_arena_point(p_arena: Arena, rng: RandomNumberGenerator) -> V
 		return p_arena.random_point(rng, SPAWN_MARGIN)
 	var b := Rect2(-Arena.SIZE / 2.0, Arena.SIZE).grow(-SPAWN_MARGIN)
 	return Vector3(rng.randf_range(b.position.x, b.end.x), 0.0, rng.randf_range(b.position.y, b.end.y))
+
+
+## Where spawn points may lie: the arena bounds shrunk by SPAWN_MARGIN.
+static func _spawn_area(p_arena: Arena) -> Rect2:
+	var b := p_arena.get_bounds() if p_arena != null and is_instance_valid(p_arena) else Rect2(-Arena.SIZE / 2.0, Arena.SIZE)
+	return b.grow(-SPAWN_MARGIN)
+
+
+static func _random_point_in(rect: Rect2, rng: RandomNumberGenerator) -> Vector3:
+	return Vector3(rng.randf_range(rect.position.x, rect.end.x), 0.0, rng.randf_range(rect.position.y, rect.end.y))

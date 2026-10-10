@@ -35,6 +35,25 @@ const REVIVE_COLOR := Color(0.55, 1.0, 0.45)
 const CHANNEL_GOLD := Color(1.0, 0.84, 0.36)
 ## Where the reviver's light beam ends on the ghost (above its origin).
 const CHANNEL_TARGET_HEIGHT := 0.85
+## Base alpha of the translucent downed ghost (the rim adds more).
+const GHOST_ALPHA := 0.6
+## Player marker ("P2" + nameplate diamond, see [method set_tag]): height of its bottom tip
+## above a living hero / a floating ghost, and above the "Resurrecting" cast bar text. The
+## marker is drawn at a fixed screen size and on top of everything (shows through crowds).
+const MARKER_Y := 1.8
+const MARKER_GHOST_Y := 2.05
+const MARKER_GHOST_BOB := 0.09
+## World lift that puts the marker above the cast bar label for the gameplay camera pitch
+## (the label sits ~0.7 m above the bar in the billboard plane).
+const MARKER_CAST_Y := CAST_BAR_Y + 1.3
+## Fixed-size sprites: world size per texel at 1 m depth (FOV 40: 1080 px span 0.728 m).
+const MARKER_DIAMOND_PIXEL := 0.00038
+const MARKER_LABEL_PIXEL := 0.00037
+const MARKER_TEX_SIZE := Vector2i(40, 52)
+## Revive area ring alpha (tinted with the downed player's own colour).
+const REVIVE_AREA_ALPHA := 0.7
+## Purple flames (GDD 13: "horned hood and purple flames") on the warlock's horns.
+const WARLOCK_FLAME := Color(0.72, 0.38, 1.0)
 
 const GOLD := Color(0.96, 0.76, 0.3)
 const LEATHER := Color(0.4, 0.25, 0.14)
@@ -42,6 +61,13 @@ const IVORY := Color(0.94, 0.9, 0.78)
 const SPROUT_GREEN := Color(0.38, 0.7, 0.22)
 const TABARD_BLUE := Color(0.17, 0.3, 0.68)
 const SCARF_RED := Color(0.66, 0.11, 0.13)
+## Rogue cowl: open above this height (pale neck + green stalk show), pale trim, dark mask.
+const ROGUE_COWL_TOP := 0.86
+const ROGUE_TRIM := Color(0.93, 0.89, 0.74)
+const ROGUE_MASK := Color(0.13, 0.11, 0.12)
+## Warlock hood / cape (purple, light enough to read against dark ground) and bone horns.
+const WARLOCK_HOOD := Color(0.36, 0.17, 0.44)
+const WARLOCK_HORN := Color(0.86, 0.79, 0.7)
 
 ## Bulb silhouette: (radius, y) from the root up to the neck.
 const BULB_POINTS := [
@@ -52,12 +78,15 @@ const BULB_POINTS := [
 ]
 
 static var _profile_cache := PackedVector2Array()
+static var _marker_texture: Texture2D
 
 var class_data: ClassData
 var player_color := Color.WHITE
 var hp_ratio := 1.0
 var downed := false
 var revive_progress := 0.0
+## Player tag shown on the marker above the head ("P1" ...); "" hides the marker.
+var tag := ""
 
 var _yaw: Node3D
 var _body: Node3D
@@ -73,6 +102,11 @@ var _feet: Array[Node3D] = []
 var _peels: Array[Node3D] = []
 var _tears: Array[Node3D] = []
 var _fel_flame: Node3D
+## Extra flickering flames (warlock horn flames).
+var _flames: Array[Node3D] = []
+var _marker: Node3D
+var _marker_label: Label3D
+var _marker_diamond: Sprite3D
 var _weapon_nodes: Array[Node3D] = [null, null]
 var _weapon_data: Array[WeaponData] = [null, null]
 ## Toon-shaded meshes that take the hit flash and the ghost material.
@@ -121,6 +155,7 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_saved_materials.clear()
 	_weapon_nodes = [null, null]
 	_fel_flame = null
+	_flames.clear()
 	_cast_bar = null
 	_cast_label = null
 	_channel_glows.clear()
@@ -134,12 +169,27 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_build_peels()
 	_build_tears()
 	_build_pointer()
+	_build_marker()
 	_yaw.rotation.y = _target_yaw
 	set_weapons(_weapon_data[0], _weapon_data[1])
 	set_hp_ratio(hp_ratio)
 	_apply_downed_look()
 	set_revive_progress(revive_progress, _reviver_color)
 	set_channel_target(_channel_target)
+
+
+## Player marker above the head: a small nameplate diamond in the player colour with
+## [param text] ("P1" ...) on top, drawn through everything so a hero / ghost is easy to
+## find in a crowd. "" hides it (lobby previews).
+func set_tag(text: String) -> void:
+	tag = text
+	if _marker_label != null:
+		_marker_label.text = text
+	_update_marker(0.0)
+
+
+func is_marker_visible() -> bool:
+	return _marker != null and _marker.visible
 
 
 ## Shows the weapon models in the hands (null = empty hand).
@@ -350,6 +400,14 @@ func _process(delta: float) -> void:
 	if _fel_flame != null and _fel_flame.visible:
 		var f := 1.0 + sin(_time * 17.0) * 0.08 + sin(_time * 7.3) * 0.06
 		_fel_flame.scale = Vector3(1.0 / f, f, 1.0 / f)
+	for i in _flames.size():
+		var fl := _flames[i]
+		if fl.visible:
+			var g := 1.0 + sin(_time * 15.0 + i * 2.1) * 0.12 + sin(_time * 6.1 + i) * 0.08
+			fl.scale = Vector3(1.0 / g, g, 1.0 / g)
+	if downed:
+		_pulse_ghost_ring()
+	_update_marker(delta)
 	if _channel_target != null:
 		if not is_instance_valid(_channel_target) or not _channel_target.is_inside_tree() or downed:
 			set_channel_target(null)
@@ -456,10 +514,10 @@ func _skin_color() -> Color:
 func _apply_downed_look() -> void:
 	if _body == null:
 		return
-	var ghost_color := Color(0.88, 0.94, 1.0, 0.42)
+	var ghost_color := Color(0.88, 0.94, 1.0, GHOST_ALPHA)
 	if class_data != null:
 		var c := class_data.onion_color.lerp(Color(0.92, 0.96, 1.0), 0.6)
-		ghost_color = Color(c.r, c.g, c.b, 0.42)
+		ghost_color = Color(c.r, c.g, c.b, GHOST_ALPHA)
 	for mi in _skin_meshes:
 		if not is_instance_valid(mi):
 			continue
@@ -488,12 +546,18 @@ func _apply_downed_look() -> void:
 		t.visible = downed
 	if _fel_flame != null:
 		_fel_flame.visible = not downed and _weapon_data[1] == null
+	for fl in _flames:
+		fl.visible = not downed
 	_revive_area.visible = downed
 	_revive_arc.visible = downed and revive_progress > 0.0
-	_ring.visible = not downed
+	# The player-colour ring stays under the ghost (pulsing, see _pulse_ghost_ring) so it is
+	# clear whose ghost it is; the facing pointer goes.
+	_ring.visible = true
+	_ring.scale = Vector3(RING_SIZE, 1, RING_SIZE)
 	Mats.set_ring(_ring, Color(player_color.r, player_color.g, player_color.b, 0.95), 0.72, 0.93, 0.16)
 	if _pointer != null:
 		_pointer.visible = not downed
+	_update_marker(0.0)
 
 
 func _face_mesh() -> GeometryInstance3D:
@@ -542,12 +606,15 @@ func _build_ground_decals() -> void:
 	_ring.position.y = 0.025
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	Mats.set_ring(_ring, player_color, 0.72, 0.93, 0.16)
+	Mats.set_ring_stroke(_ring, 1.0)
 	var d := REVIVE_RING_RADIUS * 2.0
 	_revive_area = _mesh("ReviveArea", self, _quad_mesh(), Mats.ring(), false)
 	_revive_area.scale = Vector3(d, 1, d)
 	_revive_area.position.y = 0.02
 	_revive_area.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	Mats.set_ring(_revive_area, Color(1.0, 1.0, 1.0, 0.45), 0.88, 0.95, 0.06)
+	# Tinted with the downed player's own colour: whose circle it is reads from afar.
+	Mats.set_ring(_revive_area, Color(player_color.r, player_color.g, player_color.b, REVIVE_AREA_ALPHA), 0.88, 0.95, 0.06)
+	Mats.set_ring_stroke(_revive_area, 0.6)
 	_revive_area.visible = false
 	_revive_arc = _mesh("ReviveArc", self, _quad_mesh(), Mats.ring(), false)
 	_revive_arc.scale = Vector3(d, 1, d)
@@ -565,6 +632,107 @@ func _build_pointer() -> void:
 	_pointer = _mesh("Pointer", _yaw, mesh, Mats.unshaded(player_color), false)
 	_pointer.position.y = 0.03
 	_pointer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## "P1" + nameplate diamond above the head (see [method set_tag]). Fixed screen size, no
+## depth test (visible through enemies), does not turn with the body.
+func _build_marker() -> void:
+	_marker = _node("Marker", self)
+	_marker_diamond = Sprite3D.new()
+	_marker_diamond.name = "Diamond"
+	_marker_diamond.texture = marker_texture()
+	_marker_diamond.pixel_size = MARKER_DIAMOND_PIXEL
+	# Bottom tip on the marker origin, the diamond grows upwards.
+	_marker_diamond.offset = Vector2(0, MARKER_TEX_SIZE.y * 0.5)
+	_marker_diamond.modulate = Color(player_color.r, player_color.g, player_color.b, 1.0)
+	_marker_diamond.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_marker_diamond.fixed_size = true
+	_marker_diamond.no_depth_test = true
+	_marker_diamond.shaded = false
+	_marker_diamond.double_sided = true
+	_marker_diamond.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	_marker_diamond.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+	_marker_diamond.render_priority = 26
+	_marker_diamond.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_marker.add_child(_marker_diamond)
+	_marker_label = Label3D.new()
+	_marker_label.name = "Tag"
+	_marker_label.text = tag
+	_marker_label.font_size = 44
+	_marker_label.outline_size = 14
+	_marker_label.pixel_size = MARKER_LABEL_PIXEL
+	_marker_label.modulate = player_color.lightened(0.3)
+	_marker_label.outline_modulate = Color(0.06, 0.035, 0.045)
+	_marker_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	# Sits on the diamond's top tip (both scale with depth the same way).
+	_marker_label.offset = Vector2(0, MARKER_TEX_SIZE.y * MARKER_DIAMOND_PIXEL / MARKER_LABEL_PIXEL - 10.0)
+	_marker_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_marker_label.fixed_size = true
+	_marker_label.no_depth_test = true
+	_marker_label.shaded = false
+	_marker_label.double_sided = true
+	_marker_label.render_priority = 28
+	_marker_label.outline_render_priority = 27
+	_marker_label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_marker.add_child(_marker_label)
+	_update_marker(0.0)
+
+
+## Marker height / visibility: above the head, bobbing over a ghost, lifted above the
+## "Resurrecting" cast bar while a teammate revives.
+func _update_marker(_delta: float) -> void:
+	if _marker == null:
+		return
+	_marker.visible = tag != ""
+	if not _marker.visible:
+		return
+	var y := MARKER_Y
+	if downed:
+		y = MARKER_CAST_Y if is_cast_bar_visible() else MARKER_GHOST_Y
+		y += sin(_time * 3.2) * MARKER_GHOST_BOB
+	_marker.position = Vector3(0, y, 0)
+
+
+## Downed: the player-colour ring under the ghost breathes (alpha + size) so the ghost is
+## easy to spot and clearly someone's.
+func _pulse_ghost_ring() -> void:
+	var pulse := 0.5 + 0.5 * sin(_time * 4.2)
+	var s := RING_SIZE * (1.08 + 0.14 * pulse)
+	_ring.scale = Vector3(s, 1, s)
+	Mats.set_ring(_ring, Color(player_color.r, player_color.g, player_color.b, 0.6 + 0.38 * pulse), 0.7, 0.93, 0.1 + 0.18 * pulse)
+
+
+## Nameplate diamond (white fill with soft facets, dark outline) – tinted per player through
+## the sprite's modulate. Built once.
+static func marker_texture() -> Texture2D:
+	if _marker_texture != null:
+		return _marker_texture
+	var w := MARKER_TEX_SIZE.x
+	var h := MARKER_TEX_SIZE.y
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var hw := w * 0.5 - 1.0
+	var hh := h * 0.5 - 1.0
+	var edge_scale := hw * hh / sqrt(hw * hw + hh * hh)
+	var outline := 3.2
+	var dark := Color(0.06, 0.035, 0.045)
+	for y in h:
+		for x in w:
+			var dx := (x + 0.5 - w * 0.5) / hw
+			var dy := (y + 0.5 - h * 0.5) / hh
+			var e := (1.0 - (absf(dx) + absf(dy))) * edge_scale
+			var a := clampf(e + 0.5, 0.0, 1.0)
+			if a <= 0.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			# Upper-left facets lit, lower-right a little darker, a bright inner edge.
+			var shade := 1.0 if dx + dy < 0.0 else 0.8
+			var inner := clampf(1.0 - absf(e - outline - 1.5) / 1.2, 0.0, 1.0) * 0.15
+			var fill := Color(shade + inner, shade + inner, shade + inner)
+			var t := clampf(e - outline + 0.5, 0.0, 1.0)
+			var c := dark.lerp(fill, t)
+			img.set_pixel(x, y, Color(c.r, c.g, c.b, a))
+	_marker_texture = ImageTexture.create_from_image(img)
+	return _marker_texture
 
 
 func _build_body() -> void:
@@ -858,6 +1026,14 @@ func _build_gear() -> void:
 			var gm := _mesh("FelTrim", _body, glow, Mats.glow(acc, 1.6), false)
 			gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_fel_flame = _build_flame(_hands[1], acc)
+			# Purple flames licking up from the horn tips: the warlock's silhouette glows
+			# from above instead of reading as a dark blob.
+			for side: float in [-1.0, 1.0]:
+				var horn := _warlock_horn(side)
+				var flame := _build_flame(_body, WARLOCK_FLAME, "HornFlameL" if side < 0.0 else "HornFlameR")
+				flame.position = horn[horn.size() - 1] + Vector3(0, 0.02, 0)
+				flame.scale = Vector3.ONE
+				_flames.append(flame)
 		&"wizard_hat":
 			var star := MeshKit.cached("onion:hat_star", func() -> Mesh:
 				var k := MeshKit.new()
@@ -872,8 +1048,8 @@ func _build_gear() -> void:
 			sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
-func _build_flame(parent: Node3D, color: Color) -> Node3D:
-	var pivot := _node("FelFlame", parent)
+func _build_flame(parent: Node3D, color: Color, node_name: String = "FelFlame") -> Node3D:
+	var pivot := _node(node_name, parent)
 	pivot.position = Vector3(0, 0.1, 0)
 	var mesh := MeshKit.cached("onion:flame", func() -> Mesh:
 		var k := MeshKit.new()
@@ -917,7 +1093,10 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 			k.add_torus(0.26, 0.32, MeshKit.xf(Vector3(0, 0.83, 0.006), Vector3(-6, 0, 0), Vector3(1, 1.4, 1)), GOLD, 24, 5)
 			_belt(k, GOLD, hat)
 		&"hood":
-			_hood_cap(k, acc)
+			# Open-topped leather cowl: the pale spring-onion neck and its long green stalk
+			# stay visible from the top-down camera (GDD 13), pale trim on both edges.
+			_hood_cap(k, acc, ROGUE_COWL_TOP)
+			_cowl_trim(k, ROGUE_TRIM)
 			_belt(k, LEATHER, Color(0.7, 0.7, 0.72))
 			k.add_box(Vector3(0.12, 0.12, 0.08), MeshKit.xf(OnionModel.bulb_point(0.25, 125.0, 0.04), Vector3(0, 125, 0)), LEATHER.darkened(0.2))
 			var strap := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(32))) * Basis.from_scale(Vector3(1, 0.55, 1)), Vector3(0, 0.45, 0))
@@ -939,12 +1118,14 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 				k.add_extrusion(ribbon, 0.022, MeshKit.xf(knot + Vector3(0.03 * side, -0.01, 0.0),
 					Vector3(112.0 + 10.0 * i, 18.0 * side, 0.0)), SCARF_RED.darkened(0.06 * i), 0.9)
 		&"horned_hood":
-			var dark := Color(0.17, 0.09, 0.2)
+			var dark := WARLOCK_HOOD
 			_hood_cap(k, dark)
 			for side: float in [-1.0, 1.0]:
-				var horn := PackedVector3Array([Vector3(0.26 * side, 0.86, 0.04), Vector3(0.4 * side, 0.95, 0.1),
-					Vector3(0.47 * side, 1.07, 0.2), Vector3(0.43 * side, 1.14, 0.33), Vector3(0.35 * side, 1.1, 0.4)])
-				k.add_tube(horn, 0.07, 0.012, Color(0.62, 0.52, 0.48), 8)
+				var horn := _warlock_horn(side)
+				k.add_tube(horn, 0.07, 0.012, WARLOCK_HORN, 8)
+				# Pale bone rim where the horn leaves the hood (reads against the dark hood).
+				k.add_torus(0.055, 0.095, Transform3D(MeshKit.basis_from_y((horn[1] - horn[0]).normalized()), horn[0]),
+					WARLOCK_HORN.lightened(0.25), 10, 4)
 			_belt(k, dark.lightened(0.1), acc)
 		_:
 			_belt(k, LEATHER, GOLD)
@@ -1002,15 +1183,33 @@ static func _belt(k: MeshKit, belt: Color, buckle: Color) -> void:
 	k.add_box(Vector3(0.1, 0.08, 0.04), MeshKit.xf(OnionModel.bulb_point(0.3, 0.0, 0.035)), buckle)
 
 
-static func _hood_cap(k: MeshKit, color: Color) -> void:
+## Hood over the top of the bulb. [param top] < the neck height leaves the top open (cowl,
+## no pointed tip).
+static func _hood_cap(k: MeshKit, color: Color, top: float = 2.0) -> void:
 	var prof := PackedVector2Array()
 	for p in bulb_profile():
-		if p.y >= 0.66:
+		if p.y >= 0.66 and p.y <= top:
 			prof.append(Vector2(p.x * 1.1 + 0.02, p.y + 0.03))
 	k.add_lathe(prof, Transform3D(), color, 28)
+	if top < 1.0:
+		return
 	var tip := PackedVector3Array([Vector3(0, 0.98, 0.04), Vector3(0, 1.05, 0.14), Vector3(0, 1.02, 0.27),
 		Vector3(0, 0.95, 0.33)])
 	k.add_tube(tip, 0.075, 0.015, color, 8)
+
+
+## Pale trim rings on the rogue cowl: its open top and its lower (brow) edge.
+static func _cowl_trim(k: MeshKit, color: Color) -> void:
+	var top_r := bulb_radius(ROGUE_COWL_TOP) * 1.1 + 0.02
+	k.add_torus(top_r - 0.022, top_r + 0.018, MeshKit.xf(Vector3(0, ROGUE_COWL_TOP + 0.03, 0)), color, 22, 4)
+	var low_r := bulb_radius(0.68) * 1.1 + 0.02
+	k.add_torus(low_r - 0.02, low_r + 0.02, MeshKit.xf(Vector3(0, 0.71, 0)), color, 26, 4)
+
+
+## Centre line of a warlock horn (root on the hood, curling backwards).
+static func _warlock_horn(side: float) -> PackedVector3Array:
+	return PackedVector3Array([Vector3(0.26 * side, 0.86, 0.04), Vector3(0.4 * side, 0.95, 0.1),
+		Vector3(0.47 * side, 1.07, 0.2), Vector3(0.43 * side, 1.14, 0.33), Vector3(0.35 * side, 1.1, 0.4)])
 
 
 static func _cloth_mesh(cd: ClassData) -> Mesh:
@@ -1026,14 +1225,16 @@ static func _cloth_mesh(cd: ClassData) -> Mesh:
 			k.add_lathe(trim, Transform3D(), GOLD, 6, -30.0, 30.0)
 		&"hood":
 			_hood_sides(k, acc)
+			# Dark domino mask across the eyes (GDD 13: "hood and mask"): the white eyes pop
+			# out of it, so the rogue reads as a masked rogue, not as a dark blob.
 			var mask := PackedVector2Array()
 			for p in bulb_profile():
-				if p.y >= 0.37 and p.y <= 0.49:
-					mask.append(Vector2(p.x + 0.018, p.y))
-			k.add_lathe(mask, Transform3D(), acc.darkened(0.25), 14, -80.0, 80.0)
+				if p.y >= EYE_Y - 0.085 and p.y <= EYE_Y + 0.075:
+					mask.append(Vector2(p.x + 0.014, p.y))
+			k.add_lathe(mask, Transform3D(), ROGUE_MASK, 18, -66.0, 66.0)
 		&"horned_hood":
-			_hood_sides(k, Color(0.17, 0.09, 0.2))
-			_cape(k, Color(0.24, 0.1, 0.28))
+			_hood_sides(k, WARLOCK_HOOD)
+			_cape(k, WARLOCK_HOOD.lightened(0.06))
 	return k.build()
 
 

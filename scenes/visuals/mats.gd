@@ -138,16 +138,33 @@ render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabl
 uniform vec4 ring_color = vec4(1.0, 1.0, 1.0, 1.0);
 // x = inner radius, y = outer radius (0..1 of the quad half size), z = fill alpha, w = arc 0..1
 uniform vec4 ring_shape = vec4(0.78, 0.95, 0.18, 1.0);
+// 0..1: dark outline just outside the band + thin white stroke on its inner edge, so the
+// player colour reads on any ground / class colour (player rings; VFX rings use 0).
+uniform float ring_stroke = 0.0;
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
 	float r = length(p);
 	float aa = fwidth(r) * 1.5;
-	float band = smoothstep(ring_shape.x - aa, ring_shape.x + aa, r) * (1.0 - smoothstep(ring_shape.y - aa, ring_shape.y + aa, r));
-	float fill = (1.0 - smoothstep(ring_shape.x - aa, ring_shape.x + aa, r)) * ring_shape.z * (0.6 + 0.4 * r / max(ring_shape.x, 0.001));
+	float inner = ring_shape.x;
+	float outer = ring_shape.y;
+	float band = smoothstep(inner - aa, inner + aa, r) * (1.0 - smoothstep(outer - aa, outer + aa, r));
+	float fill = (1.0 - smoothstep(inner - aa, inner + aa, r)) * ring_shape.z * (0.6 + 0.4 * r / max(inner, 0.001));
 	float ang = fract(atan(p.x, -p.y) / 6.2831853 + 1.0);
 	float arc = ring_shape.w >= 0.999 ? 1.0 : step(ang, ring_shape.w);
-	ALBEDO = ring_color.rgb;
-	ALPHA = clamp(max(band * arc, fill), 0.0, 1.0) * ring_color.a;
+	vec3 col = ring_color.rgb;
+	float a = max(band * arc, fill);
+	if (ring_stroke > 0.0) {
+		float w = max(outer - inner, 0.001);
+		float ow = max(w * 0.3, aa * 2.0);
+		float edge = smoothstep(outer - aa, outer + aa, r) * (1.0 - smoothstep(outer + ow - aa, outer + ow + aa, r));
+		float iw = max(w * 0.17, aa * 1.6);
+		float stroke = smoothstep(inner - aa, inner + aa, r) * (1.0 - smoothstep(inner + iw - aa, inner + iw + aa, r));
+		col = mix(col, vec3(1.0), stroke * 0.85 * ring_stroke);
+		col = mix(col, vec3(0.06, 0.035, 0.045), edge * ring_stroke);
+		a = max(a, edge * arc * 0.8 * ring_stroke);
+	}
+	ALBEDO = col;
+	ALPHA = clamp(a, 0.0, 1.0) * ring_color.a;
 }
 """
 
@@ -424,6 +441,13 @@ static func set_ring(node: GeometryInstance3D, color: Color, inner: float, outer
 		return
 	m.set_shader_parameter(&"ring_color", color)
 	m.set_shader_parameter(&"ring_shape", Vector4(inner, outer, fill_alpha, arc))
+
+
+## Dark outline + white inner stroke on a [method ring] node (0 = plain band, 1 = full).
+static func set_ring_stroke(node: GeometryInstance3D, amount: float) -> void:
+	var m := node.material_override as ShaderMaterial
+	if m != null:
+		m.set_shader_parameter(&"ring_stroke", clampf(amount, 0.0, 1.0))
 
 
 static func _is_overlay_of(material: Material, base: Material) -> bool:

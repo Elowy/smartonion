@@ -12,8 +12,12 @@ const PITCH_DEG := 57.0
 const FOV := 40.0
 const MIN_DISTANCE := 19.5
 const MAX_DISTANCE := 36.0
-## Metres kept between the outermost players and the screen edge.
+## Metres (ground) kept between the outermost players and the screen edge, per side: the HUD
+## covers more at the top (unit frames + wave / timer plaque) and the bottom (unit frames +
+## XP strip) than at the sides, so heroes never sit under it.
 const FRAME_MARGIN := 3.2
+const FRAME_MARGIN_TOP := 4.8
+const FRAME_MARGIN_BOTTOM := 3.8
 const FOLLOW_SHARPNESS := 4.5
 const ZOOM_SHARPNESS := 2.2
 const SHAKE_DECAY := 1.8
@@ -193,10 +197,29 @@ static func half_width_at(dist: float, aspect: float, dz: float) -> float:
 
 
 ## Largest player spread (x = across the screen, y = along Z) that [method compute_framing]
-## can still fit on screen at MAX_DISTANCE with FRAME_MARGIN.
+## can still fit on screen at MAX_DISTANCE with the frame margins.
 static func max_spread(aspect: float) -> Vector2:
 	var ext := ground_extents(MAX_DISTANCE, aspect)
-	return Vector2(2.0 * (ext.x - FRAME_MARGIN), ext.y + ext.z - 2.0 * FRAME_MARGIN)
+	return Vector2(2.0 * (ext.x - FRAME_MARGIN), ext.y + ext.z - FRAME_MARGIN_TOP - FRAME_MARGIN_BOTTOM)
+
+
+## The part of the ground a camera focused on [param center] at [param dist] shows outside
+## the HUD (frame margins on every side; the narrow bottom-edge width for the sides). Spawn
+## telegraphs prefer it so they are never off-screen or under the HUD.
+static func safe_ground_rect(center: Vector3, dist: float, aspect: float) -> Rect2:
+	var north := dist * north_factor()
+	var south := dist * south_factor()
+	var half_w := half_width_at(dist, aspect, south)
+	var x0 := center.x - half_w + FRAME_MARGIN
+	var x1 := center.x + half_w - FRAME_MARGIN
+	var z0 := center.z - north + FRAME_MARGIN_TOP
+	var z1 := center.z + south - FRAME_MARGIN_BOTTOM
+	return Rect2(x0, z0, maxf(x1 - x0, 0.0), maxf(z1 - z0, 0.0))
+
+
+## [method safe_ground_rect] of the current (smoothed) view.
+func get_safe_ground_rect() -> Rect2:
+	return safe_ground_rect(focus, distance, _aspect())
 
 
 ## Where a framed player may stand so the whole team still fits on one screen together
@@ -237,7 +260,8 @@ static func walk_rect(center: Vector3, dist: float, aspect: float, margin: float
 	return Rect2(x0, z0, maxf(x1 - x0, 0.0), maxf(z1 - z0, 0.0))
 
 
-## Distance needed to keep all [param points] on screen with [constant FRAME_MARGIN].
+## Distance needed to keep all [param points] on screen with the frame margins
+## (FRAME_MARGIN at the sides, FRAME_MARGIN_TOP / FRAME_MARGIN_BOTTOM).
 static func required_distance(points: Array[Vector3], aspect: float) -> float:
 	if points.is_empty():
 		return MIN_DISTANCE
@@ -247,7 +271,7 @@ static func required_distance(points: Array[Vector3], aspect: float) -> float:
 		lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
 		hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
 	var dx := ((hi.x - lo.x) * 0.5 + FRAME_MARGIN) / width_factor(aspect)
-	var dz := ((hi.y - lo.y) + 2.0 * FRAME_MARGIN) / (north_factor() + south_factor())
+	var dz := ((hi.y - lo.y) + FRAME_MARGIN_TOP + FRAME_MARGIN_BOTTOM) / (north_factor() + south_factor())
 	return clampf(maxf(dx, dz), MIN_DISTANCE, MAX_DISTANCE)
 
 
@@ -268,7 +292,8 @@ static func clamp_to_view(target: Vector3, dist: float, aspect: float, rect: Rec
 
 ## Target framing for a set of player positions: {target: Vector3, distance: float}.
 ## Follows the centroid, respects the view rect, and finally guarantees (within
-## MAX_DISTANCE) that every player stays inside the screen margin.
+## MAX_DISTANCE) that every player stays inside the screen margins (so out from under the
+## HUD: FRAME_MARGIN_TOP / FRAME_MARGIN_BOTTOM / FRAME_MARGIN).
 static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 = Rect2()) -> Dictionary:
 	var centroid := Vector3.ZERO
 	var lo := Vector2(INF, INF)
@@ -287,7 +312,7 @@ static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 =
 	var lo_x := hi.x + FRAME_MARGIN - ext.x
 	var hi_x := lo.x - FRAME_MARGIN + ext.x
 	target.x = clampf(target.x, lo_x, hi_x) if lo_x <= hi_x else (lo.x + hi.x) * 0.5
-	var lo_z := hi.y + FRAME_MARGIN - ext.z
-	var hi_z := lo.y - FRAME_MARGIN + ext.y
+	var lo_z := hi.y + FRAME_MARGIN_BOTTOM - ext.z
+	var hi_z := lo.y - FRAME_MARGIN_TOP + ext.y
 	target.z = clampf(target.z, lo_z, hi_z) if lo_z <= hi_z else (lo_z + hi_z) * 0.5
 	return {"target": target, "distance": dist}

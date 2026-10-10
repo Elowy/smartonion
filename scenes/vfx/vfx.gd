@@ -9,11 +9,20 @@ extends RefCounted
 ## the Compatibility renderer only fits for ~256 instances), small CPU particle bursts.
 ## Visual randomness uses a private RNG so gameplay determinism (RunState.rng) is untouched.
 
-## Floating texts alive at once; extra non-crit texts are dropped when the screen is busy.
-const MAX_TEXTS := 70
+## Floating texts alive at once; extra non-crit texts (size <= 1) are dropped when the
+## screen is busy. Crits may go CRIT_EXTRA_TEXTS above it.
+const MAX_TEXTS := 28
+const CRIT_EXTRA_TEXTS := 8
+## Hits on the same target within this many seconds add up on one damage number.
+const MERGE_WINDOW := 0.25
 ## Label3D uses fixed_size: pixel_size is the world size at 1 m, i.e. constant on screen.
 const TEXT_PIXEL_SIZE := 0.00046
 const TEXT_FONT_SIZE := 64
+## Explosion flash: start alpha, radius factor and fade time (s) – a short pop, the ground
+## ring and embers carry the effect so the targets stay visible.
+const EXPLOSION_FLASH_ALPHA := 0.45
+const EXPLOSION_FLASH_SCALE := 0.6
+const EXPLOSION_FLASH_TIME := 0.15
 ## World height of ground decals (shock-wave rings) – they snap to the ground whatever
 ## height the effect itself was spawned at (explosions happen at projectile height ...).
 const GROUND_Y := 0.04
@@ -127,23 +136,73 @@ void fragment() {
 	float pulse = 0.72 + 0.28 * sin(TIME * speed);
 	float fill = (1.0 - smoothstep(0.84, 0.88, r)) * (0.12 + 0.2 * rune_progress) * pulse;
 	float lines = clamp(outer + inner * 0.85 + glyph * 0.9 + star_line * 0.8, 0.0, 1.0);
-	ALBEDO = mix(rune_color.rgb, vec3(1.0, 0.75, 0.55), lines * 0.35 * rune_progress);
-	ALPHA = clamp(lines * pulse + fill, 0.0, 1.0) * clamp(rune_fade, 0.0, 1.6) * rune_color.a;
+	// White-hot core inside the red lines (outer circle and star) plus a soft white glow
+	// along the inner rim: readable without relying on red alone (colour-blind players).
+	float core_ring = smoothstep(0.885 - aa, 0.885 + aa, r) * (1.0 - smoothstep(0.915 - aa, 0.915 + aa, r));
+	float core_star = 1.0 - smoothstep(0.004, 0.004 + aa, star);
+	float rim_glow = smoothstep(0.62, 0.84, r) * (1.0 - smoothstep(0.84, 0.86, r)) * 0.35;
+	float core = clamp(core_ring + core_star * 0.85 + rim_glow, 0.0, 1.0) * (0.75 + 0.25 * pulse);
+	vec3 col = mix(rune_color.rgb, vec3(1.0, 0.75, 0.55), lines * 0.35 * rune_progress);
+	ALBEDO = mix(col, vec3(1.0, 0.97, 0.94), core);
+	ALPHA = clamp(lines * pulse + fill + core * 0.6, 0.0, 1.0) * clamp(rune_fade, 0.0, 1.6) * rune_color.a;
 }
 """
 
 static var _text_count := 0
 static var _rng := RandomNumberGenerator.new()
 static var _materials: Dictionary[String, Material] = {}
+## Live damage numbers by target instance id (see [method damage_number]).
+static var _merge: Dictionary[int, VfxEffect] = {}
 
 
-## Floating combat text (damage, "Dodge", "+12 gold" ...). [param size] 1 = normal, crits ~1.5.
-static func floating_text(pos: Vector3, text: String, color: Color, size: float = 1.0) -> void:
-	if _text_count >= MAX_TEXTS and size <= 1.0:
-		return
-	var fx := _effect(VfxEffect.Kind.TEXT, pos, 0.85 + 0.15 * size)
+## Floating combat text (damage, "Dodge", "Resurrected!" ...) in WoW scrolling-combat-text
+## style: pops in, then arcs up and sideways. [param size] 1 = normal (crits bigger);
+## [param color] alpha is the text's opacity. [param side] +1 / -1 arcs to the right / left,
+## 0 picks a random side.
+static func floating_text(pos: Vector3, text: String, color: Color, size: float = 1.0, side: float = 0.0) -> void:
+	_text(pos, text, color, size, side)
+
+
+## A damage number on [param target] (merge key: hits on the same target within
+## MERGE_WINDOW add up on one number that pops again; null never merges). A crit merged into
+## a normal number upgrades it to [param color] / [param size].
+static func damage_number(target: Object, pos: Vector3, amount: float, color: Color, size: float) -> void:
+	var key := target.get_instance_id() if target != null and is_instance_valid(target) else 0
+	if key != 0 and _merge.has(key):
+		var live: VfxEffect = _merge[key]
+		if is_instance_valid(live) and not live.is_queued_for_deletion() and live.age < MERGE_WINDOW:
+			live.amount += amount
+			if size > live.size:
+				live.size = size
+				live.color = color
+				var label := live.main as Label3D
+				if label != null:
+					label.pixel_size = TEXT_PIXEL_SIZE * size
+					label.modulate = Color(color.r, color.g, color.b, label.modulate.a)
+			(live.main as Label3D).text = format_damage(live.amount)
+			live.repop()
+			return
+		_merge.erase(key)
+	var fx := _text(pos, format_damage(amount), color, size, 0.0)
 	if fx == null:
 		return
+	fx.amount = amount
+	if key != 0:
+		fx.merge_key = key
+		_merge[key] = fx
+
+
+## Whole-number damage text (at least 1).
+static func format_damage(amount: float) -> String:
+	return str(maxi(1, roundi(amount)))
+
+
+static func _text(pos: Vector3, text: String, color: Color, size: float, side: float) -> VfxEffect:
+	if _text_count >= MAX_TEXTS + CRIT_EXTRA_TEXTS or (_text_count >= MAX_TEXTS and size <= 1.0):
+		return null
+	var fx := _effect(VfxEffect.Kind.TEXT, pos, 0.8 + 0.15 * size)
+	if fx == null:
+		return null
 	_text_count += 1
 	var label := Label3D.new()
 	label.name = "Label"
@@ -151,8 +210,8 @@ static func floating_text(pos: Vector3, text: String, color: Color, size: float 
 	label.font_size = TEXT_FONT_SIZE
 	label.pixel_size = TEXT_PIXEL_SIZE * size
 	label.outline_size = 18
-	label.modulate = Color(color.r, color.g, color.b, 1.0)
-	label.outline_modulate = Color(0.08, 0.04, 0.05, 1.0)
+	label.modulate = Color(color.r, color.g, color.b, color.a)
+	label.outline_modulate = Color(0.08, 0.04, 0.05, color.a)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.shaded = false
@@ -165,8 +224,11 @@ static func floating_text(pos: Vector3, text: String, color: Color, size: float 
 	fx.main = label
 	fx.size = size
 	fx.color = color
-	fx.drift = Vector3(_rng.randf_range(-0.35, 0.35), 0.0, _rng.randf_range(-0.1, 0.1))
+	var s := signf(side) if side != 0.0 else (1.0 if _rng.randf() < 0.5 else -1.0)
+	# Sideways part of the arc (world X = screen X); a little random so numbers fan out.
+	fx.drift = Vector3(s * _rng.randf_range(0.3, 0.55), 0.0, _rng.randf_range(-0.08, 0.08))
 	_start(fx)
+	return fx
 
 
 ## Melee swing arc on the ground plane.
@@ -262,7 +324,8 @@ static func explosion(pos: Vector3, radius: float, color: Color) -> void:
 		return
 	fx.size = maxf(radius, 0.3)
 	fx.color = color
-	fx.flash = _glow_ball(fx, color, 1.0)
+	# Short, faint, small flash: the targets inside stay readable (ring + embers carry it).
+	fx.flash = _glow_ball(fx, color, EXPLOSION_FLASH_ALPHA)
 	fx.flash.position.y = 0.0
 	fx.ring = _ground_ring(fx)
 	var embers := _particles(fx, 14, 0.5, _ball_mesh(), Mats.particle(true))

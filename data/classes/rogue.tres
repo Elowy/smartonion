@@ -24,6 +24,6 @@ proficiencies = Array[StringName]([&"dagger", &"sword", &"mace", &"bow", &"gun",
 resource_type = &"energy"
 resource_color = Color(1.0, 0.9, 0.2, 1)
 onion_color = Color(0.9, 0.92, 0.78, 1)
-accent_color = Color(0.22, 0.18, 0.15, 1)
+accent_color = Color(0.43, 0.5, 0.28, 1)
 headgear = &"hood"
 big_shoulders = false

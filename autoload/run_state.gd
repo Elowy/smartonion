@@ -15,13 +15,17 @@ signal leveled_up(level: int)
 const TOTAL_WAVES := 25
 const BOSS_WAVES: Array[int] = [10, 25]
 const ELITE_WAVES: Array[int] = [20]
+## The team starts at level 1 (WoW style); the XP curve counts level-ups from here.
+const START_LEVEL := 1
+## Talent points come from this level on (GDD 7.1: one per level from level 10).
+const TALENT_START_LEVEL := 10
 
 var active := false
 var victory := false
 var wave := 0
 var gold := 0
 var xp := 0
-var level := 0
+var level := START_LEVEL
 ## Level-ups gained during the current wave, resolved on the between-wave screen.
 var pending_level_ups := 0
 var player_count := 1
@@ -45,7 +49,7 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	wave = 0
 	gold = 0
 	xp = 0
-	level = 0
+	level = START_LEVEL
 	pending_level_ups = 0
 	player_count = clampi(p_player_count, 1, 4)
 	if seed_value >= 0:
@@ -126,13 +130,17 @@ func try_spend(amount: int) -> bool:
 
 # --- Shared XP ---------------------------------------------------------------
 
-## XP needed to go from [member level] to level + 1: (n + 3)^2 scaled by player count.
+## XP needed to go from [member level] to level + 1 (see [method xp_needed_for_level]).
 func xp_to_next_level() -> int:
 	return xp_needed_for_level(level + 1, player_count)
 
 
+## XP needed to reach [param target_level]: (n + 3)^2 for the n-th level-up of the run
+## (GDD 6.1, Brotato formula; n = target_level - START_LEVEL, so level 1 -> 2 needs
+## (1 + 3)^2), scaled by the player count.
 static func xp_needed_for_level(target_level: int, players: int) -> int:
-	var base := pow(target_level + 3, 2)
+	var n := maxi(1, target_level - START_LEVEL)
+	var base := pow(n + 3, 2)
 	return int(ceil(base * (1.0 + 0.6 * (players - 1))))
 
 
@@ -150,9 +158,10 @@ func add_xp(amount: int) -> void:
 	xp_changed.emit(xp, needed)
 
 
-## Talent points become available from level 10 (GDD 7.1). Used from M5.
+## Talent points become available from level 10 (GDD 7.1): one at 10, one per level after.
+## Used from M5.
 func talent_points_earned() -> int:
-	return maxi(0, level - 9)
+	return maxi(0, level - TALENT_START_LEVEL + 1)
 
 
 # --- Statistics --------------------------------------------------------------

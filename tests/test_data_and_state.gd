@@ -57,13 +57,28 @@ func test_gold_find_remainder_per_slot() -> void:
 
 func test_shared_xp_levels() -> void:
 	RunState.start_run(1, 1)
-	check_eq(RunState.xp_to_next_level(), 16, "level 1 needs (1+3)^2")
+	check_eq(RunState.level, 1, "the team starts at level 1 (WoW style)")
+	check_eq(RunState.xp_to_next_level(), 16, "the first level-up (1 -> 2) needs (1+3)^2")
 	RunState.add_xp(16 + 25 + 3)
-	check_eq(RunState.level, 2)
+	check_eq(RunState.level, 3)
 	check_eq(RunState.xp, 3)
 	check_eq(RunState.pending_level_ups, 2)
+	check_eq(RunState.xp_to_next_level(), 36, "third level-up needs (3+3)^2")
 	RunState.start_run(4, 1)
+	check_eq(RunState.level, 1, "a new run starts at level 1 again")
 	check_eq(RunState.xp_to_next_level(), int(ceil(16 * 2.8)), "co-op scaling")
+
+
+func test_talent_points_start_at_level_10() -> void:
+	RunState.start_run(1, 1)
+	check_eq(RunState.talent_points_earned(), 0, "none at the start")
+	RunState.level = 9
+	check_eq(RunState.talent_points_earned(), 0, "none at level 9")
+	RunState.level = 10
+	check_eq(RunState.talent_points_earned(), 1, "first point at level 10")
+	RunState.level = 14
+	check_eq(RunState.talent_points_earned(), 5, "one per level after")
+	RunState.start_run(1, 1)
 
 
 func test_wave_duration() -> void:

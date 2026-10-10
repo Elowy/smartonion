@@ -275,7 +275,8 @@ func test_begin_wave_heals_and_revives() -> void:
 func test_team_level_placeholder_bonus() -> void:
 	# TEMPORARY M1 placeholder (until the M4 level-up cards): +1 Max HP, +4% damage per level.
 	var p := Fakes.spawn_player(world, 0, &"warrior")
-	check(not p.stats.has_source(Player.LEVEL_SOURCE), "no level bonus at level 0")
+	check_eq(RunState.level, RunState.START_LEVEL, "run starts at the start level")
+	check(not p.stats.has_source(Player.LEVEL_SOURCE), "no level bonus at the starting level")
 	var dmg_pct := p.stats.get_raw(Stats.DAMAGE_PCT)
 	var mult := p.stats.damage_mult()
 	var ghost := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))
@@ -287,7 +288,7 @@ func test_team_level_placeholder_bonus() -> void:
 	var hp_events: Array[float] = []
 	p.hp_changed.connect(func(value: float, _max: float) -> void: hp_events.append(value))
 	RunState.add_xp(RunState.xp_to_next_level())
-	check_eq(RunState.level, 1, "levelled up")
+	check_eq(RunState.level, RunState.START_LEVEL + 1, "levelled up")
 	check_eq(p.max_hp(), 16.0, "+1 max hp")
 	check_eq(p.hp, 11.0, "current hp rises by the max hp gained")
 	check(not hp_events.is_empty() and is_equal_approx(hp_events[-1], 11.0), "hp_changed with the new hp")
@@ -296,8 +297,8 @@ func test_team_level_placeholder_bonus() -> void:
 	check_eq(ghost.hp, 0.0, "a ghost stays at 0 hp")
 	check_eq(ghost.max_hp(), 16.0, "but its max hp grows too")
 	# Two levels at once (one leveled_up per level).
-	RunState.add_xp(RunState.xp_to_next_level() + RunState.xp_needed_for_level(3, 1))
-	check_eq(RunState.level, 3, "two more levels")
+	RunState.add_xp(RunState.xp_to_next_level() + RunState.xp_needed_for_level(RunState.level + 2, 1))
+	check_eq(RunState.level, RunState.START_LEVEL + 3, "two more levels")
 	check_eq(p.max_hp(), 18.0, "+3 max hp in total")
 	check_eq(p.hp, 13.0, "+2 hp from the two levels")
 	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct + 12.0, "+12% damage in total")
