@@ -686,10 +686,26 @@ func _take_screenshot() -> void:
 		_quit(1)
 		return
 	await RenderingServer.frame_post_draw
+	_log_player_screen_positions()
 	var image := get_viewport().get_texture().get_image()
 	var err := ERR_CANT_CREATE if image == null else image.save_png(path)
 	print("SCREENSHOT %s (%s)" % [path, error_string(err)])
 	_quit(0 if err == OK else 1)
+
+
+## Screenshot aid: where every player is on screen (pixels of the visible rect).
+func _log_player_screen_positions() -> void:
+	if arena == null or not is_instance_valid(arena.camera):
+		return
+	var cam := arena.camera.camera
+	var size := get_viewport().get_visible_rect().size
+	for p in players:
+		if not is_instance_valid(p):
+			continue
+		var px := cam.unproject_position(p.global_position + Vector3.UP * 0.6)
+		_log("%s %s at %s -> screen (%d, %d) of %dx%d, camera distance %.1f" % [
+			p.slot.label() if p.slot != null else "?", "alive" if p.is_alive() else "downed",
+			p.global_position.snappedf(0.1), px.x, px.y, size.x, size.y, arena.camera.distance])
 
 
 func _quit(code: int) -> void:

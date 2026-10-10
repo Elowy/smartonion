@@ -34,27 +34,54 @@ not rename or remove the contract members.
 ## Runtime flow
 
 ```
-Main (Node)
-├── MainMenu / Lobby / Intermission / GameOverScreen / PauseMenu  (CanvasLayer UI)
-├── Arena (Node3D)             – Arena.current
+Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is paused)
+├── Arena (Node3D, PAUSABLE)   – Arena.current
 │   ├── environment, ground, walls, props
 │   ├── CameraRig
 │   └── entities (Node3D)      – players, enemies, projectiles, pickups, VFX
-├── WaveDirector (Node)
-└── Hud (CanvasLayer UI)
+├── WaveDirector (Node, PAUSABLE)
+├── HudLayer (CanvasLayer 10, PAUSABLE) / Hud
+├── MenuLayer (20)          / MainMenu or Lobby
+├── IntermissionLayer (30)  / Intermission      (ALWAYS)
+├── GameOverLayer (40)      / GameOverScreen    (ALWAYS)
+└── PauseLayer (50)         / PauseMenu         (ALWAYS)
 ```
 
-1. **MENU** – MainMenu. Play → LOBBY.
-2. **LOBBY** – `PlayerManager.joining_enabled = true`. Each slot picks a class (◀ ▶), readies
-   with A, leaves with B. All joined players ready → `RunState.start_run(count)` → RUN.
-3. **RUN / WAVE n** – Main spawns one `Player` per slot at `arena.get_player_spawn_points()`,
-   calls `player.begin_wave()`, `wave_director.start_wave(n)`. HUD shows frames / timer.
+States (`Main.State`): `MENU -> LOBBY -> WAVE -> WAVE_END -> INTERMISSION -> WAVE ... ->
+GAME_OVER -> LOBBY`. Screens are created when their state starts and freed when it ends; the
+run (arena, director, players, HUD, run screens) is built by `start_run()` and torn down by
+`_teardown_run()`. Transitions triggered by UI signals are connected `CONNECT_DEFERRED`, so
+the new screen never sees the button press that closed the old one.
+
+1. **MENU** – MainMenu. Nobody has joined here, so entering MENU clears every slot. Play →
+   LOBBY, Quit → quit.
+2. **LOBBY** – the Lobby owns `PlayerManager.joining_enabled`. Each slot picks a class (◀ ▶),
+   readies with A, leaves with B. All joined players ready → countdown → `start_requested`
+   → run. B with nobody joined → MENU.
+3. **RUN / WAVE n** – `RunState.start_run(count, seed)`, `Arena.create()`,
+   `WaveDirector.create(arena)`, one `Player.create(slot)` per slot under `arena.entities`
+   (`Main._spawn_player` is the single place a slot becomes a hero – the future M9 loadout
+   hook), `hud.bind_players(players)`, `wave_timer_changed → hud.set_wave_time`. Every wave:
+   players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
+   return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
    - A player at 0 HP is **downed**; a living teammate standing within `REVIVE_RADIUS` for
-     `REVIVE_TIME` revives them at 30% HP. Everybody downed at once → GAME_OVER (defeat).
+     `REVIVE_TIME` revives them at 30% HP (cast bar in the reviver's colour, channel beam,
+     `Vfx.resurrect_column`). Everybody downed at once → GAME_OVER (defeat).
      Solo: downed = defeat.
-4. **wave_cleared** → `wave_director.stop()` banks loot → if n == 25 → GAME_OVER (victory),
-   else **INTERMISSION** (`RunState.pending_level_ups` shown, players ready with A) → wave n+1.
-5. START on any player's device → PauseMenu (`get_tree().paused`).
+4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
+   **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
+   move) → if n == 25 → GAME_OVER (victory), else **INTERMISSION** (tree paused,
+   `Intermission.open(n, RunState.pending_level_ups)`, players ready with A, bots and unplugged
+   devices auto-ready) → `pending_level_ups = 0` (choices arrive in M4) → wave n+1.
+5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
+   `GameOverScreen.open(victory)`. A / START → **LOBBY with the same players** (ready again);
+   the main menu only through the lobby's Back.
+6. START on any player's device during WAVE / WAVE_END → PauseMenu (`get_tree().paused`).
+   Resume unpauses; "Quit to Menu" ends the run (`RunState.end_run(false)`) and goes to MENU.
+   `PlayerManager.device_disconnected` during a run → pause + HUD notice;
+   `device_reconnected` → notice hidden (the player resumes with START).
+7. `RunState.leveled_up` during a wave → `Vfx.level_up_burst` on every living player (the HUD
+   shows the "LEVEL UP!" banner by itself).
 
 ## Combat model
 
@@ -93,10 +120,32 @@ Main (Node)
 
 ## Command line (Main)
 
-`-- --smoke` 4 bots, random classes, menus skipped, `Engine.time_scale = 4`, plays
-`--waves=N` waves (default 3), prints `SMOKE_RESULT {json}` and quits (exit 1 if a wave
-could not complete). `--players=N` bot count, `--seed=N`, `--demo` bots without time scaling
-(for screenshots), `--screenshot=path` + `--shot-time=seconds` saves a PNG then quits.
+Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `--`).
+
+| Flag | Meaning |
+|---|---|
+| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. |
+| `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
+| `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
+| `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
+| `--start-wave=N` | First wave of the run (testing later waves). |
+| `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
+| `--view=NAME` `--view-time=S` | Dev: reach a screen for a screenshot – `menu`, `lobby` (bots join, P1 ready), `game`, `intermission` (the wave timer is run out), `game_over`, `victory`, `pause`; forced at S seconds of game time (default: shot time − 3 s) and held open. |
+| `--time-scale=X` | Overrides the time scale. |
+
+`SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `kills`, `gold`,
+`level`, `players_downed`, `revives`, `wipes`, `errors`, `warnings`, `error_samples`,
+`game_time`, `real_time`, and `perf` – physics tick times measured by `PhysicsClock` and
+grouped by living enemies (`RunPerf`): `physics_ms_avg`, `physics_ms_at_peak` (ticks with
+≥ 80% of the peak enemy count), `script_ms_at_peak`, `physics_ms_max`, and
+`monitor_physics_ms_at_peak` (`Performance.TIME_PHYSICS_PROCESS`, which is the slowest tick of
+the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line.
+Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
+crowded), avoid walls, stay near the team and run to downed teammates when it is safe.
+
+Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission,game_over}.png`
+(`--view=lobby --players=3`, `--demo --seed=5 --start-wave=4 --shot-time=12`,
+`--view=intermission --start-wave=3 --shot-time=16`, `--view=game_over --start-wave=3 --shot-time=16`).
 
 ## Visuals (procedural art)
 
@@ -105,9 +154,9 @@ could not complete). `--players=N` bot count, `--seed=N`, `--demo` bots without 
   instance) drawn with `Mats.toon_vc()`. All toon materials share a few cached shaders
   (two-band toon light, warm rim, inverted-hull outline as `next_pass`; the outline is drawn
   in the alpha pass only, so it costs nothing in the shadow pass).
-- Per-node looks go through instance uniforms, never duplicated materials:
-  `Mats.set_overlay` (hit flash / wind-up tint), `Mats.set_ring` (ground rings),
-  `Mats.set_cast_bar`.
+- No `instance uniform`s (the Compatibility renderer only fits ~256 instances using them):
+  per-node looks swap in cached material variants – `Mats.set_overlay` (hit flash / wind-up
+  tint) – or use per-node materials (`Mats.set_ring` ground rings, `Mats.set_cast_bar`).
 - Public helpers beyond the stubs:
   - `OnionModel.set_revive_progress(progress, reviver_color, seconds_left)` – revive ring arc
     plus a WoW-like "Resurrecting" cast bar above the ghost, in the reviver's colour.
