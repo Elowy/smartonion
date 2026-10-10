@@ -48,7 +48,9 @@ func test_navigate_and_quit() -> void:
 	UiFakes.nudge(menu, a, Vector2.UP)
 	check_eq(menu.selected, PauseMenu.Item.QUIT, "up wraps too")
 	UiFakes.tap(menu, a, PlayerInput.Pad.A)
-	check_eq(quits, 1, "A on Quit -> quit_to_menu_requested")
+	check_eq(quits, 0, "the first A on Quit only asks 'Are you sure?'")
+	UiFakes.tap(menu, a, PlayerInput.Pad.A)
+	check_eq(quits, 1, "the second A on Quit -> quit_to_menu_requested")
 	check_eq(resumes, 0, "no resume")
 	check(not menu.visible, "closed")
 

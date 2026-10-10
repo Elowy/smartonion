@@ -26,6 +26,7 @@ const SPIRIT := &"spirit"
 const FORTUNE := &"fortune"
 const GOLD_FIND := &"gold_find"
 # Utility (not shown on items, used by systems)
+## Percent: +100 doubles BASE_PICKUP_RANGE (GDD 2.4.1).
 const PICKUP_RANGE := &"pickup_range"
 const DAMAGE_PCT := &"damage_pct"
 
@@ -38,7 +39,7 @@ const ALL: Array[StringName] = [
 
 const BASE_MAX_HP := 10.0
 const BASE_MOVE_SPEED := 5.0  ## metres / second at Speed 0
-const BASE_PICKUP_RANGE := 3.0  ## metres
+const BASE_PICKUP_RANGE := 3.0  ## metres at Pickup Range 0
 
 const DODGE_CAP := 60.0
 const AVOIDANCE_CAP := 50.0
@@ -71,7 +72,7 @@ const DISPLAY_NAMES := {
 
 ## Stats displayed with a % suffix.
 const PERCENT_STATS: Array[StringName] = [
-	CRIT, HASTE, VERSATILITY, DODGE, AVOIDANCE, LEECH, SPEED, GOLD_FIND, DAMAGE_PCT,
+	CRIT, HASTE, VERSATILITY, DODGE, AVOIDANCE, LEECH, SPEED, GOLD_FIND, PICKUP_RANGE, DAMAGE_PCT,
 ]
 
 

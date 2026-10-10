@@ -2,8 +2,9 @@ extends Node
 ## Autoload "PlayerManager": local co-op device handling (GDD chapter 6 / 11).
 ##
 ## - Up to MAX_PLAYERS slots, each bound to one device (controller, keyboard or bot).
-## - While [member joining_enabled] is true, pressing A on an unused controller (or
-##   Enter / Space on the keyboard) joins a new player.
+## - While [member joining_enabled] is true, pressing A on an unused controller (or one of
+##   KeyboardInput.JOIN_KEYS on the keyboard) joins a new player. The join press is swallowed
+##   (PlayerInput.swallow()), so it does not also count as A for the screen that is open.
 ## - Polls every slot's PlayerInput once per frame before any scene node runs.
 
 signal player_joined(slot: PlayerSlot)
@@ -72,6 +73,32 @@ func is_device_used(device_key: String) -> bool:
 	return false
 
 
+## Human (non-bot) slots whose device is not connected right now (an unplugged controller).
+func disconnected_slots() -> Array[PlayerSlot]:
+	var out: Array[PlayerSlot] = []
+	for slot in _slots:
+		if slot != null and slot.input != null and not slot.is_bot() and not slot.input.is_connected_device():
+			out.append(slot)
+	return out
+
+
+## True when at least one human slot has a working device (it can press buttons).
+func has_connected_human() -> bool:
+	for slot in _slots:
+		if slot != null and slot.input != null and not slot.is_bot() and slot.input.is_connected_device():
+			return true
+	return false
+
+
+## Removes every human slot whose device is gone (a ghost slot can never ready up, so it would
+## block the lobby for good). Returns how many slots were removed.
+func prune_disconnected() -> int:
+	var gone := disconnected_slots()
+	for slot in gone:
+		leave(slot.index)
+	return gone.size()
+
+
 func all_ready() -> bool:
 	var slots := get_slots()
 	if slots.is_empty():
@@ -128,16 +155,20 @@ func _scan_for_joins() -> void:
 		var key := "joy:%d" % device
 		var down := Input.is_joy_button_pressed(device, JOY_BUTTON_A)
 		if down and not _join_prev.get(key, false) and not is_device_used(key):
-			var slot := join(JoypadInput.new(device))
-			if slot != null:
-				slot.input.poll(0.0)  # swallow the join press
+			_join_with(JoypadInput.new(device))
 		_join_prev[key] = down
-	var kb_down := Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_SPACE)
+	var kb_down := KeyboardInput.join_key_held()
 	if kb_down and not _join_prev.get("keyboard", false) and not is_device_used("keyboard"):
-		var slot := join(KeyboardInput.new())
-		if slot != null:
-			slot.input.poll(0.0)
+		_join_with(KeyboardInput.new())
 	_join_prev["keyboard"] = kb_down
+
+
+## Joins a device that was just seen pressing its join button. The input is swallowed BEFORE
+## the join is announced: the press that joined must not be A for the lobby (it would ready
+## the new player at once), and a stick held at that moment must not navigate.
+func _join_with(input: PlayerInput) -> PlayerSlot:
+	input.swallow()
+	return join(input)
 
 
 func _on_joy_connection_changed(device: int, connected: bool) -> void:

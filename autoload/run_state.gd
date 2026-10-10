@@ -34,6 +34,10 @@ var gold_earned := 0
 var kills_by_player: Dictionary[int, int] = {}
 var damage_by_player: Dictionary[int, float] = {}
 
+## Fraction of a gold coin each player slot has earned through Gold Find but not yet
+## received (see add_gold_for). Keyed by slot index (-1 = no slot).
+var _gold_remainder: Dictionary[int, float] = {}
+
 
 func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	active = true
@@ -52,6 +56,7 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	gold_earned = 0
 	kills_by_player.clear()
 	damage_by_player.clear()
+	_gold_remainder.clear()
 	run_started.emit()
 	gold_changed.emit(gold, 0)
 	xp_changed.emit(xp, xp_to_next_level())
@@ -83,6 +88,27 @@ func add_gold(amount: int) -> void:
 	if amount > 0:
 		gold_earned += amount
 	gold_changed.emit(gold, amount)
+
+
+## Gold picked up by player slot [param slot_index] with [param gold_find_pct] percent Gold
+## Find: the exact value (CombatMath.gold_with_find_pct) plus the slot's stored fraction;
+## the whole part goes to the shared wallet, the rest is kept for the slot's next pickup.
+## Returns the whole gold added.
+func add_gold_for(slot_index: int, amount: int, gold_find_pct: float) -> int:
+	if amount <= 0:
+		return 0
+	var carried: float = _gold_remainder.get(slot_index, 0.0)
+	var exact := CombatMath.gold_with_find_pct(amount, gold_find_pct) + carried
+	# The epsilon keeps float sums like 10 x 0.1 from landing just below a whole coin.
+	var whole := floori(exact + 0.000001)
+	_gold_remainder[slot_index] = maxf(0.0, exact - whole)
+	add_gold(whole)
+	return whole
+
+
+## Gold Find fraction player slot [param slot_index] carries towards its next coin (0..1).
+func gold_remainder(slot_index: int) -> float:
+	return _gold_remainder.get(slot_index, 0.0)
 
 
 func can_afford(amount: int) -> bool:

@@ -2,9 +2,13 @@ class_name Lobby
 extends Control
 ## Join + class select screen (GDD 6, 12). Four slot cards in a row.
 ##
-## - While visible, PlayerManager.joining_enabled is true: A on a free controller or Enter /
-##   Space on the keyboard joins a new player (armed only once the button that opened the
-##   lobby has been released, so pressing "Play" does not also join).
+## - While visible, PlayerManager.joining_enabled is true: A on a free controller or one of
+##   KeyboardInput.JOIN_KEYS (Enter / Space / Keypad Enter / F) joins a new player (armed only
+##   once the button that opened the lobby has been released, so pressing "Play" does not also
+##   join). The join press is swallowed by PlayerManager (PlayerInput.swallow()): it neither
+##   readies the new player nor moves its class cursor until the stick has been neutral once.
+## - Slots whose controller is unplugged are removed when the lobby is shown and every frame
+##   while it is open (a ghost slot could never ready up and would block the start).
 ## - Joined players use their own PlayerSlot.input: ◀ ▶ changes class (Db.cycle_class),
 ##   A toggles ready, START readies, B unreadies or – when not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
@@ -53,6 +57,7 @@ func is_counting_down() -> bool:
 func reset() -> void:
 	_started = false
 	countdown_left = -1.0
+	PlayerManager.prune_disconnected()
 	PlayerManager.set_all_ready(false)
 	_set_joining(not UiPads.join_button_held())
 
@@ -158,6 +163,7 @@ func _process(delta: float) -> void:
 		return
 	if not _owns_joining and not UiPads.join_button_held():
 		_set_joining(true)
+	PlayerManager.prune_disconnected()
 	var nobody_before := PlayerManager.count() == 0
 	for slot in PlayerManager.get_slots():
 		_handle_slot_input(slot)

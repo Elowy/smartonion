@@ -2,8 +2,11 @@ class_name GameOverScreen
 extends Control
 ## End-of-run summary (GDD 1): "Victory!" (gold) or "Defeat" (red), waves cleared, total kills,
 ## gold earned, team level and one row per player (class, kills, damage; the top damage
-## dealer gets a crown). After INPUT_DELAY, A / START on any player's device, any controller's
-## A or ui_accept -> back_to_menu_requested (once per open). See docs/ARCHITECTURE.md.
+## dealer gets a crown). After INPUT_DELAY, A / START on any joined player's own device ->
+## back_to_menu_requested (once per open). Godot's global ui_accept / any controller's A only
+## count when no joined player has a working device (nobody joined, a bot-only demo, or every
+## human's controller unplugged), so a second device never acts for somebody else's slot.
+## See docs/ARCHITECTURE.md.
 
 signal back_to_menu_requested
 
@@ -204,11 +207,14 @@ func _process(delta: float) -> void:
 	_prompt.modulate.a = clampf((_t - INPUT_DELAY + 0.4) / 0.4, 0.0, 1.0)
 	if not accepting:
 		return
-	var go := Input.is_action_just_pressed(&"ui_accept") or pads.any_just_pressed(JOY_BUTTON_A) \
-		or pads.any_just_pressed(JOY_BUTTON_START)
+	var go := false
 	for s in PlayerManager.get_slots():
 		if s.input != null and (s.input.just_pressed(PlayerInput.Pad.A) or s.input.just_pressed(PlayerInput.Pad.START)):
 			go = true
+	if not PlayerManager.has_connected_human():
+		# Nobody who could press a button: the global actions keep the screen from soft-locking.
+		go = go or Input.is_action_just_pressed(&"ui_accept") or pads.any_just_pressed(JOY_BUTTON_A) \
+			or pads.any_just_pressed(JOY_BUTTON_START)
 	if go:
 		_done = true
 		back_to_menu_requested.emit()

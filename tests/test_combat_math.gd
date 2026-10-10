@@ -47,6 +47,18 @@ func test_incoming_damage() -> void:
 	check_eq(CombatMath.incoming_damage(0.1, s), 1.0, "minimum damage")
 
 
+func test_incoming_damage_is_not_rounded() -> void:
+	# Small armour values count: 1 armour on a 2-damage hit = 2 * (1 - 1/16) = 1.875 (was 2).
+	var s := StatBlock.new()
+	s.set_source(&"x", {Stats.ARMOR: 1.0})
+	check_eq(CombatMath.incoming_damage(2.0, s), 2.0 * (1.0 - 1.0 / 16.0), "1 armour")
+	var none := StatBlock.new()
+	check_eq(CombatMath.incoming_damage(1.32, none), 1.32, "fractional wave-scaled damage passes through")
+	none.set_source(&"v", {Stats.VERSATILITY: 10.0})
+	check_eq(CombatMath.incoming_damage(3.0, none), 3.0 * 0.95, "10 versatility = -5%")
+	check_eq(CombatMath.incoming_damage(1.05, none), 1.0, "still at least MIN_DAMAGE")
+
+
 func test_rolls_respect_chance() -> void:
 	var s := StatBlock.new()
 	var rng := RandomNumberGenerator.new()
@@ -59,4 +71,8 @@ func test_rolls_respect_chance() -> void:
 func test_gold_find() -> void:
 	var s := StatBlock.new()
 	s.set_source(&"x", {Stats.GOLD_FIND: 50.0})
-	check_eq(CombatMath.gold_with_find(10, s), 15)
+	check_eq(CombatMath.gold_with_find(10, s), 15.0)
+	s.set_source(&"x", {Stats.GOLD_FIND: 10.0})
+	check_eq(CombatMath.gold_with_find(1, s), 1.1, "exact, not rounded")
+	check_eq(CombatMath.gold_with_find_pct(4.0, 25.0), 5.0)
+	check_eq(CombatMath.gold_with_find_pct(4.0, -150.0), 0.0, "never negative")

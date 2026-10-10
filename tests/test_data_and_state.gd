@@ -36,6 +36,25 @@ func test_shared_wallet() -> void:
 	check_eq(RunState.gold, 10)
 
 
+func test_gold_find_remainder_per_slot() -> void:
+	RunState.start_run(2, 1)
+	check_eq(RunState.add_gold_for(0, 1, 25.0), 1, "1.25 -> 1 now")
+	check_eq(RunState.add_gold_for(1, 1, 25.0), 1, "other slot: own remainder")
+	check_eq(RunState.add_gold_for(0, 1, 25.0), 1, "2.5 total")
+	check_eq(RunState.add_gold_for(0, 1, 25.0), 1, "3.75 total")
+	check_eq(RunState.add_gold_for(0, 1, 25.0), 2, "5.0 total: the fractions became a coin")
+	check_eq(RunState.gold, 6, "whole gold in the shared wallet")
+	check_eq(RunState.gold_earned, 6, "counts as earned")
+	check_near(RunState.gold_remainder(1), 0.25, 0.0001, "slot 1 keeps its quarter")
+	check_eq(RunState.add_gold_for(0, 0, 25.0), 0, "nothing picked up")
+	var tenth := 0
+	for i in 10:
+		tenth += RunState.add_gold_for(3, 1, 10.0)
+	check_eq(tenth, 11, "float sums of 0.1 still pay the 11th coin")
+	RunState.start_run(2, 1)
+	check_eq(RunState.gold_remainder(1), 0.0, "a new run clears the remainders")
+
+
 func test_shared_xp_levels() -> void:
 	RunState.start_run(1, 1)
 	check_eq(RunState.xp_to_next_level(), 16, "level 1 needs (1+3)^2")

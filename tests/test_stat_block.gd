@@ -47,6 +47,17 @@ func test_derived_values() -> void:
 	check_near(s.cooldown_mult(), 1.0 / 1.25, 0.0001, "cooldown mult")
 
 
+func test_pickup_range_is_a_percent_stat() -> void:
+	var s := StatBlock.new()
+	check_eq(s.pickup_range(), Stats.BASE_PICKUP_RANGE, "base range")
+	s.set_source(&"x", {Stats.PICKUP_RANGE: 50.0})
+	check_eq(s.pickup_range(), Stats.BASE_PICKUP_RANGE * 1.5, "+50%")
+	s.set_source(&"x", {Stats.PICKUP_RANGE: -100.0})
+	check_eq(s.pickup_range(), 0.5, "never below 0.5 m")
+	check(Stats.is_percent(Stats.PICKUP_RANGE), "shown with a % suffix")
+	check_eq(Stats.format_value(Stats.PICKUP_RANGE, 20.0), "+20%")
+
+
 func test_changed_signal() -> void:
 	var s := StatBlock.new()
 	var hits := [0]

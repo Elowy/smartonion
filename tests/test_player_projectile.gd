@@ -120,6 +120,16 @@ func test_player_projectile_credit_and_leech() -> void:
 	check(e.fake_knockback_log[0].is_equal_approx(Vector3.RIGHT * 3.0), "knockback along the shot")
 
 
+func test_projectile_overkill_is_not_recorded() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior", Vector3(0, 0, 5))
+	var e := Fakes.spawn_enemy(world, Vector3(3, 0, 0))
+	e.hp = 2.0
+	var proj := _launch(Projectile.TEAM_PLAYERS, 7.0, Vector3.RIGHT, 10.0, 0, 0.0, p)
+	_fly(proj, 1.0)
+	check_eq(e.fake_hits(), 1, "hit")
+	check_eq(RunState.damage_by_player.get(0, 0.0), 2.0, "recorded only the 2 hp the enemy had")
+
+
 func test_enemy_projectile_hits_only_living_players() -> void:
 	var ghost := Fakes.spawn_player(world, 0, &"warrior", Vector3(2, 0, 0))
 	var target := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))

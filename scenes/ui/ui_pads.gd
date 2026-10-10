@@ -43,10 +43,10 @@ func any_pressed(button: JoyButton) -> bool:
 	return false
 
 
-## True while any controller's A or the keyboard's Enter / Space is held (the join buttons).
+## True while any controller's A or one of the keyboard's join keys (KeyboardInput.JOIN_KEYS:
+## Enter, Space, Keypad Enter, F – the same keys PlayerManager joins with) is held.
 static func join_button_held() -> bool:
-	if Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_SPACE) \
-			or Input.is_physical_key_pressed(KEY_KP_ENTER):
+	if KeyboardInput.join_key_held():
 		return true
 	for device in Input.get_connected_joypads():
 		if Input.is_joy_button_pressed(device, JOY_BUTTON_A):

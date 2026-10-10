@@ -104,6 +104,18 @@ func test_damage_record_kill_credit_and_knockback() -> void:
 	check_eq(dealt, [dmg] as Array[float], "on_hit_dealt called")
 
 
+func test_damage_record_ignores_overkill() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	var enemy := Fakes.spawn_enemy(world, Vector3(1.5, 0, 0))
+	enemy.hp = 3.0
+	WeaponRunner.apply_hit(p, enemy, 10.0, false, Vector3.ZERO)
+	check_eq(enemy.fake_damage_log, [10.0] as Array[float], "the full hit is applied")
+	check_eq(RunState.damage_by_player.get(0, 0.0), 3.0, "only the 3 hp it had left is recorded")
+	enemy.hp = 20.0
+	WeaponRunner.apply_hit(p, enemy, 4.5, false, Vector3.ZERO)
+	check_eq(RunState.damage_by_player.get(0, 0.0), 7.5, "a normal hit counts in full")
+
+
 func test_crit_multiplies_damage() -> void:
 	var p := Fakes.spawn_player(world, 0, &"rogue")
 	p.stats.set_source(&"test", {Stats.CRIT: 100.0})

@@ -87,12 +87,17 @@ the new screen never sees the button press that closed the old one.
    `PlayerManager.device_disconnected` during a run → pause + HUD notice;
    `device_reconnected` → notice hidden (the player resumes with START).
 7. `RunState.leveled_up` during a wave → `Vfx.level_up_burst` on every living player (the HUD
-   shows the "LEVEL UP!" banner by itself).
+   shows the "LEVEL UP!" banner by itself; each Player grows its temporary `&"level"` bonus,
+   see Combat model).
 
 ## Combat model
 
 - Player stats: `StatBlock` with sources `&"class"` (ClassData.base_stats),
   `&"weapon:main"`, `&"weapon:off"` (WeaponData.bonus_stats). Max HP = 10 + Stamina.
+- **TEMPORARY placeholder until the M4 level-up cards:** every team level gives every player
+  +1 Stamina (+1 Max HP) and +4% damage via the source `&"level"` (`Player.LEVEL_*`; applied
+  in `Player.create` for the current level and on `RunState.leveled_up`, current HP rises by
+  the Max HP gained). Remove it when the level-up cards replace it.
 - `WeaponRunner` (one per weapon that `attacks()`): cooldown =
   `CombatMath.weapon_cooldown`; target = nearest living enemy within `attack_range`.
   - `MELEE_ARC`: every enemy within `attack_range + enemy.radius` and inside `arc_degrees`
@@ -105,14 +110,21 @@ the new screen never sees the button press that closed the old one.
   1 s) via `player.take_damage(dmg, CombatMath.KIND_MELEE, enemy)`; ranged enemies throw
   `Projectile.create(TEAM_ENEMIES, ...)` with kind `KIND_PROJECTILE`.
 - `Player.take_damage`: dodge roll → "Dodge" text; shield `block_chance` → half damage;
-  `CombatMath.incoming_damage`; i-frames `INVULNERABLE_AFTER_HIT`.
-- Enemy stats at wave w: `data.hp_at_wave(w) * RunState.coop_hp_mult()`,
-  `data.contact_damage_at_wave(w)`, `data.projectile_damage_at_wave(w)`.
+  `CombatMath.incoming_damage` (not rounded – small Armor / Versatility / Avoidance values
+  count; at least 1); i-frames `INVULNERABLE_AFTER_HIT`. HP may be fractional: only the
+  displayed numbers are rounded (floating text to one decimal, unit frames round up).
+- Enemy stats at wave w (GDD 9, additive): HP `data.hp_at_wave(w) * RunState.coop_hp_mult()`
+  = `max_hp * (1 + hp_growth * (w - 1)) * coop`, contact / projectile damage
+  `base * (1 + damage_growth * (w - 1))`; `EnemyData.hp_growth` = 0.12 and `damage_growth`
+  = 0.08 by default (a future DifficultyData may override them).
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
-  `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`.
-- Pickups fly to the nearest living player inside that player's `stats.pickup_range()`;
-  gold → `RunState.add_gold(CombatMath.gold_with_find(gold, player.stats))`, xp →
-  `RunState.add_xp(xp)`.
+  `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
+  (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
+- Pickups fly to the nearest living player inside that player's `stats.pickup_range()`
+  (Pickup Range is a percent stat: `BASE_PICKUP_RANGE * (1 + raw / 100)`);
+  gold → `RunState.add_gold_for(slot_index, gold, Gold Find %)`, which keeps each slot's
+  fractional remainder so +10% on ten 1-gold coins pays 11; xp → `RunState.add_xp(xp)`.
+  Loot banked at the wave end (`collect_to_bank`, no collector) gets **no** Gold Find.
 
 ## Waves (WaveDirector)
 

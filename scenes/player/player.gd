@@ -5,7 +5,8 @@ extends CharacterBody3D
 ## Moves on the XZ plane: input Vector2(x, y) -> world Vector3(x, 0, y).
 ##
 ## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
-## &"weapon:main" and &"weapon:off" (WeaponData.bonus_stats). Every equipped weapon that
+## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
+## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a slow ghost that
 ## does not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME
 ## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
@@ -57,6 +58,13 @@ const DAMAGE_TEXT_COLOR := Color(1.0, 0.27, 0.22)
 const HEAL_TEXT_COLOR := Color(0.35, 1.0, 0.4)
 const DODGE_TEXT_COLOR := Color(0.7, 0.88, 1.0)
 const BLOCK_TEXT_COLOR := Color(0.88, 0.88, 0.95)
+
+## TEMPORARY placeholder until the M4 level-up cards (GDD 6.1) exist: every team level gives
+## every player +1 Stamina (= +1 Max HP) and +4% damage through the StatBlock source
+## LEVEL_SOURCE. Remove this (and _apply_level_bonus) when the level-up cards land.
+const LEVEL_SOURCE := &"level"
+const LEVEL_STAMINA := 1.0
+const LEVEL_DAMAGE_PCT := 4.0
 
 var slot: PlayerSlot
 var stats := StatBlock.new()
@@ -115,8 +123,12 @@ static func create(p_slot: PlayerSlot) -> Player:
 		p.equip_weapons(p.class_data.main_hand, p.class_data.off_hand)
 	else:
 		p.equip_weapons(null, null)
+	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
+	# created mid-run.
+	p._apply_level_bonus(RunState.level)
 	p.hp = p.max_hp()
 	p.stats.changed.connect(p._on_stats_changed)
+	RunState.leveled_up.connect(p._on_team_leveled_up)
 
 	if p_slot != null:
 		p_slot.player = p
@@ -530,6 +542,31 @@ func _on_stats_changed() -> void:
 	_hp_updated()
 
 
+## TEMPORARY placeholder for the M4 level-up cards: sets the LEVEL_SOURCE stat source for
+## team [param level] (nothing at level 0).
+func _apply_level_bonus(level: int) -> void:
+	if level <= 0:
+		stats.remove_source(LEVEL_SOURCE)
+		return
+	stats.set_source(LEVEL_SOURCE, {
+		Stats.STAMINA: LEVEL_STAMINA * level,
+		Stats.DAMAGE_PCT: LEVEL_DAMAGE_PCT * level,
+	})
+
+
+## TEMPORARY placeholder for the M4 level-up cards: the team levelled up – grow the level
+## bonus; a living hero's current HP rises by the Max HP gained (a ghost keeps 0 HP and
+## comes back with its share of the new Max HP).
+func _on_team_leveled_up(level: int) -> void:
+	var before := max_hp()
+	_apply_level_bonus(level)
+	var gained := max_hp() - before
+	if downed or gained <= 0.0:
+		return
+	hp = minf(max_hp(), hp + gained)
+	_hp_updated()
+
+
 func _add_runner(runner: WeaponRunner) -> void:
 	weapons.append(runner)
 	add_child(runner)
@@ -541,10 +578,13 @@ func _shake_camera(strength: float) -> void:
 		arena.camera.shake(strength)
 
 
+## Floating-text number: damage / heal is no longer rounded by the combat math, so show a
+## whole number when it is one (to one decimal) and one decimal otherwise ("2", "1.3").
 static func _format_amount(value: float) -> String:
-	if is_equal_approx(value, roundf(value)):
-		return str(int(roundf(value)))
-	return "%.1f" % value
+	var tenths := roundf(value * 10.0)
+	if is_zero_approx(fmod(tenths, 10.0)):
+		return str(int(tenths / 10.0))
+	return "%.1f" % (tenths / 10.0)
 
 
 func _notification(what: int) -> void:

@@ -6,7 +6,8 @@ extends Node3D
 ## Looks like a small spinning golden coin with a faint glow (an XP-only drop is a small
 ## glowing orb). Once a player's [method StatBlock.pickup_range] covers it, it accelerates
 ## towards that player and is collected within COLLECT_DISTANCE: gold goes through the
-## collector's Gold Find ([method CombatMath.gold_with_find]), XP to the shared bar.
+## collector's Gold Find ([method RunState.add_gold_for] keeps the fraction per player slot),
+## XP to the shared bar. Loot banked at the wave end has no collector, so no Gold Find.
 ## When many pickups lie around, new drops merge into a nearby idle one ([method drop]).
 
 const COLLECT_DISTANCE := 0.5
@@ -130,7 +131,8 @@ func collect(player: Player) -> void:
 		return
 	_collected = true
 	if player != null and is_instance_valid(player):
-		RunState.add_gold(CombatMath.gold_with_find(gold, player.stats))
+		var slot_index := player.slot.index if player.slot != null else -1
+		RunState.add_gold_for(slot_index, gold, player.stats.get_stat(Stats.GOLD_FIND))
 	else:
 		RunState.add_gold(gold)
 	RunState.add_xp(xp)
@@ -139,7 +141,8 @@ func collect(player: Player) -> void:
 	_remove()
 
 
-## Wave end: credits the loot to the team without a collector, then frees itself.
+## Wave end: credits the loot to the team without a collector (so without Gold Find),
+## then frees itself.
 func collect_to_bank() -> void:
 	if _collected:
 		return

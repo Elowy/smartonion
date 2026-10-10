@@ -15,7 +15,10 @@ extends Node
 ##   -> GAME_OVER (victory). Everybody downed at the same time (solo: the player is downed)
 ##   -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with the same players.
 ## - Any player's START during a wave opens the PauseMenu (get_tree().paused). A controller
-##   unplugged during a run pauses the wave and shows a HUD notice until it is back.
+##   unplugged during a run pauses the wave and shows a HUD notice until it is back (also when
+##   it is already gone as the next wave is about to start). The game cannot be resumed while a
+##   joined controller is missing: the menu offers "Continue without Pn" instead
+##   (drop_player: the slot is given up and the hero removed; nobody left -> lobby).
 ## - UI screens live on CanvasLayers: HUD < menus < intermission < game over < pause.
 ## - Main processes ALWAYS (it drives the dev harness while the tree is paused); the Arena and
 ##   the HUD layer are PAUSABLE, WaveDirector forces PAUSABLE, and the Intermission,
@@ -168,6 +171,9 @@ func go_to_menu() -> void:
 func go_to_lobby() -> void:
 	_teardown_run()
 	_free_main_menu()
+	# A controller that died during the run / on the game-over screen must not leave a ghost
+	# slot behind (it could never ready up).
+	PlayerManager.prune_disconnected()
 	if lobby == null:
 		lobby = Lobby.create()
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
@@ -218,6 +224,7 @@ func start_run() -> void:
 	pause_menu = PauseMenu.create()
 	pause_menu.resume_requested.connect(resume_game, CONNECT_DEFERRED)
 	pause_menu.quit_to_menu_requested.connect(quit_to_menu, CONNECT_DEFERRED)
+	pause_menu.drop_player_requested.connect(drop_player, CONNECT_DEFERRED)
 	_layers[LAYER_PAUSE].add_child(pause_menu)
 
 	players.clear()
@@ -252,6 +259,7 @@ func start_wave(n: int) -> void:
 	if hud != null:
 		hud.show()
 		hud.show_banner("Final Wave" if wave >= RunState.TOTAL_WAVES else "Wave %d" % wave)
+	_pause_if_pad_missing()
 
 
 ## Between-wave screen (tree paused). Bots and unplugged devices are auto-ready.
@@ -306,10 +314,46 @@ func pause_game(by: PlayerSlot = null) -> void:
 
 
 func resume_game() -> void:
+	var running := state == State.WAVE or state == State.WAVE_END
+	if running and pause_menu != null and not PlayerManager.disconnected_slots().is_empty():
+		# A joined controller is unplugged: stay paused (the menu offers "Continue without Pn").
+		if not pause_menu.visible:
+			pause_menu.open(null)
+		return
 	if pause_menu != null and pause_menu.visible:
 		pause_menu.hide()
-	if state == State.WAVE or state == State.WAVE_END:
+	if running:
 		get_tree().paused = false
+
+
+## Pause Menu "Continue without Pn": the player's controller is gone, so their slot is given
+## up (PlayerManager.leave) and their hero removed; the run goes on with the others. Nobody
+## left -> the run is abandoned and the lobby opens.
+func drop_player(slot: PlayerSlot) -> void:
+	if slot == null or PlayerManager.get_slot(slot.index) != slot:
+		return
+	_disconnected.erase(slot.index)
+	for p in players.duplicate():
+		if not is_instance_valid(p) or p.slot == slot:
+			players.erase(p)
+			_free_node(p)
+	_free_node(slot.player)
+	slot.player = null
+	PlayerManager.leave(slot.index)
+	if hud != null:
+		hud.bind_players(players)
+	_log("%s dropped out (controller unplugged), %d player(s) left" % [slot.label(), PlayerManager.count()])
+	if PlayerManager.count() == 0:
+		if arena != null and RunState.active:
+			RunState.end_run(false)
+		go_to_lobby()
+		return
+	_show_disconnect_notice()
+	if PlayerManager.disconnected_slots().is_empty():
+		resume_game()
+	elif is_running() and (state == State.WAVE or state == State.WAVE_END):
+		pause_game(null)
+	_check_party_wipe()
 
 
 func is_paused() -> bool:
@@ -360,6 +404,32 @@ func _poll_pause_buttons() -> void:
 		if slot.input != null and slot.input.just_pressed(PlayerInput.Pad.START):
 			pause_game(slot)
 			return
+
+
+## A joined controller that is already unplugged when a wave is about to start pauses the
+## game at once, with the usual notice.
+func _pause_if_pad_missing() -> void:
+	var missing := PlayerManager.disconnected_slots()
+	if missing.is_empty():
+		return
+	for m in missing:
+		_disconnected[m.index] = true
+	_show_disconnect_notice()
+	pause_game(null)
+
+
+## HUD notice for the lowest-numbered player whose controller is missing (hidden when none).
+func _show_disconnect_notice() -> void:
+	if hud == null:
+		return
+	var indices := _disconnected.keys()
+	indices.sort()
+	for index: int in indices:
+		var other := PlayerManager.get_slot(index)
+		if other != null:
+			hud.show_notice(DISCONNECT_NOTICE % other.label())
+			return
+	hud.hide_notice()
 
 
 func _after_wave_end() -> void:
@@ -518,6 +588,11 @@ func _on_player_downed_changed(is_downed: bool, _player: Player) -> void:
 			revives += 1
 		return
 	players_downed += 1
+	_check_party_wipe()
+
+
+## Everybody downed at once during a wave: defeat (smoke runs count a wipe and revive instead).
+func _check_party_wipe() -> void:
 	if state != State.WAVE or not all_players_down():
 		return
 	if options.smoke and not options.allow_defeat:
@@ -549,14 +624,7 @@ func _on_device_disconnected(slot: PlayerSlot) -> void:
 
 func _on_device_reconnected(slot: PlayerSlot) -> void:
 	_disconnected.erase(slot.index)
-	if hud == null:
-		return
-	if _disconnected.is_empty():
-		hud.hide_notice()
-	else:
-		var other := PlayerManager.get_slot(_disconnected.keys()[0])
-		if other != null:
-			hud.show_notice(DISCONNECT_NOTICE % other.label())
+	_show_disconnect_notice()
 
 
 func _on_leveled_up(_level: int) -> void:

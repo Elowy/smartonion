@@ -64,9 +64,12 @@ func test_out_of_range_stays_until_range_grows() -> void:
 	EFakes.step(p, 0.5)
 	check(p.is_idle(), "5 m > 3 m pickup range")
 	check_near(p.global_position.x, 5.0, 0.0001, "does not move")
-	player.stats.set_source(&"test", {Stats.PICKUP_RANGE: 3.0})
+	player.stats.set_source(&"test", {Stats.PICKUP_RANGE: 50.0})
+	EFakes.step(p, 0.5)
+	check(p.is_idle(), "+50% pickup range = 4.5 m < 5 m")
+	player.stats.set_source(&"test", {Stats.PICKUP_RANGE: 100.0})
 	EFakes.step(p, 1.0)
-	check(p.is_collected(), "collected with 6 m range")
+	check(p.is_collected(), "collected with +100% = 6 m range")
 
 
 func test_downed_player_does_not_attract() -> void:
@@ -96,12 +99,31 @@ func test_nearest_player_collects() -> void:
 	check_eq(RunState.gold, 4, "collector's gold find counts")
 
 
+func test_small_gold_find_adds_up_over_pickups() -> void:
+	# +10% Gold Find on ten 1-gold coins = 11 gold (it used to round to 1 per coin = 10).
+	var player := EFakes.spawn_player(world, Vector3.ZERO, 0)
+	player.stats.set_source(&"test", {Stats.GOLD_FIND: 10.0})
+	for i in 10:
+		_drop(1, 0, Vector3(0.2, 0.0, 0.0)).collect(player)
+	check_eq(RunState.gold, 11, "10 coins * 1.1")
+	check_near(RunState.gold_remainder(0), 0.0, 0.0001, "nothing left over")
+	# +50% no longer doubles every coin: 1, then 2 (1.5 + 0.5 carried), then 1 ...
+	var greedy := EFakes.spawn_player(world, Vector3(4.0, 0.0, 0.0), 1)
+	greedy.stats.set_source(&"test", {Stats.GOLD_FIND: 50.0})
+	var before := RunState.gold
+	_drop(1, 0, Vector3(4.2, 0.0, 0.0)).collect(greedy)
+	check_eq(RunState.gold, before + 1, "first coin: 1 (0.5 kept)")
+	_drop(1, 0, Vector3(4.2, 0.0, 0.0)).collect(greedy)
+	check_eq(RunState.gold, before + 3, "second coin: 1.5 + 0.5 = 2")
+	check_near(RunState.gold_remainder(0), 0.0, 0.0001, "the other slot's fraction is separate")
+
+
 func test_collect_to_bank() -> void:
 	var player := EFakes.spawn_player(world, Vector3(10.0, 0.0, 0.0))
 	player.stats.set_source(&"test", {Stats.GOLD_FIND: 100.0})
 	var p := _drop(5, 2, Vector3.ZERO)
 	p.collect_to_bank()
-	check_eq(RunState.gold, 5, "no gold find without a collector")
+	check_eq(RunState.gold, 5, "banked at the wave end: no gold find without a collector")
 	check_eq(RunState.xp, 2, "xp banked")
 	check(p.is_queued_for_deletion(), "freed")
 	p.collect_to_bank()

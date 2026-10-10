@@ -237,9 +237,10 @@ static func enemies_in_arc(nodes: Array[Node], origin: Vector3, direction: Vecto
 	return out
 
 
-## One weapon hit of [param attacker] (may be null) on [param enemy]: records the damage,
-## applies it (kill credit goes through the attacker), rolls the stun, shows the damage
-## number and triggers the attacker's on-hit effects (leech).
+## One weapon hit of [param attacker] (may be null) on [param enemy]: records the damage
+## (only what the enemy had left – overkill does not count), applies it (kill credit goes
+## through the attacker), rolls the stun, shows the damage number and triggers the
+## attacker's on-hit effects (leech).
 static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bool, knockback: Vector3,
 		stun_chance: float = 0.0, stun_duration: float = 0.5) -> void:
 	if enemy == null or not is_instance_valid(enemy) or enemy.is_dead():
@@ -247,7 +248,7 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 	var valid_attacker: Player = attacker if attacker != null and is_instance_valid(attacker) else null
 	var text_pos := enemy.global_position + Vector3.UP * DAMAGE_TEXT_HEIGHT
 	if valid_attacker != null and valid_attacker.slot != null:
-		RunState.record_damage(valid_attacker.slot.index, damage)
+		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)))
 	enemy.take_damage(damage, is_crit, valid_attacker, knockback)
 	if stun_chance > 0.0 and is_instance_valid(enemy) and not enemy.is_dead() \
 			and RunState.rng.randf() < stun_chance:

@@ -99,8 +99,9 @@ func damage_mult() -> float:
 	return maxf(0.0, 1.0 + (get_stat(Stats.VERSATILITY) + get_raw(Stats.DAMAGE_PCT)) / 100.0)
 
 
+## Loot magnet radius in metres. Pickup Range is a percent stat (GDD 2.4.1): +50 = 1.5x.
 func pickup_range() -> float:
-	return maxf(0.5, Stats.BASE_PICKUP_RANGE + get_raw(Stats.PICKUP_RANGE))
+	return maxf(0.5, Stats.BASE_PICKUP_RANGE * (1.0 + get_raw(Stats.PICKUP_RANGE) / 100.0))
 
 
 ## HP regenerated per second from Spirit (5 Spirit ~= 1 HP every 3 s).

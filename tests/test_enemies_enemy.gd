@@ -36,9 +36,47 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	e1.free()
 
 	var e5 := Enemy.create(data, 5)
-	check_eq(e5.max_hp, 4.0 + 2.5 * 4.0, "wave 5 hp = 4 + 2.5 * 4")
-	check_eq(e5.contact_damage, data.contact_damage_at_wave(5), "contact damage scales")
+	check_eq(e5.max_hp, 4.0 * (1.0 + 0.12 * 4.0), "wave 5 hp = 4 * (1 + 12% * 4)")
+	check_eq(e5.contact_damage, 1.0 * (1.0 + 0.08 * 4.0), "wave 5 contact damage = 1 * (1 + 8% * 4)")
 	e5.free()
+
+
+func test_wave_scaling_follows_gdd() -> void:
+	# GDD 9: +12% HP and +8% damage per wave after the first, additive (not compounding).
+	var data := EFakes.enemy_data(EnemyData.Behavior.RANGED)
+	data.max_hp = 10.0
+	data.contact_damage = 3.0
+	data.projectile_damage = 4.0
+	check_eq(data.hp_growth, 0.12, "default hp growth")
+	check_eq(data.damage_growth, 0.08, "default damage growth")
+	check_eq(data.hp_at_wave(1), 10.0, "wave 1 = base hp")
+	check_eq(data.hp_at_wave(0), 10.0, "wave 0 / negative waves clamp to the base")
+	check_eq(data.hp_at_wave(11), 10.0 * 2.2, "wave 11: +120%")
+	check_eq(data.hp_at_wave(25), 10.0 * (1.0 + 0.12 * 24.0), "wave 25: x3.88")
+	check_eq(data.contact_damage_at_wave(1), 3.0, "wave 1 = base contact damage")
+	check_eq(data.contact_damage_at_wave(11), 3.0 * 1.8, "wave 11 contact: +80%")
+	check_eq(data.projectile_damage_at_wave(1), 4.0, "wave 1 = base projectile damage")
+	check_eq(data.projectile_damage_at_wave(6), 4.0 * 1.4, "wave 6 projectile: +40%")
+	# Data driven: a difficulty can override the growth rates.
+	data.hp_growth = 0.2
+	data.damage_growth = 0.0
+	check_eq(data.hp_at_wave(6), 20.0, "custom hp growth")
+	check_eq(data.contact_damage_at_wave(6), 3.0, "no damage growth")
+	# Every shipped enemy uses the GDD defaults.
+	for id in Db.enemies:
+		var d: EnemyData = Db.enemies[id]
+		check_eq(d.hp_growth, 0.12, "%s hp growth" % id)
+		check_eq(d.damage_growth, 0.08, "%s damage growth" % id)
+
+
+func test_enemy_stats_at_wave_include_coop_hp_only() -> void:
+	var data := Db.get_enemy(&"troll_axethrower")
+	RunState.start_run(4, 1)
+	var e := Enemy.create(data, 6)
+	check_eq(e.max_hp, data.max_hp * 1.6 * 1.6, "hp: base * (1 + 12% * 5) * coop 1.6")
+	check_eq(e.contact_damage, data.contact_damage * 1.4, "contact damage: no co-op factor")
+	check_eq(e.projectile_damage, data.projectile_damage * 1.4, "projectile damage: no co-op factor")
+	e.free()
 
 
 func test_hp_scales_with_coop() -> void:
@@ -287,7 +325,7 @@ func test_ranged_keeps_distance_and_throws() -> void:
 	data.preferred_distance = 7.0
 	data.attack_cooldown = 1.0
 	data.projectile_damage = 4.0
-	data.damage_per_wave = 0.5
+	data.damage_growth = 0.5
 	var player := EFakes.spawn_player(world, Vector3.ZERO)
 	var e := EFakes.spawn_enemy(world, data, Vector3(3.0, 0.0, 0.0), 3)
 	EFakes.step(e, 0.5)

@@ -5,8 +5,12 @@ extends PlayerInput
 ## Enter / Space / F = confirm, Esc / Backspace = back, R = sell, C = compare,
 ## Tab = ping, P / Esc = pause.
 
+## The keys that confirm (Pad.A) AND join a new keyboard player in the lobby: one list, so
+## the join gesture and the confirm gesture can never drift apart.
+const JOIN_KEYS: Array[Key] = [KEY_ENTER, KEY_SPACE, KEY_KP_ENTER, KEY_F]
+
 const _KEYS := {
-	PlayerInput.Pad.A: [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_F],
+	PlayerInput.Pad.A: JOIN_KEYS,
 	PlayerInput.Pad.B: [KEY_ESCAPE, KEY_BACKSPACE],
 	PlayerInput.Pad.X: [KEY_R],
 	PlayerInput.Pad.Y: [KEY_C],
@@ -20,6 +24,14 @@ const _KEYS := {
 	PlayerInput.Pad.DPAD_LEFT: [KEY_LEFT],
 	PlayerInput.Pad.DPAD_RIGHT: [KEY_RIGHT],
 }
+
+
+## True while any of the JOIN_KEYS is held (physical keys, any keyboard layout).
+static func join_key_held() -> bool:
+	for key in JOIN_KEYS:
+		if Input.is_physical_key_pressed(key):
+			return true
+	return false
 
 
 func get_device_name() -> String:

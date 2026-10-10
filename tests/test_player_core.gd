@@ -272,6 +272,52 @@ func test_begin_wave_heals_and_revives() -> void:
 	check_eq(p.invulnerable_left, 0.0, "no leftover i-frames")
 
 
+func test_team_level_placeholder_bonus() -> void:
+	# TEMPORARY M1 placeholder (until the M4 level-up cards): +1 Max HP, +4% damage per level.
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	check(not p.stats.has_source(Player.LEVEL_SOURCE), "no level bonus at level 0")
+	var dmg_pct := p.stats.get_raw(Stats.DAMAGE_PCT)
+	var mult := p.stats.damage_mult()
+	var ghost := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))
+	ghost.take_damage(999.0)
+	check(ghost.downed, "ghost downed")
+	p.stats.set_source(&"test", {Stats.ARMOR: -2.0})  # 2 class armour - 2 = 0
+	p.take_damage(5.0)
+	check_eq(p.hp, 10.0, "15 - 5")
+	var hp_events: Array[float] = []
+	p.hp_changed.connect(func(value: float, _max: float) -> void: hp_events.append(value))
+	RunState.add_xp(RunState.xp_to_next_level())
+	check_eq(RunState.level, 1, "levelled up")
+	check_eq(p.max_hp(), 16.0, "+1 max hp")
+	check_eq(p.hp, 11.0, "current hp rises by the max hp gained")
+	check(not hp_events.is_empty() and is_equal_approx(hp_events[-1], 11.0), "hp_changed with the new hp")
+	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct + 4.0, "+4% damage")
+	check_eq(p.stats.damage_mult(), mult + 0.04, "damage mult +0.04")
+	check_eq(ghost.hp, 0.0, "a ghost stays at 0 hp")
+	check_eq(ghost.max_hp(), 16.0, "but its max hp grows too")
+	# Two levels at once (one leveled_up per level).
+	RunState.add_xp(RunState.xp_to_next_level() + RunState.xp_needed_for_level(3, 1))
+	check_eq(RunState.level, 3, "two more levels")
+	check_eq(p.max_hp(), 18.0, "+3 max hp in total")
+	check_eq(p.hp, 13.0, "+2 hp from the two levels")
+	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct + 12.0, "+12% damage in total")
+	# A hero created mid-run starts with the team level's bonus at full hp.
+	var late := Fakes.spawn_player(world, 2, &"warrior", Vector3(-4, 0, 0))
+	check_eq(late.max_hp(), 18.0, "late hero has the level bonus")
+	check_eq(late.hp, 18.0, "at full hp")
+
+
+func test_floating_numbers_round_for_display() -> void:
+	check_eq(Player._format_amount(2.0), "2", "whole")
+	check_eq(Player._format_amount(1.32), "1.3", "one decimal")
+	check_eq(Player._format_amount(1.875), "1.9", "rounded to one decimal")
+	check_eq(Player._format_amount(4.98), "5", "no trailing .0")
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	p.stats.set_source(&"test", {Stats.ARMOR: -1.0})  # 2 class - 1 = 1 armour
+	p.take_damage(2.0)
+	check_near(p.hp, 15.0 - 2.0 * (1.0 - 1.0 / 16.0), 0.0001, "1 armour reduces a 2-damage hit")
+
+
 func test_spirit_regen_accumulates_fractions() -> void:
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	p.stats.set_source(&"test", {Stats.SPIRIT: 15.0})  # 1 hp / s
