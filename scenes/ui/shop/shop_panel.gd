@@ -13,7 +13,9 @@ extends Control
 ## pings, Y votes for a reroll (only humans with a working device vote; bots never block it).
 ## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with that
 ## player's equipped item in the item's default slot, beside the stall on the player's own
-## side (P1 / P3 left, P2 / P4 right) so it never covers the stall.
+## side (P1 / P3 left, P2 / P4 right; P1 / P2 from the top of the stall down, P3 / P4 from the
+## bottom of the screen up) so it never covers the stall; when two tooltips on one side
+## overlap, the one of the player who acted last is on top.
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed.
 
@@ -31,6 +33,10 @@ const HOLD_SHARE := 0.5
 const FEEDBACK_LINES := 3
 const FEEDBACK_TIME := 6.0
 const TOOLTIP_GAP := 12.0
+## Shop tooltips are drawn a little smaller so two fit above each other beside the stall.
+const TOOLTIP_SCALE := 0.82
+## Distance of the P3 / P4 tooltips from the bottom screen edge.
+const TOOLTIP_BOTTOM_MARGIN := 14.0
 
 var shop: Shop
 ## Offer grid width (5 for 10 offers, 4 for 8 or 4, 3 for 6).
@@ -133,6 +139,7 @@ func refresh(slots: Array[PlayerSlot]) -> void:
 			tip.name = "Tooltip%d" % (s.index + 1)
 			tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			tip.visible = false
+			tip.scale = Vector2(TOOLTIP_SCALE, TOOLTIP_SCALE)
 			_tooltip_layer.add_child(tip)
 			_tooltips[s.index] = tip
 	for i: int in _cursor.keys():
@@ -172,6 +179,7 @@ func handle_input(slot: PlayerSlot) -> void:
 	var nav := inp.nav_just_pressed()
 	if nav != Vector2i.ZERO:
 		_move_cursor(i, nav)
+		_raise_tooltip(i)
 	if _holds.has(i):
 		var hold := _holds[i]
 		if not inp.is_pressed(PlayerInput.Pad.A) or int(hold["offer"]) != cursor_of(i) or inp.just_pressed(PlayerInput.Pad.B):
@@ -183,6 +191,7 @@ func handle_input(slot: PlayerSlot) -> void:
 				try_buy(slot, int(hold["offer"]))
 	elif inp.just_pressed(PlayerInput.Pad.A):
 		_press_buy(slot)
+		_raise_tooltip(i)
 	if inp.just_pressed(PlayerInput.Pad.X):
 		_toggle_lock(slot)
 	if inp.just_pressed(PlayerInput.Pad.R3):
@@ -698,18 +707,24 @@ func _update_tooltips() -> void:
 		_place_tooltip(tip, s.index)
 
 
-## Beside the stall on the player's own side: P1 / P3 left, P2 / P4 right; P1 / P2 aligned
-## with the top of the stall body, P3 / P4 with its bottom; kept inside the screen.
+## Beside the stall on the player's own side: P1 / P3 left, P2 / P4 right; P1 / P2 from the
+## top of the stall down, P3 / P4 from the bottom of the screen up; kept inside the screen.
 func _place_tooltip(tip: ItemTooltip, slot_index: int) -> void:
-	var tsize := tip.get_combined_minimum_size().max(tip.size)
+	var tsize := tip.get_combined_minimum_size().max(tip.size) * tip.scale
 	var left := slot_index % 2 == 0
-	var pos := Vector2(-tsize.x - TOOLTIP_GAP if left else size.x + TOOLTIP_GAP,
-		BODY_TOP if slot_index < 2 else size.y - tsize.y)
 	var vp := get_viewport_rect().size if is_inside_tree() else STALL_SIZE
-	var g := global_position + pos
+	var g := Vector2(global_position.x - tsize.x - TOOLTIP_GAP if left else global_position.x + size.x + TOOLTIP_GAP,
+		global_position.y if slot_index < 2 else vp.y - TOOLTIP_BOTTOM_MARGIN - tsize.y)
 	g.x = clampf(g.x, 8.0, maxf(8.0, vp.x - tsize.x - 8.0))
 	g.y = clampf(g.y, 8.0, maxf(8.0, vp.y - tsize.y - 8.0))
 	tip.position = g - global_position
+
+
+## The tooltip of the player who acted last is drawn on top of the others.
+func _raise_tooltip(slot_index: int) -> void:
+	var tip: ItemTooltip = _tooltips.get(slot_index)
+	if tip != null and tip.get_parent() == _tooltip_layer:
+		_tooltip_layer.move_child(tip, -1)
 
 
 # --- Drawing ------------------------------------------------------------------------
