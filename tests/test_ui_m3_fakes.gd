@@ -16,18 +16,6 @@ class CastEffect extends AbilityEffect:
 		return true
 
 
-## An effect that publishes charges like BlinkEffect does (the bar reads them by duck typing).
-class ChargeEffect extends AbilityEffect:
-	var available := 1
-	var maximum := 2
-
-	func charges_available() -> int:
-		return available
-
-	func charges_max() -> int:
-		return maximum
-
-
 static func resource(id: StringName, display: ResourceData.Display, max_value: float, color: Color, start: float = 0.0) -> ResourceData:
 	var r := ResourceData.new()
 	r.id = id

@@ -326,22 +326,21 @@ func test_frame_stays_compact() -> void:
 	check(AbilityIcon.COOLDOWN_FONT >= 18 and AbilityIcon.PROMPT_FONT >= 18 and AbilityIcon.COST_FONT >= 18, "icon texts >= 18 px")
 
 
-func test_charges_are_shown_when_the_effect_publishes_them() -> void:
+func test_charges_counter_follows_the_runner() -> void:
 	var blink := Fakes.ability(&"blink", &"", 0.0, 6.0)
-	blink.effect = Fakes.ChargeEffect
+	blink.params = {"charges": 2}
 	var p := _hero([], [blink, Fakes.ability(&"b")])
 	var icon := frame.ability_bar.icons[0]
 	frame.ability_bar.refresh()
-	check_eq(icon.charges_max, 2, "two charges possible")
-	check_eq(icon.charges, 1, "one left")
-	var effect := p.abilities.effect_for(blink) as Fakes.ChargeEffect
-	effect.available = 0
-	frame.ability_bar.refresh()
+	check_eq(icon.charges_max, 2, "two charges")
+	check_eq(icon.charges, 2, "both ready")
+	check(p.abilities.try_cast(0), "blink")
+	check_eq(icon.charges, 1, "one left after a cast")
+	check(icon.usable and icon.cooldown_text() == "", "still usable, no cooldown number while a charge is left")
+	check(p.abilities.try_cast(0), "second blink")
 	check_eq(icon.charges, 0, "none left")
-	check_eq(frame.ability_bar.icons[1].charges_max, 0, "abilities without charges show no counter")
-	effect.maximum = 1
-	frame.ability_bar.refresh()
-	check_eq(icon.charges_max, 1, "a single charge hides the counter (charges_max <= 1)")
+	check(not icon.usable, "not usable without a charge")
+	check_eq(frame.ability_bar.icons[1].charges_max, 1, "an ordinary ability has one charge (no counter)")
 
 
 func test_resource_rows_do_not_leak_the_class_resource() -> void:

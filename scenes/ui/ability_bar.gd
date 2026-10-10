@@ -114,10 +114,8 @@ func refresh(with_costs: bool = false) -> void:
 			continue
 		if with_costs:
 			icon.set_cost(runner.cost_of(icon.ability))
-		var effect := runner.effect_for(icon.ability)
-		if effect != null and effect.has_method(&"charges_max"):
-			# Abilities with charges (Blink with Band of the Blinking Star) publish them.
-			icon.set_charges(int(effect.call(&"charges_available")), int(effect.call(&"charges_max")))
+		# Charges (Blink with the Band of the Blinking Star): a counter while there is more than one.
+		icon.set_charges(runner.charges_available(icon.ability), runner.charges_max(icon.ability))
 		var left := runner.remaining(i)
 		icon.set_state(runner.cooldown_ratio(i), left, left <= 0.0 and runner.is_ready(i))
 
