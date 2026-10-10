@@ -20,6 +20,9 @@ const SHAKE_DECAY := 1.8
 ## Max screen offset of the camera (metres at the focus plane) at full trauma.
 const SHAKE_MAX_OFFSET := 0.55
 const SHAKE_MAX_ROLL := 0.035
+## Extra room below the top screen edge in [method walk_rect] so a player's head (1.3 m)
+## stays on screen: at the top edge the view ray is ~37 degrees steep.
+const WALK_HEAD_ROOM := 1.8
 
 var camera: Camera3D
 ## Current (smoothed) look-at point and distance.
@@ -68,6 +71,14 @@ func shake(strength: float) -> void:
 
 func get_trauma() -> float:
 	return _trauma
+
+
+## Shared screen, no split (GDD 13): the ground rectangle players may walk in so nobody
+## can leave the screen – what the camera shows at MAX_DISTANCE around its current focus,
+## inset by [param margin]. Players clamp their movement to it (the screen edge acts as an
+## invisible wall once the camera cannot zoom out any further).
+func get_walk_rect(margin: float = 1.0) -> Rect2:
+	return walk_rect(focus, MAX_DISTANCE, _aspect(), margin)
 
 
 func _process(delta: float) -> void:
@@ -152,6 +163,26 @@ static func width_factor(aspect: float) -> float:
 ## (towards -Z), z = south (towards +Z).
 static func ground_extents(dist: float, aspect: float) -> Vector3:
 	return Vector3(dist * width_factor(aspect), dist * north_factor(), dist * south_factor())
+
+
+## Visible ground half-width at [param dz] metres south (+Z) of the focus (perspective:
+## the near / bottom part of the screen shows less ground than the far / top part).
+static func half_width_at(dist: float, aspect: float, dz: float) -> float:
+	return width_factor(aspect) * (dist - dz * cos(deg_to_rad(PITCH_DEG)))
+
+
+## Conservative walkable rectangle (XZ) inside the view of a camera focused on
+## [param center] at [param dist]: the narrow bottom-edge width is used for the sides, and
+## the top edge keeps [constant WALK_HEAD_ROOM] extra. Empty when the margins do not fit.
+static func walk_rect(center: Vector3, dist: float, aspect: float, margin: float = 1.0) -> Rect2:
+	var north := dist * north_factor()
+	var south := dist * south_factor()
+	var half_w := half_width_at(dist, aspect, south)
+	var x0 := center.x - half_w + margin
+	var x1 := center.x + half_w - margin
+	var z0 := center.z - north + margin + WALK_HEAD_ROOM
+	var z1 := center.z + south - margin
+	return Rect2(x0, z0, maxf(x1 - x0, 0.0), maxf(z1 - z0, 0.0))
 
 
 ## Distance needed to keep all [param points] on screen with [constant FRAME_MARGIN].
