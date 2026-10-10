@@ -187,8 +187,8 @@ func _draw_overlay() -> void:
 	if _lock.visible:
 		ci.draw_circle(_lock.position + _lock.size * 0.5, 14.0, Color(0.05, 0.04, 0.03, 0.9))
 		ci.draw_arc(_lock.position + _lock.size * 0.5, 14.0, 0.0, TAU, 24, _lock.color, 2.0, true)
-	# "P2 wants" tags.
-	var y := 6.0
+	# "P2 wants" tags (below the cursor corner tags).
+	var y := 14.0
 	for slot_index in offer.pinged_by:
 		var col: Color = _colors.get(slot_index, Color.WHITE)
 		var text := "P%d wants" % (slot_index + 1)

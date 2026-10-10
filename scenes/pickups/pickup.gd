@@ -7,7 +7,8 @@ extends Node3D
 ## glowing orb). Once a player's [method StatBlock.pickup_range] covers it, it accelerates
 ## towards that player and is collected within COLLECT_DISTANCE: gold goes through the
 ## collector's Gold Find ([method RunState.add_gold_for] keeps the fraction per player slot),
-## XP to the shared bar. Loot banked at the wave end has no collector, so no Gold Find.
+## XP through the collector's XP Gain to the shared bar. Loot banked at the wave end has no
+## collector, so no Gold Find / XP Gain.
 ## When many pickups lie around, new drops merge into a nearby idle one ([method drop]).
 ## Idle pickups read the collectors from the shared per-tick [LivingPlayers] snapshot (positions
 ## and pickup range squared as packed floats) instead of calling into every player each tick;
@@ -138,17 +139,20 @@ func absorb(p_gold: int, p_xp: int) -> void:
 
 
 ## [param player] picks the loot up: gold (with the player's Gold Find) to the shared
-## wallet, XP to the shared bar, a sparkle, then the pickup frees itself.
+## wallet, XP (with the player's XP Gain, [method Player.xp_with_gain]) to the shared bar, a
+## sparkle, then the pickup frees itself.
 func collect(player: Player) -> void:
 	if _collected:
 		return
 	_collected = true
+	var gained_xp := xp
 	if player != null and is_instance_valid(player):
 		var slot_index := player.slot.index if player.slot != null else -1
 		RunState.add_gold_for(slot_index, gold, player.stats.get_stat(Stats.GOLD_FIND))
+		gained_xp = player.xp_with_gain(xp)
 	else:
 		RunState.add_gold(gold)
-	RunState.add_xp(xp)
+	RunState.add_xp(gained_xp)
 	var pos := global_position if is_inside_tree() else position
 	Vfx.pickup_sparkle(pos + Vector3.UP * HOVER_HEIGHT)
 	_remove()
