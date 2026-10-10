@@ -7,9 +7,10 @@ extends CharacterBody3D
 ## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
 ## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
 ## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level gained). Every equipped weapon that
-## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a slow ghost that
-## does not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME
-## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
+## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
+## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
+## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
+## the arena's [SpiritHealer] (1 s in its circle, full HP – see healer_channel).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 ## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
@@ -47,8 +48,8 @@ const DECELERATION := 60.0
 const MOVE_DEADZONE := 0.05
 ## Gap (m) kept between the body and the arena's outer walls (see _clamp_motion_to_arena).
 const WALL_GAP := 0.02
-## Downed ghosts move at half speed (GDD 1).
-const GHOST_SPEED_MULT := 0.5
+## Downed ghosts move at full speed (GDD 1), so the walk to the Spirit Healer is quick.
+const GHOST_SPEED_MULT := 1.0
 ## HP fraction after a teammate revive / after a wave starts while downed.
 const REVIVE_HP_RATIO := 0.3
 const WAVE_START_REVIVE_HP_RATIO := 0.5
@@ -110,6 +111,11 @@ var forced_crits := 0
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
+## Set every tick by the [SpiritHealer] while this ghost channels in its circle: progress
+## (0..1, 0 = not channelling) and the seconds it still needs (-1 = none). The cast bar shows
+## whichever revive – teammates' or the healer's – is closer to completion.
+var healer_channel := 0.0
+var healer_seconds_left := -1.0
 ## Remaining invulnerability (i-frames) in seconds.
 var invulnerable_left := 0.0
 ## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
@@ -449,6 +455,8 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	downed = false
 	revive_progress = 0.0
 	reviver_count = 0
+	healer_channel = 0.0
+	healer_seconds_left = -1.0
 	_regen_accum = 0.0
 	var nobody: Array[Player] = []
 	_update_channelers(nobody)
@@ -478,7 +486,7 @@ func revive_seconds_left() -> float:
 	return maxf(0.0, REVIVE_TIME - revive_progress) / speed
 
 
-## Current top speed in m/s (halved while downed).
+## Current top speed in m/s (GHOST_SPEED_MULT while downed).
 func current_max_speed() -> float:
 	return stats.move_speed() * (GHOST_SPEED_MULT if downed else 1.0)
 
@@ -708,7 +716,14 @@ func _update_revive(delta: float) -> void:
 		var color := OnionModel.REVIVE_COLOR
 		if not revivers.is_empty() and revivers[0].slot != null:
 			color = revivers[0].slot.color
-		model.set_revive_progress(revive_progress / REVIVE_TIME, color, revive_seconds_left())
+		var ratio := revive_progress / REVIVE_TIME
+		var seconds := revive_seconds_left()
+		if healer_channel > ratio:
+			# The Spirit Healer's channel is further along: show that one.
+			ratio = healer_channel
+			color = SpiritHealer.CAST_COLOR
+			seconds = healer_seconds_left
+		model.set_revive_progress(ratio, color, seconds)
 	if revive_progress >= REVIVE_TIME - 0.0001:
 		var feet := global_position
 		revive(REVIVE_HP_RATIO)

@@ -244,15 +244,17 @@ func test_revive_is_not_interrupted_by_damage_and_ends_with_a_light_column() -> 
 	check(resurrected, "\"Resurrected!\" floating text")
 
 
-func test_downed_ghost_does_not_attack_and_moves_slowly() -> void:
+func test_downed_ghost_does_not_attack_and_moves_at_full_speed() -> void:
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	Fakes.spawn_enemy(world, Vector3(1.5, 0, 0))
 	p.take_damage(999.0)
 	check(not p.weapons[0].tick(1.0), "ghost does not attack")
+	check_eq(Player.GHOST_SPEED_MULT, 1.0, "GDD 1: ghosts walk to the Spirit Healer at full speed")
 	(p.slot.input as ScriptedInput).move = Vector2(0, -1)
 	p.global_position = Vector3(0, 0, 5)
 	Fakes.step(p, 1.0)
-	check_near(p.velocity.length(), p.stats.move_speed() * Player.GHOST_SPEED_MULT, 0.01, "half speed")
+	check_near(p.velocity.length(), p.stats.move_speed() * Player.GHOST_SPEED_MULT, 0.01, "full speed")
+	check_near(p.current_max_speed(), p.stats.move_speed(), 0.0001, "not slowed while downed")
 
 
 func test_begin_wave_heals_and_revives() -> void:

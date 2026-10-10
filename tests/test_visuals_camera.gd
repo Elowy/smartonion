@@ -286,3 +286,62 @@ func test_safe_ground_rect_lies_inside_the_view_outside_the_hud() -> void:
 	rig.snap()
 	var live := rig.get_safe_ground_rect()
 	check(live.has_point(Vector2(3, 1)), "the framed hero stands inside the safe rect")
+
+
+# --- Spirit Healer (GDD 1) --------------------------------------------------------
+
+func test_framing_points_add_the_spirit_healer_only_while_a_ghost_exists() -> void:
+	var living: Array[Vector3] = [Vector3(4, 0, 2), Vector3(6, 0, 2)]
+	var none: Array[Vector3] = []
+	var ghosts: Array[Vector3] = [Vector3(-3, 0, 5)]
+	var healer: Array[Vector3] = [Vector3.ZERO]
+	check_eq(CameraRig.framing_points(living, none, healer), living, "nobody down: just the living")
+	var with_ghost := CameraRig.framing_points(living, ghosts, healer)
+	check_eq(with_ghost.size(), 3, "the living + the healer")
+	check(Vector3.ZERO in with_ghost, "the healer is framed")
+	check(not ghosts[0] in with_ghost, "the ghost itself is not")
+	check_eq(CameraRig.framing_points(living, ghosts, none), living, "no healer: just the living")
+	check_eq(CameraRig.framing_points(none, ghosts, healer), ghosts, "everybody down: the ghosts (old fallback)")
+
+
+func test_ghost_walk_rect_reaches_the_healer() -> void:
+	var safe := Rect2(2, -3, 10, 6)
+	var none: Array[Vector3] = []
+	check(CameraRig.ghost_walk_rect(safe, none).is_equal_approx(safe), "no healer: the safe rect")
+	var inside: Array[Vector3] = [Vector3(5, 0, 0)]
+	check(CameraRig.ghost_walk_rect(safe, inside).is_equal_approx(safe), "a healer on screen changes nothing")
+	var beside: Array[Vector3] = [Vector3(-1, 0, 4)]
+	var r := CameraRig.ghost_walk_rect(safe, beside)
+	check(r.encloses(safe), "still the whole safe rect")
+	check(r.position.x <= -1.0 and r.end.y >= 4.0, "the healer point is within reach: %s" % r)
+	check_near(r.end.x, safe.end.x, 0.0001, "grown only towards the healer")
+	check_near(r.position.y, safe.position.y, 0.0001, "grown only towards the healer")
+
+
+func test_rig_frames_the_spirit_healer_while_a_ghost_exists() -> void:
+	var arena := Arena.create()
+	_nodes.append(arena)
+	tree.root.add_child(arena)
+	var rig := arena.camera
+	var h := arena.spirit_healer.global_position
+	var hero := _player(Vector3(15, 0, 9))
+	rig.snap()
+	check(not h in rig._player_points(), "nobody down: the healer is not framed")
+	var ghost := _player(Vector3(14, 0, 7), false)
+	check(h in rig._player_points(), "a ghost exists: the healer is framed")
+	rig.snap()
+	var aspect := rig._aspect()
+	var ext := CameraRig.ground_extents(rig.distance, aspect)
+	for p: Vector3 in [h, hero.global_position]:
+		check(p.z - (rig.focus.z - ext.y) >= CameraRig.top_margin(rig.distance) - 0.001, "%s below the top margin" % p)
+		check((rig.focus.z + ext.z) - p.z >= CameraRig.FRAME_MARGIN_BOTTOM - 0.001, "%s above the bottom margin" % p)
+		check(ext.x - absf(p.x - rig.focus.x) >= CameraRig.FRAME_MARGIN - 0.001, "%s clear of the sides" % p)
+	var gr := rig.get_walk_rect(ghost)
+	check(gr.position.x <= h.x and gr.end.x >= h.x and gr.position.y <= h.z and gr.end.y >= h.z,
+		"the ghost may walk to the healer: %s" % gr)
+	var spread := CameraRig.max_spread(aspect)
+	var hr := rig.get_walk_rect(hero)
+	check_near(hr.position.x, h.x - spread.x, 0.001, "the living hero keeps the healer within one screen")
+	check_near(hr.end.x, h.x + spread.x, 0.001, "both ways")
+	ghost.alive = true
+	check(not h in rig._player_points(), "revived: the healer is no longer framed")

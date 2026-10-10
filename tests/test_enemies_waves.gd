@@ -370,3 +370,17 @@ func test_director_spawns_where_the_camera_looks() -> void:
 	check_eq(inside, 40, "telegraphs land on screen outside the HUD")
 	arena.camera = null
 	rig.free()
+
+
+## Groups never spawn on the Spirit Healer: a revived hero must not pop up inside one.
+func test_spawn_point_avoids_the_spirit_healer() -> void:
+	var healer := SpiritHealer.create()
+	arena.add_child(healer)
+	arena.spirit_healer = healer
+	healer.global_position = Vector3(2.0, 0.0, 1.0)
+	for _i in 60:
+		var p := director.find_spawn_point()
+		check(Vector2(p.x - 2.0, p.z - 1.0).length() >= WaveDirector.MIN_PLAYER_DISTANCE - 0.001,
+				"away from the healer (%s)" % p)
+	arena.spirit_healer = null
+	healer.free()

@@ -3,8 +3,10 @@ extends Node3D
 ## The battlefield (owned by the "visuals" module): an Elwynn-like forest clearing (GDD 13).
 ## Flat ground on the XZ plane, centred on the origin, enclosed by a low stone wall with tall
 ## invisible collision (layer 1 "world"). Screen-up is -Z. Contains:
-##   entities: Node3D  – parent for players, enemies, projectiles, pickups and VFX.
-##   camera:   CameraRig
+##   entities:      Node3D  – parent for players, enemies, projectiles, pickups and VFX.
+##   camera:        CameraRig
+##   spirit_healer: SpiritHealer – part of the level at SPIRIT_HEALER_POINT (GDD 1): ghosts
+##                  standing in its circle come back at full HP.
 ## Everything (ground shader, walls, trees, props, light, environment) is built in code by
 ## [method create]; decoration lives outside the playable rectangle so the camera never
 ## shows the void.
@@ -22,6 +24,8 @@ const VIEW_MARGIN_SOUTH := 4.0
 ## How far beyond the walls the forest decoration extends.
 const DECOR_MARGIN := 24.0
 const DECOR_SEED := 20240611
+## Where the Spirit Healer stands: the arena centre (no decor or props inside the walls).
+const SPIRIT_HEALER_POINT := Vector3.ZERO
 
 const _GROUND_CODE := """
 shader_type spatial;
@@ -128,6 +132,7 @@ static var current: Arena
 
 var entities: Node3D
 var camera: CameraRig
+var spirit_healer: SpiritHealer
 var walls: StaticBody3D
 var sun: DirectionalLight3D
 var world_environment: WorldEnvironment
@@ -215,6 +220,10 @@ func _build() -> void:
 	var decor := ArenaDecor.build(self, rng)
 	decor.name = "Decor"
 	add_child(decor)
+	# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
+	spirit_healer = SpiritHealer.create()
+	spirit_healer.position = SPIRIT_HEALER_POINT
+	add_child(spirit_healer)
 	entities = Node3D.new()
 	entities.name = "Entities"
 	add_child(entities)

@@ -3,7 +3,9 @@ extends Node3D
 ## Top-down camera (~57 degree pitch, FOV 40) owned by the "visuals" module. Follows the
 ## centroid of the living players (group &"players", Player.is_alive()), zooms out with the
 ## players' spread so everyone stays on screen, and clamps so the view stays inside the
-## decorated area around the arena (Arena.current.get_view_rect()).
+## decorated area around the arena (Arena.current.get_view_rect()). While anybody is a ghost
+## it also frames the arena's Spirit Healer (Arena.current.spirit_healer), so the healer is
+## always on screen and reachable for the ghost ([method framing_points]).
 ##
 ## The rig node sits at the look-at point on the ground; [member camera] is offset back and
 ## up along the pitch. Framing math is static (see [method compute_framing]) and unit tested.
@@ -86,21 +88,25 @@ func get_trauma() -> float:
 ## Shared screen, no split (GDD 13): the ground rectangle [param body] (a node in group
 ## &"players") may stand in so that nobody leaves the screen – once the camera cannot zoom
 ## out any further, the screen edge acts as an invisible wall. Players clamp their movement
-## to it. A framed (living) player is limited by the spread of the other framed players
-## ([method walk_rect_for]); a ghost that the camera does not follow is kept inside the
-## current view and out from under the HUD ([method safe_ground_rect]), so it stays easy to
-## find.
+## to it. A framed (living) player is limited by the spread of the other framed points
+## ([method walk_rect_for]; the Spirit Healer counts while a ghost exists); a ghost that the
+## camera does not follow is kept inside the current view and out from under the HUD
+## ([method safe_ground_rect]), so it stays easy to find – but it may always walk to the
+## Spirit Healer ([method ghost_walk_rect]).
 func get_walk_rect(body: Node3D) -> Rect2:
-	var others: Array[Vector3] = []
-	var framed := false
-	for n in _framed_players():
-		if n == body:
-			framed = true
-		else:
-			others.append(n.global_position)
-	if framed:
+	var living: Array[Node3D] = []
+	var ghosts: Array[Node3D] = []
+	_split_players(living, ghosts)
+	var framed := living if not living.is_empty() else ghosts
+	var anchors := _anchor_points(living, ghosts)
+	if body in framed:
+		var others: Array[Vector3] = []
+		for n in framed:
+			if n != body:
+				others.append(n.global_position)
+		others.append_array(anchors)
 		return walk_rect_for(others, _aspect())
-	return safe_ground_rect(focus, distance, _aspect())
+	return ghost_walk_rect(safe_ground_rect(focus, distance, _aspect()), anchors)
 
 
 func _process(delta: float) -> void:
@@ -147,30 +153,77 @@ func _aspect() -> float:
 	return size.x / size.y if size.y > 0.0 else 16.0 / 9.0
 
 
+## The ground points the camera frames ([method framing_points]): the living players, plus
+## the Spirit Healer while somebody is a ghost; the ghosts when everybody is down.
 func _player_points() -> Array[Vector3]:
-	var out: Array[Vector3] = []
-	for n in _framed_players():
-		out.append(n.global_position)
-	return out
+	var living: Array[Node3D] = []
+	var ghosts: Array[Node3D] = []
+	_split_players(living, ghosts)
+	return framing_points(_positions(living), _positions(ghosts), _anchor_points(living, ghosts))
 
 
-## Players the camera frames: the living ones, or everybody when all are down.
-func _framed_players() -> Array[Node3D]:
-	var alive: Array[Node3D] = []
-	var all: Array[Node3D] = []
+## Sorts the players in the tree (group &"players") into [param living] and [param ghosts]
+## (is_alive() false).
+func _split_players(living: Array[Node3D], ghosts: Array[Node3D]) -> void:
 	if not is_inside_tree():
-		return all
+		return
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var n := node as Node3D
 		if n == null or not n.is_inside_tree():
 			continue
-		all.append(n)
 		if not n.has_method(&"is_alive") or n.call(&"is_alive"):
-			alive.append(n)
-	return alive if not alive.is_empty() else all
+			living.append(n)
+		else:
+			ghosts.append(n)
+
+
+## Extra points framed with the living players: the Spirit Healer of Arena.current while
+## somebody is a ghost and somebody else still stands (empty otherwise).
+func _anchor_points(living: Array[Node3D], ghosts: Array[Node3D]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if living.is_empty() or ghosts.is_empty():
+		return out
+	var arena := Arena.current
+	if arena == null or not is_instance_valid(arena):
+		return out
+	var healer := arena.spirit_healer
+	if healer != null and is_instance_valid(healer) and healer.is_inside_tree():
+		out.append(healer.global_position)
+	return out
+
+
+static func _positions(nodes: Array[Node3D]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for n in nodes:
+		out.append(n.global_position)
+	return out
 
 
 # --- Framing math (static, unit tested) ---------------------------------------
+
+## The points [method compute_framing] keeps on screen: the [param living] players' positions
+## plus, while there are [param ghosts], the [param anchors] (the Spirit Healer – a ghost
+## always sees it and can walk to it). With nobody alive: the ghosts (the old fallback).
+static func framing_points(living: Array[Vector3], ghosts: Array[Vector3], anchors: Array[Vector3]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if living.is_empty():
+		out.append_array(ghosts)
+		return out
+	out.append_array(living)
+	if not ghosts.is_empty():
+		out.append_array(anchors)
+	return out
+
+
+## Walk rectangle of a ghost: [param safe] (the visible ground outside the HUD) grown just
+## enough to hold every [param anchors] point, so the framed Spirit Healer is always within
+## reach (the straight way there stays inside).
+static func ghost_walk_rect(safe: Rect2, anchors: Array[Vector3]) -> Rect2:
+	var out := safe
+	for a in anchors:
+		out = out.expand(Vector2(a.x, a.z))
+	return out
+
 
 ## Visible ground distance in front of (north of) the focus point per metre of distance.
 static func north_factor() -> float:

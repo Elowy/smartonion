@@ -15,6 +15,7 @@ scenes/
   main/     Main – game flow state machine                         [integration]
   arena/    Arena – battlefield, walls, entities root               [visuals]
   camera/   CameraRig                                                [visuals]
+  world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
   visuals/  Mats, OnionModel, EnemyModel, WeaponModel               [visuals]
   vfx/      Vfx – fire-and-forget effects                           [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
@@ -37,8 +38,9 @@ not rename or remove the contract members.
 Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is paused)
 ├── Arena (Node3D, PAUSABLE)   – Arena.current
 │   ├── environment, ground, walls, props
-│   ├── CameraRig
-│   └── entities (Node3D)      – players, enemies, projectiles, pickups, VFX
+│   ├── SpiritHealer           – arena.spirit_healer at Arena.SPIRIT_HEALER_POINT (centre)
+│   ├── entities (Node3D)      – players, enemies, projectiles, pickups, VFX
+│   └── CameraRig
 ├── WaveDirector (Node, PAUSABLE)
 ├── HudLayer (CanvasLayer 10, PAUSABLE) / Hud
 ├── MenuLayer (20)          / MainMenu or Lobby
@@ -68,8 +70,23 @@ the new screen never sees the button press that closed the old one.
    hook), `hud.bind_players(players)`, `wave_timer_changed → hud.set_wave_time`. Every wave:
    players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
    return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
-   - A player at 0 HP is **downed**; a living teammate standing within `REVIVE_RADIUS` for
-     `REVIVE_TIME` (5 s) revives them at 30% HP. Every additional living reviver in the
+   - A player at 0 HP is **downed**: a ghost that moves at full speed
+     (`Player.GHOST_SPEED_MULT` = 1) and that enemies ignore.
+   - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
+     one at `Arena.SPIRIT_HEALER_POINT` (the centre; no decor there) as its own child (not an
+     entity), `Arena.current.spirit_healer`; no collision. Every physics tick (before the
+     entities, paused with the arena) every ghost within `HEAL_RADIUS` (1.6 m, flat XZ)
+     channels; after `CHANNEL_TIME` (1 s) `revive(REVIVE_HP_RATIO = 1.0)` +
+     `Vfx.resurrect_column` + "Resurrected!" and the `resurrected(player)` signal. Leaving the
+     circle resets that ghost's channel; several ghosts channel at once; the living are not
+     affected. It writes `Player.healer_channel` / `healer_seconds_left`, and the ghost's cast
+     bar shows whichever revive (teammates' or the healer's) is further along, in
+     `SpiritHealer.CAST_COLOR` for the healer; whichever finishes first revives. Look:
+     procedural winged spirit (own copies of `Mats.ghost`), halo, rune circle on
+     `HEAL_RADIUS`, motes, one `OmniLight3D`; while a ghost exists (`is_active()`) it pulses
+     brighter and shows a light column.
+   - A living teammate standing within `REVIVE_RADIUS` for `REVIVE_TIME` (5 s) still revives
+     them at 30% HP. Every additional living reviver in the
      circle adds +50% speed (`Player.revive_speed(n)`: 1 → 1×, 2 → 1.5×, 3 → 2×); with
      nobody in the circle the progress drains slowly (`REVIVE_DECAY_PER_SECOND`); taking
      damage never interrupts it. Cast bar in the reviver's colour with the time left at the
@@ -198,7 +215,9 @@ grouped by living enemies (`RunPerf`): `physics_ms_avg`, `physics_ms_at_peak` (t
 `monitor_physics_ms_at_peak` (`Performance.TIME_PHYSICS_PROCESS`, which is the slowest tick of
 the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line.
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
-crowded), avoid walls, stay near the team and run to downed teammates when it is safe.
+crowded), avoid walls, stay near the team and run to downed teammates within
+`BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
+and waits inside its circle (`HEALER_STOP_DISTANCE`).
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
 `PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
 -1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
@@ -245,6 +264,9 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   - Enemy projectiles (`ProjectileVisual.build(..., enemy = true)`): 1.6× size, red-orange
     halo and a short trail, fast spin – a different hue family from the heroes' class-
     coloured bolts.
+  - Camera framing (`CameraRig.framing_points(living, ghosts, anchors)` →
+    `compute_framing`): the living players plus, while anybody is a ghost, the Spirit Healer
+    (so it is always on screen and reachable); everybody down → the ghosts (old fallback).
   - Camera framing keeps heroes out from under the HUD: per-side margins `FRAME_MARGIN`
     (sides), `FRAME_MARGIN_BOTTOM` and `CameraRig.top_margin(distance)` (grows with the zoom –
     the wave / timer plaque covers a fixed share of the screen – capped so the whole arena
@@ -256,8 +278,10 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     along the edge (`Player.clamp_motion_to_rect`: a body already outside is never pushed,
     only kept from going further out). For living players it binds only when the team
     spreads wider than the fully zoomed-out view (never in the MVP arena: the whole arena
-    fits at `MAX_DISTANCE`); a ghost, which the camera does not follow, is kept inside the
-    current view, out from under the HUD (`safe_ground_rect`).
+    fits at `MAX_DISTANCE`; the Spirit Healer counts as a framed point while a ghost exists);
+    a ghost, which the camera does not follow, is kept inside the current view, out from
+    under the HUD (`safe_ground_rect`), grown to reach the Spirit Healer
+    (`CameraRig.ghost_walk_rect`).
   - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
 - Art showcase (dev tool, renders a PNG under Xvfb):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
@@ -295,7 +319,8 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   bottom edge (WoW style; level at its left end, "xp / needed XP" at its right end) and a slim
   translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
   plaque. Unit frames hide when their player is freed; while downed they show the revive
-  progress.
+  progress (teammates' or the Spirit Healer's, whichever is further along; spirit blue for the
+  healer) and the hint "Go to the Spirit Healer" (`UnitFrame.GHOST_HINT`).
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
   ignore the input of the frame they were opened on (Game Over: the first
   `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with

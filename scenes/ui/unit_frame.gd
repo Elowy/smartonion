@@ -5,7 +5,8 @@ extends PanelContainer
 ## (ResourceDisplay: a coloured bar with "value / max", pips for Holy Power / Soul Shards /
 ## Combo Points - live from player.abilities), the ability bar underneath (AbilityBar: the core
 ## ability icons with this player's button prompts, cooldown sweep and dimming) and a DOWNED
-## overlay with the revive progress over the bars.
+## overlay over the bars: the revive progress (teammates' or the Spirit Healer's, whichever is
+## further along) and the hint "Go to the Spirit Healer".
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge.
 
 ## Compact (it sits in a screen corner over the playfield): ~340 x 100 reference px.
@@ -15,6 +16,11 @@ const PORTRAIT_SIZE := 76.0
 const PANEL_ALPHA := 0.8
 ## Smallest text on the frame (resource name, revive hint): readable at 720p.
 const SMALL_FONT := 18
+## Shown while downed: what a ghost should do (GDD 1 – 1 s in the healer's circle = full HP).
+const GHOST_HINT := "Go to the Spirit Healer"
+## Hint text and revive bar fill (pale spirit blue while the Spirit Healer channels).
+const GHOST_HINT_COLOR := Color(0.74, 0.9, 1.0)
+const REVIVE_BAR_COLOR := Color(0.55, 1.0, 0.45)
 
 var index := 0
 var mirrored := false
@@ -32,6 +38,7 @@ var resource_bar: UiBar:
 var name_label: Label
 var downed_overlay: PanelContainer
 var revive_bar: UiBar
+var hint_label: Label
 
 var _player_label: Label
 var _class_label: Label
@@ -112,12 +119,13 @@ func _build() -> void:
 	downed_overlay.add_child(dbox)
 	var top := UiTheme.hbox(8)
 	top.add_child(UiTheme.label("DOWNED", UiTheme.HEADING, 21, UiTheme.RED))
-	revive_bar = UiBar.create(Color(0.55, 1.0, 0.45), 12.0, 12)
+	revive_bar = UiBar.create(REVIVE_BAR_COLOR, 12.0, 12)
 	revive_bar.animated = false
 	revive_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(revive_bar)
 	dbox.add_child(top)
-	dbox.add_child(UiTheme.label("Stand close to revive", &"", SMALL_FONT, UiTheme.TEXT))
+	hint_label = UiTheme.label(GHOST_HINT, &"", SMALL_FONT, GHOST_HINT_COLOR)
+	dbox.add_child(hint_label)
 	downed_overlay.visible = false
 	stack.add_child(downed_overlay)
 
@@ -203,4 +211,8 @@ func _process(_delta: float) -> void:
 		visible = false
 		return
 	if player.downed:
-		revive_bar.set_values(player.revive_progress, Player.REVIVE_TIME)
+		# Whichever revive is further along: teammates standing close or the Spirit Healer.
+		var mates := player.revive_progress / Player.REVIVE_TIME
+		var healer := player.healer_channel > mates
+		revive_bar.fill_color = SpiritHealer.CAST_COLOR if healer else REVIVE_BAR_COLOR
+		revive_bar.set_values(player.healer_channel if healer else mates, 1.0)

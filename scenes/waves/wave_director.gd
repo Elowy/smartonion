@@ -217,16 +217,19 @@ static func pick_spawn_point(p_arena: Arena, rng: RandomNumberGenerator, avoid: 
 	return best
 
 
-## Spawn point for the next group, away from the living players, preferably where the
-## camera shows it outside the HUD.
+## Spawn point for the next group, away from the living players and the Spirit Healer (a
+## revived hero must not pop up inside a fresh group), preferably where the camera shows it
+## outside the HUD.
 func find_spawn_point() -> Vector3:
 	var tree := get_tree() if is_inside_tree() else null
 	var a := _arena()
 	var view := Rect2()
 	if a != null and is_instance_valid(a.camera) and a.camera.is_inside_tree():
 		view = a.camera.get_safe_ground_rect()
-	return pick_spawn_point(a, RunState.rng, Enemy.living_player_positions(tree), MIN_PLAYER_DISTANCE,
-		SPAWN_POINT_TRIES, view)
+	var avoid := Enemy.living_player_positions(tree)
+	if a != null and is_instance_valid(a.spirit_healer):
+		avoid.append(a.spirit_healer.global_position)
+	return pick_spawn_point(a, RunState.rng, avoid, MIN_PLAYER_DISTANCE, SPAWN_POINT_TRIES, view)
 
 
 ## Enemies currently alive in the tree.
