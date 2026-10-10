@@ -30,7 +30,7 @@ const ATTACK_TIME := 0.24
 const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
 ## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
 const CAST_BAR_Y := 2.0
-const CAST_BAR_SIZE := Vector2(1.15, 0.17)
+const CAST_BAR_SIZE := Vector2(1.6, 0.3)
 const REVIVE_COLOR := Color(0.55, 1.0, 0.45)
 const CHANNEL_GOLD := Color(1.0, 0.84, 0.36)
 ## Where the reviver's light beam ends on the ghost (above its origin).
@@ -750,8 +750,8 @@ func _build_cast_bar() -> void:
 	_cast_label = Label3D.new()
 	_cast_label.name = "CastLabel"
 	_cast_label.text = "Resurrecting"
-	_cast_label.font_size = 40
-	_cast_label.pixel_size = 0.0055
+	_cast_label.font_size = 48
+	_cast_label.pixel_size = 0.0062
 	_cast_label.outline_size = 12
 	_cast_label.modulate = Color(1.0, 0.97, 0.88)
 	_cast_label.outline_modulate = Color(0.08, 0.04, 0.05)
@@ -761,7 +761,9 @@ func _build_cast_bar() -> void:
 	_cast_label.render_priority = 32
 	_cast_label.outline_render_priority = 31
 	_cast_label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_cast_label.position = Vector3(0, CAST_BAR_Y + CAST_BAR_SIZE.y * 0.5 + 0.13, 0)
+	# Same anchor as the bar, lifted in screen space (billboard plane) so it never overlaps.
+	_cast_label.position = Vector3(0, CAST_BAR_Y, 0)
+	_cast_label.offset = Vector2(0, (CAST_BAR_SIZE.y * 0.5 + 0.2) / _cast_label.pixel_size)
 	add_child(_cast_label)
 
 

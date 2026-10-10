@@ -25,7 +25,13 @@ func run() -> void:
 		_:
 			await _gameplay()
 	var out := _arg("out", "/tmp/smartonion_showcase.png")
-	var err := get_viewport().get_texture().get_image().save_png(out)
+	var image: Image = null
+	if DisplayServer.get_name() != "headless":
+		image = get_viewport().get_texture().get_image()
+	if image == null:
+		printerr("showcase: nothing rendered – run with a display (xvfb-run) and --rendering-driver opengl3")
+		return
+	var err := image.save_png(out)
 	print("showcase: %s -> %s (%s)" % [view, out, error_string(err)])
 
 
@@ -216,8 +222,8 @@ func _revive() -> void:
 	arena.camera.snap()
 	await _frames(12)
 	Engine.time_scale = 0.1
-	Vfx.resurrect_column(spots[2])
-	Vfx.level_up_burst(spots[3])
+	Vfx.resurrect_column(Vector3(4.0, 0, -3.5))
+	Vfx.level_up_burst(Vector3(-4.0, 0, -3.0))
 	await _frames(4)
 	Engine.time_scale = 1.0
 

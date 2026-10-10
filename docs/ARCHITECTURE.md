@@ -97,3 +97,28 @@ Main (Node)
 `--waves=N` waves (default 3), prints `SMOKE_RESULT {json}` and quits (exit 1 if a wave
 could not complete). `--players=N` bot count, `--seed=N`, `--demo` bots without time scaling
 (for screenshots), `--screenshot=path` + `--shot-time=seconds` saves a PNG then quits.
+
+## Visuals (procedural art)
+
+- No imported assets yet: `MeshKit` merges primitives / lathes / extrusions into one
+  vertex-coloured `ArrayMesh` per prop, enemy or weapon (cached by key, shared by every
+  instance) drawn with `Mats.toon_vc()`. All toon materials share a few cached shaders
+  (two-band toon light, warm rim, inverted-hull outline as `next_pass`; the outline is drawn
+  in the alpha pass only, so it costs nothing in the shadow pass).
+- Per-node looks go through instance uniforms, never duplicated materials:
+  `Mats.set_overlay` (hit flash / wind-up tint), `Mats.set_ring` (ground rings),
+  `Mats.set_cast_bar`.
+- Public helpers beyond the stubs:
+  - `OnionModel.set_revive_progress(progress, reviver_color, seconds_left)` – revive ring arc
+    plus a WoW-like "Resurrecting" cast bar above the ghost, in the reviver's colour.
+  - `OnionModel.set_channel_target(downed_player)` / `null` – the reviver raises golden,
+    glowing hands and a light beam connects it to the ghost.
+  - `Vfx.resurrect_column(feet_pos)` – shaft of light from the sky when a revive completes.
+  - `CameraRig.get_walk_rect(player)` – shared screen (GDD 13): the rectangle a player may
+    walk in so nobody leaves the screen once the camera is fully zoomed out (in the MVP
+    arena it never binds: the whole arena fits at `MAX_DISTANCE`).
+  - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
+- Art showcase (dev tool, renders a PNG under Xvfb):
+  `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
+  (views: gameplay, live, onions, enemies, weapons, arena, revive). Latest gameplay view:
+  `docs/screenshots/visuals_showcase.png`.

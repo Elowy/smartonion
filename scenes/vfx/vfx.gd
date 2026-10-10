@@ -359,8 +359,8 @@ static func resurrect_column(pos: Vector3) -> void:
 	column.name = "Column"
 	column.mesh = MeshKit.cached("vfx:sky_column", func() -> Mesh:
 		var c := CylinderMesh.new()
-		c.top_radius = 0.95
-		c.bottom_radius = 0.7
+		c.top_radius = 0.8
+		c.bottom_radius = 0.55
 		c.height = 1.0
 		c.radial_segments = 20
 		c.rings = 0
@@ -371,7 +371,7 @@ static func resurrect_column(pos: Vector3) -> void:
 		return k.build())
 	column.material_override = _material("sky_column", _SKY_COLUMN_CODE)
 	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.9, 0.55, 1.0))
+	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.86, 0.45, 0.6))
 	fx.add_child(column)
 	fx.main = column
 	fx.flash = _glow_ball(fx, Color(1.0, 0.95, 0.7), 0.85)
