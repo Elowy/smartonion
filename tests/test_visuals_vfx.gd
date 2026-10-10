@@ -122,3 +122,17 @@ func test_slash_arc_faces_direction() -> void:
 	var forward := fx.transform.basis * Vector3.FORWARD
 	check(forward.x > 0.99, "arc centred on the swing direction")
 	check_near((fx.get_node("Arc") as Node3D).scale.x, 2.0, 0.001, "scaled to the reach")
+	check_near(fx.global_position.y, Vfx.ARC_LIFT, 0.001, "lifted to mid-body height")
+
+
+func test_ground_rings_snap_to_the_ground() -> void:
+	Vfx.explosion(Vector3(1, 0.9, 2), 1.5, Color.ORANGE)
+	Vfx.death_puff(Vector3(-1, 0.5, 0), Color.GRAY, 1.0)
+	Vfx.level_up_burst(Vector3(3, 0, 1))
+	var fx := _effects()
+	check_eq(fx.size(), 3, "three effects")
+	for e in fx:
+		var ring := e.get_node_or_null("Ring") as Node3D
+		check(ring != null, "%s has a shock ring" % e.name)
+		if ring != null:
+			check_near(ring.global_position.y, Vfx.GROUND_Y, 0.001, "%s ring on the ground" % e.name)
