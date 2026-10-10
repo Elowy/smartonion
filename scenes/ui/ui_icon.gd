@@ -258,28 +258,44 @@ static func _draw_helm(ci: CanvasItem, to_screen: Callable, k: float, w: float) 
 	var metal := Color(0.66, 0.68, 0.74)
 	var gold := Color(0.93, 0.72, 0.28)
 	var ivory := Color(0.95, 0.9, 0.76)
-	# Horns.
+	# Horns: a tapered curve swept along its normal, with a dark tip.
 	for side in [-1.0, 1.0]:
-		var horn := PackedVector2Array()
-		var outer: Array[Vector2] = []
-		var inner: Array[Vector2] = []
-		for i in 9:
-			var t := float(i) / 8.0
-			var root := Vector2(side * 0.36, 0.7)
-			var tip := Vector2(side * 0.74, 1.12)
-			var ctrl := Vector2(side * 0.78, 0.66)
+		var root := Vector2(side * 0.36, 0.72)
+		var ctrl := Vector2(side * 0.86, 0.66)
+		var tip := Vector2(side * 0.8, 1.17)
+		var upper: Array[Vector2] = []
+		var lower: Array[Vector2] = []
+		var steps := 12
+		for i in steps + 1:
+			var t := float(i) / float(steps)
 			var p := root.lerp(ctrl, t).lerp(ctrl.lerp(tip, t), t)
-			var thick := lerpf(0.09, 0.0, t)
-			outer.append(p + Vector2(0, -thick))
-			inner.append(p + Vector2(-side * thick * 0.4, thick))
-		for p in outer:
+			var tangent := (ctrl - root).lerp(tip - ctrl, t).normalized()
+			var n := Vector2(-tangent.y, tangent.x)
+			var thick := 0.11 * pow(1.0 - t, 0.75) + 0.004
+			upper.append(p + n * thick)
+			lower.append(p - n * thick)
+		var horn := PackedVector2Array()
+		for p in upper:
 			horn.append(to_screen.call(p))
-		for i in range(inner.size() - 1, -1, -1):
-			horn.append(to_screen.call(inner[i]))
+		for i in range(lower.size() - 1, -1, -1):
+			horn.append(to_screen.call(lower[i]))
+		var cols := PackedColorArray()
+		for i in horn.size():
+			var t := float(i if i <= steps else horn.size() - 1 - i) / float(steps)
+			cols.append(ivory.lerp(Color(0.55, 0.45, 0.32), smoothstep(0.55, 1.0, t)))
+		ci.draw_polygon(horn, cols)
 		var closed := PackedVector2Array(horn)
 		closed.append(horn[0])
-		ci.draw_colored_polygon(horn, ivory)
 		ci.draw_polyline(closed, DARK, w, true)
+		# Gold ring where the horn meets the helm.
+		var ring_t := 0.16
+		var rp := root.lerp(ctrl, ring_t).lerp(ctrl.lerp(tip, ring_t), ring_t)
+		var rt := (ctrl - root).lerp(tip - ctrl, ring_t).normalized()
+		var rn := Vector2(-rt.y, rt.x) * 0.105
+		var ring_a: Vector2 = to_screen.call(rp + rn)
+		var ring_b: Vector2 = to_screen.call(rp - rn)
+		ci.draw_line(ring_a, ring_b, DARK, k * 0.075, true)
+		ci.draw_line(ring_a, ring_b, gold, k * 0.045, true)
 	# Dome.
 	var dome := PackedVector2Array()
 	var center := Vector2(0.0, 0.6)
