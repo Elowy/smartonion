@@ -37,15 +37,17 @@ void fragment() {
 }
 """
 
+## Flash balls: mixed (not additive) so they keep their colour over the bright grass,
+## with a hot white core.
 const _GLOW_CODE := """
 shader_type spatial;
-render_mode unshaded, cull_back, depth_draw_never, blend_add, shadows_disabled;
+render_mode unshaded, cull_back, depth_draw_never, blend_mix, shadows_disabled;
 instance uniform vec4 fx_color = vec4(1.0);
 instance uniform float fx_fade = 1.0;
 void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-	ALBEDO = mix(fx_color.rgb, vec3(1.0), facing * facing * 0.5);
-	ALPHA = clamp(fx_color.a * fx_fade * (0.25 + 0.75 * pow(facing, 1.5)), 0.0, 1.0);
+	ALBEDO = mix(fx_color.rgb * 1.15, vec3(1.0), smoothstep(0.55, 1.0, facing) * 0.75);
+	ALPHA = clamp(fx_color.a * fx_fade * (0.2 + 0.8 * pow(facing, 1.2)), 0.0, 1.0);
 }
 """
 

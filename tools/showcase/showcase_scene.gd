@@ -206,8 +206,8 @@ func _free_spot(arena: Arena, center: Vector3, others: Array[EnemyModel]) -> Vec
 	for attempt in 30:
 		var a := _rng.randf_range(0.0, TAU)
 		var r := _rng.randf_range(4.5, 9.0)
-		p = arena.clamp_point(center + Vector3(cos(a) * r * 1.4, 0, sin(a) * r), 1.0)
-		var free := true
+		p = center + Vector3(cos(a) * r * 1.4, 0, sin(a) * r)
+		var free := arena.is_inside(p, 1.0)
 		for o in others:
 			if o.position.distance_to(p) < 1.3:
 				free = false
