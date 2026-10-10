@@ -179,6 +179,13 @@ static func draw_onion(ci: CanvasItem, rect: Rect2, skin: Color, with_helm: bool
 	var units := Vector2(1.5 if with_helm else 1.08, 1.3)
 	var k := minf(rect.size.x / units.x, rect.size.y / units.y)
 	var base := Vector2(rect.get_center().x, rect.position.y + (rect.size.y + units.y * k) * 0.5 - 0.04 * k)
+	draw_onion_at(ci, base, k, skin, with_helm, with_face)
+
+
+## Draws the onion with its root at [param base]; [param k] = pixels per bulb height.
+## [param sprout] scales the leaves on top (portraits use short ones).
+static func draw_onion_at(ci: CanvasItem, base: Vector2, k: float, skin: Color, with_helm: bool = false,
+		with_face: bool = true, sprout: float = 1.0) -> void:
 	var to_screen := func(v: Vector2) -> Vector2: return base + Vector2(v.x, -v.y) * k
 	var outline_w := maxf(1.5, k * 0.035)
 
@@ -186,8 +193,9 @@ static func draw_onion(ci: CanvasItem, rect: Rect2, skin: Color, with_helm: bool
 	var leaf := Color(0.4, 0.72, 0.24)
 	for leaf_def: Array in [[Vector2(0.0, 0.97), Vector2(-0.2, 1.24), 0.07], [Vector2(0.0, 0.97), Vector2(0.14, 1.27), 0.06],
 			[Vector2(0.0, 0.97), Vector2(0.03, 1.29), 0.05]]:
-		var a: Vector2 = to_screen.call(leaf_def[0])
-		var b: Vector2 = to_screen.call(leaf_def[1])
+		var root: Vector2 = leaf_def[0]
+		var a: Vector2 = to_screen.call(root)
+		var b: Vector2 = to_screen.call(root + (Vector2(leaf_def[1]) - root) * sprout)
 		var w: float = leaf_def[2] * k
 		var n := (b - a).normalized().orthogonal() * w
 		var mid := a.lerp(b, 0.45)

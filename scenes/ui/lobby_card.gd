@@ -5,13 +5,14 @@ extends PanelContainer
 ## class stat bonuses, starting weapons, resource and the device's own button prompts.
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
-const PREVIEW_HEIGHT := 250.0
+const PREVIEW_HEIGHT := 224.0
 
 var index := 0
 var slot: PlayerSlot
 var preview: OnionPreview
 
 var _state_key := ""
+var _was_ready := false
 var _t := 0.0
 var _arrow_kick := Vector2.ZERO  # x: left arrow, y: right arrow
 
@@ -95,7 +96,6 @@ func _build_joined() -> void:
 	_header.add_child(hrow)
 	_player_label = UiTheme.label("P1", UiTheme.HEADING, 34, UiTheme.TEXT)
 	hrow.add_child(_player_label)
-	hrow.add_child(UiTheme.spacer())
 	_device_label = UiTheme.label("Controller", &"", UiTheme.FONT_SMALL, UiTheme.TEXT)
 	_device_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_device_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -128,7 +128,7 @@ func _build_joined() -> void:
 	var class_row := UiTheme.hbox(6)
 	_left_arrow = UiIcon.create(UiIcon.Kind.ARROW_LEFT, Vector2(34, 40), UiTheme.GOLD)
 	_right_arrow = UiIcon.create(UiIcon.Kind.ARROW_RIGHT, Vector2(34, 40), UiTheme.GOLD)
-	_class_label = UiTheme.centered_label("Warrior", UiTheme.HEADING, 44)
+	_class_label = UiTheme.centered_label("Warrior", UiTheme.HEADING, 42)
 	_class_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	class_row.add_child(_left_arrow)
 	class_row.add_child(_class_label)
@@ -140,7 +140,7 @@ func _build_joined() -> void:
 
 	_desc_label = UiTheme.wrapped_label("", &"", UiTheme.FONT_BODY - 1, Color(0.9, 0.87, 0.8))
 	_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_desc_label.custom_minimum_size.y = 56
+	_desc_label.custom_minimum_size.y = 52
 	_joined_box.add_child(_desc_label)
 
 	var info := UiTheme.panel(UiTheme.INSET_PANEL)
@@ -194,14 +194,14 @@ func _make_ready_ribbon() -> PanelContainer:
 	style.rebuild()
 	ribbon.add_theme_stylebox_override(&"panel", style)
 	var row := UiTheme.hbox(10)
-	row.add_child(UiIcon.create(UiIcon.Kind.CHECK, Vector2(34, 34)))
-	row.add_child(UiTheme.label("READY", UiTheme.HEADING, 36, UiTheme.GREEN))
+	row.add_child(UiIcon.create(UiIcon.Kind.CHECK, Vector2(28, 28)))
+	row.add_child(UiTheme.label("READY", UiTheme.HEADING, 30, UiTheme.GREEN))
 	ribbon.add_child(row)
 	ribbon.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	ribbon.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	ribbon.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	ribbon.offset_bottom = -14
-	ribbon.offset_top = -14
+	ribbon.offset_bottom = -6
+	ribbon.offset_top = -6
 	ribbon.offset_left = 0
 	ribbon.offset_right = 0
 	ribbon.visible = false
@@ -219,15 +219,16 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 		key = "%d:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name()]
 	if key == _state_key:
 		return
-	var was_ready := _state_key.ends_with(":true:" + (p_slot.input.get_device_name() if p_slot != null else ""))
 	_state_key = key
 	if p_slot == null:
 		_keyboard_hint.visible = keyboard_free
 		_apply_empty()
+		_was_ready = false
 	else:
 		_apply_joined(p_slot)
-		if p_slot.ready and not was_ready:
+		if p_slot.ready and not _was_ready:
 			preview.cheer()
+		_was_ready = p_slot.ready
 
 
 ## Flashes the ◀ / ▶ arrow after a class change.
@@ -283,7 +284,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 		_resource_dot.set_color(data.resource_color)
 		_resource_label.text = "Resource: " + UiTheme.resource_name(data.resource_type)
 		_resource_label.add_theme_color_override(&"font_color", data.resource_color.lightened(0.35))
-		_armor_label.text = String(ClassData.ArmorType.keys()[data.armor_type]).capitalize() + " armour"
+		_armor_label.text = String(ClassData.ArmorType.keys()[data.armor_type]).capitalize() + " armor"
 	_fill_prompts(s)
 
 
@@ -371,9 +372,11 @@ func _process(delta: float) -> void:
 		_join_glyph.scale = Vector2.ONE * (1.0 + 0.06 * p)
 		_join_glyph.pivot_offset = _join_glyph.size * 0.5
 	elif _left_arrow.visible:
-		_arrow_kick = _arrow_kick.move_toward(Vector2.ZERO, delta * 5.0)
-		var bob := sin(_t * 3.0) * 3.0
-		_left_arrow.position.x = -bob - _arrow_kick.x * 10.0
-		_right_arrow.position.x = _right_arrow.get_parent_control().size.x - _right_arrow.size.x + bob + _arrow_kick.y * 10.0
-		_left_arrow.modulate = Color(1, 1, 1).lerp(Color(1.6, 1.5, 1.2), _arrow_kick.x)
-		_right_arrow.modulate = Color(1, 1, 1).lerp(Color(1.6, 1.5, 1.2), _arrow_kick.y)
+		_arrow_kick = _arrow_kick.move_toward(Vector2.ZERO, delta * 4.0)
+		var glow := 0.15 + 0.15 * sin(_t * 3.0)
+		_left_arrow.pivot_offset = _left_arrow.size * 0.5
+		_right_arrow.pivot_offset = _right_arrow.size * 0.5
+		_left_arrow.scale = Vector2.ONE * (1.0 + 0.35 * _arrow_kick.x)
+		_right_arrow.scale = Vector2.ONE * (1.0 + 0.35 * _arrow_kick.y)
+		_left_arrow.modulate = Color(1, 1, 1).lerp(Color(1.5, 1.45, 1.2), maxf(glow, _arrow_kick.x))
+		_right_arrow.modulate = Color(1, 1, 1).lerp(Color(1.5, 1.45, 1.2), maxf(glow, _arrow_kick.y))

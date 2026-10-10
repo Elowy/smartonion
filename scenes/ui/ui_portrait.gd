@@ -61,8 +61,8 @@ func _draw() -> void:
 		var t := float(i) / 6.0
 		draw_circle(c + Vector2(0, -inner_r * 0.15 * t), inner_r * (1.0 - t * 0.55), Color(ring.darkened(0.55), 0.18 + t * 0.06))
 	var skin := skin_color if not downed else Color(0.55, 0.6, 0.7)
-	var onion_rect := Rect2(c - Vector2(inner_r * 0.82, inner_r * 0.62), Vector2(inner_r * 1.64, inner_r * 1.72))
-	UiIcon.draw_onion(self, onion_rect, skin, false, true)
+	var k := inner_r * 1.5
+	UiIcon.draw_onion_at(self, c + Vector2(0.0, 0.47 * k), k, skin, false, true, 0.45)
 	if downed:
 		draw_circle(c, inner_r, Color(0.35, 0.05, 0.05, 0.45))
 	if hit_flash > 0.0:

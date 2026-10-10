@@ -66,7 +66,7 @@ func _build() -> void:
 	title_label.add_theme_constant_override(&"shadow_outline_size", 22)
 	title_label.add_theme_constant_override(&"shadow_offset_y", 8)
 	col.add_child(title_label)
-	var subtitle := UiTheme.centered_label("Onion heroes in shining armour  ·  1–4 player local co-op", &"", UiTheme.FONT_LARGE, UiTheme.TEXT_DIM)
+	var subtitle := UiTheme.centered_label("Onion heroes in shining armor  ·  1–4 player local co-op", &"", UiTheme.FONT_LARGE, UiTheme.TEXT_DIM)
 	col.add_child(subtitle)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 18)
