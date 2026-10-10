@@ -234,22 +234,35 @@ func test_resolve_is_final() -> void:
 	check(Support.equipment_of(slots[0]).backpack.is_empty(), "apply before resolve does nothing")
 
 
+## A hand-made item of [param slot_type] with [param stats] (no generator).
+static func _gear(item_level: int, armor_type: int, stats: Dictionary,
+		slot_type: Items.SlotType = Items.SlotType.CHEST) -> ItemInstance:
+	var item := Support.make_armor(item_level, armor_type, 20, Items.Rarity.COMMON, slot_type)
+	for stat: StringName in stats:
+		item.stats[stat] = float(stats[stat])
+	return item
+
+
 func test_bot_choice() -> void:
 	var warrior := slots[0]
 	var chest := Support.make_armor(20, ClassData.ArmorType.PLATE)
 	check_eq(LootRoll.bot_choice(warrior, chest), LootRoll.Choice.NEED, "empty slot -> Need")
-	Support.equipment_of(warrior).equip(Support.make_armor(20, ClassData.ArmorType.PLATE))
-	check_eq(LootRoll.bot_choice(warrior, Support.make_armor(25, ClassData.ArmorType.PLATE)),
-			LootRoll.Choice.NEED, "higher Item Level -> Need")
-	check_eq(LootRoll.bot_choice(warrior, Support.make_armor(20, ClassData.ArmorType.PLATE)),
-			LootRoll.Choice.GREED, "same Item Level -> Greed")
-	check_eq(LootRoll.bot_choice(warrior, Support.make_armor(12, ClassData.ArmorType.PLATE)),
+	check(Support.equipment_of(warrior).equip(_gear(20, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 4, Stats.ARMOR: 3})), "plate chest on")
+	check_eq(LootRoll.bot_choice(warrior, _gear(25, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 8, Stats.ARMOR: 3})),
+			LootRoll.Choice.NEED, "better stats -> Need")
+	check_eq(LootRoll.bot_choice(warrior, _gear(30, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 4, Stats.ARMOR: 3})),
+			LootRoll.Choice.GREED, "same stats: a higher Item Level alone is no upgrade -> Greed")
+	check_eq(LootRoll.bot_choice(warrior, _gear(12, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 1})),
 			LootRoll.Choice.GREED, "downgrade -> Greed")
+	check_eq(LootRoll.bot_choice(warrior, _gear(40, ClassData.ArmorType.CLOTH, {Stats.INTELLECT: 12})),
+			LootRoll.Choice.GREED, "a cloth Intellect robe is no upgrade for a Warrior in plate -> Greed")
+	check_eq(LootRoll.bot_choice(slots[1], _gear(40, ClassData.ArmorType.CLOTH, {Stats.INTELLECT: 12})),
+			LootRoll.Choice.NEED, "but the Mage needs it")
 	check_eq(LootRoll.bot_choice(slots[1], chest), LootRoll.Choice.GREED, "mage cannot wear plate -> Greed")
 	check_eq(LootRoll.bot_choice(warrior, Support.make_weapon(&"bow")), LootRoll.Choice.GREED, "cannot use -> Greed")
 	check_eq(LootRoll.bot_choice(slots[2], Support.make_weapon(&"bow")), LootRoll.Choice.NEED, "rogue + bow, empty slot")
 	Support.fill_backpack(warrior)
-	check_eq(LootRoll.bot_choice(warrior, Support.make_armor(99, ClassData.ArmorType.PLATE)),
+	check_eq(LootRoll.bot_choice(warrior, _gear(99, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 30})),
 			LootRoll.Choice.GREED, "no room -> Greed")
 	check_eq(LootRoll.bot_choice(null, chest), LootRoll.Choice.GREED, "no slot")
 	var ghost := PlayerSlot.new(5, ScriptedInput.new("ghost"), Color.WHITE)
@@ -257,16 +270,32 @@ func test_bot_choice() -> void:
 	check_eq(LootRoll.bot_choice(ghost, chest), LootRoll.Choice.GREED, "no player node")
 
 
-func test_bot_compares_rings_against_the_default_slot() -> void:
+## Bots roll with the same upgrade test they equip with (ItemTooltip.upgrade_direction vs
+## ItemTooltip.equipped_for_compare): rings against the weaker ring, by stats.
+func test_bot_compares_rings_against_the_weaker_ring() -> void:
 	var rogue := slots[2]
 	var eq := Support.equipment_of(rogue)
-	var ring_a := Support.make_armor(30, Items.NO_ARMOR, 20, 0, Items.SlotType.RING)
-	var ring_b := Support.make_armor(10, Items.NO_ARMOR, 20, 0, Items.SlotType.RING)
+	var ring_a := _gear(30, Items.NO_ARMOR, {Stats.AGILITY: 6}, Items.SlotType.RING)
+	var ring_b := _gear(10, Items.NO_ARMOR, {Stats.AGILITY: 2}, Items.SlotType.RING)
 	check(eq.equip(ring_a), "equip ring 1")
-	check_eq(LootRoll.bot_choice(rogue, Support.make_armor(5, Items.NO_ARMOR, 20, 0, Items.SlotType.RING)),
+	check_eq(LootRoll.bot_choice(rogue, _gear(5, Items.NO_ARMOR, {Stats.AGILITY: 1}, Items.SlotType.RING)),
 			LootRoll.Choice.NEED, "second ring slot is empty -> Need")
 	check(eq.equip(ring_b), "equip ring 2")
-	check_eq(LootRoll.bot_choice(rogue, Support.make_armor(20, Items.NO_ARMOR, 20, 0, Items.SlotType.RING)),
-			LootRoll.Choice.GREED, "both slots full: compared with the default position (ring 1, level 30)")
-	check_eq(LootRoll.bot_choice(rogue, Support.make_armor(35, Items.NO_ARMOR, 20, 0, Items.SlotType.RING)),
-			LootRoll.Choice.NEED, "better than ring 1")
+	check_eq(LootRoll.bot_choice(rogue, _gear(20, Items.NO_ARMOR, {Stats.AGILITY: 2}, Items.SlotType.RING)),
+			LootRoll.Choice.GREED, "no better than the weaker ring -> Greed")
+	check_eq(LootRoll.bot_choice(rogue, _gear(15, Items.NO_ARMOR, {Stats.AGILITY: 4}, Items.SlotType.RING)),
+			LootRoll.Choice.NEED, "better than the weaker ring (ring 2) -> Need")
+	check_eq(LootRoll.bot_choice(rogue, _gear(35, Items.NO_ARMOR, {Stats.INTELLECT: 3}, Items.SlotType.RING)),
+			LootRoll.Choice.GREED, "Item Level alone is no upgrade")
+
+
+## The rogue holds two daggers: a bow (two-hander) is weighed against both of them.
+func test_bot_choice_weighs_a_two_hander_against_both_hands() -> void:
+	var rogue := slots[2]
+	var eq := Support.equipment_of(rogue)
+	eq.equip_starting_weapons()
+	check_eq(LootRoll.bot_choice(rogue, Support.make_weapon(&"bow", Items.Rarity.EPIC)), LootRoll.Choice.GREED,
+			"an Epic bow is worse than two daggers")
+	var dagger := ItemTooltip.weapon_dps(eq.get_item(Items.EquipSlot.MAIN_HAND), Stats.AGILITY, ItemTooltip.NOMINAL_PRIMARY)
+	check(ItemTooltip.weapon_dps(Support.make_weapon(&"bow", Items.Rarity.EPIC), Stats.AGILITY, ItemTooltip.NOMINAL_PRIMARY) > dagger,
+			"(although it beats one dagger)")

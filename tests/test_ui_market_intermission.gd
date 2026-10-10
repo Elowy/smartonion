@@ -180,6 +180,7 @@ func test_a_buys_and_start_readies_in_the_market() -> void:
 	RunState.add_gold(100)
 	screen.open(1, 0)
 	_step()
+	_step(Intermission.MARKET_INPUT_LOCKOUT)  # A and X wait a moment after the market opens
 	_tap(a, PlayerInput.Pad.A)
 	check_eq(shop.buy_calls, [[0, 0]] as Array[Array], "P1 bought the helm")
 	check_eq(bought, 1, "item_bought forwarded")
@@ -210,16 +211,20 @@ func test_smoke_bots_buy_and_equip_upgrades() -> void:
 	_step()
 	check_eq(continues, 0, "the first frame is skipped")
 	_step()
-	check_eq(shop.buy_calls.size(), 2, "every bot bought once")
-	check_eq(shop.buy_calls[0], [0, 0], "the warrior: the cheapest offer it can use")
-	check_eq(shop.buy_calls[1], [1, 1], "the mage cannot wear plate: the robe")
-	check_eq(bought, 2, "counted")
+	# Every affordable upgrade, cheapest first, one buy per bot and pass (shared wallet):
+	# helm (warrior) 12, robe (mage) 14, ring (warrior) 16, Rare staff (mage: beats the wand) 32.
+	# The Rare sword (30) would be an upgrade for the warrior too, but only 26 g are left.
+	check_eq(shop.buy_calls, [[0, 0], [1, 1], [2, 0], [4, 1]] as Array[Array], "bots buy every affordable upgrade")
+	check_eq(bought, 4, "counted")
+	check_eq(RunState.gold, 26, "100 - 12 - 14 - 16 - 32")
 	check_eq(continues, 1, "bots are ready")
+	check_eq(ShopPanel.equipment_of(mage).get_item(Items.EquipSlot.MAIN_HAND).display_name, "Staff", "the mage wears the staff")
 	for s in [warrior, mage]:
 		var eq := ShopPanel.equipment_of(s)
+		check_eq(Intermission.bot_offer_choice(s, shop), -1, "%s: no affordable upgrade left" % s.label())
 		for item in eq.backpack:
 			var current := ItemTooltip.equipped_for_compare(item, eq)
-			check(not eq.can_equip(item) or ItemTooltip.upgrade_direction(item, current, s.class_data) <= 0,
+			check(not eq.can_equip(item) or ItemTooltip.upgrade_direction(item, current, s.class_data, eq) <= 0,
 				"%s left an upgrade in the backpack: %s" % [s.label(), item.display_name])
 
 
@@ -244,8 +249,10 @@ func test_demo_bots_keep_the_market_open_a_while() -> void:
 	_step()
 	check_eq(shop.buy_calls.size(), 0, "not at once")
 	_step(2.0)
-	check_eq(shop.buy_calls.size(), 1, "half-way: the bot shops")
-	check_eq(screen.shop_panel.cursor_of(0), 0, "its cursor shows what it bought")
+	# Helm 12, robe 14 (cloth fills the empty chest), ring 16, Rare sword 30; the greaves (40)
+	# are not affordable any more.
+	check_eq(shop.buy_calls, [[0, 0], [1, 0], [2, 0], [3, 0]] as Array[Array], "half-way: the bot shops")
+	check_eq(screen.shop_panel.cursor_of(0), 3, "its cursor shows what it bought last")
 	check_eq(continues, 0, "still open")
 	_step(2.1)
 	check_eq(continues, 1, "then the next wave")

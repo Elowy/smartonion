@@ -77,6 +77,7 @@ func test_start_toggles_and_b_unreadies() -> void:
 	screen.open(1, 0)
 	UiFakes.step(screen)
 	var slot := PlayerManager.get_slot(0)
+	UiFakes.step(screen, Intermission.MARKET_INPUT_LOCKOUT)  # past the buy lockout
 	UiFakes.tap(screen, a, PlayerInput.Pad.A)
 	check(not slot.ready, "A buys in the shop, it does not ready")
 	UiFakes.tap(screen, a, PlayerInput.Pad.START)

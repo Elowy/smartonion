@@ -2,10 +2,18 @@ class_name Equipment
 extends RefCounted
 ## One player's equipped items + 10-slot backpack (GDD 5.1, 5.6). Pure data + rules;
 ## Player turns it into stat sources and weapons (Player.apply_equipment).
+##
+## A hero never ends up without an attacking weapon (shields and tomes do not attack):
+## equip() refuses an off-hand item that would push the only weapon (a two-hander) out,
+## unequip() refuses the last equipped attacking weapon, and remove_from_backpack() (sell,
+## trade) refuses the last usable attacking weapon of a hero who has none equipped
+## (is_last_weapon / equip_disarms; the UI shows NEED_WEAPON). take() is not guarded.
 
 signal changed
 
 const ARMOR_SPEC_BONUS := 0.10
+## Message of the "never without an attacking weapon" guard.
+const NEED_WEAPON := "You need a weapon"
 
 var class_data: ClassData
 var slots: Dictionary[int, ItemInstance] = {}
@@ -40,9 +48,11 @@ func add_to_backpack(item: ItemInstance) -> bool:
 	return true
 
 
+## Takes [param item] out of the backpack (sell, trade). False when it is not there or it is
+## the hero's last usable attacking weapon while none is equipped (is_last_weapon).
 func remove_from_backpack(item: ItemInstance) -> bool:
 	var i := backpack.find(item)
-	if i < 0:
+	if i < 0 or is_last_weapon(item):
 		return false
 	backpack.remove_at(i)
 	changed.emit()
@@ -79,9 +89,78 @@ func default_slot(item: ItemInstance) -> int:
 	return targets[0]
 
 
+## The equipped items equip([param item], [param equip_slot]) would move to the backpack
+## (-1 = default_slot): what sits in that position, plus the off hand for a two-hander, plus
+## an equipped two-hander for anything going into the off hand. Empty for an invalid slot.
+func displaced_by(item: ItemInstance, equip_slot: int = -1) -> Array[ItemInstance]:
+	var out: Array[ItemInstance] = []
+	if item == null:
+		return out
+	if equip_slot < 0:
+		equip_slot = default_slot(item)
+	if equip_slot not in target_slots(item):
+		return out
+	if slots.has(equip_slot) and slots[equip_slot] != item:
+		out.append(slots[equip_slot])
+	# Two-handers clear the off hand; an off-hand item next to a two-hander clears the main hand.
+	var off := get_item(Items.EquipSlot.OFF_HAND)
+	if item.is_two_handed() and off != null and off not in out:
+		out.append(off)
+	if equip_slot == Items.EquipSlot.OFF_HAND:
+		var main := get_item(Items.EquipSlot.MAIN_HAND)
+		if main != null and main.is_two_handed() and main not in out:
+			out.append(main)
+	return out
+
+
+## Whether an attacking weapon (not a shield / tome) is equipped in either hand.
+func is_armed() -> bool:
+	return is_attacking_weapon(get_item(Items.EquipSlot.MAIN_HAND)) \
+		or is_attacking_weapon(get_item(Items.EquipSlot.OFF_HAND))
+
+
+static func is_attacking_weapon(item: ItemInstance) -> bool:
+	return item != null and item.is_weapon() and item.weapon.attacks()
+
+
+## Whether equipping [param item] at [param equip_slot] (-1 = default) would leave the hero
+## without an attacking weapon while one is equipped now – e.g. a shield or tome next to a
+## two-hander, which pushes the two-hander out.
+func equip_disarms(item: ItemInstance, equip_slot: int = -1) -> bool:
+	if item == null or is_attacking_weapon(item) or not is_armed():
+		return false
+	var gone := displaced_by(item, equip_slot)
+	for s in [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]:
+		var held := get_item(s)
+		if is_attacking_weapon(held) and held not in gone:
+			return false
+	return true
+
+
+## Whether taking [param item] away (unequip, sell, trade) would leave the hero without an
+## attacking weapon: it is the only attacking weapon equipped, or – while none is equipped –
+## the last attacking weapon in the backpack this class can use.
+func is_last_weapon(item: ItemInstance) -> bool:
+	if not is_attacking_weapon(item):
+		return false
+	var hands: Array[ItemInstance] = [get_item(Items.EquipSlot.MAIN_HAND), get_item(Items.EquipSlot.OFF_HAND)]
+	if item in hands:
+		for held in hands:
+			if held != item and is_attacking_weapon(held):
+				return false
+		return true
+	if is_armed() or not backpack.has(item) or (class_data != null and not item.can_be_used_by(class_data)):
+		return false
+	for other in backpack:
+		if other != item and is_attacking_weapon(other) and (class_data == null or other.can_be_used_by(class_data)):
+			return false
+	return true
+
+
 ## Equips [param item] (taking it out of the backpack if it is there). Displaced items go to
-## the backpack. Returns false and changes nothing when the item cannot be used, the slot is
-## not valid for it, or the backpack has no room for what would be displaced.
+## the backpack (displaced_by). Returns false and changes nothing when the item cannot be
+## used, the slot is not valid for it, the backpack has no room for what would be displaced,
+## or it would leave the hero without an attacking weapon (equip_disarms).
 func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 	if not can_equip(item):
 		return false
@@ -89,16 +168,9 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 		equip_slot = default_slot(item)
 	if equip_slot not in target_slots(item):
 		return false
-	var displaced: Array[ItemInstance] = []
-	if slots.has(equip_slot):
-		displaced.append(slots[equip_slot])
-	# Two-handers clear the off hand; an off-hand item next to a two-hander clears the main hand.
-	if item.is_two_handed() and slots.has(Items.EquipSlot.OFF_HAND):
-		displaced.append(slots[Items.EquipSlot.OFF_HAND])
-	if equip_slot == Items.EquipSlot.OFF_HAND:
-		var main := get_item(Items.EquipSlot.MAIN_HAND)
-		if main != null and main.is_two_handed():
-			displaced.append(main)
+	if equip_disarms(item, equip_slot):
+		return false
+	var displaced := displaced_by(item, equip_slot)
 	var in_backpack := backpack.has(item)
 	var free := Items.BACKPACK_SIZE - backpack.size() + (1 if in_backpack else 0)
 	if displaced.size() > free:
@@ -115,9 +187,10 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 	return true
 
 
-## Moves the item in [param equip_slot] to the backpack. False if empty or no room.
+## Moves the item in [param equip_slot] to the backpack. False if empty, no room, or it is the
+## last equipped attacking weapon (is_last_weapon).
 func unequip(equip_slot: Items.EquipSlot) -> bool:
-	if not slots.has(equip_slot) or not has_space():
+	if not slots.has(equip_slot) or not has_space() or is_last_weapon(slots[equip_slot]):
 		return false
 	backpack.append(slots[equip_slot])
 	slots.erase(equip_slot)
@@ -126,6 +199,7 @@ func unequip(equip_slot: Items.EquipSlot) -> bool:
 
 
 ## Removes [param item] wherever it is (backpack or equipped). Returns true if found.
+## Not guarded by is_last_weapon (internal moves such as forging).
 func take(item: ItemInstance) -> bool:
 	if backpack.has(item):
 		backpack.erase(item)

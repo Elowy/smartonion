@@ -120,20 +120,19 @@ func apply(slots: Array[PlayerSlot]) -> void:
 			_sell()
 
 
-## What a bot picks: Need if it can use the item and it is an upgrade, else Greed.
-## An upgrade = the default equip position is empty, or the item's Item Level is higher than
-## what sits there.
+## What a bot picks: Need if it can use the item, has room and the item is an upgrade, else
+## Greed. "Upgrade" is the same test bots equip with (Intermission.bot_equip_upgrades):
+## ItemTooltip.upgrade_direction against ItemTooltip.equipped_for_compare – weighted stats
+## and weapon DPS, not Item Level (a Warrior Greeds a cloth Intellect robe that would replace
+## its plate chest).
 static func bot_choice(slot: PlayerSlot, p_item: ItemInstance) -> Choice:
 	if slot == null or p_item == null or not p_item.can_be_used_by(slot.class_data):
 		return Choice.GREED
 	var equipment := _equipment_of(slot)
-	if equipment == null or not equipment.has_space():
+	if equipment == null or not equipment.has_space() or not equipment.can_equip(p_item):
 		return Choice.GREED
-	var target := equipment.default_slot(p_item)
-	if target < 0:
-		return Choice.GREED
-	var current := equipment.get_item(target as Items.EquipSlot)
-	if current == null or p_item.item_level > current.item_level:
+	var current := ItemTooltip.equipped_for_compare(p_item, equipment)
+	if ItemTooltip.upgrade_direction(p_item, current, slot.class_data, equipment) > 0:
 		return Choice.NEED
 	return Choice.GREED
 

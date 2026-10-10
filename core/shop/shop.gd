@@ -10,7 +10,12 @@ extends RefCounted
 ##   usable by it (two players on the same class share them) (the guarantee: a few biased draws, then the generator's strict `usable_by`
 ##   option). The class bias rotates over the players from round to round, so with few free
 ##   slots (many locked offers) it is not always the same player who loses out. Slots left
-##   over are generic. Placement of the offers in the stall is shuffled with the run rng.
+##   over are generic (no class bias) but still usable by somebody: each is generated with
+##   the strict `usable_by` option for a random joined class. Placement of the offers in the
+##   stall is shuffled with the run rng.
+## - Fortune: every new offer (round or reroll) is generated with the team's highest Fortune
+##   ([method team_fortune]), which shifts the rarity upwards like it does for loot
+##   (ItemGenerator.rarity_weights; the shop still stops at Epic).
 ## - Price: ItemGenerator.price_for(rarity, wave), stored on the Offer and item.buy_price. A
 ##   kept (locked) offer keeps the price of the wave it was generated for.
 ## - Lock: any player may lock an unsold offer for the next round (locked_by = their slot).
@@ -21,7 +26,10 @@ extends RefCounted
 ## - Ping: toggle per slot, cleared by a reroll and by a new round; selling clears it.
 ## - Reroll: each joined player toggles their vote; when all voted and the wallet can pay,
 ##   the cost is spent and every unsold, unlocked, unpinged offer is redrawn. Nothing is
-##   charged (and nothing happens) when no offer would change.
+##   charged (and nothing happens) when no offer would change. Voting ([method vote_reroll])
+##   and the reroll step ([method try_reroll]) are separate: the UI re-runs the step every
+##   frame while votes stand (a voter unplugged, gold arrived) and drops the votes of
+##   players who are no longer voters ([method prune_votes]).
 ## - Buy: the shared wallet pays, the item goes into the buyer's backpack. A full backpack,
 ##   a sold offer or an empty wallet refuses without spending anything ([method try_buy]
 ##   tells which).
@@ -172,8 +180,18 @@ func vote_reroll(slot_index: int, joined: Array[int], rng: RandomNumberGenerator
 		reroll_votes.erase(slot_index)
 	else:
 		reroll_votes[slot_index] = true
+	if try_reroll(joined, rng):
+		return true
+	changed.emit()
+	return false
+
+
+## The reroll step on its own: rerolls (and returns true) when every index in [param joined]
+## voted, the wallet can pay and an offer would change; otherwise it does nothing (no signal).
+## The between-wave screen calls it every frame while votes are standing, so a reroll also
+## fires when the last missing voter unplugs or the gold arrives after the last vote.
+func try_reroll(joined: Array[int], rng: RandomNumberGenerator) -> bool:
 	if not reroll_ready(joined) or not RunState.try_spend(reroll_cost()):
-		changed.emit()
 		return false
 	var positions := rerollable_positions()
 	for i in positions:
@@ -187,6 +205,19 @@ func vote_reroll(slot_index: int, joined: Array[int], rng: RandomNumberGenerator
 	rerolled.emit(rerolls_this_round)
 	changed.emit()
 	return true
+
+
+## Drops the votes of slots that are not in [param joined] any more (the player left or the
+## pad is unplugged). True when a vote was dropped.
+func prune_votes(joined: Array[int]) -> bool:
+	var dropped := false
+	for i: int in reroll_votes.keys():
+		if i not in joined:
+			reroll_votes.erase(i)
+			dropped = true
+	if dropped:
+		changed.emit()
+	return dropped
 
 
 ## True when every index in [param joined] voted, the wallet can pay and an offer would change.
@@ -276,12 +307,38 @@ func _make_offer(class_data: ClassData, rng: RandomNumberGenerator) -> Offer:
 	return o
 
 
+## The highest Fortune among the round's heroes (0 without any) – the shop's rarity roll.
+func team_fortune() -> float:
+	var best := 0.0
+	for s in _slots:
+		best = maxf(best, LootDrops.killer_fortune(s.player))
+	return best
+
+
+## Distinct classes of the round's players (generic offers must be usable by one of them).
+func _team_classes() -> Array[ClassData]:
+	var out: Array[ClassData] = []
+	for s in _slots:
+		if s.class_data != null and s.class_data not in out:
+			out.append(s.class_data)
+	return out
+
+
 func _generate_for(class_data: ClassData, rng: RandomNumberGenerator) -> ItemInstance:
+	var fortune := team_fortune()
 	if class_data == null:
-		return ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng)
+		# Generic: no class bias, but never something nobody in the team can use.
+		var team := _team_classes()
+		if team.is_empty():
+			return ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng, {&"fortune": fortune})
+		var anyone := team[rng.randi_range(0, team.size() - 1)]
+		return ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng,
+			{&"usable_by": anyone, &"fortune": fortune})
 	var item: ItemInstance = null
 	for _i in BIAS_TRIES:
-		item = ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng, {&"class_data": class_data})
+		item = ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng,
+			{&"class_data": class_data, &"fortune": fortune})
 		if item.can_be_used_by(class_data):
 			return item
-	return ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng, {&"usable_by": class_data})
+	return ItemGenerator.generate(ItemGenerator.Source.SHOP, wave, rng,
+		{&"usable_by": class_data, &"fortune": fortune})

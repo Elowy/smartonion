@@ -14,6 +14,10 @@ extends RefCounted
 ##   extra secondary stat). Armor pieces also get implicit Armor (free, not from the budget).
 ## Hand-made items (UniqueItemData) keep their name and stats (scaled by tier and the loot bonus);
 ## Legendary rolls become a hand-made Legendary whenever one fits.
+## Attack Power / Spell Power enchants (Mighty / Arcane-touched) follow the class when one is
+## known (&"class_data" bias or &"usable_by"): classes whose own weapon is magic (Mage,
+## Warlock) mostly roll Spell Power, the others Attack Power (power_enchant_weight); items
+## for nobody in particular keep both.
 
 enum Source { SHOP, LOOT, ELITE, GOBLIN, BOSS }
 
@@ -102,6 +106,10 @@ const OFF_STAT_SUFFIX_WEIGHT := 0.25
 const WEAPON_STAT_SUFFIX_WEIGHT := 3.0
 const WEAPON_OFF_STAT_SUFFIX_WEIGHT := 0.35
 const OWN_CLASS_UNIQUE_WEIGHT := 3.0
+## Enchant weight multipliers of the class's own power stat (Spell Power for magic-weapon
+## classes, Attack Power for the others) and of the other one, when the class is known.
+const FAVOURED_POWER_ENCHANT_WEIGHT := 1.9
+const OFF_POWER_ENCHANT_WEIGHT := 0.1
 
 ## Which kind of item a random roll makes.
 const SLOT_WEIGHTS := {
@@ -322,7 +330,7 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 		var with_trinkets := rarity >= Items.Rarity.LEGENDARY or forced == Items.SlotType.TRINKET
 		var data := _pick_unique(source, wave, rarity, forced, with_trinkets, usable, favour, rng)
 		if data != null:
-			return from_unique(data, wave, looted, rng)
+			return from_unique(data, wave, looted, rng, favour if favour != null else usable)
 
 	var slot := forced if forced >= 0 else _roll_slot(rng, true)
 	if slot == Items.SlotType.TRINKET:
@@ -331,13 +339,15 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 		if trinket == null and forced == Items.SlotType.TRINKET:
 			trinket = _pick_unique(source, wave, -1, slot, true, usable, favour, rng)
 		if trinket != null:
-			return from_unique(trinket, wave, looted, rng)
+			return from_unique(trinket, wave, looted, rng, favour if favour != null else usable)
 		slot = Items.SlotType.RING if forced == Items.SlotType.TRINKET else _roll_slot(rng, false)
 
+	# The class the enchants are rolled for (Attack / Spell Power, power_enchant_weight).
+	var for_class: ClassData = favour if favour != null else usable
 	if slot == Items.SlotType.WEAPON:
 		var weapon := _pick_weapon(usable, rng)
 		if weapon != null:
-			return _make_weapon(weapon, rarity, wave, looted, favour, rng)
+			return _make_weapon(weapon, rarity, wave, looted, favour, rng, for_class)
 		slot = Items.SlotType.CHEST
 	var base := _pick_base(slot, usable, favour, rng)
 	if base == null:
@@ -345,8 +355,8 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 		if any_weapon == null:
 			push_warning("ItemGenerator: no item bases or weapons to generate from")
 			return null
-		return _make_weapon(any_weapon, rarity, wave, looted, favour, rng)
-	return _make_from_base(base, rarity, wave, looted, favour, rng)
+		return _make_weapon(any_weapon, rarity, wave, looted, favour, rng, for_class)
+	return _make_from_base(base, rarity, wave, looted, favour, rng, for_class)
 
 
 ## A weapon item of [param base] (rarity damage multiplier, bonus stats, enchants).
@@ -357,8 +367,9 @@ static func generate_weapon(base: WeaponData, rarity: int, wave: int, looted: bo
 ## A hand-designed item instance. Its stats grow with the material tier of [param wave] and the
 ## loot bonus (negative stats stay as designed); armor pieces get implicit Armor; fixed
 ## enchants come from data.enchant_ids (looted: +1 rank); Legendaries are topped up to
-## LEGENDARY_ENCHANTS random enchants.
-static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: RandomNumberGenerator) -> ItemInstance:
+## LEGENDARY_ENCHANTS random enchants (for [param for_class], see power_enchant_weight).
+static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: RandomNumberGenerator,
+		for_class: ClassData = null) -> ItemInstance:
 	wave = maxi(1, wave)
 	var item := ItemInstance.new()
 	item.source_id = data.id
@@ -396,13 +407,13 @@ static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: Rand
 		var rank := data.enchant_ranks[i] if i < data.enchant_ranks.size() else enchant_rank(wave, false)
 		item.enchants.append(EnchantRoll.new(enchant, rank + (1 if looted else 0)))
 	if data.rarity >= Items.Rarity.LEGENDARY and item.enchants.size() < LEGENDARY_ENCHANTS:
-		_roll_enchants(item, LEGENDARY_ENCHANTS - item.enchants.size(), rng)
+		_roll_enchants(item, LEGENDARY_ENCHANTS - item.enchants.size(), rng, for_class)
 	item.buy_price = price_for(data.rarity, wave)
 	return item
 
 
 static func _make_from_base(base: ItemBase, rarity: int, wave: int, looted: bool,
-		favour: ClassData, rng: RandomNumberGenerator) -> ItemInstance:
+		favour: ClassData, rng: RandomNumberGenerator, for_class: ClassData = null) -> ItemInstance:
 	var item := ItemInstance.new()
 	item.source_id = base.id
 	item.slot_type = base.slot_type
@@ -414,7 +425,7 @@ static func _make_from_base(base: ItemBase, rarity: int, wave: int, looted: bool
 	var affix := _pick_affix(base.slot_type, favour, null, rng)
 	_roll_stats(item, stat_budget(rarity, base.slot_type, wave, looted), affix,
 			implicit_armor(base.armor_type, base.slot_type, wave), rng)
-	_roll_enchants(item, enchant_count(rarity, looted, rng), rng)
+	_roll_enchants(item, enchant_count(rarity, looted, rng), rng, for_class)
 	item.display_name = _join([_prefix(item), _material_name(base.armor_type, wave),
 			base.display_name, affix.suffix if affix != null else ""])
 	item.buy_price = price_for(rarity, wave)
@@ -422,11 +433,11 @@ static func _make_from_base(base: ItemBase, rarity: int, wave: int, looted: bool
 
 
 static func _make_weapon(base: WeaponData, rarity: int, wave: int, looted: bool,
-		favour: ClassData, rng: RandomNumberGenerator) -> ItemInstance:
+		favour: ClassData, rng: RandomNumberGenerator, for_class: ClassData = null) -> ItemInstance:
 	var item := ItemInstance.from_weapon(base, rarity, wave, looted)
 	var affix := _pick_affix(Items.SlotType.WEAPON, favour, base, rng)
 	_roll_stats(item, stat_budget(rarity, Items.SlotType.WEAPON, wave, looted, base), affix, 0, rng)
-	_roll_enchants(item, enchant_count(rarity, looted, rng), rng)
+	_roll_enchants(item, enchant_count(rarity, looted, rng), rng, for_class)
 	item.display_name = _join([_prefix(item), base.display_name,
 			affix.suffix if affix != null else ""])
 	item.buy_price = price_for(rarity, wave)
@@ -472,8 +483,10 @@ static func _add_stat(item: ItemInstance, stat: StringName, points: float) -> vo
 	item.stats[stat] = item.stats.get(stat, 0.0) + units
 
 
-## Adds up to [param count] different random enchants that fit the item (weighted).
-static func _roll_enchants(item: ItemInstance, count: int, rng: RandomNumberGenerator) -> void:
+## Adds up to [param count] different random enchants that fit the item (weighted; Attack /
+## Spell Power by the class [param for_class], see power_enchant_weight).
+static func _roll_enchants(item: ItemInstance, count: int, rng: RandomNumberGenerator,
+		for_class: ClassData = null) -> void:
 	if count <= 0:
 		return
 	var have: Array[StringName] = []
@@ -489,7 +502,7 @@ static func _roll_enchants(item: ItemInstance, count: int, rng: RandomNumberGene
 		if not Db.is_unlocked(enchant.id) or not enchant_fits(enchant, item):
 			continue
 		pool.append(enchant)
-		weights.append(enchant.weight)
+		weights.append(enchant.weight * power_enchant_weight(enchant, for_class))
 	var rank := enchant_rank(item.wave, item.looted)
 	while count > 0 and not pool.is_empty():
 		var i := _pick_index(weights, rng)
@@ -499,6 +512,25 @@ static func _roll_enchants(item: ItemInstance, count: int, rng: RandomNumberGene
 		pool.remove_at(i)
 		weights.remove_at(i)
 		count -= 1
+
+
+## Whether [param class_data]'s damage goes through Spell Power: its own (starting) weapon is
+## a magic weapon (GDD 2.4.1) – Mage (wand), Warlock (staff).
+static func uses_spell_power(class_data: ClassData) -> bool:
+	return class_data != null and class_data.main_hand != null and class_data.main_hand.is_magic()
+
+
+## Enchant weight multiplier for [param for_class]: an Attack Power enchant (Mighty) is
+## favoured for physical classes and rare for magic-weapon classes, a Spell Power enchant
+## (Arcane-touched) the other way round. 1 for every other enchant and without a class.
+static func power_enchant_weight(enchant: EnchantData, for_class: ClassData) -> float:
+	if for_class == null or enchant == null:
+		return 1.0
+	var attack := enchant.equip_stats.has(Stats.ATTACK_POWER)
+	var spell := enchant.equip_stats.has(Stats.SPELL_POWER)
+	if attack == spell:
+		return 1.0
+	return FAVOURED_POWER_ENCHANT_WEIGHT if spell == uses_spell_power(for_class) else OFF_POWER_ENCHANT_WEIGHT
 
 
 # --- Pools -------------------------------------------------------------------------------------

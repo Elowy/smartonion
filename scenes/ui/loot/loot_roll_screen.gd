@@ -5,7 +5,8 @@ extends Control
 ## arrow, decided tick, then dice / coin / pass icon and the 1-100 roll), message log on the
 ## right ("P2 rolls 87 (Need) for [Stormcaller]"), "Items: 2 / 5" and the queue of the next
 ## items on the left. Per player: A = Need (greyed with the reason when not allowed), X = Greed,
-## B = Pass, Y = Greed all remaining. Choices stay hidden until everyone decided (or the time
+## B = Pass, Y = Greed all remaining (counts in every phase, the result line included; the
+## first moments of an item ignore the others). Choices stay hidden until everyone decided (or the time
 ## ran out: undecided = Pass). Bots decide with LootRoll.bot_choice; unplugged controllers
 ## pass. Solo: Take (A) / Sell (X) / Leave (B), Y = sell all remaining.
 ## Each roll is resolved with RunState.rng and applied (LootRoll.apply); the winner line shows
@@ -106,6 +107,10 @@ func open(p_items: Array[ItemInstance], p_slots: Array[PlayerSlot]) -> void:
 	roll = null
 	_skip_frames = 1
 	_chip_keys.clear()
+	# A press or a stick push that started before the roll opened is not a choice.
+	for s in slots:
+		if not s.is_bot() and s.input != null:
+			s.input.swallow()
 	_rebuild_chips()
 	_build_legend(is_solo())
 	title_label.text = "Loot" if is_solo() else "Loot Roll"
@@ -343,6 +348,7 @@ func _process(delta: float) -> void:
 		Phase.CHOOSING:
 			_process_choosing(delta)
 		Phase.RESULT:
+			_process_result_input()
 			_result_left -= delta
 			if _result_left <= 0.0:
 				_next_item()
@@ -369,10 +375,13 @@ func _process_choosing(delta: float) -> void:
 			_choose(s, LootRoll.Choice.PASS)
 	if _skip_frames > 0:
 		_skip_frames -= 1
-	elif _input_delay <= 0.0:
+	else:
+		# In the first moments of an item only Y (a standing "Greed all remaining") counts:
+		# an A / X / B there is more likely the previous item's press.
+		var can_choose := _input_delay <= 0.0
 		for s in slots:
 			if not s.is_bot() and s.input != null and s.input.is_connected_device():
-				_handle_input(s)
+				_handle_input(s, can_choose)
 	timer_bar.set_values(time_left, ROLL_TIME, "%d s" % ceili(time_left))
 	timer_bar.set_fill_color(UiTheme.RED if time_left <= 5.0 else Color(0.95, 0.62, 0.15))
 	_refresh_chips()
@@ -380,19 +389,36 @@ func _process_choosing(delta: float) -> void:
 		_resolve()
 
 
-func _handle_input(s: PlayerSlot) -> void:
+## While the winner line shows, Y still counts (Greed all remaining): it is applied to the
+## next item when that one starts (_next_item). Nothing to do after the last item.
+func _process_result_input() -> void:
+	if current >= items.size() - 1:
+		return
+	for s in slots:
+		if not s.is_bot() and s.input != null and s.input.is_connected_device() \
+				and s.input.just_pressed(PlayerInput.Pad.Y):
+			_set_greed_all(s)
+
+
+## Y: [param s] greeds (solo: sells) every remaining item without being asked again.
+func _set_greed_all(s: PlayerSlot) -> void:
+	if greed_all.get(s.index, false):
+		return
+	greed_all[s.index] = true
+	var what := "sell" if is_solo() else "greed"
+	_log("[color=#a09a90]%s will %s all remaining items[/color]" % [s.label(), what],
+		"%s will %s all remaining items" % [s.label(), what])
+
+
+func _handle_input(s: PlayerSlot, can_choose: bool = true) -> void:
 	var inp := s.input
 	var undecided := choice_of(s.index) == LootRoll.Choice.UNDECIDED
 	if inp.just_pressed(PlayerInput.Pad.Y):
-		if not greed_all.get(s.index, false):
-			greed_all[s.index] = true
-			var what := "sell" if is_solo() else "greed"
-			_log("[color=#a09a90]%s will %s all remaining items[/color]" % [s.label(), what],
-				"%s will %s all remaining items" % [s.label(), what])
+		_set_greed_all(s)
 		if undecided:
 			_choose(s, LootRoll.Choice.GREED)
 		return
-	if not undecided:
+	if not undecided or not can_choose:
 		return
 	if inp.just_pressed(PlayerInput.Pad.A):
 		if roll.can_need(s):

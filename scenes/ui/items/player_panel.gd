@@ -13,6 +13,10 @@ extends Control
 ## B closes menus, Y toggles the comparison in the tooltip, LT / RT switch tabs.
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
+## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
+## two-hander, "Replaces Dagger + Dagger" for a two-hander). Nothing may leave the hero without
+## an attacking weapon (Equipment.is_last_weapon / equip_disarms): those Equip / Unequip /
+## Sell / Trade entries are greyed out with "You need a weapon".
 ## The selected item's ItemTooltip floats beside the panel, towards the screen centre.
 
 signal trade_done(item: ItemInstance, to_slot_index: int)
@@ -151,7 +155,7 @@ func refresh() -> void:
 		cell.icon.set_unusable(cls != null and not it.can_be_used_by(cls))
 		var badge := 0
 		if cell.bag_index >= 0 and cls != null and it.can_be_used_by(cls):
-			badge = ItemTooltip.upgrade_direction(it, ItemTooltip.equipped_for_compare(it, eq), cls)
+			badge = ItemTooltip.upgrade_direction(it, ItemTooltip.equipped_for_compare(it, eq), cls, eq)
 		cell.icon.set_upgrade_badge(badge)
 	if _initial_selection:
 		_initial_selection = false
@@ -282,6 +286,16 @@ func menu_entry_enabled(label: String) -> bool:
 	return false
 
 
+## Right-hand text of the entry labelled [param label] in the open menu level ("" if none).
+func menu_entry_detail(label: String) -> String:
+	if _menu_stack.is_empty():
+		return ""
+	for e: MenuEntry in _menu_stack.back()["entries"]:
+		if e.label == label:
+			return e.detail
+	return ""
+
+
 func menu_index() -> int:
 	return int(_menu_stack.back()["index"]) if not _menu_stack.is_empty() else -1
 
@@ -405,17 +419,23 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 		equip.detail = "▸"
 		equip.action = _open_equip_choice.bind(it)
 	else:
-		equip.detail = Items.EQUIP_SLOT_NAMES.get(targets[0], "")
-		equip.action = _do_equip.bind(it, targets[0])
+		_fill_equip_entry(equip, it, targets[0], Items.EQUIP_SLOT_NAMES.get(targets[0], ""))
 	out.append(equip)
+	var last_weapon := eq.is_last_weapon(it)
 	var sell := _entry("Sell")
 	sell.detail = "+%d gold" % it.sell_value()
-	sell.action = _do_sell.bind(it)
+	if last_weapon:
+		_need_weapon(sell)
+	else:
+		sell.action = _do_sell.bind(it)
 	out.append(sell)
 	if not _teammates().is_empty():
 		var trade := _entry("Trade")
 		trade.detail = "▸"
-		trade.action = _open_trade_choice.bind(it)
+		if last_weapon:
+			_need_weapon(trade)
+		else:
+			trade.action = _open_trade_choice.bind(it)
 		out.append(trade)
 	var cancel := _entry("Cancel")
 	cancel.action = close_menu
@@ -426,7 +446,9 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 func _equipped_entries(equip_slot: int) -> Array[MenuEntry]:
 	var out: Array[MenuEntry] = []
 	var unequip := _entry("Unequip")
-	if not equipment().has_space():
+	if equipment().is_last_weapon(equipment().get_item(equip_slot as Items.EquipSlot)):
+		_need_weapon(unequip)
+	elif not equipment().has_space():
 		unequip.enabled = false
 		unequip.detail = "Backpack full"
 		unequip.reason = "Your backpack is full"
@@ -445,10 +467,39 @@ func _open_equip_choice(it: ItemInstance) -> void:
 	for s in eq.target_slots(it):
 		var e := _entry(Items.EQUIP_SLOT_NAMES.get(s, "?"))
 		var current := eq.get_item(s)
-		e.detail = current.display_name if current != null else "empty"
-		e.action = _do_equip.bind(it, s)
+		_fill_equip_entry(e, it, s, current.display_name if current != null else "empty")
 		entries.append(e)
 	_push_menu("Equip to", entries, it)
+
+
+## An Equip entry for [param it] at [param equip_slot]: [param plain] as the detail, or
+## "Replaces A (+ B)" when it pushes out an item of another position (an off-hand item next to
+## a two-hander, a two-hander with something in the off hand); greyed out when it would leave
+## the hero without an attacking weapon.
+func _fill_equip_entry(e: MenuEntry, it: ItemInstance, equip_slot: int, plain: String) -> void:
+	var eq := equipment()
+	var gone := eq.displaced_by(it, equip_slot)
+	e.detail = plain
+	var current := eq.get_item(equip_slot as Items.EquipSlot)
+	var names := PackedStringArray()
+	var elsewhere := false
+	for old in gone:
+		names.append(old.display_name)
+		elsewhere = elsewhere or old != current
+	if elsewhere:
+		e.detail = "Replaces " + " + ".join(names)
+	if eq.equip_disarms(it, equip_slot):
+		e.enabled = false
+		e.reason = "%s – equip a one-handed weapon first" % Equipment.NEED_WEAPON
+	else:
+		e.action = _do_equip.bind(it, equip_slot)
+
+
+## Greys out [param e]: it would leave the hero without an attacking weapon.
+func _need_weapon(e: MenuEntry) -> void:
+	e.enabled = false
+	e.detail = "Last weapon"
+	e.reason = Equipment.NEED_WEAPON
 
 
 func _open_trade_choice(it: ItemInstance) -> void:
@@ -474,6 +525,8 @@ func _do_equip(it: ItemInstance, equip_slot: int) -> void:
 	if eq.equip(it, equip_slot):
 		close_menu()
 		_message("Equipped %s" % _bb_item(it), "Equipped %s" % it.display_name)
+	elif eq.equip_disarms(it, equip_slot):
+		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
 	else:
 		_message("Your backpack is full", "", UiTheme.RED)
 
@@ -483,6 +536,8 @@ func _do_unequip(equip_slot: int) -> void:
 	if equipment().unequip(equip_slot as Items.EquipSlot):
 		close_menu()
 		_message("Unequipped %s" % _bb_item(it), "Unequipped %s" % it.display_name)
+	elif equipment().is_last_weapon(it):
+		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
 	else:
 		_message("Your backpack is full", "", UiTheme.RED)
 
@@ -492,7 +547,9 @@ func _do_sell(it: ItemInstance) -> void:
 	if not eq.backpack.has(it):
 		return
 	var value := it.sell_value()
-	eq.remove_from_backpack(it)
+	if not eq.remove_from_backpack(it):
+		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
+		return
 	RunState.add_gold(value)
 	close_menu()
 	_message("+%d gold" % value, "", UiTheme.GOLD, true)
@@ -506,6 +563,8 @@ func _do_trade(it: ItemInstance, mate: PlayerSlot) -> void:
 		_message("%s's backpack is full" % mate.label(), "", UiTheme.RED)
 		return
 	if not eq.remove_from_backpack(it):
+		if eq.is_last_weapon(it):
+			_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
 		return
 	if not other.add_to_backpack(it):
 		eq.add_to_backpack(it)

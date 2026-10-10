@@ -8,7 +8,10 @@ extends PanelContainer
 ## price (when given) and the sell value, and a comparison block against the viewer's equipped
 ## item ("If you replace this item:" +green / -red per stat).
 ## Static helpers (stat_delta, upgrade_direction, item_score, equipped_for_compare) are shared
-## with the shop, the loot roll and bots.
+## with the shop, the loot roll and bots. Weapons compare with everything they would push out:
+## a two-hander with main + off hand together (an EquippedPair), an off-hand item or a
+## dual-wield one-hander next to an equipped two-hander with that two-hander; nothing that
+## would leave the hero without an attacking weapon is an upgrade.
 
 const WIDTH := 360.0
 const NAME_SIZE := 24
@@ -47,6 +50,23 @@ var comparison_visible := true
 
 var _box: VBoxContainer
 static var _italic: FontVariation
+
+
+## Main + off hand compared as one item (what a two-hander replaces): summed stats and weapon
+## DPS, shown as "Equipped: Dagger + Dagger". Never equipped itself.
+class EquippedPair extends ItemInstance:
+	var parts: Array[ItemInstance] = []
+
+	static func of(main: ItemInstance, off: ItemInstance) -> EquippedPair:
+		var pair := EquippedPair.new()
+		pair.parts = [main, off]
+		pair.display_name = "%s + %s" % [main.display_name, off.display_name]
+		pair.slot_type = Items.SlotType.WEAPON
+		pair.rarity = maxi(main.rarity, off.rarity)
+		pair.wave = maxi(main.wave, off.wave)
+		pair.item_level = roundi((main.item_level + off.item_level) * 0.5)
+		pair.buy_price = main.buy_price + off.buy_price
+		return pair
 
 
 static func create() -> ItemTooltip:
@@ -131,6 +151,12 @@ static func total_stats(p_item: ItemInstance) -> Dictionary[StringName, float]:
 	var out: Dictionary[StringName, float] = {}
 	if p_item == null:
 		return out
+	if p_item is EquippedPair:
+		for part in (p_item as EquippedPair).parts:
+			var part_stats := total_stats(part)
+			for stat in part_stats:
+				out[stat] = out.get(stat, 0.0) + part_stats[stat]
+		return out
 	out = p_item.all_stats()
 	for roll in p_item.enchants:
 		var extra := roll.equip_stats()
@@ -158,6 +184,11 @@ static func stat_delta(p_item: ItemInstance, equipped: ItemInstance) -> Dictiona
 ## Damage per second of a weapon item (0 for armour and passive off-hands). With
 ## [param primary] the weapon's scaling on that stat counts [param primary_value] points.
 static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_value: float = 0.0) -> float:
+	if p_item is EquippedPair:
+		var total := 0.0
+		for part in (p_item as EquippedPair).parts:
+			total += weapon_dps(part, primary, primary_value)
+		return total
 	if p_item == null or not p_item.is_weapon() or not p_item.weapon.attacks():
 		return 0.0
 	var w := p_item.weapon
@@ -199,11 +230,17 @@ static func item_score(p_item: ItemInstance, p_viewer: ClassData) -> float:
 
 
 ## Simple "is it an upgrade" heuristic used by badges and bots: +1 better, -1 worse, 0 unclear.
-## An item the viewer cannot use is never an upgrade; anything usable beats an empty slot.
-static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_viewer: ClassData) -> int:
+## [param equipped] is what it would replace (equipped_for_compare). An item the viewer cannot
+## use is never an upgrade, nor is anything that would leave the hero without an attacking
+## weapon (a shield / tome replacing a two-hander; with [param equipment] every such case,
+## Equipment.equip_disarms); anything else usable beats an empty slot.
+static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_viewer: ClassData,
+		equipment: Equipment = null) -> int:
 	if p_item == null:
 		return 0
 	if p_viewer != null and not p_item.can_be_used_by(p_viewer):
+		return -1
+	if disarms(p_item, equipped, equipment):
 		return -1
 	if equipped == null:
 		return 1
@@ -215,14 +252,38 @@ static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_vi
 	return 0
 
 
+## Whether equipping [param p_item] in place of [param equipped] would leave the hero without
+## an attacking weapon: a non-attacking off-hand item (shield, tome) replacing a two-hander,
+## or – when [param equipment] is given – anything Equipment.equip_disarms refuses.
+static func disarms(p_item: ItemInstance, equipped: ItemInstance, equipment: Equipment = null) -> bool:
+	if p_item == null or Equipment.is_attacking_weapon(p_item):
+		return false
+	if equipment != null and p_item.is_weapon() and equipment.equip_disarms(p_item):
+		return true
+	return equipped != null and equipped.is_two_handed() and Equipment.is_attacking_weapon(equipped)
+
+
 ## The equipped item [param p_item] would be compared with / replace: for rings, trinkets and
-## dual-wield one-handers the weaker of the two (null when one of them is empty).
+## dual-wield one-handers the weaker of the two (null when one of them is empty). Weapons
+## compare with everything they push out: a two-hander with main + off hand together (an
+## EquippedPair; the one that is there when only one hand is filled), an off-hand item or a
+## one-hander next to an equipped two-hander with that two-hander (the off hand is not
+## "empty" then).
 static func equipped_for_compare(p_item: ItemInstance, equipment: Equipment) -> ItemInstance:
 	if p_item == null or equipment == null:
 		return null
 	var targets := equipment.target_slots(p_item)
 	if targets.is_empty():
 		return null
+	if p_item.is_weapon():
+		var main := equipment.get_item(Items.EquipSlot.MAIN_HAND)
+		var off := equipment.get_item(Items.EquipSlot.OFF_HAND)
+		if p_item.is_two_handed():
+			if main != null and off != null:
+				return EquippedPair.of(main, off)
+			return main if main != null else off
+		if main != null and main.is_two_handed():
+			return main
 	if targets.size() == 1:
 		return equipment.get_item(targets[0])
 	var worst: ItemInstance = null

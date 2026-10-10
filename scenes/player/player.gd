@@ -266,15 +266,17 @@ func heal(amount: float) -> void:
 ## Called by this player's weapons after each successful hit (leech, on-hit procs). Proc
 ## damage never calls it (no proc chains). [param weapon] (its cooldown drives the PPM
 ## chance), [param is_crit], and [param is_extra] (a hit of an extra attack – it cannot
-## trigger further extra attacks) are passed on to the procs.
+## trigger further extra attacks) are passed on to the procs. On-hit procs roll once per
+## attack: the further hits of a melee arc / projectile fan / pierce / explosion pass
+## [param roll_procs] = false (leech still rolls per hit).
 func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_crit: bool = false,
-		is_extra: bool = false) -> void:
+		is_extra: bool = false, roll_procs: bool = true) -> void:
 	if downed:
 		return
 	hit_dealt.emit(damage, target)
 	if stats.get_stat(Stats.LEECH) > 0.0 and CombatMath.roll_leech(stats, RunState.rng):
 		heal(1.0)
-	if procs != null and target != null and is_instance_valid(target):
+	if roll_procs and procs != null and target != null and is_instance_valid(target):
 		procs.on_hit(target, damage, weapon, is_crit, is_extra)
 
 
@@ -293,7 +295,8 @@ func notify_kill(enemy: Node3D) -> void:
 # --- Extra public helpers ------------------------------------------------------
 
 ## Re-applies [member equipment]: one stat source per equipped position (Items.source_for),
-## Armor Specialization (+10% primary stat, GDD 5.3) and the equipped weapons.
+## the equipped weapons (their bonus stats) and then Armor Specialization (+10% of the primary
+## stat with every other source – weapons included – in place, GDD 5.3).
 func apply_equipment() -> void:
 	if equipment == null:
 		return
@@ -304,14 +307,14 @@ func apply_equipment() -> void:
 			stats.set_source(source, sources[source])
 		else:
 			stats.remove_source(source)
-	stats.remove_source(&"armor_spec")
-	if class_data != null and equipment.armor_spec_active():
-		var primary := stats.get_raw(class_data.primary_stat)
-		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
 	var main := equipment.main_weapon()
 	var off := equipment.off_weapon()
 	if main != main_hand or off != off_hand:
 		equip_weapons(main, off)
+	stats.remove_source(&"armor_spec")
+	if class_data != null and equipment.armor_spec_active():
+		var primary := stats.get_raw(class_data.primary_stat)
+		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
 	if procs != null:
 		procs.refresh()
 

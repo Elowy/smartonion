@@ -9,8 +9,10 @@ extends Control
 ##
 ## Per player (handle_input, called by the Intermission for every slot whose focus is the
 ## shop): d-pad / stick moves the cursor, A buys (hold A for HOLD_TIME when the price is more
-## than HOLD_SHARE of the shared wallet – a fill ring shows the progress), X locks, R3 / Tab
-## pings, Y votes for a reroll (only humans with a working device vote; bots never block it).
+## than HOLD_SHARE of the shared wallet – a fill ring shows the progress; a reroll, a changed
+## offer or B cancels it), X locks, R3 / Tab pings, Y votes for a reroll (only humans with a
+## working device vote; bots never block it; process_votes re-evaluates standing votes).
+## lock_input(seconds) makes A / X ignored for a moment after the market opens.
 ## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with the item it
 ## would replace for that player (ItemTooltip.equipped_for_compare), beside the stall on the player's own
 ## side (P1 / P3 left, P2 / P4 right; P1 / P2 from the top of the stall down, P3 / P4 from the
@@ -47,8 +49,15 @@ var _slots: Array[PlayerSlot] = []
 var _cursor: Dictionary[int, int] = {}
 ## Slot index -> false while that player's focus is their own panel (dim cursor, no tooltip).
 var _active: Dictionary[int, bool] = {}
-## Slot index -> {"offer": int, "time": float} while A is held on an expensive offer.
+## Slot index -> {"offer": int, "time": float, "uid": int, "price": int} while A is held on an
+## expensive offer (the item's uid and the price are checked again before the purchase: a
+## reroll that swaps the offer cancels the hold).
 var _holds: Dictionary[int, Dictionary] = {}
+## B just cancelled a hold in the last handle_input call (the Intermission then does not also
+## unready the player with that press).
+var last_input_consumed := false
+## Seconds A and X (buy / lock) are ignored for (a press that was meant for the previous screen).
+var _input_lockout := 0.0
 var _tooltips: Dictionary[int, ItemTooltip] = {}
 var _tooltip_keys: Dictionary[int, String] = {}
 ## Newest last: {"bb": String, "plain": String, "age": float}.
@@ -113,9 +122,12 @@ func set_shop(p_shop: Shop) -> void:
 		return
 	if shop != null and shop.changed.is_connected(_on_shop_changed):
 		shop.changed.disconnect(_on_shop_changed)
+	if shop != null and shop.rerolled.is_connected(_on_shop_rerolled):
+		shop.rerolled.disconnect(_on_shop_rerolled)
 	shop = p_shop
 	if shop != null:
 		shop.changed.connect(_on_shop_changed)
+		shop.rerolled.connect(_on_shop_rerolled)
 	_rebuild_cards()
 
 
@@ -165,10 +177,23 @@ func refresh(slots: Array[PlayerSlot]) -> void:
 ## Called once per frame by the Intermission before the handle_input calls (hold timers).
 func begin_frame(delta: float) -> void:
 	_frame_delta = delta
+	_input_lockout = maxf(0.0, _input_lockout - delta)
+
+
+## A (buy) and X (lock) are ignored for [param seconds] (the Intermission calls it when the
+## market opens: a Need / Buy press or a stick push meant for the loot roll must not act in
+## the shop). The lockout runs down in [method begin_frame].
+func lock_input(seconds: float) -> void:
+	_input_lockout = maxf(_input_lockout, seconds)
+
+
+func is_input_locked() -> bool:
+	return _input_lockout > 0.0
 
 
 ## Called every _process frame by the Intermission for a slot whose focus is the shop.
 func handle_input(slot: PlayerSlot) -> void:
+	last_input_consumed = false
 	if slot == null or slot.input == null or shop == null:
 		return
 	var inp := slot.input
@@ -180,19 +205,24 @@ func handle_input(slot: PlayerSlot) -> void:
 	if nav != Vector2i.ZERO:
 		_move_cursor(i, nav)
 		_raise_tooltip(i)
+	var locked := _input_lockout > 0.0
 	if _holds.has(i):
 		var hold := _holds[i]
-		if not inp.is_pressed(PlayerInput.Pad.A) or int(hold["offer"]) != cursor_of(i) or inp.just_pressed(PlayerInput.Pad.B):
+		var cancel_b := inp.just_pressed(PlayerInput.Pad.B)
+		if cancel_b:
+			last_input_consumed = true  # B cancels the hold; it does not also unready
+		if not inp.is_pressed(PlayerInput.Pad.A) or int(hold["offer"]) != cursor_of(i) or cancel_b \
+				or not _hold_matches_offer(hold):
 			_holds.erase(i)
 		else:
 			hold["time"] = float(hold["time"]) + dt
 			if float(hold["time"]) >= HOLD_TIME:
 				_holds.erase(i)
 				try_buy(slot, int(hold["offer"]))
-	elif inp.just_pressed(PlayerInput.Pad.A):
+	elif inp.just_pressed(PlayerInput.Pad.A) and not locked:
 		_press_buy(slot)
 		_raise_tooltip(i)
-	if inp.just_pressed(PlayerInput.Pad.X):
+	if inp.just_pressed(PlayerInput.Pad.X) and not locked:
 		_toggle_lock(slot)
 	if inp.just_pressed(PlayerInput.Pad.R3):
 		_toggle_ping(slot)
@@ -309,6 +339,35 @@ func voter_indices() -> Array[int]:
 		if not s.is_bot() and s.input != null and s.input.is_connected_device():
 			out.append(s.index)
 	return out
+
+
+## Evaluates the standing reroll votes (the Intermission calls it every frame while there are
+## any): votes of players who are no longer voters (left, pad unplugged) are dropped, and the
+## reroll fires once every remaining voter has voted and the wallet can pay – also when the
+## last missing voter unplugged or the gold arrived after the last vote. True if it rerolled.
+func process_votes() -> bool:
+	if shop == null or shop.reroll_votes.is_empty():
+		return false
+	var voters := voter_indices()
+	shop.prune_votes(voters)
+	var cost := shop.reroll_cost()
+	if shop.try_reroll(voters, RunState.rng):
+		_say("The goblin restocks the stall (–%d g)" % cost, "Rerolled for %d g" % cost)
+		return true
+	return false
+
+
+## An unplugged human pad (bots and working pads are "present"). Its cursor and tooltip are
+## hidden: nobody is moving them.
+static func is_unplugged(slot: PlayerSlot) -> bool:
+	return slot != null and not slot.is_bot() and slot.input != null and not slot.input.is_connected_device()
+
+
+func _slot_of(slot_index: int) -> PlayerSlot:
+	for s in _slots:
+		if s.index == slot_index:
+			return s
+	return null
 
 
 ## The feedback log as plain text, oldest first (tests, screenshots).
@@ -503,8 +562,31 @@ func _update_cards() -> void:
 
 
 func _on_shop_changed() -> void:
+	_validate_holds()
 	_update_cards()
 	_update_info()
+
+
+## A reroll swapped the offers under the cursors: no hold-to-buy may carry over to the new item.
+func _on_shop_rerolled(_count: int) -> void:
+	_holds.clear()
+	_cursor_layer.queue_redraw()
+
+
+## True while the offer at the hold's cursor position is still the item (and price) the hold
+## started on.
+func _hold_matches_offer(hold: Dictionary) -> bool:
+	var o := offer_at(int(hold["offer"]))
+	return o != null and o.item != null and not o.sold and o.item.uid == int(hold["uid"]) \
+		and o.price == int(hold["price"])
+
+
+## Cancels the holds whose offer changed (rerolled, restocked, sold) and those of unplugged pads.
+func _validate_holds() -> void:
+	for i: int in _holds.keys():
+		var s := _slot_of(i)
+		if s == null or is_unplugged(s) or not _hold_matches_offer(_holds[i]):
+			_holds.erase(i)
 
 
 func _on_gold_changed(_gold: int, _delta: int) -> void:
@@ -592,7 +674,7 @@ func _press_buy(slot: PlayerSlot) -> void:
 		_say_to(slot, reason)
 		return
 	if needs_hold(o.price):
-		_holds[slot.index] = {"offer": index, "time": 0.0}
+		_holds[slot.index] = {"offer": index, "time": 0.0, "uid": o.item.uid, "price": o.price}
 		return
 	try_buy(slot, index)
 
@@ -676,6 +758,8 @@ func _process(delta: float) -> void:
 		if at >= 0:
 			var age := float(_feedback[at]["age"])
 			_feedback_labels[i].modulate.a = 1.0 - smoothstep(FEEDBACK_TIME - 1.0, FEEDBACK_TIME, age)
+	if not _holds.is_empty():
+		_validate_holds()
 	_update_tooltips()
 	if not _holds.is_empty() or is_visible_in_tree():
 		_cursor_layer.queue_redraw()
@@ -687,7 +771,8 @@ func _update_tooltips() -> void:
 		if tip == null:
 			continue
 		var o := offer_at(cursor_of(s.index))
-		var show := is_cursor_active(s.index) and o != null and o.item != null and not o.sold
+		var show := is_cursor_active(s.index) and not is_unplugged(s) and o != null and o.item != null \
+			and not o.sold
 		if not show:
 			tip.visible = false
 			_tooltip_keys.erase(s.index)
@@ -747,7 +832,7 @@ func _draw_cursors() -> void:
 	var per_card: Dictionary[int, Array] = {}
 	for s in _slots:
 		var idx := cursor_of(s.index)
-		if idx < 0 or idx >= cards.size():
+		if idx < 0 or idx >= cards.size() or is_unplugged(s):
 			continue
 		if not per_card.has(idx):
 			per_card[idx] = []

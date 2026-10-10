@@ -400,9 +400,24 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   (`ShopPanel` centred, one `PlayerPanel` per hero scaled into its corner with
   `tooltip_inside = true`). Per player: LB / RB switch focus shop ↔ own panel, A buys
   (hold when > 50% of the wallet), X lock, R3 / Tab ping, Y reroll vote, START ready, B
-  unready unless the panel consumed it (`last_input_consumed`); panel tabs on LT / RT. The 60 s
+  unready unless the panel consumed it (`last_input_consumed`; the shop consumes the B that
+  cancels a hold-to-buy); panel tabs on LT / RT. The 60 s
   auto-continue runs only in MARKET. The HUD is hidden during the intermission; the HUD shows a
   "Team Loot: N" counter during waves.
+  - **Input guards** (co-op, one screen): the loot roll and the market swallow every human's
+    held buttons / stick (`PlayerInput.swallow()`) when they open and when the market starts
+    after the roll; A and X (buy / lock) are additionally ignored for
+    `Intermission.MARKET_INPUT_LOCKOUT` (0.4 s) after the market starts, so a Need press or a
+    stick push meant for the roll never buys or drifts the cursor. Y (Greed all remaining) is
+    taken in every loot phase (result line and the first moments of an item included).
+  - **Reroll votes** are re-evaluated every frame (`ShopPanel.process_votes` →
+    `Shop.try_reroll`, votes of non-voters dropped by `Shop.prune_votes`), so a reroll also
+    fires when the last missing voter unplugs / leaves or the gold arrives later.
+  - **Hold-to-buy** remembers the offer's item uid + price and is cancelled by a reroll
+    (`Shop.rerolled`), any change of the offer, B, or the player unplugging / leaving.
+  - **Unplug / leave:** a pad that comes back is un-readied (auto-ready lasts only while it is
+    unplugged); an unplugged player's shop cursor and tooltip are hidden;
+    `PlayerManager.player_left` refreshes panels, chips, the shop cursors and the votes.
 - **Bots** (smoke / demo): buy the cheapest usable affordable offer (50%), equip upgrades
   (`ItemTooltip.upgrade_direction`), sell junk when full. `SMOKE_RESULT` adds `items_bought`,
   `items_looted`, `loot_rolls`, `need_wins`, `greed_gold`.
