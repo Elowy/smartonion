@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"venomous"
+prefix = "Venomous"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({})
+effect = &"dot"
+params = {
+"damage": 12.0,
+"duration_fixed": 3.0,
+"stacks_fixed": 3.0
+}
+ppm = 6.0
+chance = 0.0
+icd = 0.5
+school = &"nature"
+description = "Chance on hit: Poisons the target for {damage} Nature damage over {duration_fixed} sec. Stacks up to {stacks_fixed} times."

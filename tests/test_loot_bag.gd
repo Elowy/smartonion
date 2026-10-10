@@ -37,7 +37,7 @@ func test_create_builds_a_bag_with_a_beam() -> void:
 	var bag := _bag(Items.Rarity.EPIC)
 	check(bag.is_in_group(&"loot_bags"), "group")
 	check(not bag.is_collected(), "not collected")
-	for part in ["Visual/Body", "Visual/Neck", "Visual/Flare", "Visual/Tie", "Visual/Gem"]:
+	for part in ["Visual/Body", "Visual/Neck", "Visual/Flare", "Visual/Tie", "Visual/Coins", "Visual/Gem"]:
 		check(bag.get_node_or_null(NodePath(part)) is MeshInstance3D, "has %s" % part)
 	check(bag.get_node_or_null(^"Beam") is MeshInstance3D, "has a beam")
 	check(bag.get_node_or_null(^"GroundGlow") is MeshInstance3D, "has a ground glow")
@@ -78,7 +78,7 @@ func test_bag_bobs_spins_and_pops_in() -> void:
 	var bag := _bag(Items.Rarity.RARE)
 	var visual := bag.get_node(^"Visual") as Node3D
 	bag._process(0.01)
-	check(visual.scale.x < 1.0, "starts small")
+	check(visual.scale.x < LootBag.BAG_SCALE, "starts small")
 	var y0 := visual.position.y
 	var yaw0 := visual.rotation.y
 	bag._process(0.1)
@@ -86,7 +86,7 @@ func test_bag_bobs_spins_and_pops_in() -> void:
 	check(not is_equal_approx(visual.rotation.y, yaw0), "spins")
 	check(visual.position.y > 0.05, "hovers above the ground")
 	bag._process(0.5)
-	check_near(visual.scale.x, 1.0, 0.001, "full size after the pop-in")
+	check_near(visual.scale.x, LootBag.BAG_SCALE, 0.001, "full size after the pop-in")
 	check_near(_beam_of(bag).scale.y, 1.0, 0.001, "beam fully grown")
 
 

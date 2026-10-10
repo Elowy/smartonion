@@ -208,14 +208,14 @@ func _draw_cursor(r: Rect2, s: float, radius: int) -> void:
 	frame.anti_aliasing = true
 	draw_style_box(frame, outer)
 	# Gold corner brackets (WoW selection look).
-	var len := s * 0.24
+	var arm := s * 0.24
 	var w := maxf(2.0, s * 0.05)
 	var g := UiTheme.GOLD_BRIGHT
 	for corner: Vector2 in [outer.position, Vector2(outer.end.x, outer.position.y), Vector2(outer.position.x, outer.end.y), outer.end]:
 		var sx := 1.0 if corner.x < r.get_center().x else -1.0
 		var sy := 1.0 if corner.y < r.get_center().y else -1.0
 		var o := corner + Vector2(-sx, -sy) * w * 0.5
-		draw_line(o, o + Vector2(sx * len, 0), ItemArt.OUTLINE, w + 2.0)
-		draw_line(o, o + Vector2(0, sy * len), ItemArt.OUTLINE, w + 2.0)
-		draw_line(o, o + Vector2(sx * len, 0), g, w)
-		draw_line(o, o + Vector2(0, sy * len), g, w)
+		draw_line(o, o + Vector2(sx * arm, 0), ItemArt.OUTLINE, w + 2.0)
+		draw_line(o, o + Vector2(0, sy * arm), ItemArt.OUTLINE, w + 2.0)
+		draw_line(o, o + Vector2(sx * arm, 0), g, w)
+		draw_line(o, o + Vector2(0, sy * arm), g, w)

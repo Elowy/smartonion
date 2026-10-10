@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"vampiric"
+prefix = "Vampiric"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({})
+effect = &"drain"
+params = {
+"damage": 10.0
+}
+ppm = 3.0
+chance = 0.0
+icd = 0.5
+school = &"shadow"
+description = "Chance on hit: Drains {damage} Shadow damage from the target and heals you for the same amount."

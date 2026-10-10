@@ -20,36 +20,44 @@ const POP_TIME := 0.35
 
 ## Beam height (m), width (m) and brightness by rarity (Common .. Artifact).
 const BEAM_HEIGHT: Array[float] = [2.2, 3.6, 5.0, 6.5, 8.0, 9.0]
-const BEAM_WIDTH: Array[float] = [0.45, 0.55, 0.6, 0.7, 0.8, 0.9]
-const BEAM_INTENSITY: Array[float] = [0.28, 0.55, 0.7, 0.8, 0.9, 0.95]
+const BEAM_WIDTH: Array[float] = [0.5, 0.7, 0.8, 0.9, 1.0, 1.1]
+const BEAM_INTENSITY: Array[float] = [0.35, 0.65, 0.8, 0.9, 0.96, 1.0]
 const GROUND_GLOW_SIZE := 1.5
 
 const LEATHER := Color(0.46, 0.29, 0.15)
 const LEATHER_DARK := Color(0.3, 0.18, 0.09)
 const ROPE := Color(0.85, 0.72, 0.4)
+const COINS := Color(0.92, 0.7, 0.2)
+## The bag model is a bit larger than life so it reads from the camera distance.
+const BAG_SCALE := 1.25
 
-## Fixed-Y billboard quad: bright at the foot, fading upwards and towards the sides.
+## Fixed-Y billboard quad: bright at the foot, fading upwards and towards the sides. Alpha
+## blended (additive blending would shift the hue over the green meadow).
 const _BEAM_SHADER := """
 shader_type spatial;
-render_mode unshaded, blend_add, cull_disabled, depth_draw_never, fog_disabled;
+render_mode unshaded, cull_disabled, depth_draw_never, fog_disabled;
 uniform vec4 beam_color : source_color = vec4(1.0);
 uniform float intensity = 0.8;
+uniform float beam_height = 5.0;
 void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], MODEL_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
 }
 void fragment() {
 	float across = clamp(1.0 - abs(UV.x - 0.5) * 2.0, 0.0, 1.0);
-	float up = clamp(1.0 - UV.y, 0.0, 1.0);
+	// UV.y runs 1 at the foot to 0 at the tip. The foot is transparent so the bag itself is
+	// not washed out by the beam in front of it.
+	float up = clamp(UV.y, 0.0, 1.0);
+	float foot = smoothstep(0.3, 1.2, (1.0 - UV.y) * beam_height);
 	float core = pow(across, 1.7);
 	ALBEDO = mix(beam_color.rgb, vec3(1.0), core * core * 0.35);
-	ALPHA = core * pow(up, 1.4) * intensity;
+	ALPHA = core * pow(up, 1.1) * foot * intensity;
 }
 """
 
 ## Soft round glow on the ground under the bag.
 const _GLOW_SHADER := """
 shader_type spatial;
-render_mode unshaded, blend_add, cull_disabled, depth_draw_never, fog_disabled;
+render_mode unshaded, cull_disabled, depth_draw_never, fog_disabled;
 uniform vec4 glow_color : source_color = vec4(1.0);
 uniform float intensity = 0.6;
 void fragment() {
@@ -75,6 +83,7 @@ static var _body_mesh: SphereMesh
 static var _neck_mesh: CylinderMesh
 static var _flare_mesh: CylinderMesh
 static var _tie_mesh: TorusMesh
+static var _coins_mesh: CylinderMesh
 static var _gem_mesh: SphereMesh
 static var _glow_quad: QuadMesh
 static var _beam_meshes: Array[QuadMesh] = []
@@ -139,7 +148,7 @@ func _process(delta: float) -> void:
 	if _age <= POP_TIME + delta:
 		var k := clampf(_age / POP_TIME, 0.0, 1.0)
 		var eased := 1.0 - pow(1.0 - k, 3.0)
-		_visual.scale = Vector3.ONE * (0.4 + 0.6 * eased)
+		_visual.scale = Vector3.ONE * BAG_SCALE * (0.4 + 0.6 * eased)
 		_beam.scale = Vector3(1.0, eased, 1.0)
 		_glow.scale = Vector3.ONE * eased
 
@@ -208,11 +217,13 @@ func _build_visual() -> void:
 	_visual = Node3D.new()
 	_visual.name = "Visual"
 	_visual.position = Vector3(0.0, HOVER_HEIGHT, 0.0)
+	_visual.scale = Vector3.ONE * BAG_SCALE
 	add_child(_visual)
 	_add_part("Body", _body_mesh, Mats.toon(LEATHER), Vector3(0.0, 0.19, 0.0))
 	_add_part("Neck", _neck_mesh, Mats.toon(LEATHER_DARK), Vector3(0.0, 0.4, 0.0))
 	_add_part("Flare", _flare_mesh, Mats.toon(LEATHER), Vector3(0.0, 0.5, 0.0))
 	_add_part("Tie", _tie_mesh, Mats.toon_plain(ROPE), Vector3(0.0, 0.4, 0.0))
+	_add_part("Coins", _coins_mesh, Mats.toon_plain(COINS), Vector3(0.0, 0.5, 0.0))
 	_add_part("Gem", _gem_mesh, Mats.glow(color, 1.6), Vector3(0.0, 0.2, 0.21))
 
 
@@ -235,6 +246,7 @@ static func _material(kind: String, rarity: int, color: Color) -> ShaderMaterial
 		m.shader = _beam_shader
 		m.set_shader_parameter("beam_color", color)
 		m.set_shader_parameter("intensity", BEAM_INTENSITY[rarity])
+		m.set_shader_parameter("beam_height", BEAM_HEIGHT[rarity])
 	else:
 		m.shader = _glow_shader
 		m.set_shader_parameter("glow_color", color)
@@ -270,6 +282,13 @@ static func _ensure_shared_resources() -> void:
 	_flare_mesh.height = 0.1
 	_flare_mesh.radial_segments = 10
 	_flare_mesh.rings = 1
+	_flare_mesh.cap_top = false  # open mouth, full of coins
+	_coins_mesh = CylinderMesh.new()
+	_coins_mesh.top_radius = 0.105
+	_coins_mesh.bottom_radius = 0.105
+	_coins_mesh.height = 0.02
+	_coins_mesh.radial_segments = 10
+	_coins_mesh.rings = 1
 
 	_tie_mesh = TorusMesh.new()
 	_tie_mesh.inner_radius = 0.075

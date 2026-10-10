@@ -17,7 +17,7 @@ class_restriction = &""
 unique_effect = &"buff"
 unique_params = {
 "trigger": "low_hp",
-"threshold": 0.35,
+"threshold": 35.0,
 "icd": 15.0,
 "stats": {
 &"spirit": 6.0

@@ -4,16 +4,25 @@ extends SceneTree
 ## counts, enchant / unique frequencies and price ranges.
 ##
 ##   godot --headless --path . -s res://tools/item_report.gd [-- --seed=N --count=N]
+##
+## A -s main script is compiled before the autoloads exist, so the Db autoload and
+## ItemGenerator (which uses Db) are only reached at runtime through [member db] / [member gen].
+
+enum Source { SHOP, LOOT, ELITE, GOBLIN, BOSS }  ## = ItemGenerator.Source
 
 const WAVES: Array[int] = [1, 3, 5, 8, 10, 13, 15, 18, 20, 25]
 ## Share of the items per source (shop and normal loot dominate, like in a run).
 const SOURCE_SHARE := {
-	ItemGenerator.Source.SHOP: 0.4, ItemGenerator.Source.LOOT: 0.3,
-	ItemGenerator.Source.ELITE: 0.12, ItemGenerator.Source.GOBLIN: 0.1,
-	ItemGenerator.Source.BOSS: 0.08,
+	Source.SHOP: 0.4, Source.LOOT: 0.3,
+	Source.ELITE: 0.12, Source.GOBLIN: 0.1,
+	Source.BOSS: 0.08,
 }
 const SOURCE_NAMES := ["SHOP", "LOOT", "ELITE", "GOBLIN", "BOSS"]
 const RARITIES := 5
+
+## ItemGenerator script and the Db autoload, resolved at runtime.
+var gen: Variant
+var db: Variant
 
 
 func _initialize() -> void:
@@ -21,6 +30,8 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	gen = load("res://core/items/item_generator.gd")
+	db = root.get_node(^"Db")
 	var seed_value := 20261010
 	var count := 10000
 	for arg in OS.get_cmdline_user_args():
@@ -32,25 +43,25 @@ func _run() -> void:
 	rng.seed = seed_value
 	print("== Item report: %d items, seed %d ==" % [count, seed_value])
 	print("Content: %d bases, %d suffixes, %d weapons, %d enchants, %d uniques" % [
-		Db.item_bases.size(), Db.affixes.size(), Db.weapons.size(), Db.enchants.size(),
-		Db.uniques.size()])
+		db.item_bases.size(), db.affixes.size(), db.weapons.size(), db.enchants.size(),
+		db.uniques.size()])
 	_print_tables()
 
 	var items: Array[ItemInstance] = []
 	var item_sources: Array[int] = []
 	var classes: Array[ClassData] = []
-	for id in Db.class_ids:
-		classes.append(Db.get_class_data(id))
+	for id in db.class_ids:
+		classes.append(db.get_class_data(id))
 	for source in SOURCE_SHARE:
 		var n := roundi(count * float(SOURCE_SHARE[source]))
 		for i in n:
 			var wave := WAVES[i % WAVES.size()]
-			if source == ItemGenerator.Source.BOSS:
+			if source == Source.BOSS:
 				wave = 10 if i % 2 == 0 else 25
 			var options := {}
-			if source == ItemGenerator.Source.SHOP and not classes.is_empty() and i % 2 == 0:
+			if source == Source.SHOP and not classes.is_empty() and i % 2 == 0:
 				options[&"class_data"] = classes[i % classes.size()]
-			var item := ItemGenerator.generate(source, wave, rng, options)
+			var item: ItemInstance = gen.generate(source, wave, rng, options)
 			if item != null:
 				items.append(item)
 				item_sources.append(source)
@@ -71,12 +82,12 @@ func _print_tables() -> void:
 	for source in SOURCE_NAMES.size():
 		var line := "%-7s" % SOURCE_NAMES[source]
 		for wave in [1, 3, 5, 9, 10, 15, 20, 25]:
-			var w := ItemGenerator.rarity_weights(source, wave)
+			var w: Array[float] = gen.rarity_weights(source, wave)
 			line += "  w%-2d %s" % [wave, "/".join(w.map(func(x: float) -> String: return "%d" % roundi(x * 100)))]
 		print(line)
 	var line := "LOOT w15, Fortune 0/25/50/100:"
 	for f in [0.0, 25.0, 50.0, 100.0]:
-		var w := ItemGenerator.rarity_weights(ItemGenerator.Source.LOOT, 15, f)
+		var w: Array[float] = gen.rarity_weights(Source.LOOT, 15, f)
 		line += "  " + "/".join(w.map(func(x: float) -> String: return "%d" % roundi(x * 100)))
 	print(line)
 
@@ -112,16 +123,16 @@ func _print_budgets(items: Array[ItemInstance]) -> void:
 			if item.unique or item.rarity != r:
 				continue
 			n += 1
-			var b := ItemGenerator.stat_budget(item.rarity, item.slot_type, item.wave, item.looted,
+			var b: float = gen.stat_budget(item.rarity, item.slot_type, item.wave, item.looted,
 					item.weapon)
 			budget += b
 			var rolled := item.stats.duplicate()
-			var implicit := ItemGenerator.implicit_armor(item.armor_type, item.slot_type, item.wave)
+			var implicit: int = gen.implicit_armor(item.armor_type, item.slot_type, item.wave)
 			if implicit > 0:
 				rolled[Stats.ARMOR] = rolled.get(Stats.ARMOR, 0.0) - implicit
 				if is_zero_approx(rolled[Stats.ARMOR]):
 					rolled.erase(Stats.ARMOR)
-			spent += ItemGenerator.stat_cost(rolled)
+			spent += gen.stat_cost(rolled)
 			lines += item.stats.size()
 			ilvl += item.item_level
 			for stat in item.stats:
@@ -146,14 +157,14 @@ func _print_slots(items: Array[ItemInstance]) -> void:
 
 
 func _print_enchants(items: Array[ItemInstance]) -> void:
-	print("-- Enchants --")
+	print("-- Enchants (hand-made items below Legendary have none and are left out) --")
 	for r in RARITIES:
 		var n := 0
 		var total := 0
 		var with_any := 0
 		var max_count := 0
 		for item in items:
-			if item.rarity != r:
+			if item.rarity != r or (item.unique and r < Items.Rarity.LEGENDARY):
 				continue
 			n += 1
 			total += item.enchants.size()
@@ -200,10 +211,10 @@ func _print_uniques(items: Array[ItemInstance]) -> void:
 				100.0 * by_rarity[r] / n_rarity[r], by_rarity[r]])
 	print("Trinkets: %d (%.1f%% of all items)" % [trinkets, 100.0 * trinkets / items.size()])
 	var never: PackedStringArray = []
-	for id in Db.uniques:
+	for id in db.uniques:
 		if not by_id.has(id):
 			never.append(String(id))
-	print("Distinct uniques seen: %d / %d%s\n" % [by_id.size(), Db.uniques.size(),
+	print("Distinct uniques seen: %d / %d%s\n" % [by_id.size(), db.uniques.size(),
 		("  never: " + ", ".join(never)) if not never.is_empty() else ""])
 
 
@@ -223,8 +234,8 @@ func _print_prices(items: Array[ItemInstance]) -> void:
 			n += 1
 		if n > 0:
 			print("%-10s %4d .. %4d  avg %.0f   (wave 1: %d, wave 10: %d, wave 25: %d)" % [
-				Items.RARITY_NAMES[r], lo, hi, float(sum) / n, ItemGenerator.price_for(r, 1),
-				ItemGenerator.price_for(r, 10), ItemGenerator.price_for(r, 25)])
+				Items.RARITY_NAMES[r], lo, hi, float(sum) / n, gen.price_for(r, 1),
+				gen.price_for(r, 10), gen.price_for(r, 25)])
 	print("")
 
 
@@ -256,7 +267,7 @@ func _print_class_bias(rng: RandomNumberGenerator, classes: Array[ClassData]) ->
 	for c in classes:
 		var usable := 0
 		for i in 400:
-			var item := ItemGenerator.generate(ItemGenerator.Source.SHOP, 1 + i % 25, rng, {&"class_data": c})
+			var item: ItemInstance = gen.generate(Source.SHOP, 1 + i % 25, rng, {&"class_data": c})
 			if item.can_be_used_by(c):
 				usable += 1
 		parts.append("%s %.0f%%" % [c.id, usable / 4.0])

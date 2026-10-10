@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shadowflame"
+prefix = "Shadowflame"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({})
+effect = &"bolt"
+params = {
+"damage": 10.0,
+"dot": 8.0,
+"dot_duration_fixed": 4.0,
+"spread_fixed": 3.5
+}
+ppm = 3.0
+chance = 0.0
+icd = 1.0
+school = &"shadow"
+description = "Chance on hit: A shadowflame bolt deals {damage} Shadow damage and burns for {dot} more over {dot_duration_fixed} sec. The flames spread when a burning enemy dies."

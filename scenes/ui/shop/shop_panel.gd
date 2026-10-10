@@ -719,8 +719,8 @@ func _draw_pips() -> void:
 	var cy := _pips.size.y * 0.5
 	for s in _slots:
 		var c := Vector2(x, cy)
-		var voted := shop != null and shop.reroll_votes.get(s.index, false)
-		var auto := s.is_bot() or s.input == null or not s.input.is_connected_device()
+		var voted: bool = shop != null and shop.reroll_votes.get(s.index, false)
+		var auto: bool = s.is_bot() or s.input == null or not s.input.is_connected_device()
 		_pips.draw_circle(c, 9.0, Color(0.05, 0.04, 0.03, 0.95))
 		if voted:
 			_pips.draw_circle(c, 8.0, s.color)

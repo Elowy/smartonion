@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"greedy"
+prefix = "Greedy"
+kind = 2
+slot_types = Array[int]([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 0.8
+equip_stats = Dictionary[StringName, float]({})
+effect = &"gold"
+params = {
+"amount": 1.0
+}
+ppm = 0.0
+chance = 5.0
+icd = 0.5
+school = &"physical"
+description = "On kill: 5% chance to find {amount} extra gold."
