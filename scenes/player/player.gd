@@ -67,8 +67,8 @@ const SELF_TEXT_SIZE := 0.85
 ## Soft player-vs-player separation (no physics collision between heroes): bodies closer than
 ## SEPARATION_DISTANCE drift apart at up to SEPARATION_SPEED m/s, so heroes never fully
 ## overlap but can still walk through each other.
-const SEPARATION_DISTANCE := 0.95
-const SEPARATION_SPEED := 2.2
+const SEPARATION_DISTANCE := 1.15
+const SEPARATION_SPEED := 3.0
 
 ## TEMPORARY placeholder until the M4 level-up cards (GDD 6.1) exist: every team level gives
 ## every player +1 Stamina (= +1 Max HP) and +4% damage through the StatBlock source

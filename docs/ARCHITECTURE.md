@@ -57,7 +57,11 @@ the new screen never sees the button press that closed the old one.
    LOBBY, Quit → quit.
 2. **LOBBY** – the Lobby owns `PlayerManager.joining_enabled`. Each slot picks a class (◀ ▶),
    readies with A, leaves with B. All joined players ready → countdown → `start_requested`
-   → run. B with nobody joined → MENU.
+   → run (a new join or an unready cancels the countdown). B with nobody joined → MENU.
+   The join press is swallowed (`PlayerInput.swallow()`): it never also readies the player,
+   and navigation waits until the stick is neutral. Slots of unplugged pads are pruned
+   (`PlayerManager.prune_disconnected()`) when the lobby opens / resets and every frame
+   while it is open, so a dead controller can never block the countdown or Back.
 3. **RUN / WAVE n** – `RunState.start_run(count, seed)`, `Arena.create()`,
    `WaveDirector.create(arena)`, one `Player.create(slot)` per slot under `arena.entities`
    (`Main._spawn_player` is the single place a slot becomes a hero – the future M9 loadout
@@ -83,8 +87,15 @@ the new screen never sees the button press that closed the old one.
    `GameOverScreen.open(victory)`. A / START → **LOBBY with the same players** (ready again);
    the main menu only through the lobby's Back.
 6. START on any player's device during WAVE / WAVE_END → PauseMenu (`get_tree().paused`).
-   Resume unpauses; "Quit to Menu" ends the run (`RunState.end_run(false)`) and goes to MENU.
-   `PlayerManager.device_disconnected` during a run → pause + HUD notice;
+   The menu ignores navigation until the stick has been neutral once (`PlayerInput.nav_held()`),
+   so a stick held during play cannot move the selection. Resume unpauses; "Quit to Menu"
+   needs a second press ("Are you sure? Press again") and then ends the run
+   (`RunState.end_run(false)`) and goes to MENU.
+   **Disconnects:** `PlayerManager.device_disconnected` during a run → pause + HUD notice;
+   a wave never starts while a joined pad is unplugged (`Main.start_wave` pauses at once).
+   While any joined pad is unplugged, START / B / Resume do nothing; the PauseMenu offers
+   "Continue without Pn" → `Main.drop_player(slot)` frees that hero, `PlayerManager.leave`,
+   rebinds the HUD and resumes (nobody left → LOBBY; the rest all downed → defeat).
    `device_reconnected` → notice hidden (the player resumes with START).
 7. `RunState.leveled_up` during a wave → `Vfx.level_up_burst` on every living player (the HUD
    shows the "LEVEL UP!" banner by itself; each Player grows its temporary `&"level"` bonus,
@@ -162,6 +173,11 @@ grouped by living enemies (`RunPerf`): `physics_ms_avg`, `physics_ms_at_peak` (t
 the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line.
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
 crowded), avoid walls, stay near the team and run to downed teammates when it is safe.
+**Determinism:** bots decide in `BotInput.think(delta)`, called by
+`PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
+-1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
+counts `WAVE_END_DELAY` in physics ticks. The same `--seed` therefore reproduces a smoke run
+exactly (same kills, gold, downs).
 
 Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission,game_over}.png`
 (`--view=lobby --players=3`, `--demo --seed=5 --start-wave=4 --shot-time=12`,
@@ -230,8 +246,13 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   A "Next wave in 42 s" line counts down `Intermission.auto_continue_time` (static setting,
   default 60 s, ≤ 0 = off and hidden – the settings menu comes later); at 0 it emits
   `continue_requested` without the stragglers.
-  PauseMenu: `process_mode` ALWAYS, only the pausing player navigates, their B or any
-  player's START resumes; it hides itself when it emits. Intermission / Game Over / Pause
+  PauseMenu: `process_mode` ALWAYS, only the pausing player navigates (falls back to any
+  device if that player's own pad is unplugged), their B or any player's START resumes
+  unless a joined pad is unplugged; it hides itself when it emits.
+  GameOverScreen reads only joined slots' inputs while a human with a working device is
+  joined (global `ui_accept` / any pad only with no / bot-only / all-unplugged slots).
+- Keyboard join keys are one constant, `KeyboardInput.JOIN_KEYS` (Enter, Space, Keypad
+  Enter, F) – the same keys as confirm (A). Intermission / Game Over / Pause
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
 - `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
   3D scene show through the dark vignette backdrop.

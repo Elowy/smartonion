@@ -81,7 +81,7 @@ func _build_empty() -> void:
 	_empty_box.add_child(_join_glyph)
 	var press := UiTheme.centered_label("Press A to join", UiTheme.GOLD_LABEL, 34)
 	_empty_box.add_child(press)
-	_keyboard_hint = UiTheme.centered_label("Keyboard: Enter / Space", UiTheme.DIM)
+	_keyboard_hint = UiTheme.centered_label("Keyboard: Enter / Space / F", UiTheme.DIM)
 	_empty_box.add_child(_keyboard_hint)
 	_empty_box.add_child(UiTheme.spacer(true))
 

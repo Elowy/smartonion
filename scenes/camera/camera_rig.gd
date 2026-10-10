@@ -16,14 +16,14 @@ const MAX_DISTANCE := 36.0
 ## covers more at the top (unit frames + wave / timer plaque) and the bottom (unit frames +
 ## XP strip) than at the sides, so heroes never sit under it.
 const FRAME_MARGIN := 3.2
-const FRAME_MARGIN_BOTTOM := 3.8
+const FRAME_MARGIN_BOTTOM := 3.6
 ## The top margin grows with the distance (the wave / timer plaque covers a fixed share of
 ## the screen, i.e. more ground when zoomed out; heads stick up into it too): FRAME_MARGIN_TOP
 ## at MIN_DISTANCE, + TOP_MARGIN_SLOPE per metre further out, at most FRAME_MARGIN_TOP_MAX
 ## (so the whole MVP arena still fits at MAX_DISTANCE). See [method top_margin].
-const FRAME_MARGIN_TOP := 5.2
+const FRAME_MARGIN_TOP := 6.0
 const TOP_MARGIN_SLOPE := 0.2
-const FRAME_MARGIN_TOP_MAX := 7.0
+const FRAME_MARGIN_TOP_MAX := 7.4
 const FOLLOW_SHARPNESS := 4.5
 const ZOOM_SHARPNESS := 2.2
 const SHAKE_DECAY := 1.8
@@ -88,7 +88,8 @@ func get_trauma() -> float:
 ## out any further, the screen edge acts as an invisible wall. Players clamp their movement
 ## to it. A framed (living) player is limited by the spread of the other framed players
 ## ([method walk_rect_for]); a ghost that the camera does not follow is kept inside the
-## current view ([method walk_rect]).
+## current view and out from under the HUD ([method safe_ground_rect]), so it stays easy to
+## find.
 func get_walk_rect(body: Node3D) -> Rect2:
 	var others: Array[Vector3] = []
 	var framed := false
@@ -99,7 +100,7 @@ func get_walk_rect(body: Node3D) -> Rect2:
 			others.append(n.global_position)
 	if framed:
 		return walk_rect_for(others, _aspect())
-	return walk_rect(focus, distance, _aspect())
+	return safe_ground_rect(focus, distance, _aspect())
 
 
 func _process(delta: float) -> void:

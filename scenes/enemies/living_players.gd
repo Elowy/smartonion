@@ -35,14 +35,17 @@ static func mark_dirty() -> void:
 	_dirty = true
 
 
-## Makes the snapshot current for a consumer that last used snapshot [param last_serial]
-## (-1 if never) and returns the serial it should remember.
-static func refresh(tree: SceneTree, last_serial: int) -> int:
+## Makes the snapshot current for [param consumer] (a node in the tree) that last used
+## snapshot [param last_serial] (-1 if never) and returns the serial it should remember.
+static func refresh(consumer: Node, last_serial: int) -> int:
+	var frame := Engine.get_physics_frames()
+	if not _dirty and frame == _frame and last_serial != serial:
+		return serial  # fast path: already built this tick
+	var tree := consumer.get_tree() if consumer != null else null
 	if tree == null:
 		if count > 0:
 			_clear()
 		return serial
-	var frame := Engine.get_physics_frames()
 	var group_count := tree.get_node_count_in_group(&"players")
 	if _dirty or frame != _frame or group_count != _group_count or last_serial == serial:
 		_rebuild(tree, frame, group_count)

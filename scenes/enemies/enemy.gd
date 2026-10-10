@@ -354,7 +354,7 @@ func _physics_process(delta: float) -> void:
 func _scan_players(here: Vector3, stunned: bool) -> void:
 	_target = null
 	_target_dist_sq = INF
-	_players_serial = LivingPlayers.refresh(get_tree(), _players_serial)
+	_players_serial = LivingPlayers.refresh(self, _players_serial)
 	var n := LivingPlayers.count
 	if n == 0:
 		return

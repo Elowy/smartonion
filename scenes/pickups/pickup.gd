@@ -216,7 +216,7 @@ func _process(delta: float) -> void:
 ## Nearest living player whose pickup range reaches [param here] (from the shared
 ## [LivingPlayers] snapshot; the winner is re-checked, a stale one falls back to a live scan).
 func _find_collector(here: Vector3) -> Player:
-	_players_serial = LivingPlayers.refresh(get_tree(), _players_serial)
+	_players_serial = LivingPlayers.refresh(self, _players_serial)
 	var xs := LivingPlayers.pos_x
 	var zs := LivingPlayers.pos_z
 	var ranges := LivingPlayers.pickup_range_sq

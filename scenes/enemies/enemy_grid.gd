@@ -44,8 +44,8 @@ static var _count := 0
 static var _dirty := true
 static var _serial := 0
 static var _size := 0
-## By build index (group order).
-static var _nodes: Array[Enemy] = []
+## By build index (group order); untyped (a freed enemy can be read and checked safely).
+static var _nodes: Array = []
 static var _slot_of := PackedInt32Array()
 ## By slot (sorted by cell): keys, build index and build-time position / radius.
 static var _keys := PackedInt64Array()
@@ -105,7 +105,7 @@ static func _rebuild(tree: SceneTree, frame: int, count: int) -> void:
 	_dirty = false
 	var nodes := tree.get_nodes_in_group(&"enemies")
 	var cap := mini(nodes.size(), MAX_ENEMIES)
-	var list: Array[Enemy] = []
+	var list := []
 	var xs := PackedFloat64Array()
 	var zs := PackedFloat64Array()
 	var rs := PackedFloat64Array()
@@ -317,14 +317,17 @@ static func nearest(tree: SceneTree, origin: Vector3, max_range: float) -> Enemy
 ## MAX_SEPARATION_SPEED). Every pair of the build is evaluated once per build, on the
 ## build-time positions (symmetric and independent of the processing order).
 static func crowd_velocity(e: Enemy, velocity: Vector3, delta: float, push: bool) -> Vector3:
-	var tree := e.get_tree()
-	if tree == null:
-		return velocity
-	ensure(tree)
-	if e._grid_used == _serial:
-		# This enemy already moved with this build: a second tick within the same physics frame
-		# (nodes stepped by hand, e.g. in tests) – the positions are stale, rebuild.
-		_rebuild(tree, _frame, tree.get_node_count_in_group(&"enemies"))
+	# Fast path: built this tick and not yet used by this enemy. (Enemies that entered since
+	# the build are only separated from the next tick on – queries check that themselves.)
+	if _dirty or _frame != Engine.get_physics_frames() or e._grid_used == _serial:
+		var tree := e.get_tree()
+		if tree == null:
+			return velocity
+		ensure(tree)
+		if e._grid_used == _serial:
+			# This enemy already moved with this build: a second tick within the same physics
+			# frame (nodes stepped by hand, e.g. in tests) – the positions are stale, rebuild.
+			_rebuild(tree, _frame, tree.get_node_count_in_group(&"enemies"))
 	e._grid_used = _serial
 	var tag := e._grid_tag
 	if tag < _serial * MAX_ENEMIES or tag >= (_serial + 1) * MAX_ENEMIES:

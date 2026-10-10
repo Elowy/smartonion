@@ -91,10 +91,14 @@ func _gameplay() -> void:
 	Vfx.slash_arc(warrior.position + Vector3.UP * 0.3, Vector3(-1, 0, 0.3), 2.3, 110.0, Color(1.0, 0.9, 0.6))
 	Vfx.explosion(center + Vector3(5, 0.8, -3), 1.6, Color(0.75, 0.4, 1.0))
 	Vfx.death_puff(center + Vector3(-4, 0.5, 3), Color(0.9, 0.88, 0.78))
-	Vfx.floating_text(center + Vector3(-3.5, 1.2, -1), "12", Color.WHITE)
-	Vfx.floating_text(center + Vector3(3.8, 1.2, 0.5), "37", Color(1.0, 0.85, 0.2), 1.5)
-	Vfx.floating_text(center + Vector3(0.5, 1.4, -2.5), "Dodge", Color(0.7, 0.88, 1.0), 0.9)
-	Vfx.floating_text(center + Vector3(-1.5, 1.2, 3.0), "+3 gold", Color(1.0, 0.82, 0.25), 0.9)
+	# Damage numbers as the game shows them (small translucent hits, bigger crits) and a
+	# hero's own number beside its head.
+	WeaponRunner.show_damage_number(center + Vector3(-3.5, 1.2, -1), 12.0, false)
+	WeaponRunner.show_damage_number(center + Vector3(-5.0, 1.2, 1.5), 6.0, false)
+	WeaponRunner.show_damage_number(center + Vector3(3.8, 1.2, 0.5), 37.0, true)
+	Vfx.floating_text(center + spots[0] + Vector3(Player.SELF_TEXT_SIDE, Player.SELF_TEXT_HEIGHT, 0), "2",
+		Player.DAMAGE_TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
+	Vfx.floating_text(center + Vector3(0.5, 1.4, -2.5), "Dodge", Player.DODGE_TEXT_COLOR, Player.SELF_TEXT_SIZE)
 	Vfx.hit_spark(center + Vector3(-3.2, 0.6, -1.5), Color(1, 0.9, 0.5))
 	Vfx.pickup_sparkle(center + Vector3(1.5, 0.3, 3.0))
 	# In-flight projectiles: a troll's axe (enemy: red-orange halo) and a fel bolt (hero).
@@ -104,6 +108,11 @@ func _gameplay() -> void:
 		center + Vector3(2.4, 0.7, 2.6), Vector3(1, 0, 0.3))
 	if not enemies.is_empty():
 		enemies[0].flash_hit()
+	# Floating texts past their pop-in, so they show at their real size.
+	for c in arena.entities.get_children():
+		var fx := c as VfxEffect
+		if fx != null and fx.kind == VfxEffect.Kind.TEXT:
+			fx._process(0.2)
 	await _frames(5)
 	Engine.time_scale = 1.0
 

@@ -44,11 +44,11 @@ static func build(style: StringName, color: Color, is_crit: bool = false, enemy:
 
 ## Red-orange halo disc under the projectile + a short tapered trail behind it.
 static func _build_threat_glow(root: Node3D) -> void:
-	var halo := _add(root, _cylinder(0.62, 0.62, 0.01, 24), Mats.unshaded(Color(ENEMY_HALO, 0.42)), Vector3(0, -0.05, 0))
+	var halo := _add(root, _cylinder(0.5, 0.5, 0.01, 24), Mats.unshaded(Color(ENEMY_HALO, 0.3)), Vector3(0, -0.05, 0))
 	halo.name = "Halo"
-	var rim := _add(root, _cylinder(0.34, 0.34, 0.012, 20), Mats.unshaded(Color(ENEMY_CORE, 0.6)), Vector3(0, -0.04, 0))
+	var rim := _add(root, _cylinder(0.27, 0.27, 0.012, 20), Mats.unshaded(Color(ENEMY_CORE, 0.45)), Vector3(0, -0.04, 0))
 	rim.name = "HaloCore"
-	var trail := _add(root, _cylinder(0.04, 0.3, 1.1, 10), Mats.unshaded(Color(ENEMY_HALO, 0.36)), Vector3(0, 0, 0.75))
+	var trail := _add(root, _cylinder(0.03, 0.2, 0.9, 10), Mats.unshaded(Color(ENEMY_HALO, 0.28)), Vector3(0, 0, 0.6))
 	trail.name = "Trail"
 	# Narrow end far behind (+Z), wide end at the projectile.
 	trail.rotation_degrees = Vector3(90, 0, 0)

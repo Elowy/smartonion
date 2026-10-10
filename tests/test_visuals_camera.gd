@@ -221,6 +221,7 @@ func test_rig_walk_rect_for_players_and_ghosts() -> void:
 	var rg := rig.get_walk_rect(ghost)
 	check(rg.has_point(Vector2(2, 3)), "ghost may stay where it is")
 	check(rg.size.x < spread.x, "ghost is kept inside the current (closer) view")
+	check(rg.is_equal_approx(rig.get_safe_ground_rect()), "ghost kept out from under the HUD")
 
 
 ## The HUD (unit frames, wave / timer plaque, XP strip) must never cover a hero: every
