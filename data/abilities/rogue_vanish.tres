@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_vanish.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"vanish"
+display_name = "Vanish"
+description = "Melt into the shadows for {duration} sec: enemies lose you and you cannot be hurt. Your next hit is a guaranteed critical strike."
+class_id = &"rogue"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 15.0
+targeting = 0
+cast_range = 5.0
+effect = ExtResource("2_effect")
+params = {
+"cooldown": 15.0,
+"duration": 2.0,
+"forced_crits": 1,
+"invulnerable": 1,
+"opacity": 0.35
+}
+icon = &"vanish"
+color = Color(0.45, 0.4, 0.62, 1)

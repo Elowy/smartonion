@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_fan_of_knives.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fan_of_knives"
+display_name = "Fan of Knives"
+description = "Throws {knives} knives in every direction, each for {damage_pct}% weapon damage. Spends all Combo Points: +{combo_bonus_pct}% damage per point."
+class_id = &"rogue"
+school = &"physical"
+resource = &"energy"
+cost = 35.0
+cooldown = 0.0
+targeting = 0
+cast_range = 7.0
+effect = ExtResource("2_effect")
+params = {
+"combo_bonus_pct": 20.0,
+"damage_pct": 80.0,
+"knives": 8,
+"range": 7.0,
+"speed": 16.0
+}
+icon = &"fan_of_knives"
+color = Color(0.82, 0.88, 1, 1)
