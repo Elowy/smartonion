@@ -60,9 +60,7 @@ func _gameplay() -> void:
 			var e := EnemyModel.new()
 			arena.entities.add_child(e)
 			e.setup(data)
-			var a := _rng.randf_range(0.0, TAU)
-			var r := _rng.randf_range(4.5, 9.0)
-			e.position = center + Vector3(cos(a) * r * 1.4, 0, sin(a) * r)
+			e.position = _free_spot(arena, center, enemies)
 			e.set_facing(center - e.position)
 			e.set_moving(_rng.randf_range(0.5, 1.0))
 			if _rng.randf() < 0.12:
@@ -201,6 +199,23 @@ func _arena_overview() -> void:
 
 
 # --- Helpers -------------------------------------------------------------------
+
+## A random point 4.5-9 m around [param center], inside the arena, not on another enemy.
+func _free_spot(arena: Arena, center: Vector3, others: Array[EnemyModel]) -> Vector3:
+	var p := center
+	for attempt in 30:
+		var a := _rng.randf_range(0.0, TAU)
+		var r := _rng.randf_range(4.5, 9.0)
+		p = arena.clamp_point(center + Vector3(cos(a) * r * 1.4, 0, sin(a) * r), 1.0)
+		var free := true
+		for o in others:
+			if o.position.distance_to(p) < 1.3:
+				free = false
+				break
+		if free:
+			return p
+	return p
+
 
 ## Neutral lit stage for close-ups (same light direction as the arena).
 func _studio() -> Node3D:

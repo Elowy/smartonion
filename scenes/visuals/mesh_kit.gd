@@ -120,7 +120,7 @@ func add_cylinder(top_radius: float, bottom_radius: float, height: float, xform:
 	m.bottom_radius = bottom_radius
 	m.height = height
 	m.radial_segments = radial
-	m.rings = 1
+	m.rings = 0
 	m.cap_top = caps
 	m.cap_bottom = caps
 	return add_mesh(m, xform, color)

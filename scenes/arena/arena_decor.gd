@@ -22,6 +22,9 @@ const PINE_GREEN := Color(0.16, 0.38, 0.22)
 const WALL_OFFSET := 0.4
 const WALL_DEPTH := 0.7
 const GATE_HALF_WIDTH := 1.6
+## Trees farther than this from the playable bounds are only seen from afar: low-poly,
+## no shadows.
+const FAR_TREE_DISTANCE := 11.0
 
 
 ## Builds every decoration node for [param arena] (walls are built separately).
@@ -194,8 +197,11 @@ static func road_x(z: float, bounds: Rect2) -> float:
 
 
 static func _build_forest(root: Node3D, bounds: Rect2, decor: Rect2, rng: RandomNumberGenerator) -> void:
-	# Four chunks (N, S, W, E) so the camera can frustum-cull them.
-	var kits: Array[MeshKit] = [MeshKit.new(), MeshKit.new(), MeshKit.new(), MeshKit.new()]
+	# Chunks N, S, W, E (so the camera can frustum-cull them), each split into a near part
+	# (detailed, casts shadows into the clearing) and a far part (low-poly, no shadows).
+	var kits: Array[MeshKit] = []
+	for i in 8:
+		kits.append(MeshKit.new())
 	var cell := 3.6
 	var y := decor.position.y
 	while y < decor.end.y:
@@ -204,11 +210,12 @@ static func _build_forest(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 			var p := Vector2(x + rng.randf_range(0.2, cell - 0.2), y + rng.randf_range(0.2, cell - 0.2))
 			var dense := absf(p.x) > bounds.end.x + 5.0 or p.y < bounds.position.y - 5.0 or p.y > bounds.end.y + 11.0
 			if tree_allowed(p, bounds, decor) and rng.randf() < (0.86 if dense else 0.6):
-				var k := kits[_chunk(p, bounds)]
+				var far := distance_outside(p, bounds) > FAR_TREE_DISTANCE
+				var k := kits[_chunk(p, bounds) + (4 if far else 0)]
 				if rng.randf() < 0.2:
-					_pine(k, Vector3(p.x, 0, p.y), rng)
+					_pine(k, Vector3(p.x, 0, p.y), rng, far)
 				else:
-					_tree(k, Vector3(p.x, 0, p.y), rng)
+					_tree(k, Vector3(p.x, 0, p.y), rng, far)
 			x += cell
 		y += cell
 	var names := ["ForestNorth", "ForestSouth", "ForestWest", "ForestEast"]
@@ -216,10 +223,19 @@ static func _build_forest(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 		if kits[i].is_empty():
 			continue
 		var mi := MeshInstance3D.new()
-		mi.name = names[i]
+		mi.name = names[i % 4] + ("Far" if i >= 4 else "")
 		mi.mesh = kits[i].build()
 		mi.material_override = Mats.toon_vc(true, Color.WHITE, 0.045)
+		if i >= 4:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
+
+
+## Distance (metres) from [param p] to the rectangle [param r] (0 inside).
+static func distance_outside(p: Vector2, r: Rect2) -> float:
+	var dx := maxf(maxf(r.position.x - p.x, p.x - r.end.x), 0.0)
+	var dy := maxf(maxf(r.position.y - p.y, p.y - r.end.y), 0.0)
+	return Vector2(dx, dy).length()
 
 
 static func _chunk(p: Vector2, bounds: Rect2) -> int:
@@ -230,40 +246,44 @@ static func _chunk(p: Vector2, bounds: Rect2) -> int:
 	return 2 if p.x < 0.0 else 3
 
 
-static func _tree(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
+static func _tree(k: MeshKit, p: Vector3, rng: RandomNumberGenerator, low: bool = false) -> void:
 	var h := rng.randf_range(1.8, 3.0)
 	var r := rng.randf_range(0.22, 0.34)
 	var lean := Vector3(rng.randf_range(-0.25, 0.25), 0, rng.randf_range(-0.25, 0.25))
 	var top := p + Vector3(0, h, 0) + lean
 	var bark := WOOD.darkened(rng.randf_range(-0.05, 0.15))
-	k.add_segment(p + Vector3(0, -0.1, 0), top, r * 1.25, r * 0.7, bark, 7)
+	k.add_segment(p + Vector3(0, -0.1, 0), top, r * 1.25, r * 0.7, bark, 5 if low else 7)
 	# Root flare and a couple of branches.
 	for i in 3:
 		var a := rng.randf_range(0.0, TAU)
-		k.add_segment(p + Vector3(0, 0.25, 0), p + Vector3(sin(a) * r * 2.2, 0.0, cos(a) * r * 2.2), r * 0.55, r * 0.2, bark, 5)
+		var foot := p + Vector3(sin(a) * r * 2.2, 0.0, cos(a) * r * 2.2)
+		if not low:
+			k.add_segment(p + Vector3(0, 0.25, 0), foot, r * 0.55, r * 0.2, bark, 5)
 	var palette := LEAF_GREENS if rng.randf() > 0.1 else LEAF_AUTUMN
 	var base := palette[rng.randi_range(0, palette.size() - 1)]
 	var canopy := top + Vector3(0, rng.randf_range(0.6, 1.0), 0)
 	var blobs := rng.randi_range(3, 5)
 	var size := rng.randf_range(1.3, 1.9)
-	k.add_sphere(size, MeshKit.xf(canopy, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), base.darkened(0.08), 12, 6)
+	var radial := 8 if low else 12
+	var rings := 4 if low else 6
+	k.add_sphere(size, MeshKit.xf(canopy, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), base.darkened(0.08), radial, rings)
 	for i in blobs:
 		var a := TAU * i / blobs + rng.randf_range(-0.4, 0.4)
 		var off := Vector3(sin(a) * size * 0.7, rng.randf_range(-0.2, 0.5), cos(a) * size * 0.7)
 		var c := base.lightened(rng.randf_range(-0.05, 0.12))
-		k.add_sphere(size * rng.randf_range(0.6, 0.8), MeshKit.xf(canopy + off, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), c, 11, 6)
-	k.add_sphere(size * 0.7, MeshKit.xf(canopy + Vector3(0, size * 0.6, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(0.16), 11, 6)
+		k.add_sphere(size * rng.randf_range(0.6, 0.8), MeshKit.xf(canopy + off, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), c, radial - 1, rings)
+	k.add_sphere(size * 0.7, MeshKit.xf(canopy + Vector3(0, size * 0.6, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(0.16), radial - 1, rings)
 
 
-static func _pine(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
+static func _pine(k: MeshKit, p: Vector3, rng: RandomNumberGenerator, low: bool = false) -> void:
 	var h := rng.randf_range(5.0, 7.5)
-	k.add_cylinder(0.16, 0.3, h * 0.35, MeshKit.xf(p + Vector3(0, h * 0.17, 0)), DARK_WOOD, 6)
+	k.add_cylinder(0.16, 0.3, h * 0.35, MeshKit.xf(p + Vector3(0, h * 0.17, 0)), DARK_WOOD, 5 if low else 6)
 	var tiers := 4
 	for i in tiers:
 		var t := float(i) / tiers
 		var w := lerpf(1.9, 0.7, t) * rng.randf_range(0.9, 1.1)
 		var y := lerpf(h * 0.25, h * 0.8, t)
-		k.add_cylinder(0.0, w, h * 0.32, MeshKit.xf(p + Vector3(0, y + h * 0.16, 0), Vector3(0, rng.randf_range(0, 60), 0)), PINE_GREEN.lightened(t * 0.12 + rng.randf_range(-0.03, 0.05)), 8)
+		k.add_cylinder(0.0, w, h * 0.32, MeshKit.xf(p + Vector3(0, y + h * 0.16, 0), Vector3(0, rng.randf_range(0, 60), 0)), PINE_GREEN.lightened(t * 0.12 + rng.randf_range(-0.03, 0.05)), 7 if low else 8)
 
 
 # --- Undergrowth: bushes, rocks, mushrooms ------------------------------------
@@ -325,7 +345,7 @@ static func _bush(k: MeshKit, p: Vector3, size: float, rng: RandomNumberGenerato
 		var a := rng.randf_range(0.0, TAU)
 		var off := Vector3(sin(a), 0, cos(a)) * size * rng.randf_range(0.2, 0.6)
 		var s := size * rng.randf_range(0.55, 0.85)
-		k.add_sphere(s, MeshKit.xf(p + off + Vector3(0, s * 0.55, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(rng.randf_range(0.0, 0.14)), 12, 6)
+		k.add_sphere(s, MeshKit.xf(p + off + Vector3(0, s * 0.55, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(rng.randf_range(0.0, 0.14)), 11, 5)
 	if rng.randf() < 0.3:
 		var bloom := [Color(0.98, 0.6, 0.75), Color(0.98, 0.95, 0.85), Color(1.0, 0.85, 0.3)][rng.randi_range(0, 2)] as Color
 		for i in 5:
@@ -448,8 +468,8 @@ static func _build_grass(root: Node3D, bounds: Rect2, decor: Rect2, rng: RandomN
 		var fk := MeshKit.new()
 		for j in 5:
 			var a := TAU * j / 5.0
-			fk.add_sphere(0.05, MeshKit.xf(Vector3(sin(a) * 0.05, 0.1, cos(a) * 0.05)), fc, 5, 3)
-		fk.add_sphere(0.035, MeshKit.xf(Vector3(0, 0.12, 0)), Color(1.0, 0.7, 0.2) if fc.b > 0.5 else Color(0.95, 0.55, 0.15), 5, 3)
+			fk.add_sphere(0.05, MeshKit.xf(Vector3(sin(a) * 0.05, 0.1, cos(a) * 0.05)), fc, 4, 2)
+		fk.add_sphere(0.035, MeshKit.xf(Vector3(0, 0.12, 0)), Color(1.0, 0.7, 0.2) if fc.b > 0.5 else Color(0.95, 0.55, 0.15), 4, 2)
 		var fpoints: Array[Transform3D] = []
 		var fcols: Array[Color] = []
 		for i in 110:

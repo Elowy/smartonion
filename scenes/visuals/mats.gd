@@ -3,7 +3,9 @@ extends RefCounted
 ## Shared material factory with caching (owned by the "visuals" module).
 ## Stylised WoW-like look: soft two-band toon shading, warm rim light, toon specular blob and
 ## a thin dark inverted-hull outline (next_pass, cull_front + vertex grow). All shaders work
-## in the GL Compatibility renderer.
+## in the GL Compatibility renderer. The outline pass does not write depth, so it is drawn
+## in the alpha pass only and never enters the (expensive) shadow pass – outlines all share
+## one colour, so their mutual draw order does not matter.
 ##
 ## Every toon shader declares `instance uniform vec4 overlay` (rgb = colour, a = amount):
 ## a per-node hit flash / wind-up tint without duplicating materials –
@@ -92,7 +94,7 @@ void light() {
 
 const _OUTLINE_CODE := """
 shader_type spatial;
-render_mode unshaded, cull_front, depth_draw_opaque;
+render_mode unshaded, cull_front, depth_draw_never, shadows_disabled;
 uniform vec4 color : source_color = vec4(0.07, 0.045, 0.06, 1.0);
 uniform float width = 0.016;
 void vertex() {
