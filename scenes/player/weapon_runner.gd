@@ -186,7 +186,7 @@ func riposte(target: Enemy) -> void:
 		return
 	var dir := flat(target.global_position - player.global_position)
 	dir = dir.normalized() if dir.length_squared() > 0.000001 else player.facing
-	var crit := CombatMath.roll_crit(player.stats, RunState.rng)
+	var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
 	var dmg := CombatMath.weapon_hit_damage(weapon, player.stats) \
 			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
 	Vfx.slash_arc(player.global_position + Vector3.UP * 0.3, dir, 1.4, 70.0, _slash_color())
@@ -255,7 +255,7 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 	for e in hits:
 		if not is_instance_valid(e) or e.is_dead():
 			continue
-		var crit := CombatMath.roll_crit(player.stats, RunState.rng)
+		var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
 		var dmg := base * (crit_mult if crit else 1.0)
 		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color())
 		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration,
@@ -280,7 +280,7 @@ func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false) -> void:
 		var shot := dir
 		if count > 1:
 			shot = dir.rotated(Vector3.UP, deg_to_rad(FAN_STEP_DEGREES * (float(i) - float(count - 1) * 0.5)))
-		var crit := CombatMath.roll_crit(stats, RunState.rng)
+		var crit := player.consume_forced_crit() or CombatMath.roll_crit(stats, RunState.rng)
 		var dmg := CombatMath.weapon_hit_damage(weapon, stats) * (crit_mult if crit else 1.0)
 		var proj := Projectile.create(Projectile.TEAM_PLAYERS, dmg, crit, shot, weapon.projectile_speed,
 				weapon.attack_range + PROJECTILE_EXTRA_RANGE, pierce, radius, player, style, color)
@@ -404,6 +404,7 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 	if valid_attacker != null:
 		var ratio := enemy.hp / enemy.max_hp if enemy.max_hp > 0.0 else 1.0
 		damage *= CombatMath.target_damage_mult(valid_attacker.stats, ratio, enemy.is_elite())
+		damage *= valid_attacker.outgoing_damage_mult(enemy, weapon.school if weapon != null else &"physical", &"weapon")
 	var text_pos := enemy.global_position + Vector3.UP * DAMAGE_TEXT_HEIGHT
 	if valid_attacker != null and valid_attacker.slot != null:
 		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)))

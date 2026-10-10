@@ -22,6 +22,15 @@ enum ArmorType { CLOTH, LEATHER, MAIL, PLATE }
 @export var resource_type: StringName
 @export var resource_color: Color = Color.WHITE
 
+@export_group("Abilities (M3)")
+## Class resources, primary first (Rogue: Energy + Combo Points).
+@export var resources: Array[ResourceData] = []
+## The two core abilities: [0] = RT, [1] = LT (GDD 3).
+@export var abilities: Array[AbilityData] = []
+## Script extending MasteryEffect: Mastery + passive class hooks (pets, auras).
+@export var mastery: Script
+@export_multiline var mastery_text: String
+
 @export_group("Look")
 ## Onion skin colour (GDD 13: Warrior red onion, Mage purple, ...).
 @export var onion_color: Color = Color(0.85, 0.55, 0.3)

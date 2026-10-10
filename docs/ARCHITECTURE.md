@@ -445,3 +445,35 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   and wear it; sell non-upgrades when the backpack is full (never the last weapon); Need only
   real upgrades (`LootRoll.bot_choice`). `SMOKE_RESULT` adds `items_bought`,
   `items_looted`, `loot_rolls`, `need_wins`, `greed_gold`.
+
+## M3: classes – resources, abilities, Mastery
+
+```
+core/abilities/  AbilityRunner (per player, child "Abilities"), ClassResource, AbilityContext,
+                 AbilityEffect (behaviour base), MasteryEffect (Mastery / pets / auras base),
+                 AbilityArea (shared ground AoE: damage / slow / stun / heal ticks)
+data/abilities/  AbilityData (.tres per ability)      data/resources/  ResourceData (.tres)
+scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX, pets
+```
+
+- `ClassData.resources` (primary first), `ClassData.abilities` ([0] = RT, [1] = LT),
+  `ClassData.mastery` (script extending MasteryEffect), `mastery_text`.
+- `AbilityRunner`: 4 slots (0 RT, 1 LT core; 2 RB, 3 LB learned in M4); reads
+  `ability_just_pressed` in `_process`; cooldown = `cooldown x stats.cooldown_mult() x
+  (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
+  gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
+  NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`); bots
+  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast` (every 0.25 s); `is_ready()` is
+  the cheap HUD check.
+- Player hooks: weapon hits → `abilities.on_weapon_hit` (resources, Mastery), damage taken →
+  `on_damage_taken`, kills → `on_kill`, `begin_wave` resets resources and cooldowns;
+  `Player.outgoing_damage_mult(target, school, source)` multiplies weapon hits
+  (`WeaponRunner.apply_hit`), procs / DoTs / abilities (`ProcSystem.deal_raw(..., source)`)
+  by `MasteryEffect.damage_mult` and `Player.damage_mults` (named temporary buffs);
+  `Player.forced_crits` = guaranteed crits for the next weapon hits.
+- Item ability mods (GDD 5.5 class items): `unique_effect = &"ability_mod"`,
+  `unique_params = {"ability": id, "mods": {...}}`; `Player.ability_mods(id)` merges them,
+  `AbilityRunner.apply_mods` applies `<param>_add`, `<param>_pct`, other keys replace.
+- Ability damage: use `CombatMath.weapon_hit_damage(player.main_hand, player.stats) x pct`
+  for weapon-based abilities, `CombatMath.proc_damage(base, school, stats)` for spells, and
+  deal it with `player.procs.deal_raw(enemy, amount, school, true, &"ability")`.

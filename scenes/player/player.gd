@@ -102,6 +102,10 @@ var weapons: Array[WeaponRunner] = []
 var equipment: Equipment
 ## Enchantment / unique-item procs of the equipped items (child node "Procs", GDD 5.7).
 var procs: ProcSystem
+## Class abilities, resources and Mastery (child node "Abilities", GDD 3).
+var abilities: AbilityRunner
+## The next N weapon hits are guaranteed critical strikes (Vanish, talents ...).
+var forced_crits := 0
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
@@ -147,6 +151,8 @@ static func create(p_slot: PlayerSlot) -> Player:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
 	p.procs = ProcSystem.create(p)
+	p.abilities = AbilityRunner.create(p)
+	p.add_child(p.abilities)
 	p.add_child(p.procs)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons()
@@ -193,6 +199,8 @@ func begin_wave() -> void:
 		runner.reset()
 	if procs != null:
 		procs.begin_wave()
+	if abilities != null:
+		abilities.begin_wave()
 
 
 ## Called by enemies / enemy projectiles. Rolls dodge, parry (melee: negates the hit and
@@ -243,6 +251,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	_shake_camera(HIT_SHAKE)
 	_hp_updated()
 	damage_taken.emit(dmg, source)
+	if abilities != null:
+		abilities.on_damage_taken(dmg)
 	if hp <= 0.0:
 		_go_down()
 	_thorns(attacker, kind)
@@ -278,12 +288,16 @@ func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_c
 		heal(1.0)
 	if roll_procs and procs != null and target != null and is_instance_valid(target):
 		procs.on_hit(target, damage, weapon, is_crit, is_extra)
+	if abilities != null:
+		abilities.on_weapon_hit(target, damage, is_crit)
 
 
 ## Called by an Enemy this player killed (any damage of this player: weapon, proc, Thorns).
 ## Life on Kill (% chance to heal 1) and on-kill procs; a downed hero only gets the credit.
 func notify_kill(enemy: Node3D) -> void:
 	enemy_killed.emit(enemy)
+	if abilities != null and not downed:
+		abilities.on_kill(enemy)
 	if downed:
 		return
 	if stats.get_raw(Stats.LIFE_ON_KILL) > 0.0 and CombatMath.roll_life_on_kill(stats, RunState.rng):
@@ -375,6 +389,49 @@ func block_chance() -> float:
 	if off_hand != null:
 		total += off_hand.block_chance
 	return total
+
+
+## Multiplier on all outgoing damage of this player (Mastery, ability buffs ...).
+## [param source]: &"weapon", &"proc", &"dot", &"ability", &"pet". [param target] may be null.
+func outgoing_damage_mult(target: Node3D, school: StringName, source: StringName) -> float:
+	var m := 1.0
+	if abilities != null and abilities.mastery != null:
+		m *= abilities.mastery.damage_mult(target, school, source)
+	for v in damage_mults.values():
+		m *= v
+	return maxf(0.0, m)
+
+
+## Temporary named outgoing-damage multipliers set by abilities / talents (key -> mult).
+var damage_mults: Dictionary[StringName, float] = {}
+
+
+## Consumes one guaranteed critical strike (Vanish ...). Weapon runners call this.
+func consume_forced_crit() -> bool:
+	if forced_crits <= 0:
+		return false
+	forced_crits -= 1
+	return true
+
+
+## Item modifiers for ability [param ability_id] from equipped items whose unique_effect is
+## &"ability_mod" and unique_params.ability == ability_id (merged "mods" dictionaries; see
+## AbilityRunner.apply_mods for the key conventions).
+func ability_mods(ability_id: StringName) -> Dictionary:
+	var out := {}
+	if equipment == null:
+		return out
+	for item in equipment.equipped_items():
+		if item.unique_effect != &"ability_mod" or StringName(item.unique_params.get("ability", "")) != ability_id:
+			continue
+		var mods: Dictionary = item.unique_params.get("mods", {})
+		for key: String in mods:
+			var v: Variant = mods[key]
+			if typeof(v) in [TYPE_INT, TYPE_FLOAT] and out.has(key) and typeof(out[key]) in [TYPE_INT, TYPE_FLOAT]:
+				out[key] = float(out[key]) + float(v)
+			else:
+				out[key] = v
+	return out
 
 
 ## Revives a downed player at [param hp_ratio] of max HP (min 1 HP).
@@ -780,6 +837,11 @@ static func _format_amount(value: float) -> String:
 	if is_zero_approx(fmod(tenths, 10.0)):
 		return str(int(tenths / 10.0))
 	return "%.1f" % (tenths / 10.0)
+
+
+func _exit_tree() -> void:
+	if abilities != null:
+		abilities.teardown()
 
 
 func _notification(what: int) -> void:

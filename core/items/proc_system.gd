@@ -306,12 +306,15 @@ func deal(target: Enemy, base: float, school: StringName) -> float:
 	return deal_raw(target, CombatMath.proc_damage(base, school, player.stats), school, true)
 
 
-## Applies [param amount] as this player's non-weapon damage (procs, DoT ticks, Thorns):
+## Applies [param amount] as this player's non-weapon damage (procs, DoT ticks, Thorns,
+## abilities – [param source] &"proc" / &"dot" / &"ability" / &"pet" for Mastery hooks):
 ## records it, credits a kill, shows a number in the school colour. [param target_bonus]:
 ## Executioner / Slayer apply. Returns the damage dealt.
-func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bool = true) -> float:
+func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bool = true,
+		source: StringName = &"proc") -> float:
 	if player == null or amount <= 0.0 or not _is_live(target):
 		return 0.0
+	amount *= player.outgoing_damage_mult(target, school, source)
 	if target_bonus:
 		var ratio := target.hp / target.max_hp if target.max_hp > 0.0 else 1.0
 		amount *= CombatMath.target_damage_mult(player.stats, ratio, target.is_elite())
@@ -787,7 +790,7 @@ func _tick_dots(delta: float) -> void:
 		var amount := d.owed
 		d.owed = 0.0
 		if amount > 0.0:
-			deal_raw(e, amount, d.school, true)
+			deal_raw(e, amount, d.school, true, &"dot")
 		var died := not _is_live(e)
 		if d.left <= TIME_EPSILON or died:
 			if i < _dots.size() and _dots[i] == d:
