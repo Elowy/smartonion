@@ -10,10 +10,14 @@ extends HBoxContainer
 
 const SLOT_COUNT := AbilityRunner.MAX_SLOTS
 const SEPARATION := 6
+## Costs (item mods can change them) are re-read this often (s).
+const COST_REFRESH := 0.25
 
 var runner: AbilityRunner
 var input: PlayerInput
 var icons: Array[AbilityIcon] = []
+
+var _cost_timer := 0.0
 
 
 static func create(mirrored: bool = false, icon_size: float = AbilityIcon.SIZE) -> AbilityBar:
@@ -91,14 +95,25 @@ func _rebuild() -> void:
 	refresh()
 
 
-## Pushes cooldown / readiness of every slot into the icons.
-func refresh() -> void:
+## Tooltip text of slot [param slot]: the description with the item-modded params filled in
+## (AbilityRunner.params_for), numbers without trailing ".0".
+func description_for(slot: int) -> String:
+	if not is_instance_valid(runner) or slot < 0 or slot >= runner.slots.size() or runner.slots[slot] == null:
+		return ""
+	return AbilityIcon.format_description(runner.slots[slot], runner.params_for(runner.slots[slot]))
+
+
+## Pushes cooldown / readiness of every slot into the icons. [param with_costs] also re-reads
+## the costs (done every COST_REFRESH seconds by the per-frame update).
+func refresh(with_costs: bool = false) -> void:
 	if not is_instance_valid(runner):
 		return
 	for i in SLOT_COUNT:
 		var icon := icons[i]
 		if icon.ability == null:
 			continue
+		if with_costs:
+			icon.set_cost(runner.cost_of(icon.ability))
 		var left := runner.remaining(i)
 		icon.set_state(runner.cooldown_ratio(i), left, left <= 0.0 and runner.is_ready(i))
 
@@ -109,8 +124,12 @@ func _on_ability_cast(slot_index: int, _ability: AbilityData) -> void:
 	refresh()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not is_instance_valid(runner):
 		set_process(false)
 		return
-	refresh()
+	_cost_timer -= delta
+	var with_costs := _cost_timer <= 0.0
+	if with_costs:
+		_cost_timer = COST_REFRESH
+	refresh(with_costs)

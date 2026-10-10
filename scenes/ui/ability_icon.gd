@@ -219,6 +219,13 @@ func set_ability(a: AbilityData, p_cost: float = -1.0, p_cost_color: Color = Col
 	queue_redraw()
 
 
+## Updates the cost shown in the corner (item mods can change it).
+func set_cost(p_cost: float) -> void:
+	if not is_equal_approx(p_cost, cost):
+		cost = p_cost
+		queue_redraw()
+
+
 func set_prompt(text: String, keyboard: bool = false) -> void:
 	prompt = text
 	prompt_keyboard = keyboard
