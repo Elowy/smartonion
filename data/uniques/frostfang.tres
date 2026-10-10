@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/dagger.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"frostfang"
+display_name = "Frostfang"
+flavor = "The blade fogs your breath."
+slot_type = 11
+armor_type = -1
+rarity = 3
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"agility": 8.0,
+&"crit": 5.0,
+&"frost_damage": 10.0
+})
+class_restriction = &""
+unique_effect = &"slow"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 6.0,
+"pct": 40.0,
+"duration": 3.0
+}
+unique_text = "Chance on hit: Chills the target, slowing it by 40% for 3 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

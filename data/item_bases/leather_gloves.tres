@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/item_base.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"leather_gloves"
+display_name = "Gloves"
+slot_type = 5
+armor_type = 1
+weight = 1.0
+look = &""

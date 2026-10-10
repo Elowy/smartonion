@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ember_of_the_forge"
+display_name = "Ember of the Forge"
+flavor = "Still warm from an anvil nobody remembers."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"fire_damage": 10.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 6.0,
+"icd": 1.0,
+"damage": 18.0,
+"radius": 2.5,
+"school": "fire",
+"at": "target"
+}
+unique_text = "Chance on hit: Erupts in flame, dealing 18 Fire damage to enemies around the target."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

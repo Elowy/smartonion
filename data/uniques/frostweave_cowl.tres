@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"frostweave_cowl"
+display_name = "Frostweave Cowl"
+flavor = "Knitted from the first snow of winter."
+slot_type = 0
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 6.0,
+&"area_size": 15.0
+})
+class_restriction = &"mage"
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 3.0,
+"icd": 1.0,
+"damage": 14.0,
+"radius": 2.5,
+"school": "frost",
+"at": "target",
+"slow": 40.0
+}
+unique_text = "Chance on hit: A flurry of ice hits the target, dealing 14 Frost damage to nearby enemies and slowing them by 40%."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

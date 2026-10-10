@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/sword.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"stormcaller"
+display_name = "Stormcaller"
+flavor = "The sky remembers every oath sworn upon this blade."
+slot_type = 11
+armor_type = -1
+rarity = 4
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"crit": 5.0,
+&"haste": 5.0
+})
+class_restriction = &""
+unique_effect = &"chain"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 3.0,
+"icd": 0.5,
+"damage": 20.0,
+"targets": 4,
+"school": "nature"
+}
+unique_text = "Chance on hit: Calls down a bolt of lightning that jumps to 4 enemies for 20 Nature damage."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

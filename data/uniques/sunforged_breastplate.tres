@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"sunforged_breastplate"
+display_name = "Sunforged Breastplate"
+flavor = "Hammered at noon, on the longest day of the year."
+slot_type = 3
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"stamina": 10.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "when_struck",
+"chance": 10.0,
+"icd": 4.0,
+"damage": 15.0,
+"radius": 3.0,
+"school": "holy",
+"at": "self"
+}
+unique_text = "When struck: 10% chance to release a burst of holy light, dealing 15 Holy damage to enemies around you."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

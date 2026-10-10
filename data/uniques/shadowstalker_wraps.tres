@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shadowstalker_wraps"
+display_name = "Shadowstalker Wraps"
+flavor = "You were never here."
+slot_type = 4
+armor_type = 1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"agility": 4.0,
+&"dodge": 3.0
+})
+class_restriction = &"rogue"
+unique_effect = &"buff"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 0.3,
+"icd": 30.0,
+"stats": {
+&"dodge": 40.0,
+&"speed": 20.0
+},
+"duration": 3.0
+}
+unique_text = "Equip: When you fall below 30% health, you melt into the shadows, gaining 40% Dodge and 20% Speed for 3 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

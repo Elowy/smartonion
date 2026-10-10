@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bramblethorn_bracers"
+display_name = "Bramblethorn Bracers"
+flavor = "Grown, not stitched."
+slot_type = 4
+armor_type = 1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"agility": 4.0,
+&"stamina": 3.0,
+&"thorns": 3.0
+})
+class_restriction = &""
+unique_effect = &"reflect"
+unique_params = {
+"trigger": "when_struck",
+"chance": 30.0,
+"icd": 1.0,
+"damage": 5.0,
+"school": "nature"
+}
+unique_text = "When struck: 30% chance to lash the attacker with thorns for 5 Nature damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

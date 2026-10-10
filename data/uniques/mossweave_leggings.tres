@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mossweave_leggings"
+display_name = "Mossweave Leggings"
+flavor = "Water twice a week."
+slot_type = 7
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 5.0,
+&"spirit": 4.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "periodic",
+"interval": 10.0,
+"amount": 2.0,
+"target": "self"
+}
+unique_text = "Every 10 sec: Living moss mends your wounds, healing you for 2."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

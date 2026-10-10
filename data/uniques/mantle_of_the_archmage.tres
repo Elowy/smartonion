@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mantle_of_the_archmage"
+display_name = "Mantle of the Archmage"
+flavor = "Embroidered with spells too rude to cast."
+slot_type = 2
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 9.0,
+&"resource_regen": 25.0,
+&"spell_power": 4.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"damage": 18.0,
+"school": "arcane"
+}
+unique_text = "Chance on hit: Fires an arcane missile at the target for 18 Arcane damage."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

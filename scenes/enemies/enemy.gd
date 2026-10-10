@@ -16,8 +16,10 @@ extends CharacterBody3D
 ##            throw an axe (Projectile, TEAM_ENEMIES) after a short wind-up.
 ## With no living player the enemy wanders. Touching a living player (distance <=
 ## radius + Player.RADIUS) deals contact damage, at most once per CONTACT_COOLDOWN.
-## Damage taken by the enemy is recorded by the attacker side (WeaponRunner); the enemy only
-## handles knockback, hit flash and death (kill credit, death puff, loot, [signal died]).
+## Damage taken by the enemy is recorded by the attacker side (WeaponRunner / ProcSystem); the
+## enemy only handles knockback, hit flash, slows and death (kill credit, death puff, loot,
+## item drops via [method LootDrops.on_enemy_killed], [method Player.notify_kill] for the
+## killing Player, [signal died]).
 ## Players are looked up through the shared per-tick [LivingPlayers] snapshot.
 
 signal died(enemy: Enemy, killer_index: int)
@@ -111,6 +113,9 @@ var attack_cooldown_left := 0.0
 ## Seconds until the next contact hit may land.
 var contact_cooldown_left := 0.0
 var stun_left := 0.0
+## Movement slow (procs such as Frostbite): percent and seconds left (the strongest wins).
+var slow_pct := 0.0
+var slow_left := 0.0
 var knockback_velocity := Vector3.ZERO
 
 var _dead := false
@@ -211,6 +216,29 @@ func is_dead() -> bool:
 
 func is_stunned() -> bool:
 	return stun_left > 0.0
+
+
+## Elites and bosses (Slayer bonus). Regular enemies only until M5 / M6 add elites.
+func is_elite() -> bool:
+	return false
+
+
+func is_slowed() -> bool:
+	return slow_left > 0.0 and slow_pct > 0.0
+
+
+## Slows walking (and lunges) by [param pct] percent (at most 90) for [param duration]
+## seconds. A stronger slow replaces the running one, an equal one extends it, a weaker one
+## is ignored while the stronger one lasts.
+func apply_slow(pct: float, duration: float) -> void:
+	if is_dead() or pct <= 0.0 or duration <= 0.0:
+		return
+	var p := clampf(pct, 0.0, 90.0)
+	if slow_left <= 0.0 or p > slow_pct:
+		slow_pct = p
+		slow_left = duration
+	elif is_equal_approx(p, slow_pct):
+		slow_left = maxf(slow_left, duration)
 
 
 ## [param attacker] is the Player (or null). [param knockback] is a world-space impulse.
@@ -324,6 +352,11 @@ func _physics_process(delta: float) -> void:
 	if attack_cooldown_left > 0.0:
 		attack_cooldown_left -= delta
 	var stunned := stun_left > 0.0
+	if slow_left > 0.0:
+		slow_left -= delta
+		if slow_left <= 0.0:
+			slow_left = 0.0
+			slow_pct = 0.0
 	if stunned:
 		stun_left -= delta
 		if stun_left <= 0.0:
@@ -539,7 +572,10 @@ func _apply_movement(delta: float, here: Vector3, stunned: bool) -> void:
 		knockback_velocity *= exp(-KNOCKBACK_DECAY * delta)
 		if knockback_velocity.length_squared() < 0.0025:
 			knockback_velocity = Vector3.ZERO
-	velocity = EnemyGrid.crowd_velocity(self, _move_velocity + knockback_velocity, delta, not stunned)
+	var walk := _move_velocity
+	if slow_left > 0.0:
+		walk *= 1.0 - slow_pct / 100.0
+	velocity = EnemyGrid.crowd_velocity(self, walk + knockback_velocity, delta, not stunned)
 	if velocity.length_squared() < 0.000001:
 		velocity = Vector3.ZERO
 		return
@@ -618,17 +654,24 @@ func _die(attacker: Node3D) -> void:
 		return
 	_dead = true
 	var killer_index := -1
+	var killer: Player = null
 	if attacker != null and is_instance_valid(attacker):
-		var player := attacker as Player
-		if player != null and player.slot != null:
-			killer_index = player.slot.index
+		killer = attacker as Player
+		if killer != null and killer.slot != null:
+			killer_index = killer.slot.index
 	RunState.record_kill(killer_index)
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
 		_drop_loot(pos)
+	# Item drops (GDD 10.1) – the killer's Fortune counts (null killer: base chance).
+	LootDrops.on_enemy_killed(self, attacker if attacker != null and is_instance_valid(attacker) else null)
 	_leave_world()
 	died.emit(self, killer_index)
+	# On-kill effects of the killing hero (Life on Kill, on-kill procs) – after the enemy left
+	# the world, so a corpse explosion never hits the corpse itself.
+	if killer != null and is_instance_valid(killer):
+		killer.notify_kill(self)
 	queue_free()
 
 

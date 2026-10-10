@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/wand.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"emberglow_wand"
+display_name = "Emberglow Wand"
+flavor = "Smells faintly of toast."
+slot_type = 11
+armor_type = -1
+rarity = 2
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 5.0,
+&"fire_damage": 10.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"damage": 14.0,
+"school": "fire"
+}
+unique_text = "Chance on hit: Launches a cinder at the target for 14 Fire damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

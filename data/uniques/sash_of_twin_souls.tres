@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"sash_of_twin_souls"
+display_name = "Sash of Twin Souls"
+flavor = "Two souls, one waistline."
+slot_type = 6
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 6.0,
+&"agility": 6.0,
+&"cooldown_reduction": 15.0
+})
+class_restriction = &""
+unique_effect = &"extra_attack"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"icd": 1.0,
+"count": 1
+}
+unique_text = "Chance on hit: Your twin soul strikes alongside you, attacking again at once."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

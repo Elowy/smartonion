@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"pendant_of_the_starless_night"
+display_name = "Pendant of the Starless Night"
+flavor = "Hold it up to the sky and the stars go out."
+slot_type = 1
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"haste": 5.0,
+&"mastery": 5.0,
+&"shadow_damage": 10.0
+})
+class_restriction = &""
+unique_effect = &"explode"
+unique_params = {
+"trigger": "on_kill",
+"chance": 15.0,
+"damage": 15.0,
+"radius": 2.5,
+"school": "shadow"
+}
+unique_text = "On kill: 15% chance the enemy collapses into shadow, dealing 15 Shadow damage to enemies nearby."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

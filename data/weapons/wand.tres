@@ -18,6 +18,7 @@ cooldown = 0.6
 crit_mult = 2.0
 knockback = 2.0
 stun_chance = 0.0
+school = &"arcane"
 attack_range = 8.0
 arc_degrees = 100.0
 projectile_speed = 18.0
