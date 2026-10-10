@@ -77,6 +77,14 @@ const BODY_CENTER_HEIGHT := 0.6
 ## move_and_slide iterations: 2 lets enemies slide along a wall (they only collide with the
 ## world, so a second slide is only ever needed in a corner).
 const MAX_SLIDES := 2
+## Open-field fast path: an enemy whose step stays this far (m, beyond its radius) inside the
+## part of the arena that holds no world collider moves directly – move_and_slide would not
+## hit anything there. Once per physics tick one shape query checks that the arena interior
+## (inside the walls) is free of world colliders; any prop on the world layer switches the
+## fast path off for that tick and everybody uses move_and_slide.
+const OPEN_FIELD_MARGIN := 0.05
+## Height range (m above the ground) of the interior check (enemy bodies live in it).
+const OPEN_FIELD_HEIGHT := Vector2(0.05, 2.0)
 ## Loot lands up to this far (m) from the death position.
 const LOOT_SCATTER := 0.4
 ## State timers end this close to zero (keeps frame counts exact despite float error).
@@ -127,6 +135,15 @@ var _players_serial := -1
 ## this enemy in that build, and the last build this enemy moved with.
 var _grid_tag := -1
 var _grid_used := -1
+
+# Open-field fast path (see OPEN_FIELD_MARGIN): the collider-free interior of this tick.
+static var _open_frame := -1
+static var _open_ok := false
+static var _open_min_x := 0.0
+static var _open_max_x := 0.0
+static var _open_min_z := 0.0
+static var _open_max_z := 0.0
+static var _open_query: PhysicsShapeQueryParameters3D
 
 # Frame-cached list of the players in the tree (shared by all enemies and pickups).
 static var _player_cache: Array[Player] = []
@@ -336,7 +353,7 @@ func _physics_process(delta: float) -> void:
 				_update_ranged(delta, here)
 			_:
 				_update_chase(delta, here)
-	_apply_movement(delta, stunned)
+	_apply_movement(delta, here, stunned)
 	if model != null:
 		# Only forward noticeable changes (the model smooths them anyway).
 		if _facing.dot(_sent_facing) < 0.9995:
@@ -515,9 +532,9 @@ func _steer(desired: Vector3, delta: float) -> void:
 
 
 ## Walk + knockback, adjusted by the crowd ([method EnemyGrid.crowd_velocity]: slides along
-## touching neighbours, pushes out of overlaps – not while stunned), then one move_and_slide
-## against the world.
-func _apply_movement(delta: float, stunned: bool) -> void:
+## touching neighbours, pushes out of overlaps – not while stunned), then a move against the
+## world: directly in the open field (nothing to hit there), else move_and_slide.
+func _apply_movement(delta: float, here: Vector3, stunned: bool) -> void:
 	if knockback_velocity != Vector3.ZERO:
 		knockback_velocity *= exp(-KNOCKBACK_DECAY * delta)
 		if knockback_velocity.length_squared() < 0.0025:
@@ -525,6 +542,15 @@ func _apply_movement(delta: float, stunned: bool) -> void:
 	velocity = EnemyGrid.crowd_velocity(self, _move_velocity + knockback_velocity, delta, not stunned)
 	if velocity.length_squared() < 0.000001:
 		velocity = Vector3.ZERO
+		return
+	var nx := here.x + velocity.x * delta
+	var nz := here.z + velocity.z * delta
+	if _open_frame != Engine.get_physics_frames():
+		_update_open_field(self)
+	var m := radius + OPEN_FIELD_MARGIN
+	if _open_ok and here.y == 0.0 and nx - m >= _open_min_x and nx + m <= _open_max_x \
+			and nz - m >= _open_min_z and nz + m <= _open_max_z:
+		global_position = Vector3(nx, 0.0, nz)
 		return
 	move_and_slide()
 	var pos := global_position
@@ -536,6 +562,42 @@ func _apply_movement(delta: float, stunned: bool) -> void:
 		if Arena.current != null:
 			fixed = Arena.current.clamp_point(fixed, radius)
 		global_position = fixed
+
+
+## Once per physics tick: is the arena interior (inside the walls) free of world colliders?
+static func _update_open_field(e: Enemy) -> void:
+	_open_frame = Engine.get_physics_frames()
+	_open_ok = false
+	var arena := Arena.current
+	if arena == null or not arena.is_inside_tree() or not e.is_inside_tree():
+		return
+	var world := e.get_world_3d()
+	var space := world.direct_space_state if world != null else null
+	if space == null:
+		return
+	var b := arena.get_bounds()
+	if not b.has_area():
+		return
+	if _open_query == null:
+		_open_query = PhysicsShapeQueryParameters3D.new()
+		_open_query.shape = BoxShape3D.new()
+		_open_query.collision_mask = COLLISION_MASK_WORLD
+		_open_query.collide_with_areas = false
+		_open_query.collide_with_bodies = true
+	# Slightly smaller than the bounds: the walls' inner faces lie exactly on them.
+	var inner := b.grow(-0.02)
+	var height := OPEN_FIELD_HEIGHT.y - OPEN_FIELD_HEIGHT.x
+	(_open_query.shape as BoxShape3D).size = Vector3(inner.size.x, height, inner.size.y)
+	var center := inner.get_center()
+	_open_query.transform = Transform3D(Basis.IDENTITY,
+			Vector3(center.x, OPEN_FIELD_HEIGHT.x + height * 0.5, center.y))
+	if not space.intersect_shape(_open_query, 1).is_empty():
+		return
+	_open_ok = true
+	_open_min_x = b.position.x
+	_open_max_x = b.end.x
+	_open_min_z = b.position.y
+	_open_max_z = b.end.y
 
 
 ## Normalised XZ direction to the current target (or the current facing).
