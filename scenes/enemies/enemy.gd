@@ -411,11 +411,14 @@ func _scan_players(here: Vector3, stunned: bool) -> void:
 	var players := LivingPlayers.players
 	var xs := LivingPlayers.pos_x
 	var zs := LivingPlayers.pos_z
+	var hidden := LivingPlayers.stealthed
 	var reach := radius + Player.RADIUS
 	var reach_sq := reach * reach
 	var can_hit := not stunned and contact_cooldown_left <= 0.0
 	var best := -1
 	for i in n:
+		if hidden[i] != 0:
+			continue  # stealthed (Vanish): neither touched nor chased
 		var dx := xs[i] - here.x
 		var dz := zs[i] - here.z
 		var d_sq := dx * dx + dz * dz

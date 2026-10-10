@@ -82,13 +82,18 @@ func effect_for(ability: AbilityData) -> AbilityEffect:
 	return _effects.get(ability.id) if ability != null else null
 
 
-## Full cooldown after Haste (half effect) and Cooldown Reduction.
-func cooldown_of(ability: AbilityData) -> float:
-	if ability == null or ability.cooldown <= 0.0:
+## Full cooldown: the "cooldown" param (after item mods, from [param ctx] when given), then
+## Haste (half effect) and Cooldown Reduction.
+func cooldown_of(ability: AbilityData, ctx: AbilityContext = null) -> float:
+	if ability == null:
+		return 0.0
+	var params := ctx.params if ctx != null else params_for(ability)
+	var base := float(params.get("cooldown", ability.cooldown))
+	if base <= 0.0:
 		return 0.0
 	var cdr := clampf(player.stats.get_raw(Stats.COOLDOWN_REDUCTION), 0.0, 60.0) if player != null else 0.0
 	var mult := player.stats.cooldown_mult() if player != null else 1.0
-	return ability.cooldown * mult * (1.0 - cdr / 100.0)
+	return base * mult * (1.0 - cdr / 100.0)
 
 
 func remaining(index: int) -> float:
@@ -103,12 +108,12 @@ func cooldown_ratio(index: int) -> float:
 	return clampf(remaining(index) / full, 0.0, 1.0) if full > 0.0 else 0.0
 
 
+## Resource cost: the "cost" param after item mods (from [param ctx] when given).
 func cost_of(ability: AbilityData, ctx: AbilityContext = null) -> float:
 	if ability == null:
 		return 0.0
-	if ctx != null and ctx.params.has("cost"):
-		return maxf(0.0, ctx.num("cost"))
-	return ability.cost
+	var params := ctx.params if ctx != null else params_for(ability)
+	return maxf(0.0, float(params.get("cost", ability.cost)))
 
 
 func can_afford(ability: AbilityData, ctx: AbilityContext = null) -> bool:
@@ -145,7 +150,7 @@ func try_cast(index: int) -> bool:
 		return false
 	if a.resource != &"":
 		get_resource(a.resource).spend(cost_of(a, ctx))
-	_cooldown_left[a.id] = cooldown_of(a)
+	_cooldown_left[a.id] = cooldown_of(a, ctx)
 	ability_cast.emit(index, a)
 	return true
 
@@ -157,7 +162,7 @@ func build_context(ability: AbilityData) -> AbilityContext:
 	ctx.ability = ability
 	ctx.rank = ranks.get(ability.id, 0)
 	ctx.rng = RunState.rng
-	ctx.params = apply_mods(ability.params, player.ability_mods(ability.id) if player != null else {})
+	ctx.params = params_for(ability)
 	var here := player.global_position if player != null and player.is_inside_tree() else Vector3.ZERO
 	ctx.point = here
 	ctx.direction = player.facing if player != null else Vector3.FORWARD
@@ -193,10 +198,18 @@ func _light_context(ability: AbilityData) -> AbilityContext:
 	ctx.ability = ability
 	ctx.rank = ranks.get(ability.id, 0)
 	ctx.rng = RunState.rng
-	ctx.params = apply_mods(ability.params, player.ability_mods(ability.id) if player != null else {})
+	ctx.params = params_for(ability)
 	ctx.point = player.global_position if player != null and player.is_inside_tree() else Vector3.ZERO
 	ctx.direction = player.facing if player != null else Vector3.FORWARD
 	return ctx
+
+
+## The ability's params with "cooldown" / "cost" filled in from the data (unless the params
+## set them) and the player's item mods applied – so "cooldown_add": -5 works on any ability.
+func params_for(ability: AbilityData) -> Dictionary:
+	var base := {"cooldown": ability.cooldown, "cost": ability.cost}
+	base.merge(ability.params, true)
+	return apply_mods(base, player.ability_mods(ability.id) if player != null else {})
 
 
 ## Applies item mods to [param base] params. Keys: "<param>_add" adds, "<param>_pct" scales

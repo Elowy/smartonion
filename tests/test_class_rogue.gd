@@ -113,6 +113,11 @@ func test_class_items_are_ability_mods() -> void:
 		check_eq(u.unique_effect, &"ability_mod", "%s is an ability mod" % u.id)
 		check_eq(u.class_restriction, &"rogue", "%s keeps its class" % u.id)
 		check(u.unique_text.begins_with("Equip:"), "%s text" % u.id)
+	var ability_ids: Array[StringName] = []
+	for a in Db.get_class_data(&"rogue").abilities:
+		ability_ids.append(a.id)
+	check(StringName(wraps.unique_params["ability"]) in ability_ids, "wraps target a Rogue ability")
+	check(StringName(blade.unique_params["ability"]) in ability_ids, "blade targets a Rogue ability")
 	check_eq(wraps.unique_params["ability"], "vanish", "wraps target")
 	check_eq(wraps.unique_params["mods"]["cooldown_add"], -5.0, "-5 s cooldown")
 	check_eq(blade.unique_params["ability"], "fan_of_knives", "blade target")
@@ -290,10 +295,9 @@ func test_vanish_hides_the_rogue_for_two_seconds() -> void:
 	check(rogue.abilities.try_cast(1), "cast")
 	check(effect.is_active(), "active")
 	check_near(effect.time_left(), 2.0, 0.001, "2 seconds")
-	check_near(rogue.invulnerable_left, 2.0, 0.001, "untouchable while hidden (fallback for the stealth hook)")
-	var hp_before := rogue.hp
-	rogue.take_damage(5.0)
-	check_eq(rogue.hp, hp_before, "no damage taken while hidden")
+	check_near(rogue.stealth_left, 2.0, 0.001, "stealthed while hidden")
+	check(rogue.is_stealthed(), "enemies lose the rogue")
+	check_eq(rogue.invulnerable_left, 0.0, "no extra invulnerability (stealth only)")
 	check(meshes.size() > 5, "the model has meshes")
 	var ghost: Material = meshes[0].material_override
 	check(ghost is ShaderMaterial and (ghost as ShaderMaterial).get_shader_parameter("color").a < 0.5,
@@ -305,7 +309,7 @@ func test_vanish_hides_the_rogue_for_two_seconds() -> void:
 		rogue.abilities._physics_process(DT)
 		rogue._physics_process(DT)
 	check(effect.is_active(), "still hidden after 1.7 s")
-	check(rogue.invulnerable_left > 0.0, "and still untouchable")
+	check(rogue.is_stealthed(), "and still stealthed")
 	for i in 21:
 		rogue.abilities._physics_process(DT)
 		rogue._physics_process(DT)
@@ -315,10 +319,7 @@ func test_vanish_hides_the_rogue_for_two_seconds() -> void:
 		check_eq(mi.cast_shadow, shadows[mi], "%s casts its shadow again" % mi.name)
 	for i in meshes.size():
 		check(meshes[i].material_override == originals[i], "the model's own material is back")
-	check_eq(rogue.invulnerable_left, 0.0, "the invulnerability window is over too")
-	var hp := rogue.hp
-	rogue.take_damage(1.0)
-	check(rogue.hp < hp, "damage lands again")
+	check(not rogue.is_stealthed(), "the stealth is over too")
 
 
 func test_vanish_cooldown_and_cooldown_mod() -> void:
@@ -348,14 +349,24 @@ func test_vanish_cooldown_mod_scales_with_cooldown_reduction() -> void:
 	check_near(rogue.abilities.remaining(1), 10.0 * 0.8 - DT, 0.01, "(15 - 5) x (1 - 20%)")
 
 
-func test_vanish_stealth_hook_is_used_when_the_player_has_one() -> void:
-	# Without the core hook the property does not exist; apply_stealth must not fail either way.
+func test_vanish_stealth_and_optional_invulnerability() -> void:
 	RogueVanish.apply_stealth(rogue, 1.0, false)
-	check_eq(rogue.invulnerable_left, 0.0, "no fallback when switched off")
-	RogueVanish.apply_stealth(rogue, 1.0, true)
-	check_near(rogue.invulnerable_left, 1.0, 0.001, "fallback window")
-	if RogueVanish.STEALTH_PROPERTY in rogue:
-		check_near(float(rogue.get(RogueVanish.STEALTH_PROPERTY)), 1.0, 0.001, "core hook set")
+	check_near(rogue.stealth_left, 1.0, 0.001, "stealth set")
+	check_eq(rogue.invulnerable_left, 0.0, "no invulnerability unless asked")
+	RogueVanish.apply_stealth(rogue, 0.5, true)
+	check_near(rogue.stealth_left, 1.0, 0.001, "a shorter stealth does not cut the running one")
+	check_near(rogue.invulnerable_left, 0.5, 0.001, "optional invulnerability window")
+	rogue.take_damage(9999.0)
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(rogue.downed, "downed")
+	check(not rogue.is_stealthed(), "going down ends the stealth")
+
+
+func test_vanish_stealth_ends_at_wave_start() -> void:
+	check(rogue.abilities.try_cast(1), "cast")
+	rogue.begin_wave()
+	check(not rogue.is_stealthed(), "no stealth carried into the next wave")
 
 
 # --- Bots ---------------------------------------------------------------------------------

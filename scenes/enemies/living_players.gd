@@ -24,6 +24,8 @@ static var pos_x := PackedFloat64Array()
 static var pos_z := PackedFloat64Array()
 ## Squared [method StatBlock.pickup_range] of each player.
 static var pickup_range_sq := PackedFloat64Array()
+## 1 = the player is stealthed ([method Player.is_stealthed]): enemies skip it, pickups do not.
+static var stealthed := PackedByteArray()
 
 static var _frame := -1
 static var _group_count := -1
@@ -61,6 +63,7 @@ static func _rebuild(tree: SceneTree, frame: int, group_count: int) -> void:
 	var xs := PackedFloat64Array()
 	var zs := PackedFloat64Array()
 	var ranges := PackedFloat64Array()
+	var hidden := PackedByteArray()
 	for p in Enemy.cached_players(tree):
 		if not Enemy.is_living_player(p):
 			continue
@@ -70,10 +73,12 @@ static func _rebuild(tree: SceneTree, frame: int, group_count: int) -> void:
 		xs.append(pos.x)
 		zs.append(pos.z)
 		ranges.append(reach * reach)
+		hidden.append(1 if p.stealth_left > 0.0 else 0)
 	players = list
 	pos_x = xs
 	pos_z = zs
 	pickup_range_sq = ranges
+	stealthed = hidden
 	count = list.size()
 
 
@@ -85,4 +90,5 @@ static func _clear() -> void:
 	pos_x = PackedFloat64Array()
 	pos_z = PackedFloat64Array()
 	pickup_range_sq = PackedFloat64Array()
+	stealthed = PackedByteArray()
 	count = 0

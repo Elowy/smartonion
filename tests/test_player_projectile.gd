@@ -144,6 +144,16 @@ func test_enemy_projectile_hits_only_living_players() -> void:
 	check(proj.is_done(), "used up")
 
 
+func test_enemy_projectile_passes_stealthed_players() -> void:
+	var hidden := Fakes.spawn_player(world, 0, &"rogue", Vector3(2, 0, 0))
+	var target := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))
+	hidden.stealth_left = 2.0
+	var proj := _launch(Projectile.TEAM_ENEMIES, 6.0, Vector3.RIGHT, 10.0)
+	_fly(proj, 1.0)
+	check_eq(hidden.hp, hidden.max_hp(), "flies through the stealthed rogue")
+	check(target.hp < target.max_hp(), "hits the player behind")
+
+
 func test_enemy_projectile_kind_respects_avoidance() -> void:
 	var target := Fakes.spawn_player(world, 0, &"warrior", Vector3(3, 0, 0))
 	target.stats.set_source(&"test", {Stats.ARMOR: -2.0, Stats.AVOIDANCE: 50.0})

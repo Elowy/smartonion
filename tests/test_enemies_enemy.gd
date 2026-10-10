@@ -121,6 +121,22 @@ func test_no_contact_damage_out_of_reach_or_downed() -> void:
 	check_eq(player.fake_hits.size(), 0, "downed players are ignored")
 
 
+func test_stealthed_players_are_ignored() -> void:
+	var hidden := EFakes.spawn_player(world, Vector3.ZERO)
+	var other := EFakes.spawn_player(world, Vector3(-8.0, 0.0, 0.0))
+	hidden.stealth_left = 2.0
+	var data := EFakes.enemy_data()
+	var e := EFakes.spawn_enemy(world, data, Vector3(0.6, 0.0, 0.0))
+	EFakes.step(e, 0.5)
+	check_eq(hidden.fake_hits.size(), 0, "no contact damage while stealthed")
+	check(e.global_position.x < 0.6, "chases the visible player instead")
+	other.downed = true
+	hidden.stealth_left = 0.0
+	LivingPlayers.mark_dirty()
+	EFakes.step(e, 0.5)
+	check(hidden.fake_hits.size() >= 1, "found again once the stealth is over")
+
+
 func test_chases_nearest_living_player() -> void:
 	EFakes.spawn_player(world, Vector3(-6.0, 0.0, 0.0))
 	var b := EFakes.spawn_player(world, Vector3(6.0, 0.0, 0.0))

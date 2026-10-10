@@ -112,6 +112,8 @@ var revive_progress := 0.0
 var reviver_count := 0
 ## Remaining invulnerability (i-frames) in seconds.
 var invulnerable_left := 0.0
+## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
+var stealth_left := 0.0
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -183,6 +185,11 @@ func is_alive() -> bool:
 	return not downed
 
 
+## Hidden from enemies (Vanish): still collects pickups and can be healed / revived.
+func is_stealthed() -> bool:
+	return stealth_left > 0.0
+
+
 ## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1).
 func begin_wave() -> void:
 	velocity = Vector3.ZERO
@@ -195,6 +202,7 @@ func begin_wave() -> void:
 		hp = max_hp()
 		_hp_updated()
 	invulnerable_left = 0.0
+	stealth_left = 0.0
 	for runner in weapons:
 		runner.reset()
 	if procs != null:
@@ -516,6 +524,7 @@ func face_attack(direction: Vector3) -> void:
 
 func _physics_process(delta: float) -> void:
 	invulnerable_left = maxf(0.0, invulnerable_left - delta)
+	stealth_left = maxf(0.0, stealth_left - delta)
 	_attack_look_left = maxf(0.0, _attack_look_left - delta)
 	_update_movement(delta)
 	if downed:
@@ -755,6 +764,7 @@ func _go_down() -> void:
 	reviver_count = 0
 	_regen_accum = 0.0
 	invulnerable_left = 0.0
+	stealth_left = 0.0
 	if model != null:
 		model.set_downed(true)
 		model.set_revive_progress(0.0)
