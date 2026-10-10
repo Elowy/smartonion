@@ -1299,3 +1299,4 @@ indulnak.
 | Mentés | Automatikus, minden hullám végén |
 | Meta-progresszió | Eredményekkel nyíló tartalom (B opció) – részletek később |
 | Zene | Egyelőre nincs |
+| Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
