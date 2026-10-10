@@ -42,7 +42,11 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 ```
 
 - **Egy menet = 25 hullám.**
-- Hullámhossz: `20 + 5 × (hullám − 1)` másodperc, maximum 60 mp (a 9. hullámtól 60 mp).
+- Hullámhossz:
+  - **1–10. hullám:** `20 + 5 × (hullám − 1)` másodperc, legfeljebb 60 mp (a 9–10. hullám 60 mp).
+  - **A 10. hullám felett hullámonként +10 mp:** 11. = 70 mp, 15. = 110 mp, 20. = 160 mp,
+    25. = 210 mp.
+  - Egy teljes menet így kb. **42 perc** harc, plusz a hullámok közötti idő.
 - **Különleges hullámok:**
   - **10.** – boss-hullám (mini-raid boss),
   - **20.** – elit-hullám (minden ellenség elit-affixet kap),
@@ -414,9 +418,20 @@ kap az azonos ritkaságú bolti itemhez képest, és a tier set darabok lootban 
 - **Típusok:** Cloth, Leather, Mail, Plate.
 - **Mely slotokra vonatkozik:** Head, Shoulders, Chest, Wrist, Hands, Waist, Legs, Feet.
 - **Implicit Armor (a slot szorzójával):** Cloth +0, Leather +1, Mail +2, Plate +3.
-- **Bármelyik kaszt bármilyen páncélt felvehet.**
+- **Szigorú, WoW-szerű páncél-jártasság:** minden kaszt a saját páncéltípusát és az annál
+  könnyebbeket viselheti.
+
+  | Kaszt | Viselhető |
+  |---|---|
+  | Warrior, Paladin | Plate, Mail, Leather, Cloth |
+  | Hunter, Shaman (M8) | Mail, Leather, Cloth |
+  | Rogue | Leather, Cloth |
+  | Mage, Warlock | Cloth |
+
 - **Armor Specialization:** ha mind a 8 páncélslotban a saját kaszt páncéltípusa van,
-  **+10% elsődleges stat** jár érte.
+  **+10% elsődleges stat** jár érte. Így a Warrior akkor is Plate-et akar hordani, ha egy
+  Leather darab épp jobb statokat ad.
+- **Need-szabály:** Needet csak az nyomhat, aki viselni tudja az itemet (10.1).
 - **Nincs páncéltípusa:** Neck, Ring, Trinket.
 
 ### 5.4 Item-generálás
@@ -568,6 +583,35 @@ választható. Egyébként a szokásos Need / Greed / Pass dobás dönt (10.1).
 | Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad |
 | Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz |
 
+#### Kaszt-specifikus itemek
+
+A WoW-hoz hasonlóan vannak **csak egy kaszt által használható** itemek. A tooltipben külön
+sor jelzi: „*Classes: Mage*”.
+
+- **Mit tudnak:** az erejük nem a statokban van, hanem abban, hogy a kaszt saját
+  képességeit **módosítják**, pl. hosszabb időtartam, extra célpont vagy új mellékhatás.
+- **Honnan:** lootból és a boltból. A közös bolt a csapat kasztjaihoz illőket kínálja
+  (10. fejezet).
+- **Need:** csak az adott kaszt nyomhat rá.
+- **Ritkaság:** Rare-től felfelé léteznek. A tier set darabok is ilyenek.
+
+**Példák (MVP: kasztonként 4, összesen 20)**
+
+| Kaszt | Item | Slot | Hatás |
+|---|---|---|---|
+| Warrior | Gauntlets of the Whirling Blade | Hands | A Whirlwind +1 mp-ig tart, és közben lassít |
+| Warrior | Warbringer's Greaves | Feet | A Charge után 3 mp-ig +20% sebzés |
+| Mage | Frostweave Cowl | Head | A Blizzard területe +30% |
+| Mage | Band of the Blinking Star | Ring | A Blink 2 töltettel használható |
+| Paladin | Libram of Devotion | Off Hand (Tome) | A Word of Glory 1 Holy Powerrel olcsóbb |
+| Paladin | Sabatons of the Dawn | Feet | A Consecration követi a Paladint |
+| Rogue | Shadowstalker Wraps | Wrist | A Vanish 5 mp-mel rövidebb cooldownú |
+| Rogue | Blade of the Thousand Cuts | Main Hand (Dagger) | A Fan of Knives +4 tőrt dob |
+| Warlock | Grimoire of the Imp Lord | Off Hand (Tome) | Az Imp +50% sebzés, és tűzlövedéke 2 célpontot ér |
+| Warlock | Soulbinder's Sash | Waist | Minden 8. ölés ad Soul Shardot (12 helyett) |
+
+A többi 10 a fejlesztés közben készül el, ugyanígy: kasztonként 4.
+
 ### 5.6 Backpack
 
 - **10 hely játékosonként.**
@@ -680,6 +724,7 @@ II: 9–16., III: 17. hullámtól). A rang növeli az értékét vagy a proc seb
 | Stat-utótag („of the Bear” …) | 12 | 25 |
 | Enchantment | 24 | 50+ |
 | Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | 40 |
+| Kaszt-specifikus itemek | 20 (kasztonként 4) | 60+ (kasztonként 8+) |
 | Trinket | 10 | 30 |
 | Legendary | 8 | 25 |
 | Tier set | 5 (kasztonként 1) | 10 (+5 kaszt-független) |
@@ -963,7 +1008,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 ## 9. Hullámok és skálázás
 
-- **25 hullám**; a hullámhossz a 9. hullámtól 60 mp.
+- **25 hullám**; a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
 
 - **Ellenség HP és sebzés:** hullámonként nő (kiinduló érték: +12% HP és +8% sebzés hullámonként, összeadódva).
 - **Spawn:** a spawnpontok a pálya szélén és véletlen belső pontokon vannak, 1 mp-es
@@ -1030,11 +1075,27 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 **Bolt**
 
-- Játékosonként saját bolt-panel, **4 ajánlattal** (a játékos kasztjához illő kínálattal),
-  de mindenki a közös kasszából fizet.
+- **Közös bolt:** egyetlen bolt a képernyő közepén – egy goblin kereskedő standja –, amit
+  mindenki egyszerre használ.
+- **Kínálat:** a játékosszámmal nő: 1 játékos → 4 ajánlat, 2 → 6, 3 → 8, 4 → 10.
+- **Mindenkinek jut valami:** a generátor garantálja, hogy minden játékosnak legyen legalább
+  1–2 olyan ajánlata, amit a kasztja használni tud (fegyver- és páncél-jártasság,
+  kaszt-specifikus itemek).
+- **Saját kurzor:** mindenki a saját színes kurzorával mozog a pult ajánlatai között.
+  - **A** = megvesz. A közös kasszából fizet, az item a vásárló backpackjébe kerül.
+  - Ha másnak jobb, utána tradeléssel tovább lehet adni (5.6).
+- **Ping:** a jobb kar benyomásával egy ajánlatra „*P2 wants*” címke kerül a játékos színével,
+  így vásárlás előtt látszik, ki mire pályázik.
+- **Lock:** bárki zárolhat egy ajánlatot a következő körre. A zárolt ajánlaton látszik,
+  ki zárolta.
+- **Reroll csak közös szavazással:**
+  - Minden játékos külön nyomja meg a saját Reroll gombját (Y). Ezt egy pipa jelzi a pult
+    tetején, a játékos színével.
+  - **A bolt csak akkor rerollol, ha minden játékos megnyomta.** A szavazat visszavonható.
+  - A zárolt és a pingelt ajánlatok rerollnál megmaradnak.
+  - Ára `hullám × 2 + 2` a közös kasszából, körönként minden további reroll +2-vel
+    drágább.
 - **A bolt legfeljebb Epicet árul**; Legendary és Artifact csak lootból szerezhető (10.1).
-- **Lock:** egy ajánlat zárolható a következő körre.
-- **Reroll:** ára `hullám × 2 + 2`, körönként minden további reroll +2-vel drágább.
 - **Árak:** ritkaság alapár × `(1 + 0,08 × (hullám − 1))`.
 
   | Ritkaság | Alapár |
@@ -1192,10 +1253,17 @@ indulnak.
 
 **Hullám utáni képernyő**
 
-- **Elrendezés:** a képernyő 1/2/3/4 panelre oszlik (játékosonként egy).
-- **Szintlépés:** előbb egy szintlépés-képernyő jön (3 ability + 2 stat kártya,
-  szintenként), utána a fülek.
-- **Fülek:** **Shop | Trainer | Talents | Character**.
+- **Sorrend:**
+  1. loot roll (közös),
+  2. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
+  3. közös bolt + személyes panelek egyszerre,
+  4. Ready.
+- **Elrendezés:**
+  - **Középen:** a **közös bolt** (goblin kereskedő standja) a játékosok színes kurzoraival,
+    felül a reroll-szavazás pipái.
+  - **A sarkokban:** 1–4 **személyes panel**, játékosonként egy.
+  - LB/RB-vel lehet váltani a bolti kurzor és a saját panel között.
+- **Személyes fülek:** **Trainer | Talents | Character**.
 - **Trainer fül:** a megtanult abilityk listája, a jelenlegi rang, a következő rang
   hatása, ára és egy „Train” gomb. A Rank V-nél a 2 specializáció közül lehet választani.
 - **Talents fül:** WoW-szerű elrendezés – a 3 fa egymás mellett, tierenként sorokban.
@@ -1378,3 +1446,7 @@ indulnak.
 | Meta-progresszió | Eredményekkel nyíló tartalom (B opció) – részletek később |
 | Zene | Egyelőre nincs |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
+| Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
+| Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |
+| Bolt | Közös bolt, saját kurzorokkal; reroll csak akkor, ha minden játékos megszavazta |
+| Hullámhossz | A 10. hullám felett +10 mp hullámonként (25. hullám = 210 mp) |
