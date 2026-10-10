@@ -1,7 +1,7 @@
-# Game Design Document – munkacím: „SmartOnion”
+# SmartOnion – Game Design Document
 
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
-> fantasy stílusban, 1–4 fős helyi co-oppal.
+> fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
 > Státusz: **tervezés** – kód még nincs. Ez a dokumentum a fejlesztés alapja; minden
 > szám kiinduló érték, a balanszolás során változni fog.
@@ -12,6 +12,8 @@
 
 | Téma | Döntés |
 |---|---|
+| Cím | **SmartOnion** |
+| Hősök | **Hagymák WoW-páncélban** (mint a Brotato krumplijai) |
 | Motor | **Godot 4** (legfrissebb stabil 4.x, a projekt indításakor rögzítjük), GDScript |
 | Platform | Csak **PC** (Windows / Linux, később Steam) |
 | Co-op | Helyi, **1–4 játékos**, kontrollerrel (+1 opcionális billentyű+egér) |
@@ -19,10 +21,10 @@
 | Aktív képességek | **Igen**, kasztonként saját erőforrással (Rage, Mana, Energy, Holy Power, Soul Shard) |
 | Menet hossza | **25 hullám** |
 | Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 9.1) |
-| Szintlépés | **Abilityk** (3 véletlen közül) **és** véletlen statok közül lehet választani; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
+| Szintlépés | **5 kártya, abilityk és statok keverve**, 1 választható; goldért rerollolható; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
 | Talentek | WoW-szerű **talentfák** (kasztonként 3); a **10. szinttől szintenként 1 talentpont**, a hullámok között költhető (lásd 7. fejezet) |
 | Fegyverkovácsolás | Brotato-szerűen: **2 azonos fegyver, azonos ritkaságban → 1, eggyel magasabb ritkaságú** (lásd 4.1) |
-| Loot / erőforrás | **Közös**: a gold és az XP a csapaté, mindenki osztozik rajta (részletek: 10. fejezet) |
+| Loot / erőforrás | **Egyetlen közös pénztárca** és közös XP – bárki költhet belőle, ezért koordinációt igényel (részletek: 10. fejezet) |
 | Grafika | WoW-szerű stilizált low-poly 3D, felülnézeti kamera (részletek: 13. fejezet) |
 | Kasztok (MVP) | Warrior, Mage, Paladin, Rogue, Warlock – adatvezérelten bővíthető |
 
@@ -404,7 +406,7 @@ Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 - **10 hely játékosonként.**
 - **Megvásárlás:** a megvett item a backpackbe kerül, onnan lehet felvenni.
 - **Csere:** felvételkor a régi item a backpackbe kerül; ha tele van, el kell adni valamit.
-- **Eladás:** a vételár 35%-a, a közös kasszába.
+- **Eladás:** a vételár 35%-a, a közös pénztárcába.
 
 ---
 
@@ -417,12 +419,19 @@ Ez a játék fő újítása a Brotatóhoz képest: a szintlépés nem csak stato
 
 - **XP:** közös csapat-XP. Az `n.` szinthez szükséges XP: `(n + 3)²` (Brotato-képlet).
 - **Választás:** a hullám végén, minden megszerzett szint után, minden játékos **1 kártyát
-  választ 5 közül**:
-  - **3 ability-kártya:** véletlenül húzva a kaszt saját és az általános ability-készletből.
+  választ 5 közül**. Az 5 kártya **vegyesen** jön egy közös húzópakliból:
+  - **Ability-kártyák:** a kaszt saját és az általános ability-készletéből.
     Ha egy már megtanult ability jön, az **ingyenes rangemelést** jelent (+1 Rank).
-  - **2 stat-kártya:** véletlen stat-fejlesztések ritkasággal, pl. Common: +3 Stamina,
+  - **Stat-kártyák:** véletlen stat-fejlesztések ritkasággal, pl. Common: +3 Stamina,
     Rare: +3% Crit és +2 Agility.
-- **Reroll:** ára `hullám + 2` gold, minden további reroll ugyanabban a körben +2.
+  - **Arány:** alapból kb. 50–50% esély ability-re és statra; minden húzásban
+    **legalább 1 ability és 1 stat** garantált.
+  - **Tele slotok:** ha a slotok tele vannak, az új abilityk helyett gyakrabban jönnek a
+    rangemelések és a statok.
+- **Reroll goldért:**
+  - Mind az 5 kártyát újrahúzza.
+  - Ára `hullám + 2` gold, minden további reroll ugyanabban a körben +2-vel drágább.
+  - A **közös pénztárcából** fizeti a játékos.
 - **Kompromisszum:** ability helyett statot választani akkor éri meg, ha a slotok már
   tele vannak, vagy ha a build egy konkrét statra épül.
 
@@ -697,16 +706,31 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 ## 10. Közös loot és gazdaság
 
-**Gold**
+**Gold – egyetlen közös pénztárca**
 
-- **Csapat-kassza:** minden felszedett gold (bárki szedi fel) a közös kasszába kerül.
-- **Szétosztás:** a hullám végén a kassza **egyenlő arányban** szétoszlik a játékosok
-  pénztárcáiba. A maradék a következő körre a kasszában marad.
-- **Miért így:** mindenki osztozik a lootban, de a boltban senki nem költheti el a másik
-  részét. (Alternatíva: egyetlen közös pénztárca, amiből bárki vásárol – a
-  playtesteken eldönthetjük.)
-- **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 8. fejezet. A Gold Findet minden játékos
-  külön adja hozzá a felszedéshez.
+- **Egy kassza:** minden felszedett gold (bárki szedi fel) **egyetlen közös pénztárcába**
+  kerül. Ebből **bárki költhet**: bolt, Trainer, reroll, talent-reset.
+- **Miért így:** a játék tudatosan koordinációt kíván – a csapatnak meg kell beszélnie, ki
+  kapja a drága Epic itemet, és kinek az abilityjét fejlesszék.
+- **Mi kerül a kasszába:**
+  - **Eladás** (a vételár 35%-a).
+  - **Gold Find:** annak a játékosnak a Gold Find-ja számít, aki felszedi a goldot.
+- **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 8. fejezet.
+
+**Koordinációs eszközök (hogy a közös kassza ne okozzon káoszt)**
+
+- **Kívánságjelzés (Ping):** a játékos megjelölhet egy bolti ajánlatot vagy Trainer-rangot
+  (kontrolleren a jobb kar benyomásával). Ekkor a többiek paneljén megjelenik:
+  „*P2 wants: Rare Dagger – 62g*”.
+- **Vásárlás megerősítése:** ha a vásárlás a kassza **több mint 50%-át** elvinné, 1 mp-ig
+  nyomva kell tartani az „A” gombot. Ez véletlen nagy költés ellen véd.
+- **Költésnapló:** a képernyő tetején a kassza mellett egy rövid lista látszik: ki mit vett
+  és mennyiért ebben a körben.
+- **Ready-állapot:** a kassza mellett látszik, ki van már kész. A ready-t meg lehet szüntetni,
+  ha valaki még vásárolni akar.
+- **Egyidejű vásárlás:** ha két játékos ugyanabban a pillanatban költene, és már csak az
+  egyiknek jut fedezet, az nyer, aki előbb nyomta meg a gombot. A másik „*Not enough gold*”
+  üzenetet kap.
 
 **XP**
 
@@ -717,12 +741,13 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - Need / Greed / Pass dobás, WoW-stílusban (1–100 közötti dobás, a Need erősebb a Greednél).
 - Need csak akkor választható, ha a játékos kasztja használni tudja az itemet.
 
-**Gold felhasználása:** item vásárlás (bolt), **ability rangemelés (Trainer, 6.3)**,
-szintlépési reroll, bolti reroll.
+**Gold felhasználása (mind a közös kasszából):** item vásárlás (bolt), **ability rangemelés
+(Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset.
 
 **Bolt**
 
-- Játékosonként saját bolt-panel, **4 ajánlattal**.
+- Játékosonként saját bolt-panel, **4 ajánlattal** (a játékos kasztjához illő kínálattal),
+  de mindenki a közös kasszából fizet.
 - **Lock:** egy ajánlat zárolható a következő körre.
 - **Reroll:** ára `hullám × 2 + 2`, körönként minden további reroll +2-vel drágább.
 - **Árak:** ritkaság alapár × `(1 + 0,08 × (hullám − 1))`.
@@ -735,7 +760,6 @@ szintlépési reroll, bolti reroll.
   | Epic | 90 |
   | Legendary | 140 |
 
-- **Ajándék:** gold átadható egy társnak, kis összegekben.
 
 ---
 
@@ -819,7 +843,7 @@ indulnak.
 ## 13. Grafikai irány
 
 - **Stílus:** WoW-szerű stilizált fantasy.
-  - Zömök, nagyfejű, „chibi” arányú hősök (a Brotato-féle kis karakterek hangulata).
+  - **A hősök hagymák WoW-páncélban** – a Brotato krumplijainak megfelelője.
   - Telített színek, kézzel festett hatású textúrák.
   - Enyhe toon-shading, rim light, vékony körvonal.
 - **Technika:**
@@ -827,13 +851,42 @@ indulnak.
   - Kb. 55–60°-os felülnézeti kamera (keskeny FOV vagy ortografikus).
   - A kamera a csapat középpontját követi, és dinamikusan zoomol, hogy mindenki látszódjon.
 - **Assetek (első kör, licencek letöltéskor ellenőrizendők):**
-  - **KayKit** csomagok (Kay Lousberg, CC0): Adventurers (Knight, Barbarian, Mage, Rogue),
-    Skeletons, Dungeon Remastered.
+  - **KayKit** csomagok (Kay Lousberg, CC0): Skeletons, Dungeon Remastered, és a fegyver- /
+    kellékmodellek az Adventurers csomagból (a hősök saját hagyma-modellek).
   - **Quaternius** (CC0): szörnyek és fantasy kellékek.
   - Ikonok: **game-icons.net** (CC BY 3.0 – feltüntetéssel), WoW-szerű keretbe és színezésbe
     rakva.
   - Hangok: Kenney (CC0), freesound.org (licenc szerint).
   - Betűtípus: *Cinzel* vagy hasonló, szabadon használható fantasy font.
+- **A hagyma-hősök kinézete:**
+  - **Alap modell:**
+    - egyetlen saját low-poly hagymatest (gömbölyű, csúcsos hajtással a tetején, rétegzett
+      héj-textúrával),
+    - nagy kifejező szemek,
+    - **lebegő kezek és apró lábak**, mint a Brotatóban.
+  - **Héjszín kasztonként:**
+    - Warrior: vöröshagyma,
+    - Mage: lilahagyma,
+    - Paladin: aranysárga hagyma,
+    - Rogue: újhagyma (zöld szárral),
+    - Warlock: fekete / mogyoróhagyma.
+  - **Látható felszerelés:** a **Head**, **Shoulders**, **Chest** (mellvért / köpeny),
+    **Main Hand** és **Off Hand** cseréje a modellen is látszik.
+    - **Méret:** a vállvértek WoW-osan túlméretezettek.
+    - **Ritkaság-effekt:** az Epic és a Legendary cuccok halványan izzanak.
+  - **Kaszt-kezdőszettek (kinézet):**
+    - Warrior: szarvas sisak és hatalmas vállvért,
+    - Mage: csúcsos varázslósüveg és köpeny,
+    - Paladin: aranyozott lemezvért és tabard,
+    - Rogue: csuklya és maszk,
+    - Warlock: szarvas csuklya és lila lángok.
+  - **Sebződés vizuálisan:** alacsony HP-n a hagyma „hámlik”: héjrétegek repednek le róla.
+    Elesésnél egy meghámozott, könnyező hagymaszellem lesz belőle.
+  - **Készítés:** a hagymatest és a páncélelemek **saját modellek** (egyszerű low-poly, Blenderben
+    vagy akár Godot primitívekből). A páncélokat csatlakozási pontokra (fej, váll, törzs, kezek)
+    illesztjük, így a felszerelés modulárisan cserélhető.
+- **Ellenségek:** maradnak a klasszikus fantasy szörnyek (csontvázak, ghoulok, trollok, démonok).
+  A hagyma-hősök és a „komoly” szörnyek közti kontraszt a humor forrása.
 - **UI-téma:** sötét kő és arany keretek, pergamen tooltip, ritkaság-színek a WoW
   konvenciója szerint.
 - **Arénák (MVP: 1):** *Elwynn-szerű erdei tisztás*. Később: havas dombok, sivatag, démoni pusztaság.
@@ -911,10 +964,15 @@ indulnak.
 
 ## 17. Nyitott kérdések
 
-1. **Karakterek kinézete:** a repó neve *smartonion* – a Brotato burgonyáihoz hasonlóan a
-   hősök **hagymák** legyenek WoW-páncélban, vagy maradjanak kis chibi humanoidok?
-2. **Gold:** megfelel-e az „egyenlő szétosztás” értelmezés, vagy egyetlen közös pénztárca legyen?
-3. **A játék végleges címe.**
-4. **Nyelv:** a játék felülete angol legyen (WoW-terminológia), vagy magyar?
-5. **Szintlépés:** a „1 kártya 5-ből (3 ability + 2 stat)” megfelel, vagy legyen külön
-   ability- **és** stat-választás minden szintnél?
+1. **Nyelv:** a felület angol legyen (WoW-terminológia, javasolt), magyar, vagy mindkettő
+   (lokalizációval)?
+2. A 14 hiányzó talentfa részletes kidolgozása most, vagy a fejlesztés közben (M5)?
+
+### Lezárt döntések
+
+| Kérdés | Döntés |
+|---|---|
+| Karakterek kinézete | Hagymák WoW-páncélban |
+| Gold | Egyetlen közös pénztárca, bárki költhet belőle |
+| Szintlépés | 5 kártya, ability és stat keverve, goldért rerollolható |
+| Cím | SmartOnion |
