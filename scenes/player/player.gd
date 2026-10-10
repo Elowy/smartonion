@@ -196,6 +196,27 @@ func is_stealthed() -> bool:
 	return stealth_left > 0.0
 
 
+## Alive and standing next to a downed teammate (reviving it) – bots must not dash away.
+func is_reviving() -> bool:
+	if downed or not is_inside_tree():
+		return false
+	var here := global_position
+	for node in get_tree().get_nodes_in_group(&"players"):
+		var other := node as Player
+		if other == null or other == self or not other.downed or not other.is_inside_tree():
+			continue
+		var d := other.global_position - here
+		if Vector2(d.x, d.z).length() <= REVIVE_RADIUS:
+			return true
+	return false
+
+
+## Wave cleared (before the intermission): abilities / Mastery drop auras and buffs.
+func end_wave() -> void:
+	if abilities != null:
+		abilities.end_wave()
+
+
 ## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1).
 func begin_wave() -> void:
 	velocity = Vector3.ZERO
@@ -209,6 +230,8 @@ func begin_wave() -> void:
 		_hp_updated()
 	invulnerable_left = 0.0
 	stealth_left = 0.0
+	forced_crits = 0
+	damage_mults.clear()
 	for runner in weapons:
 		runner.reset()
 	if procs != null:
@@ -345,6 +368,8 @@ func apply_equipment() -> void:
 		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
 	if procs != null:
 		procs.refresh()
+	if abilities != null:
+		abilities.invalidate_params()  # item ability mods
 
 
 ## The WeaponRunner of [param weapon] (the first runner when [param weapon] is null or not

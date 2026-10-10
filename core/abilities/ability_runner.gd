@@ -36,6 +36,8 @@ var _effects: Dictionary[StringName, AbilityEffect] = {}
 var _cooldown_left: Dictionary[StringName, float] = {}
 ## Ability id -> charges spent and not yet back.
 var _charges_spent: Dictionary[StringName, int] = {}
+## Ability id -> params_for result (read-only); cleared by invalidate_params.
+var _params_cache: Dictionary[StringName, Dictionary] = {}
 var _auto_timer := 0.0
 
 
@@ -74,6 +76,7 @@ func set_slot(index: int, ability: AbilityData) -> void:
 	slots[index] = ability
 	if ability != null and not _effects.has(ability.id) and ability.effect != null:
 		_effects[ability.id] = ability.effect.new() as AbilityEffect
+	invalidate_params()
 	slots_changed.emit()
 
 
@@ -94,7 +97,10 @@ func effect_for(ability: AbilityData) -> AbilityEffect:
 func cooldown_of(ability: AbilityData, ctx: AbilityContext = null) -> float:
 	if ability == null:
 		return 0.0
-	var params := ctx.params if ctx != null else params_for(ability)
+	return _cooldown_from(ability, ctx.params if ctx != null else params_for(ability))
+
+
+func _cooldown_from(ability: AbilityData, params: Dictionary) -> float:
 	var base := float(params.get("cooldown", ability.cooldown))
 	if base <= 0.0:
 		return 0.0
@@ -158,6 +164,31 @@ func can_afford(ability: AbilityData, ctx: AbilityContext = null) -> bool:
 	return res != null and res.can_afford(cost_of(ability, ctx))
 
 
+## Everything the HUD shows for slot [param index] from one params lookup: charges,
+## charges_max, left (s until castable), ratio (0..1 of the running recharge), ready
+## (alive, castable now and affordable) and cost. Empty for an empty slot.
+func slot_state(index: int) -> Dictionary:
+	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
+	if a == null:
+		return {}
+	var params := params_for(a)
+	var cmax := maxi(1, roundi(float(params.get("charges", 1.0))))
+	var charges := maxi(0, cmax - int(_charges_spent.get(a.id, 0)))
+	var left := 0.0 if charges > 0 else float(_cooldown_left.get(a.id, 0.0))
+	var full := _cooldown_from(a, params)
+	var cost := maxf(0.0, float(params.get("cost", a.cost)))
+	var res := get_resource(a.resource) if a.resource != &"" else null
+	var affordable := a.resource == &"" or (res != null and res.can_afford(cost))
+	return {
+		"charges": charges,
+		"charges_max": cmax,
+		"left": left,
+		"ratio": clampf(left / full, 0.0, 1.0) if full > 0.0 else 0.0,
+		"ready": left <= 0.0 and player != null and player.is_alive() and affordable,
+		"cost": cost,
+	}
+
+
 ## Cheap readiness for the HUD: equipped, alive, off cooldown and affordable (no targeting).
 func is_ready(index: int) -> bool:
 	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
@@ -168,19 +199,32 @@ func is_ready(index: int) -> bool:
 
 ## Ready = equipped, alive, off cooldown, affordable and the effect agrees.
 func can_cast(index: int) -> bool:
-	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
-	if a == null or player == null or not player.is_alive() or remaining(index) > 0.0:
+	if not _cheap_ready(index):
 		return false
-	if effect_for(a) == null or not can_afford(a, _light_context(a)):
-		return false  # (cheap checks first: targeting scans the enemies)
-	return effect_for(a).can_cast(build_context(a))
+	return effect_for(slots[index]).can_cast(build_context(slots[index]))
 
 
 func try_cast(index: int) -> bool:
-	if not can_cast(index):
+	if not _cheap_ready(index):
 		return false
+	var ctx := build_context(slots[index])
+	if not effect_for(slots[index]).can_cast(ctx):
+		return false
+	return _cast_with(index, ctx)
+
+
+## Equipped, alive, off cooldown, has an effect and is affordable – everything but the
+## targeting (which scans the enemies) and the effect's own conditions.
+func _cheap_ready(index: int) -> bool:
+	var a := slots[index] if index >= 0 and index < MAX_SLOTS else null
+	if a == null or player == null or not player.is_alive() or remaining(index) > 0.0:
+		return false
+	return effect_for(a) != null and can_afford(a, _light_context(a))
+
+
+## Casts slot [param index] with an already resolved [param ctx] (cost, cooldown / charge).
+func _cast_with(index: int, ctx: AbilityContext) -> bool:
 	var a := slots[index]
-	var ctx := build_context(a)
 	var effect := effect_for(a)
 	if not effect.cast(ctx):
 		return false
@@ -246,10 +290,36 @@ func _light_context(ability: AbilityData) -> AbilityContext:
 
 ## The ability's params with "cooldown", "cost" and "charges" (1) filled in (unless the params
 ## set them) and the player's item mods applied – so "cooldown_add": -5 works on any ability.
+## Cached per ability and read-only: effects copy it before changing anything; equipment
+## changes (Player.apply_equipment) and set_slot call [method invalidate_params].
 func params_for(ability: AbilityData) -> Dictionary:
+	var cached: Variant = _params_cache.get(ability.id)
+	if cached != null:
+		return cached
 	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1}
 	base.merge(ability.params, true)
-	return apply_mods(base, player.ability_mods(ability.id) if player != null else {})
+	var out := apply_mods(base, player.ability_mods(ability.id) if player != null else {})
+	out.make_read_only()
+	_params_cache[ability.id] = out
+	return out
+
+
+## Drops the cached params (item mods or ranks changed).
+func invalidate_params() -> void:
+	_params_cache.clear()
+
+
+## +[param amount] class resource from an item proc (Soulreaping): whole points for the first
+## pip resource (Holy Power, Soul Shards, Combo Points), else 10 % of the primary bar per point.
+func gain_from_proc(amount: float) -> void:
+	for id in resource_order:
+		var res := resources[id]
+		if res.data != null and res.data.display == ResourceData.Display.PIPS:
+			res.add(amount, false)
+			return
+	var primary := primary_resource()
+	if primary != null:
+		primary.add(amount * primary.max_value() * 0.1, false)
 
 
 ## Applies item mods to [param base] params. Keys: "<param>_add" adds, "<param>_pct" scales
@@ -281,6 +351,16 @@ func begin_wave() -> void:
 			_effects[a.id].begin_wave(_light_context(a))
 	if mastery != null:
 		mastery.begin_wave()
+
+
+## Wave cleared (before the intermission): effects and the Mastery drop what must not show
+## in the market (auras, buffs).
+func end_wave() -> void:
+	for a in slots:
+		if a != null and _effects.has(a.id):
+			_effects[a.id].end_wave(_light_context(a))
+	if mastery != null:
+		mastery.end_wave()
 
 
 func on_weapon_hit(target: Node3D, damage: float, is_crit: bool) -> void:
@@ -329,20 +409,27 @@ func _physics_process(delta: float) -> void:
 	for id in resource_order:
 		resources[id].gain_mult = maxf(0.0, regen)
 		resources[id].tick(delta, haste)
+	# The Mastery ticks while downed too (its DoTs keep burning like item DoTs; pets / auras
+	# check player.is_alive() themselves).
+	if mastery != null:
+		mastery.tick(delta)
 	if not player.is_alive():
 		return
 	for a in slots:
 		if a != null and _effects.has(a.id):
 			_effects[a.id].tick(_light_context(a), delta)
-	if mastery != null:
-		mastery.tick(delta)
 	if auto_cast:
 		_auto_timer -= delta
 		if _auto_timer <= 0.0:
 			_auto_timer = AUTO_CAST_INTERVAL
 			for i in MAX_SLOTS:
-				if can_cast(i) and effect_for(slots[i]).wants_auto_cast(build_context(slots[i])):
-					try_cast(i)
+				if not _cheap_ready(i):
+					continue
+				# One targeting pass per decision (DENSEST_CLUSTER scans the enemies).
+				var ctx := build_context(slots[i])
+				var effect := effect_for(slots[i])
+				if effect.can_cast(ctx) and effect.wants_auto_cast(ctx):
+					_cast_with(i, ctx)
 
 
 ## Recharges: the timer runs while charges are spent; each expiry returns one charge and
@@ -388,7 +475,7 @@ func _densest_cluster(here: Vector3, reach: float, radius: float) -> Node3D:
 		var e := node as Enemy
 		if e == null or e.is_dead():
 			continue
-		var count := EnemyGrid.gather_around(tree, e.global_position, radius).size()
+		var count := EnemyGrid.count_around(tree, e.global_position, radius)
 		if count > best_count:
 			best_count = count
 			best = e

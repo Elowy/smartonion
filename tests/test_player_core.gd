@@ -498,3 +498,14 @@ func test_own_numbers_beside_the_head_and_tagged_marker() -> void:
 	var left := p.self_text_position(-1.0)
 	check(right.x > 2.3 and left.x < 1.7, "numbers start beside the hero, not on it")
 	check(right.y > Player.CHEST_HEIGHT + 0.5, "at head height")
+
+
+func test_is_reviving_next_to_a_ghost() -> void:
+	var p1 := Fakes.spawn_player(world, 0, &"warrior")
+	var p2 := Fakes.spawn_player(world, 1, &"warrior", Vector3(1.0, 0, 0))
+	check(not p2.is_reviving(), "nobody downed")
+	p1.take_damage(999.0)
+	check(p2.is_reviving(), "next to the ghost")
+	check(not p1.is_reviving(), "a ghost does not revive")
+	p2.global_position = Vector3(Player.REVIVE_RADIUS + 0.5, 0, 0)
+	check(not p2.is_reviving(), "out of the circle")

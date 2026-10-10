@@ -205,3 +205,81 @@ func test_pip_gains_ignore_resource_regen() -> void:
 	bar.gain_mult = 1.5
 	bar.on_weapon_hit(false)
 	check_eq(bar.value, 15.0, "bars still scale")
+
+
+class TickCountingMastery extends MasteryEffect:
+	var ticks := 0
+	var ended := 0
+	func tick(_delta: float) -> void:
+		ticks += 1
+	func end_wave() -> void:
+		ended += 1
+
+
+func test_slot_state_matches_the_single_queries() -> void:
+	var p := _make_player()
+	var a := p.abilities.slots[0]
+	a.params["charges"] = 2
+	p.abilities.invalidate_params()
+	var res := p.abilities.get_resource(&"test_rage")
+	res.set_value(40.0)
+	var st := p.abilities.slot_state(0)
+	check_eq(st["charges"], 2, "charges")
+	check_eq(st["charges_max"], 2, "max")
+	check(st["ready"], "ready")
+	check_eq(st["cost"], 30.0, "cost")
+	check(p.abilities.try_cast(0), "cast once")
+	st = p.abilities.slot_state(0)
+	check_eq(st["charges"], 1, "one left")
+	check(not st["ready"], "10 rage left: not affordable")
+	res.set_value(100.0)
+	p.abilities.try_cast(0)
+	st = p.abilities.slot_state(0)
+	check_near(st["left"], p.abilities.remaining(0), 0.0001, "left = remaining")
+	check_near(st["ratio"], p.abilities.cooldown_ratio(0), 0.0001, "ratio = cooldown_ratio")
+	check_eq(p.abilities.slot_state(3), {}, "empty slot")
+
+
+func test_params_cache_follows_equipment() -> void:
+	var p := _make_player()
+	var a := p.abilities.slots[0]
+	check_near(p.abilities.cooldown_of(a), 2.0, 0.001, "base")
+	check(p.abilities.params_for(a).is_read_only(), "cached params are read-only")
+	var item := ItemInstance.new()
+	item.slot_type = Items.SlotType.HEAD
+	item.armor_type = Items.NO_ARMOR
+	item.unique_effect = &"ability_mod"
+	item.unique_params = {"ability": "test_strike", "mods": {"cooldown_add": -1.0}}
+	p.equipment.equip(item)
+	check_near(p.abilities.cooldown_of(a), 1.0, 0.001, "equip invalidates the cache")
+	p.equipment.unequip(Items.EquipSlot.HEAD)
+	check_near(p.abilities.cooldown_of(a), 2.0, 0.001, "unequip too")
+
+
+func test_mastery_ticks_while_downed_and_hears_wave_end() -> void:
+	var p := _make_player()
+	var m := TickCountingMastery.new()
+	p.abilities.mastery = m
+	p.abilities._physics_process(DT)
+	p._go_down()
+	p.abilities._physics_process(DT)
+	check_eq(m.ticks, 2, "ticks alive and downed (DoTs keep burning)")
+	p.end_wave()
+	check_eq(m.ended, 1, "end_wave reaches the Mastery")
+
+
+func test_wave_start_clears_crits_and_buffs() -> void:
+	var p := _make_player()
+	p.forced_crits = 1
+	p.damage_mults[&"test"] = 1.5
+	p.begin_wave()
+	check_eq(p.forced_crits, 0, "forced crits do not carry over")
+	check(p.damage_mults.is_empty(), "named buffs end with the wave")
+
+
+func test_keyboard_learned_slots_are_q_then_e() -> void:
+	var kb := KeyboardInput.new()
+	check_eq(kb.ability_button(0), PlayerInput.Pad.RT, "LMB")
+	check_eq(kb.ability_button(2), PlayerInput.Pad.LB, "Q = learned 1")
+	check_eq(kb.ability_button(3), PlayerInput.Pad.RB, "E = learned 2")
+	check_eq(ScriptedInput.new("x").ability_button(2), PlayerInput.Pad.RB, "pads: RB = learned 1")

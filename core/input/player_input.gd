@@ -78,12 +78,18 @@ func just_released(button: Pad) -> bool:
 	return not _cur.get(button, false) and _prev.get(button, false)
 
 
+## The button that casts ability slot [param index] on this device (keyboard overrides the
+## order of the learned slots: Q = slot 2, E = slot 3, GDD 11).
+func ability_button(index: int) -> Pad:
+	return ABILITY_BUTTONS[index]
+
+
 func is_ability_pressed(index: int) -> bool:
-	return index >= 0 and index < ABILITY_BUTTONS.size() and is_pressed(ABILITY_BUTTONS[index])
+	return index >= 0 and index < ABILITY_BUTTONS.size() and is_pressed(ability_button(index))
 
 
 func ability_just_pressed(index: int) -> bool:
-	return index >= 0 and index < ABILITY_BUTTONS.size() and just_pressed(ABILITY_BUTTONS[index])
+	return index >= 0 and index < ABILITY_BUTTONS.size() and just_pressed(ability_button(index))
 
 
 ## Menu navigation: a unit direction on the frame a direction is pushed, then with

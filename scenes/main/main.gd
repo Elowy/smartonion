@@ -296,6 +296,10 @@ func open_intermission() -> void:
 		return
 	_set_state(State.INTERMISSION)
 	get_tree().paused = true
+	for slot in PlayerManager.get_slots():
+		var p := slot.player as Player
+		if p != null and is_instance_valid(p):
+			p.end_wave()  # auras / buffs must not show in the market
 	if hud != null:
 		hud.hide()  # the market has its own summary; start_wave shows the HUD again
 	intermission.open(wave, RunState.pending_level_ups)

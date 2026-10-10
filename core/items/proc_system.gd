@@ -37,7 +37,7 @@ extends Node
 ##   smite_heal {damage, heal, school} – damage + heal the most injured ally
 ##   cheat_death {invulnerable}       – lethal damage leaves 1 HP + invulnerable seconds
 ##                                      (passive, once per wave unless per_wave says more)
-##   resource {amount}                – class resource (no-op until M3)
+##   resource {amount}                – class resource (AbilityRunner.gain_from_proc)
 ## Riders on every damaging block: slow (%) + slow_duration (default 2 s), stun (s),
 ## dot (total) + dot_duration (default 3 s) + dot_stacks (default 1), spread (m: when an enemy
 ## burning with the dot dies, it spreads to up to SPREAD_TARGETS enemies in that radius).
@@ -558,7 +558,8 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 				ProcVfx.beam(_chest(e), ally.get_chest_position(), color)
 				ally.heal(p.num("heal"))
 		&"resource":
-			pass  # class resources arrive with M3 (abilities)
+			if player.abilities != null:
+				player.abilities.gain_from_proc(p.num("amount", 1.0))
 
 
 func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:

@@ -384,3 +384,12 @@ func test_spawn_point_avoids_the_spirit_healer() -> void:
 				"away from the healer (%s)" % p)
 	arena.spirit_healer = null
 	healer.free()
+
+
+func test_stop_ends_ability_areas() -> void:
+	var area := AbilityArea.new()
+	area.duration = 10.0
+	EFakes.arena_of(world).entities.add_child(area)
+	check(area.is_in_group(&"ability_areas"), "areas join the group")
+	director.stop()
+	check(area.is_queued_for_deletion(), "a Blizzard does not survive the wave")

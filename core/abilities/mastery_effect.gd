@@ -38,7 +38,14 @@ func begin_wave() -> void:
 	pass
 
 
-## Every physics frame while the player is alive (auras).
+## Wave cleared, before the intermission (the tree pauses): drop what must not show in the
+## market (aura stat sources ...).
+func end_wave() -> void:
+	pass
+
+
+## Every physics frame, also while the player is downed (DoTs keep burning; pets / auras
+## check player.is_alive() themselves).
 func tick(_delta: float) -> void:
 	pass
 

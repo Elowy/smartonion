@@ -128,6 +128,11 @@ func stop() -> void:
 		var proj := node as Projectile
 		if proj != null and proj.team == Projectile.TEAM_ENEMIES and not proj.is_queued_for_deletion():
 			proj.queue_free()
+	# Ability ground effects (Blizzard, Consecration, Rain of Fire) end with the wave instead
+	# of resuming at the old spot in the next one.
+	for node in tree.get_nodes_in_group(&"ability_areas"):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			node.queue_free()
 
 
 # --- Queries / formulas -------------------------------------------------------------
