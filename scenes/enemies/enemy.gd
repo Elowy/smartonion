@@ -46,7 +46,7 @@ const STRAFE_SPEED_RATIO := 0.45
 const STRAFE_SWITCH_MIN := 1.2
 const STRAFE_SWITCH_MAX := 2.8
 ## Height (m) the axe is released at.
-const THROW_HEIGHT := 0.9
+const THROW_HEIGHT := 0.8
 
 const SWARM_WEAVE := 0.35
 const SWARM_WEAVE_SPEED := 4.0
@@ -223,14 +223,14 @@ func despawn() -> void:
 # --- Shared player lookup ------------------------------------------------------
 
 ## Every Player in the tree, cached once per physics frame (refreshed earlier when the
-## number of players changes). Entries may be downed, out of the tree or already freed –
-## check [code]is_instance_valid(p) and p.is_alive()[/code]. Do not modify the array.
+## number of players changes or a cached one was freed). Entries may be downed or out of
+## the tree – use [method is_living_player]. Do not modify the array.
 static func cached_players(tree: SceneTree) -> Array[Player]:
 	if tree == null:
 		return _no_players
 	var frame := Engine.get_physics_frames()
 	var count := tree.get_node_count_in_group(&"players")
-	if frame != _player_cache_frame or count != _player_cache_count:
+	if frame != _player_cache_frame or count != _player_cache_count or _player_cache_has_freed():
 		_player_cache_frame = frame
 		_player_cache_count = count
 		_player_cache.clear()
@@ -247,8 +247,21 @@ static func invalidate_player_cache() -> void:
 	_player_cache_count = -1
 
 
-static func is_living_player(p: Player) -> bool:
-	return is_instance_valid(p) and p.is_inside_tree() and p.is_alive()
+## True for a Player that is valid (not freed), inside the tree and not downed.
+## Takes a Variant on purpose: passing a freed instance to a [Player]-typed parameter is a
+## script error, and pickups / AI may still hold a reference to a freed player.
+static func is_living_player(p: Variant) -> bool:
+	if not is_instance_valid(p):
+		return false
+	var player := p as Player
+	return player != null and player.is_inside_tree() and player.is_alive()
+
+
+static func _player_cache_has_freed() -> bool:
+	for p in _player_cache:
+		if not is_instance_valid(p):
+			return true
+	return false
 
 
 ## World positions of every living player.
@@ -455,8 +468,8 @@ func _throw(here: Vector3) -> void:
 	var proj := Projectile.create(Projectile.TEAM_ENEMIES, projectile_damage, false, dir,
 			data.projectile_speed, THROW_RANGE, 0, 0.0, self, &"axe", Projectile.default_color(&"axe"))
 	parent.add_child(proj)
-	proj.global_position = here + Vector3.UP * THROW_HEIGHT * maxf(0.5, data.model_scale) \
-			+ dir * (radius + 0.15)
+	# Released a little in front of the body so it does not start inside the thrower.
+	proj.global_position = here + Vector3.UP * THROW_HEIGHT + dir * (radius + 0.15)
 	if model != null:
 		model.play_attack()
 

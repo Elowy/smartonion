@@ -28,6 +28,13 @@ const FLASH_TIME := 0.14
 const SQUASH_TIME := 0.22
 const ATTACK_TIME := 0.24
 const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
+## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
+const CAST_BAR_Y := 2.0
+const CAST_BAR_SIZE := Vector2(1.15, 0.17)
+const REVIVE_COLOR := Color(0.55, 1.0, 0.45)
+const CHANNEL_GOLD := Color(1.0, 0.84, 0.36)
+## Where the reviver's light beam ends on the ghost (above its origin).
+const CHANNEL_TARGET_HEIGHT := 0.85
 
 const GOLD := Color(0.96, 0.76, 0.3)
 const LEATHER := Color(0.4, 0.25, 0.14)
@@ -83,6 +90,13 @@ var _attack_t: Array[float] = [1.0, 1.0]
 var _blink := 0.0
 var _next_blink := 2.0
 var _rng := RandomNumberGenerator.new()
+var _reviver_color := REVIVE_COLOR
+var _cast_bar: MeshInstance3D
+var _cast_label: Label3D
+## Reviving a teammate: raised glowing hands + light beam to [member _channel_target].
+var _channel_target: Node3D
+var _channel_glows: Array[MeshInstance3D] = []
+var _beam: MeshInstance3D
 
 
 func _init() -> void:
@@ -107,6 +121,10 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_saved_materials.clear()
 	_weapon_nodes = [null, null]
 	_fel_flame = null
+	_cast_bar = null
+	_cast_label = null
+	_channel_glows.clear()
+	_beam = null
 	_build_ground_decals()
 	_yaw = _node("Yaw", self)
 	_body = _node("Body", _yaw)
@@ -120,7 +138,8 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	set_weapons(_weapon_data[0], _weapon_data[1])
 	set_hp_ratio(hp_ratio)
 	_apply_downed_look()
-	set_revive_progress(revive_progress)
+	set_revive_progress(revive_progress, _reviver_color)
+	set_channel_target(_channel_target)
 
 
 ## Shows the weapon models in the hands (null = empty hand).
@@ -193,13 +212,50 @@ func set_downed(p_downed: bool) -> void:
 		set_revive_progress(0.0)
 
 
-## 0..1 revive progress ring shown while a teammate stands next to a downed player.
-func set_revive_progress(progress: float) -> void:
+## 0..1 revive progress shown while a teammate stands next to a downed player: an arc on
+## the revive ring plus a WoW-like "Resurrecting" cast bar above the head, both in
+## [param reviver_color] (the reviver's player colour). [param seconds_left] >= 0 adds the
+## remaining cast time to the bar.
+func set_revive_progress(progress: float, reviver_color: Color = REVIVE_COLOR, seconds_left: float = -1.0) -> void:
 	revive_progress = clampf(progress, 0.0, 1.0)
+	_reviver_color = reviver_color
 	if _revive_arc == null:
 		return
-	_revive_arc.visible = downed and revive_progress > 0.0
-	Mats.set_ring(_revive_arc, Color(0.55, 1.0, 0.45, 0.95), 0.86, 0.97, 0.0, revive_progress)
+	var showing := downed and revive_progress > 0.0
+	_revive_arc.visible = showing
+	Mats.set_ring(_revive_arc, Color(reviver_color.r, reviver_color.g, reviver_color.b, 0.95), 0.86, 0.97, 0.0, revive_progress)
+	if showing and _cast_bar == null:
+		_build_cast_bar()
+	if _cast_bar == null:
+		return
+	_cast_bar.visible = showing
+	_cast_label.visible = showing
+	if showing:
+		Mats.set_cast_bar(_cast_bar, Color(reviver_color.r, reviver_color.g, reviver_color.b, 1.0), revive_progress)
+		_cast_label.text = "Resurrecting" if seconds_left < 0.0 else "Resurrecting  %.1f" % seconds_left
+
+
+func is_cast_bar_visible() -> bool:
+	return _cast_bar != null and _cast_bar.visible
+
+
+## Reviving a teammate (GDD 1): both hands rise and glow golden, and a beam of light
+## connects them to [param target] (the downed player's node). null stops it.
+func set_channel_target(target: Node3D) -> void:
+	_channel_target = target if target != null and is_instance_valid(target) else null
+	var active := _channel_target != null
+	if active and _beam == null and _hands.size() == 2:
+		_build_channel_fx()
+	for g in _channel_glows:
+		g.visible = active
+	if _beam != null:
+		_beam.visible = active
+		if active:
+			_update_beam()
+
+
+func is_channeling() -> bool:
+	return _channel_target != null
 
 
 # --- Public helpers ----------------------------------------------------------
@@ -292,6 +348,11 @@ func _process(delta: float) -> void:
 	if _fel_flame != null and _fel_flame.visible:
 		var f := 1.0 + sin(_time * 17.0) * 0.08 + sin(_time * 7.3) * 0.06
 		_fel_flame.scale = Vector3(1.0 / f, f, 1.0 / f)
+	if _channel_target != null:
+		if not is_instance_valid(_channel_target) or not _channel_target.is_inside_tree() or downed:
+			set_channel_target(null)
+		else:
+			_update_beam()
 
 
 func _animate_alive(delta: float) -> void:
@@ -341,6 +402,9 @@ func _animate_hands(delta: float) -> void:
 		var rot := Vector3.ZERO
 		if downed:
 			pos = HAND_POS[i] * Vector3(0.85, 1.0, 1.0) + Vector3(0, 0.05 + hover * 2.0, 0.05)
+		elif _channel_target != null:
+			pos = Vector3(HAND_POS[i].x * 0.82, 0.98 + hover * 1.5, -0.22)
+			rot = Vector3(0.5, 0.0, -0.35 * side)
 		elif ranged:
 			pos += Vector3(0, 0.03, -0.14) * strike
 			rot.x = -0.25 * strike
@@ -673,6 +737,69 @@ func _build_peels() -> void:
 		_mesh("Flap", pivot, flap, Mats.toon_vc())
 		pivot.visible = false
 		_peels.append(pivot)
+
+
+func _build_cast_bar() -> void:
+	_cast_bar = _mesh("CastBar", self, MeshKit.cached("onion:cast_bar", func() -> Mesh:
+		var q := QuadMesh.new()
+		q.size = Vector2(1, 1)
+		return q), Mats.cast_bar(), false)
+	_cast_bar.position = Vector3(0, CAST_BAR_Y, 0)
+	_cast_bar.scale = Vector3(CAST_BAR_SIZE.x, CAST_BAR_SIZE.y, 1.0)
+	_cast_bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cast_label = Label3D.new()
+	_cast_label.name = "CastLabel"
+	_cast_label.text = "Resurrecting"
+	_cast_label.font_size = 40
+	_cast_label.pixel_size = 0.0055
+	_cast_label.outline_size = 12
+	_cast_label.modulate = Color(1.0, 0.97, 0.88)
+	_cast_label.outline_modulate = Color(0.08, 0.04, 0.05)
+	_cast_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_cast_label.no_depth_test = true
+	_cast_label.shaded = false
+	_cast_label.render_priority = 32
+	_cast_label.outline_render_priority = 31
+	_cast_label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cast_label.position = Vector3(0, CAST_BAR_Y + CAST_BAR_SIZE.y * 0.5 + 0.13, 0)
+	add_child(_cast_label)
+
+
+func _build_channel_fx() -> void:
+	var glow_mesh := MeshKit.cached("onion:channel_glow", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_sphere(0.15, Transform3D(), Color.WHITE, 12, 6)
+		return k.build())
+	for hand in _hands:
+		var g := _mesh("ChannelGlow", hand, glow_mesh, Mats.glow(Color(CHANNEL_GOLD, 0.55), 2.2), false)
+		g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		g.visible = false
+		_channel_glows.append(g)
+	_beam = _mesh("ChannelBeam", self, MeshKit.cached("onion:beam", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_cylinder(1.0, 1.0, 1.0, MeshKit.xf(Vector3(0, 0.5, 0)), Color.WHITE, 10, false)
+		return k.build()), Mats.glow(Color(1.0, 0.88, 0.5, 0.5), 2.0), false)
+	_beam.top_level = true
+	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beam.visible = false
+
+
+## Stretches the light beam from the raised hands to the revived ghost.
+func _update_beam() -> void:
+	if _beam == null or _channel_target == null or not is_inside_tree() or not _channel_target.is_inside_tree():
+		return
+	var from := (_hands[0].global_position + _hands[1].global_position) * 0.5 + Vector3(0, 0.08, 0)
+	var to := _channel_target.global_position + Vector3.UP * CHANNEL_TARGET_HEIGHT
+	var length := from.distance_to(to)
+	if length < 0.05:
+		_beam.visible = false
+		return
+	_beam.visible = true
+	var r := 0.05 * (1.0 + 0.3 * sin(_time * 14.0))
+	var b := MeshKit.basis_from_y((to - from) / length)
+	_beam.global_transform = Transform3D(Basis(b.x * r, b.y * length, b.z * r), from)
+	for g in _channel_glows:
+		g.scale = Vector3.ONE * (1.0 + 0.18 * sin(_time * 9.0 + g.get_instance_id() % 5))
 
 
 func _build_tears() -> void:

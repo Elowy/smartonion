@@ -3,7 +3,7 @@ extends Node3D
 ## One fire-and-forget effect spawned by [Vfx]. Animates its children in code (no Tweens,
 ## so tests can step it with _process) and frees itself after [member life] seconds.
 
-enum Kind { TEXT, ARC, SPARK, PUFF, EXPLOSION, TELEGRAPH, LEVEL_UP, SPARKLE }
+enum Kind { TEXT, ARC, SPARK, PUFF, EXPLOSION, TELEGRAPH, LEVEL_UP, SPARKLE, RESURRECT }
 
 var kind: Kind = Kind.SPARK
 var life := 0.5
@@ -55,6 +55,16 @@ func _update(t: float) -> void:
 				flash.scale = Vector3.ONE * size * lerpf(0.4, 1.3, smoothstep(0.0, 0.2, t))
 				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.1, 0.5, t))
 			_update_ring(t, 0.3, 2.6)
+		Kind.RESURRECT:
+			if main != null:
+				# A shaft of light from the sky: snaps wide, then narrows and fades.
+				var w := lerpf(0.25, 1.0, smoothstep(0.0, 0.12, t)) * lerpf(1.0, 0.55, smoothstep(0.35, 1.0, t))
+				main.scale = Vector3(w, size, w)
+				(main as GeometryInstance3D).set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.55, 1.0, t))
+			if flash != null:
+				flash.scale = Vector3.ONE * lerpf(0.3, 0.9, smoothstep(0.0, 0.25, t))
+				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.2, 0.7, t))
+			_update_ring(t, 0.4, 2.2)
 		Kind.EXPLOSION:
 			if flash != null:
 				var e := smoothstep(0.0, 0.3, t)

@@ -19,6 +19,8 @@ const GROUND_Y := 0.04
 ## Extra height added to [method slash_arc] positions (callers pass feet + 0.3 m), so the
 ## swing reads at mid-body height.
 const ARC_LIFT := 0.3
+## Height (m) of the [method resurrect_column] light shaft.
+const RESURRECT_HEIGHT := 14.0
 
 const _ARC_CODE := """
 shader_type spatial;
@@ -51,16 +53,41 @@ void fragment() {
 }
 """
 
+## Level-up column (unit cylinder from y 0 to 1): strongest at the ground, fading upwards.
 const _COLUMN_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_add, shadows_disabled;
 instance uniform vec4 fx_color = vec4(1.0);
 instance uniform float fx_fade = 1.0;
+varying float height;
+void vertex() {
+	height = VERTEX.y;
+}
 void fragment() {
-	float v = clamp(UV.y, 0.0, 1.0);
+	float v = 1.0 - clamp(height, 0.0, 1.0);
 	float stripes = 0.75 + 0.25 * sin(UV.x * 6.2831853 * 6.0 + TIME * 4.0);
 	ALBEDO = fx_color.rgb;
 	ALPHA = clamp(fx_color.a * fx_fade * v * v * stripes, 0.0, 1.0);
+}
+"""
+
+## Light shaft from the sky (unit cylinder from y 0 to 1, scaled up): bright at the
+## ground, fading out high up.
+const _SKY_COLUMN_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_add, shadows_disabled;
+instance uniform vec4 fx_color = vec4(1.0);
+instance uniform float fx_fade = 1.0;
+varying float height;
+void vertex() {
+	height = VERTEX.y;
+}
+void fragment() {
+	float v = 1.0 - smoothstep(0.25, 1.0, clamp(height, 0.0, 1.0));
+	float edge = pow(1.0 - abs(dot(NORMAL, VIEW)), 1.5);
+	float rays = 0.8 + 0.2 * sin(UV.x * 6.2831853 * 5.0 - TIME * 3.0);
+	ALBEDO = mix(fx_color.rgb, vec3(1.0), 0.35 * (1.0 - edge));
+	ALPHA = clamp(fx_color.a * fx_fade * v * (0.3 + 0.7 * (1.0 - edge)) * rays, 0.0, 1.0);
 }
 """
 
@@ -317,6 +344,52 @@ static func level_up_burst(pos: Vector3) -> void:
 	sparks.angular_velocity_min = -200.0
 	sparks.angular_velocity_max = 200.0
 	sparks.color_ramp = _fade_gradient(Color(1.0, 0.95, 0.6), Color(1.0, 0.7, 0.2, 0.0))
+	_start(fx)
+
+
+## Resurrection (GDD 1): a shaft of golden light from the sky onto [param pos] (the
+## revived player's feet), a shock ring and rising sparkles.
+static func resurrect_column(pos: Vector3) -> void:
+	var fx := _effect(VfxEffect.Kind.RESURRECT, pos, 1.3)
+	if fx == null:
+		return
+	fx.color = Color(1.0, 0.9, 0.55)
+	fx.size = RESURRECT_HEIGHT
+	var column := MeshInstance3D.new()
+	column.name = "Column"
+	column.mesh = MeshKit.cached("vfx:sky_column", func() -> Mesh:
+		var c := CylinderMesh.new()
+		c.top_radius = 0.95
+		c.bottom_radius = 0.7
+		c.height = 1.0
+		c.radial_segments = 20
+		c.rings = 0
+		c.cap_top = false
+		c.cap_bottom = false
+		var k := MeshKit.new()
+		k.add_mesh(c, MeshKit.xf(Vector3(0, 0.5, 0)), Color.WHITE)
+		return k.build())
+	column.material_override = _material("sky_column", _SKY_COLUMN_CODE)
+	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.9, 0.55, 1.0))
+	fx.add_child(column)
+	fx.main = column
+	fx.flash = _glow_ball(fx, Color(1.0, 0.95, 0.7), 0.85)
+	fx.flash.position.y = 0.7
+	fx.ring = _ground_ring(fx)
+	var motes := _particles(fx, 18, 1.1, _star_mesh(), Mats.particle(true))
+	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	motes.emission_sphere_radius = 0.6
+	motes.position.y = 0.4
+	motes.direction = Vector3.UP
+	motes.spread = 25.0
+	motes.initial_velocity_min = 1.0
+	motes.initial_velocity_max = 2.6
+	motes.gravity = Vector3(0, 0.6, 0)
+	motes.explosiveness = 0.6
+	motes.angular_velocity_min = -180.0
+	motes.angular_velocity_max = 180.0
+	motes.color_ramp = _fade_gradient(Color(1.0, 0.97, 0.75), Color(1.0, 0.8, 0.3, 0.0))
 	_start(fx)
 
 

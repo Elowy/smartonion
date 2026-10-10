@@ -332,3 +332,37 @@ func test_player_cache_follows_group_changes() -> void:
 	check_eq(players.size(), 0, "removed player dropped")
 	p.free()
 	check_eq(Enemy.living_player_positions(null).size(), 0, "null tree is safe")
+
+
+func test_freed_players_are_handled() -> void:
+	# A script error (e.g. a freed instance passed to a typed parameter) aborts this method;
+	# the sentinel failure then stays in the list.
+	failures.append("aborted by a script error")
+	var a := EFakes.spawn_player(world, Vector3(2.0, 0.0, 0.0))
+	var b := EFakes.spawn_player(world, Vector3(-2.0, 0.0, 0.0))
+	check_eq(Enemy.cached_players(tree).size(), 2, "both cached")
+	# Free one and add another in the same frame: the group size stays the same.
+	a.free()
+	var c := FakeLookup.new()
+	c.add_to_group(&"players")
+	EFakes.arena_of(world).entities.add_child(c)
+	c.global_position = Vector3(0.0, 0.0, 4.0)
+	check(not Enemy.is_living_player(a), "freed player is not alive")
+	check(not Enemy.is_living_player(null), "null is not alive")
+	check(Enemy.is_living_player(b), "living player")
+	var cached := Enemy.cached_players(tree)
+	check_eq(cached.size(), 2, "rebuilt after a cached player was freed")
+	check(c in cached, "new player seen")
+	check_eq(Enemy.living_player_positions(tree).size(), 2, "living positions")
+	# Enemies keep working with a freed target.
+	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3(-1.0, 0.0, 0.0))
+	EFakes.step(e, 0.1)
+	b.free()
+	EFakes.step(e, 0.1)
+	check(e.global_position.z > 0.0, "turned to the remaining player")
+	failures.erase("aborted by a script error")
+
+
+## Another fake player type (as a second Player subclass instance in the group).
+class FakeLookup extends EFakes.FakePlayer:
+	pass

@@ -157,3 +157,67 @@ func test_shake_decays() -> void:
 	rig.shake(0.5)
 	rig.snap()
 	check_eq(rig.get_trauma(), 0.0, "snap clears shake")
+
+
+func test_team_at_max_spread_still_fits_on_screen() -> void:
+	var spread := CameraRig.max_spread(ASPECT)
+	check(spread.x > 0.0 and spread.y > 0.0, "positive spread")
+	var pts: Array[Vector3] = [Vector3(-spread.x * 0.5, 0, -spread.y * 0.5), Vector3(spread.x * 0.5, 0, spread.y * 0.5)]
+	var f := CameraRig.compute_framing(pts, ASPECT)
+	check_near(f["distance"], CameraRig.MAX_DISTANCE, 0.01, "needs the max zoom")
+	for p in pts:
+		check(_visible(p, f["target"], f["distance"]), "corner player %s visible" % p)
+	# The MVP arena never needs the invisible screen wall: the whole team always fits.
+	check(spread.x >= Arena.SIZE.x and spread.y >= Arena.SIZE.y, "arena %s fits in %s" % [Arena.SIZE, spread])
+
+
+func test_walk_rect_keeps_runaways_on_screen() -> void:
+	check(CameraRig.walk_rect_for([], ASPECT).size.x > 1000.0, "alone -> unbounded")
+	var spread := CameraRig.max_spread(ASPECT)
+	var others: Array[Vector3] = [Vector3(-5, 0, 2), Vector3(-3, 0, -1)]
+	var r := CameraRig.walk_rect_for(others, ASPECT)
+	check(r.has_point(Vector2(-4, 0)), "can walk among the team")
+	check_near(r.end.x, -5.0 + spread.x, 0.001, "east limit = westmost teammate + max spread")
+	check_near(r.position.y, 2.0 - spread.y, 0.001, "north limit = southmost teammate - max spread")
+	# A player running far east is stopped at the limit and the camera still frames everyone.
+	var runaway := Vector3(200, 0, 0)
+	var stopped := Vector3(clampf(runaway.x, r.position.x, r.end.x), 0, clampf(runaway.z, r.position.y, r.end.y))
+	var team: Array[Vector3] = [others[0], others[1], stopped]
+	var f := CameraRig.compute_framing(team, ASPECT)
+	for p in team:
+		check(_visible(p, f["target"], f["distance"]), "player %s still visible" % p)
+	# Teammates already too far apart collapse the rect onto their middle.
+	var apart: Array[Vector3] = [Vector3(-200, 0, 0), Vector3(200, 0, 0)]
+	var squeezed := CameraRig.walk_rect_for(apart, ASPECT)
+	check_near(squeezed.size.x, 0.0, 0.001, "no room left")
+	check_near(squeezed.position.x, 0.0, 0.001, "pulled to the middle")
+
+
+func test_view_walk_rect_lies_inside_the_view() -> void:
+	var center := Vector3(3, 0, -2)
+	var dist := 26.0
+	var r := CameraRig.walk_rect(center, dist, ASPECT, 1.0)
+	check(r.size.x > 10.0 and r.size.y > 5.0, "usable area")
+	var ext := CameraRig.ground_extents(dist, ASPECT)
+	for corner: Vector2 in [r.position, r.end, Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.position.y)]:
+		var dz := corner.y - center.z
+		check(dz >= -ext.y and dz <= ext.z, "corner %s inside the visible depth" % corner)
+		check(absf(corner.x - center.x) <= CameraRig.half_width_at(dist, ASPECT, dz), "corner %s inside the visible width" % corner)
+	check(r.position.y - (center.z - ext.y) >= CameraRig.WALK_HEAD_ROOM, "head room at the top edge")
+
+
+func test_rig_walk_rect_for_players_and_ghosts() -> void:
+	var a := _player(Vector3(0, 0, 0))
+	var b := _player(Vector3(4, 0, 0))
+	var ghost := _player(Vector3(2, 0, 3), false)
+	var rig := _rig()
+	rig.snap()
+	# Headless viewports may not be 16:9 – use the rig's own aspect.
+	var spread := CameraRig.max_spread(rig._aspect())
+	var ra := rig.get_walk_rect(a)
+	check_near(ra.end.x, 4.0 + spread.x, 0.001, "living player limited by the other living one")
+	check_near(ra.position.x, 4.0 - spread.x, 0.001, "both ways")
+	check(not rig.get_walk_rect(b).has_point(Vector2(-spread.x - 1.0, 0)), "b cannot run off the far side")
+	var rg := rig.get_walk_rect(ghost)
+	check(rg.has_point(Vector2(2, 3)), "ghost may stay where it is")
+	check(rg.size.x < spread.x, "ghost is kept inside the current (closer) view")

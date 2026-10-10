@@ -138,6 +138,36 @@ void fragment() {
 }
 """
 
+## WoW-like cast bar quad (QuadMesh, UV 0..1) that always faces the camera and draws on
+## top. Instance uniforms: bar_color (fill), bar_progress (0..1).
+const _CAST_BAR_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, depth_test_disabled, blend_mix, shadows_disabled;
+instance uniform vec4 bar_color = vec4(1.0, 0.8, 0.2, 1.0);
+instance uniform float bar_progress = 0.0;
+void vertex() {
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+	MODELVIEW_MATRIX = MODELVIEW_MATRIX * mat4(vec4(length(MODEL_MATRIX[0].xyz), 0.0, 0.0, 0.0),
+		vec4(0.0, length(MODEL_MATRIX[1].xyz), 0.0, 0.0), vec4(0.0, 0.0, length(MODEL_MATRIX[2].xyz), 0.0),
+		vec4(0.0, 0.0, 0.0, 1.0));
+}
+void fragment() {
+	vec2 uv = UV;
+	float bx = 0.022;
+	float by = 0.2;
+	float inside = step(bx, uv.x) * step(uv.x, 1.0 - bx) * step(by, uv.y) * step(uv.y, 1.0 - by);
+	float fill_x = (uv.x - bx) / (1.0 - 2.0 * bx);
+	float filled = inside * step(fill_x, bar_progress);
+	float shine = 0.78 + 0.4 * (1.0 - smoothstep(0.0, 0.5, abs(uv.y - 0.4)));
+	vec3 frame = mix(vec3(0.55, 0.42, 0.18), vec3(0.95, 0.8, 0.42), smoothstep(0.0, 1.0, uv.y));
+	vec3 col = mix(frame, vec3(0.08, 0.07, 0.07), inside);
+	col = mix(col, bar_color.rgb * shine, filled);
+	float spark = filled * (1.0 - smoothstep(0.0, 0.02, abs(fill_x - bar_progress)));
+	ALBEDO = mix(col, vec3(1.0), spark * 0.8);
+	ALPHA = 0.96 * bar_color.a;
+}
+"""
+
 static var _shaders: Dictionary[String, Shader] = {}
 static var _cache: Dictionary[String, Material] = {}
 
@@ -281,6 +311,22 @@ static func ring() -> Material:
 	m.render_priority = -1
 	_cache["ring"] = m
 	return m
+
+
+## Shared camera-facing cast bar material – configure per node with [method set_cast_bar].
+static func cast_bar() -> Material:
+	if _cache.has("cast_bar"):
+		return _cache["cast_bar"]
+	var m := ShaderMaterial.new()
+	m.shader = _shader("cast_bar", _CAST_BAR_CODE)
+	m.render_priority = 30
+	_cache["cast_bar"] = m
+	return m
+
+
+static func set_cast_bar(node: GeometryInstance3D, color: Color, progress: float) -> void:
+	node.set_instance_shader_parameter(&"bar_color", color)
+	node.set_instance_shader_parameter(&"bar_progress", clampf(progress, 0.0, 1.0))
 
 
 ## The outline pass (inverted hull). One cached instance per width.

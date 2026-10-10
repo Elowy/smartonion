@@ -73,12 +73,23 @@ func get_trauma() -> float:
 	return _trauma
 
 
-## Shared screen, no split (GDD 13): the ground rectangle players may walk in so nobody
-## can leave the screen – what the camera shows at MAX_DISTANCE around its current focus,
-## inset by [param margin]. Players clamp their movement to it (the screen edge acts as an
-## invisible wall once the camera cannot zoom out any further).
-func get_walk_rect(margin: float = 1.0) -> Rect2:
-	return walk_rect(focus, MAX_DISTANCE, _aspect(), margin)
+## Shared screen, no split (GDD 13): the ground rectangle [param body] (a node in group
+## &"players") may stand in so that nobody leaves the screen – once the camera cannot zoom
+## out any further, the screen edge acts as an invisible wall. Players clamp their movement
+## to it. A framed (living) player is limited by the spread of the other framed players
+## ([method walk_rect_for]); a ghost that the camera does not follow is kept inside the
+## current view ([method walk_rect]).
+func get_walk_rect(body: Node3D) -> Rect2:
+	var others: Array[Vector3] = []
+	var framed := false
+	for n in _framed_players():
+		if n == body:
+			framed = true
+		else:
+			others.append(n.global_position)
+	if framed:
+		return walk_rect_for(others, _aspect())
+	return walk_rect(focus, distance, _aspect())
 
 
 func _process(delta: float) -> void:
@@ -126,15 +137,25 @@ func _aspect() -> float:
 
 
 func _player_points() -> Array[Vector3]:
-	var alive: Array[Vector3] = []
-	var all: Array[Vector3] = []
+	var out: Array[Vector3] = []
+	for n in _framed_players():
+		out.append(n.global_position)
+	return out
+
+
+## Players the camera frames: the living ones, or everybody when all are down.
+func _framed_players() -> Array[Node3D]:
+	var alive: Array[Node3D] = []
+	var all: Array[Node3D] = []
+	if not is_inside_tree():
+		return all
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var n := node as Node3D
 		if n == null or not n.is_inside_tree():
 			continue
-		all.append(n.global_position)
+		all.append(n)
 		if not n.has_method(&"is_alive") or n.call(&"is_alive"):
-			alive.append(n.global_position)
+			alive.append(n)
 	return alive if not alive.is_empty() else all
 
 
@@ -169,6 +190,37 @@ static func ground_extents(dist: float, aspect: float) -> Vector3:
 ## the near / bottom part of the screen shows less ground than the far / top part).
 static func half_width_at(dist: float, aspect: float, dz: float) -> float:
 	return width_factor(aspect) * (dist - dz * cos(deg_to_rad(PITCH_DEG)))
+
+
+## Largest player spread (x = across the screen, y = along Z) that [method compute_framing]
+## can still fit on screen at MAX_DISTANCE with FRAME_MARGIN.
+static func max_spread(aspect: float) -> Vector2:
+	var ext := ground_extents(MAX_DISTANCE, aspect)
+	return Vector2(2.0 * (ext.x - FRAME_MARGIN), ext.y + ext.z - 2.0 * FRAME_MARGIN)
+
+
+## Where a framed player may stand so the whole team still fits on one screen together
+## with [param others] (the other framed players' positions). Unbounded without others.
+static func walk_rect_for(others: Array[Vector3], aspect: float) -> Rect2:
+	if others.is_empty():
+		return Rect2(-1.0e6, -1.0e6, 2.0e6, 2.0e6)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in others:
+		lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
+		hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
+	var spread := max_spread(aspect)
+	var x0 := hi.x - spread.x
+	var x1 := lo.x + spread.x
+	var z0 := hi.y - spread.y
+	var z1 := lo.y + spread.y
+	if x0 > x1:
+		x0 = (lo.x + hi.x) * 0.5
+		x1 = x0
+	if z0 > z1:
+		z0 = (lo.y + hi.y) * 0.5
+		z1 = z0
+	return Rect2(x0, z0, x1 - x0, z1 - z0)
 
 
 ## Conservative walkable rectangle (XZ) inside the view of a camera focused on

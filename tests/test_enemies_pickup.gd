@@ -128,3 +128,19 @@ func test_drop_merges_when_crowded() -> void:
 	# Nothing idle nearby: still creates a new one below the hard cap.
 	var lone := Pickup.drop(arena.entities, 1, 1, Vector3(14.0, 0.0, 9.0))
 	check(lone != a and lone.get_parent() == arena.entities, "far away: new pickup")
+
+
+func test_flying_pickup_survives_freed_target() -> void:
+	failures.append("aborted by a script error")
+	var player := EFakes.spawn_player(world, Vector3.ZERO)
+	var p := _drop(1, 1, Vector3(2.5, 0.0, 0.0))
+	p._physics_process(1.0 / 60.0)
+	check(p.target == player, "flying to the player")
+	player.free()
+	EFakes.step(p, 0.2)
+	check(p.is_idle(), "released the freed target")
+	check(not p.is_collected(), "not collected by nobody")
+	var x := p.global_position.x
+	EFakes.step(p, 0.2)
+	check_near(p.global_position.x, x, 0.0001, "stops moving")
+	failures.erase("aborted by a script error")
