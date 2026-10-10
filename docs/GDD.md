@@ -468,6 +468,29 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 - **Megvásárlás:** a megvett item a backpackbe kerül, onnan lehet felvenni.
 - **Csere:** felvételkor a régi item a backpackbe kerül; ha tele van, el kell adni valamit.
 - **Eladás:** a vételár 35%-a, a közös pénztárcába.
+- **Átadás egy társnak (Trade):** a hullámok között bármelyik backpack-item ingyen
+  átadható egy másik játékosnak (a fogadónak kell, hogy legyen szabad helye). Ha valaki
+  rossz itemet nyert Needdel, vagy egy bolti item másnak jobb, oda lehet adni.
+  - A Character fülön az item műveletmenüjében: „Trade → P2 / P3 / P4”.
+  - A fogadó panelén megjelenik: „*P1 gave you [Runed Plate Helm]*”.
+
+### 5.6.1 Item Level
+
+- **Megjelenés:** minden item tooltipjében WoW-szerű **Item Level** (ilvl) szám látszik a név
+  alatt, hogy ránézésre össze lehessen hasonlítani két itemet.
+- **Képlet:** `ilvl = 10 + 3 × hullám + ritkaság-bónusz + (6, ha Looted)`.
+
+  | Ritkaság | Bónusz |
+  |---|---|
+  | Common | +0 |
+  | Uncommon | +4 |
+  | Rare | +8 |
+  | Epic | +13 |
+  | Legendary | +20 |
+  | Artifact | +25, és hullámonként nő |
+
+- **Karakterpanel:** a statlista tetején a felszerelés átlagos ilvl-je is látszik
+  („Avg. Item Level 64”).
 
 ---
 
