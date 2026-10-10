@@ -59,7 +59,16 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 ### Elesés és halál (co-op)
 
 - 0 HP-nál a játékos **elesik** (szellem-alak, lassan mozoghat, nem támad).
-- Egy élő társ **3 mp-ig mellette állva** felélesztheti (30% HP-val).
+- Egy élő társ **5 mp-ig mellette állva** felélesztheti (30% HP-val), WoW-szerű
+  **„Resurrecting…” cast barral**:
+  - **Cast bar:** a halott hagyma feje fölött jelenik meg, a felélesztő színében, a
+    hátralévő idővel.
+  - **Animáció:** a felélesztő hagyma két keze felemelkedik és aranyszínű fénnyel izzik, egy
+    fénycsík köti össze a szellemmel.
+  - **Befejezéskor:** fényoszlop az égből, „*Resurrected!*” felirat, és 1 mp sebezhetetlenség.
+  - **Ha a felélesztő kilép a körből:** a cast bar lassan visszafogy, nem nullázódik azonnal.
+  - **Több felélesztő:** minden további társ +50%-kal gyorsítja (co-op).
+  - **Sebződés:** nem szakítja meg a felélesztést. A kockázat az, hogy közben állni kell.
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
@@ -1027,6 +1036,13 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 
 **Loot roll közben:** A = Need, X = Greed, B = Pass, Y = Greed all remaining.
 
+**Gombfeliratok:** a játék felismeri a kontroller típusát, és ahhoz igazítja a feliratokat:
+- Xbox: A B X Y,
+- PlayStation: ✕ ○ □ △,
+- Nintendo-elrendezés: B A Y X.
+
+Vegyes kontrollereknél minden játékos a saját paneljén a saját kontrollere jeleit látja.
+
 ### Billentyű + egér (1 játékos)
 
 | Bemenet | Funkció |
@@ -1109,6 +1125,9 @@ indulnak.
   - Godot 4, **3D low-poly** modellek.
   - Kb. 55–60°-os felülnézeti kamera (keskeny FOV vagy ortografikus).
   - A kamera a csapat középpontját követi, és dinamikusan zoomol, hogy mindenki látszódjon.
+  - **Közös képernyő, osztás nélkül:** a kamera egy határig zoomol ki. Utána a képernyő széle
+    láthatatlan falként megállítja azt a játékost, aki tovább szaladna. Így senki nem
+    tűnhet el a képből.
 - **Assetek (első kör, licencek letöltéskor ellenőrizendők):**
   - **KayKit** csomagok (Kay Lousberg, CC0): Skeletons, Dungeon Remastered, és a fegyver- /
     kellékmodellek az Adventurers csomagból (a hősök saját hagyma-modellek).
@@ -1206,7 +1225,13 @@ indulnak.
 /docs/        GDD.md
 ```
 
-**Mentés (MVP):** csak beállítások. Később meta-progresszió (kaszt- és item-feloldások).
+**Mentés:**
+- beállítások;
+- **automatikus mentés minden hullám végén** (a teljes menet állapota: hullám, kassza,
+  XP, játékosok felszerelése, abilityk, talentek), így egy 25 hullámos menet félbehagyható és
+  folytatható;
+- később meta-progresszió (eredményekkel nyíló kasztok, Legendaryk és nehézségi szintek –
+  részletek később).
 
 ---
 
@@ -1238,3 +1263,11 @@ indulnak.
 | Szintlépés | 5 kártya, ability és stat keverve, goldért rerollolható |
 | Cím | SmartOnion |
 | Nyelv | Angol |
+| Kamera | Közös képernyő; korlátos kizoomolás, a képernyő széle falként megállítja a játékosokat |
+| Felélesztés | 5 mp a halott mellett állva, cast barral és animációval |
+| Gyógyulás | Minden hullám elején teljes HP |
+| Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
+| Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
+| Mentés | Automatikus, minden hullám végén |
+| Meta-progresszió | Eredményekkel nyíló tartalom (B opció) – részletek később |
+| Zene | Egyelőre nincs |
