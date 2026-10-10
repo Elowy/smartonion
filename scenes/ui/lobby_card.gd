@@ -5,7 +5,10 @@ extends PanelContainer
 ## class stat bonuses, starting weapons, resource and the device's own button prompts.
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
-const PREVIEW_HEIGHT := 224.0
+const PREVIEW_HEIGHT := 150.0
+const ABILITY_ICON_SIZE := 40.0
+## The Mastery text is cut after this many lines (the class .tres texts are 2 to 4 lines).
+const MASTERY_MAX_LINES := 3
 
 var index := 0
 var slot: PlayerSlot
@@ -40,6 +43,14 @@ var _resource_dot: UiIcon
 var _resource_label: Label
 var _armor_label: Label
 var _prompt_holder: CenterContainer
+# Abilities / Mastery block (hidden for a class without M3 data).
+var _abilities_panel: PanelContainer
+var _ability_row: HBoxContainer
+## One icon + name label per core ability of the shown class (for tests).
+var ability_icons: Array[AbilityIcon] = []
+var ability_name_labels: Array[Label] = []
+var mastery_title_label: Label
+var mastery_label: Label
 
 
 static func create(p_index: int) -> LobbyCard:
@@ -87,7 +98,7 @@ func _build_empty() -> void:
 
 
 func _build_joined() -> void:
-	_joined_box = UiTheme.vbox(8)
+	_joined_box = UiTheme.vbox(5)
 	add_child(_joined_box)
 
 	_header = PanelContainer.new()
@@ -136,7 +147,6 @@ func _build_joined() -> void:
 	_joined_box.add_child(class_row)
 	_role_label = UiTheme.centered_label("Melee bruiser", UiTheme.DIM, UiTheme.FONT_BODY, Color(0.85, 0.8, 0.7))
 	_joined_box.add_child(_role_label)
-	_joined_box.add_child(UiTheme.divider())
 
 	_desc_label = UiTheme.wrapped_label("", &"", UiTheme.FONT_BODY - 1, Color(0.9, 0.87, 0.8))
 	_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -164,6 +174,19 @@ func _build_joined() -> void:
 	_armor_label = UiTheme.label("Plate", UiTheme.SMALL)
 	res_row.add_child(_armor_label)
 	info_box.add_child(res_row)
+
+	_abilities_panel = UiTheme.panel(UiTheme.INSET_PANEL)
+	_joined_box.add_child(_abilities_panel)
+	var ab_box := UiTheme.vbox(4)
+	_abilities_panel.add_child(ab_box)
+	_ability_row = UiTheme.hbox(10)
+	ab_box.add_child(_ability_row)
+	mastery_title_label = UiTheme.label("Mastery", UiTheme.GOLD_LABEL, UiTheme.FONT_SMALL + 2)
+	ab_box.add_child(mastery_title_label)
+	mastery_label = UiTheme.wrapped_label("", &"", UiTheme.FONT_SMALL, Color(0.88, 0.85, 0.78))
+	mastery_label.max_lines_visible = MASTERY_MAX_LINES
+	mastery_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	ab_box.add_child(mastery_label)
 
 	_joined_box.add_child(UiTheme.spacer(true))
 	_prompt_holder = CenterContainer.new()
@@ -280,6 +303,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 	_desc_label.text = data.description if data != null else ""
 	_fill_stats(data)
 	_fill_weapons(data)
+	_fill_abilities(data, s)
 	if data != null:
 		_resource_dot.set_color(data.resource_color)
 		_resource_label.text = "Resource: " + UiTheme.resource_name(data.resource_type)
@@ -308,18 +332,76 @@ func _fill_weapons(data: ClassData) -> void:
 		c.queue_free()
 	if data == null:
 		return
-	var rows: Array[Array] = [["Main Hand", data.main_hand], ["Off Hand", data.off_hand]]
-	for row: Array in rows:
-		var w := row[1] as WeaponData
+	# One line: "Weapons  Mace + Shield".
+	var line := UiTheme.hbox(6)
+	var slot_label := UiTheme.label("Weapons", UiTheme.SMALL)
+	slot_label.custom_minimum_size.x = 96
+	line.add_child(slot_label)
+	var first := true
+	for w: WeaponData in [data.main_hand, data.off_hand]:
 		if w == null:
 			continue
-		var line := UiTheme.hbox(8)
-		var slot_label := UiTheme.label(str(row[0]), UiTheme.SMALL)
-		slot_label.custom_minimum_size.x = 96
-		line.add_child(slot_label)
+		if not first:
+			line.add_child(UiTheme.label("+", UiTheme.SMALL))
+		first = false
 		var rarity := clampi(w.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)
 		line.add_child(UiTheme.label(w.display_name, &"", UiTheme.FONT_SMALL + 1, UiTheme.RARITY_COLORS[rarity]))
-		_weapons_box.add_child(line)
+	_weapons_box.add_child(line)
+
+
+## The two core abilities (icon with this device's button, name) and the Mastery line.
+func _fill_abilities(data: ClassData, s: PlayerSlot) -> void:
+	for c in _ability_row.get_children():
+		_ability_row.remove_child(c)
+		c.queue_free()
+	ability_icons.clear()
+	ability_name_labels.clear()
+	var has_abilities := data != null and not data.abilities.is_empty()
+	var has_mastery := data != null and data.mastery_text.strip_edges() != ""
+	_abilities_panel.visible = has_abilities or has_mastery
+	_ability_row.visible = has_abilities
+	mastery_title_label.visible = has_mastery
+	mastery_label.visible = has_mastery
+	if has_abilities:
+		var keyboard := s.input is KeyboardInput
+		for i in mini(data.abilities.size(), AbilityRunner.CORE_SLOTS):
+			var a := data.abilities[i]
+			if a == null:
+				continue
+			var cell := UiTheme.hbox(8)
+			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var icon := AbilityIcon.create(ABILITY_ICON_SIZE)
+			icon.slot_index = i
+			var cost_color := Color(0, 0, 0, 0)
+			for r in data.resources:
+				if r != null and r.id == a.resource:
+					cost_color = r.color
+			icon.set_ability(a, a.cost, cost_color)
+			icon.set_prompt(AbilityBar.prompt_text(s.input, i), keyboard)
+			cell.add_child(icon)
+			var name_label := UiTheme.wrapped_label(a.display_name, &"", UiTheme.FONT_SMALL + 2, UiTheme.TEXT)
+			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			name_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+			name_label.custom_minimum_size = Vector2(60, ABILITY_ICON_SIZE)
+			name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			cell.add_child(name_label)
+			_ability_row.add_child(cell)
+			ability_icons.append(icon)
+			ability_name_labels.append(name_label)
+	if has_mastery:
+		var parts := mastery_parts(data.mastery_text)
+		mastery_title_label.text = "Mastery: %s" % parts[0] if parts[0] != "" else "Mastery"
+		mastery_label.text = parts[1]
+
+
+## Splits a Mastery text "Battle Fury: the lower your health ..." into its name and the rest
+## (the name is empty when the text has no "Name: " lead-in).
+static func mastery_parts(text: String) -> Array[String]:
+	var t := text.strip_edges()
+	var colon := t.find(": ")
+	if colon > 0 and colon <= 28:
+		return [t.substr(0, colon), t.substr(colon + 2)]
+	return ["", t]
 
 
 func _fill_prompts(s: PlayerSlot) -> void:

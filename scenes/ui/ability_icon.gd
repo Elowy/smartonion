@@ -189,7 +189,7 @@ static func format_number(value: Variant) -> String:
 			var s := ("%.2f" % v)
 			while s.ends_with("0"):
 				s = s.left(s.length() - 1)
-			return s
+			return s.trim_suffix(".")
 	return str(value)
 
 
