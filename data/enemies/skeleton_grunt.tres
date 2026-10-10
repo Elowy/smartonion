@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"skeleton_grunt"
+display_name = "Skeleton Grunt"
+behavior = 0
+max_hp = 4.0
+contact_damage = 1.0
+move_speed = 2.3
+radius = 0.45
+first_wave = 1
+spawn_weight = 1.0
+group_min = 1
+group_max = 1
+gold = 1
+xp = 1
+model_style = &"skeleton"
+color = Color(0.9, 0.88, 0.78, 1)
+model_scale = 1.0

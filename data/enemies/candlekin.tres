@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"candlekin"
+display_name = "Candlekin"
+behavior = 1
+max_hp = 2.0
+contact_damage = 1.0
+move_speed = 3.6
+radius = 0.32
+first_wave = 2
+spawn_weight = 0.8
+group_min = 3
+group_max = 6
+gold = 1
+xp = 1
+model_style = &"candlekin"
+color = Color(0.62, 0.42, 0.26, 1)
+model_scale = 0.75

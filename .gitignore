@@ -1,0 +1,10 @@
+# Godot 4
+.godot/
+/android/
+*.translation
+export_presets.cfg
+export_credentials.cfg
+# Local artifacts
+/build/
+/screenshots/
+*.tmp

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ClassData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/sword.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"warrior"
+display_name = "Warrior"
+description = "Thrives in the thick of battle. Rage builds as you deal and take damage."
+role = "Melee bruiser"
+armor_type = 3
+primary_stat = &"strength"
+base_stats = Dictionary[StringName, float]({
+&"stamina": 5.0,
+&"armor": 2.0,
+&"speed": -5.0
+})
+main_hand = ExtResource("2_mh")
+proficiencies = Array[StringName]([&"sword", &"axe", &"mace", &"dagger", &"shield", &"dual_wield"])
+resource_type = &"rage"
+resource_color = Color(0.85, 0.15, 0.1, 1)
+onion_color = Color(0.72, 0.18, 0.2, 1)
+accent_color = Color(0.62, 0.64, 0.7, 1)
+headgear = &"helm_horned"
+big_shoulders = true

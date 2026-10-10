@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"marsh_gurgler"
+display_name = "Marsh Gurgler"
+behavior = 2
+max_hp = 6.0
+contact_damage = 2.0
+move_speed = 2.0
+radius = 0.45
+lunge_speed = 9.0
+lunge_windup = 0.45
+attack_cooldown = 2.2
+first_wave = 3
+spawn_weight = 0.7
+group_min = 3
+group_max = 5
+gold = 1
+xp = 2
+model_style = &"gurgler"
+color = Color(0.3, 0.62, 0.52, 1)
+model_scale = 0.95

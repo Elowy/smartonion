@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ClassData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/wand.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mage"
+display_name = "Mage"
+description = "Fragile master of the arcane. Blizzards and blinks."
+role = "Ranged caster, area damage"
+armor_type = 0
+primary_stat = &"intellect"
+base_stats = Dictionary[StringName, float]({
+&"stamina": -3.0,
+&"armor": -2.0,
+&"intellect": 3.0
+})
+main_hand = ExtResource("2_mh")
+proficiencies = Array[StringName]([&"wand", &"staff", &"sword", &"dagger", &"tome"])
+resource_type = &"mana"
+resource_color = Color(0.2, 0.45, 1.0, 1)
+onion_color = Color(0.55, 0.28, 0.68, 1)
+accent_color = Color(0.25, 0.35, 0.85, 1)
+headgear = &"wizard_hat"
+big_shoulders = false

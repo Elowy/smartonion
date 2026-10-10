@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"troll_axethrower"
+display_name = "Troll Axethrower"
+behavior = 3
+max_hp = 8.0
+contact_damage = 1.0
+move_speed = 2.2
+radius = 0.55
+preferred_distance = 7.0
+attack_cooldown = 2.6
+projectile_damage = 2.0
+projectile_speed = 9.0
+first_wave = 5
+spawn_weight = 0.5
+group_min = 1
+group_max = 2
+gold = 2
+xp = 2
+model_style = &"troll"
+color = Color(0.35, 0.55, 0.62, 1)
+model_scale = 1.2

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="ClassData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"warlock"
+display_name = "Warlock"
+description = "Dark caster who commands demons and lingering curses."
+role = "Damage over time, pets"
+armor_type = 0
+primary_stat = &"intellect"
+base_stats = Dictionary[StringName, float]({
+&"armor": -2.0,
+&"speed": -5.0
+})
+main_hand = ExtResource("2_mh")
+proficiencies = Array[StringName]([&"wand", &"staff", &"dagger", &"sword", &"tome"])
+resource_type = &"soul_shard"
+resource_color = Color(0.7, 0.3, 0.9, 1)
+onion_color = Color(0.3, 0.16, 0.32, 1)
+accent_color = Color(0.4, 0.9, 0.25, 1)
+headgear = &"horned_hood"
+big_shoulders = false
