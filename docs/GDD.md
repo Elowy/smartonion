@@ -312,7 +312,7 @@ Trinket 1, Trinket 2, Main Hand, Off Hand.
 | Rare | kék | 11 | 1 enchant | 4. hullámtól | 3. hullámtól |
 | Epic | lila | 16 | 1–2 enchant, set-tag lehetséges | 9. hullámtól | 6. hullámtól |
 | Legendary | narancs | 22 | 2 enchant + egyedi, kézzel tervezett proc | **soha** | 10. hullámtól (boss, elit, goblin, ritka drop) |
-| Artifact | világos arany | – | kasztfegyver, fejlődik | soha | csak a 10. hullám bossától |
+| Artifact | világos arany | – | kasztfegyver, fejlődik | soha | **ritka véletlen loot** a 10. hullámtól (lásd 5.5) |
 
 \* A **stat-keret** az a pontszám, amiből a generált item a statjait „vásárolja”
 (lásd 5.4). A slot szorzója módosítja.
@@ -459,9 +459,37 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 #### Artifact fegyverek (kasztonként 1)
 
-- A 10. hullám bossa dobja: minden játékos megkapja a **saját kasztja** Artifactját.
-- Main Hand fegyver (a kétkezes variánsok mindkét slotot foglalják).
-- Minden hullám végén **fejlődik** (+statok); a 15. és a 20. hullám után egy-egy új tulajdonságot nyit meg.
+Az Artifact **ritka, véletlen loot** – senki nem kapja meg automatikusan. Ha leesik, az
+a menet legnagyobb pillanata.
+
+**Honnan eshet (a 10. hullámtól)**
+
+| Forrás | Esély |
+|---|---|
+| Boss (10. és 25. hullám) | 15% minden boss-lootra |
+| Loot Goblin | 5% |
+| Elit | 2% |
+| Normál ellenség | 0,05% (a „jackpot”) |
+
+A Fortune minden esélyt növel.
+
+**Melyik kaszté:**
+- 80% eséllyel a csapatban lévő egyik kaszté, 20% eséllyel bármelyiké.
+- Ha senki nem tudja használni, Greed esetén nagyon sok goldot ér.
+
+**Need:** csak a megfelelő kasztú játékos nyomhat rá Needet; a többieknek csak Greed vagy Pass
+választható. Egyébként a szokásos Need / Greed / Pass dobás dönt (10.1).
+
+**Korlátok:**
+- Egy menetben kasztonként legfeljebb 1 Artifact eshet.
+- **Pech-védelem:** minden boss után, ami nem dobott Artifactot, +5% esély.
+
+**Fejlődés:**
+- Main Hand fegyver; a kétkezes változatok mindkét slotot foglalják.
+- Akkor is értelmes, ha későn esik le: a megszerzés hullámához illő Item Levellel érkezik.
+- Utána minden hullám végén **fejlődik** (+statok).
+- A felvétele után **3 hullámmal** az első, **6 hullámmal** a második különleges
+  tulajdonsága nyílik meg.
 
 | Kaszt | Artifact | Hatás |
 |---|---|---|
@@ -496,7 +524,7 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
   | Rare | +8 |
   | Epic | +13 |
   | Legendary | +20 |
-  | Artifact | +25, és hullámonként nő |
+  | Artifact | +25, és felvétel után hullámonként nő |
 
 - **Karakterpanel:** a statlista tetején a felszerelés átlagos ilvl-je is látszik
   („Avg. Item Level 64”).
@@ -955,7 +983,7 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Elit | garantált 1 | Rare+ |
 | Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
 | Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
-| A 10. hullám bossa | + kasztonként az **Artifact** (dobás nélkül, mindenki megkapja a sajátját) | Artifact |
+| Artifact (ritka) | lásd 5.5: boss 15%, goblin 5%, elit 2%, normál 0,05% – a 10. hullámtól | Artifact |
 
 **A földön**
 
