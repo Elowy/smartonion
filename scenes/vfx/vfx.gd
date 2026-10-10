@@ -4,8 +4,9 @@ extends RefCounted
 ## itself (see [VfxEffect]). Effects are parented to Arena.current.entities when an arena
 ## exists, otherwise to the current scene. Positions are world positions.
 ##
-## Cheap by design: one VfxEffect node + 1-3 children per effect, shared meshes and
-## materials (per-effect colour / fade via instance uniforms), small CPU particle bursts.
+## Cheap by design: one VfxEffect node + 1-3 children per effect, shared meshes and shaders
+## (each animated part owns a duplicate of a cached material – no instance uniforms, which
+## the Compatibility renderer only fits for ~256 instances), small CPU particle bursts.
 ## Visual randomness uses a private RNG so gameplay determinism (RunState.rng) is untouched.
 
 ## Floating texts alive at once; extra non-crit texts are dropped when the screen is busy.
@@ -25,9 +26,9 @@ const RESURRECT_HEIGHT := 14.0
 const _ARC_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
-instance uniform vec4 arc_color = vec4(1.0);
-instance uniform float arc_progress = 0.0;
-instance uniform float arc_fade = 1.0;
+uniform vec4 arc_color = vec4(1.0);
+uniform float arc_progress = 0.0;
+uniform float arc_fade = 1.0;
 void fragment() {
 	float head = arc_progress;
 	float behind = head - UV.x;
@@ -44,8 +45,8 @@ void fragment() {
 const _GLOW_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_back, depth_draw_never, blend_mix, shadows_disabled;
-instance uniform vec4 fx_color = vec4(1.0);
-instance uniform float fx_fade = 1.0;
+uniform vec4 fx_color = vec4(1.0);
+uniform float fx_fade = 1.0;
 void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	ALBEDO = mix(fx_color.rgb * 1.15, vec3(1.0), smoothstep(0.55, 1.0, facing) * 0.75);
@@ -57,8 +58,8 @@ void fragment() {
 const _COLUMN_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_add, shadows_disabled;
-instance uniform vec4 fx_color = vec4(1.0);
-instance uniform float fx_fade = 1.0;
+uniform vec4 fx_color = vec4(1.0);
+uniform float fx_fade = 1.0;
 varying float height;
 void vertex() {
 	height = VERTEX.y;
@@ -76,8 +77,8 @@ void fragment() {
 const _SKY_COLUMN_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_add, shadows_disabled;
-instance uniform vec4 fx_color = vec4(1.0);
-instance uniform float fx_fade = 1.0;
+uniform vec4 fx_color = vec4(1.0);
+uniform float fx_fade = 1.0;
 varying float height;
 void vertex() {
 	height = VERTEX.y;
@@ -94,9 +95,9 @@ void fragment() {
 const _RUNE_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
-instance uniform vec4 rune_color = vec4(1.0, 0.16, 0.1, 1.0);
-instance uniform float rune_progress = 0.0;
-instance uniform float rune_fade = 1.0;
+uniform vec4 rune_color = vec4(1.0, 0.16, 0.1, 1.0);
+uniform float rune_progress = 0.0;
+uniform float rune_fade = 1.0;
 
 float seg_dist(vec2 p, vec2 a, vec2 b) {
 	vec2 pa = p - a;
@@ -180,10 +181,10 @@ static func slash_arc(pos: Vector3, direction: Vector3, radius: float, arc_degre
 		var k := MeshKit.new()
 		k.add_arc(0.5, 1.0, deg, Transform3D(), Color.WHITE, maxi(8, int(deg / 6.0)))
 		return k.build())
-	mi.material_override = _material("arc", _ARC_CODE)
+	mi.material_override = _unique_material("arc", _ARC_CODE)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.scale = Vector3.ONE * maxf(radius, 0.1)
-	mi.set_instance_shader_parameter(&"arc_color", Color(color.r, color.g, color.b, 1.0))
+	VfxEffect.param(mi, &"arc_color", Color(color.r, color.g, color.b, 1.0))
 	fx.add_child(mi)
 	fx.main = mi
 	fx.color = color
@@ -290,11 +291,11 @@ static func spawn_telegraph(pos: Vector3, radius: float, duration: float) -> voi
 	var mi := MeshInstance3D.new()
 	mi.name = "Rune"
 	mi.mesh = _quad()
-	mi.material_override = _material("rune", _RUNE_CODE)
+	mi.material_override = _unique_material("rune", _RUNE_CODE)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position.y = 0.035
 	mi.set_meta(&"diameter", maxf(radius, 0.3) * 2.0)
-	mi.set_instance_shader_parameter(&"rune_color", Color(1.0, 0.16, 0.1, 1.0))
+	VfxEffect.param(mi, &"rune_color", Color(1.0, 0.16, 0.1, 1.0))
 	fx.add_child(mi)
 	fx.main = mi
 	_start(fx)
@@ -320,9 +321,9 @@ static func level_up_burst(pos: Vector3) -> void:
 		var k := MeshKit.new()
 		k.add_mesh(c, MeshKit.xf(Vector3(0, 0.5, 0)), Color.WHITE)
 		return k.build())
-	column.material_override = _material("column", _COLUMN_CODE)
+	column.material_override = _unique_material("column", _COLUMN_CODE)
 	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.88, 0.42, 1.0))
+	VfxEffect.param(column, &"fx_color", Color(1.0, 0.88, 0.42, 1.0))
 	fx.add_child(column)
 	fx.main = column
 	fx.size = 0.9
@@ -369,9 +370,9 @@ static func resurrect_column(pos: Vector3) -> void:
 		var k := MeshKit.new()
 		k.add_mesh(c, MeshKit.xf(Vector3(0, 0.5, 0)), Color.WHITE)
 		return k.build())
-	column.material_override = _material("sky_column", _SKY_COLUMN_CODE)
+	column.material_override = _unique_material("sky_column", _SKY_COLUMN_CODE)
 	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	column.set_instance_shader_parameter(&"fx_color", Color(1.0, 0.86, 0.45, 0.6))
+	VfxEffect.param(column, &"fx_color", Color(1.0, 0.86, 0.45, 0.6))
 	fx.add_child(column)
 	fx.main = column
 	fx.flash = _glow_ball(fx, Color(1.0, 0.95, 0.7), 0.85)
@@ -469,6 +470,11 @@ static func _start(fx: VfxEffect) -> void:
 			(child as CPUParticles3D).restart()
 
 
+## A fresh copy of the cached material [param key] (shared shader, own parameters).
+static func _unique_material(key: String, code: String) -> Material:
+	return _material(key, code).duplicate()
+
+
 static func _material(key: String, code: String) -> Material:
 	if _materials.has(key):
 		return _materials[key]
@@ -508,11 +514,11 @@ static func _glow_ball(fx: VfxEffect, color: Color, alpha: float) -> GeometryIns
 		var k := MeshKit.new()
 		k.add_sphere(1.0, Transform3D(), Color.WHITE, 16, 8)
 		return k.build())
-	mi.material_override = _material("glow", _GLOW_CODE)
+	mi.material_override = _unique_material("glow", _GLOW_CODE)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position.y = 0.5
 	mi.scale = Vector3.ONE * 0.01
-	mi.set_instance_shader_parameter(&"fx_color", Color(color.r, color.g, color.b, alpha))
+	VfxEffect.param(mi, &"fx_color", Color(color.r, color.g, color.b, alpha))
 	fx.add_child(mi)
 	return mi
 

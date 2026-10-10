@@ -19,6 +19,13 @@ var start_pos := Vector3.ZERO
 var drift := Vector3.ZERO
 
 
+## Sets a shader parameter on [param gi]'s own material (VFX parts never share one).
+static func param(gi: GeometryInstance3D, name: StringName, value: Variant) -> void:
+	var m := gi.material_override as ShaderMaterial if gi != null else null
+	if m != null:
+		m.set_shader_parameter(name, value)
+
+
 func _ready() -> void:
 	start_pos = position
 	_update(0.0)
@@ -43,38 +50,38 @@ func _update(t: float) -> void:
 		Kind.ARC:
 			var gi := main as GeometryInstance3D
 			if gi != null:
-				gi.set_instance_shader_parameter(&"arc_progress", smoothstep(0.0, 0.55, t) * 1.25)
-				gi.set_instance_shader_parameter(&"arc_fade", 1.0 - smoothstep(0.45, 1.0, t))
+				param(gi, &"arc_progress", smoothstep(0.0, 0.55, t) * 1.25)
+				param(gi, &"arc_fade", 1.0 - smoothstep(0.45, 1.0, t))
 		Kind.TELEGRAPH:
 			_update_telegraph(t)
 		Kind.LEVEL_UP:
 			if main != null:
 				main.scale = Vector3(1.0 + 0.3 * t, 0.3 + 3.4 * smoothstep(0.0, 0.3, t), 1.0 + 0.3 * t)
-				(main as GeometryInstance3D).set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.45, 1.0, t))
+				param(main as GeometryInstance3D, &"fx_fade", 1.0 - smoothstep(0.45, 1.0, t))
 			if flash != null:
 				flash.scale = Vector3.ONE * size * lerpf(0.4, 1.3, smoothstep(0.0, 0.2, t))
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.1, 0.5, t))
+				param(flash, &"fx_fade", 1.0 - smoothstep(0.1, 0.5, t))
 			_update_ring(t, 0.3, 2.6)
 		Kind.RESURRECT:
 			if main != null:
 				# A shaft of light from the sky: snaps wide, then narrows and fades.
 				var w := lerpf(0.25, 1.0, smoothstep(0.0, 0.12, t)) * lerpf(1.0, 0.55, smoothstep(0.35, 1.0, t))
 				main.scale = Vector3(w, size, w)
-				(main as GeometryInstance3D).set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.55, 1.0, t))
+				param(main as GeometryInstance3D, &"fx_fade", 1.0 - smoothstep(0.55, 1.0, t))
 			if flash != null:
 				flash.scale = Vector3.ONE * lerpf(0.3, 0.9, smoothstep(0.0, 0.25, t))
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.2, 0.7, t))
+				param(flash, &"fx_fade", 1.0 - smoothstep(0.2, 0.7, t))
 			_update_ring(t, 0.4, 2.2)
 		Kind.EXPLOSION:
 			if flash != null:
 				var e := smoothstep(0.0, 0.3, t)
 				flash.scale = Vector3.ONE * size * lerpf(0.3, 1.0, e)
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.25, 0.85, t))
+				param(flash, &"fx_fade", 1.0 - smoothstep(0.25, 0.85, t))
 			_update_ring(t, size * 0.4, size * 1.25)
 		_:
 			if flash != null:
 				flash.scale = Vector3.ONE * size * lerpf(1.0, 0.3, t)
-				flash.set_instance_shader_parameter(&"fx_fade", 1.0 - smoothstep(0.05, 0.6, t))
+				param(flash, &"fx_fade", 1.0 - smoothstep(0.05, 0.6, t))
 			_update_ring(t, size * 0.3, size * 1.4)
 
 
@@ -106,8 +113,8 @@ func _update_telegraph(t: float) -> void:
 	var fade := 1.0 - smoothstep(warn, life, age)
 	main.scale = Vector3(grow, 1.0, grow) * main.get_meta(&"diameter", 1.0)
 	main.rotation.y = age * 0.8
-	gi.set_instance_shader_parameter(&"rune_progress", p)
-	gi.set_instance_shader_parameter(&"rune_fade", fade * (1.0 + 0.6 * smoothstep(0.85, 1.0, p)))
+	param(gi, &"rune_progress", p)
+	param(gi, &"rune_fade", fade * (1.0 + 0.6 * smoothstep(0.85, 1.0, p)))
 
 
 func _update_ring(t: float, from_r: float, to_r: float) -> void:

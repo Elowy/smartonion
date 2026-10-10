@@ -7,14 +7,21 @@ extends RefCounted
 ## in the alpha pass only and never enters the (expensive) shadow pass – outlines all share
 ## one colour, so their mutual draw order does not matter.
 ##
-## Every toon shader declares `instance uniform vec4 overlay` (rgb = colour, a = amount):
-## a per-node hit flash / wind-up tint without duplicating materials –
-## see [method set_overlay].
+## No `instance uniform`s anywhere: the GL Compatibility renderer keeps them in one 64 KB
+## uniform buffer with 16 slots per instance, i.e. only ~256 instances for the whole scene –
+## far too few for 150 enemies. Instead:
+##   - hit flash / wind-up tint: [method set_overlay] swaps the node to a cached variant of
+##     its (shared) material, quantised so only a handful of variants ever exist;
+##   - ground rings, cast bars and VFX get their own material per node ([method ring],
+##     [method cast_bar]) and are animated with regular shader parameters.
 
 const OUTLINE_COLOR := Color(0.07, 0.045, 0.06)
 ## Outline thickness in metres (object space).
 const OUTLINE_WIDTH := 0.016
 const OVERLAY_PARAM := &"overlay"
+## Overlay amounts are quantised to this many steps (variant materials are cached).
+const OVERLAY_STEPS := 10
+const _BASE_META := &"mats_base"
 
 const _TOON_CODE := """
 shader_type spatial;
@@ -26,11 +33,13 @@ uniform float shade_softness = 0.16;
 uniform float spec_strength = 0.22;
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_energy = 0.0;
-instance uniform vec4 overlay = vec4(1.0, 1.0, 1.0, 0.0);
+uniform vec4 overlay = vec4(1.0, 1.0, 1.0, 0.0);
+// > 0: the overlay pulses with this angular speed (wind-up tells).
+uniform float overlay_pulse = 0.0;
 #ifdef ONION
 uniform float stripe_count = 11.0;
 uniform float stripe_strength = 0.22;
-instance uniform float damage = 0.0;
+uniform float damage = 0.0;
 #endif
 
 #ifdef ONION
@@ -71,13 +80,17 @@ void fragment() {
 		base *= 1.0 - 0.55 * clamp(edge, 0.0, 1.0);
 	}
 #endif
-	ALBEDO = mix(base, overlay.rgb, overlay.a);
+	float over = overlay.a;
+	if (overlay_pulse > 0.0) {
+		over *= 0.6 + 0.4 * sin(TIME * overlay_pulse);
+	}
+	ALBEDO = mix(base, overlay.rgb, over);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	EMISSION = rim * rim_strength * mix(base, vec3(1.0, 0.95, 0.85), 0.55)
 		+ emission_color.rgb * emission_energy
-		+ overlay.rgb * overlay.a * 0.7;
+		+ overlay.rgb * over * 0.7;
 }
 
 void light() {
@@ -117,14 +130,14 @@ void fragment() {
 }
 """
 
-## Flat ground ring / disc decal (quad on XZ, UV 0..1). Instance uniforms so every user
-## (player rings, revive rings, shock waves) shares one material.
+## Flat ground ring / disc decal (quad on XZ, UV 0..1). One material per node (see
+## [method ring]) animated through regular uniforms.
 const _RING_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
-instance uniform vec4 ring_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform vec4 ring_color = vec4(1.0, 1.0, 1.0, 1.0);
 // x = inner radius, y = outer radius (0..1 of the quad half size), z = fill alpha, w = arc 0..1
-instance uniform vec4 ring_shape = vec4(0.78, 0.95, 0.18, 1.0);
+uniform vec4 ring_shape = vec4(0.78, 0.95, 0.18, 1.0);
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
 	float r = length(p);
@@ -139,12 +152,12 @@ void fragment() {
 """
 
 ## WoW-like cast bar quad (QuadMesh, UV 0..1) that always faces the camera and draws on
-## top. Instance uniforms: bar_color (fill), bar_progress (0..1).
+## top. Uniforms: bar_color (fill), bar_progress (0..1).
 const _CAST_BAR_CODE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, depth_test_disabled, blend_mix, shadows_disabled;
-instance uniform vec4 bar_color = vec4(1.0, 0.8, 0.2, 1.0);
-instance uniform float bar_progress = 0.0;
+uniform vec4 bar_color = vec4(1.0, 0.8, 0.2, 1.0);
+uniform float bar_progress = 0.0;
 void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
 	MODELVIEW_MATRIX = MODELVIEW_MATRIX * mat4(vec4(length(MODEL_MATRIX[0].xyz), 0.0, 0.0, 0.0),
@@ -214,9 +227,19 @@ static func toon_cloth_vc() -> Material:
 	return _toon_variant("cloth_vc", Color.WHITE, false)
 
 
-## Onion skin: toon + vertical layer stripes + instance uniform `damage` (0..1) peeling.
-static func onion_skin(color: Color) -> Material:
-	return _toon_variant("onion", color, true)
+## Onion skin: toon + vertical layer stripes; [param damage] (0..1, quantised to 0.05)
+## peels the outer layers off. Cached per colour and damage step.
+static func onion_skin(color: Color, damage: float = 0.0) -> Material:
+	var step := roundi(clampf(damage, 0.0, 1.0) * 20.0)
+	if step == 0:
+		return _toon_variant("onion", color, true)
+	var key := "onion_dmg:%s:%d" % [color.to_html(), step]
+	if _cache.has(key):
+		return _cache[key]
+	var m := (_toon_variant("onion", color, true) as ShaderMaterial).duplicate() as ShaderMaterial
+	m.set_shader_parameter("damage", step / 20.0)
+	_cache[key] = m
+	return m
 
 
 ## Toon material with an emissive tint (glowing gems / trims that still read as solid).
@@ -302,31 +325,29 @@ static func ghost(color: Color) -> Material:
 	return m
 
 
-## Shared ground ring material – configure per node with [method set_ring].
+## A NEW ground ring material (shared shader) – one per node, configured with
+## [method set_ring]. Not cached: each ring animates its own parameters.
 static func ring() -> Material:
-	if _cache.has("ring"):
-		return _cache["ring"]
 	var m := ShaderMaterial.new()
 	m.shader = _shader("ring", _RING_CODE)
 	m.render_priority = -1
-	_cache["ring"] = m
 	return m
 
 
-## Shared camera-facing cast bar material – configure per node with [method set_cast_bar].
+## A NEW camera-facing cast bar material – one per node, see [method set_cast_bar].
 static func cast_bar() -> Material:
-	if _cache.has("cast_bar"):
-		return _cache["cast_bar"]
 	var m := ShaderMaterial.new()
 	m.shader = _shader("cast_bar", _CAST_BAR_CODE)
 	m.render_priority = 30
-	_cache["cast_bar"] = m
 	return m
 
 
 static func set_cast_bar(node: GeometryInstance3D, color: Color, progress: float) -> void:
-	node.set_instance_shader_parameter(&"bar_color", color)
-	node.set_instance_shader_parameter(&"bar_progress", clampf(progress, 0.0, 1.0))
+	var m := node.material_override as ShaderMaterial
+	if m == null:
+		return
+	m.set_shader_parameter(&"bar_color", color)
+	m.set_shader_parameter(&"bar_progress", clampf(progress, 0.0, 1.0))
 
 
 ## The outline pass (inverted hull). One cached instance per width.
@@ -343,16 +364,70 @@ static func outline(width: float = OUTLINE_WIDTH) -> Material:
 
 
 ## Per-node colour overlay for toon materials: hit flash (white), wind-up tell (red) ...
-## [param amount] 0 = none, 1 = solid colour.
-static func set_overlay(node: GeometryInstance3D, color: Color, amount: float) -> void:
-	node.set_instance_shader_parameter(OVERLAY_PARAM, Color(color.r, color.g, color.b, clampf(amount, 0.0, 1.0)))
+## [param amount] 0 = none, 1 = solid colour (quantised to [constant OVERLAY_STEPS]);
+## [param pulse] > 0 makes the tint pulse in the shader (angular speed). The node is
+## switched to a cached variant of its base material (remembered in node meta), so the
+## call is cheap and shared by every node with the same base material.
+static func set_overlay(node: GeometryInstance3D, color: Color, amount: float, pulse: float = 0.0) -> void:
+	var base := base_material(node)
+	if base == null:
+		return
+	node.material_override = with_overlay(base, color, amount, pulse)
 
 
-## Configures a node using [method ring]: radii are fractions of the quad half size.
+## The node's material without any overlay (see [method set_overlay]).
+static func base_material(node: GeometryInstance3D) -> Material:
+	if node.has_meta(_BASE_META):
+		var m: Material = node.get_meta(_BASE_META)
+		# Somebody replaced the material meanwhile (e.g. the downed ghost look): track it.
+		if node.material_override == m or _is_overlay_of(node.material_override, m):
+			return m
+	var current := node.material_override
+	if current != null and current.has_meta(_BASE_META):
+		current = current.get_meta(_BASE_META)
+	node.set_meta(_BASE_META, current)
+	return current
+
+
+## Current overlay amount of a node (0 = none) – for tests / debugging.
+static func overlay_amount(node: GeometryInstance3D) -> float:
+	var m := node.material_override as ShaderMaterial
+	if m == null:
+		return 0.0
+	var v: Variant = m.get_shader_parameter(OVERLAY_PARAM)
+	return (v as Color).a if v is Color else 0.0
+
+
+## Cached variant of [param base] (a toon ShaderMaterial) with an overlay tint.
+static func with_overlay(base: Material, color: Color, amount: float, pulse: float = 0.0) -> Material:
+	var step := roundi(clampf(amount, 0.0, 1.0) * OVERLAY_STEPS)
+	var sm := base as ShaderMaterial
+	if step == 0 or sm == null:
+		return base
+	var key := "overlay:%d:%s:%d:%.1f" % [base.get_instance_id(), color.to_html(false), step, pulse]
+	if _cache.has(key):
+		return _cache[key]
+	var m := sm.duplicate() as ShaderMaterial
+	m.set_shader_parameter(OVERLAY_PARAM, Color(color.r, color.g, color.b, float(step) / OVERLAY_STEPS))
+	m.set_shader_parameter(&"overlay_pulse", pulse)
+	m.set_meta(_BASE_META, base)
+	_cache[key] = m
+	return m
+
+
+## Configures a node using its own [method ring] material: radii are fractions of the quad
+## half size.
 static func set_ring(node: GeometryInstance3D, color: Color, inner: float, outer: float,
 		fill_alpha: float = 0.0, arc: float = 1.0) -> void:
-	node.set_instance_shader_parameter(&"ring_color", color)
-	node.set_instance_shader_parameter(&"ring_shape", Vector4(inner, outer, fill_alpha, arc))
+	var m := node.material_override as ShaderMaterial
+	if m == null:
+		return
+	m.set_shader_parameter(&"ring_color", color)
+	m.set_shader_parameter(&"ring_shape", Vector4(inner, outer, fill_alpha, arc))
+
+
+static func _is_overlay_of(material: Material, base: Material) -> bool:
+	return material != null and material.has_meta(_BASE_META) and material.get_meta(_BASE_META) == base
 
 
 static func cached_count() -> int:

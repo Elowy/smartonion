@@ -14,6 +14,8 @@ const FLASH_TIME := 0.12
 const ATTACK_TIME := 0.32
 const MAX_WINDUP := 1.2
 const WINDUP_COLOR := Color(1.0, 0.18, 0.1)
+## Angular speed of the pulsing wind-up tint (shader side).
+const WINDUP_PULSE := 30.0
 
 const BONE := Color(0.9, 0.88, 0.78)
 const RUST := Color(0.62, 0.36, 0.2)
@@ -45,6 +47,8 @@ var _windup := -1.0
 var _attack := 1.0
 var _stunned := false
 var _overlay_dirty := false
+## (kind, quantised amount) of the applied overlay: 0 none, 1 hit flash, 2 wind-up.
+var _overlay_state := Vector2i.ZERO
 
 
 func _init() -> void:
@@ -60,6 +64,7 @@ func setup(p_data: EnemyData) -> void:
 		remove_child(child)
 		child.queue_free()
 	_stars = null
+	_overlay_state = Vector2i.ZERO
 	var parts := parts_for(style, color)
 	_pivot = Node3D.new()
 	_pivot.name = "Pivot"
@@ -192,15 +197,18 @@ func _apply_overlay() -> void:
 	_overlay_dirty = false
 	if _body == null:
 		return
-	var color := Color.WHITE
-	var amount := _flash * 0.9
-	if _windup >= 0.0:
-		var pulse := 0.35 + 0.25 * sin(_windup * 30.0)
-		if pulse > amount:
-			color = WINDUP_COLOR
-			amount = pulse
-	Mats.set_overlay(_body, color, amount)
-	Mats.set_overlay(_arm, color, amount)
+	# Hit flash (white, fading) wins over the wind-up tell (red, pulsing in the shader).
+	var state := Vector2i(1, roundi(_flash * 0.9 * Mats.OVERLAY_STEPS))
+	if state.y == 0:
+		state = Vector2i(2, 5) if _windup >= 0.0 else Vector2i.ZERO
+	if state == _overlay_state:
+		return
+	_overlay_state = state
+	var color := WINDUP_COLOR if state.x == 2 else Color.WHITE
+	var amount := float(state.y) / Mats.OVERLAY_STEPS
+	var pulse := WINDUP_PULSE if state.x == 2 else 0.0
+	Mats.set_overlay(_body, color, amount, pulse)
+	Mats.set_overlay(_arm, color, amount, pulse)
 
 
 # --- Mesh building (shared, cached) ------------------------------------------

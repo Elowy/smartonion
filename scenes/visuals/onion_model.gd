@@ -195,8 +195,10 @@ func flash_hit() -> void:
 ## Low HP -> peeled / cracked onion layers (visual HP feedback). [param ratio] = hp / max.
 func set_hp_ratio(ratio: float) -> void:
 	hp_ratio = clampf(ratio, 0.0, 1.0)
-	if _bulb != null:
-		_bulb.set_instance_shader_parameter(&"damage", 0.0 if downed else damage_amount(hp_ratio))
+	if _bulb != null and not downed:
+		_bulb.material_override = Mats.onion_skin(_skin_color(), damage_amount(hp_ratio))
+		if _flash > 0.0:
+			Mats.set_overlay(_bulb, Color(1, 1, 1), _flash * 0.85)
 	for i in _peels.size():
 		_peels[i].visible = not downed and hp_ratio < PEEL_THRESHOLDS[i]
 
@@ -431,9 +433,24 @@ func _animate_blink(delta: float) -> void:
 
 
 func _apply_flash() -> void:
+	if downed:
+		return
 	for mi in _skin_meshes:
 		if is_instance_valid(mi):
 			Mats.set_overlay(mi, Color(1, 1, 1), _flash * 0.85)
+
+
+## Current peel amount of the bulb material (0 = intact) – for tests / debugging.
+func bulb_damage() -> float:
+	var m := Mats.base_material(_bulb) as ShaderMaterial if _bulb != null else null
+	if m == null:
+		return 0.0
+	var v: Variant = m.get_shader_parameter(&"damage")
+	return float(v) if v != null else 0.0
+
+
+func _skin_color() -> Color:
+	return class_data.onion_color if class_data != null else Color(0.85, 0.55, 0.3)
 
 
 func _apply_downed_look() -> void:
@@ -447,6 +464,8 @@ func _apply_downed_look() -> void:
 		if not is_instance_valid(mi):
 			continue
 		if downed:
+			# Drop any hit-flash tint first so the saved / kept look is the plain one.
+			mi.material_override = Mats.base_material(mi)
 			if not _saved_materials.has(mi):
 				_saved_materials[mi] = mi.material_override
 			if mi != _face_mesh():
@@ -555,7 +574,7 @@ func _build_body() -> void:
 		var k := MeshKit.new()
 		k.add_lathe(bulb_profile(), Transform3D(), Color.WHITE, 36)
 		return k.build())
-	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin))
+	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio)))
 	# Sprout (long green stalk for the spring-onion rogue, withered for the warlock).
 	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else "normal")
 	if headgear != &"wizard_hat":
