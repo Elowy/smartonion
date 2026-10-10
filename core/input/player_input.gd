@@ -7,8 +7,10 @@ extends RefCounted
 ##   ScriptedInput / BotInput – tests, smoke runs and attract mode
 ##
 ## PlayerManager calls poll() once per rendered frame BEFORE any scene node processes.
-## is_pressed() / get_move() are safe everywhere; just_pressed() / nav_just_pressed()
-## describe edges of the current rendered frame and must be read from _process().
+## is_pressed() / get_move() / nav_held() are safe everywhere; just_pressed() /
+## nav_just_pressed() describe edges of the current rendered frame and must be read from
+## _process(). swallow() marks everything held right now as already handled (used after a join
+## and by screens that must not react to a press / stick push that started before they opened).
 
 enum Pad {
 	A, B, X, Y,          ## face buttons (Xbox naming): A confirm, B back, X sell, Y compare

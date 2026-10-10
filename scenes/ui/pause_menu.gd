@@ -216,8 +216,8 @@ func _refresh_entries() -> void:
 	quit_armed = false
 	_missing_label.visible = not names.is_empty()
 	if not names.is_empty():
-		_missing_label.text = "%s: controller%s unplugged.\nPlug %s back in to resume – or continue without." % [
-			", ".join(names), "s" if names.size() > 1 else "", "them" if names.size() > 1 else "it"]
+		_missing_label.text = "%s: controller%s unplugged.\nReconnect to resume, or continue without." % [
+			", ".join(names), "s" if names.size() > 1 else ""]
 	_update_selection()
 
 
