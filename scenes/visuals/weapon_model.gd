@@ -255,8 +255,8 @@ static func _tome(k: MeshKit, c: Color) -> void:
 	k.add_box(Vector3(0.26, 0.33, 0.075), Transform3D(), c)
 	k.add_box(Vector3(0.24, 0.31, 0.06), MeshKit.xf(Vector3(0.018, 0, 0)), Color(0.97, 0.93, 0.8))
 	k.add_cylinder(0.04, 0.04, 0.33, MeshKit.xf(Vector3(-0.13, 0, 0)), c.darkened(0.2), 8)
-	for sx in [-1.0, 1.0]:
-		for sy in [-1.0, 1.0]:
+	for sx: float in [-1.0, 1.0]:
+		for sy: float in [-1.0, 1.0]:
 			k.add_box(Vector3(0.05, 0.05, 0.085), MeshKit.xf(Vector3(0.11 * sx, 0.145 * sy, 0)), GOLD)
 	k.add_torus(0.05, 0.075, MeshKit.xf(Vector3(0, 0.02, -0.038), Vector3(90, 0, 0), Vector3(1, 1, 0.3)), GOLD, 12, 4)
 

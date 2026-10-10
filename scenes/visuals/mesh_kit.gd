@@ -265,7 +265,7 @@ func add_extrusion(outline: PackedVector2Array, depth: float, xform: Transform3D
 		if Vector2(n.x, n.y).dot(mid) < 0.0:
 			n = -n
 		var base := _verts.size()
-		for v in [v0, v1, v2, v3]:
+		for v: Vector3 in [v0, v1, v2, v3]:
 			_verts.append(xform * v)
 			_normals.append((nb * n).normalized())
 			_colors.append(color)

@@ -151,8 +151,9 @@ static func toon_plain(color: Color) -> Material:
 
 
 ## Toon material multiplying vertex colours (for [MeshKit] merged meshes). Cached.
-static func toon_vc(outline: bool = true, tint: Color = Color.WHITE) -> Material:
-	return _toon_variant("vc", tint, outline)
+## [param outline_width] in metres – big props (trees) need a thicker line to read.
+static func toon_vc(outline: bool = true, tint: Color = Color.WHITE, outline_width: float = OUTLINE_WIDTH) -> Material:
+	return _toon_variant("vc", tint, outline, outline_width)
 
 
 ## Vertex-colour toon material with a faint emissive glow (epic / legendary gear).
@@ -313,8 +314,9 @@ static func cached_count() -> int:
 
 # --- Internals ---------------------------------------------------------------
 
-static func _toon_variant(variant: String, color: Color, with_outline: bool) -> Material:
-	var key := "%s:%s:%s" % [variant, color.to_html(), with_outline]
+static func _toon_variant(variant: String, color: Color, with_outline: bool,
+		outline_width: float = OUTLINE_WIDTH) -> Material:
+	var key := "%s:%s:%s:%.4f" % [variant, color.to_html(), with_outline, outline_width]
 	if _cache.has(key):
 		return _cache[key]
 	var m := ShaderMaterial.new()
@@ -323,7 +325,7 @@ static func _toon_variant(variant: String, color: Color, with_outline: bool) -> 
 	if variant == "onion":
 		m.set_shader_parameter("rim_strength", 0.38)
 	if with_outline:
-		m.next_pass = outline()
+		m.next_pass = outline(outline_width)
 	_cache[key] = m
 	return m
 
