@@ -33,6 +33,10 @@ var _gold_shown := 0.0
 var _coin_pop := 0.0
 var _timer_second := -1
 var _timer_pop := 0.0
+var _floater: Label
+var _floater_amount := 0
+var _floater_born := 0.0
+var _clock := 0.0
 
 
 static func create() -> Hud:
@@ -335,10 +339,17 @@ func _on_leveled_up(level: int) -> void:
 	show_banner("LEVEL UP!", UiTheme.GOLD)
 
 
-## "+12" (or "-30") rising from the gold counter.
+## "+12" (or "-30") rising from the gold counter. Pickups arriving in quick succession
+## add up on one floater instead of stacking.
 func _spawn_gold_floater(delta: int) -> void:
-	var text := ("+%s" if delta > 0 else "-%s") % UiTheme.format_int(absi(delta))
-	var l := UiTheme.label(text, UiTheme.GOLD_LABEL, 26, UiTheme.GOLD_BRIGHT if delta > 0 else UiTheme.RED)
+	if is_instance_valid(_floater) and _clock - _floater_born < 0.35 and signi(_floater_amount) == signi(delta):
+		_floater_amount += delta
+		_floater.text = _floater_text(_floater_amount)
+		return
+	_floater_amount = delta
+	_floater_born = _clock
+	var l := UiTheme.label(_floater_text(delta), UiTheme.GOLD_LABEL, 26, UiTheme.GOLD_BRIGHT if delta > 0 else UiTheme.RED)
+	_floater = l
 	_fx_layer.add_child(l)
 	var origin := gold_label.get_global_rect().position - _fx_layer.get_global_rect().position
 	l.position = origin + Vector2(gold_label.size.x + 10.0, -4.0)
@@ -349,7 +360,12 @@ func _spawn_gold_floater(delta: int) -> void:
 	tw.chain().tween_callback(l.queue_free)
 
 
+static func _floater_text(amount: int) -> String:
+	return ("+%s" if amount > 0 else "-%s") % UiTheme.format_int(absi(amount))
+
+
 func _process(delta: float) -> void:
+	_clock += delta
 	if not is_equal_approx(_gold_shown, float(_gold_target)):
 		var step := maxf(absf(float(_gold_target) - _gold_shown) * minf(1.0, delta * 10.0), delta * 30.0)
 		_gold_shown = move_toward(_gold_shown, float(_gold_target), step)

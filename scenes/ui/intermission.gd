@@ -276,12 +276,13 @@ func _process(delta: float) -> void:
 			s.ready = true
 			continue
 		var inp := s.input
+		# B before START: the keyboard maps Esc to both.
 		if inp.just_pressed(PlayerInput.Pad.A):
 			s.ready = not s.ready
-		elif inp.just_pressed(PlayerInput.Pad.START):
-			s.ready = true
 		elif inp.just_pressed(PlayerInput.Pad.B):
 			s.ready = false
+		elif inp.just_pressed(PlayerInput.Pad.START):
+			s.ready = true
 	_refresh_chips()
 	if slots.is_empty() or PlayerManager.all_ready():
 		_done = true

@@ -99,7 +99,7 @@ func _build() -> void:
 	rows_box = UiTheme.vbox(6)
 	tcol.add_child(rows_box)
 
-	_prompt = UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.A), "/", UiGlyph.key("Enter"), "Back to Menu"]],
+	_prompt = UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.A), "/", UiGlyph.key("Enter"), "Back to Lobby"]],
 		UiTheme.FONT_LARGE - 2, UiTheme.TEXT)
 	col.add_child(_prompt)
 	visible = false

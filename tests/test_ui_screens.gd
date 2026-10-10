@@ -149,6 +149,9 @@ func test_hud_wave_timer_gold_xp() -> void:
 	for i in 30:
 		hud._process(0.1)
 	check_eq(hud.gold_label.text, "37", "gold counts up to the shared wallet")
+	RunState.add_gold(2)
+	RunState.add_gold(3)
+	check_eq(hud._floater.text, "+5", "quick pickups add up on one floater")
 	RunState.add_xp(5)
 	check_eq(hud.xp_bar.value, 5.0, "xp bar value")
 	check_eq(hud.xp_label.text, "5 / %d XP" % RunState.xp_to_next_level(), "xp text")

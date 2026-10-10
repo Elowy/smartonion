@@ -127,7 +127,13 @@ func _ready() -> void:
 
 func _on_visibility_changed() -> void:
 	if is_visible_in_tree() and play_button != null and play_button.is_inside_tree():
-		play_button.grab_focus.call_deferred()
+		_focus_play.call_deferred()
+
+
+## Deferred: the menu may already have left the tree (Main switched screens this frame).
+func _focus_play() -> void:
+	if play_button != null and play_button.is_inside_tree() and play_button.is_visible_in_tree():
+		play_button.grab_focus()
 
 
 func _process(delta: float) -> void:

@@ -174,16 +174,17 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
 	if inp == null:
 		return
+	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
 		slot.ready = not slot.ready
-	elif inp.just_pressed(PlayerInput.Pad.START):
-		slot.ready = true
 	elif inp.just_pressed(PlayerInput.Pad.B):
 		if slot.ready:
 			slot.ready = false
 		else:
 			PlayerManager.leave(slot.index)
 			return
+	elif inp.just_pressed(PlayerInput.Pad.START):
+		slot.ready = true
 	if not slot.ready:
 		var nav := inp.nav_just_pressed()
 		if nav.x != 0:

@@ -123,6 +123,43 @@ could not complete). `--players=N` bot count, `--seed=N`, `--demo` bots without 
   (views: gameplay, live, onions, enemies, weapons, arena, revive). Latest gameplay view:
   `docs/screenshots/visuals_showcase.png`.
 
+## UI (scenes/ui/)
+
+- Every screen is a full-rect `Control` built in code (`create()`), themed by the cached
+  `UiTheme.get_theme()` (WoW look: `UiFrameStyle` stone frames with gold borders, inner
+  shadow and corner studs; parchment tooltips; outlined default font, emboldened via
+  `FontVariation` for titles). Layout is anchors + containers on the 1920x1080
+  `canvas_items` canvas, so it holds at 720p, 4:3 and 21:9. Icons, button glyphs, bars and
+  portraits are drawn procedurally (`UiIcon`, `UiGlyph`, `UiBar`, `UiPortrait`).
+- Input: joined players drive menus only through their own `PlayerSlot.input`. Before anyone
+  joined (main menu, empty lobby) Godot's `ui_*` actions are used for keyboard / d-pad focus
+  navigation, and `UiPads` reads A / B / START on every controller (the default `ui_accept`
+  / `ui_cancel` have no pad buttons). Prompts follow the player's device
+  (`UiGlyph.for_input`: key caps for the keyboard, A / B / X / Y for controllers). Because
+  the keyboard maps Esc to both B and START, screens check B before START.
+- `MainMenu`: `play_pressed` / `quit_pressed`; `activate_focused()` = controller A.
+- `Lobby`: `PlayerManager.joining_enabled` is true while it is visible in the tree (armed only
+  after the join button that opened it is released); showing it clears every slot's `ready`.
+  ◀ ▶ = `Db.cycle_class`, A toggles ready, START readies, B unreadies or leaves. Everyone
+  ready → `COUNTDOWN_TIME` (3 s) countdown, cancelled by an unready or a join →
+  `start_requested` (once; joining is switched off). B / Esc with nobody joined →
+  `back_requested`. A controller unplugged in the lobby leaves its slot. Each card has a live
+  `OnionPreview` (SubViewport with its own World3D).
+- `Hud`: listens to `RunState` (wave, gold with a count-up and "+N" floater, XP, level up →
+  `show_banner("LEVEL UP!")`) by itself; Main calls `bind_players(players)` after spawning and
+  connects `WaveDirector.wave_timer_changed` → `set_wave_time` (red ≤ 5 s). Unit frames hide
+  when their player is freed; while downed they show the revive progress.
+- `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
+  ignore the input of the frame they were opened on (Game Over: the first
+  `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with
+  A / START, unready with B; bots (`is_bot()`) and unplugged devices are auto-ready.
+  PauseMenu: `process_mode` ALWAYS, only the pausing player navigates, their B or any
+  player's START resumes; it hides itself when it emits. Intermission / Game Over / Pause
+  also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
+- `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
+  3D scene show through the dark vignette backdrop.
+- Screenshots: `docs/screenshots/ui_lobby.png`, `docs/screenshots/ui_hud.png`.
+
 ## Forward compatibility: meta-progression (GDD chapter 17, milestone M9)
 
 Meta-progression ships last, but every system built before it must already allow it

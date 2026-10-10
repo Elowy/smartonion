@@ -122,3 +122,15 @@ func test_unplugged_player_does_not_block() -> void:
 	UiFakes.step(screen)
 	UiFakes.tap(screen, a, PlayerInput.Pad.A)
 	check_eq(continues, 1, "continues without the unplugged player")
+
+
+func test_b_and_start_together_act_as_b() -> void:
+	var a := _human("pad:a")
+	_human("pad:b")
+	screen.open(1, 0)
+	UiFakes.step(screen)
+	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	a.press(PlayerInput.Pad.B)
+	a.press(PlayerInput.Pad.START)
+	UiFakes.step(screen)
+	check(not PlayerManager.get_slot(0).ready, "keyboard Esc (B + START) unreadies")

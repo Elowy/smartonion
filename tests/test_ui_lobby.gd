@@ -160,3 +160,22 @@ func test_disconnect_frees_the_slot() -> void:
 	var slot := PlayerManager.get_slot(0)
 	PlayerManager.device_disconnected.emit(slot)
 	check_eq(PlayerManager.count(), 0, "unplugged controller leaves the lobby")
+
+
+func test_b_and_start_together_act_as_b() -> void:
+	# KeyboardInput maps Esc to both B and START: it must unready / leave, never ready.
+	var input := _join("pad:a")
+	var slot := PlayerManager.get_slot(0)
+	UiFakes.tap(lobby, input, PlayerInput.Pad.A)
+	check(slot.ready, "ready")
+	input.press(PlayerInput.Pad.B)
+	input.press(PlayerInput.Pad.START)
+	UiFakes.step(lobby)
+	check(not slot.ready, "Esc unreadies")
+	input.release(PlayerInput.Pad.B)
+	input.release(PlayerInput.Pad.START)
+	UiFakes.step(lobby, 0.0)
+	input.press(PlayerInput.Pad.B)
+	input.press(PlayerInput.Pad.START)
+	UiFakes.step(lobby)
+	check_eq(PlayerManager.count(), 0, "Esc while not ready leaves")

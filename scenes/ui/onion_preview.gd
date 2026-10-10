@@ -16,6 +16,7 @@ var camera: Camera3D
 var _pivot: Node3D
 var _t := 0.0
 var _class_id: StringName = &""
+var _color := Color(0, 0, 0, 0)
 
 
 static func create() -> OnionPreview:
@@ -74,8 +75,9 @@ func show_class(data: ClassData, player_color: Color) -> void:
 	if model == null:
 		model = OnionModel.new()
 		_pivot.add_child(model)
-	if data.id != _class_id:
+	if data.id != _class_id or player_color != _color:
 		_class_id = data.id
+		_color = player_color
 		model.setup(data, player_color)
 		model.set_weapons(data.main_hand, data.off_hand)
 		model.set_facing(Vector3(0.0, 0.0, 1.0))

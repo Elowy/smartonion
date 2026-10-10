@@ -72,6 +72,8 @@ var revive_progress := 0.0
 var invulnerable_left := 0.0
 
 var _regen_accum := 0.0
+## Teammates whose model currently channels a revive beam to this player.
+var _channelers: Array[Player] = []
 var _attack_look_dir := Vector3.FORWARD
 var _attack_look_left := 0.0
 
@@ -233,6 +235,8 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	downed = false
 	revive_progress = 0.0
 	_regen_accum = 0.0
+	var nobody: Array[Player] = []
+	_update_channelers(nobody)
 	velocity = Vector3.ZERO
 	hp = clampf(roundf(max_hp() * hp_ratio), 1.0, max_hp())
 	invulnerable_left = INVULNERABLE_AFTER_REVIVE
@@ -360,21 +364,37 @@ func _update_regen(delta: float) -> void:
 
 
 func _update_revive(delta: float) -> void:
-	if _has_reviver():
+	var revivers := _revivers()
+	if not revivers.is_empty():
 		revive_progress = minf(REVIVE_TIME, revive_progress + delta)
 	else:
 		revive_progress = maxf(0.0, revive_progress - REVIVE_DECAY_PER_SECOND * delta)
+	_update_channelers(revivers)
 	if model != null:
-		model.set_revive_progress(revive_progress / REVIVE_TIME)
+		# GDD 1: "Resurrecting" cast bar in the reviver's colour with the time left.
+		var color := OnionModel.REVIVE_COLOR
+		var seconds_left := -1.0
+		if not revivers.is_empty():
+			seconds_left = REVIVE_TIME - revive_progress
+			if revivers[0].slot != null:
+				color = revivers[0].slot.color
+		model.set_revive_progress(revive_progress / REVIVE_TIME, color, seconds_left)
 	if revive_progress >= REVIVE_TIME - 0.0001:
 		revive(REVIVE_HP_RATIO)
-		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Revived!", HEAL_TEXT_COLOR, 1.2)
+		Vfx.resurrect_column(global_position)
+		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
 
 
 ## True when a living teammate stands within REVIVE_RADIUS.
 func _has_reviver() -> bool:
+	return not _revivers().is_empty()
+
+
+## Living teammates standing within REVIVE_RADIUS.
+func _revivers() -> Array[Player]:
+	var out: Array[Player] = []
 	if not is_inside_tree():
-		return false
+		return out
 	var here := global_position
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var other := node as Player
@@ -382,8 +402,29 @@ func _has_reviver() -> bool:
 			continue
 		var d := other.global_position - here
 		if Vector2(d.x, d.z).length() <= REVIVE_RADIUS:
-			return true
-	return false
+			out.append(other)
+	return out
+
+
+## Reviving teammates raise glowing hands with a light beam to this ghost (GDD 1); the beam
+## stops when they step out of the circle or the revive ends. A reviver already channeling
+## another ghost keeps that one.
+func _update_channelers(revivers: Array[Player]) -> void:
+	var mine: Array[Player] = []
+	for i in _channelers.size():
+		var v: Variant = _channelers[i]
+		if not is_instance_valid(v):
+			continue  # a freed reviver (typed loop variables reject freed instances)
+		var p := v as Player
+		if p in revivers:
+			mine.append(p)
+		elif p.model != null:
+			p.model.set_channel_target(null)
+	for p in revivers:
+		if p not in mine and p.model != null and not p.model.is_channeling():
+			p.model.set_channel_target(self)
+			mine.append(p)
+	_channelers = mine
 
 
 func _go_down() -> void:
