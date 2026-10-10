@@ -24,6 +24,7 @@
 | Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 9.1) |
 | Szintlépés | **5 kártya, abilityk és statok keverve**, 1 választható; goldért rerollolható; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
 | Talentek | WoW-szerű **talentfák** (kasztonként 3); a **10. szinttől szintenként 1 talentpont**, a hullámok között költhető (lásd 7. fejezet) |
+| Loot | Az ellenségek **itemet dobnak**; hullám után a közös képernyőn **Need / Greed / Pass** dobás, mint a WoW-ban. A loot **erősebb**, mint a bolt kínálata (lásd 10.1) |
 | Fegyverkovácsolás | Brotato-szerűen: **2 azonos fegyver, azonos ritkaságban → 1, eggyel magasabb ritkaságú** (lásd 4.1) |
 | Loot / erőforrás | **Egyetlen közös pénztárca** és közös XP – bárki költhet belőle, ezért koordinációt igényel (részletek: 10. fejezet) |
 | Grafika | WoW-szerű stilizált low-poly 3D, felülnézeti kamera (részletek: 13. fejezet) |
@@ -35,7 +36,8 @@
 
 ```
 Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
-  → [ Hullám (harc) → Szintlépés (ability / stat) → Bolt + Trainer + Karakterpanel → Ready ] × 25
+  → [ Hullám (harc) → Loot roll (Need / Greed / Pass) → Szintlépés (ability / stat)
+      → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25
   → Győzelem / Vereség képernyő (statisztikák)
 ```
 
@@ -50,7 +52,8 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 - Hullám közben a karakterek **automatikusan támadnak** a fegyvereikkel a legközelebbi
   ellenségre; a játékos **mozog** és **képességeket** használ.
 - A hullám végén a földön maradt gold és XP automatikusan begyűjtődik.
-- Hullám után: szintlépés-választások (ability vagy stat) → bolt / trainer / karakterpanel
+- Hullám után: **loot roll** a hullámban szerzett itemekre (közös képernyőn) →
+  szintlépés-választások (ability vagy stat) → bolt / trainer / talents / karakterpanel
   → minden játékos „Ready” → következő hullám.
 
 ### Elesés és halál (co-op)
@@ -101,7 +104,7 @@ a százalékos statok közvetlenül %-ban értendők).
 
 | Stat | Hatás |
 |---|---|
-| **Fortune** | Jobb ritkaság a boltban és a szintlépésnél, nagyobb esély elit drop-ra |
+| **Fortune** | Jobb ritkaság a boltban, a lootban és a szintlépésnél; nagyobb item-drop esély |
 | **Gold Find** | +% felszedett gold |
 
 > A **Range** nem stat, hanem a fegyver tulajdonsága.
@@ -267,30 +270,44 @@ Trinket 1, Trinket 2, Main Hand, Off Hand.
 
 ### 5.2 Ritkaság
 
-| Ritkaság | Szín | Stat-keret* | Különlegesség | Elérhető |
-|---|---|---|---|---|
-| Common | fehér | 4 | – | 1. hullámtól |
-| Uncommon | zöld | 7 | – | 2. hullámtól |
-| Rare | kék | 11 | – | 4. hullámtól |
-| Epic | lila | 16 | kis effekt vagy set-tag | 9. hullámtól |
-| Legendary | narancs | 22 | egyedi proc, kézzel tervezett | 14. hullámtól |
-| Artifact | világos arany | – | kasztfegyver, fejlődik | csak boss dropból |
+| Ritkaság | Szín | Stat-keret* | Különlegesség | Boltban | Lootban |
+|---|---|---|---|---|---|
+| Common | fehér | 4 | – | 1. hullámtól | 1. hullámtól |
+| Uncommon | zöld | 7 | – | 2. hullámtól | 1. hullámtól |
+| Rare | kék | 11 | – | 4. hullámtól | 3. hullámtól |
+| Epic | lila | 16 | kis effekt vagy set-tag | 9. hullámtól | 6. hullámtól |
+| Legendary | narancs | 22 | egyedi proc, kézzel tervezett | **soha** | 10. hullámtól (boss, elit, goblin, ritka drop) |
+| Artifact | világos arany | – | kasztfegyver, fejlődik | soha | csak a 10. hullám bossától |
 
 \* A **stat-keret** az a pontszám, amiből a generált item a statjait „vásárolja”
 (lásd 5.4). A slot szorzója módosítja.
 
-**A bolt ritkasági esélyei (Fortune nélkül)**
+**A bolt ritkasági esélyei (Fortune nélkül)** – a bolt legfeljebb Epicet árul.
+
+| Hullám | Common | Uncommon | Rare | Epic |
+|---|---|---|---|---|
+| 1 | 100% | – | – | – |
+| 5 | 60% | 30% | 10% | – |
+| 10 | 40% | 35% | 20% | 5% |
+| 15 | 26% | 33% | 29% | 12% |
+| 20 | 16% | 30% | 34% | 20% |
+| 25 | 10% | 25% | 38% | 27% |
+
+**A loot ritkasági esélyei (normál ellenség, Fortune nélkül)** – kb. egy fokozattal jobb a boltnál.
 
 | Hullám | Common | Uncommon | Rare | Epic | Legendary |
 |---|---|---|---|---|---|
-| 1 | 100% | – | – | – | – |
-| 5 | 60% | 30% | 10% | – | – |
-| 10 | 40% | 35% | 20% | 5% | – |
-| 15 | 25% | 32% | 28% | 12% | 3% |
-| 20 | 15% | 28% | 32% | 19% | 6% |
-| 25 | 8% | 22% | 35% | 25% | 10% |
+| 1 | 60% | 40% | – | – | – |
+| 5 | 25% | 45% | 30% | – | – |
+| 10 | 10% | 35% | 40% | 13% | 2% |
+| 15 | – | 25% | 45% | 25% | 5% |
+| 20 | – | 15% | 42% | 35% | 8% |
+| 25 | – | 8% | 37% | 43% | 12% |
 
 A köztes hullámokra lineárisan interpolálunk; a Fortune a magasabb ritkaságok felé tolja az eloszlást.
+
+**Loot-bónusz:** a lootból származó item („**Looted**” címke a tooltipben) **+25% stat-keretet**
+kap az azonos ritkaságú bolti itemhez képest, és a tier set darabok lootban 3× gyakoribbak.
 
 ### 5.3 Páncéltípusok
 
@@ -645,7 +662,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - **Ha megölik:**
   - 30× a hullám átlagos ellenség-goldja,
   - nagy XP-csomag (kb. 25 normál ellenségnyi),
-  - garantált item (Rare+), Need / Greed / Pass dobással.
+  - garantált item (Rare+, 25% eséllyel Epic+), Need / Greed / Pass dobással (lásd 10.1).
 - **Ritka változat (később):** *Golden Goblin* – 1% eséllyel, csak goldot dob, de
   nagyon sokat.
 - **Co-op:** a csapatnak össze kell hangolnia, hogy körbezárják (pl. Frost Nova,
@@ -655,8 +672,8 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - Az 5. hullámtól véletlenszerűen jelennek meg, ezüst sárkányos portrékerettel és névvel.
 - 3× HP, 1 véletlen affix (Shielding, Enraged, Frenzied, Vampiric).
-- Garantált itemet dobnak (Uncommon+), amit a hullám végén **Need / Greed / Pass** dobással
-  osztunk el (lásd 10. fejezet).
+- Garantált itemet dobnak (Rare+), amit a hullám végén **Need / Greed / Pass** dobással
+  osztunk el (lásd 10.1).
 
 **Bossok**
 
@@ -737,10 +754,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - **Közös XP-sáv:** az egész csapat egyszerre lép szintet, mindenki kap választást.
 
-**Elit- és boss-drop**
-
-- Need / Greed / Pass dobás, WoW-stílusban (1–100 közötti dobás, a Need erősebb a Greednél).
-- Need csak akkor választható, ha a játékos kasztja használni tudja az itemet.
+**Item-loot:** lásd **10.1** (Need / Greed / Pass).
 
 **Gold felhasználása (mind a közös kasszából):** item vásárlás (bolt), **ability rangemelés
 (Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset.
@@ -749,6 +763,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - Játékosonként saját bolt-panel, **4 ajánlattal** (a játékos kasztjához illő kínálattal),
   de mindenki a közös kasszából fizet.
+- **A bolt legfeljebb Epicet árul**; Legendary és Artifact csak lootból szerezhető (10.1).
 - **Lock:** egy ajánlat zárolható a következő körre.
 - **Reroll:** ára `hullám × 2 + 2`, körönként minden további reroll +2-vel drágább.
 - **Árak:** ritkaság alapár × `(1 + 0,08 × (hullám − 1))`.
@@ -759,8 +774,81 @@ A fajok WoW-hangulatúak, de saját nevűek.
   | Uncommon | 30 |
   | Rare | 55 |
   | Epic | 90 |
-  | Legendary | 140 |
 
+
+---
+
+### 10.1 Loot és Need / Greed / Pass dobás
+
+A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hullám után,
+**a közös képernyőn** kell eldöntenie, ki mit kap – ahogy a WoW-ban.
+
+**Mi dob itemet**
+
+| Forrás | Esély | Ritkaság |
+|---|---|---|
+| Normál ellenség | 1,5% ellenségenként (a Fortune növeli); hullámonként legfeljebb `1 + játékosszám` db | a loot-tábla szerint (5.2) |
+| Elit | garantált 1 | Rare+ |
+| Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
+| Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
+| A 10. hullám bossa | + kasztonként az **Artifact** (dobás nélkül, mindenki megkapja a sajátját) | Artifact |
+
+**A földön**
+
+- Az item **lootzsákként** esik le, a ritkaság színében világító fénynyalábbal
+  (fehér, zöld, kék, lila, narancs), így messziről is látszik, ha valami jó esett.
+- Bármelyik játékos felveheti, ha rálép. Ilyenkor a zsák a HUD-on lévő
+  „**Team Loot**” számlálóba repül.
+- Amit senki nem vett fel, a hullám végén automatikusan begyűjtődik. A loot nem vész el.
+
+**A dobás menete (hullám után, a szintlépés előtt)**
+
+1. **Sorban jönnek az itemek** egy WoW-stílusú dobó-ablakban:
+   - ikon, név a ritkaság színében, teljes tooltip;
+   - minden játékos chipjén kis nyíl mutatja, hogy **neki** fejlesztés-e
+     (zöld ↑ / piros ↓ a jelenleg felvett itemhez képest).
+2. **Mindenki a saját kontrollerével választ:**
+
+   | Gomb | Választás | Hatás |
+   |---|---|---|
+   | A | **Need** (kocka ikon) | „Kell nekem” – ha nyer, az item a **saját backpackjébe** kerül |
+   | X | **Greed** (érme ikon) | „Adjuk el” – ha az item Greedre megy, **azonnal eladódik** |
+   | B | **Pass** | Nem vesz részt a dobásban |
+
+   - **Időkorlát:** 15 mp; aki nem dönt, az Passnak számít.
+   - **Rejtett döntések:** a döntések a végéig rejtve maradnak; csak egy pipa jelzi, ki döntött már.
+3. **Need feltétele:**
+   - a kaszt használni tudja az itemet (fegyver-jártasság),
+   - van hely a backpackben.
+
+   Ha valamelyik nem teljesül, a Need gomb szürke, és kiírja az okát
+   („Cannot use” / „Backpack full”).
+4. **Kiértékelés** (WoW-szabályok szerint):
+   - **Van Need:** csak a needelők dobnak 1–100-at. A legnagyobb nyer, és az item a
+     nyertes backpackjébe kerül. Döntetlennél a döntetlenek újra dobnak.
+   - **Nincs Need, de van Greed:** a greedelők dobnak (a statisztikához, ki „nyerte” el),
+     az item **azonnal eladódik**. Az ár a **közös kasszába** kerül, és **50%**-os
+     eladási áron megy, ami jobb a normál 35%-nál, így a Greed is valódi jutalom.
+   - **Mindenki Passt nyom:** az item elvész. (Később: *Disenchant*, ami anyagot ad
+     a fegyverkovácsoláshoz.)
+5. **Eredmény:** WoW-stílusú üzenetsor, pl.:
+   „*P2 rolls 87 (Need) for [Stormcaller]*” → „*P2 wins [Stormcaller]*”.
+
+**Különleges esetek**
+
+- **Egy játékos:** nincs dobás, csak Take (A) / Sell (X) / Leave (B).
+- **Botok:** Need, ha használni tudják és fejlesztés nekik, különben Greed.
+- **Gyorsítás:** minden játékos egy gombbal (Y) **„Greed all remaining”**-et is választhat;
+  ekkor a hátralévő itemekre automatikusan Greedet dob.
+- **Statisztika:** a játék végén látszik, ki hány itemet nyert Needdel, és mennyi gold
+  jött Greedből.
+
+**Miért jó ez a co-opban?**
+
+- A **Need** egyéni erő, a **Greed** a csapat kasszáját tölti. A közös pénztárca miatt a
+  Greed mindenkinek jó, így a csapatnak meg kell beszélnie, kinek kell igazán az item.
+- A Need és a fegyverkovácsolás összeér: egy lootolt fegyver párja lehet egy bolti
+  fegyvernek. A kovácsolt fegyver megtartja a „Looted” bónuszt, ha bármelyik fele lootból jött.
 
 ---
 
@@ -776,11 +864,13 @@ A fajok WoW-hangulatúak, de saját nevűek.
 | LT | Alap képesség 2 | – |
 | RB | Tanult aktív ability 1 | Fül váltás jobbra |
 | LB | Tanult aktív ability 2 | Fül váltás balra |
-| A | Felélesztés (tartva) | Kiválaszt / vásárol / felvesz |
+| A | – (felélesztéshez elég a társ mellett állni) | Kiválaszt / vásárol / felvesz |
 | B | – | Vissza |
 | X | – | Eladás |
 | Y | – | Összehasonlítás a felvett itemmel |
 | Start | Szünet | Ready |
+
+**Loot roll közben:** A = Need, X = Greed, B = Pass, Y = Greed all remaining.
 
 ### Billentyű + egér (1 játékos)
 
@@ -815,6 +905,14 @@ indulnak.
 - **Felül középen:** hullám száma, visszaszámláló, csapat-kassza.
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).
+
+**Loot roll képernyő (közös)**
+
+- **Elrendezés:** a hullám után a közös képernyő közepén egy nagy, WoW-szerű dobó-ablak
+  jelenik meg: item-ikon, név a ritkaság színében, tooltip és visszaszámláló sáv.
+- **Játékos-chipek:** alul 1–4 chip a játékosok színével. Mindegyiken látszik az upgrade-nyíl,
+  a döntés állapota (pipa), majd a végén a dobás eredménye (kocka, érme vagy Pass ikon és a szám).
+- **Jobb oldal:** üzenetsor a dobásokról, és egy „Items: 2 / 5” számláló.
 
 **Hullám utáni képernyő**
 
@@ -927,7 +1025,8 @@ indulnak.
 | `TalentSystem` | Talentfák, pontköltés, előfeltételek, respec |
 | `ForgeSystem` | Fegyverkovácsolás (azonos típus + ritkaság → eggyel magasabb ritkaság) |
 | `Spawner` / `WaveDirector` | Hullámok, spawnolás, skálázás |
-| `LootSystem` | Item-generálás, ritkaság, Need/Greed |
+| `LootSystem` | Item-generálás, ritkaság (bolt- és loot-tábla), drop-esélyek, lootzsákok |
+| `LootRoll` | Need / Greed / Pass dobások, kiértékelés, backpackbe tétel / eladás |
 | `ShopSystem` | Ajánlatok, lock, reroll, árak |
 | `Inventory` / `Equipment` | Backpack, slotok, set-bónuszok, Armor Specialization |
 | UI | Játékosonkénti panelek |
@@ -954,10 +1053,10 @@ indulnak.
 |---|---|---|
 | M0 | Váz | Godot projekt, 1–4 kontroller csatlakozása, mozgó placeholder karakterek, kamera |
 | M1 | Harc magja | Auto-attack MH/OH fegyverrel, 3 ellenségtípus, gold/XP felszedés, hullám-időzítő |
-| M2 | Felszerelés | Statrendszer, item-generálás, ritkaság, bolt, backpack, karakterpanel, tooltip |
+| M2 | Felszerelés és loot | Item-generálás, ritkaság, bolt, backpack, karakterpanel, tooltip, **item-drop és Need / Greed / Pass dobás** |
 | M3 | Kasztok | 5 kaszt, erőforrások, 2-2 alap képesség, Mastery |
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
-| M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, Need/Greed, közös kassza |
+| M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, közös kassza |
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
 
