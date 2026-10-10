@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/tome.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"grimoire_of_the_imp_lord"
+display_name = "Grimoire of the Imp Lord"
+flavor = "Do not feed after midnight."
+slot_type = 11
+armor_type = -1
+rarity = 3
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 7.0,
+&"fire_damage": 15.0
+})
+class_restriction = &"warlock"
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"damage": 16.0,
+"school": "fire"
+}
+unique_text = "Chance on hit: An imp leaps from the pages and hurls a firebolt for 16 Fire damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

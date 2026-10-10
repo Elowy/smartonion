@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"helm_of_the_iron_vigil"
+display_name = "Helm of the Iron Vigil"
+flavor = "Its wearer never sleeps. Or blinks."
+slot_type = 0
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 7.0,
+&"stamina": 8.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "when_struck",
+"chance": 15.0,
+"icd": 8.0,
+"amount": 5.0,
+"duration": 4.0
+}
+unique_text = "When struck: 15% chance to raise your guard, absorbing 5 damage for 4 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

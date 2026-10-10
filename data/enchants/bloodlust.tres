@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bloodlust"
+prefix = "Bloodlust"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 0.7
+equip_stats = Dictionary[StringName, float]({})
+effect = &"buff"
+params = {
+"haste": 20.0,
+"duration_fixed": 6.0
+}
+ppm = 1.0
+chance = 0.0
+icd = 6.0
+school = &"physical"
+description = "Chance on hit: Bloodlust grants +{haste}% Haste for {duration_fixed} sec."

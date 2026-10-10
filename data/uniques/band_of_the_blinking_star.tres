@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"band_of_the_blinking_star"
+display_name = "Band of the Blinking Star"
+flavor = "Now you see it."
+slot_type = 9
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"haste": 5.0,
+&"crit": 4.0,
+&"arcane_damage": 10.0
+})
+class_restriction = &"mage"
+unique_effect = &"buff"
+unique_params = {
+"trigger": "when_struck",
+"chance": 15.0,
+"icd": 6.0,
+"stats": {
+&"speed": 40.0,
+&"dodge": 20.0
+},
+"duration": 2.0
+}
+unique_text = "When struck: 15% chance to blink away, gaining 40% Speed and 20% Dodge for 2 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

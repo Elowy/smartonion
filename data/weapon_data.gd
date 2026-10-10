@@ -28,6 +28,10 @@ enum AttackKind { MELEE_ARC, PROJECTILE, NONE }
 ## 0..1 chance to stun the target for stun_duration seconds.
 @export var stun_chance: float = 0.0
 @export var stun_duration: float = 0.5
+## Damage school (Stats.SCHOOL_STATS key): physical, fire, frost, arcane, holy, shadow, nature.
+## Its school damage % applies to every hit; non-physical ("magic") weapons scale with
+## Spell Power instead of Attack Power (GDD 2.4.1).
+@export var school: StringName = &"physical"
 
 @export_group("Reach")
 ## Metres. For MELEE_ARC this is the reach of the swing; for PROJECTILE the targeting range.
@@ -61,3 +65,8 @@ func is_off_hand_only() -> bool:
 
 func attacks() -> bool:
 	return attack_kind != AttackKind.NONE
+
+
+## Spell-school weapon (wand, staff ...): Spell Power instead of Attack Power.
+func is_magic() -> bool:
+	return school != &"physical" and school != &""

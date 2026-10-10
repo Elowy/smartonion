@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/shield.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bulwark_of_the_last_stand"
+display_name = "Bulwark of the Last Stand"
+flavor = "Dented by a thousand blows. Broken by none."
+slot_type = 11
+armor_type = -1
+rarity = 4
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"stamina": 10.0,
+&"block_value": 25.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 25.0,
+"per_wave": 1,
+"amount": 8.0,
+"duration": 3.0
+}
+unique_text = "Equip: When you fall below 25% health, a barrier absorbs 8 damage for 3 sec. Once per wave."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

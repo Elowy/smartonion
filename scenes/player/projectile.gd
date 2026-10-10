@@ -41,6 +41,13 @@ var knockback := 1.5
 ## TEAM_PLAYERS only: chance (0..1) to stun each enemy hit.
 var stun_chance := 0.0
 var stun_duration := 0.5
+## TEAM_PLAYERS only: the weapon that fired it (on-hit procs read its cooldown) and whether it
+## belongs to an extra attack (its hits cannot trigger further extra attacks).
+var weapon: WeaponData
+var is_extra := false
+## TEAM_PLAYERS only: the attack's shared on-hit proc roll (only the first hit of the whole
+## fan / pierce / explosion rolls on-hit procs); null = every hit rolls.
+var proc_gate: WeaponRunner.ProcGate
 ## Metres flown so far.
 var travelled := 0.0
 ## Number of targets damaged so far.
@@ -208,7 +215,7 @@ func _apply_hit(body: Node3D, kb_dir: Vector3, from_explosion: bool) -> void:
 	var source: Node3D = attacker if attacker != null and is_instance_valid(attacker) else null
 	if team == TEAM_PLAYERS:
 		WeaponRunner.apply_hit(source as Player, body as Enemy, damage, is_crit, kb_dir * knockback,
-				stun_chance, stun_duration)
+				stun_chance, stun_duration, weapon, is_extra, proc_gate == null or proc_gate.take())
 	else:
 		var p := body as Player
 		p.take_damage(damage, CombatMath.KIND_AOE if from_explosion else CombatMath.KIND_PROJECTILE, source)

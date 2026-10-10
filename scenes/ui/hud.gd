@@ -4,7 +4,9 @@ extends Control
 ## P2 top-right, P3 bottom-left, P4 bottom-right), wave counter + timer and the shared gold at
 ## the top centre, the shared XP bar as a thin full-width strip along the bottom edge (WoW
 ## style), a translucent level-up / wave banner just below the timer and a notice line for
-## controller disconnects. Listens to RunState (wave, gold, xp, level) by itself.
+## controller disconnects. Listens to RunState (wave, gold, xp, level, team loot) by itself.
+## Under the gold a "Team Loot: N" bag counter shows the items picked up this wave (they wait
+## for the Need / Greed / Pass roll, GDD 10.1); hidden while the team loot is empty.
 
 const MARGIN := 22.0
 const LOW_TIME := 5.0
@@ -32,11 +34,17 @@ var xp_label: Label
 var xp_bar: UiBar
 var banner_label: Label
 var notice_label: Label
+## "Team Loot: N" (RunState.team_loot); its row is hidden while N is 0.
+var team_loot_label: Label
 
 var _banner: Control
 var _banner_tween: Tween
 var _notice: PanelContainer
 var _coin: UiIcon
+var _loot_row: HBoxContainer
+var _loot_bag: LootBagIcon
+var _loot_count := 0
+var _loot_pop := 0.0
 var _fx_layer: Control
 var _gold_target := 0
 var _gold_shown := 0.0
@@ -191,6 +199,19 @@ func _build_top() -> void:
 	gold_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 26)
 	gold_row.add_child(gold_label)
 	col.add_child(gold_row)
+	# Team loot bag counter (GDD 10.1: picked-up item bags fly into it).
+	_loot_row = UiTheme.hbox(6)
+	_loot_row.name = "TeamLoot"
+	_loot_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_loot_bag = LootBagIcon.new()
+	_loot_bag.custom_minimum_size = Vector2(22, 22)
+	_loot_bag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loot_bag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_loot_row.add_child(_loot_bag)
+	team_loot_label = UiTheme.label("Team Loot: 0", UiTheme.GOLD_LABEL, 19, Color(0.86, 0.78, 1.0))
+	_loot_row.add_child(team_loot_label)
+	_loot_row.visible = false
+	col.add_child(_loot_row)
 
 
 ## WoW-style XP bar: a thin segmented strip across the whole bottom edge, the team level at
@@ -320,7 +341,10 @@ func _ready() -> void:
 	RunState.gold_changed.connect(_on_gold_changed)
 	RunState.xp_changed.connect(_on_xp_changed)
 	RunState.leveled_up.connect(_on_leveled_up)
+	RunState.team_loot_changed.connect(_on_team_loot_changed)
 	_on_wave_changed(RunState.wave)
+	_loot_count = RunState.team_loot.size()
+	_show_team_loot()
 	_gold_target = RunState.gold
 	_gold_shown = float(RunState.gold)
 	gold_label.text = UiTheme.format_int(RunState.gold)
@@ -361,6 +385,23 @@ func _on_leveled_up(level: int) -> void:
 	level_label.text = "Level %d" % level
 	xp_bar.flash = 1.0
 	show_banner("LEVEL UP!", UiTheme.GOLD)
+
+
+func _on_team_loot_changed() -> void:
+	var n := RunState.team_loot.size()
+	if n > _loot_count:
+		_loot_pop = 1.0
+	_loot_count = n
+	_show_team_loot()
+
+
+func _show_team_loot() -> void:
+	team_loot_label.text = "Team Loot: %d" % _loot_count
+	_loot_row.visible = _loot_count > 0
+
+
+func is_team_loot_visible() -> bool:
+	return _loot_row.visible
 
 
 func _build_floater() -> void:
@@ -423,5 +464,37 @@ func _process(delta: float) -> void:
 		_coin.scale = Vector2.ONE * (1.0 + 0.3 * _coin_pop)
 	if _timer_pop > 0.0:
 		_timer_pop = maxf(0.0, _timer_pop - delta * 3.0)
+	if _loot_pop > 0.0:
+		_loot_pop = maxf(0.0, _loot_pop - delta * 3.0)
+		_loot_bag.pivot_offset = _loot_bag.size * 0.5
+		_loot_bag.scale = Vector2.ONE * (1.0 + 0.45 * _loot_pop)
+		_loot_bag.glow = _loot_pop
+		_loot_bag.queue_redraw()
 	timer_label.pivot_offset = timer_label.size * 0.5
 	timer_label.scale = Vector2.ONE * (1.0 + 0.22 * _timer_pop)
+
+
+## Small loot sack drawn in code (the "Team Loot" counter); [member glow] flashes it when an
+## item bag was picked up.
+class LootBagIcon extends Control:
+	var glow := 0.0
+
+	func _draw() -> void:
+		var s := minf(size.x, size.y)
+		var c := size * 0.5
+		var line := Color(0.07, 0.04, 0.02)
+		if glow > 0.0:
+			draw_circle(c, s * 0.7, Color(0.75, 0.55, 1.0, 0.35 * glow))
+		var body := PackedVector2Array()
+		for i in 20:
+			var a := TAU * i / 20.0
+			body.append(c + Vector2(cos(a) * s * 0.42, s * 0.12 + sin(a) * s * 0.34))
+		draw_colored_polygon(body, Color(0.58, 0.4, 0.22))
+		var outline := body.duplicate()
+		outline.append(body[0])
+		draw_polyline(outline, line, 1.5, true)
+		var neck := PackedVector2Array([c + Vector2(-s * 0.16, -s * 0.2), c + Vector2(s * 0.16, -s * 0.2),
+			c + Vector2(s * 0.26, -s * 0.44), c + Vector2(-s * 0.26, -s * 0.44)])
+		draw_colored_polygon(neck, Color(0.66, 0.47, 0.27))
+		draw_line(c + Vector2(-s * 0.2, -s * 0.2), c + Vector2(s * 0.2, -s * 0.2), UiTheme.GOLD, 2.0)
+		draw_circle(c + Vector2(0, s * 0.12), s * 0.1, Color(0.75, 0.55, 1.0))

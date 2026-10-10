@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"vial_of_troll_blood"
+display_name = "Vial of Troll Blood"
+flavor = "It wriggles. Best not to ask."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"spirit": 3.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 35.0,
+"icd": 15.0,
+"stats": {
+&"spirit": 6.0
+},
+"duration": 5.0
+}
+unique_text = "Equip: When you fall below 35% health, your Spirit is increased by 6 for 5 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

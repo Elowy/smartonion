@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"idol_of_the_moon"
+display_name = "Idol of the Moon"
+flavor = "Its glow brightens when nobody is looking."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"crit": 5.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "periodic",
+"interval": 20.0,
+"stats": {
+&"crit": 5.0
+},
+"duration": 8.0
+}
+unique_text = "Every 20 sec: Moonlight grants you 5% Critical Strike for 8 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

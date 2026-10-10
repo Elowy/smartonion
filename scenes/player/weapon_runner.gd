@@ -12,6 +12,16 @@ extends Node3D
 ## Targets and melee arcs come from the shared [EnemyGrid] (only the enemies near the player
 ## are looked at). While nothing is in range the runner looks again every NO_TARGET_RETRY
 ## seconds – or at once when the number of enemies changes.
+##
+## Exotic stats (GDD 2.4.1): Extra Attack (% chance an attack strikes again at once; extra
+## attacks never roll it again), Critical Damage (crit multiplier), Extra Projectile (a fan of
+## FAN_STEP_DEGREES), Pierce, Area Size (explosion radius); Attack / Spell Power and school %
+## are in [method CombatMath.weapon_hit_damage], Executioner / Slayer in [method apply_hit].
+## Procs (Galeforce) add extra attacks through [method extra_attack].
+## On-hit procs roll once per attack, not once per enemy hit: a melee arc rolls them on the
+## attacked target (else the first enemy it hits), a projectile attack on the first hit of
+## any of its projectiles (fan, pierce and explosions share one [ProcGate]); Executioner /
+## Slayer, leech, stuns and damage stay per target.
 
 ## Fraction of the cooldown the off hand waits at wave start / after idling.
 const OFF_HAND_PHASE := 0.5
@@ -29,6 +39,22 @@ const NORMAL_TEXT_COLOR := Color(1.0, 1.0, 1.0, 0.75)
 const CRIT_TEXT_COLOR := Color(1.0, 0.84, 0.12)
 const NORMAL_TEXT_SIZE := 0.6
 const CRIT_TEXT_SIZE := 1.1
+## Angle (degrees) between the projectiles of an Extra Projectile fan.
+const FAN_STEP_DEGREES := 10.0
+## Safety cap of extra attacks resolved after one attack.
+const MAX_EXTRA_ATTACKS := 8
+
+
+## One attack's on-hit proc roll, shared by everything the attack hits: only the first hit
+## rolls on-hit procs.
+class ProcGate extends RefCounted:
+	var open := true
+
+	## True for the first hit of the attack, false afterwards.
+	func take() -> bool:
+		var was := open
+		open = false
+		return was
 
 var weapon: WeaponData
 var player: Player
@@ -41,6 +67,10 @@ var _waiting_for_target := false
 var _retry_left := 0.0
 ## Enemies in the tree at the last failed search (-1 = none yet).
 var _retry_enemy_count := -1
+## True while an attack resolves (extra attacks requested meanwhile wait for its end).
+var _attacking := false
+## Extra attacks waiting for the current attack to finish.
+var _pending_extra := 0
 
 
 static func create(p_weapon: WeaponData, owner_player: Player, p_off_hand: bool) -> WeaponRunner:
@@ -120,19 +150,87 @@ func _enemy_count() -> int:
 	return player.get_tree().get_node_count_in_group(&"enemies") if player.is_inside_tree() else 0
 
 
-## Attacks [param target] right now (no cooldown check).
-func attack(target: Enemy) -> void:
+## Attacks [param target] right now (no cooldown check). A normal attack may strike again at
+## once (Extra Attack stat); [param is_extra] marks an extra attack, whose hits can never
+## trigger further extra attacks (stat or proc).
+func attack(target: Enemy, is_extra: bool = false) -> void:
 	if weapon == null or player == null or not player.is_inside_tree():
+		return
+	var outer := _attacking
+	_attacking = true
+	_strike(target, is_extra)
+	_attacking = outer
+	if not is_extra and player.stats.get_raw(Stats.EXTRA_ATTACK) > 0.0 \
+			and CombatMath.roll_extra_attack(player.stats, RunState.rng):
+		_pending_extra += 1
+	if not outer:
+		_flush_extra(target)
+
+
+## [param count] extra attacks (procs such as Galeforce): right after the attack that is
+## resolving now, else at once – at [param target] while it lives, else the nearest enemy.
+func extra_attack(count: int, target: Enemy = null) -> void:
+	if count <= 0 or weapon == null or not weapon.attacks():
+		return
+	_pending_extra += count
+	if not _attacking:
+		_flush_extra(target)
+
+
+## Parry riposte: one instant hit of this weapon on [param target] (no range check – it just
+## attacked in melee). A weapon hit (on-hit procs), but like an extra attack it never leads to
+## further extra attacks.
+func riposte(target: Enemy) -> void:
+	if weapon == null or player == null or not player.is_inside_tree() or target == null \
+			or not is_instance_valid(target) or target.is_dead():
+		return
+	var dir := flat(target.global_position - player.global_position)
+	dir = dir.normalized() if dir.length_squared() > 0.000001 else player.facing
+	var crit := CombatMath.roll_crit(player.stats, RunState.rng)
+	var dmg := CombatMath.weapon_hit_damage(weapon, player.stats) \
+			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
+	Vfx.slash_arc(player.global_position + Vector3.UP * 0.3, dir, 1.4, 70.0, _slash_color())
+	Vfx.hit_spark(target.global_position + Vector3.UP * 0.6, _slash_color())
+	player.face_attack(dir)
+	apply_hit(player, target, dmg, crit, dir * weapon.knockback, weapon.stun_chance,
+			weapon.stun_duration, weapon, true)
+
+
+func _flush_extra(target: Enemy) -> void:
+	var done := 0
+	while _pending_extra > 0 and done < MAX_EXTRA_ATTACKS:
+		_pending_extra -= 1
+		done += 1
+		if player == null or not player.is_alive() or not player.is_inside_tree():
+			break
+		var t: Enemy = target if _is_live(target) else find_target()
+		if t == null:
+			break
+		_attacking = true
+		_strike(t, true)
+		_attacking = false
+	_pending_extra = 0
+
+
+static func _is_live(e: Variant) -> bool:
+	if not is_instance_valid(e):
+		return false
+	var enemy := e as Enemy
+	return enemy != null and enemy.is_inside_tree() and not enemy.is_dead()
+
+
+func _strike(target: Enemy, is_extra: bool) -> void:
+	if target == null or not is_instance_valid(target):
 		return
 	var origin := player.global_position
 	var dir := flat(target.global_position - origin)
 	dir = dir.normalized() if dir.length_squared() > 0.000001 else player.facing
 	match weapon.attack_kind:
 		WeaponData.AttackKind.MELEE_ARC:
-			_melee(origin, dir)
+			_melee(origin, dir, is_extra, target)
 		WeaponData.AttackKind.PROJECTILE:
 			dir = _lead_direction(origin, target, dir)
-			_shoot(origin, dir)
+			_shoot(origin, dir, is_extra)
 		_:
 			return
 	player.face_attack(dir)
@@ -140,36 +238,60 @@ func attack(target: Enemy) -> void:
 		player.model.play_attack(is_off_hand)
 
 
-func _melee(origin: Vector3, dir: Vector3) -> void:
+## Hits every enemy in the arc; [param target] (the attacked enemy) is hit first and rolls
+## the on-hit procs of this attack (the first enemy hit does when it is not in the arc).
+func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy = null) -> void:
 	var base := CombatMath.weapon_hit_damage(weapon, player.stats)
+	var crit_mult := CombatMath.crit_multiplier(weapon, player.stats)
 	# Only the enemies the grid finds within reach (+ their radius) – same hits, same order.
 	var nodes := EnemyGrid.gather_around(player.get_tree(), origin, weapon.attack_range)
 	var hits := enemies_in_arc(nodes, origin, dir, weapon.attack_range, weapon.arc_degrees)
+	var at := hits.find(target) if target != null else -1
+	if at > 0:
+		hits.remove_at(at)
+		hits.push_front(target)
 	Vfx.slash_arc(origin + Vector3.UP * 0.3, dir, weapon.attack_range, weapon.arc_degrees, _slash_color())
+	var gate := ProcGate.new()
 	for e in hits:
 		if not is_instance_valid(e) or e.is_dead():
 			continue
 		var crit := CombatMath.roll_crit(player.stats, RunState.rng)
-		var dmg := base * (weapon.crit_mult if crit else 1.0)
+		var dmg := base * (crit_mult if crit else 1.0)
 		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color())
-		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration)
+		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration,
+				weapon, is_extra, gate.take())
 
 
-func _shoot(origin: Vector3, dir: Vector3) -> void:
+## Fires the weapon's projectile(s): 1 + Extra Projectile in a fan, with the extra Pierce and
+## the Area Size of the player.
+func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false) -> void:
 	var parent := effects_parent(player)
 	if parent == null:
 		return
-	var crit := CombatMath.roll_crit(player.stats, RunState.rng)
-	var dmg := CombatMath.weapon_hit_damage(weapon, player.stats) * (weapon.crit_mult if crit else 1.0)
+	var stats := player.stats
+	var count := 1 + CombatMath.extra_projectiles(stats)
+	var pierce := weapon.pierce + CombatMath.extra_pierce(stats)
+	var radius := weapon.aoe_radius * CombatMath.area_mult(stats) if weapon.aoe_radius > 0.0 else 0.0
+	var crit_mult := CombatMath.crit_multiplier(weapon, stats)
 	var style := projectile_style(weapon)
-	var proj := Projectile.create(Projectile.TEAM_PLAYERS, dmg, crit, dir, weapon.projectile_speed,
-			weapon.attack_range + PROJECTILE_EXTRA_RANGE, weapon.pierce, weapon.aoe_radius, player,
-			style, _projectile_color(style))
-	proj.knockback = weapon.knockback
-	proj.stun_chance = weapon.stun_chance
-	proj.stun_duration = weapon.stun_duration
-	parent.add_child(proj)
-	proj.global_position = origin + Vector3.UP * Player.CHEST_HEIGHT + dir * (Player.RADIUS + 0.15)
+	var color := _projectile_color(style)
+	var gate := ProcGate.new()
+	for i in count:
+		var shot := dir
+		if count > 1:
+			shot = dir.rotated(Vector3.UP, deg_to_rad(FAN_STEP_DEGREES * (float(i) - float(count - 1) * 0.5)))
+		var crit := CombatMath.roll_crit(stats, RunState.rng)
+		var dmg := CombatMath.weapon_hit_damage(weapon, stats) * (crit_mult if crit else 1.0)
+		var proj := Projectile.create(Projectile.TEAM_PLAYERS, dmg, crit, shot, weapon.projectile_speed,
+				weapon.attack_range + PROJECTILE_EXTRA_RANGE, pierce, radius, player, style, color)
+		proj.knockback = weapon.knockback
+		proj.stun_chance = weapon.stun_chance
+		proj.stun_duration = weapon.stun_duration
+		proj.weapon = weapon
+		proj.is_extra = is_extra
+		proj.proc_gate = gate
+		parent.add_child(proj)
+		proj.global_position = origin + Vector3.UP * Player.CHEST_HEIGHT + shot * (Player.RADIUS + 0.15)
 
 
 ## Aims a little ahead of a moving target.
@@ -266,15 +388,22 @@ static func enemies_in_arc(nodes: Array[Node], origin: Vector3, direction: Vecto
 	return out
 
 
-## One weapon hit of [param attacker] (may be null) on [param enemy]: records the damage
-## (only what the enemy had left – overkill does not count), applies it (kill credit goes
-## through the attacker), rolls the stun, shows the damage number and triggers the
-## attacker's on-hit effects (leech).
+## One weapon hit of [param attacker] (may be null) on [param enemy]: the attacker's
+## Executioner / Slayer bonus against this target, records the damage (only what the enemy
+## had left – overkill does not count), applies it (kill credit goes through the attacker),
+## rolls the stun, shows the damage number and triggers the attacker's on-hit effects (leech,
+## procs – [param weapon], [param is_extra] and [param roll_procs] (false for the further
+## hits of one attack: on-hit procs roll once per attack) are passed on, see
+## Player.on_hit_dealt).
 static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bool, knockback: Vector3,
-		stun_chance: float = 0.0, stun_duration: float = 0.5) -> void:
+		stun_chance: float = 0.0, stun_duration: float = 0.5, weapon: WeaponData = null,
+		is_extra: bool = false, roll_procs: bool = true) -> void:
 	if enemy == null or not is_instance_valid(enemy) or enemy.is_dead():
 		return
 	var valid_attacker: Player = attacker if attacker != null and is_instance_valid(attacker) else null
+	if valid_attacker != null:
+		var ratio := enemy.hp / enemy.max_hp if enemy.max_hp > 0.0 else 1.0
+		damage *= CombatMath.target_damage_mult(valid_attacker.stats, ratio, enemy.is_elite())
 	var text_pos := enemy.global_position + Vector3.UP * DAMAGE_TEXT_HEIGHT
 	if valid_attacker != null and valid_attacker.slot != null:
 		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)))
@@ -283,8 +412,8 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 			and RunState.rng.randf() < stun_chance:
 		enemy.apply_stun(stun_duration)
 	show_damage_number(text_pos, damage, is_crit, enemy)
-	if valid_attacker != null:
-		valid_attacker.on_hit_dealt(damage, enemy)
+	if valid_attacker != null and is_instance_valid(valid_attacker):
+		valid_attacker.on_hit_dealt(damage, enemy, weapon, is_crit, is_extra, roll_procs)
 
 
 ## White number for normal hits, bigger yellow one for crits. Hits on the same

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"banner_of_the_warband"
+display_name = "Banner of the Warband"
+flavor = "Plant it, and the onions will follow."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"damage_pct": 5.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "periodic",
+"interval": 12.0,
+"amount": 2.0,
+"target": "lowest_ally"
+}
+unique_text = "Every 12 sec: Rallies your most wounded ally, healing them for 2."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"signet_of_the_dawnwatch"
+display_name = "Signet of the Dawnwatch"
+flavor = "The watch ends at dawn. It never ends."
+slot_type = 9
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"crit": 4.0,
+&"versatility": 3.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "on_kill",
+"chance": 10.0,
+"icd": 2.0,
+"amount": 2.0,
+"target": "lowest_ally"
+}
+unique_text = "On kill: 10% chance to heal your most wounded ally for 2."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

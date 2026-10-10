@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"crown_of_ashes"
+display_name = "Crown of Ashes"
+flavor = "Worn by a king who would not stop burning."
+slot_type = 0
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 8.0,
+&"stamina": 8.0,
+&"fire_damage": 15.0
+})
+class_restriction = &""
+unique_effect = &"explode"
+unique_params = {
+"trigger": "on_kill",
+"chance": 10.0,
+"damage": 25.0,
+"radius": 3.0,
+"school": "fire"
+}
+unique_text = "On kill: 10% chance the enemy bursts into flames, dealing 25 Fire damage to enemies nearby."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

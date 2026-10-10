@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"boots_of_the_wanderer"
+display_name = "Boots of the Wanderer"
+flavor = "They have walked every road. Twice."
+slot_type = 8
+armor_type = 1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"agility": 7.0,
+&"stamina": 6.0,
+&"speed": 15.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "when_struck",
+"chance": 25.0,
+"icd": 6.0,
+"stats": {
+&"dodge": 10.0,
+&"speed": 10.0
+},
+"duration": 4.0
+}
+unique_text = "When struck: 25% chance to gain 10% Dodge and 10% Speed for 4 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

@@ -18,6 +18,7 @@ cooldown = 1.0
 crit_mult = 2.0
 knockback = 2.0
 stun_chance = 0.0
+school = &"fire"
 attack_range = 7.5
 arc_degrees = 100.0
 projectile_speed = 14.0

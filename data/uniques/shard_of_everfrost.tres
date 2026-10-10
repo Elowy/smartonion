@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shard_of_everfrost"
+display_name = "Shard of Everfrost"
+flavor = "Cold enough to stop a heart. Or to keep one beating."
+slot_type = 10
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"stamina": 4.0,
+&"versatility": 3.0
+})
+class_restriction = &""
+unique_effect = &"cheat_death"
+unique_params = {
+"trigger": "equip",
+"invulnerable": 2.0
+}
+unique_text = "Equip: Instead of falling, you are encased in ice and cannot be harmed for 2 sec. Once per wave."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

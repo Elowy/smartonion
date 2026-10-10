@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"goblin_coin_purse"
+display_name = "Goblin Coin Purse"
+flavor = "Lighter than it looks. Heavier than it should be."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"gold_find": 15.0,
+&"armor": -1.0
+})
+class_restriction = &""
+unique_effect = &"gold"
+unique_params = {
+"trigger": "on_kill",
+"chance": 4.0,
+"amount": 1
+}
+unique_text = "On kill: 4% chance to find 1 extra gold."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

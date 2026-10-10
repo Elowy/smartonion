@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"gauntlets_of_the_titan"
+display_name = "Gauntlets of the Titan"
+flavor = "Made for hands far larger than yours. They adjust."
+slot_type = 5
+armor_type = 3
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"strength": 10.0,
+&"physical_damage": 20.0,
+&"haste": -10.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 2.0,
+"icd": 3.0,
+"damage": 20.0,
+"radius": 3.0,
+"school": "physical",
+"at": "target",
+"stun": 1.0
+}
+unique_text = "Chance on hit: Slams the ground, dealing 20 Physical damage to enemies around the target and stunning them for 1 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

@@ -206,7 +206,7 @@ Minden kaszt tartalmaz:
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
-| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a legközelebbi társat |
+| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a legközelebbi társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
 | Mastery | **Aura of Devotion** – a közelben lévő társak HP-regenerációt és Armort kapnak (pontonként) |
 
 ### 3.4 Rogue
@@ -1193,7 +1193,7 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Gomb | Harcban | Menüben |
 |---|---|---|
 | Bal kar | Mozgás | Navigáció |
-| Jobb kar | (Opció) kézi célzás; alapból auto-aim | Tooltip görgetés |
+| Jobb kar | – (minden automatikusan céloz) | Tooltip görgetés |
 | RT | Alap képesség 1 | – |
 | LT | Alap képesség 2 | – |
 | RB | Tanult aktív ability 1 | Fül váltás jobbra |
@@ -1541,6 +1541,8 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Mentés | Automatikus, minden hullám végén |
 | Meta-progresszió | Egy fő profil (a kaszt szintjét bárki megkapja, aki azzal a kaszttal játszik), Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
 | Zene | Egyelőre nincs |
+| Célzás | Csak automatikus (fegyverek és képességek); nincs kézi célzás |
+| Paladin Word of Glory | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP) |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
 | Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |

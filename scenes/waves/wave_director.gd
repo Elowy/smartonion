@@ -12,7 +12,7 @@ extends Node
 ##   (Vfx.spawn_telegraph) and appears TELEGRAPH_TIME later, scattered around the point.
 ## - At most MAX_ENEMIES alive + telegraphed. A small opening group is telegraphed at once.
 ## - When the timer runs out: [method stop] (enemies despawn without loot, telegraphs are
-##   cancelled, pickups are banked), then [signal wave_cleared].
+##   cancelled, pickups and loot bags are banked), then [signal wave_cleared].
 ## Does not process while the tree is paused. Copes with enemies being freed at any time.
 
 signal wave_started(wave: int)
@@ -101,7 +101,7 @@ func start_wave(p_wave: int) -> void:
 	_telegraph_opening_group()
 
 
-## Stops spawning, removes remaining enemies (no loot) and banks dropped pickups.
+## Stops spawning, removes remaining enemies (no loot) and banks dropped pickups and loot bags.
 func stop() -> void:
 	_running = false
 	_pending.clear()
@@ -118,6 +118,11 @@ func stop() -> void:
 		var p := node as Pickup
 		if p != null and is_instance_valid(p):
 			p.collect_to_bank()
+	# Item bags on the ground go to the team loot (the loot roll after the wave).
+	for node in tree.get_nodes_in_group(&"loot_bags"):
+		var bag := node as LootBag
+		if bag != null and is_instance_valid(bag):
+			bag.collect_to_bank()
 	# Axes still in flight would hit players during the break.
 	for node in tree.get_nodes_in_group(&"projectiles"):
 		var proj := node as Projectile

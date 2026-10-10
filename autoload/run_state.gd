@@ -11,6 +11,8 @@ signal wave_changed(wave: int)
 signal gold_changed(gold: int, delta: int)
 signal xp_changed(xp: int, needed: int)
 signal leveled_up(level: int)
+## Team loot changed (an item bag was picked up / banked, or the loot roll consumed items).
+signal team_loot_changed
 
 const TOTAL_WAVES := 25
 const BOSS_WAVES: Array[int] = [10, 25]
@@ -38,6 +40,16 @@ var gold_earned := 0
 var kills_by_player: Dictionary[int, int] = {}
 var damage_by_player: Dictionary[int, float] = {}
 
+# Items (M2): loot collected this wave waits here for the Need / Greed / Pass roll (GDD 10.1);
+# the shared shop persists through the run (locked offers carry over).
+var team_loot: Array[ItemInstance] = []
+## Item drops from normal enemies this wave (capped at 1 + players, GDD 10.1).
+var loot_drops_this_wave := 0
+var shop := Shop.new()
+## Statistics for the end screen / meta-progression: items won by Need per slot, Greed gold.
+var need_wins_by_player: Dictionary[int, int] = {}
+var greed_gold := 0
+
 ## Fraction of a gold coin each player slot has earned through Gold Find but not yet
 ## received (see add_gold_for). Keyed by slot index (-1 = no slot).
 var _gold_remainder: Dictionary[int, float] = {}
@@ -61,6 +73,11 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	kills_by_player.clear()
 	damage_by_player.clear()
 	_gold_remainder.clear()
+	team_loot.clear()
+	loot_drops_this_wave = 0
+	shop = Shop.new()
+	need_wins_by_player.clear()
+	greed_gold = 0
 	run_started.emit()
 	gold_changed.emit(gold, 0)
 	xp_changed.emit(xp, xp_to_next_level())
@@ -76,7 +93,24 @@ func end_run(p_victory: bool) -> void:
 
 func set_wave(value: int) -> void:
 	wave = value
+	loot_drops_this_wave = 0
 	wave_changed.emit(wave)
+
+
+## Adds a looted item to the team loot (waits for the Need / Greed / Pass roll).
+func add_team_loot(item: ItemInstance) -> void:
+	if item == null:
+		return
+	team_loot.append(item)
+	team_loot_changed.emit()
+
+
+## Takes all collected loot out (the loot roll screen consumes it).
+func take_team_loot() -> Array[ItemInstance]:
+	var out := team_loot.duplicate()
+	team_loot.clear()
+	team_loot_changed.emit()
+	return out
 
 
 func is_last_wave() -> bool:

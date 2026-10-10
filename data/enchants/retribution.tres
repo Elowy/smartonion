@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"retribution"
+prefix = "Retribution"
+kind = 3
+slot_types = Array[int]([0, 2, 3, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({})
+effect = &"reflect"
+params = {
+"damage": 6.0
+}
+ppm = 0.0
+chance = 100.0
+icd = 0.5
+school = &"holy"
+description = "When struck: Deals {damage} Holy damage to the attacker."

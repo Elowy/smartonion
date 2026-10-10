@@ -12,6 +12,10 @@ extends CharacterBody3D
 ## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
+## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
+## (refreshed on equipment.changed); weapon hits report to on_hit_dealt(), kills to
+## notify_kill() (Life on Kill, on-kill procs); take_damage() handles Parry (riposte), Block
+## Value, proc shields, cheat-death, Thorns and the when-struck / low-HP procs.
 
 signal hp_changed(hp: float, max_hp: float)
 signal downed_changed(is_downed: bool)
@@ -19,6 +23,8 @@ signal downed_changed(is_downed: bool)
 signal damage_taken(amount: float, source: Node3D)
 ## Emitted from on_hit_dealt() after each successful weapon hit of this player.
 signal hit_dealt(damage: float, target: Node3D)
+## Emitted from notify_kill() when this player landed the killing blow (weapon, proc, thorns).
+signal enemy_killed(enemy: Node3D)
 
 const RADIUS := 0.45
 ## Height (metres) where projectiles / damage numbers originate.
@@ -58,6 +64,7 @@ const DAMAGE_TEXT_COLOR := Color(1.0, 0.27, 0.22)
 const HEAL_TEXT_COLOR := Color(0.35, 1.0, 0.4)
 const DODGE_TEXT_COLOR := Color(0.7, 0.88, 1.0)
 const BLOCK_TEXT_COLOR := Color(0.88, 0.88, 0.95)
+const PARRY_TEXT_COLOR := Color(0.95, 0.9, 0.7)
 ## Damage-taken / heal numbers start beside the head (alternating sides) instead of on the
 ## body, so they do not cover the hero or the "P1" marker above it.
 const SELF_TEXT_HEIGHT := 1.45
@@ -91,6 +98,10 @@ var main_hand: WeaponData
 var off_hand: WeaponData
 ## One runner per equipped weapon that attacks (main hand first).
 var weapons: Array[WeaponRunner] = []
+## Equipped items + backpack (GDD 5). Changes re-apply stat sources and weapons.
+var equipment: Equipment
+## Enchantment / unique-item procs of the equipped items (child node "Procs", GDD 5.7).
+var procs: ProcSystem
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
@@ -105,6 +116,8 @@ var _attack_look_dir := Vector3.FORWARD
 var _attack_look_left := 0.0
 ## Side (+1 / -1) of the next damage-taken number.
 var _text_side := 1.0
+## XP Gain fraction carried to this hero's next pickup (see xp_with_gain).
+var _xp_carry := 0.0
 
 
 ## Creates and configures a player for [param p_slot]. Not yet in the tree.
@@ -133,9 +146,12 @@ static func create(p_slot: PlayerSlot) -> Player:
 	if p.class_data != null:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
-		p.equip_weapons(p.class_data.main_hand, p.class_data.off_hand)
-	else:
-		p.equip_weapons(null, null)
+	p.procs = ProcSystem.create(p)
+	p.add_child(p.procs)
+	p.equipment = Equipment.new(p.class_data)
+	p.equipment.equip_starting_weapons()
+	p.apply_equipment()
+	p.equipment.changed.connect(p.apply_equipment)
 	# "P1" nameplate marker above the head (also marks whose ghost it is).
 	p.model.set_tag(p_slot.label() if p_slot != null else "")
 	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
@@ -175,9 +191,13 @@ func begin_wave() -> void:
 	invulnerable_left = 0.0
 	for runner in weapons:
 		runner.reset()
+	if procs != null:
+		procs.begin_wave()
 
 
-## Called by enemies / enemy projectiles. Rolls dodge and block, applies armour etc.
+## Called by enemies / enemy projectiles. Rolls dodge, parry (melee: negates the hit and
+## ripostes) and block (Block Value absorbs more), applies armour etc., then a proc shield,
+## a cheat-death effect, Thorns (melee) and the when-struck / low-HP procs.
 ## [param kind] is one of CombatMath.KIND_*.
 func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null) -> void:
 	if downed or invulnerable_left > 0.0 or raw <= 0.0:
@@ -188,15 +208,36 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	if stats.get_stat(Stats.DODGE) > 0.0 and CombatMath.roll_dodge(stats, rng):
 		Vfx.floating_text(text_pos, "Dodge", DODGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 		return
+	var valid_source: Node3D = source if source != null and is_instance_valid(source) else null
+	var attacker: Enemy = valid_source as Enemy
+	if kind == CombatMath.KIND_MELEE and stats.get_raw(Stats.PARRY) > 0.0 \
+			and CombatMath.roll_parry(stats, rng):
+		Vfx.floating_text(text_pos, "Parry", PARRY_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+		_riposte(attacker)
+		return
 	var amount := raw
 	var block := block_chance()
 	if block > 0.0 and CombatMath.roll_block(block, rng):
-		amount *= BLOCK_DAMAGE_MULT
+		amount *= 1.0 - CombatMath.block_absorb(stats.get_raw(Stats.BLOCK_VALUE))
 		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
+		if amount <= 0.0001:
+			invulnerable_left = INVULNERABLE_AFTER_HIT
+			_thorns(attacker, kind)
+			return
 	var dmg := CombatMath.incoming_damage(amount, stats, kind)
+	if procs != null:
+		dmg = procs.absorb(dmg)
+		if dmg <= 0.0:
+			invulnerable_left = INVULNERABLE_AFTER_HIT
+			_thorns(attacker, kind)
+			procs.on_struck(valid_source, 0.0)
+			return
+		if dmg >= hp and procs.try_cheat_death():
+			dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
 	hp = maxf(0.0, hp - dmg)
-	invulnerable_left = INVULNERABLE_AFTER_HIT
-	Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
+	if dmg > 0.0:
+		Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	if model != null:
 		model.flash_hit()
 	_shake_camera(HIT_SHAKE)
@@ -204,6 +245,9 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	damage_taken.emit(dmg, source)
 	if hp <= 0.0:
 		_go_down()
+	_thorns(attacker, kind)
+	if not downed and procs != null:
+		procs.on_struck(valid_source, dmg)
 
 
 func heal(amount: float) -> void:
@@ -219,19 +263,87 @@ func heal(amount: float) -> void:
 	_hp_updated()
 
 
-## Called by this player's weapons after each successful hit (leech etc.).
-func on_hit_dealt(damage: float, target: Node3D) -> void:
+## Called by this player's weapons after each successful hit (leech, on-hit procs). Proc
+## damage never calls it (no proc chains). [param weapon] (its cooldown drives the PPM
+## chance), [param is_crit], and [param is_extra] (a hit of an extra attack – it cannot
+## trigger further extra attacks) are passed on to the procs. On-hit procs roll once per
+## attack: the further hits of a melee arc / projectile fan / pierce / explosion pass
+## [param roll_procs] = false (leech still rolls per hit).
+func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_crit: bool = false,
+		is_extra: bool = false, roll_procs: bool = true) -> void:
 	if downed:
 		return
 	hit_dealt.emit(damage, target)
 	if stats.get_stat(Stats.LEECH) > 0.0 and CombatMath.roll_leech(stats, RunState.rng):
 		heal(1.0)
+	if roll_procs and procs != null and target != null and is_instance_valid(target):
+		procs.on_hit(target, damage, weapon, is_crit, is_extra)
+
+
+## Called by an Enemy this player killed (any damage of this player: weapon, proc, Thorns).
+## Life on Kill (% chance to heal 1) and on-kill procs; a downed hero only gets the credit.
+func notify_kill(enemy: Node3D) -> void:
+	enemy_killed.emit(enemy)
+	if downed:
+		return
+	if stats.get_raw(Stats.LIFE_ON_KILL) > 0.0 and CombatMath.roll_life_on_kill(stats, RunState.rng):
+		heal(1.0)
+	if procs != null:
+		procs.on_kill(enemy)
 
 
 # --- Extra public helpers ------------------------------------------------------
 
+## Re-applies [member equipment]: one stat source per equipped position (Items.source_for),
+## the equipped weapons (their bonus stats) and then Armor Specialization (+10% of the primary
+## stat with every other source – weapons included – in place, GDD 5.3).
+func apply_equipment() -> void:
+	if equipment == null:
+		return
+	var sources := equipment.stat_sources()
+	for s in Items.EquipSlot.values():
+		var source := Items.source_for(s)
+		if sources.has(source):
+			stats.set_source(source, sources[source])
+		else:
+			stats.remove_source(source)
+	var main := equipment.main_weapon()
+	var off := equipment.off_weapon()
+	if main != main_hand or off != off_hand:
+		equip_weapons(main, off)
+	stats.remove_source(&"armor_spec")
+	if class_data != null and equipment.armor_spec_active():
+		var primary := stats.get_raw(class_data.primary_stat)
+		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
+	if procs != null:
+		procs.refresh()
+
+
+## The WeaponRunner of [param weapon] (the first runner when [param weapon] is null or not
+## equipped; null without attacking weapons).
+func runner_for(weapon: WeaponData) -> WeaponRunner:
+	if weapon != null:
+		for runner in weapons:
+			if runner.weapon == weapon:
+				return runner
+	return weapons[0] if not weapons.is_empty() else null
+
+
+## XP Gain (GDD 2.4.1): the whole XP this hero adds for picking up [param amount] XP; the
+## fraction is kept for this hero's next pickup (so +10% on single XP orbs adds up).
+func xp_with_gain(amount: int) -> int:
+	var pct := stats.get_raw(Stats.XP_GAIN)
+	if pct == 0.0 and _xp_carry == 0.0:
+		return amount
+	var exact := CombatMath.xp_with_gain(amount, pct) + _xp_carry
+	var whole := floori(exact + 0.000001)
+	_xp_carry = maxf(0.0, exact - whole)
+	return whole
+
+
 ## Equips [param p_main] / [param p_off] (null = empty hand): updates the weapon stat
-## sources, rebuilds the WeaponRunners and the weapon models.
+## sources (WeaponData.bonus_stats), rebuilds the WeaponRunners and the weapon models.
+## Normally called by apply_equipment(); tests may call it directly.
 func equip_weapons(p_main: WeaponData, p_off: WeaponData) -> void:
 	main_hand = p_main
 	off_hand = p_off
@@ -630,6 +742,24 @@ func _on_team_leveled_up(level: int) -> void:
 		return
 	hp = minf(max_hp(), hp + gained)
 	_hp_updated()
+
+
+## Thorns (GDD 2.4.1): a melee attacker takes this much damage back (flat, no multipliers).
+func _thorns(attacker: Enemy, kind: StringName) -> void:
+	if attacker == null or kind != CombatMath.KIND_MELEE or procs == null:
+		return
+	var thorns := stats.get_raw(Stats.THORNS)
+	if thorns > 0.0 and is_instance_valid(attacker) and not attacker.is_dead():
+		procs.deal_raw(attacker, thorns, CombatMath.SCHOOL_PHYSICAL, false)
+
+
+## Parry (GDD 2.4.1): an immediate counter-strike with the first attacking weapon.
+func _riposte(attacker: Enemy) -> void:
+	if attacker == null or not is_instance_valid(attacker) or attacker.is_dead():
+		return
+	var runner := runner_for(null)
+	if runner != null:
+		runner.riposte(attacker)
 
 
 func _add_runner(runner: WeaponRunner) -> void:

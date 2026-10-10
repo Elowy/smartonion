@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"zealous"
+prefix = "Zealous"
+kind = 0
+slot_types = Array[int]([11, 4, 5, 9, 10])
+requires_projectile = false
+min_rarity = 1
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({
+&"extra_attack": 3.0
+})
+effect = &""
+params = {}
+ppm = 0.0
+chance = 0.0
+icd = 0.0
+school = &"physical"
+description = "Equip: {extra_attack}% chance that your weapon attacks strike again at once."

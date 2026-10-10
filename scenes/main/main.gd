@@ -11,7 +11,8 @@ extends Node
 ##   GameOverScreen and PauseMenu. Every wave: players back on the spawn points,
 ##   Player.begin_wave(), WaveDirector.start_wave(n), camera snap, "Wave n" banner.
 ##   wave_cleared -> WAVE_END ("Wave cleared!" for WAVE_END_DELAY) -> INTERMISSION (tree
-##   paused, RunState.pending_level_ups shown) -> next wave; after wave RunState.TOTAL_WAVES
+##   paused: loot roll of RunState.team_loot, then the shared shop + personal panels;
+##   RunState.pending_level_ups shown) -> next wave; after wave RunState.TOTAL_WAVES
 ##   -> GAME_OVER (victory). Everybody downed at the same time (solo: the player is downed)
 ##   -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with the same players.
 ## - Any player's START during a wave opens the PauseMenu (get_tree().paused). A controller
@@ -35,6 +36,10 @@ enum State { BOOT, MENU, LOBBY, WAVE, WAVE_END, INTERMISSION, GAME_OVER }
 const WAVE_END_DELAY := 1.6
 ## Demo mode: seconds on the Game Over screen before the next run starts.
 const DEMO_RESTART_DELAY := 6.0
+## Demo mode: the bots' market stays open this long (they shop half-way), and their loot-roll
+## "thinking" time scale (see LootRollScreen.bot_think_time).
+const DEMO_MARKET_TIME := 4.0
+const DEMO_BOT_THINK_TIME := 1.0
 const LAYER_HUD := 10
 const LAYER_MENU := 20
 const LAYER_INTERMISSION := 30
@@ -50,6 +55,9 @@ const BASE_PHYSICS_TICKS := 60
 ## Real-time limit of a smoke run: expected duration * FACTOR + EXTRA seconds.
 const SMOKE_TIMEOUT_FACTOR := 3.0
 const SMOKE_TIMEOUT_EXTRA := 60.0
+## Game seconds allowed per intermission of a smoke run (the loot roll shows every item's
+## result for LootRollScreen.RESULT_TIME).
+const SMOKE_INTERMISSION_ALLOWANCE := 12.0
 const DISCONNECT_NOTICE := "%s's controller disconnected – plug it back in to continue"
 
 var options: LaunchOptions
@@ -73,6 +81,11 @@ var players_downed := 0
 var revives := 0
 ## Smoke runs only: full party wipes that were revived instead of ending the run.
 var wipes := 0
+## Items bought in the shared shop / item bags picked up (RunState.team_loot) / loot rolls
+## resolved this run.
+var items_bought := 0
+var items_looted := 0
+var loot_rolls := 0
 var victory := false
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
@@ -95,6 +108,8 @@ var _view_forced := false
 var _reviving_all := false
 var _wave_perf := RunPerf.new()
 var _clock: PhysicsClock
+## RunState.team_loot size last seen (items_looted counts the growth).
+var _loot_seen := 0
 
 
 ## Main for [param p_options] (null = parse the command line in _ready).
@@ -123,6 +138,7 @@ func _ready() -> void:
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
 	RunState.leveled_up.connect(_on_leveled_up)
+	RunState.team_loot_changed.connect(_on_team_loot_changed)
 	_apply_time_scale(options.effective_time_scale())
 	if options.smoke or options.demo or options.view != "":
 		_clock = PhysicsClock.create()
@@ -202,6 +218,10 @@ func start_run() -> void:
 	players_downed = 0
 	revives = 0
 	wipes = 0
+	items_bought = 0
+	items_looted = 0
+	loot_rolls = 0
+	_loot_seen = RunState.team_loot.size()
 	victory = false
 	perf = RunPerf.new()
 
@@ -217,6 +237,12 @@ func start_run() -> void:
 	wave_director.wave_timer_changed.connect(hud.set_wave_time)
 	intermission = Intermission.create()
 	intermission.continue_requested.connect(_on_intermission_continue, CONNECT_DEFERRED)
+	intermission.item_bought.connect(_on_item_bought)
+	intermission.loot_rolled.connect(_on_loot_rolled)
+	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
+	intermission.bot_shopping = options.smoke or options.demo
+	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
+	intermission.loot_screen.bot_think_time = DEMO_BOT_THINK_TIME if options.demo and not options.smoke else 0.0
 	_layers[LAYER_INTERMISSION].add_child(intermission)
 	game_over = GameOverScreen.create()
 	game_over.back_to_menu_requested.connect(_on_game_over_back, CONNECT_DEFERRED)
@@ -263,12 +289,15 @@ func start_wave(n: int) -> void:
 	_pause_if_pad_missing()
 
 
-## Between-wave screen (tree paused). Bots and unplugged devices are auto-ready.
+## Between-wave screen (tree paused): loot roll (if any team loot), then the shared shop and
+## the personal panels. Bots and unplugged devices are auto-ready.
 func open_intermission() -> void:
 	if intermission == null:
 		return
 	_set_state(State.INTERMISSION)
 	get_tree().paused = true
+	if hud != null:
+		hud.hide()  # the market has its own summary; start_wave shows the HUD again
 	intermission.open(wave, RunState.pending_level_ups)
 
 
@@ -552,9 +581,10 @@ func _on_wave_cleared(n: int) -> void:
 	if state != State.WAVE or n != wave:
 		return
 	waves_completed += 1
-	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs; %s" % [
+	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; %s" % [
 		n, (Time.get_ticks_msec() - _wave_start_msec) / 1000.0, RunState.kills, RunState.gold,
-		RunState.level, living_player_count(), players.size(), players_downed, _wave_perf.summary()])
+		RunState.level, living_player_count(), players.size(), players_downed, items_looted, items_bought,
+		_wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
 		if n >= RunState.TOTAL_WAVES:
 			RunState.end_run(true)
@@ -572,6 +602,21 @@ func _on_intermission_continue() -> void:
 		return  # held open for the screenshot
 	RunState.pending_level_ups = 0  # level-up choices arrive in M4
 	start_wave(wave + 1)
+
+
+func _on_item_bought(_slot_index: int, _item: ItemInstance) -> void:
+	items_bought += 1
+
+
+func _on_loot_rolled(_roll: LootRoll) -> void:
+	loot_rolls += 1
+
+
+func _on_team_loot_changed() -> void:
+	var n := RunState.team_loot.size()
+	if n > _loot_seen:
+		items_looted += n - _loot_seen
+	_loot_seen = n
 
 
 func _on_game_over_back() -> void:
@@ -680,7 +725,7 @@ func _start_smoke() -> void:
 	_smoke_running = true
 	var expected := 0.0
 	for w in range(options.start_wave, options.last_wave() + 1):
-		expected += RunState.wave_duration(w) + WAVE_END_DELAY + 0.5
+		expected += RunState.wave_duration(w) + WAVE_END_DELAY + 0.5 + SMOKE_INTERMISSION_ALLOWANCE
 	var real := expected / options.effective_time_scale()
 	_smoke_deadline_msec = _start_msec + int((real * SMOKE_TIMEOUT_FACTOR + SMOKE_TIMEOUT_EXTRA) * 1000.0)
 	print("SMOKE start: %d bots, waves %d-%d, seed %d, time scale %.1f, %d physics ticks/s, timeout %.0f s" % [
@@ -693,7 +738,17 @@ func _finish_smoke(result: String) -> void:
 	if _smoke_done:
 		return
 	_smoke_done = true
+	var data := smoke_result(result)
+	print("SMOKE_RESULT " + JSON.stringify(data))
+	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
+
+
+## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line").
+func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
+	var need_wins := 0
+	for slot_index in RunState.need_wins_by_player:
+		need_wins += RunState.need_wins_by_player[slot_index]
 	var data := {
 		"result": result,
 		"waves_completed": waves_completed,
@@ -706,6 +761,11 @@ func _finish_smoke(result: String) -> void:
 		"players_downed": players_downed,
 		"revives": revives,
 		"wipes": wipes,
+		"items_bought": items_bought,
+		"items_looted": items_looted,
+		"loot_rolls": loot_rolls,
+		"need_wins": need_wins,
+		"greed_gold": RunState.greed_gold,
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
@@ -715,8 +775,7 @@ func _finish_smoke(result: String) -> void:
 	}
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
-	print("SMOKE_RESULT " + JSON.stringify(data))
-	_quit(0 if result == "completed" and errors == 0 else 1)
+	return data
 
 
 func _update_harness() -> void:

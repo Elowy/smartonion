@@ -1,7 +1,8 @@
 extends TestCase
-## Intermission: per-player ready with A / B, bots and unplugged devices auto-ready,
-## continue_requested once when everybody is ready, or when the auto-continue countdown
-## (GDD 12, 60 s, can be switched off) runs out.
+## Intermission: per-player ready with START (A buys in the shop since M2), B unreadies,
+## bots and unplugged devices auto-ready, continue_requested once when everybody is ready, or
+## when the auto-continue countdown (GDD 12, 60 s, can be switched off) runs out. The M2 phases
+## (loot roll, market routing) are covered by test_ui_market_intermission.gd.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
@@ -54,33 +55,36 @@ func test_everyone_ready_continues_once() -> void:
 	screen.open(1, 0)
 	check(not PlayerManager.get_slot(0).ready and not PlayerManager.get_slot(1).ready, "open clears ready")
 	UiFakes.step(screen)  # first frame after open is ignored
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
 	check(PlayerManager.get_slot(0).ready, "P1 ready")
 	check_eq(continues, 0, "waiting for P2")
 	UiFakes.tap(screen, b, PlayerInput.Pad.START)
-	check(PlayerManager.get_slot(1).ready, "START readies too")
+	check(PlayerManager.get_slot(1).ready, "START readies")
 	check_eq(continues, 1, "all ready -> continue")
 	UiFakes.tap(screen, a, PlayerInput.Pad.B)
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
 	check_eq(continues, 1, "only once per open")
 	screen.open(2, 0)
 	UiFakes.step(screen)
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
-	UiFakes.tap(screen, b, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
+	UiFakes.tap(screen, b, PlayerInput.Pad.START)
 	check_eq(continues, 2, "next open works again")
 
 
-func test_a_toggles_and_b_unreadies() -> void:
+func test_start_toggles_and_b_unreadies() -> void:
 	var a := _human("pad:a")
 	_human("pad:b")
 	screen.open(1, 0)
 	UiFakes.step(screen)
 	var slot := PlayerManager.get_slot(0)
+	UiFakes.step(screen, Intermission.MARKET_INPUT_LOCKOUT)  # past the buy lockout
 	UiFakes.tap(screen, a, PlayerInput.Pad.A)
-	check(slot.ready, "A readies")
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
-	check(not slot.ready, "A again unreadies")
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	check(not slot.ready, "A buys in the shop, it does not ready")
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
+	check(slot.ready, "START readies")
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
+	check(not slot.ready, "START again unreadies")
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
 	UiFakes.tap(screen, a, PlayerInput.Pad.B)
 	check(not slot.ready, "B unreadies")
 	check_eq(continues, 0, "never everyone ready")
@@ -88,7 +92,7 @@ func test_a_toggles_and_b_unreadies() -> void:
 
 func test_press_on_the_opening_frame_is_ignored() -> void:
 	var a := _human("pad:a")
-	a.press(PlayerInput.Pad.A)
+	a.press(PlayerInput.Pad.START)
 	a.poll(0.016)
 	screen.open(1, 0)
 	screen._process(0.016)
@@ -102,7 +106,7 @@ func test_bots_are_auto_ready() -> void:
 	check(PlayerManager.get_slot(0).ready, "bot ready at once")
 	check(not PlayerManager.get_slot(1).ready, "human not")
 	UiFakes.step(screen)
-	UiFakes.tap(screen, human, PlayerInput.Pad.A)
+	UiFakes.tap(screen, human, PlayerInput.Pad.START)
 	check_eq(continues, 1, "bot never blocks")
 
 
@@ -122,7 +126,7 @@ func test_unplugged_player_does_not_block() -> void:
 	screen.open(1, 0)
 	check(Intermission.is_auto_ready(PlayerManager.get_slot(1)), "unplugged counts as ready")
 	UiFakes.step(screen)
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
 	check_eq(continues, 1, "continues without the unplugged player")
 
 
@@ -131,7 +135,8 @@ func test_b_and_start_together_act_as_b() -> void:
 	_human("pad:b")
 	screen.open(1, 0)
 	UiFakes.step(screen)
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
+	check(PlayerManager.get_slot(0).ready, "ready first")
 	a.press(PlayerInput.Pad.B)
 	a.press(PlayerInput.Pad.START)
 	UiFakes.step(screen)
@@ -148,7 +153,7 @@ func test_next_wave_starts_by_itself_after_the_countdown() -> void:
 	UiFakes.step(screen, 18.0)
 	check_eq(screen.countdown_label.text, "Next wave in 42 s", "counts down")
 	check_eq(screen.countdown_label.get_theme_color(&"font_color"), UiTheme.TEXT_DIM, "calm colour")
-	UiFakes.tap(screen, a, PlayerInput.Pad.A)
+	UiFakes.tap(screen, a, PlayerInput.Pad.START)
 	check(PlayerManager.get_slot(0).ready, "P1 ready, P2 dawdles")
 	UiFakes.step(screen, 31.5)
 	check_eq(continues, 0, "still waiting")
