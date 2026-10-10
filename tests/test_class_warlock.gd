@@ -322,6 +322,11 @@ func test_drain_life_ends_without_enemies_or_when_downed() -> void:
 	check(p.abilities.try_cast(1), "cast again")
 	p._go_down()
 	check(not effect.is_channeling(), "downed: ends")
+	p.begin_wave()
+	check(p.abilities.try_cast(1), "cast after the revive")
+	p.begin_wave()
+	check(not effect.is_channeling(), "wave start: ends")
+	check(effect.beam == null, "beam released")
 
 
 func test_drain_life_bot_casts_when_hurt() -> void:

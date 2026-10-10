@@ -114,6 +114,12 @@ func stop() -> void:
 	beam = null
 
 
+## Wave start: a channel never carries over into the next wave.
+func begin_wave(_ctx: AbilityContext) -> void:
+	if is_channeling():
+		stop()
+
+
 ## Bots: hurt (HP below auto_cast_hp %) and an enemy within range.
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player

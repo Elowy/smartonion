@@ -6,13 +6,13 @@ extends Node3D
 ## Warlock is gone or downed. While the target is invalid (between a kill and the retarget)
 ## it is hidden. Shared meshes, cached materials.
 
-const OUTER := Color(0.62, 0.22, 0.88, 0.5)
-const CORE := Color(0.45, 1.0, 0.32)
+const OUTER := Color(0.62, 0.22, 0.88, 0.32)
+const CORE := Color(0.4, 1.0, 0.28)
 const MOTE := Color(0.6, 1.0, 0.45)
 const MOTES := 4
 const MOTE_SPEED := 1.6
-const OUTER_WIDTH := 0.2
-const CORE_WIDTH := 0.07
+const OUTER_WIDTH := 0.26
+const CORE_WIDTH := 0.09
 const FADE_TIME := 0.15
 
 static var _cylinder: CylinderMesh
@@ -60,8 +60,8 @@ func _build() -> void:
 		_cylinder.radial_segments = 8
 		_cylinder.rings = 1
 		_sphere = SphereMesh.new()
-		_sphere.radius = 0.07
-		_sphere.height = 0.14
+		_sphere.radius = 0.085
+		_sphere.height = 0.17
 		_sphere.radial_segments = 8
 		_sphere.rings = 4
 	_outer = _mesh(_cylinder, Mats.unshaded(OUTER))

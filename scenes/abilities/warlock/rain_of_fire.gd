@@ -60,6 +60,11 @@ func cast(ctx: AbilityContext) -> bool:
 	return true
 
 
+## Wave start: the old circle no longer blocks the bots.
+func begin_wave(_ctx: AbilityContext) -> void:
+	last_area = null
+
+
 ## Bots: at least auto_cast_min enemies under the circle, and not on top of a running one.
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player
