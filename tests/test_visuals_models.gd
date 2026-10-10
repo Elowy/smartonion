@@ -157,7 +157,7 @@ func test_every_weapon_builds_a_shared_mesh() -> void:
 		check(ma != null and mb != null and ma.mesh == mb.mesh, "%s mesh shared" % id)
 		var aabb := ma.mesh.get_aabb()
 		check(aabb.end.y > 0.1, "%s extends along +Y" % id)
-	check(WeaponModel.build(null).get_child_count() == 0, "null weapon -> empty node")
+	check(_keep(WeaponModel.build(null)).get_child_count() == 0, "null weapon -> empty node")
 
 
 func test_epic_weapons_glow() -> void:
