@@ -209,3 +209,20 @@ func test_bot_auto_cast_runs_through_the_runner() -> void:
 	_enemy(Vector3(-1.2, 0, -0.5))
 	Fakes.step(p.abilities, 0.3)
 	check(p.global_position.x > 5.0, "the bot blinked away (x = %f)" % p.global_position.x)
+
+
+func test_cooldown_mods_apply_to_blink_and_its_recharge() -> void:
+	var p := _mage()
+	var item := ItemInstance.new()
+	item.slot_type = Items.SlotType.RING
+	item.armor_type = Items.NO_ARMOR
+	item.unique_effect = &"ability_mod"
+	item.unique_params = {"ability": "blink", "mods": {"cooldown_add": -2.0, "charges_add": 1.0}}
+	check(p.equipment.equip(item), "wear it")
+	_move(p, Vector2(1, 0))
+	check_near(p.abilities.cooldown_of(p.abilities.slots[1]), 4.0, 0.001, "4 s with the mod")
+	p.abilities.try_cast(1)
+	Fakes.step(p.abilities, 0.1)
+	p.abilities.try_cast(1)
+	Fakes.step(p.abilities, 4.1)
+	check_eq(_blink(p).charges_available(), 1, "a charge per 4 s")
