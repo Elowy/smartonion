@@ -14,6 +14,10 @@ const RICOCHET_RANGE := 5.0
 ## Instance ids of the enemies damaged by this bolt, in order (tests).
 var victim_ids: Array[int] = []
 
+## Where the last ricochet put the bolt (null = no ricochet this step): Projectile.advance
+## would move it to the end of the old segment after the sweep, see [method advance].
+var _turned_at: Variant = null
+
 
 ## Fires a bolt from [param from] (world, its height is kept) along [param dir] for
 ## [param warlock]. [param targets] = enemies it may hit (1 = no pierce). Added under the
@@ -42,6 +46,17 @@ static func fire(warlock: Player, from: Vector3, dir: Vector3, p_damage: float, 
 		parent.add_child(b)
 		b.global_position = from
 	return b
+
+
+## Projectile.advance, but a ricochet during the sweep keeps its new start point (the centre
+## of the enemy just hit) instead of being moved to the end of the old flight segment – from
+## there the new heading may pass beside the next target.
+func advance(delta: float) -> void:
+	_turned_at = null
+	super.advance(delta)
+	if _turned_at != null and not is_done() and is_inside_tree():
+		global_position = _turned_at
+	_turned_at = null
 
 
 ## Replaces the weapon hit of Projectile: pet damage through the Warlock's ProcSystem.
@@ -84,5 +99,6 @@ func _ricochet(from_enemy: Enemy) -> void:
 	direction = to.normalized()
 	global_position = Vector3(center.x, global_position.y, center.z)
 	max_range = travelled + RICOCHET_RANGE + 1.0
+	_turned_at = global_position
 	if _visual != null:
 		_visual.basis = Basis.looking_at(direction, Vector3.UP)

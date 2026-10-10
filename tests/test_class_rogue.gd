@@ -176,16 +176,16 @@ func test_combo_points_from_real_weapon_hits() -> void:
 
 # --- Fan of Knives ------------------------------------------------------------------------
 
-func test_fan_of_knives_throws_eight_knives() -> void:
+func test_fan_of_knives_throws_ten_knives() -> void:
 	check(rogue.abilities.try_cast(0), "cast")
 	var knives := _knives()
-	check_eq(knives.size(), 8, "eight knives")
+	check_eq(knives.size(), 10, "ten knives")
 	check_eq(_energy().value, 65.0, "35 Energy spent")
 	var sum := Vector3.ZERO
 	var angles: Array[float] = []
 	for k in knives:
 		check_eq(k.team, Projectile.TEAM_PLAYERS, "player knife")
-		check_eq(k.pierce, 0, "no pierce")
+		check_eq(k.pierce, 1, "each passes through one enemy")
 		check(k.weapon == rogue.main_hand and k.is_extra, "weapon based, no extra-attack chains")
 		check_near(k.direction.length(), 1.0, 0.001, "unit direction")
 		check_near(k.global_position.y, Player.CHEST_HEIGHT, 0.001, "chest height")
@@ -195,7 +195,7 @@ func test_fan_of_knives_throws_eight_knives() -> void:
 	var distinct := {}
 	for a in angles:
 		distinct[a] = true
-	check_eq(distinct.size(), 8, "eight distinct angles")
+	check_eq(distinct.size(), 10, "ten distinct angles")
 
 
 func test_fan_needs_energy() -> void:
@@ -209,16 +209,16 @@ func test_fan_needs_energy() -> void:
 
 func test_fan_damage_is_weapon_based() -> void:
 	rogue.abilities.try_cast(0)
-	var expected := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 0.8
+	var expected := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 1.1
 	for k in _knives():
-		check_near(k.damage, expected, 0.001, "80% of a weapon hit")
+		check_near(k.damage, expected, 0.001, "110% of a weapon hit")
 		check(not k.is_crit, "no crit without crit chance")
 	check(expected > 1.0, "sane damage")
 
 
 func test_fan_spends_combo_points_for_damage() -> void:
 	_combo().set_value(3.0)
-	var base := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 0.8
+	var base := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 1.1
 	check(rogue.abilities.try_cast(0), "cast")
 	check_eq(_combo().value, 0.0, "every Combo Point spent")
 	for k in _knives():
@@ -229,17 +229,17 @@ func test_fan_spends_combo_points_for_damage() -> void:
 	_energy().set_value(100.0)
 	rogue.abilities.try_cast(0)
 	var after_free := _knives().filter(func(k: Projectile) -> bool: return not k.is_queued_for_deletion())
-	check_eq(after_free.size(), 8, "second fan")
+	check_eq(after_free.size(), 10, "second fan")
 	for k: Projectile in after_free:
 		check_near(k.damage, base * 2.0, 0.001, "5 points double the damage")
 
 
 func test_fan_knives_crit_and_hit_each_target_once() -> void:
 	rogue.stats.set_source(&"test", {Stats.CRIT: 500.0})
-	var enemies := _surround(8, 3.0)
+	var enemies := _surround(10, 3.0)
 	check(rogue.abilities.try_cast(0), "cast")
 	var crit_mult := CombatMath.crit_multiplier(rogue.main_hand, rogue.stats)
-	var base := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 0.8
+	var base := CombatMath.weapon_hit_damage(rogue.main_hand, rogue.stats) * 1.1
 	for k in _knives():
 		check(k.is_crit, "knives crit at 100% crit chance")
 		check_near(k.damage, base * crit_mult, 0.001, "crit damage")
@@ -252,7 +252,22 @@ func test_fan_knives_crit_and_hit_each_target_once() -> void:
 		check_eq(e.fake_attacker_log[0], rogue, "credited to the rogue")
 	check_eq(_combo().value, 5.0, "knife crits refill the Combo Points")
 	var mastery := rogue.abilities.mastery as RogueMastery
-	check_eq(mastery.poisoned_count(), 8, "and poison everybody")
+	check_eq(mastery.poisoned_count(), 10, "and poison everybody")
+
+
+func test_fan_knives_pierce_one_enemy() -> void:
+	rogue.facing = Vector3.FORWARD
+	var first := Fakes.spawn_enemy(world, Vector3(0, 0, -2.0))
+	var second := Fakes.spawn_enemy(world, Vector3(0, 0, -4.0))
+	var third := Fakes.spawn_enemy(world, Vector3(0, 0, -6.0))
+	EnemyGrid.mark_dirty()
+	check(rogue.abilities.try_cast(0), "cast")
+	for i in 40:
+		for k in _knives():
+			k.advance(DT)
+	check_eq(first.fake_hits(), 1, "the first enemy in line is hit")
+	check_eq(second.fake_hits(), 1, "the knife passes through to the second")
+	check_eq(third.fake_hits(), 0, "and stops there")
 
 
 func test_blade_of_the_thousand_cuts_adds_four_knives() -> void:
@@ -260,11 +275,11 @@ func test_blade_of_the_thousand_cuts_adds_four_knives() -> void:
 	check_eq(rogue.ability_mods(&"fan_of_knives"), {"knives_add": 4.0}, "mod collected")
 	rogue.stats.set_source(&"test", {Stats.CRIT: -500.0})
 	check(rogue.abilities.try_cast(0), "cast")
-	check_eq(_knives().size(), 12, "8 + 4 knives")
+	check_eq(_knives().size(), 14, "10 + 4 knives")
 	var distinct := {}
 	for k in _knives():
 		distinct[snappedf(rad_to_deg(Vector3.FORWARD.signed_angle_to(k.direction, Vector3.UP)), 1.0)] = true
-	check_eq(distinct.size(), 12, "still evenly spread")
+	check_eq(distinct.size(), 14, "still evenly spread")
 
 
 # --- Vanish -------------------------------------------------------------------------------
@@ -322,6 +337,18 @@ func test_vanish_hides_the_rogue_for_two_seconds() -> void:
 	check(not rogue.is_stealthed(), "the stealth is over too")
 
 
+func test_vanish_heals_a_share_of_max_hp() -> void:
+	var ctx := rogue.abilities.build_context(rogue.abilities.slots[1])
+	check_near(ctx.num("heal_max_hp_pct"), 30.0, 0.001, "30% of max HP in the data")
+	rogue.hp = rogue.max_hp() * 0.2
+	check(rogue.abilities.try_cast(1), "cast")
+	check_near(rogue.hp, rogue.max_hp() * 0.5, 0.001, "20% + 30% of max HP")
+	rogue.abilities.begin_wave()
+	rogue.hp = rogue.max_hp() * 0.9
+	check(rogue.abilities.try_cast(1), "cast near full health")
+	check_near(rogue.hp, rogue.max_hp(), 0.001, "capped at max HP")
+
+
 func test_vanish_cooldown_and_cooldown_mod() -> void:
 	check(rogue.abilities.try_cast(1), "cast")
 	check_near(rogue.abilities.remaining(1), 15.0, 0.001, "15 s cooldown")
@@ -367,6 +394,116 @@ func test_vanish_stealth_ends_at_wave_start() -> void:
 	check(rogue.abilities.try_cast(1), "cast")
 	rogue.begin_wave()
 	check(not rogue.is_stealthed(), "no stealth carried into the next wave")
+
+
+func _bulb() -> MeshInstance3D:
+	return rogue.model.find_child("Bulb", true, false) as MeshInstance3D
+
+
+## The bulb's HP-peel amount at the rogue's HP (Mats.onion_skin quantises it in 1/20 steps).
+func _peel() -> float:
+	return roundf(OnionModel.damage_amount(rogue.hp / rogue.max_hp()) * 20.0) / 20.0
+
+
+func _ghost_count(ghost: Material) -> int:
+	var n := 0
+	for mi in _body_meshes():
+		if Mats.base_material(mi) == ghost:
+			n += 1
+	return n
+
+
+func test_vanish_silhouette_survives_hp_and_stat_changes() -> void:
+	var effect := _vanish_effect()
+	var meshes := _body_meshes()
+	var shadows := {}
+	for mi in meshes:
+		shadows[mi] = mi.cast_shadow
+	var bulb := _bulb()
+	check(bulb != null and bulb in meshes, "the bulb is a body mesh")
+	check_eq(shadows[bulb], GeometryInstance3D.SHADOW_CASTING_SETTING_ON, "the bulb casts a shadow")
+	rogue.hp = rogue.max_hp() * 0.3
+	rogue._hp_updated()
+	check(rogue.abilities.try_cast(1), "cast")
+	var ghost: Material = bulb.material_override
+	check_eq(_ghost_count(ghost), meshes.size(), "every mesh faded")
+	rogue.heal(1.0)  # -> OnionModel.set_hp_ratio puts the HP-peel skin on the bulb
+	check(bulb.material_override == ghost, "a heal keeps the bulb in the silhouette")
+	check_eq(_ghost_count(ghost), meshes.size(), "and every other mesh")
+	rogue.stats.set_source(&"aura", {Stats.ARMOR: 3.0})  # stats.changed -> _hp_updated
+	check(bulb.material_override == ghost, "so does a stat change")
+	# A look change without hp_changed: the next tick fades it again.
+	rogue.model.set_hp_ratio(0.6)
+	check(bulb.material_override != ghost, "(the model replaced it)")
+	rogue.abilities._physics_process(DT)
+	check(bulb.material_override == ghost, "re-faded on the next tick")
+	check_eq(bulb.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "still no shadow")
+	rogue.model.set_hp_ratio(rogue.hp / rogue.max_hp())
+	for i in 130:
+		rogue.abilities._physics_process(DT)
+	check(not effect.is_active(), "over")
+	check_eq(_ghost_count(ghost), 0, "solid again")
+	for mi in meshes:
+		check_eq(mi.cast_shadow, shadows[mi], "%s casts its shadow again" % mi.name)
+	check_near(rogue.model.bulb_damage(), _peel(), 0.0001, "the bulb shows the current HP peel")
+	# The next Vanish starts from the true materials (the shadow is not lost for the run).
+	rogue.abilities.begin_wave()
+	rogue.hp = rogue.max_hp() * 0.3
+	check(rogue.abilities.try_cast(1), "second cast")
+	rogue.heal(1.0)
+	effect.end()
+	for mi in meshes:
+		check_eq(mi.cast_shadow, shadows[mi], "%s shadow after the second Vanish" % mi.name)
+
+
+func test_vanish_ends_with_the_wave() -> void:
+	var effect := _vanish_effect()
+	var meshes := _body_meshes()
+	var originals: Array[Material] = []
+	var shadows: Array[int] = []
+	for mi in meshes:
+		originals.append(mi.material_override)
+		shadows.append(mi.cast_shadow)
+	check(rogue.abilities.try_cast(1), "cast")
+	rogue.end_wave()
+	check(not effect.is_active(), "the market shows no Vanish")
+	for i in meshes.size():
+		check(meshes[i].material_override == originals[i], "%s solid at the wave end" % meshes[i].name)
+	rogue.begin_wave()
+	check(rogue.abilities.try_cast(1), "cast again")
+	check(effect.is_active(), "active")
+	rogue.begin_wave()
+	check(not effect.is_active(), "a new wave starts visible")
+	for i in meshes.size():
+		check(meshes[i].material_override == originals[i], "%s solid at the wave start" % meshes[i].name)
+		check_eq(meshes[i].cast_shadow, shadows[i], "%s casts its shadow again" % meshes[i].name)
+
+
+func test_vanish_ends_when_the_rogue_goes_down() -> void:
+	var effect := _vanish_effect()
+	var meshes := _body_meshes()
+	var originals := {}
+	var shadows := {}
+	for mi in meshes:
+		originals[mi] = mi.material_override
+		shadows[mi] = mi.cast_shadow
+	var bulb := _bulb()
+	check(rogue.abilities.try_cast(1), "cast")
+	var ghost: Material = bulb.material_override
+	rogue.take_damage(9999.0)
+	check(rogue.downed, "downed")
+	check(not effect.is_active(), "going down ends Vanish")
+	check_eq(_ghost_count(ghost), 0, "the downed look replaced the silhouette")
+	rogue.revive()
+	check_eq(_ghost_count(ghost), 0, "no silhouette after the revive")
+	for mi in meshes:
+		if mi != bulb:
+			check(mi.material_override == originals[mi], "%s has its own material back" % mi.name)
+		check_eq(mi.cast_shadow, shadows[mi], "%s casts its shadow again" % mi.name)
+	check_near(rogue.model.bulb_damage(), _peel(), 0.0001, "the bulb shows the revive HP")
+	for i in 150:
+		rogue.abilities._physics_process(DT)
+	check_eq(_ghost_count(ghost), 0, "nothing fades later either")
 
 
 # --- Bots ---------------------------------------------------------------------------------
@@ -424,5 +561,5 @@ func test_bots_cast_through_the_runner() -> void:
 	_surround(4, 3.0)
 	rogue.abilities._auto_timer = 0.0
 	rogue.abilities._physics_process(DT)
-	check_eq(_knives().size(), 8, "the auto-cast threw the fan")
+	check_eq(_knives().size(), 10, "the auto-cast threw the fan")
 	check_near(_energy().value, 65.0, 0.1, "and paid for it")

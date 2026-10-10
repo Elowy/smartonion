@@ -6,6 +6,11 @@ const Fakes := preload("res://tests/test_ui_m3_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
 var lobby: Lobby
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
@@ -70,15 +75,16 @@ func test_mastery_line_comes_from_class_data() -> void:
 	var card := _join(UiFakes.HumanInput.new("pad:a"), _class(abilities, "Battle Fury: the lower your health, the harder you hit."))
 	check(card.mastery_title_label.visible and card.mastery_label.visible, "Mastery shown")
 	check_eq(card.mastery_title_label.text, "Mastery: Battle Fury", "title with the Mastery name")
-	check_eq(card.mastery_label.text, "the lower your health, the harder you hit.", "the rest of mastery_text")
+	check_eq(card.mastery_label.text, "The lower your health, the harder you hit.", "the rest of mastery_text, capitalised")
 	var plain := _join(UiFakes.HumanInput.new("pad:b"), _class(abilities, "Hits harder when hurt."))
 	check_eq(plain.mastery_title_label.text, "Mastery", "no name in the text")
 	check_eq(plain.mastery_label.text, "Hits harder when hurt.", "whole text")
 
 
 func test_mastery_parts() -> void:
-	check_eq(LobbyCard.mastery_parts("Ignite: crits burn."), ["Ignite", "crits burn."], "name: text")
-	check_eq(LobbyCard.mastery_parts("  Aura of Devotion: allies gain Armor: 5.  "), ["Aura of Devotion", "allies gain Armor: 5."], "first colon only")
+	check_eq(LobbyCard.mastery_parts("Ignite: crits burn."), ["Ignite", "Crits burn."], "name: text, the body capitalised")
+	check_eq(LobbyCard.mastery_parts("  Aura of Devotion: allies gain Armor: 5.  "), ["Aura of Devotion", "Allies gain Armor: 5."], "first colon only")
+	check_eq(LobbyCard.mastery_parts("Fury: +2% damage."), ["Fury", "+2% damage."], "a body not starting with a letter stays")
 	check_eq(LobbyCard.mastery_parts("Allies nearby gain bonuses and then something: else"), ["", "Allies nearby gain bonuses and then something: else"], "a long lead-in is not a name")
 	check_eq(LobbyCard.mastery_parts(""), ["", ""], "empty")
 
@@ -117,3 +123,30 @@ func test_every_shipped_class_card_matches_its_data() -> void:
 			var parts := LobbyCard.mastery_parts(data.mastery_text)
 			check_eq(card.mastery_label.text, parts[1], "%s: Mastery text" % class_id)
 		PlayerManager.leave(PlayerManager.get_slots().back().index)
+
+
+func test_every_class_mastery_text_fits_the_card() -> void:
+	# 1920x1080 is the canvas at every 16:9 window size (1080p and 720p alike: stretch mode
+	# canvas_items / expand); four joined cards are as narrow as the cards get there.
+	_async = true
+	lobby.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	lobby.size = Vector2(1920, 1080)
+	for class_id in Db.class_ids:
+		var data := Db.get_class_data(class_id)
+		if data.mastery_text.strip_edges() == "":
+			continue
+		for i in PlayerManager.MAX_PLAYERS:
+			PlayerManager.join(UiFakes.HumanInput.new("pad:%s:%d" % [class_id, i]), data)
+		UiFakes.step(lobby)
+		await tree.process_frame
+		await tree.process_frame
+		for card in lobby.cards:
+			var label := card.mastery_label
+			check(label.is_visible_in_tree(), "%s: Mastery shown" % class_id)
+			check(label.size.x > 200.0, "%s: laid out (%s px wide)" % [class_id, label.size.x])
+			check(label.get_line_count() <= LobbyCard.MASTERY_MAX_LINES,
+				"%s: the Mastery text needs %d lines, the card shows %d" % [class_id, label.get_line_count(), LobbyCard.MASTERY_MAX_LINES])
+			check_eq(label.text.left(1), label.text.left(1).to_upper(), "%s: the body starts with a capital" % class_id)
+		UiFakes.reset_players()
+		UiFakes.step(lobby)
+	finished.emit()

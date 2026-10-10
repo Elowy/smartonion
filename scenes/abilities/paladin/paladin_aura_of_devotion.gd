@@ -87,7 +87,14 @@ func clear() -> void:
 	_affected.clear()
 
 
+## Also runs while the Paladin is downed (MasteryEffect.tick): a downed Paladin grants
+## nothing (_on_downed_changed already cleared the aura; this keeps it cleared).
 func tick(delta: float) -> void:
+	if player == null or not player.is_alive():
+		if not _affected.is_empty():
+			clear()
+		_timer = 0.0  # (refresh at once after the revive)
+		return
 	_timer -= delta
 	if _timer <= 0.0:
 		_timer = REFRESH_INTERVAL
@@ -95,6 +102,13 @@ func tick(delta: float) -> void:
 
 
 func begin_wave() -> void:
+	_timer = 0.0
+
+
+## The market shows everybody's own stats: the aura comes back with the next wave's first
+## tick.
+func end_wave() -> void:
+	clear()
 	_timer = 0.0
 
 

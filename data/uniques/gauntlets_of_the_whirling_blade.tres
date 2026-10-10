@@ -25,7 +25,7 @@ unique_params = {
 "slow_duration": 1.5
 }
 }
-unique_text = "Whirlwind lasts 1 sec longer and slows enemies by 30%."
+unique_text = "Equip: Your Whirlwind lasts 1 sec longer and slows enemies by 30%."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

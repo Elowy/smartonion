@@ -4,7 +4,9 @@ extends MasteryEffect
 ##
 ## Ignite: a critical weapon hit sets its target burning for (1% x Mastery) of the crit's
 ## damage, spread over BURN_DURATION seconds in ticks of fire damage. A new crit on a burning
-## enemy adds its share to what is still burning and restarts the clock.
+## enemy adds its share to what is still burning and restarts the clock. A crit that killed
+## its target sets the nearest living enemy within 2.5 m of it burning instead ([CritDot]).
+## Burns keep ticking while the Mage is downed (MasteryEffect.tick).
 ##
 ## Mana: max 100 + 2 x Intellect (follows gear and level bonuses). ResourceData is shared by
 ## every Mage, so this class swaps its own resource's data for a private copy on the first
@@ -39,8 +41,8 @@ static func mana_max_for(intellect: float) -> float:
 
 
 func on_hit(target: Node3D, damage: float, is_crit: bool) -> void:
-	if is_crit:
-		ignite(target as Enemy, damage)
+	if is_crit and damage > 0.0 and mastery() > 0.0:
+		ignite(CritDot.target_for(target), damage)  # (a killing crit spreads to a neighbour)
 
 
 ## Sets [param enemy] burning for Mastery% of [param crit_damage] over BURN_DURATION.

@@ -210,7 +210,7 @@ Minden kaszt tartalmaz:
 | Erőforrás | **Mana** (100 + 2 × Int), +10 / mp (Haste-tel nő) |
 | Képesség 1 | **Blizzard** – 50 Mana: jégeső a legsűrűbb ellenségcsoportra, 3 mp, lassít |
 | Képesség 2 | **Blink** – 6 mp CD: rövid teleport mozgásirányba |
-| Mastery | **Ignite** – a kritikus találat égést okoz (a krit sebzés pontonként +1%-a 3 mp alatt) |
+| Mastery | **Ignite** – a kritikus találat égést okoz (a krit sebzés pontonként +1%-a 3 mp alatt). Ha a krit megölte a célt, a legközelebbi élő ellenség kezd égni a tetemtől 2,5 m-en belül (ha nincs ilyen, elvész) |
 
 ### 3.3 Paladin
 | | |
@@ -222,7 +222,7 @@ Minden kaszt tartalmaz:
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
-| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a legközelebbi társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
+| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a 8 m-en belüli legsebesültebb társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
 | Mastery | **Aura of Devotion** – a közelben lévő társak HP-regenerációt és Armort kapnak (pontonként) |
 
 ### 3.4 Rogue
@@ -234,9 +234,9 @@ Minden kaszt tartalmaz:
 | Jártasság | Dagger, One-Hand Sword, Mace, Bow, Gun, **Dual Wield** |
 | Alap | +10% Crit, +10% Dodge, **−3 Max HP**, **−1 Armor** |
 | Erőforrás | **Energy** (0–100), +15 / mp; **Combo Points** (0–5): +1 minden kritikus találatnál |
-| Képesség 1 | **Fan of Knives** – 35 Energy: tőrök minden irányba; minden elhasznált Combo Point +20% sebzés |
-| Képesség 2 | **Vanish** – 15 mp CD: 2 mp láthatatlanság, az ellenség elveszti a célt, a következő találat garantált krit |
-| Mastery | **Deadly Poison** – a krit mérget tesz az ellenségre (pontonkénti DoT) |
+| Képesség 1 | **Fan of Knives** – 35 Energy: 10 tőr minden irányba (egyenként 110% fegyversebzés, mindegyik átüt egy ellenségen); minden elhasznált Combo Point +20% sebzés |
+| Képesség 2 | **Vanish** – 15 mp CD: 2 mp láthatatlanság, az ellenség elveszti a célt, a Rogue visszanyeri a max HP-ja 30%-át, a következő találat garantált krit |
+| Mastery | **Deadly Poison** – a krit mérget tesz az ellenségre (pontonkénti DoT). Ha a krit megölte a célt, a méreg a tetemtől 2,5 m-en belüli legközelebbi élő ellenségre kerül (ha nincs ilyen, elvész) |
 
 ### 3.5 Warlock
 | | |

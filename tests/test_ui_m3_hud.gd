@@ -7,7 +7,14 @@ const UiFakes := preload("res://tests/ui_fakes.gd")
 
 var world: Node3D
 var frame: UnitFrame
+## A mirrored frame for the layout tests (created on demand by _frame_right).
+var _right: UnitFrame
 var nodes: Array[Node] = []
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
@@ -126,10 +133,14 @@ func test_resource_display_rebinds_cleanly() -> void:
 	check_eq(frame.resource_display.row_count(), 0, "unbound: no rows")
 	check_eq(frame.resource_display.get_child_count(), 0, "unbound: no nodes")
 	check(not frame.visible, "unbound frame hides")
+	check_eq(frame.name_pips.get_child_count(), 0, "unbound: no inline pips")
 	combo.add(2.0, false)
 	frame.bind(p)
 	check_eq(frame.resource_display.pips_for(&"combo_points").filled, 2, "rebinding reads the current value")
-	check_eq(frame.resource_display.get_child_count(), 2, "one node per resource")
+	check_eq(frame.resource_display.get_child_count(), 1, "the Energy bar under the HP bar")
+	check_eq(frame.name_pips.get_child_count(), 1, "the combo pips inline in the name row")
+	frame.bind(p)
+	check_eq(frame.resource_display.get_child_count() + frame.name_pips.get_child_count(), 2, "rebinding twice: still one node per resource")
 
 
 func test_class_without_resources_keeps_the_placeholder_bar() -> void:
@@ -177,9 +188,28 @@ func test_prompts_follow_the_players_device() -> void:
 	check_eq(AbilityBar.prompt_text(ScriptedInput.new(), 0), "RT", "bots read like a pad")
 	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 0), "LMB", "keyboard slot 0 = left mouse button")
 	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 1), "RMB", "keyboard slot 1 = right mouse button")
-	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 2), "E", "keyboard slot 2 = E")
-	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 3), "Q", "keyboard slot 3 = Q")
+	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 2), "Q", "keyboard slot 2 (first learned) = Q")
+	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 3), "E", "keyboard slot 3 (second learned) = E")
 	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), 7), "", "no such slot")
+	check_eq(AbilityBar.prompt_text(KeyboardInput.new(), -1), "", "no negative slot")
+	check_eq(AbilityBar.prompt_text(null, 2), "RB", "no device: the controller default")
+	# The prompt is the device's real binding (PlayerInput.ability_button), not a fixed table.
+	var kb := KeyboardInput.new()
+	for i in AbilityRunner.MAX_SLOTS:
+		var key := UiGlyph.keyboard_name(kb.ability_button(i))
+		if i >= AbilityRunner.CORE_SLOTS:
+			check_eq(AbilityBar.prompt_text(kb, i), key, "keyboard slot %d shows its bound key" % i)
+		var pad := UiFakes.HumanInput.new("pad")
+		check_eq(AbilityBar.prompt_text(pad, i), String(PlayerInput.Pad.keys()[pad.ability_button(i)]), "pad slot %d shows its bound button" % i)
+
+
+func test_learned_slots_show_q_and_e_on_the_keyboard() -> void:
+	var abilities: Array[AbilityData] = [Fakes.ability(&"a"), Fakes.ability(&"b"), Fakes.ability(&"c"), Fakes.ability(&"d")]
+	_hero([], abilities, KeyboardInput.new())
+	var prompts: Array[String] = []
+	for icon in frame.ability_bar.icons:
+		prompts.append(icon.prompt)
+	check_eq(prompts, ["LMB", "RMB", "Q", "E"] as Array[String], "keyboard: LMB / RMB / Q / E")
 
 
 func test_bound_icons_carry_the_prompts_of_their_device() -> void:
@@ -198,6 +228,11 @@ func test_bound_icons_carry_the_prompts_of_their_device() -> void:
 	check_eq(kb_frame.ability_bar.icons[1].prompt, "RMB", "keyboard RMB")
 	check(kb_frame.ability_bar.icons[0].prompt_keyboard, "drawn as a key cap")
 	check_eq(kb_frame.ability_bar.alignment, BoxContainer.ALIGNMENT_END, "right-hand frames are mirrored")
+	# Neighbouring prompt pills never touch: "LMB" / "RMB" are wider than the icons.
+	for bar: AbilityBar in [frame.ability_bar, kb_frame.ability_bar]:
+		var pitch := bar.icons[0].icon_side() + bar.get_theme_constant(&"separation")
+		var pills := (bar.icons[0].prompt_width() + bar.icons[1].prompt_width()) * 0.5
+		check(pitch >= pills + AbilityBar.PILL_GAP - 0.5, "pills %s apart at a %s px pitch" % [pills, pitch])
 
 
 func test_cooldown_sweep_ratio_and_seconds() -> void:
@@ -225,6 +260,25 @@ func test_cooldown_sweep_ratio_and_seconds() -> void:
 	check_eq(icon.sweep_ratio, 0.0, "done")
 	check_eq(icon.cooldown_text(), "", "number gone")
 	check(icon.usable, "usable again")
+
+
+func test_hidden_bar_skips_updates_and_catches_up_when_shown() -> void:
+	# The HUD hides in the market: no slot_state reads while hidden, the first shown frame
+	# brings everything (costs included) up to date.
+	var p := _hero([], [Fakes.ability(&"charge", &"", 0.0, 4.0)])
+	var bar := frame.ability_bar
+	var icon := bar.icons[0]
+	check(p.abilities.try_cast(0), "cast")
+	check_eq(icon.sweep_ratio, 1.0, "full sweep")
+	frame.hide()
+	Fakes.step_physics(p, 2.0)
+	bar._process(1.0 / 60.0)
+	check_eq(icon.sweep_ratio, 1.0, "a hidden bar is not updated")
+	check(bar._cost_timer <= 0.0, "costs are due on the first shown frame")
+	frame.show()
+	bar._process(1.0 / 60.0)
+	check_near(icon.sweep_ratio, 0.5, 0.02, "the first shown frame catches up")
+	check(icon.cooldown_text() in ["2.0", "2.1", "1.9"], "with the seconds (%s)" % icon.cooldown_text())
 
 
 func test_cooldown_sweep_follows_cooldown_reduction() -> void:
@@ -321,9 +375,82 @@ func test_description_uses_the_modded_params() -> void:
 func test_frame_stays_compact() -> void:
 	_hero([Fakes.energy(), Fakes.combo()], [Fakes.ability(&"a"), Fakes.ability(&"b")])
 	frame.reset_size()
-	check(frame.custom_minimum_size.x <= 345.0, "~340 px wide")
-	check(frame.get_combined_minimum_size().y <= 190.0, "no taller than ~190 px even with pips (%s)" % frame.get_combined_minimum_size().y)
+	var size := frame.get_combined_minimum_size()
+	check(size.x <= 440.0, "~430 px wide (%s)" % size.x)
+	check(size.y <= UnitFrame.MAX_HEIGHT, "no taller than %s px even with pips (%s)" % [UnitFrame.MAX_HEIGHT, size.y])
 	check(AbilityIcon.COOLDOWN_FONT >= 18 and AbilityIcon.PROMPT_FONT >= 18 and AbilityIcon.COST_FONT >= 18, "icon texts >= 18 px")
+	check(UnitFrame.ABILITY_ICON_SIZE >= 40.0, "icons stay big enough to read the glyph and the seconds")
+
+
+func test_ability_icons_sit_beside_the_bars_on_the_inner_side() -> void:
+	_hero([Fakes.rage()], [Fakes.ability(&"a"), Fakes.ability(&"b")])
+	var right := UnitFrame.create(1, true)
+	tree.root.add_child(right)
+	nodes.append(right)
+	right.bind(Fakes.hero(world, UiFakes.HumanInput.new("pad:2"), [Fakes.rage()], [Fakes.ability(&"a"), Fakes.ability(&"b")], &"warrior", 1))
+	for f: UnitFrame in [frame, right]:
+		f.reset_size()
+		var size := f.get_combined_minimum_size()
+		f.size = size
+		# Layout without a frame: sort the containers by hand.
+		_sort(f)
+		var hp := f.hp_bar.get_global_rect()
+		var icons := f.ability_bar.get_global_rect()
+		var face := f.portrait.get_global_rect()
+		check(icons.position.y < hp.end.y + 4.0 and icons.end.y > hp.position.y, "P%d: icons in the bars' rows" % (f.index + 1))
+		if f.mirrored:
+			check(icons.end.x <= hp.position.x + 0.5 and face.position.x >= hp.end.x - 0.5, "mirrored: icons left of the bars, portrait outside right")
+		else:
+			check(icons.position.x >= hp.end.x - 0.5 and face.end.x <= hp.position.x + 0.5, "icons right of the bars, portrait outside left")
+
+
+func _sort(node: Node) -> void:
+	if node is Container:
+		(node as Container).notification(Container.NOTIFICATION_SORT_CHILDREN)
+	for c in node.get_children():
+		_sort(c)
+
+
+func test_every_class_frame_fits_the_height_limit() -> void:
+	# The camera keeps heroes out of fixed bands under the frames (CameraRig margins): a frame
+	# must stay within UnitFrame.MAX_HEIGHT for every class, alive and downed (the Spirit Healer
+	# hint), the Rogue's combo pips included.
+	for class_id in Db.class_ids:
+		var slot := PlayerSlot.new(0, UiFakes.HumanInput.new("pad:%s" % class_id), PlayerManager.PLAYER_COLORS[0])
+		slot.class_data = Db.get_class_data(class_id)
+		var p := Player.create(slot)
+		world.add_child(p)
+		var alive_heights: Array[float] = []
+		for f: UnitFrame in [frame, _frame_right()]:
+			f.bind(p)
+			var alive := f.get_combined_minimum_size()
+			alive_heights.append(alive.y)
+			check(alive.y <= UnitFrame.MAX_HEIGHT, "%s P%d: %s px tall" % [class_id, f.index + 1, alive.y])
+			check(alive.x <= 440.0, "%s P%d: %s px wide" % [class_id, f.index + 1, alive.x])
+			check_eq(f.ability_bar.icons[0].ability, slot.class_data.abilities[0], "%s: the class's abilities on the frame" % class_id)
+		if class_id == &"rogue":
+			check(frame.resource_display.pips_for(&"combo_points") != null, "rogue: combo pips shown")
+			check(frame.resource_display.pips_for(&"combo_points").get_parent() == frame.name_pips, "rogue: inline in the name row")
+		p.take_damage(1.0e6)
+		check(p.downed, "%s downed" % class_id)
+		for f: UnitFrame in [frame, _frame_right()]:
+			f.bind(p)
+			check(f.is_downed_shown(), "%s: DOWNED overlay" % class_id)
+			check_eq(f.hint_label.text, "Go to the Spirit Healer", "%s: the Spirit Healer hint" % class_id)
+			var downed := f.get_combined_minimum_size()
+			check(downed.y <= UnitFrame.MAX_HEIGHT, "%s P%d downed: %s px tall" % [class_id, f.index + 1, downed.y])
+			check_eq(downed.y, alive_heights[0], "%s P%d: going down does not change the frame height" % [class_id, f.index + 1])
+			f.unbind()
+		world.remove_child(p)
+		p.free()
+
+
+func _frame_right() -> UnitFrame:
+	if _right == null:
+		_right = UnitFrame.create(3, true)
+		tree.root.add_child(_right)
+		nodes.append(_right)
+	return _right
 
 
 func test_charges_counter_follows_the_runner() -> void:
@@ -362,3 +489,63 @@ func test_resource_rows_do_not_leak_the_class_resource() -> void:
 	check_eq(res.changed.get_connections().size(), 0, "no connection left on the signal")
 	res.set_value(10.0)
 	runner.free()
+
+
+## Screen point of ground point [param p] for a CameraRig framing ([param target],
+## [param dist]) on a [param screen] sized 16:9 view (same pinhole as Camera3D, KEEP_HEIGHT).
+static func _project(p: Vector3, target: Vector3, dist: float, screen: Vector2) -> Vector2:
+	var pitch := deg_to_rad(CameraRig.PITCH_DEG)
+	var cam := Transform3D(Basis(Vector3.RIGHT, -pitch), target + Vector3(0.0, dist * sin(pitch), dist * cos(pitch)))
+	var v := cam.affine_inverse() * p
+	var t := tan(deg_to_rad(CameraRig.FOV) * 0.5)
+	var ndc := Vector2(v.x / -v.z / t / (screen.x / screen.y), v.y / -v.z / t)
+	return Vector2((ndc.x + 1.0) * 0.5 * screen.x, (1.0 - ndc.y) * 0.5 * screen.y)
+
+
+func test_camera_framing_keeps_heroes_out_from_under_the_frames() -> void:
+	# The camera's top / bottom margins (CameraRig) were sized for ~100 px frames: a framed
+	# hero's feet and head must stay clear of every unit frame, also at the widest spread.
+	_async = true
+	var screen := Vector2(1920, 1080)
+	var canvas := Control.new()
+	canvas.size = screen
+	tree.root.add_child(canvas)
+	nodes.append(canvas)
+	var hud := Hud.create()
+	canvas.add_child(hud)
+	var heroes: Array[Player] = []
+	var classes: Array[StringName] = [&"warrior", &"mage", &"rogue", &"rogue"]
+	for i in classes.size():
+		var input: PlayerInput = KeyboardInput.new() if i == 2 else UiFakes.HumanInput.new("pad:%d" % i)
+		var slot := PlayerSlot.new(i, input, PlayerManager.PLAYER_COLORS[i])
+		slot.class_data = Db.get_class_data(classes[i])
+		var p := Player.create(slot)
+		world.add_child(p)
+		heroes.append(p)
+	hud.bind_players(heroes)
+	heroes[3].take_damage(1.0e6)  # a downed frame (the Spirit Healer hint)
+	await tree.process_frame
+	await tree.process_frame
+	var rects: Array[Rect2] = []
+	for f in hud.frames:
+		check(f.visible, "%s shown" % f.name)
+		rects.append(f.get_global_rect())
+		check(f.size.y <= UnitFrame.MAX_HEIGHT, "%s: %s px tall" % [f.name, f.size.y])
+	var layouts: Array = [
+		[Vector3(-16.5, 0, -10.5), Vector3(16.5, 0, -10.5), Vector3(-16.5, 0, 10.5), Vector3(16.5, 0, 10.5)],
+		[Vector3(-16, 0, -10), Vector3(16, 0, 10), Vector3(-16, 0, 10), Vector3(16, 0, -10)],
+		[Vector3(-12, 0, -8), Vector3(12, 0, 8), Vector3(0, 0, 0)],
+		[Vector3(3, 0, -10), Vector3(-3, 0, 10)],
+		[Vector3(-6, 0, -4), Vector3(6, 0, 4)],
+	]
+	var arena_view := Rect2(-25, -19, 50, 38)
+	for layout in layouts:
+		var pts: Array[Vector3] = []
+		pts.assign(layout)
+		var framing := CameraRig.compute_framing(pts, screen.x / screen.y, arena_view)
+		for p in pts:
+			for point: Vector3 in [p, p + Vector3(0, 1.3, 0)]:
+				var px := _project(point, framing["target"], framing["distance"], screen)
+				for i in rects.size():
+					check(not rects[i].has_point(px), "%s (d %.1f) at %s is under P%d's frame %s" % [point, framing["distance"], px, i + 1, rects[i]])
+	finished.emit()

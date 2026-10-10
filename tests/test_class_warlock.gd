@@ -327,6 +327,10 @@ func test_drain_life_ends_without_enemies_or_when_downed() -> void:
 	p.begin_wave()
 	check(not effect.is_channeling(), "wave start: ends")
 	check(effect.beam == null, "beam released")
+	check(p.abilities.try_cast(1), "cast once more")
+	p.end_wave()
+	check(not effect.is_channeling(), "wave end: ends before the intermission")
+	check(effect.beam == null, "no beam in the market")
 
 
 func test_drain_life_bot_casts_when_hurt() -> void:
@@ -411,6 +415,20 @@ func test_imp_hides_while_the_warlock_is_downed() -> void:
 	check_eq(imp.shots_fired, 1, "shoots again")
 
 
+func test_no_imp_is_summoned_while_the_warlock_is_downed() -> void:
+	var p := _warlock()
+	p.stats.set_source(&"t", {Stats.DODGE: -500.0})
+	p.take_damage(9999.0)
+	check(p.downed, "downed before the first tick")
+	_enemy(Vector3(0, 0, -4))
+	for i in 60:
+		p.abilities._physics_process(DT)
+	check(_mastery(p).imp == null, "the Mastery ticks, but no Imp appears")
+	p.revive()
+	p.abilities._physics_process(DT)
+	check(_mastery(p).has_imp(), "summoned after the revive")
+
+
 func test_imp_survives_waves_and_is_freed_in_teardown() -> void:
 	var p := _warlock()
 	var imp := _imp(p)
@@ -443,6 +461,27 @@ func test_grimoire_of_the_imp_lord() -> void:
 	check_eq(bolt.victim_ids, [a.get_instance_id(), b.get_instance_id()] as Array[int], "ricochets to the second")
 	check_eq(a.hits.size(), 1, "a hit once")
 	check_eq(b.hits.size(), 1, "b hit once")
+
+
+func test_grimoire_ricochet_reaches_a_sideways_target_off_a_big_enemy() -> void:
+	var p := _warlock()
+	check(p.equipment.equip(_mod_trinket(&"grimoire_of_the_imp_lord")), "equip")
+	for layout: Array in [[1.2, 0.4], [0.55, 0.32]]:
+		var big := _enemy(Vector3(0, 0, -5))
+		big.radius = float(layout[0])
+		var side := _enemy(Vector3(3, 0, -5))
+		side.radius = float(layout[1])
+		var bolt := WarlockImpBolt.fire(p, Vector3(0, WarlockImp.BOLT_HEIGHT, 0), Vector3.FORWARD, 5.0, 2,
+				12.0, 13.0)
+		_fly(bolt)
+		check_eq(bolt.victim_ids.size(), 2, "radius %s -> %s: both hit" % [layout[0], layout[1]])
+		check_eq(side.hits.size(), 1, "the sideways enemy took the ricochet")
+		for e in [big, side]:
+			e.get_parent().remove_child(e)
+			e.free()
+		if is_instance_valid(bolt):
+			bolt.free()
+		EnemyGrid.mark_dirty()
 
 
 # --- Demonic Pact ----------------------------------------------------------------------------

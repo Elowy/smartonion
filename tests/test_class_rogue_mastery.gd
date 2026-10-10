@@ -5,6 +5,33 @@ extends TestCase
 const Fakes := preload("res://tests/player_fakes.gd")
 const DT := 1.0 / 60.0
 
+## An enemy that dies when its HP runs out (a crit can kill it).
+class MortalEnemy extends Enemy:
+	func _init() -> void:
+		hp = 10.0
+		max_hp = 10.0
+		radius = 0.45
+
+	func _enter_tree() -> void:
+		pass
+
+	func _ready() -> void:
+		pass
+
+	func _process(_delta: float) -> void:
+		pass
+
+	func _physics_process(_delta: float) -> void:
+		pass
+
+	func is_dead() -> bool:
+		return hp <= 0.0
+
+	func take_damage(amount: float, _is_crit: bool = false, _attacker: Node3D = null,
+			_knockback: Vector3 = Vector3.ZERO) -> void:
+		hp -= amount
+
+
 var world: Node3D
 var rogue: Player
 var enemy: Fakes.FakeEnemy
@@ -134,3 +161,67 @@ func test_knife_crits_poison_through_the_runner() -> void:
 			(node as Projectile).advance(DT)
 	# The enemy straight ahead (-Z) is hit by the knife thrown along the facing.
 	check_eq(mastery.stacks_on(enemy), 1, "one knife, one stack")
+
+
+func _mortal(pos: Vector3) -> MortalEnemy:
+	var e := MortalEnemy.new()
+	e.add_to_group(&"enemies")
+	world.add_child(e)
+	e.global_position = pos
+	EnemyGrid.mark_dirty()
+	return e
+
+
+func test_killing_crit_poisons_the_nearest_neighbour() -> void:
+	enemy.global_position = Vector3(2.0, 0, -2.0)  # 2 m from the victim
+	var farther := Fakes.spawn_enemy(world, Vector3(-2.3, 0, -2.0))
+	var victim := _mortal(Vector3(0, 0, -2.0))
+	WeaponRunner.apply_hit(rogue, victim, 25.0, true, Vector3.ZERO)
+	check(victim.is_dead(), "the crit killed it")
+	check_eq(mastery.stacks_on(victim), 0, "a corpse is not poisoned")
+	check_eq(mastery.stacks_on(enemy), 1, "the poison spreads to the nearest living enemy")
+	check_eq(mastery.stacks_on(farther), 0, "only one")
+	check_near(mastery.dps_on(enemy), mastery.stack_damage(25.0) / RogueMastery.DURATION, 0.001,
+			"with the share of the killing crit")
+	_run(4.1)
+	check_near(_total(), mastery.stack_damage(25.0), 0.05, "and ticks it out")
+
+
+func test_killing_crit_spread_reach() -> void:
+	enemy.global_position = Vector3(2.6, 0, -2.0)  # 2.6 m from the victim
+	var victim := _mortal(Vector3(0, 0, -2.0))
+	mastery.on_hit(victim, 25.0, true)
+	check_eq(mastery.stacks_on(victim), 1, "a living target is poisoned itself")
+	victim.hp = 0.0
+	mastery.on_hit(victim, 25.0, true)
+	check_eq(mastery.poisoned_count(), 1, "nobody within 2.5 m: the share is lost")
+	check_eq(mastery.stacks_on(enemy), 0, "2.6 m is too far")
+	enemy.global_position = Vector3(2.4, 0, -2.0)
+	EnemyGrid.mark_dirty()
+	mastery.on_hit(victim, 25.0, true)
+	check_eq(mastery.stacks_on(enemy), 1, "2.4 m is close enough")
+	enemy.fake_dead = true
+	var other := Fakes.spawn_enemy(world, Vector3(0, 0, 0.0))
+	EnemyGrid.mark_dirty()
+	mastery.on_hit(victim, 25.0, true)
+	check_eq(mastery.stacks_on(other), 1, "dead neighbours are skipped")
+	var count := mastery.poisoned_count()
+	mastery.on_hit(null, 25.0, true)
+	mastery.on_hit(rogue, 25.0, true)
+	check_eq(mastery.poisoned_count(), count, "no target or a non-enemy target: nothing")
+
+
+func test_poison_keeps_ticking_while_the_rogue_is_downed() -> void:
+	rogue.stats.set_source(&"test", {Stats.CRIT: -500.0, Stats.DODGE: -500.0})
+	mastery.on_hit(enemy, 40.0, true)
+	_run(1.0)
+	var before := _total()
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(rogue.downed, "downed")
+	_run(3.1)
+	check(_total() > before + 0.1, "the poison kept ticking")
+	check_near(_total(), 40.0 * 0.2, 0.05, "the whole stack damage")
+	for a in enemy.fake_attacker_log:
+		check_eq(a, rogue, "credited to the downed rogue")
+	check_eq(mastery.poisoned_count(), 0, "and ran out")

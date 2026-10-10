@@ -63,7 +63,8 @@ func can_cast(_ctx: AbilityContext) -> bool:
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var player := ctx.player
-	if player == null or not player.is_inside_tree():
+	# A bot reviving a teammate stays put (the charge would break the revive).
+	if player == null or not player.is_inside_tree() or player.is_reviving():
 		return false
 	var dir := Vector3(ctx.direction.x, 0.0, ctx.direction.z)
 	if dir.length_squared() < 0.0001:

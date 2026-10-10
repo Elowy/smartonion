@@ -6,7 +6,8 @@ extends VBoxContainer
 ##    (Rage red, Mana blue, Energy yellow); a big spend flashes the bar.
 ##  - ResourceData.Display.PIPS -> a row of pips (Holy Power gold, Soul Shards purple, Combo
 ##    Points): as the primary resource in a recessed trough like a bar, as a secondary one a
-##    small centred row under the bar (Rogue: Energy bar + 5 combo pips).
+##    small row – inside [member inline_holder] when one is set (UnitFrame: the inner end of the
+##    name row, so the Rogue's Energy bar + 5 combo pips add no height), else centred under the bar.
 ## Rows follow ClassResource.changed, nothing is polled. A class without M3 resources shows a
 ## full placeholder bar from ClassData.resource_type / resource_color (the M1 look).
 
@@ -21,6 +22,8 @@ const SPEND_FLASH_SHARE := 0.1
 var font_size := UiTheme.FONT_SMALL
 ## True while the display shows the M1 placeholder bar (no resources on the player).
 var is_placeholder := false
+## Optional container (outside this display) for secondary pip rows; set before bind().
+var inline_holder: Container
 
 var _rows: Array[Row] = []
 
@@ -96,8 +99,8 @@ func unbind() -> void:
 	for row in _rows:
 		var node: Control = row.bar if row.bar != null else row.pips
 		if node != null:
-			if node.get_parent() == self:
-				remove_child(node)
+			if node.get_parent() != null:
+				node.get_parent().remove_child(node)
 			node.queue_free()
 	_rows.clear()
 	is_placeholder = false
@@ -138,8 +141,12 @@ func _add_row(res: ClassResource) -> void:
 	row.resource_ref = weakref(res)
 	var primary := _rows.is_empty()
 	if uses_pips(d):
-		row.pips = Pips.create(d, primary)
-		add_child(row.pips)
+		var inline := not primary and is_instance_valid(inline_holder)
+		row.pips = Pips.create(d, primary, inline)
+		if inline:
+			inline_holder.add_child(row.pips)
+		else:
+			add_child(row.pips)
 	else:
 		row.bar = UiBar.create(d.color, BAR_HEIGHT if primary else SECONDARY_BAR_HEIGHT, font_size)
 		row.bar.animated = false
@@ -193,7 +200,8 @@ class Pips extends Control:
 	var _pop: Array[float] = []
 	var _t := 0.0
 
-	static func create(data: ResourceData, primary: bool) -> Pips:
+	## [param inline]: a row exactly as wide as its pips (it sits beside other controls).
+	static func create(data: ResourceData, primary: bool, inline: bool = false) -> Pips:
 		var p := Pips.new()
 		p.color = data.color
 		p.count = clampi(int(roundf(data.max_value)), 1, ResourceDisplay.MAX_PIPS)
@@ -203,10 +211,22 @@ class Pips extends Control:
 		p.custom_minimum_size = Vector2(60, ResourceDisplay.BAR_HEIGHT if primary else ResourceDisplay.PIPS_HEIGHT)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if inline and not primary:
+			p.custom_minimum_size.x = p.row_width()
+			p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		p._pop.resize(p.count)
 		p._pop.fill(0.0)
 		p.set_process(false)
 		return p
+
+	## Distance between two pip centres of a free (trough-less) row.
+	func pip_step() -> float:
+		return pip_height * (0.62 if shard else 1.0) + pip_height * 0.6
+
+	## Width of a free row of [member count] pips (outline and a little room for the pop).
+	func row_width() -> float:
+		return pip_step() * (count - 1) + pip_height * (0.68 if shard else 1.0) + 8.0
 
 	## Filled pips for [param value]: whole pips only.
 	static func filled_for(value: float, p_count: int) -> int:
@@ -251,7 +271,7 @@ class Pips extends Control:
 			# Evenly spread over the trough, like the segments of a bar.
 			step = (size.x - 16.0) / float(count)
 		else:
-			step = h * (0.62 if shard else 1.0) + h * 0.6
+			step = pip_step()
 		var total := step * (count - 1)
 		var cx := size.x * 0.5 - total * 0.5
 		var cy := size.y * 0.5

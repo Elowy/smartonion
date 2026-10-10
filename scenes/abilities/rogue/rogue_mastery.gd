@@ -6,6 +6,8 @@ extends MasteryEffect
 ## DURATION seconds (a full stack bar replaces an average stack instead). Ticks every TICK
 ## seconds through ProcSystem.deal_raw(..., &"dot") – no weapon hit (no procs, no crits), but
 ## Executioner / Slayer and the outgoing damage multipliers apply, and kills are credited.
+## A crit that killed its target poisons the nearest living enemy within 2.5 m of it instead
+## ([CritDot]). The poison keeps ticking while the Rogue is downed (MasteryEffect.tick).
 ## The tracker is per enemy, lives in this object and is cleared at wave start.
 
 const DURATION := 4.0
@@ -38,8 +40,8 @@ func stack_damage(hit_damage: float) -> float:
 func on_hit(target: Node3D, damage: float, is_crit: bool) -> void:
 	if not is_crit or damage <= 0.0 or player == null:
 		return
-	var enemy := target as Enemy
-	if enemy == null or not is_instance_valid(enemy) or enemy.is_dead():
+	var enemy := CritDot.target_for(target)  # (a killing crit spreads to a neighbour)
+	if enemy == null:
 		return
 	poison(enemy, stack_damage(damage))
 

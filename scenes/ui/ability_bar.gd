@@ -1,15 +1,20 @@
 class_name AbilityBar
 extends HBoxContainer
-## The ability bar under a unit frame (GDD 12): one AbilityIcon per AbilityRunner slot.
-## Slots 0 / 1 (RT / LT, the class's two core abilities) are always drawn; slots 2 / 3 (RB / LB,
-## abilities learned in M4) appear as soon as something is slotted there. Each icon shows the
-## button prompt of the player's own device (controller RT / LT / RB / LB, keyboard LMB / RMB /
-## E / Q), a clockwise cooldown sweep with the seconds left, a dim state while the ability cannot
-## be used (AbilityRunner.is_ready) and a short flash on AbilityRunner.ability_cast.
-## Everything is pushed from the runner every frame; the bar never touches gameplay state.
+## The ability icons of a unit frame (GDD 12, beside the HP / resource bars on the frame's
+## inner side): one AbilityIcon per AbilityRunner slot. Slots 0 / 1 (the class's two core
+## abilities) are always drawn; slots 2 / 3 (learned in M4) appear as soon as something is
+## slotted there. Each icon shows the button prompt of the player's own device
+## (PlayerInput.ability_button: controller RT / LT / RB / LB, keyboard LMB / RMB / Q / E), a
+## clockwise cooldown sweep with the seconds left, a dim state while the ability cannot be used
+## and a short flash on AbilityRunner.ability_cast.
+## Everything is pushed from the runner (one AbilityRunner.slot_state per slot and rendered
+## frame, nothing while the bar is hidden); the bar never touches gameplay state.
 
 const SLOT_COUNT := AbilityRunner.MAX_SLOTS
-const SEPARATION := 6
+## Room between two icons; wider when the prompt pills ("LMB" ~50 px) are wider than the
+## icons, so neighbouring pills keep PILL_GAP between them.
+const SEPARATION := 10
+const PILL_GAP := 6
 ## Costs (item mods can change them) are re-read this often (s).
 const COST_REFRESH := 0.25
 
@@ -35,18 +40,21 @@ static func create(mirrored: bool = false, icon_size: float = AbilityIcon.SIZE) 
 	return b
 
 
-## The text of the button prompt for ability [param slot] on [param p_input]'s device.
+## The text of the button prompt for ability [param slot] on [param p_input]'s device: the
+## device's own binding (PlayerInput.ability_button) – keyboard LMB / RMB / Q / E, controllers
+## RT / LT / RB / LB (no device: the controller default).
 static func prompt_text(p_input: PlayerInput, slot: int) -> String:
 	if slot < 0 or slot >= PlayerInput.ABILITY_BUTTONS.size():
 		return ""
+	var button: PlayerInput.Pad = p_input.ability_button(slot) if p_input != null else PlayerInput.ABILITY_BUTTONS[slot]
 	if p_input is KeyboardInput:
-		match slot:
-			0:
+		match button:
+			PlayerInput.Pad.RT:
 				return "LMB"
-			1:
+			PlayerInput.Pad.LT:
 				return "RMB"
-		return UiGlyph.keyboard_name(PlayerInput.ABILITY_BUTTONS[slot])
-	return String(PlayerInput.Pad.keys()[PlayerInput.ABILITY_BUTTONS[slot]])
+		return UiGlyph.keyboard_name(button)
+	return String(PlayerInput.Pad.keys()[button])
 
 
 ## Follows [param p_runner]'s slots (null unbinds); [param p_input] picks the prompts.
@@ -92,7 +100,17 @@ func _rebuild() -> void:
 		icon.set_ability(a, runner.cost_of(a) if a != null else 0.0, cost_color)
 		icon.set_prompt(prompt_text(input, i) if a != null else "", keyboard)
 		icon.visible = i < AbilityRunner.CORE_SLOTS or a != null
+	add_theme_constant_override(&"separation", separation_for(icons))
 	refresh()
+
+
+## Icon spacing for [param p_icons]: SEPARATION, or more when a prompt pill overhangs its icon.
+static func separation_for(p_icons: Array[AbilityIcon]) -> int:
+	var overhang := 0.0
+	for icon in p_icons:
+		if icon.visible:
+			overhang = maxf(overhang, icon.prompt_width() - icon.icon_side())
+	return maxi(SEPARATION, ceili(overhang) + PILL_GAP)
 
 
 ## Tooltip text of slot [param slot]: the description with the item-modded params filled in
@@ -103,8 +121,9 @@ func description_for(slot: int) -> String:
 	return AbilityIcon.format_description(runner.slots[slot], runner.params_for(runner.slots[slot]))
 
 
-## Pushes cooldown / readiness (and charges) of every slot into the icons. [param with_costs] also re-reads
-## the costs (done every COST_REFRESH seconds by the per-frame update).
+## Pushes cooldown / readiness (and charges) of every slot into the icons, from one
+## AbilityRunner.slot_state per slot. [param with_costs] also updates the costs (done every
+## COST_REFRESH seconds by the per-frame update).
 func refresh(with_costs: bool = false) -> void:
 	if not is_instance_valid(runner):
 		return
@@ -112,12 +131,14 @@ func refresh(with_costs: bool = false) -> void:
 		var icon := icons[i]
 		if icon.ability == null:
 			continue
+		var st := runner.slot_state(i)
+		if st.is_empty():
+			continue
 		if with_costs:
-			icon.set_cost(runner.cost_of(icon.ability))
+			icon.set_cost(st["cost"])
 		# Charges (Blink with the Band of the Blinking Star): a counter while there is more than one.
-		icon.set_charges(runner.charges_available(icon.ability), runner.charges_max(icon.ability))
-		var left := runner.remaining(i)
-		icon.set_state(runner.cooldown_ratio(i), left, left <= 0.0 and runner.is_ready(i))
+		icon.set_charges(st["charges"], st["charges_max"])
+		icon.set_state(st["ratio"], st["left"], st["ready"])
 
 
 func _on_ability_cast(slot_index: int, _ability: AbilityData) -> void:
@@ -129,6 +150,9 @@ func _on_ability_cast(slot_index: int, _ability: AbilityData) -> void:
 func _process(delta: float) -> void:
 	if not is_instance_valid(runner):
 		set_process(false)
+		return
+	if not is_visible_in_tree():
+		_cost_timer = 0.0  # costs are re-read on the first frame shown again
 		return
 	_cost_timer -= delta
 	var with_costs := _cost_timer <= 0.0

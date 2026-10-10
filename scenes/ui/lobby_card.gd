@@ -7,7 +7,8 @@ extends PanelContainer
 
 const PREVIEW_HEIGHT := 150.0
 const ABILITY_ICON_SIZE := 40.0
-## The Mastery text is cut after this many lines (the class .tres texts are 2 to 4 lines).
+## The Mastery text is cut after this many lines: every class's mastery_text must fit in it
+## at the 1080p canvas (test_ui_m3_lobby checks all Db classes).
 const MASTERY_MAX_LINES := 3
 
 var index := 0
@@ -394,13 +395,15 @@ func _fill_abilities(data: ClassData, s: PlayerSlot) -> void:
 		mastery_label.text = parts[1]
 
 
-## Splits a Mastery text "Battle Fury: the lower your health ..." into its name and the rest
-## (the name is empty when the text has no "Name: " lead-in).
+## Splits a Mastery text "Battle Fury: the lower your health ..." into its name and the rest,
+## which starts with a capital letter on its own line ("The lower your health ..."); the name is
+## empty when the text has no "Name: " lead-in.
 static func mastery_parts(text: String) -> Array[String]:
 	var t := text.strip_edges()
 	var colon := t.find(": ")
 	if colon > 0 and colon <= 28:
-		return [t.substr(0, colon), t.substr(colon + 2)]
+		var body := t.substr(colon + 2).strip_edges()
+		return [t.substr(0, colon), body.left(1).to_upper() + body.substr(1)]
 	return ["", t]
 
 

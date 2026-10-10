@@ -6,6 +6,11 @@ const Fakes := preload("res://tests/test_ui_m3_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
 var nodes: Array[Node] = []
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func after_each() -> void:
@@ -166,3 +171,30 @@ func test_every_glyph_draws() -> void:
 		box.add_child(icon)
 		icon.queue_redraw()
 	check_eq(box.get_child_count(), AbilityIcon.Glyph.values().size(), "one icon per glyph")
+
+
+func test_long_cooldown_sweep_redraws_smoothly() -> void:
+	# Regression (hud-ux-02): an 8 s cooldown moves the ratio by 1/480 per physics tick, below the
+	# redraw step – the pie must still advance in small steps, not jump 45 degrees once a second.
+	_async = true
+	var icon := AbilityIcon.create()
+	icon.set_ability(Fakes.ability(&"charge", &"", 0.0, 8.0))
+	tree.root.add_child(icon)
+	nodes.append(icon)
+	var drawn: Array[float] = []
+	icon.draw.connect(func() -> void: drawn.append(icon.sweep_ratio))
+	var full := 8.0
+	var left := full
+	while left > 0.0:
+		icon.set_state(left / full, left, false)
+		await tree.process_frame
+		left -= 1.0 / 60.0
+	icon.set_state(0.0, 0.0, true)
+	await tree.process_frame
+	check(drawn.size() >= 100, "the pie is redrawn all along the cooldown (%d draws)" % drawn.size())
+	var worst := 0.0
+	for i in range(1, drawn.size()):
+		worst = maxf(worst, absf(drawn[i] - drawn[i - 1]))
+	check(worst <= 0.01, "no jump between two drawn sweeps above 0.01 (worst %s)" % worst)
+	check_eq(drawn.back(), 0.0, "ends empty")
+	finished.emit()

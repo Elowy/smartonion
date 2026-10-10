@@ -1,11 +1,12 @@
 class_name RogueFanOfKnives
 extends AbilityEffect
-## Fan of Knives (GDD 3.4, Rogue RT): throws [code]knives[/code] (8) knives in all directions,
-## each a weapon-based hit ([code]damage_pct[/code] % of the main-hand hit, able to crit).
-## Every Combo Point held is spent and adds [code]combo_bonus_pct[/code] % (20) damage.
+## Fan of Knives (GDD 3.4, Rogue RT): throws [code]knives[/code] (10) knives in all directions,
+## each a weapon-based hit ([code]damage_pct[/code] (110) % of the main-hand hit, able to crit)
+## that passes through [code]pierce[/code] (1) enemies. Every Combo Point held is spent and
+## adds [code]combo_bonus_pct[/code] % (20) damage.
 ## Item mod (Blade of the Thousand Cuts): [code]knives_add[/code] = +4 knives.
 ##
-## The knives are ordinary player Projectiles (pierce 0): their hits count as weapon hits
+## The knives are ordinary player Projectiles: their hits count as weapon hits
 ## (Combo Points and Deadly Poison on a crit, leech, Executioner / Slayer, Mastery
 ## multipliers) and roll on-hit procs once per cast. Knife crits roll normally – Vanish's
 ## guaranteed crit is kept for the weapons.
@@ -42,12 +43,13 @@ func cast(ctx: AbilityContext) -> bool:
 	var combo := player.abilities.get_resource(RogueUtil.COMBO_ID)
 	if combo != null:
 		combo.set_value(0.0)
-	var knives := maxi(1, roundi(ctx.num("knives", 8.0)))
-	var damage := knife_damage(player, weapon, ctx.num("damage_pct", 80.0), points,
+	var knives := maxi(1, roundi(ctx.num("knives", 10.0)))
+	var damage := knife_damage(player, weapon, ctx.num("damage_pct", 110.0), points,
 			ctx.num("combo_bonus_pct", 20.0))
 	var crit_mult := CombatMath.crit_multiplier(weapon, player.stats)
 	var speed := ctx.num("speed", 16.0)
 	var reach := ctx.num("range", 7.0)
+	var pierce := maxi(0, roundi(ctx.num("pierce", 0.0)))
 	var facing := Vector3(ctx.direction.x, 0.0, ctx.direction.z)
 	facing = facing.normalized() if facing.length_squared() > 0.0001 else Vector3.FORWARD
 	var origin := player.global_position
@@ -56,7 +58,7 @@ func cast(ctx: AbilityContext) -> bool:
 		var dir := facing.rotated(Vector3.UP, TAU * float(i) / float(knives))
 		var crit := CombatMath.roll_crit(player.stats, RunState.rng)
 		var proj := Projectile.create(Projectile.TEAM_PLAYERS, damage * (crit_mult if crit else 1.0), crit,
-				dir, speed, reach, 0, 0.0, player, &"arrow", KNIFE_COLOR)
+				dir, speed, reach, pierce, 0.0, player, &"arrow", KNIFE_COLOR)
 		RogueKnifeVisual.attach(proj, KNIFE_COLOR, crit)
 		proj.knockback = KNIFE_KNOCKBACK
 		proj.weapon = weapon

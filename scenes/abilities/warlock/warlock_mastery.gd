@@ -4,8 +4,8 @@ extends MasteryEffect
 ## Mastery point), the permanent Imp pet and the Soul Shard rule of Soulbinder's Sash.
 ##
 ## The Imp ([WarlockImp]) is spawned lazily from [method tick] (a physics tick – never while a
-## parent is busy setting up children) once the Warlock is in the tree, survives waves, hides
-## itself while the Warlock is downed and is freed in [method teardown].
+## parent is busy setting up children) once the Warlock is in the tree and alive, survives
+## waves, hides itself while the Warlock is downed and is freed in [method teardown].
 ##
 ## Soul Shards: +1 every ResourceData.gain_per_kills kills (soul_shards.tres: 12), counted by
 ## ClassResource. Items change the rule through ability_mod on the pseudo ability
@@ -35,9 +35,12 @@ func damage_mult(_target: Node3D, _school: StringName, source: StringName) -> fl
 	return 1.0
 
 
+## Also runs while the Warlock is downed (MasteryEffect.tick): no Imp is summoned then (an
+## existing one hides and stops shooting by itself, WarlockImp._physics_process).
 func tick(_delta: float) -> void:
 	_hook_equipment()
-	ensure_imp()
+	if player != null and player.is_alive():
+		ensure_imp()
 
 
 func on_kill(_enemy: Node3D) -> void:

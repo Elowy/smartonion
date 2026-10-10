@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"fan_of_knives"
 display_name = "Fan of Knives"
-description = "Throws {knives} knives in every direction, each for {damage_pct}% weapon damage. Spends all Combo Points: +{combo_bonus_pct}% damage per point."
+description = "Throws {knives} knives in every direction, each for {damage_pct}% weapon damage and piercing the first enemy it hits. Spends all Combo Points: +{combo_bonus_pct}% damage per point."
 class_id = &"rogue"
 school = &"physical"
 resource = &"energy"
@@ -18,8 +18,9 @@ cast_range = 7.0
 effect = ExtResource("2_effect")
 params = {
 "combo_bonus_pct": 20.0,
-"damage_pct": 80.0,
-"knives": 8,
+"damage_pct": 110.0,
+"knives": 10,
+"pierce": 1,
 "range": 7.0,
 "speed": 16.0
 }

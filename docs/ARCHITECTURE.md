@@ -96,6 +96,7 @@ the new screen never sees the button press that closed the old one.
 4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
    move) → if n == 25 → GAME_OVER (victory), else **INTERMISSION** (tree paused,
+   `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
    `Intermission.open(n, RunState.pending_level_ups)`, players ready with A, bots and unplugged
    devices auto-ready; after `Intermission.auto_continue_time` – default
    `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
@@ -201,6 +202,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. |
 | `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
+| `--classes=a,b,...` | Bot classes in join order (cycled; unknown ids warn and are skipped), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
@@ -314,13 +316,45 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   coin that sums every pickup while it shows – `FLOATER_TIME` 0.6 s after the last one –, XP,
   level up → `show_banner("LEVEL UP!")`) by itself; Main calls `bind_players(players)` after
   spawning and connects `WaveDirector.wave_timer_changed` → `set_wave_time` (red ≤ 5 s).
-  Compact: `UnitFrame`s ~340 px wide at 80% panel opacity (smallest text 18 px, readable at
-  720p), a compact wave / timer plaque, the XP bar as a thin segmented strip along the whole
+  Compact: `UnitFrame`s ~430 x 104 px at 80% panel opacity (smallest text 18 px, readable at
+  720p; at most `UnitFrame.MAX_HEIGHT` 112 px – CameraRig's top / bottom margins are
+  full-width bands sized for ~100 px frames, so frames grow sideways, not down), a compact
+  wave / timer plaque, the XP bar as a thin segmented strip along the whole
   bottom edge (WoW style; level at its left end, "xp / needed XP" at its right end) and a slim
   translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
   plaque. Unit frames hide when their player is freed; while downed they show the revive
   progress (teammates' or the Spirit Healer's, whichever is further along; spirit blue for the
   healer) and the hint "Go to the Spirit Healer" (`UnitFrame.GHOST_HINT`).
+  Frame layout: `[portrait | name row over (HP + resource bars | ability icons)]`, mirrored
+  for P2 / P4 (portrait outside, icons on the inner side). The bars cell is as tall as the
+  DOWNED overlay, so going down never changes the frame height.
+  - `ResourceDisplay` (VBox under the HP bar, bound to `player.abilities`): one row per
+    `ClassResource` in `resource_order`, following `ClassResource.changed` (no polling).
+    `BAR` resources: a `UiBar` in `ResourceData.color` with "value / max" (floored), a spend
+    of ≥ 10% flashes it. `PIPS` (≤ `MAX_PIPS` 10): diamonds (crystals for Soul Shards);
+    primary in a trough like a bar, a secondary row inline in `inline_holder` (the frame's
+    `name_pips`, inner end of the name row: the Rogue's combo points add no height).
+    No resources → the M1 placeholder bar (`ClassData.resource_type` / `resource_color`).
+  - `AbilityBar` (HBox of 4 `AbilityIcon`s, 42 px): slots 0 / 1 always shown, 2 / 3 once
+    slotted. `bind(runner, input)` follows `slots_changed` (rebuild: abilities, costs,
+    prompts) and `ability_cast` (flash). Per rendered frame – only while visible in the tree
+    (the HUD is hidden in the market) – `refresh()` reads **one**
+    `AbilityRunner.slot_state(i)` per slot (`{charges, charges_max, left, ratio, ready, cost}`,
+    one cached `params_for`) and pushes it into the icons; costs every `COST_REFRESH` 0.25 s.
+    Prompts: `AbilityBar.prompt_text(input, slot)` follows the device's real binding
+    (`PlayerInput.ability_button(slot)`): controllers RT / LT / RB / LB, keyboard
+    LMB / RMB / **Q** (slot 2) / **E** (slot 3); the icon spacing widens when a pill ("LMB")
+    is wider than an icon.
+  - `AbilityIcon` (Control, drawn in code, no assets): gold-rimmed square with a procedural
+    glyph (`glyph_for`: `AbilityData.icon`, then the id's words, then the school), tinted by
+    `AbilityData.color` / school; clockwise cooldown pie (`sweep_polygon`) + seconds
+    (`format_cooldown`: one decimal under 3 s), dimmed when off cooldown but unusable (red
+    cost), cast flash, charge counter (top-left, while `charges_max` > 1), cost (top-right),
+    prompt pill hanging below. `set_state` only redraws when the text / state changed or the
+    pie moved `SWEEP_REDRAW_STEP` since the last drawn ratio (smooth for long cooldowns);
+    StyleBoxes are cached. Also used by the lobby cards (abilities + Mastery line;
+    `LobbyCard.mastery_parts` splits "Name: text" and capitalises the text, which must fit
+    `MASTERY_MAX_LINES` 3 at the 1920x1080 canvas – every 16:9 window size, 720p included).
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
   ignore the input of the frame they were opened on (Game Over: the first
   `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with
@@ -488,8 +522,43 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
   gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
   NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`); bots
-  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast` (every 0.25 s); `is_ready()` is
-  the cheap HUD check.
+  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast` (every 0.25 s; one targeting
+  pass per decision). Keyboard: LMB / RMB = slots 0 / 1, Q = slot 2, E = slot 3
+  (`KeyboardInput.ability_button`); controllers use `PlayerInput.ABILITY_BUTTONS`.
+- `params_for(ability)` (base cooldown / cost / charges + `AbilityData.params` + item mods) is
+  **cached per ability and read-only** – copy it before changing anything.
+  `invalidate_params()` drops the cache: `set_slot`, `Player.apply_equipment` (item ability
+  mods), any future rank change. `slot_state(i)` gives the HUD everything from one lookup;
+  `is_ready(i)` = alive, off cooldown, affordable (no targeting); `can_cast` adds the effect's
+  own check with full targeting.
+- Charges: `params.charges` (default 1, e.g. Blink + the Band of the Blinking Star); the
+  recharge timer runs while charges are spent, each expiry returns one
+  (`charges_max` / `charges_available`; `remaining()` is 0 while a charge is left).
+  `set_cooldown(ability, s)` lets effects shorten / reset a running recharge (≤ 0 = ready).
+- Wave hooks: `begin_wave` (resources / cooldowns reset, `AbilityEffect.begin_wave`,
+  `MasteryEffect.begin_wave`; `Player.begin_wave` also clears `forced_crits` and
+  `damage_mults`) and `end_wave` (`AbilityEffect.end_wave(ctx)`, `MasteryEffect.end_wave()`,
+  via `Player.end_wave()` before the intermission: auras / buffs must not show in the
+  market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`.
+- `MasteryEffect.tick` runs every physics tick, **also while downed** (Ignite / Deadly Poison
+  DoTs keep burning like item DoTs); pets and auras check `player.is_alive()` themselves.
+  Ability effects only tick while alive.
+- Item proc `resource {amount}` (Soulreaping) → `AbilityRunner.gain_from_proc(amount)`: whole
+  points of the first pip resource (Holy Power, Soul Shards, Combo Points), else 10% of the
+  primary bar per point.
+- Player state used by abilities / bots: `stealth_left` / `is_stealthed()` (Vanish: enemies
+  neither target, touch nor shoot the player; cleared at wave start), `is_reviving()` (alive
+  and next to a downed teammate – bots must not dash away), `forced_crits`, `damage_mults`.
+- Crit DoT Masteries (Ignite, Deadly Poison) pick their enemy with `CritDot.target_for(hit)`
+  (`scenes/abilities/crit_dot.gd`): the hit enemy while it lives, else the nearest living
+  enemy within `CritDot.SPREAD_RADIUS` (2.5 m) of the corpse (`EnemyGrid.nearest`, ties in
+  group order), else nothing.
+- `RogueVanish` follows `Player.hp_changed` / `downed_changed`: it re-fades meshes whose look
+  the model replaced (the HP peel on a heal / stat change), ends at 0 HP before the downed
+  ghost look saves the materials, and ends on `begin_wave` / `end_wave`. (Cleaner later: a
+  stealth state on `OnionModel`, handled like `downed`.) `WarlockImpBolt` overrides
+  `Projectile.advance` so a ricochet keeps its new start point; `DrainLife.end_wave` stops
+  the channel.
 - Player hooks: weapon hits → `abilities.on_weapon_hit` (resources, Mastery), damage taken →
   `on_damage_taken`, kills → `on_kill`, `begin_wave` resets resources and cooldowns;
   `Player.outgoing_damage_mult(target, school, source)` multiplies weapon hits

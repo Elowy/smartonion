@@ -24,7 +24,8 @@ var _ability: AbilityData
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var player := ctx.player
-	if player == null or not player.is_inside_tree():
+	# A bot reviving a teammate stays put (the blink would break the revive).
+	if player == null or not player.is_inside_tree() or player.is_reviving():
 		return false
 	var here := player.global_position
 	var tree := player.get_tree()

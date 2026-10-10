@@ -120,6 +120,12 @@ func begin_wave(_ctx: AbilityContext) -> void:
 		stop()
 
 
+## Wave cleared: no beam hangs in the air during the intermission.
+func end_wave(_ctx: AbilityContext) -> void:
+	if is_channeling():
+		stop()
+
+
 ## Bots: hurt (HP below auto_cast_hp %) and an enemy within range.
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player

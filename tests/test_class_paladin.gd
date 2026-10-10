@@ -401,6 +401,44 @@ func test_aura_ends_when_paladin_goes_down_or_leaves() -> void:
 	p.free()
 
 
+func test_aura_ends_with_the_wave() -> void:
+	var p := _paladin()
+	p.stats.set_source(&"test", {Stats.MASTERY: 4.0})
+	var aura := p.abilities.mastery as PaladinAuraOfDevotion
+	var key := aura.source_key()
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3.0, 0, 0))
+	var own_armor := ally.stats.get_stat(Stats.ARMOR)
+	var own_spirit := p.stats.get_raw(Stats.SPIRIT)
+	p.abilities._physics_process(DT)
+	check(ally.stats.has_source(key) and p.stats.has_source(key), "applied")
+	p.end_wave()
+	check(not ally.stats.has_source(key), "the market shows the ally's own stats")
+	check(not p.stats.has_source(key), "and the Paladin's")
+	check_near(ally.stats.get_stat(Stats.ARMOR), own_armor, 0.0001, "no aura Armor in the market")
+	check_near(p.stats.get_raw(Stats.SPIRIT), own_spirit, 0.0001, "no aura Spirit in the market")
+	check_eq(aura.affected().size(), 0, "nobody inside")
+	p.begin_wave()
+	p.abilities._physics_process(DT)
+	check(ally.stats.has_source(key), "back with the first tick of the next wave")
+
+
+func test_downed_paladin_grants_no_aura_while_its_mastery_ticks() -> void:
+	var p := _paladin()
+	p.stats.set_source(&"test", {Stats.MASTERY: 4.0})
+	var aura := p.abilities.mastery as PaladinAuraOfDevotion
+	var key := aura.source_key()
+	_down(p)
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(1.0, 0, 0))
+	for i in 120:
+		p.abilities._physics_process(DT)
+	check(not ally.stats.has_source(key), "an ally next to the downed Paladin gets nothing")
+	check(not p.stats.has_source(key), "nor the Paladin")
+	aura.refresh()
+	check(not ally.stats.has_source(key), "not even on a forced refresh")
+	p.revive(0.5)
+	check(ally.stats.has_source(key), "back at the revive")
+
+
 func test_two_paladin_auras_stack() -> void:
 	var a := _paladin(Vector3.ZERO, 0)
 	var b := _paladin(Vector3(2.0, 0, 0), 1)

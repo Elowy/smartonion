@@ -23,7 +23,7 @@ unique_params = {
 "buff_duration": 3.0
 }
 }
-unique_text = "After Charge you deal 20% more damage for 3 sec."
+unique_text = "Equip: After Charge, you deal 20% more damage for 3 sec."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

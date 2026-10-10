@@ -491,6 +491,7 @@ func test_class_items_are_ability_mods() -> void:
 				"%s targets a Warrior ability" % u.id)
 		check(u.unique_params.get("mods") is Dictionary, "%s has mods" % u.id)
 		check(u.unique_text != "" and not u.unique_text.contains("{"), "%s has text" % u.id)
+		check(u.unique_text.begins_with("Equip: "), "%s: an Equip: line like the other class items" % u.id)
 	check_eq(StringName(g.unique_params["ability"]), &"whirlwind", "gauntlets: Whirlwind")
 	check_eq(StringName(w.unique_params["ability"]), &"charge", "greaves: Charge")
 	check_eq(g.slot_type, Items.SlotType.HANDS, "gauntlets: Hands")
@@ -592,6 +593,35 @@ func test_bot_charges_to_escape_when_hurt() -> void:
 	check(ch.wants_auto_cast(_ctx(p, 1)), "hurt and running away: flee")
 	input.move = Vector2(1.0, 0.0)
 	check(not ch.wants_auto_cast(_ctx(p, 1)), "never charge into them")
+
+
+func test_bot_does_not_charge_away_from_a_revive() -> void:
+	_arena()
+	var p := _hero()
+	var input := p.slot.input as ScriptedInput
+	var ch := _effect(p, 1)
+	input.move = Vector2(1.0, 0.0)
+	_real(Vector3(6.0, 0.0, 0.0))
+	check(ch.wants_auto_cast(_ctx(p, 1)), "baseline: an enemy 6 m ahead")
+	var mate := Fakes.spawn_player(world, 1, &"mage", Vector3(-1.0, 0.0, 0.5))
+	mate._go_down()
+	check(p.is_reviving(), "standing next to a downed teammate")
+	check(not ch.wants_auto_cast(_ctx(p, 1)), "no charge while reviving")
+	mate.global_position = Vector3(-6.0, 0.0, 0.0)
+	check(not p.is_reviving(), "the teammate is out of reach")
+	check(ch.wants_auto_cast(_ctx(p, 1)), "charges again")
+	mate.global_position = Vector3(-1.0, 0.0, 0.5)
+	_real(Vector3(1.5, 0.0, 0.0))
+	_real(Vector3(1.5, 0.0, 1.0))
+	_real(Vector3(0.0, 0.0, 1.5))
+	p.hp = p.max_hp() * 0.3
+	input.move = Vector2(-1.0, 0.0)
+	check(not ch.wants_auto_cast(_ctx(p, 1)), "not even to flee while reviving")
+	p.abilities.auto_cast = true
+	p.abilities._auto_timer = 0.0
+	var before := p.global_position
+	_step(p, 0.3)
+	check(p.global_position.distance_to(before) < 0.01, "the bot stayed at the revive")
 
 
 func test_bots_cast_by_themselves() -> void:

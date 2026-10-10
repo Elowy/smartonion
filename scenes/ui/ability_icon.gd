@@ -26,6 +26,8 @@ const PROMPT_FONT := 18
 const COOLDOWN_FONT := 22
 const COST_FONT := 18
 const FLASH_TIME := 0.32
+## The cooldown pie is redrawn once it moved this share of a full turn (~1.4 degrees).
+const SWEEP_REDRAW_STEP := 0.004
 ## Glyph half-extent as a share of the half icon size.
 const GLYPH_SCALE := 0.74
 const OUT := Color(0.05, 0.03, 0.02, 0.95)
@@ -104,7 +106,14 @@ var flash := 0.0
 var charges := 0
 var charges_max := 0
 
+## StyleBoxes reused by every draw (a running cooldown redraws every few frames): the fixed
+## looks are shared by all icons, the tinted ones belong to the icon and are recoloured.
+static var _shared_boxes: Dictionary[StringName, StyleBoxFlat] = {}
+var _boxes: Dictionary[StringName, StyleBoxFlat] = {}
 var _text_cache := ""
+## The sweep ratio of the last queued redraw: small per-tick steps add up until they are worth
+## a redraw (comparing with the live ratio would only redraw on whole seconds for long cooldowns).
+var _drawn_ratio := -1.0
 ## Side of the icon square (the control is a little taller: the prompt pill hangs below it).
 var _side := SIZE
 
@@ -248,7 +257,7 @@ func set_state(p_ratio: float, p_left: float, p_ready: bool) -> void:
 	var ratio := clampf(p_ratio, 0.0, 1.0)
 	var text := format_cooldown(p_left)
 	var dim := not p_ready and p_left <= 0.0
-	var changed := text != _text_cache or absf(ratio - sweep_ratio) >= 0.004 \
+	var changed := text != _text_cache or absf(ratio - _drawn_ratio) >= SWEEP_REDRAW_STEP \
 		or dim != dimmed or p_ready != usable
 	sweep_ratio = ratio
 	cooldown_left = maxf(p_left, 0.0)
@@ -256,11 +265,24 @@ func set_state(p_ratio: float, p_left: float, p_ready: bool) -> void:
 	dimmed = dim
 	_text_cache = text
 	if changed:
+		_drawn_ratio = ratio
 		queue_redraw()
 
 
 func cooldown_text() -> String:
 	return _text_cache
+
+
+## Side of the icon square (the control is PROMPT_OVERHANG taller).
+func icon_side() -> float:
+	return _side
+
+
+## Width of the button prompt pill (0 without a prompt); it may be wider than the icon.
+func prompt_width() -> float:
+	if not show_prompt or prompt == "":
+		return 0.0
+	return maxf(_text_width(prompt, PROMPT_FONT) + 12.0, 28.0)
 
 
 func is_dimmed() -> bool:
@@ -304,22 +326,15 @@ func _draw() -> void:
 	var sq := _side
 	var rect := Rect2(0, 0, sq, sq)
 	if ability == null:
-		var socket := StyleBoxFlat.new()
-		socket.bg_color = Color(0.03, 0.025, 0.02, 0.45)
-		socket.border_color = Color(UiTheme.GOLD_DARK, 0.5)
-		socket.set_border_width_all(2)
-		socket.set_corner_radius_all(5)
-		draw_style_box(socket, rect)
+		draw_style_box(_shared_box(&"socket"), rect)
 		return
 	var base := icon_color
 	_tone = base.lightened(0.35)
 	_hi = base.lightened(0.7)
 	_deep = base.darkened(0.1)
 
-	var bg := StyleBoxFlat.new()
+	var bg := _own_box(&"bg")
 	bg.bg_color = base.darkened(0.72)
-	bg.set_corner_radius_all(5)
-	bg.anti_aliasing = true
 	draw_style_box(bg, rect)
 	draw_circle(rect.get_center(), sq * 0.4, Color(base, 0.22))
 	draw_rect(Rect2(3, 3, sq - 6, sq * 0.34), Color(1, 1, 1, 0.05))
@@ -332,40 +347,26 @@ func _draw() -> void:
 		_draw_glyph(glyph)
 
 	if dimmed:
-		var dim := StyleBoxFlat.new()
-		dim.bg_color = Color(0.03, 0.035, 0.07, 0.66)
-		dim.set_corner_radius_all(5)
-		draw_style_box(dim, rect)
+		draw_style_box(_shared_box(&"dim"), rect)
 	elif sweep_ratio > 0.004:
 		# A light veil over the whole icon keeps the seconds readable on a busy glyph.
-		var veil := StyleBoxFlat.new()
-		veil.bg_color = Color(0, 0, 0, 0.3)
-		veil.set_corner_radius_all(5)
-		draw_style_box(veil, rect)
+		draw_style_box(_shared_box(&"veil"), rect)
 		var poly := sweep_polygon(rect.grow(-2.0), sweep_ratio)
 		if poly.size() >= 3:
 			draw_colored_polygon(poly, Color(0, 0, 0, 0.7))
 			if sweep_ratio < 0.996:
 				draw_line(poly[0], poly[1], Color(1, 1, 1, 0.5), 1.5)
 	if flash > 0.0:
-		var f := StyleBoxFlat.new()
+		var f := _own_box(&"flash")
 		f.bg_color = Color(1, 0.97, 0.85, 0.7 * flash)
-		f.set_corner_radius_all(5)
 		draw_style_box(f, rect)
 
 	var border := UiTheme.GOLD_BORDER if usable else (UiTheme.GOLD_DARK if sweep_ratio > 0.004 else Color(0.34, 0.3, 0.24))
-	var outer := StyleBoxFlat.new()
-	outer.draw_center = false
-	outer.border_color = Color(0, 0, 0, 0.9)
-	outer.set_border_width_all(1)
-	outer.set_corner_radius_all(6)
-	draw_style_box(outer, rect.grow(1.0))
-	var rim := StyleBoxFlat.new()
+	draw_style_box(_shared_box(&"outer"), rect.grow(1.0))
+	var rim := _own_box(&"rim")
 	rim.draw_center = false
 	rim.border_color = UiTheme.GOLD_BRIGHT if flash > 0.3 else border
 	rim.set_border_width_all(2)
-	rim.set_corner_radius_all(5)
-	rim.anti_aliasing = true
 	draw_style_box(rim, rect)
 
 	if _text_cache != "":
@@ -381,6 +382,42 @@ func _draw() -> void:
 		_text(count, Vector2(cw * 0.5 + 4.0, 11.0), COST_FONT, UiTheme.GOLD_BRIGHT if charges > 0 else UiTheme.RED.lightened(0.15), 5)
 	if show_prompt and prompt != "":
 		_draw_prompt(sq)
+
+
+## A StyleBoxFlat shared by every icon (socket, dim, veil, outer): built once, never changed.
+static func _shared_box(key: StringName) -> StyleBoxFlat:
+	var s: StyleBoxFlat = _shared_boxes.get(key)
+	if s != null:
+		return s
+	s = StyleBoxFlat.new()
+	s.set_corner_radius_all(5)
+	match key:
+		&"socket":
+			s.bg_color = Color(0.03, 0.025, 0.02, 0.45)
+			s.border_color = Color(UiTheme.GOLD_DARK, 0.5)
+			s.set_border_width_all(2)
+		&"dim":
+			s.bg_color = Color(0.03, 0.035, 0.07, 0.66)
+		&"veil":
+			s.bg_color = Color(0, 0, 0, 0.3)
+		&"outer":
+			s.draw_center = false
+			s.border_color = Color(0, 0, 0, 0.9)
+			s.set_border_width_all(1)
+			s.set_corner_radius_all(6)
+	_shared_boxes[key] = s
+	return s
+
+
+## This icon's own StyleBoxFlat [param key] (bg, flash, rim, prompt), recoloured by _draw.
+func _own_box(key: StringName) -> StyleBoxFlat:
+	var s: StyleBoxFlat = _boxes.get(key)
+	if s == null:
+		s = StyleBoxFlat.new()
+		s.set_corner_radius_all(5)
+		s.anti_aliasing = true
+		_boxes[key] = s
+	return s
 
 
 ## Polygon of the dark cooldown pie: [param ratio] of the circle, clockwise from 12 o'clock,
@@ -412,11 +449,10 @@ static func _edge_point(half: Vector2, angle: float) -> Vector2:
 
 
 func _draw_prompt(sq: float) -> void:
-	var w := maxf(_text_width(prompt, PROMPT_FONT) + 12.0, 28.0)
+	var w := prompt_width()
 	var pill := Rect2(sq * 0.5 - w * 0.5, sq - PROMPT_OVERHANG, w, PROMPT_HEIGHT)
-	var style := StyleBoxFlat.new()
+	var style := _own_box(&"prompt")
 	style.set_corner_radius_all(int(PROMPT_HEIGHT * 0.5) if not prompt_keyboard else 5)
-	style.anti_aliasing = true
 	style.set_border_width_all(2)
 	style.border_color = UiGlyph.DARK
 	if prompt_keyboard:

@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"vanish"
 display_name = "Vanish"
-description = "Melt into the shadows for {duration} sec: enemies lose track of you and cannot hit you. Your next hit is a guaranteed critical strike."
+description = "Melt into the shadows for {duration} sec: enemies lose track of you and cannot hit you, and you recover {heal_max_hp_pct}% of your max health. Your next hit is a guaranteed critical strike."
 class_id = &"rogue"
 school = &"physical"
 resource = &""
@@ -20,6 +20,7 @@ params = {
 "cooldown": 15.0,
 "duration": 2.0,
 "forced_crits": 1,
+"heal_max_hp_pct": 30.0,
 "invulnerable": 0,
 "opacity": 0.4
 }

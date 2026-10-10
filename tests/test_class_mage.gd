@@ -221,3 +221,44 @@ func test_ignite_is_cleared_at_wave_start() -> void:
 	p.on_hit_dealt(30.0, e, p.main_hand, true)
 	p.begin_wave()
 	check_eq((p.abilities.mastery as MageMastery).burning_count(), 0, "burns end with the wave")
+
+
+func test_killing_crit_ignites_the_nearest_neighbour() -> void:
+	var p := _mage()
+	p.stats.set_source(&"mastery", {Stats.MASTERY: 50.0})
+	var mastery := p.abilities.mastery as MageMastery
+	var victim := _enemy(Vector3(5, 0, 0))
+	var near := _enemy(Vector3(6.5, 0, 0.5))
+	var far := _enemy(Vector3(5, 0, 2.6))
+	victim.fake_dead = true  # the crit killed it
+	p.on_hit_dealt(20.0, victim, p.main_hand, true)
+	check_eq(mastery.burn_rate(victim), 0.0, "a corpse does not burn")
+	check_near(mastery.burn_rate(near), 10.0 / 3.0, 0.001, "the nearest living enemy burns instead")
+	check_eq(mastery.burn_rate(far), 0.0, "only one, within 2.5 m")
+	Fakes.step(p.abilities, 3.3)
+	check_near(_total(near), 10.0, 0.05, "the whole share")
+	near.fake_dead = true
+	p.on_hit_dealt(20.0, victim, p.main_hand, true)
+	check_eq(mastery.burning_count(), 0, "nobody left within 2.5 m: nothing")
+
+
+func test_ignite_keeps_burning_while_the_mage_is_downed() -> void:
+	var p := _mage()
+	p.stats.set_source(&"mastery", {Stats.MASTERY: 50.0})
+	p.stats.set_source(&"test", {Stats.DODGE: -500.0})
+	var mastery := p.abilities.mastery as MageMastery
+	var e := _enemy(Vector3(5, 0, 0))
+	p.on_hit_dealt(20.0, e, p.main_hand, true)
+	Fakes.step(p.abilities, 1.0)
+	var before := _total(e)
+	p.invulnerable_left = 0.0
+	p.take_damage(9999.0)
+	check(p.downed, "downed")
+	var mana := _mana(p).value
+	Fakes.step(p.abilities, 2.3)
+	check(_total(e) > before + 0.1, "the burn kept ticking")
+	check_near(_total(e), 10.0, 0.05, "the whole share")
+	check_eq(mastery.burning_count(), 0, "and burnt out")
+	check(_mana(p).value >= mana, "Mana is not touched by the downed ticks")
+	check_near(_mana(p).max_value(), MageMastery.mana_max_for(p.stats.get_raw(Stats.INTELLECT)), 0.001,
+			"the Mana maximum still follows Intellect")

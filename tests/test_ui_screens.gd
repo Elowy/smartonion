@@ -216,7 +216,8 @@ func test_hud_is_compact_and_readable() -> void:
 	var players: Array[Player] = [p1]
 	hud.bind_players(players)
 	var f := hud.frames[0]
-	check(f.custom_minimum_size.x <= 345.0, "unit frame ~340 px wide")
+	check(f.custom_minimum_size.x <= 440.0, "unit frame ~430 px wide")
+	check(f.get_combined_minimum_size().y <= UnitFrame.MAX_HEIGHT, "unit frame at most %s px tall" % UnitFrame.MAX_HEIGHT)
 	check(f.resource_bar.font_size >= 18, "resource label >= 18 px")
 	check(f.hp_bar.font_size >= 18, "hp label >= 18 px")
 	check(UnitFrame.SMALL_FONT >= 18, "revive hint >= 18 px")

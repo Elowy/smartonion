@@ -201,6 +201,27 @@ func test_bot_blinks_away_from_a_single_enemy_when_hurt() -> void:
 	check(_blink(p).wants_auto_cast(p.abilities.build_context(ability)), "hurt")
 
 
+func test_bot_does_not_blink_away_from_a_revive() -> void:
+	var p := _mage()
+	var ability := p.abilities.slots[1]
+	var effect := _blink(p)
+	_move(p, Vector2(1, 0))
+	_enemy(Vector3(-1.0, 0, 0.2))
+	_enemy(Vector3(-1.2, 0, -0.5))
+	check(effect.wants_auto_cast(p.abilities.build_context(ability)), "baseline: two adjacent enemies")
+	var mate := Fakes.spawn_player(world, 1, &"warrior", Vector3(0.5, 0, 1.0))
+	mate._go_down()
+	check(p.is_reviving(), "next to a downed teammate")
+	check(not effect.wants_auto_cast(p.abilities.build_context(ability)), "no blink while reviving")
+	p.hp = p.max_hp() * 0.3
+	check(not effect.wants_auto_cast(p.abilities.build_context(ability)), "not even when hurt")
+	p.abilities.auto_cast = true
+	Fakes.step(p.abilities, 0.3)
+	check(p.global_position.length() < 0.01, "the bot stayed at the revive")
+	mate.revive()
+	check(effect.wants_auto_cast(p.abilities.build_context(ability)), "blinks again once the revive is done")
+
+
 func test_bot_auto_cast_runs_through_the_runner() -> void:
 	var p := _mage()
 	p.abilities.auto_cast = true
