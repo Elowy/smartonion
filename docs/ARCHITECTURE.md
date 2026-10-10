@@ -122,3 +122,28 @@ could not complete). `--players=N` bot count, `--seed=N`, `--demo` bots without 
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
   (views: gameplay, live, onions, enemies, weapons, arena, revive). Latest gameplay view:
   `docs/screenshots/visuals_showcase.png`.
+
+## Forward compatibility: meta-progression (GDD chapter 17, milestone M9)
+
+Meta-progression ships last, but every system built before it must already allow it
+without rewrites:
+
+- **Stable content ids.** Every class / weapon / enemy / item base / affix / enchant /
+  ability / talent / glyph has a permanent `id: StringName`. Never rename a shipped id
+  (saves, unlocks and achievements reference them).
+- **Unlock gating in content pools.** Code that draws from a content pool (level-up ability
+  cards, shop offers, loot tables, lobby class list, difficulty list) filters through one
+  place – a future `Unlocks.is_unlocked(profile, id)` check (everything returns true until
+  M9). Do not iterate `Db.*` directly for player-facing pools without that hook.
+- **Run statistics as events.** Notable run events (kill, boss kill, elite kill, goblin kill,
+  item won by Need, legendary looted, player downed / revived, wave cleared, run won / lost,
+  difficulty) go through `RunState` signals / counters, so Class XP, Valor and achievements
+  can be computed from them later. Keep `RunState` per-player stats keyed by slot index.
+- **Profiles.** `PlayerSlot` will gain a `profile` (or Guest). Anything persistent must be
+  keyed by profile, never by slot index or device.
+- **Run start loadout.** Starting a run goes through one function (class, starting weapon,
+  heirloom, glyphs, transmog) so M9 can inject choices from the lobby.
+- **Versioned saves.** The end-of-wave autosave and future profile saves use a versioned
+  format (`{"version": N, ...}`) with migration, stored under `user://`.
+- **Power budget.** Balance Normal difficulty with zero meta-progression; meta bonuses add
+  at most ~10% power.

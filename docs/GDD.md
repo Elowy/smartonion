@@ -1403,8 +1403,7 @@ indulnak.
 - **automatikus mentés minden hullám végén** (a teljes menet állapota: hullám, kassza,
   XP, játékosok felszerelése, abilityk, talentek), így egy 25 hullámos menet félbehagyható és
   folytatható;
-- később meta-progresszió (eredményekkel nyíló kasztok, Legendaryk és nehézségi szintek –
-  részletek később).
+- profilonként a meta-progresszió (17. fejezet).
 
 ---
 
@@ -1421,10 +1420,96 @@ indulnak.
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
 | M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
+| M9 | Meta-progresszió (utolsó) | Profilok, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
 ---
 
-## 17. Nyitott kérdések
+## 17. Meta-progresszió (utolsó mérföldkő, M9)
+
+**Cél:** a megmaradó fejlődés főleg **új lehetőségeket** ad, nem nyers erőt. A Normal
+nehézség 0 meta-fejlődéssel is végigjátszható és élvezetes marad. A nyers erő-bónusz
+összesen **legfeljebb kb. +10%**.
+
+### 17.1 Profilok
+
+- Helyi co-opban mindenki **saját profilt** választ a lobbyban, csatlakozáskor
+  (név + kedvenc szín). Alternatíva a **Guest**: nem ment, és nem kap meta-fejlődést.
+- Minden meta-fejlődés a profilhoz kötött.
+
+### 17.2 Class Level (kasztonként 1–30)
+
+- **Class XP** jár minden menet után. Forrásai:
+  - túlélt hullámok,
+  - ölések,
+  - bossok,
+  - győzelem;
+  - a magasabb nehézség szorzót ad.
+- **Szint-jutalmak (útvonal):**
+
+  | Szint | Jutalom |
+  |---|---|
+  | 2, 4, 6, … | Új ability kerül a kaszt húzópaklijába (indulásra 4 van a 6-ból) |
+  | 3, 10, 20 | Glyph-slot (17.3) |
+  | 5 | Első Heirloom (17.4) |
+  | 8, 16, 24 | A talentfák capstone-jai fokozatosan nyílnak meg |
+  | 12 | Alternatív kezdőfegyver |
+  | 15, 25, 30 | Kozmetika (tabard, kalapváltozat, fényhatás) |
+  | 30 | Cím, pl. „*Onion, the Unbreakable*” |
+
+- **Kis nyers erő** (összesen legfeljebb kb. +10%, főleg kényelem): +1 backpack-hely,
+  +20 kezdő gold, +1 ingyen bolti reroll menetenként, +2% fő stat.
+
+### 17.3 Glyphek
+
+- **Választás:** menet előtt, a lobbyban legfeljebb **3 glyph** választható (a slotok Class
+  Levellel nyílnak).
+- **Mit tudnak:** a kaszt **képességeit módosítják**, oldalirányú választások. Például:
+  - *Glyph of Whirlwind*: behúzza az ellenségeket.
+  - *Glyph of Blink*: jégcsíkot hagy.
+  - *Glyph of the Imp*: Felhunter jön az Imp helyett.
+- **Mennyiség:** kasztonként kb. 8 glyph, Class Levellel és achievementekkel nyílnak.
+
+### 17.4 Heirloomok
+
+- **Menetenként 1 heirloom-slot:** egy megmaradó itemmel lehet indulni.
+- **Skálázás:** a hullámmal nő, de gyengébb az Artifactnál; a kényelmes kezdést szolgálja.
+- **Szerzés és fejlesztés:** Class Level mérföldkövekből és achievementekből jönnek, és
+  **Valorért** fejleszthetők.
+
+### 17.5 Fiók-szintű fejlődés
+
+- **Achievementek:** pontokkal és címekkel. Például:
+  - „Win without anyone going down”,
+  - „Need-roll a Legendary”,
+  - „Kill 3 Loot Goblins in one run”.
+- **Feloldások achievementekből:**
+  - új kasztok (**Hunter**, **Shaman**),
+  - új Legendaryk a loot-készletbe,
+  - nehézségi szintek kasztonként (Normal megnyerése → Heroic, Heroic → Mythic).
+- **Transmog-gyűjtemény:**
+  - minden valaha felvett item kinézete elmentődik,
+  - a lobbyban kozmetikailag ezekbe lehet öltöztetni a hagymát.
+
+### 17.6 Valor és „The Onion Patch”
+
+- **Valor:** menetenként kapott megmaradó pénz.
+- **The Onion Patch:** hagymakert-hub, kasztonként egy trainer-NPC-vel. Itt Valorért
+  heirloom-fejlesztés, glyphek és kozmetika vehető.
+- **Megvalósítás:** **először menü**, később bejárható kis kert.
+
+### 17.7 Amire a fejlesztés közben már most figyelünk
+
+Az M9 előtti rendszerek úgy épülnek, hogy a meta-progresszió később átírás nélkül
+ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
+- stabil tartalom-azonosítók,
+- feloldás-ellenőrzés a tartalom-készletekben,
+- menet-statisztika események,
+- verziózott mentés,
+- profilhoz köthető beállítások.
+
+---
+
+## 18. Nyitott kérdések
 
 1. A 14 hiányzó talentfa részletes kidolgozása most, vagy a fejlesztés közben (M5)?
 
@@ -1443,7 +1528,7 @@ indulnak.
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
 | Mentés | Automatikus, minden hullám végén |
-| Meta-progresszió | Eredményekkel nyíló tartalom (B opció) – részletek később |
+| Meta-progresszió | Profilok, Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
 | Zene | Egyelőre nincs |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
