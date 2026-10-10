@@ -8,7 +8,9 @@ extends CharacterBody3D
 ## &"weapon:main" and &"weapon:off" (WeaponData.bonus_stats). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a slow ghost that
 ## does not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME
-## seconds revives them.
+## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
+## Movement respects the arena walls and, on the shared screen, the camera's walk rect
+## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 
 signal hp_changed(hp: float, max_hp: float)
 signal downed_changed(is_downed: bool)
@@ -21,7 +23,11 @@ const RADIUS := 0.45
 ## Height (metres) where projectiles / damage numbers originate.
 const CHEST_HEIGHT := 0.7
 const REVIVE_RADIUS := 1.8
-const REVIVE_TIME := 3.0
+## Seconds a single living teammate needs to stand next to a ghost to revive it (GDD 1).
+const REVIVE_TIME := 5.0
+## Every additional living reviver inside REVIVE_RADIUS adds this much revive speed
+## (GDD 1: 1 reviver = 1x, 2 = 1.5x, 3 = 2x).
+const REVIVE_SPEED_PER_EXTRA_REVIVER := 0.5
 const INVULNERABLE_AFTER_HIT := 0.35
 
 ## Collision capsule height (the onion is ~1.3 m tall).
@@ -68,6 +74,8 @@ var off_hand: WeaponData
 var weapons: Array[WeaponRunner] = []
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
+## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
+var reviver_count := 0
 ## Remaining invulnerability (i-frames) in seconds.
 var invulnerable_left := 0.0
 
@@ -234,6 +242,7 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 		return
 	downed = false
 	revive_progress = 0.0
+	reviver_count = 0
 	_regen_accum = 0.0
 	var nobody: Array[Player] = []
 	_update_channelers(nobody)
@@ -245,6 +254,22 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 		model.set_downed(false)
 	_hp_updated()
 	downed_changed.emit(false)
+
+
+## Revive speed multiplier for [param revivers] living teammates inside REVIVE_RADIUS
+## (0 = nobody: the progress decays instead).
+static func revive_speed(revivers: int) -> float:
+	if revivers <= 0:
+		return 0.0
+	return 1.0 + REVIVE_SPEED_PER_EXTRA_REVIVER * float(revivers - 1)
+
+
+## Seconds until the revive completes at the current speed (-1 when nobody revives).
+func revive_seconds_left() -> float:
+	var speed := revive_speed(reviver_count)
+	if not downed or speed <= 0.0:
+		return -1.0
+	return maxf(0.0, REVIVE_TIME - revive_progress) / speed
 
 
 ## Current top speed in m/s (halved while downed).
@@ -290,7 +315,19 @@ func _update_movement(delta: float) -> void:
 	var motion := velocity * delta
 	if arena != null:
 		motion = _clamp_motion_to_arena(arena, motion)
+	# Shared screen (GDD 13): the screen edge of the fully zoomed-out camera is a wall.
+	var walk := _camera_walk_rect(arena)
+	var screen_wall := walk.size.x >= 0.0
+	var start := global_position if screen_wall else Vector3.ZERO
+	if screen_wall:
+		motion = _clamp_motion_to_walk_rect(walk, motion)
 	_move_body(motion)
+	if screen_wall:
+		# Sliding along a prop may deflect the motion past the screen edge: undo that part.
+		var moved := global_position
+		var kept := keep_inside_from(start, moved, walk)
+		if kept != moved:
+			global_position = kept
 	if arena != null:
 		# Safety net (spawn outside, physics push-out ...).
 		var here := global_position
@@ -324,6 +361,46 @@ func _clamp_motion_to_arena(arena: Arena, motion: Vector3) -> Vector3:
 	if cz != dest.z:
 		velocity.z = 0.0
 	return Vector3(cx - here.x, motion.y, cz - here.z)
+
+
+## Shared screen (GDD 13): the rectangle (XZ) this player may walk in so it never leaves the
+## screen once the camera is fully zoomed out ([method CameraRig.get_walk_rect]). A rect with
+## a negative size means "no limit" (no arena / camera, e.g. in unit tests).
+func _camera_walk_rect(arena: Arena) -> Rect2:
+	if arena == null or not is_instance_valid(arena.camera) or not arena.camera.is_inside_tree():
+		return Rect2(0.0, 0.0, -1.0, -1.0)
+	return arena.camera.get_walk_rect(self)
+
+
+## Clamps [param motion] to [param walk] (see [method clamp_motion_to_rect]) and stops the
+## velocity component that pushes against the screen edge, so the player slides along it.
+func _clamp_motion_to_walk_rect(walk: Rect2, motion: Vector3) -> Vector3:
+	var clamped := clamp_motion_to_rect(global_position, motion, walk)
+	if clamped.x != motion.x:
+		velocity.x = 0.0
+	if clamped.z != motion.z:
+		velocity.z = 0.0
+	return clamped
+
+
+## [param motion] from [param here] limited so the destination stays inside [param rect]
+## (XZ). A body already outside the rect (the camera moved, a teleport ...) is never pushed:
+## it may stay where it is or walk back in, but not further out. Y is left untouched.
+static func clamp_motion_to_rect(here: Vector3, motion: Vector3, rect: Rect2) -> Vector3:
+	var to := here + motion
+	var dest := keep_inside_from(here, to, rect)
+	# Untouched axes keep the exact motion (no float drift from the round trip).
+	var mx := motion.x if dest.x == to.x else dest.x - here.x
+	var mz := motion.z if dest.z == to.z else dest.z - here.z
+	return Vector3(mx, motion.y, mz)
+
+
+## [param to] limited (per axis, XZ) so it is inside [param rect] or, where [param from] was
+## already outside, no further out than [param from].
+static func keep_inside_from(from: Vector3, to: Vector3, rect: Rect2) -> Vector3:
+	var x := clampf(to.x, minf(rect.position.x, from.x), maxf(rect.end.x, from.x))
+	var z := clampf(to.z, minf(rect.position.y, from.z), maxf(rect.end.y, from.z))
+	return Vector3(x, to.y, z)
 
 
 ## Moves by [param motion], sliding along walls. Uses move_and_collide so the motion is
@@ -365,23 +442,24 @@ func _update_regen(delta: float) -> void:
 
 func _update_revive(delta: float) -> void:
 	var revivers := _revivers()
+	reviver_count = revivers.size()
 	if not revivers.is_empty():
-		revive_progress = minf(REVIVE_TIME, revive_progress + delta)
+		# Taking damage does not interrupt the revive (GDD 1): only standing in the circle counts.
+		revive_progress = minf(REVIVE_TIME, revive_progress + delta * revive_speed(reviver_count))
 	else:
+		# The cast bar drains slowly instead of resetting (GDD 1).
 		revive_progress = maxf(0.0, revive_progress - REVIVE_DECAY_PER_SECOND * delta)
 	_update_channelers(revivers)
 	if model != null:
 		# GDD 1: "Resurrecting" cast bar in the reviver's colour with the time left.
 		var color := OnionModel.REVIVE_COLOR
-		var seconds_left := -1.0
-		if not revivers.is_empty():
-			seconds_left = REVIVE_TIME - revive_progress
-			if revivers[0].slot != null:
-				color = revivers[0].slot.color
-		model.set_revive_progress(revive_progress / REVIVE_TIME, color, seconds_left)
+		if not revivers.is_empty() and revivers[0].slot != null:
+			color = revivers[0].slot.color
+		model.set_revive_progress(revive_progress / REVIVE_TIME, color, revive_seconds_left())
 	if revive_progress >= REVIVE_TIME - 0.0001:
+		var feet := global_position
 		revive(REVIVE_HP_RATIO)
-		Vfx.resurrect_column(global_position)
+		Vfx.resurrect_column(feet)
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
 
 
@@ -430,6 +508,7 @@ func _update_channelers(revivers: Array[Player]) -> void:
 func _go_down() -> void:
 	downed = true
 	revive_progress = 0.0
+	reviver_count = 0
 	_regen_accum = 0.0
 	invulnerable_left = 0.0
 	if model != null:

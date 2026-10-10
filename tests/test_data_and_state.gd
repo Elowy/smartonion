@@ -48,9 +48,22 @@ func test_shared_xp_levels() -> void:
 
 
 func test_wave_duration() -> void:
-	check_eq(RunState.wave_duration(1), 20.0)
-	check_eq(RunState.wave_duration(5), 40.0)
-	check_eq(RunState.wave_duration(25), 60.0)
+	# GDD 1: waves 1-10 = min(60, 20 + 5 * (w - 1)); above 10: +10 s per wave.
+	check_eq(RunState.wave_duration(1), 20.0, "wave 1")
+	check_eq(RunState.wave_duration(5), 40.0, "wave 5")
+	check_eq(RunState.wave_duration(8), 55.0, "wave 8")
+	check_eq(RunState.wave_duration(9), 60.0, "wave 9 hits the cap")
+	check_eq(RunState.wave_duration(10), 60.0, "wave 10 capped")
+	check_eq(RunState.wave_duration(11), 70.0, "wave 11")
+	check_eq(RunState.wave_duration(15), 110.0, "wave 15")
+	check_eq(RunState.wave_duration(20), 160.0, "wave 20")
+	check_eq(RunState.wave_duration(25), 210.0, "wave 25")
+	var total := 0.0
+	for w in range(1, RunState.TOTAL_WAVES + 1):
+		total += RunState.wave_duration(w)
+		if w > 1:
+			check(RunState.wave_duration(w) >= RunState.wave_duration(w - 1), "never shorter than the previous wave (%d)" % w)
+	check_near(total / 60.0, 42.0, 1.0, "a full run is ~42 minutes of fighting")
 
 
 func test_join_rejects_duplicate_device_and_caps_at_four() -> void:

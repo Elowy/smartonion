@@ -144,7 +144,11 @@ func record_damage(player_index: int, amount: float) -> void:
 
 # --- Wave / co-op scaling (GDD 9) -------------------------------------------
 
+## Seconds of wave [param w] (GDD 1): waves 1-10 last 20 + 5 * (w - 1) s, at most 60 s
+## (waves 9 and 10 are 60 s); every wave above 10 adds 10 s (11 = 70 s ... 25 = 210 s).
 static func wave_duration(w: int) -> float:
+	if w > 10:
+		return 60.0 + 10.0 * (w - 10)
 	return minf(60.0, 20.0 + 5.0 * (w - 1))
 
 
