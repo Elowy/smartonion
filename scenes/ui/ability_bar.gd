@@ -103,7 +103,7 @@ func description_for(slot: int) -> String:
 	return AbilityIcon.format_description(runner.slots[slot], runner.params_for(runner.slots[slot]))
 
 
-## Pushes cooldown / readiness of every slot into the icons. [param with_costs] also re-reads
+## Pushes cooldown / readiness (and charges) of every slot into the icons. [param with_costs] also re-reads
 ## the costs (done every COST_REFRESH seconds by the per-frame update).
 func refresh(with_costs: bool = false) -> void:
 	if not is_instance_valid(runner):
@@ -114,6 +114,10 @@ func refresh(with_costs: bool = false) -> void:
 			continue
 		if with_costs:
 			icon.set_cost(runner.cost_of(icon.ability))
+		var effect := runner.effect_for(icon.ability)
+		if effect != null and effect.has_method(&"charges_max"):
+			# Abilities with charges (Blink with Band of the Blinking Star) publish them.
+			icon.set_charges(int(effect.call(&"charges_available")), int(effect.call(&"charges_max")))
 		var left := runner.remaining(i)
 		icon.set_state(runner.cooldown_ratio(i), left, left <= 0.0 and runner.is_ready(i))
 

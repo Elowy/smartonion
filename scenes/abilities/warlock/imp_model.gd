@@ -8,8 +8,8 @@ extends Node3D
 ## Mats.toon_vc(); the fireball uses a cached Mats.glow material. Animation (hover bob, wing
 ## flaps, fireball flicker, throw) only moves / scales nodes – no per-node materials.
 
-const HOVER_HEIGHT := 0.62
-const MODEL_SCALE := 1.0
+const HOVER_HEIGHT := 0.6
+const MODEL_SCALE := 0.85
 const TURN_SPEED := 10.0
 const FLAP_SPEED := 17.0
 const CAST_TIME := 0.3

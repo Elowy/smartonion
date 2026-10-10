@@ -19,7 +19,7 @@ enum Glyph {
 	RAIN_OF_FIRE, DRAIN, FIRE, FROST, ARCANE, HOLY, SKULL, NATURE, SHIELD, HAMMER, BOLT, BOMB,
 }
 
-const SIZE := 44.0
+const SIZE := 50.0
 const PROMPT_HEIGHT := 22.0
 const PROMPT_OVERHANG := 11.0
 const PROMPT_FONT := 18
@@ -100,6 +100,9 @@ var usable := true
 var dimmed := false
 ## 0..1, 1 right after a cast.
 var flash := 0.0
+## Charge counter (Blink with a second charge): shown top-left while charges_max > 1.
+var charges := 0
+var charges_max := 0
 
 var _text_cache := ""
 ## Side of the icon square (the control is a little taller: the prompt pill hangs below it).
@@ -223,6 +226,14 @@ func set_ability(a: AbilityData, p_cost: float = -1.0, p_cost_color: Color = Col
 func set_cost(p_cost: float) -> void:
 	if not is_equal_approx(p_cost, cost):
 		cost = p_cost
+		queue_redraw()
+
+
+## Charge counter; [param p_max] <= 1 hides it.
+func set_charges(p_charges: int, p_max: int) -> void:
+	if p_charges != charges or p_max != charges_max:
+		charges = p_charges
+		charges_max = p_max
 		queue_redraw()
 
 
@@ -359,6 +370,10 @@ func _draw() -> void:
 		var color := UiTheme.RED.lightened(0.15) if dimmed else cost_color.lightened(0.5)
 		var w := _text_width(label, COST_FONT)
 		_text(label, Vector2(sq - w * 0.5 - 3.0, 11.0), COST_FONT, color, 5)
+	if charges_max > 1:
+		var count := str(charges)
+		var cw := _text_width(count, COST_FONT)
+		_text(count, Vector2(cw * 0.5 + 4.0, 11.0), COST_FONT, UiTheme.GOLD_BRIGHT if charges > 0 else UiTheme.RED.lightened(0.15), 5)
 	if show_prompt and prompt != "":
 		_draw_prompt(sq)
 

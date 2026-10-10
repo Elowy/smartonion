@@ -151,7 +151,7 @@ static func _sphere(r: float) -> Mesh:
 		var m := SphereMesh.new()
 		m.radius = r
 		m.height = r * 2.0
-		m.radial_segments = 10
-		m.rings = 5
+		m.radial_segments = 16
+		m.rings = 8
 		_meshes[key] = m
 	return _meshes[key]

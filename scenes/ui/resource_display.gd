@@ -12,7 +12,7 @@ extends VBoxContainer
 
 const BAR_HEIGHT := 21.0
 const SECONDARY_BAR_HEIGHT := 18.0
-const PIPS_HEIGHT := 17.0
+const PIPS_HEIGHT := 19.0
 ## More pips than this are shown as a bar instead.
 const MAX_PIPS := 10
 ## A drop of at least this share of the maximum flashes the bar (an ability was paid for).
@@ -25,15 +25,16 @@ var is_placeholder := false
 var _rows: Array[Row] = []
 
 
-## One displayed resource.
+## One displayed resource. It must not own the ClassResource: the resource's `changed` signal
+## holds the callable bound to this row, so a strong reference back would be a RefCounted cycle
+## (a leaked resource at exit whenever the HUD is freed without unbind()).
 class Row extends RefCounted:
 	var id: StringName
 	var data: ResourceData
-	var resource: ClassResource
+	var resource_ref: WeakRef
 	var bar: UiBar
 	var pips: Pips
 	var last_value := 0.0
-	var callable: Callable
 
 
 static func create(p_font_size: int = UiTheme.FONT_SMALL) -> ResourceDisplay:
@@ -72,10 +73,27 @@ func bind(runner: AbilityRunner, class_data: ClassData = null) -> void:
 		_add_placeholder(class_data)
 
 
-func unbind() -> void:
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_disconnect_all()
+
+
+func _disconnect_all() -> void:
 	for row in _rows:
-		if row.resource != null and row.callable.is_valid() and row.resource.changed.is_connected(row.callable):
-			row.resource.changed.disconnect(row.callable)
+		var res := row.resource_ref.get_ref() as ClassResource if row.resource_ref != null else null
+		if res == null:
+			continue
+		# Bound callables compare equal by target, method and bound arguments. The row must not
+		# keep the callable itself: callable -> row -> callable would be a cycle that keeps the
+		# row's ResourceData alive forever.
+		var changed := _on_changed.bind(row)
+		if res.changed.is_connected(changed):
+			res.changed.disconnect(changed)
+
+
+func unbind() -> void:
+	_disconnect_all()
+	for row in _rows:
 		var node: Control = row.bar if row.bar != null else row.pips
 		if node != null:
 			if node.get_parent() == self:
@@ -117,7 +135,7 @@ func _add_row(res: ClassResource) -> void:
 	var row := Row.new()
 	row.id = d.id
 	row.data = d
-	row.resource = res
+	row.resource_ref = weakref(res)
 	var primary := _rows.is_empty()
 	if uses_pips(d):
 		row.pips = Pips.create(d, primary)
@@ -128,8 +146,7 @@ func _add_row(res: ClassResource) -> void:
 		add_child(row.bar)
 	row.last_value = res.value
 	_apply(row, res.value, res.max_value(), false)
-	row.callable = _on_changed.bind(row)
-	res.changed.connect(row.callable)
+	res.changed.connect(_on_changed.bind(row))
 	_rows.append(row)
 
 
@@ -229,9 +246,12 @@ class Pips extends Control:
 			tr.set_border_width_all(1)
 			tr.set_corner_radius_all(3)
 			draw_style_box(tr, Rect2(Vector2.ZERO, size))
-		var gap := minf(h * 1.15, (size.x - 12.0) / float(count) - h * 0.5) if trough else h * 0.55
-		gap = maxf(gap, h * 0.35)
-		var step := h * (0.62 if shard else 1.0) + gap
+		var step: float
+		if trough:
+			# Evenly spread over the trough, like the segments of a bar.
+			step = (size.x - 16.0) / float(count)
+		else:
+			step = h * (0.62 if shard else 1.0) + h * 0.6
 		var total := step * (count - 1)
 		var cx := size.x * 0.5 - total * 0.5
 		var cy := size.y * 0.5
@@ -259,10 +279,10 @@ class Pips extends Control:
 			draw_polyline(rim, Color(color.lightened(0.5), 0.9), 1.2, true)
 		else:
 			draw_colored_polygon(_shape(c, rx + 1.5, ry + 1.5), dark)
-			draw_colored_polygon(pts, Color(color.darkened(0.8), 0.9))
+			draw_colored_polygon(pts, Color(color.darkened(0.7), 0.95))
 			var rim := pts.duplicate()
 			rim.append(pts[0])
-			draw_polyline(rim, Color(color.darkened(0.35), 0.7), 1.2, true)
+			draw_polyline(rim, Color(color.darkened(0.1), 0.85), 1.4, true)
 
 	func _shape(c: Vector2, rx: float, ry: float) -> PackedVector2Array:
 		if shard:

@@ -24,10 +24,6 @@ var _base_shard_data: ResourceData
 var _equipment: Equipment
 
 
-func setup(p_player: Player) -> void:
-	super.setup(p_player)
-
-
 ## Damage multiplier of Demonic Pact for DoTs and pets (1 + Mastery x 2%).
 func pact_mult() -> float:
 	return maxf(0.0, 1.0 + mastery() * PCT_PER_POINT / 100.0)
