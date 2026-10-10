@@ -14,6 +14,7 @@
 |---|---|
 | Cím | **SmartOnion** |
 | Hősök | **Hagymák WoW-páncélban** (mint a Brotato krumplijai) |
+| Nyelv | A játék felülete **angol** (WoW-terminológia); a szövegek kulcsokból jönnek, így később lokalizálható |
 | Motor | **Godot 4** (legfrissebb stabil 4.x, a projekt indításakor rögzítjük), GDScript |
 | Platform | Csak **PC** (Windows / Linux, később Steam) |
 | Co-op | Helyi, **1–4 játékos**, kontrollerrel (+1 opcionális billentyű+egér) |
@@ -964,9 +965,7 @@ indulnak.
 
 ## 17. Nyitott kérdések
 
-1. **Nyelv:** a felület angol legyen (WoW-terminológia, javasolt), magyar, vagy mindkettő
-   (lokalizációval)?
-2. A 14 hiányzó talentfa részletes kidolgozása most, vagy a fejlesztés közben (M5)?
+1. A 14 hiányzó talentfa részletes kidolgozása most, vagy a fejlesztés közben (M5)?
 
 ### Lezárt döntések
 
@@ -976,3 +975,4 @@ indulnak.
 | Gold | Egyetlen közös pénztárca, bárki költhet belőle |
 | Szintlépés | 5 kártya, ability és stat keverve, goldért rerollolható |
 | Cím | SmartOnion |
+| Nyelv | Angol |
