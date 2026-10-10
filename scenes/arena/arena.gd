@@ -16,6 +16,9 @@ const WALL_HEIGHT := 8.0
 const WALL_THICKNESS := 4.0
 ## How far beyond the walls the camera is allowed to look (see CameraRig).
 const VIEW_MARGIN := 8.0
+## Smaller margin on the near (south, +Z) side: the camera looks from the south, so
+## showing less of the outside there keeps more of the arena on screen.
+const VIEW_MARGIN_SOUTH := 4.0
 ## How far beyond the walls the forest decoration extends.
 const DECOR_MARGIN := 24.0
 const DECOR_SEED := 20240611
@@ -154,9 +157,9 @@ func get_bounds() -> Rect2:
 	return Rect2(-SIZE / 2.0, SIZE)
 
 
-## Ground rectangle the camera may show (bounds + VIEW_MARGIN).
+## Ground rectangle the camera may show (bounds + VIEW_MARGIN, VIEW_MARGIN_SOUTH at +Z).
 func get_view_rect() -> Rect2:
-	return get_bounds().grow(VIEW_MARGIN)
+	return get_bounds().grow_individual(VIEW_MARGIN, VIEW_MARGIN, VIEW_MARGIN, VIEW_MARGIN_SOUTH)
 
 
 ## Rectangle covered by decoration (bounds + DECOR_MARGIN).

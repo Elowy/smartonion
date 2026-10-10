@@ -110,3 +110,20 @@ func test_entities_host_vfx() -> void:
 	var a := _make()
 	Vfx.hit_spark(Vector3(1, 0.5, 1), Color.WHITE)
 	check_eq(a.entities.get_child_count(), 1, "vfx parented to the entities root")
+
+
+func test_view_rect_shows_less_outside_towards_the_camera() -> void:
+	var a := _make(false)
+	var b := a.get_bounds()
+	var v := a.get_view_rect()
+	check_near(b.position.y - v.position.y, Arena.VIEW_MARGIN, 0.0001, "north margin")
+	check_near(v.end.y - b.end.y, Arena.VIEW_MARGIN_SOUTH, 0.0001, "south margin")
+	check_near(b.position.x - v.position.x, Arena.VIEW_MARGIN, 0.0001, "west margin")
+	check(Arena.VIEW_MARGIN_SOUTH < Arena.VIEW_MARGIN, "near side margin is smaller")
+	# A lone player at the south wall stays on screen with the camera clamped to the view rect.
+	var at_wall: Array[Vector3] = [Vector3(0, 0, b.end.y - 0.5)]
+	var f := CameraRig.compute_framing(at_wall, 16.0 / 9.0, v)
+	var ext := CameraRig.ground_extents(f["distance"], 16.0 / 9.0)
+	var target: Vector3 = f["target"]
+	check(target.z + ext.z <= v.end.y + 0.001, "view stays inside the rect")
+	check(target.z + ext.z >= at_wall[0].z + CameraRig.FRAME_MARGIN - 0.001, "player keeps its frame margin")

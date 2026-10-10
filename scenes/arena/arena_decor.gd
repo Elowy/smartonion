@@ -49,14 +49,15 @@ static func build_wall_visual(bounds: Rect2, seed_value: int) -> Node3D:
 	# Runs: north (with a gap for the gate), south, west, east.
 	_wall_run(k, Vector3(x0, 0, z0), Vector3(-GATE_HALF_WIDTH - 0.5, 0, z0), rng)
 	_wall_run(k, Vector3(GATE_HALF_WIDTH + 0.5, 0, z0), Vector3(x1, 0, z0), rng)
-	_wall_run(k, Vector3(x0, 0, z1), Vector3(x1, 0, z1), rng)
+	# The south run sits between the camera and the action: keep it low.
+	_wall_run(k, Vector3(x0, 0, z1), Vector3(x1, 0, z1), rng, true)
 	_wall_run(k, Vector3(x0, 0, z0), Vector3(x0, 0, z1), rng)
 	_wall_run(k, Vector3(x1, 0, z0), Vector3(x1, 0, z1), rng)
 	# Pillars along the runs.
 	for x in _steps(x0, x1, 8.5):
 		if absf(x) > GATE_HALF_WIDTH + 1.0:
 			_pillar(k, Vector3(x, 0, z0), rng)
-		_pillar(k, Vector3(x, 0, z1), rng)
+		_pillar(k, Vector3(x, 0, z1), rng, true)
 	for z in _steps(z0, z1, 7.5):
 		_pillar(k, Vector3(x0, 0, z), rng)
 		_pillar(k, Vector3(x1, 0, z), rng)
@@ -103,11 +104,12 @@ static func _stone_color(rng: RandomNumberGenerator) -> Color:
 	return c
 
 
-static func _wall_run(k: MeshKit, a: Vector3, b: Vector3, rng: RandomNumberGenerator) -> void:
+static func _wall_run(k: MeshKit, a: Vector3, b: Vector3, rng: RandomNumberGenerator, low: bool = false) -> void:
 	var length := a.distance_to(b)
 	var dir := (b - a) / maxf(length, 0.001)
 	var yaw := atan2(dir.x, dir.z)
-	var rows := [[0.0, 0.36], [0.36, 0.32]]
+	var rows := [[0.0, 0.34]] if low else [[0.0, 0.36], [0.36, 0.32]]
+	var cap_y := 0.4 if low else 0.74
 	for r in rows.size():
 		var y: float = rows[r][0]
 		var h: float = rows[r][1]
@@ -124,16 +126,17 @@ static func _wall_run(k: MeshKit, a: Vector3, b: Vector3, rng: RandomNumberGener
 	while d2 < length - 0.05:
 		var l := minf(rng.randf_range(0.7, 1.2), length - d2)
 		var c := a + dir * (d2 + l * 0.5)
-		k.add_box(Vector3(WALL_DEPTH + 0.1, 0.13, l - 0.04), Transform3D(Basis(Vector3.UP, yaw), c + Vector3(0, 0.74, 0)), STONE.darkened(rng.randf_range(0.0, 0.12)))
+		k.add_box(Vector3(WALL_DEPTH + 0.1, 0.13, l - 0.04), Transform3D(Basis(Vector3.UP, yaw), c + Vector3(0, cap_y, 0)), STONE.darkened(rng.randf_range(0.0, 0.12)))
 		if rng.randf() < 0.22:
-			k.add_sphere(rng.randf_range(0.18, 0.3), MeshKit.xf(c + Vector3(rng.randf_range(-0.1, 0.1), 0.8, 0), Vector3.ZERO, Vector3(1.4, 0.45, 1.0)), MOSS.darkened(rng.randf_range(0.0, 0.15)), 8, 4)
+			k.add_sphere(rng.randf_range(0.18, 0.3), MeshKit.xf(c + Vector3(rng.randf_range(-0.1, 0.1), cap_y + 0.06, 0), Vector3.ZERO, Vector3(1.4, 0.45, 1.0)), MOSS.darkened(rng.randf_range(0.0, 0.15)), 8, 4)
 		d2 += l
 
 
-static func _pillar(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
-	k.add_box(Vector3(0.95, 1.15, 0.95), MeshKit.xf(p + Vector3(0, 0.575, 0), Vector3(0, rng.randf_range(-3, 3), 0)), STONE.darkened(rng.randf_range(0.02, 0.12)))
-	k.add_box(Vector3(1.1, 0.16, 1.1), MeshKit.xf(p + Vector3(0, 1.22, 0)), STONE.lightened(0.06))
-	k.add_cylinder(0.0, 0.45, 0.32, MeshKit.xf(p + Vector3(0, 1.46, 0), Vector3(0, 45, 0)), STONE.darkened(0.05), 4)
+static func _pillar(k: MeshKit, p: Vector3, rng: RandomNumberGenerator, low: bool = false) -> void:
+	var h := 0.62 if low else 1.15
+	k.add_box(Vector3(0.95, h, 0.95), MeshKit.xf(p + Vector3(0, h * 0.5, 0), Vector3(0, rng.randf_range(-3, 3), 0)), STONE.darkened(rng.randf_range(0.02, 0.12)))
+	k.add_box(Vector3(1.1, 0.16, 1.1), MeshKit.xf(p + Vector3(0, h + 0.07, 0)), STONE.lightened(0.06))
+	k.add_cylinder(0.0, 0.45, 0.32, MeshKit.xf(p + Vector3(0, h + 0.31, 0), Vector3(0, 45, 0)), STONE.darkened(0.05), 4)
 
 
 static func _tower(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
