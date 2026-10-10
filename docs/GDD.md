@@ -233,9 +233,74 @@ Minden kaszt tartalmaz:
 
 ### 3.6 Bővíthetőség
 
-Új kaszt (pl. Hunter, Priest, Druid, Shaman, Death Knight) = új **ClassData** adatfájl
-+ a két képesség saját logikája. A Mail páncéltípus már most létezik a későbbi
-Hunter / Shaman miatt.
+Új kaszt (pl. Hunter, Shaman, Priest, Druid, Death Knight) = új **ClassData** adatfájl
++ a két képesség saját logikája. A Mail páncéltípus már most létezik a Hunter és a
+Shaman miatt.
+
+### 3.7 Tervezett kasztok (backlog, M8): Hunter és Shaman
+
+Mindkettő **Mail** páncélt hord, és a többi kaszttal azonos felépítésű:
+- 2 alap képesség,
+- erőforrás,
+- Mastery,
+- 6 saját ability,
+- 3 talentfa,
+- tier set,
+- Artifact.
+
+#### Hunter
+| | |
+|---|---|
+| Szerep | Távolsági sebző + állandó **pet** |
+| Hagyma | **Salottahagyma** (rézbarna), tollas vadászkalap, szőrmés Mail-vállvért, tegez a hátán |
+| Páncél | Mail |
+| Kezdőfegyver | Bow |
+| Jártasság | Bow, Gun, Crossbow, Polearm, Axe, Sword, Dagger, **Dual Wield** |
+| Alap | +2 Agility, állandó **pet** (a lobbyban választható: farkas / vaddisznó / bagoly), **−3 Max HP** |
+| Erőforrás | **Focus** (0–100), +10 / mp |
+| Képesség 1 | **Multi-Shot** – 40 Focus: 5 nyíl legyezőben |
+| Képesség 2 | **Disengage** – 8 mp CD: hátraugrás, a közeli ellenségek 2 mp-ig lassulnak |
+| Mastery | **Master of Beasts** – +% pet-sebzés pontonként |
+| Pet | Magától támad, a vadász Stamina-jával és Agility-jével skálázódik. Ha meghal, a hullám végén feltámad |
+
+**Ability-készlet:**
+
+| Ability | Típus | Hatás |
+|---|---|---|
+| Aimed Shot | Active | Rövid célzás, nagy sebzésű, mindent átütő lövés |
+| Volley | Active | Nyílzápor egy területre, 4 mp |
+| Rapid Fire | Active | 4 mp-ig +40% Haste |
+| Explosive Trap | Auto | Csapdát tesz le, ami robban, ha ellenség lép bele |
+| Kill Command | Auto | A pet nagy csapást mér a legerősebb közeli ellenségre |
+| Feign Death | Active | Az ellenségek 2 mp-ig elveszítik a célt (menekülés) |
+
+#### Shaman
+| | |
+|---|---|
+| Szerep | Hibrid: elemi varázsló / közelharci / gyógyító **totemekkel** |
+| Hagyma | **Fokhagyma** (fehér-lila), faragott fa maszk, csontgyöngyök, kis totem a hátán |
+| Páncél | Mail |
+| Kezdőfegyver | Mace + Shield |
+| Jártasság | Mace, Axe, Dagger, Staff, Fist Weapon, Shield, Two-Hand Mace / Axe; **Dual Wield csak az Enhancement fa talentjével** |
+| Alap | +2 Armor, +3 Spirit, **−5% Speed** |
+| Erőforrás | **Maelstrom** (0–100): +5 minden fegyvertalálatnál és varázslatnál |
+| Képesség 1 | **Chain Lightning** – 30 Maelstrom: villám, ami 4 célpont között ugrál |
+| Képesség 2 | **Totemic Call** – 12 mp CD: totemet tesz le a lába elé. Az elemek körben váltják egymást: **Fire** (lövöldöző totem) → **Water** (gyógyít a közelben) → **Earth** (lassít) → **Air** (+Haste a közeli társaknak) |
+| Mastery | **Elemental Overload** – % esély, hogy a villám- és tűzhatások duplán sülnek el |
+
+**Ability-készlet:**
+
+| Ability | Típus | Hatás |
+|---|---|---|
+| Lightning Bolt | Auto | Erős villámcsapás a legközelebbi ellenségre |
+| Earthquake | Active | Földrengés-terület, sebez és időnként kábít |
+| Lava Lash | Auto | Közelharci tűzcsapás, terjedő égéssel |
+| Healing Rain | Active | Gyógyító eső-terület a társaknak (co-op) |
+| Thunderstorm | Auto | Ha körbeveszik, villámmal hátralöki az ellenségeket |
+| Feral Spirit | Active | 2 szellemfarkas 10 mp-re |
+
+**Co-op szerep:** a Shaman totemjei és a *Healing Rain* az egész csapatot segítik. Egy
+talent (*Ancestral Spirit*) a felélesztést is felgyorsítja.
 
 ---
 
@@ -456,6 +521,8 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Paladin | Lightforged Plate | +3 Armor | A Word of Glory az összes társat gyógyítja |
 | Rogue | Shadowcraft Garb | +5% Crit | A Vanish után 4 mp-ig +50% krit sebzés |
 | Warlock | Felheart Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
+| Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
+| Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Chain Lightning +2 célpontot ér |
 
 #### Artifact fegyverek (kasztonként 1)
 
@@ -498,6 +565,8 @@ választható. Egyébként a szokásos Need / Greed / Pass dobás dönt (10.1).
 | Paladin | *Dawnbreaker* (Mace) | A Consecration gyógyítja a benne álló társakat |
 | Rogue | *Fangs of the Shadow* (2 tőr, mindkét slot) | Minden 5. krit ingyen Fan of Knives-t lő |
 | Warlock | *Skull of the Damned* (Staff) | Egy második pet: Voidwalker (tank) |
+| Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad |
+| Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz |
 
 ### 5.6 Backpack
 
@@ -759,6 +828,8 @@ Minden kasztnak **3 fája** van (a WoW-os specializációk szerint):
 | Paladin | Holy | Protection | Retribution |
 | Rogue | Assassination | Combat | Subtlety |
 | Warlock | Affliction | Demonology | Destruction |
+| Hunter (M8) | Beast Mastery | Marksmanship | Survival |
+| Shaman (M8) | Elemental | Enhancement | Restoration |
 
 Egy fa **5 szintből (tier)** áll:
 
@@ -814,6 +885,12 @@ Egy fa **5 szintből (tier)** áll:
 | Warlock | Affliction | Unstable Affliction | Ha egy DoT-ot lejárat előtt eltávolít egy ellenség, AoE-robbanás és 1 mp-es Silence |
 | Warlock | Demonology | Soul Link | A sebzés 20%-át a pet viseli el; a pet +30% sebzés |
 | Warlock | Destruction | Conflagrate | A Rain of Fire égő földet hagy, és minden kritje +1 Soul Shardot ad (10% eséllyel) |
+| Hunter | Beast Mastery | Bestial Wrath | 30 mp-enként 10 mp-ig a pet +50% sebzést kap és nem lehet lassítani |
+| Hunter | Marksmanship | Trueshot Aura | A közeli társak +5% sebzést kapnak; az Aimed Shot cooldownja felére csökken |
+| Hunter | Survival | Wildfire Bombs | Az Explosive Trap égő földet hagy, és 3 kisebb bombát szór szét |
+| Shaman | Elemental | Elemental Mastery | 20 mp-enként a következő 3 varázslat garantált krit |
+| Shaman | Enhancement | Stormstrike | Minden 5. fegyvertalálat dupla villámcsapást vált ki |
+| Shaman | Restoration | Spirit Link Totem | Totem, ami kiegyenlíti a közeli társak HP-ját, és 20%-kal csökkenti a sebzésüket (co-op) |
 
 > **MVP-terjedelem:** mind az 5 kaszt × 3 fa váza, és mind a 15 capstone. A részletes
 > tier 1–4 talenteket a Warrior Arms mintája alapján, fánként egyenként tervezzük ki a
@@ -1275,6 +1352,7 @@ indulnak.
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, közös kassza |
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
+| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
 
 ---
 
