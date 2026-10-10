@@ -741,7 +741,8 @@ Ez a játék fő újítása a Brotatóhoz képest: a szintlépés nem csak stato
 
 ### 6.1 Szintlépés
 
-- **XP:** közös csapat-XP. Az `n.` szinthez szükséges XP: `(n + 3)²` (Brotato-képlet).
+- **XP:** közös csapat-XP. A csapat az **1. szintről** indul (WoW-osan); az `n.` szintlépéshez
+  szükséges XP: `(n + 3)²` (Brotato-képlet; az 1 → 2 szintlépés 16 XP).
   Co-opban ez szorzódik: `(n + 3)² × (1 + 0,6 × (játékosok − 1))`, felfelé kerekítve
   (1 játékos ×1, 2 ×1,6, 3 ×2,2, 4 ×2,8) – ugyanaz a +60% játékosonként, mint az
   ellenségszámé (9. fejezet), így a több ellenségből jövő több XP nem gyorsítja a szintlépést.

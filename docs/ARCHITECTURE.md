@@ -105,10 +105,14 @@ the new screen never sees the button press that closed the old one.
 
 - Player stats: `StatBlock` with sources `&"class"` (ClassData.base_stats),
   `&"weapon:main"`, `&"weapon:off"` (WeaponData.bonus_stats). Max HP = 10 + Stamina.
-- **TEMPORARY placeholder until the M4 level-up cards:** every team level gives every player
-  +1 Stamina (+1 Max HP) and +4% damage via the source `&"level"` (`Player.LEVEL_*`; applied
-  in `Player.create` for the current level and on `RunState.leveled_up`, current HP rises by
-  the Max HP gained). Remove it when the level-up cards replace it.
+- Team level: a run starts at level 1 (`RunState.START_LEVEL`, WoW style); the n-th
+  level-up needs `(n + 3)^2` XP × the co-op multiplier (`RunState.xp_needed_for_level`, so
+  1 → 2 needs 16 solo); talent points from level 10 (`talent_points_earned`).
+- **TEMPORARY placeholder until the M4 level-up cards:** every team level gained above the
+  starting level gives every player +1 Stamina (+1 Max HP) and +4% damage via the source
+  `&"level"` (`Player.LEVEL_*`; nothing at level 1; applied in `Player.create` for the current
+  level and on `RunState.leveled_up`, current HP rises by the Max HP gained). Remove it when
+  the level-up cards replace it.
 - `WeaponRunner` (one per weapon that `attacks()`): cooldown =
   `CombatMath.weapon_cooldown`; target = nearest living enemy within `attack_range`.
   - `MELEE_ARC`: every enemy within `attack_range + enemy.radius` and inside `arc_degrees`
@@ -144,7 +148,10 @@ the new screen never sees the button press that closed the old one.
   run is 42 minutes of fighting). Spawn budget per second
   `(0.9 + 0.22 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
   `first_wave <= w`; group size in `[group_min, group_max]`; position = random arena point
-  ≥ 6 m from every living player; `Vfx.spawn_telegraph` 1 s before the group appears.
+  ≥ 6 m from every living player, preferably on screen outside the HUD
+  (`CameraRig.get_safe_ground_rect()`; 16 tries there, then 8 anywhere in the arena);
+  `Vfx.spawn_telegraph` (red rune with a white-hot core, readable without colour) 1 s before
+  the group appears.
 - At most `MAX_ENEMIES` alive. When the timer ends: remaining enemies `despawn()` (no loot),
   pickups `collect_to_bank()`, `wave_cleared` emitted.
 - Waves 10 / 20 / 25 (boss / elite) are regular waves until milestone M6.
@@ -199,6 +206,30 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   - `OnionModel.set_channel_target(downed_player)` / `null` – the reviver raises golden,
     glowing hands and a light beam connects it to the ghost.
   - `Vfx.resurrect_column(feet_pos)` – shaft of light from the sky when a revive completes.
+  - `OnionModel.set_tag("P1")` – player marker above the head: a nameplate diamond in the
+    player colour with the slot label, fixed screen size, no depth test (shows through
+    crowds). `Player.create` sets it; "" hides it (lobby previews). Over a ghost it bobs and
+    is lifted above the "Resurrecting" cast bar. Downed: the player-colour ring stays and
+    pulses, the revive circle is tinted with the ghost's own colour, ghost alpha 0.6.
+  - `Mats.set_ring_stroke(node, amount)` – dark outline + white inner stroke on a ground
+    ring (player rings use it, so the player colour reads on any ground / class colour).
+  - Heroes never fully overlap: `Player.separation_offset` – a soft push (no physics
+    collision) when two bodies are closer than `SEPARATION_DISTANCE`.
+  - Damage numbers: `Vfx.damage_number(target, pos, amount, color, size)` – hits on the same
+    enemy within `Vfx.MERGE_WINDOW` (0.25 s) add up on one number that pops again; normal
+    hits small (0.6) and translucent, crits 1.1; at most `Vfx.MAX_TEXTS` (28) texts (+8 for
+    crits); WoW-like pop-in and sideways arc. A hero's own numbers (damage taken, heals,
+    Dodge) start beside its head (`Player.self_text_position`), alternating sides.
+  - Explosions: a short faint flash (`Vfx.EXPLOSION_FLASH_*`: alpha 0.45, 0.6 × radius,
+    gone in 0.15 s); the ground ring and embers carry the blast so targets stay visible.
+  - Enemy projectiles (`ProjectileVisual.build(..., enemy = true)`): 1.6× size, red-orange
+    halo and a short trail, fast spin – a different hue family from the heroes' class-
+    coloured bolts.
+  - Camera framing keeps heroes out from under the HUD: per-side margins `FRAME_MARGIN`
+    (sides), `FRAME_MARGIN_BOTTOM` and `CameraRig.top_margin(distance)` (grows with the zoom –
+    the wave / timer plaque covers a fixed share of the screen – capped so the whole arena
+    still fits at `MAX_DISTANCE`). `CameraRig.safe_ground_rect()` / `get_safe_ground_rect()`
+    is the visible ground outside the HUD (spawn preference, ghost walk area).
   - `CameraRig.get_walk_rect(player)` – shared screen (GDD 13): the rectangle a player may
     walk in so nobody leaves the screen once the camera is fully zoomed out. `Player` clamps
     its motion to it every tick (when `Arena.current.camera` is in the tree) and slides
@@ -206,7 +237,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     only kept from going further out). For living players it binds only when the team
     spreads wider than the fully zoomed-out view (never in the MVP arena: the whole arena
     fits at `MAX_DISTANCE`); a ghost, which the camera does not follow, is kept inside the
-    current view.
+    current view, out from under the HUD (`safe_ground_rect`).
   - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
 - Art showcase (dev tool, renders a PNG under Xvfb):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
@@ -235,10 +266,16 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   `start_requested` (once; joining is switched off). B / Esc with nobody joined →
   `back_requested`. A controller unplugged in the lobby leaves its slot. Each card has a live
   `OnionPreview` (SubViewport with its own World3D).
-- `Hud`: listens to `RunState` (wave, gold with a count-up and "+N" floater, XP, level up →
-  `show_banner("LEVEL UP!")`) by itself; Main calls `bind_players(players)` after spawning and
-  connects `WaveDirector.wave_timer_changed` → `set_wave_time` (red ≤ 5 s). Unit frames hide
-  when their player is freed; while downed they show the revive progress.
+- `Hud`: listens to `RunState` (wave, gold with a count-up and one "+N" floater right of the
+  coin that sums every pickup while it shows – `FLOATER_TIME` 0.6 s after the last one –, XP,
+  level up → `show_banner("LEVEL UP!")`) by itself; Main calls `bind_players(players)` after
+  spawning and connects `WaveDirector.wave_timer_changed` → `set_wave_time` (red ≤ 5 s).
+  Compact: `UnitFrame`s ~340 px wide at 80% panel opacity (smallest text 18 px, readable at
+  720p), a compact wave / timer plaque, the XP bar as a thin segmented strip along the whole
+  bottom edge (WoW style; level at its left end, "xp / needed XP" at its right end) and a slim
+  translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
+  plaque. Unit frames hide when their player is freed; while downed they show the revive
+  progress.
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
   ignore the input of the frame they were opened on (Game Over: the first
   `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with
@@ -256,7 +293,8 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
 - `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
   3D scene show through the dark vignette backdrop.
-- Screenshots: `docs/screenshots/ui_lobby.png`, `docs/screenshots/ui_hud.png`.
+- Screenshots: `docs/screenshots/ui_lobby.png`, `docs/screenshots/ui_hud.png`
+  (`--resolution 1920x1080 -- --demo --seed=3 --start-wave=10 --shot-time=18`).
 
 ## Forward compatibility: meta-progression (GDD chapter 17, milestone M9)
 
