@@ -82,6 +82,10 @@ class MenuEntry:
 
 var slot: PlayerSlot
 var tooltip: ItemTooltip
+## true: the selected item's tooltip stays over this panel (on the half away from the
+## selection) instead of floating towards the screen centre – used between waves, where the
+## middle of the screen holds the shared shop.
+var tooltip_inside := false
 ## Index into the cells (see select_equip_slot / select_backpack).
 var selected := 0
 ## Whether the tooltip shows the "If you replace this item:" block (Y toggles).
@@ -1133,10 +1137,19 @@ func _place_tooltip() -> void:
 	var view := get_viewport_rect()
 	var gap := 10.0 * to_canvas.get_scale().x
 	var x := panel_rect.end.x + gap
-	if panel_rect.get_center().x > view.get_center().x:
+	if tooltip_inside:
+		# Over the panel, on the half that does not hold the selected icon.
+		x = panel_rect.position.x + gap
+		if icon_rect.get_center().x < panel_rect.get_center().x:
+			x = panel_rect.end.x - gap - tip_size.x
+	elif panel_rect.get_center().x > view.get_center().x:
 		x = panel_rect.position.x - gap - tip_size.x
 	x = clampf(x, view.position.x + 4.0, maxf(view.position.x + 4.0, view.end.x - tip_size.x - 4.0))
-	var y := clampf(icon_rect.position.y - 6.0, view.position.y + 4.0, maxf(view.position.y + 4.0, view.end.y - tip_size.y - 4.0))
+	var top := panel_rect.position.y if tooltip_inside else view.position.y
+	var bottom := panel_rect.end.y if tooltip_inside else view.end.y
+	top = maxf(top, view.position.y + 4.0)
+	bottom = minf(bottom, view.end.y - 4.0)
+	var y := clampf(icon_rect.position.y - 6.0, top, maxf(top, bottom - tip_size.y))
 	tooltip.position = to_canvas.affine_inverse() * Vector2(x, y)
 
 

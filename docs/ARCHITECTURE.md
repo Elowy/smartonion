@@ -374,3 +374,35 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
 - Between waves (Intermission): loot roll (if any loot) → shared shop in the middle + one
   `PlayerPanel` per player in their corner → everyone ready (START) → next wave.
 - All player-facing content pools filter through `Db.is_unlocked(id)` (M9 hook).
+
+### M2 details
+
+- **Shop** (`core/shop/shop.gd`): offers `2 + 2 x players`; every joined class is topped up to 2
+  usable offers; `try_buy` → `Shop.BuyResult` (OK / SOLD / BACKPACK_FULL / NOT_ENOUGH_GOLD ...);
+  any player may remove any lock; locks persist across rounds until toggled or sold; pings
+  clear on a new round / reroll / sale; a reroll needs every joined human with a working pad
+  to vote and charges only when at least one offer would change.
+- **Loot** (`core/loot/`): drop chance `1.5% + Fortune / 10` percentage points (killer's
+  Fortune), at most `1 + players` normal-enemy drops per wave; `LootDrops.on_enemy_killed`
+  returns the `LootBag`. `LootRoll`: Need beats Greed, ties re-roll, undecided = Pass; a Need
+  winner whose backpack is full gets the item sold as Greed instead.
+- **Procs** (`core/items/proc_system.gd`, header documents the full vocabulary): building
+  blocks bolt, chain, dot, nova, explode, extra_attack, buff, heal, drain, slow, stun, gold,
+  resource (M3), shield, reflect, smite_heal, cheat_death; triggers on_hit (PPM), on_kill /
+  when_struck (% chance), low_hp (`threshold` in HP percent), periodic, equip; `per_wave`
+  limit; proc damage is never a weapon hit (no chains) and never crits.
+- **Exotic stats**: Attack / Spell Power add `power x base weapon cooldown` per hit (magic
+  weapons – non-physical `WeaponData.school` – use Spell Power); Executioner / Slayer multiply;
+  Parry ≤ 50%, melee only, riposte counts as an extra attack; count stats
+  (`Stats.INTEGER_STATS`) are whole numbers.
+- **Between waves** (`scenes/ui/intermission.gd`): LOOT phase (`LootRollScreen`, 15 s per
+  item, hidden choices, bots `LootRoll.bot_choice`, solo Take / Sell / Leave) then MARKET
+  (`ShopPanel` centred, one `PlayerPanel` per hero scaled into its corner with
+  `tooltip_inside = true`). Per player: LB / RB switch focus shop ↔ own panel, A buys
+  (hold when > 50% of the wallet), X lock, R3 / Tab ping, Y reroll vote, START ready, B
+  unready unless the panel consumed it (`last_input_consumed`); panel tabs on LT / RT. The 60 s
+  auto-continue runs only in MARKET. The HUD is hidden during the intermission; the HUD shows a
+  "Team Loot: N" counter during waves.
+- **Bots** (smoke / demo): buy the cheapest usable affordable offer (50%), equip upgrades
+  (`ItemTooltip.upgrade_direction`), sell junk when full. `SMOKE_RESULT` adds `items_bought`,
+  `items_looted`, `loot_rolls`, `need_wins`, `greed_gold`.

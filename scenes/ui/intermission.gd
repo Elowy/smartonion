@@ -203,6 +203,8 @@ func _sync_panels(slots: Array[PlayerSlot]) -> void:
 		if panel == null:
 			panel = PlayerPanel.create(s)
 			panel.name = "PlayerPanel%d" % (s.index + 1)
+			# The middle of the screen is the shared shop: keep item tooltips over the panel.
+			panel.tooltip_inside = true
 			_panel_layer.add_child(panel)
 			panel.trade_done.connect(_on_trade_done)
 			panels[s.index] = panel
