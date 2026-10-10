@@ -13,6 +13,8 @@ module contracts: `docs/ARCHITECTURE.md`.
   (`-- --filter=<substring>` to run a subset)
 - Smoke run (4 bots play N waves fast, exit code 1 on errors):
   `godot --headless --path . -- --smoke --waves=3`
+  For bit-identical results with the same `--seed`, add `--fixed-fps 60` (engine flag, before
+  `--path`): the camera moves per rendered frame and spawn points prefer the on-screen area.
 - Screenshot (needs a virtual display):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- --demo --screenshot=/tmp/shot.png --shot-time=8`
 

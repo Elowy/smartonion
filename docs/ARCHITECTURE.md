@@ -141,6 +141,25 @@ the new screen never sees the button press that closed the old one.
   fractional remainder so +10% on ten 1-gold coins pays 11; xp → `RunState.add_xp(xp)`.
   Loot banked at the wave end (`collect_to_bank`, no collector) gets **no** Gold Find.
 
+### Hot-path helpers (scenes/enemies/, static state, no autoload)
+
+- Enemies collide with the **world only** (layer 3, mask 1). Crowd separation comes from
+  `EnemyGrid` – a spatial hash of group `&"enemies"` (sorted cell keys, cells ≥ 1.2 m) built
+  lazily once per physics tick: every touching pair is evaluated once per build and each
+  enemy slides along touching neighbours and pushes itself out of overlaps
+  (`EnemyGrid.crowd_velocity`). In the open field (a per-tick shape query confirms the arena
+  interior holds no world collider) an enemy moves directly; near walls it uses move_and_slide.
+- The same grid answers `Projectile` sweeps / explosions (`gather_touching`) and
+  `WeaponRunner` targets / melee arcs (`nearest`, `gather_around`): queries widen by the
+  enemies' possible drift since the build and test live positions, so results equal a full
+  scan, in group order. A `WeaponRunner` with nothing in range searches again every
+  `NO_TARGET_RETRY` (0.1 s) or at once when the enemy count changes.
+- `LivingPlayers`: per-tick snapshot of the living players (positions, pickup range²) read by
+  every enemy (target / contact) and idle pickup; contact hits and enemy projectiles mark it
+  dirty. With ≥ `Pickup.IDLE_STAGGER_THRESHOLD` pickups, idle ones look for a collector every
+  `IDLE_CHECK_TICKS` ticks. Tests that teleport enemies within one frame call
+  `EnemyGrid.mark_dirty()`.
+
 ## Waves (WaveDirector)
 
 - Duration `RunState.wave_duration(w)` (GDD 1): waves 1–10 `min(60, 20 + 5 * (w - 1))` s,
@@ -183,8 +202,9 @@ crowded), avoid walls, stay near the team and run to downed teammates when it is
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
 `PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
 -1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
-counts `WAVE_END_DELAY` in physics ticks. The same `--seed` therefore reproduces a smoke run
-exactly (same kills, gold, downs).
+counts `WAVE_END_DELAY` in physics ticks. With the engine flag `--fixed-fps 60` the same
+`--seed` reproduces a smoke run exactly (same kills, gold, downs); without it the camera
+(updated per rendered frame) can shift the on-screen spawn-point preference slightly.
 
 Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission,game_over}.png`
 (`--view=lobby --players=3`, `--demo --seed=5 --start-wave=4 --shot-time=12`,
