@@ -109,6 +109,32 @@ a százalékos statok közvetlenül %-ban értendők).
 
 > A **Range** nem stat, hanem a fegyver tulajdonsága.
 
+### 2.4.1 Egzotikus statok (csak itemekről és enchantmentekről)
+
+Ezeket nem lehet szintlépéskor választani: **csak itemeken**, főleg véletlen
+**enchantmentekként** (5.7) jelennek meg, ahogy a WoW-ban az „Equip:” sorok.
+
+| Stat | Hatás |
+|---|---|
+| **Attack Power** | +flat sebzés minden fegyvertalálathoz (a fegyver sebességéhez normalizálva) |
+| **Spell Power** | +flat sebzés az abilitykhez, a varázsfegyverekhez és a varázs-procokhoz |
+| **Extra Attack** | % esély, hogy a fegyver **azonnal még egyszer üt** („dupla ütés”); az extra ütés nem indíthat újabb extra ütést |
+| **Critical Damage** | +% krit szorzó |
+| **Thorns** | Közelharci találatkor ennyi sebzést kap vissza a támadó |
+| **Parry** | % esély közelharci találat hárítására (nincs sebzés) és egy azonnali visszavágásra |
+| **Block Value** | +% a blokk által elnyelt sebzéshez |
+| **Cooldown Reduction** | −% ability-cooldown |
+| **Resource Regen** | +% kaszt-erőforrás termelés (Rage, Mana, Energy …) |
+| **Extra Projectile** | +1 lövedék a lövedékes fegyvereknek (legyezőben) |
+| **Pierce** | +1 átütés a lövedékeknek |
+| **Area Size** | +% AoE-méret (robbanások, Consecration, Blizzard …) |
+| **Iskola-sebzés** | +% Fire / Frost / Arcane / Holy / Shadow / Nature / Physical sebzés iskolánként |
+| **Executioner** | +% sebzés a 30% HP alatti célpontokra |
+| **Slayer** | +% sebzés elitekre és bossokra |
+| **Life on Kill** | Ölésenként ennyi % eséllyel +1 HP |
+| **XP Gain** | +% XP |
+| **Pickup Range** | +% loot-vonzási távolság |
+
 ### 2.5 Sebzés képlete
 
 ```
@@ -273,10 +299,10 @@ Trinket 1, Trinket 2, Main Hand, Off Hand.
 | Ritkaság | Szín | Stat-keret* | Különlegesség | Boltban | Lootban |
 |---|---|---|---|---|---|
 | Common | fehér | 4 | – | 1. hullámtól | 1. hullámtól |
-| Uncommon | zöld | 7 | – | 2. hullámtól | 1. hullámtól |
-| Rare | kék | 11 | – | 4. hullámtól | 3. hullámtól |
-| Epic | lila | 16 | kis effekt vagy set-tag | 9. hullámtól | 6. hullámtól |
-| Legendary | narancs | 22 | egyedi proc, kézzel tervezett | **soha** | 10. hullámtól (boss, elit, goblin, ritka drop) |
+| Uncommon | zöld | 7 | 30% eséllyel 1 Equip-enchant | 2. hullámtól | 1. hullámtól |
+| Rare | kék | 11 | 1 enchant | 4. hullámtól | 3. hullámtól |
+| Epic | lila | 16 | 1–2 enchant, set-tag lehetséges | 9. hullámtól | 6. hullámtól |
+| Legendary | narancs | 22 | 2 enchant + egyedi, kézzel tervezett proc | **soha** | 10. hullámtól (boss, elit, goblin, ritka drop) |
 | Artifact | világos arany | – | kasztfegyver, fejlődik | soha | csak a 10. hullám bossától |
 
 \* A **stat-keret** az a pontszám, amiből a generált item a statjait „vásárolja”
@@ -363,6 +389,23 @@ A legtöbb item **generált**: alaptípus + ritkaság + WoW-szerű utótag.
 
 Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 
+**Anyag-fokozatok (alaptípusok):** minden páncéltípusnak 3 fokozata van. A magasabb
+fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
+
+| Páncéltípus | I. (1–8. hullám) | II. (9–16. hullám) | III. (17. hullámtól) |
+|---|---|---|---|
+| Cloth | Linen | Silk | Moonweave |
+| Leather | Rugged | Thick | Shadowhide |
+| Mail | Chain | Scaled | Stormforged |
+| Plate | Iron | Steel | Runed |
+
+**Teljes névminta:** `[Enchant-előtag] [Anyag] [Alaptípus] [of the Utótag]`
+
+> Példa: *Blazing Runed Plate Helm of the Bear* (Epic, Looted)
+> - +8 Strength, +9 Stamina, +4 Armor, +3% Haste
+> - *Chance on hit: Hurls a fiery ball that causes 38 Fire damage.*
+> - *Equip: Increases your chance to strike twice by 3%.*
+
 ### 5.5 Kézzel tervezett itemek (MVP)
 
 #### Trinketek (10 db, mind kézzel tervezett, proc- vagy aktiválós hatással)
@@ -425,6 +468,95 @@ Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 - **Megvásárlás:** a megvett item a backpackbe kerül, onnan lehet felvenni.
 - **Csere:** felvételkor a régi item a backpackbe kerül; ha tele van, el kell adni valamit.
 - **Eladás:** a vételár 35%-a, a közös pénztárcába.
+
+---
+
+### 5.7 Enchantmentek és procok (véletlen, WoW-szerű)
+
+Az itemek **véletlen enchantmenteket** kapnak, amelyek a tooltipben **zöld** sorként
+jelennek meg, pontosan úgy, mint a WoW-ban:
+
+- *Equip: …* – folyamatos bónusz, gyakran egzotikus stat (2.4.1).
+- *Chance on hit: …* – találatkor bizonyos eséllyel elsül (**proc**).
+- *On kill: …* – öléskor süthet el.
+- *When struck: …* – amikor a viselőjét eltalálják.
+
+**Hány enchant jár:** a ritkaságtól függ (5.2). A **lootolt** itemek enchantjai egy
+ranggal erősebbek, és a lootolt Uncommon itemeken mindig van 1 enchant.
+
+**Rangok:** minden enchantnak I–III. rangja van az item hullámszintje szerint (I: 1–8.,
+II: 9–16., III: 17. hullámtól). A rang növeli az értékét vagy a proc sebzését.
+
+**Proc-szabályok (WoW-szerűen):**
+
+- **PPM (procs per minute):** az esély fegyvertalálatonként `PPM × fegyver_cooldown / 60`.
+  Így egy gyors tőr és egy lassú kétkezes balta percenként nagyjából ugyanannyit procol.
+- **Belső cooldown:** minden enchantnak van (0,5–20 mp), hogy ne legyen proc-spam.
+- **Skálázás:** a varázs-procok sebzése a **Spell Power**-rel, a fizikaiaké az
+  **Attack Power**-rel nő.
+- **Lánc-tiltás:** a procból származó sebzés nem indíthat újabb „Chance on hit” procot
+  (kivéve, ahol ezt kifejezetten kiírja).
+
+**Melyik slotra mi kerülhet:**
+
+| Enchant-típus | Slotok |
+|---|---|
+| Chance on hit | fegyverek, gyűrűk, trinketek |
+| When struck | Chest, Shoulders, Head, Shield |
+| On kill | bármelyik |
+| Equip | bármelyik (slothoz illő stat-készletből) |
+
+**Enchant-készlet (MVP: 24 db, saját nevekkel)**
+
+| Előtag | Típus | Hatás (I. rang) | PPM / esély |
+|---|---|---|---|
+| Zealous | Equip | +3% Extra Attack (dupla ütés) | – |
+| Galeforce | Chance on hit | 2 azonnali extra ütés | 1,5 PPM, 3 mp ICD |
+| Mighty | Equip | +6 Attack Power | – |
+| Arcane-touched | Equip | +6 Spell Power | – |
+| Brutal | Equip | +15% Critical Damage | – |
+| Splitting | Equip | +1 Extra Projectile (csak lövedékes fegyver) | – |
+| Piercing | Equip | +1 Pierce | – |
+| Executioner's | Equip | +15% Executioner | – |
+| Slayer's | Equip | +10% Slayer | – |
+| Blazing | Chance on hit | Tűzgolyó: 20 Fire sebzés (+Spell Power) | 4 PPM |
+| Stormbound | Chance on hit | Láncvillám 3 célpontra, 15 Nature sebzés | 3 PPM |
+| Frostbite | Chance on hit | Fagynyíl 12 Frost sebzés, 2 mp 30% lassítás | 4 PPM |
+| Venomous | Chance on hit | Méreg: 3 mp alatt 12 Nature sebzés, 3× halmozódik | 6 PPM |
+| Vampiric | Chance on hit | 10 Shadow sebzés, ugyanennyi gyógyítás neked | 3 PPM |
+| Bloodlust | Chance on hit | 6 mp-ig +20% Haste | 1 PPM |
+| Crusading | Chance on hit | 10 mp-ig +5 fő stat és 2 HP gyógyítás | 1 PPM |
+| Thundering | Chance on hit | Kis AoE lökéshullám, 1 mp kábítás | 2 PPM, 5 mp ICD |
+| Hallowed | Chance on hit | Holy villanás: sebez, és a legsérültebb társat gyógyítja (co-op) | 2 PPM |
+| Shadowflame | Chance on hit | Árnylövedék, ami ölésnél DoT-ot terjeszt | 3 PPM |
+| Soulreaping | On kill | 10% eséllyel +1 kaszt-erőforrás | 10% |
+| Detonating | On kill | 8% eséllyel a hulla felrobban (AoE) | 8% |
+| Greedy | On kill | 5% eséllyel +1 gold | 5% |
+| Frozen Ward | When struck | 10% eséllyel Frost Nova körülötted | 10%, 8 mp ICD |
+| Retribution | When struck | 6 Holy sebzés a támadónak | 100%, 0,5 mp ICD |
+
+**Enchanting (későbbi bővítés):**
+
+- A Passolt vagy eladott itemeket **Disenchantolni** lehet, ebből *Arcane Dust* lesz.
+- Ebből és goldból az **Enchanter** fülön egy item enchantja **újragörgethető** vagy
+  **rangja emelhető**.
+
+### 5.8 Tartalomcél – „sok item”
+
+| Kategória | MVP (M2) | Teljes játék (M6+) |
+|---|---|---|
+| Fegyver-alaptípus | 10 | 16 (+ kétkezes kard, kétkezes buzogány, polearm, fist weapon, crossbow, orb) |
+| Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 60 | 150+ |
+| Ékszer-alaptípus (Neck, Ring) | 8 | 20 |
+| Stat-utótag („of the Bear” …) | 12 | 25 |
+| Enchantment | 24 | 50+ |
+| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | 40 |
+| Trinket | 10 | 30 |
+| Legendary | 8 | 25 |
+| Tier set | 5 (kasztonként 1) | 10 (+5 kaszt-független) |
+
+A generált alaptípusok, utótagok és enchantok kombinációjából **több ezer** különböző
+item jön ki. A kézzel tervezett itemek adják a „hűha, ez leesett!” pillanatokat.
 
 ---
 
@@ -932,8 +1064,13 @@ indulnak.
 - **Character fül:** WoW-szerű karakterpanel – bal oldalon a páncélslotok, jobb oldalon az
   ékszerek és trinketek, alul a fegyverek, középen a karakter 3D modellje, alatta a statlista.
 - **Backpack:** 10 hely a panel alján.
-- **Tooltip:** pergamen / sötét keretes WoW-tooltip. A ritkasághoz illő színű név, a stat-sorok
-  után összehasonlítás (+zöld / −piros); a set-bónuszok szürkén vagy aktívan.
+- **Tooltip:** pergamen / sötét keretes WoW-tooltip, felülről lefelé:
+  - a ritkasághoz illő színű név, alatta „Looted”, slot, páncéltípus, a fegyvernél
+    sebzés és sebesség,
+  - fehér stat-sorok,
+  - **zöld enchant-sorok** („Equip: …”, „Chance on hit: …”, „On kill: …”, „When struck: …”),
+  - set-bónuszok (szürkén, ha nem aktív),
+  - legalul az összehasonlítás a felvett itemmel (+zöld / −piros).
 - **Indulás:** a „Ready” jelzés után indul a következő hullám, ha mindenki kész van
   (vagy 60 mp-es időkorlát után, beállításokban kikapcsolható).
 
@@ -1008,6 +1145,8 @@ indulnak.
 
 - `ClassData`: alapstatok, páncéltípus, jártasságok, erőforrás, alap képességek, ability-készlet.
 - `WeaponData`, `ItemData` (alaptípus + kézzel tervezett itemek), `AffixData` (utótagok).
+- `EnchantData`: típus (Equip / Chance on hit / On kill / When struck), PPM vagy esély,
+  belső cooldown, rangonkénti értékek, megengedett slotok, iskola.
 - `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
 - `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
 - `SetData`, `EnemyData`, `WaveData`, `BossData`, `DifficultyData`.
@@ -1027,6 +1166,7 @@ indulnak.
 | `Spawner` / `WaveDirector` | Hullámok, spawnolás, skálázás |
 | `LootSystem` | Item-generálás, ritkaság (bolt- és loot-tábla), drop-esélyek, lootzsákok |
 | `LootRoll` | Need / Greed / Pass dobások, kiértékelés, backpackbe tétel / eladás |
+| `ProcSystem` | Találat- / ölés- / sebződés-események, PPM-esélyek, belső cooldownok, proc-hatások |
 | `ShopSystem` | Ajánlatok, lock, reroll, árak |
 | `Inventory` / `Equipment` | Backpack, slotok, set-bónuszok, Armor Specialization |
 | UI | Játékosonkénti panelek |
@@ -1053,11 +1193,11 @@ indulnak.
 |---|---|---|
 | M0 | Váz | Godot projekt, 1–4 kontroller csatlakozása, mozgó placeholder karakterek, kamera |
 | M1 | Harc magja | Auto-attack MH/OH fegyverrel, 3 ellenségtípus, gold/XP felszedés, hullám-időzítő |
-| M2 | Felszerelés és loot | Item-generálás, ritkaság, bolt, backpack, karakterpanel, tooltip, **item-drop és Need / Greed / Pass dobás** |
+| M2 | Felszerelés és loot | Item-generálás (alaptípusok, utótagok, **enchantmentek és procok**, egzotikus statok), ritkaság, bolt, backpack, karakterpanel, tooltip, **item-drop és Need / Greed / Pass dobás** |
 | M3 | Kasztok | 5 kaszt, erőforrások, 2-2 alap képesség, Mastery |
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, közös kassza |
-| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, 25 hullám balansza (Normal) |
+| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
 
 ---
