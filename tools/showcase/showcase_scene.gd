@@ -20,6 +20,8 @@ func run() -> void:
 			await _weapons()
 		"arena":
 			await _arena_overview()
+		"revive":
+			await _revive()
 		_:
 			await _gameplay()
 	var out := _arg("out", "/tmp/smartonion_showcase.png")
@@ -184,6 +186,40 @@ func _weapons() -> void:
 		i += 1
 	_close_camera(stage, Vector3(0, 0.75, 0), 9.0, 12.0)
 	await _frames(4)
+
+
+## Revive scene through the gameplay camera: a paladin channels a resurrection on a
+## downed mage (cast bar + beam), a resurrect column and a level-up burst next to them.
+func _revive() -> void:
+	var arena := Arena.create()
+	add_child(arena)
+	var ids: Array[StringName] = [&"paladin", &"mage", &"warrior", &"rogue"]
+	var spots: Array[Vector3] = [Vector3(-0.8, 0, 0.4), Vector3(0.8, 0, -0.3), Vector3(3.5, 0, 0.5), Vector3(-3.5, 0, -0.5)]
+	var models: Array[OnionModel] = []
+	for i in ids.size():
+		var holder := Node3D.new()
+		holder.add_to_group(&"players")
+		arena.entities.add_child(holder)
+		holder.position = spots[i]
+		var cd := Db.get_class_data(ids[i])
+		var m := OnionModel.new()
+		holder.add_child(m)
+		m.setup(cd, PlayerManager.PLAYER_COLORS[i])
+		m.set_weapons(cd.main_hand, cd.off_hand)
+		models.append(m)
+	models[1].set_downed(true)
+	models[1].set_revive_progress(0.55, PlayerManager.PLAYER_COLORS[0], 2.2)
+	models[0].set_facing(spots[1] - spots[0])
+	models[0].set_channel_target(models[1])
+	models[2].set_facing(Vector3(0, 0, 1))
+	models[3].set_facing(Vector3(0, 0, 1))
+	arena.camera.snap()
+	await _frames(12)
+	Engine.time_scale = 0.1
+	Vfx.resurrect_column(spots[2])
+	Vfx.level_up_burst(spots[3])
+	await _frames(4)
+	Engine.time_scale = 1.0
 
 
 func _arena_overview() -> void:

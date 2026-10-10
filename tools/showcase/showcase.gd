@@ -13,6 +13,7 @@ extends SceneTree
 ##   enemies   Enemy line-up. --state=walk|windup|stun|hit
 ##   weapons   Every weapon model.
 ##   arena     High overview of the arena and its decoration.
+##   revive    Resurrection visuals: cast bar, channel beam, resurrect column.
 ## Common: --out=path.png  --seed=N
 
 
