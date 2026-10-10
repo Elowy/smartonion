@@ -181,6 +181,44 @@ func test_ppm_chance_statistics() -> void:
 	check_near(float(fast_procs) * 3.0 / float(slow_procs), 1.0, 0.25, "same procs per minute")
 
 
+## On-hit procs roll once per attack, not once per enemy a melee arc / projectile fan /
+## pierce hits; the attacked target gets them. Per-target effects (damage, Executioner /
+## Slayer, hit_dealt) stay per hit.
+func test_on_hit_procs_roll_once_per_attack() -> void:
+	var p := _hero()
+	p.equipment.equip(unique(&"bolt", {"trigger": "on_hit", "chance": 100.0, "damage": 1.0}))
+	var side_a := _fake(Vector3(1.2, 0, -0.6))
+	var target := _fake(Vector3(1.5, 0, 0))
+	var side_b := _fake(Vector3(1.2, 0, 0.6))
+	var hits: Array[Node3D] = []
+	p.hit_dealt.connect(func(_d: float, t: Node3D) -> void: hits.append(t))
+	p.weapons[0].attack(target)
+	check_eq(hits.size(), 3, "the swing hits all three")
+	check_eq(hits[0], target, "the attacked enemy first")
+	check_eq(p.procs.fire_count(&"test_bolt"), 1, "one proc roll for the whole swing")
+	check_eq([target.fake_hits(), side_a.fake_hits(), side_b.fake_hits()], [2, 1, 1],
+			"the bolt hit the attacked enemy")
+	# Projectiles: a fan of three wand bolts (Extra Projectile) and pierce share one roll.
+	var m := _hero(&"mage", 1, Vector3(0, 0, 20))
+	m.equipment.equip(unique(&"bolt", {"trigger": "on_hit", "chance": 100.0, "damage": 1.0}))
+	m.stats.set_source(&"test", {Stats.EXTRA_PROJECTILE: 2.0, Stats.PIERCE: 3.0})
+	var row: Array[Fakes.FakeEnemy] = []
+	for i in 3:
+		row.append(_fake(Vector3(0, 0, 16.5 - i * 1.2)))
+	var landed: Array[Node3D] = []
+	m.hit_dealt.connect(func(_d: float, t: Node3D) -> void: landed.append(t))
+	m.weapons[0].attack(row[0])
+	for i in 120:
+		for node in tree.get_nodes_in_group(&"projectiles"):
+			(node as Projectile).advance(DT)
+	check(landed.size() >= 3, "several projectile hits (%d)" % landed.size())
+	check_eq(m.procs.fire_count(&"test_bolt"), 1, "still one proc roll for the attack")
+	# The next attack rolls again.
+	p.procs._physics_process(0.1)
+	p.weapons[0].attack(target)
+	check_eq(p.procs.fire_count(&"test_bolt"), 2, "one roll per attack")
+
+
 func test_internal_cooldown() -> void:
 	var p := _hero()
 	p.equipment.equip(unique(&"bolt", {"trigger": "on_hit", "chance": 100.0, "icd": 2.0, "damage": 1.0}))

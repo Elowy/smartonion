@@ -17,10 +17,10 @@ extends Control
 ## used it (the panel closes its menu with B; B is checked before START: the keyboard's Esc is
 ## both). Opening the screen (and the market after the loot roll) swallows what the humans hold
 ## and A / X are ignored for MARKET_INPUT_LOCKOUT. Bots and players whose controller is unplugged
-## are ready (a pad that comes back is un-readied); with [member bot_shopping] (smoke / demo) every bot buys every affordable offer
-## that is an upgrade for it (cheapest first, round-robin over the bots – bot_offer_choice) and
-## equips what ItemTooltip.upgrade_direction calls an upgrade. Everyone ready -> continue_requested
-## (once per open). GDD 12: after [member auto_continue_time] seconds of MARKET the next wave
+## are ready (a pad that comes back is un-readied); with [member bot_shopping] (smoke / demo)
+## every bot buys every affordable offer that is an upgrade for it (cheapest first,
+## round-robin over the bots – bot_offer_choice) and equips what ItemTooltip.upgrade_direction
+## calls an upgrade. Everyone ready -> continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of MARKET the next wave
 ## starts anyway (the countdown does not run during the loot roll).
 ## See docs/ARCHITECTURE.md.
 

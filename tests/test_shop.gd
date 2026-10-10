@@ -346,3 +346,69 @@ func test_changed_signal_fires_for_votes_and_pings() -> void:
 	shop.toggle_lock(0, 0)
 	shop.vote_reroll(0, _joined(), rng)
 	check_eq(changes[0], 3, "ping + lock + vote")
+
+
+## Generic offers (beyond each class's guaranteed ones) are still usable by someone in the
+## team: a strict `usable_by` roll for a random joined class.
+func test_generic_offers_are_usable_by_the_team() -> void:
+	for team: Array in [[&"mage"], [&"warlock", &"mage"], [&"rogue"], [&"warrior", &"paladin"]]:
+		Support.free_slots(slots)
+		var ids: Array[StringName] = []
+		for id: StringName in team:
+			ids.append(id)
+		slots = Support.make_slots(ids)
+		var total := 0
+		var unusable := 0
+		for wave in range(1, 21, 2):
+			for _rep in 4:
+				shop = Shop.new()
+				_open(wave)
+				for o in shop.offers:
+					total += 1
+					var anyone := false
+					for s in slots:
+						anyone = anyone or o.item.can_be_used_by(s.class_data)
+					if not anyone:
+						unusable += 1
+		check(total >= 40, "%s: enough offers looked at (%d)" % [str(ids), total])
+		check_eq(unusable, 0, "%s: every offer is usable by someone in the team" % str(ids))
+
+
+## The team's highest Fortune goes into the shop's rarity roll (round and reroll).
+func test_team_fortune_raises_the_shop_rarity() -> void:
+	_open(12)
+	check_eq(shop.team_fortune(), 0.0, "no Fortune")
+	(slots[0].player as Player).stats.set_source(&"test", {Stats.FORTUNE: 15.0})
+	(slots[1].player as Player).stats.set_source(&"test", {Stats.FORTUNE: 300.0})
+	check_eq(shop.team_fortune(), 300.0, "the highest Fortune in the team")
+	var lucky := _mean_shop_rarity(12)
+	(slots[0].player as Player).stats.remove_source(&"test")
+	(slots[1].player as Player).stats.remove_source(&"test")
+	var plain := _mean_shop_rarity(12)
+	check(lucky > plain + 0.3, "Fortune shifts the stall towards higher rarities (%.2f vs %.2f)" % [lucky, plain])
+	# A reroll draws with the same Fortune.
+	(slots[1].player as Player).stats.set_source(&"test", {Stats.FORTUNE: 300.0})
+	var rolled := 0.0
+	var n := 0
+	for i in 30:
+		shop = Shop.new()
+		_open(12)
+		RunState.add_gold(shop.reroll_cost())
+		for s in slots:
+			shop.vote_reroll(s.index, _joined(), rng)
+		for o in shop.offers:
+			rolled += o.item.rarity
+			n += 1
+	check(rolled / n > plain + 0.3, "rerolled offers too (%.2f)" % (rolled / n))
+
+
+func _mean_shop_rarity(wave: int) -> float:
+	var total := 0.0
+	var n := 0
+	for i in 40:
+		shop = Shop.new()
+		_open(wave)
+		for o in shop.offers:
+			total += o.item.rarity
+			n += 1
+	return total / maxf(1.0, n)

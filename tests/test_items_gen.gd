@@ -407,6 +407,52 @@ func test_class_bias() -> void:
 
 # --- Hand-made items -----------------------------------------------------------------------
 
+## Mighty (+Attack Power) / Arcane-touched (+Spell Power) follow the class when one is known:
+## magic-weapon classes (Mage, Warlock) mostly roll Spell Power, the others Attack Power;
+## items for nobody in particular keep both.
+func test_power_enchants_follow_the_class() -> void:
+	var arcane := _add_enchant(&"t_arcane", EnchantData.Kind.EQUIP, "Arcane-touched", 1, {Stats.SPELL_POWER: 6.0})
+	var mighty: EnchantData = Db.enchants[&"t_mighty"]
+	var mage := Db.get_class_data(&"mage")
+	var warrior := Db.get_class_data(&"warrior")
+	check(ItemGenerator.uses_spell_power(mage) and ItemGenerator.uses_spell_power(Db.get_class_data(&"warlock")),
+			"mage and warlock wield magic weapons")
+	for id: StringName in [&"warrior", &"rogue", &"paladin"]:
+		check(not ItemGenerator.uses_spell_power(Db.get_class_data(id)), "%s: Attack Power" % id)
+	check_eq(ItemGenerator.power_enchant_weight(mighty, null), 1.0, "no class: unchanged")
+	check_eq(ItemGenerator.power_enchant_weight(arcane, null), 1.0, "no class: unchanged")
+	check(ItemGenerator.power_enchant_weight(arcane, mage) > ItemGenerator.power_enchant_weight(mighty, mage), "mage: Spell Power")
+	check(ItemGenerator.power_enchant_weight(mighty, warrior) > ItemGenerator.power_enchant_weight(arcane, warrior), "warrior: Attack Power")
+	check_eq(ItemGenerator.power_enchant_weight(Db.enchants[&"t_zealous"], mage), 1.0, "other enchants untouched")
+	var counts := {}
+	for key: String in ["mage", "warrior", "class bias", "nobody"]:
+		var rng := _rng(4321)
+		var ap := 0
+		var sp := 0
+		for i in 900:
+			var options := {&"rarity": Items.Rarity.RARE}
+			match key:
+				"mage":
+					options[&"usable_by"] = mage
+				"warrior":
+					options[&"usable_by"] = warrior
+				"class bias":
+					options[&"class_data"] = mage
+			var item := ItemGenerator.generate(SHOP, 10, rng, options)
+			for roll in item.enchants:
+				if roll.enchant == mighty:
+					ap += 1
+				elif roll.enchant == arcane:
+					sp += 1
+		counts[key] = [ap, sp]
+	check(counts["mage"][1] > 5 * counts["mage"][0] and counts["mage"][1] > 30, "mage items: Spell Power %s" % str(counts["mage"]))
+	check(counts["warrior"][0] > 5 * counts["warrior"][1] and counts["warrior"][0] > 30, "warrior items: Attack Power %s" % str(counts["warrior"]))
+	check(counts["class bias"][1] > 2 * counts["class bias"][0], "a class bias leans the same way %s" % str(counts["class bias"]))
+	var generic: Array = counts["nobody"]
+	check(generic[0] > 20 and generic[1] > 20 and absf(float(generic[0]) / generic[1] - 1.0) < 0.5,
+			"generic items keep both %s" % str(generic))
+
+
 func test_uniques_by_source() -> void:
 	var storm := Db.get_unique(&"stormcaller")
 	check(not ItemGenerator.unique_available(storm, SHOP, 25), "Legendary never in the shop")

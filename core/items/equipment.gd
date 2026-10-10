@@ -79,12 +79,16 @@ func target_slots(item: ItemInstance) -> Array[Items.EquipSlot]:
 
 
 ## The position equip(item) would use when none is given: the first empty one, else the first.
+## The off hand next to an equipped two-hander does not count as empty (a one-hander takes
+## the two-hander's place in the main hand).
 func default_slot(item: ItemInstance) -> int:
 	var targets := target_slots(item)
 	if targets.is_empty():
 		return -1
+	var main := get_item(Items.EquipSlot.MAIN_HAND)
+	var beside_two_hander := main != null and main.is_two_handed()
 	for s in targets:
-		if not slots.has(s):
+		if not slots.has(s) and not (s == Items.EquipSlot.OFF_HAND and beside_two_hander):
 			return s
 	return targets[0]
 

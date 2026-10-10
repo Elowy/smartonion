@@ -378,7 +378,10 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
 ### M2 details
 
 - **Shop** (`core/shop/shop.gd`): offers `2 + 2 x players`; every joined class is topped up to 2
-  usable offers; `try_buy` → `Shop.BuyResult` (OK / SOLD / BACKPACK_FULL / NOT_ENOUGH_GOLD ...);
+  usable offers, the remaining "generic" offers have no class bias but are generated
+  `usable_by` a random joined class (nothing in the stall is useless for the whole team); every
+  new offer (round or reroll) rolls its rarity with the team's highest Fortune
+  (`Shop.team_fortune`, still max Epic); `try_buy` → `Shop.BuyResult` (OK / SOLD / BACKPACK_FULL / NOT_ENOUGH_GOLD ...);
   any player may remove any lock; locks persist across rounds until toggled or sold; pings
   clear on a new round / reroll / sale; a reroll needs every joined human with a working pad
   to vote and charges only when at least one offer would change.
@@ -386,15 +389,34 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   Fortune), at most `1 + players` normal-enemy drops per wave; `LootDrops.on_enemy_killed`
   returns the `LootBag`. `LootRoll`: Need beats Greed, ties re-roll, undecided = Pass; a Need
   winner whose backpack is full gets the item sold as Greed instead.
+- **Generator enchants**: Mighty (+Attack Power) / Arcane-touched (+Spell Power) follow the
+  class when one is known (`class_data` bias or `usable_by`): magic-weapon classes (Mage,
+  Warlock – `ItemGenerator.uses_spell_power`) mostly roll Spell Power, the others Attack Power
+  (`power_enchant_weight` 1.9 / 0.1); items for nobody in particular keep both.
+- **Weapons** (`Equipment`, `ItemTooltip`): a hero never ends up without an attacking weapon
+  (shields / tomes do not attack): `equip` refuses a shield / tome that would push out the only
+  weapon (a two-hander, `equip_disarms`), `unequip` the last equipped attacking weapon,
+  `remove_from_backpack` (sell, trade) the last usable weapon of an unarmed hero
+  (`is_last_weapon`); the panel greys those entries out with "You need a weapon" and its Equip
+  entry says what else goes ("Replaces Bow", "Replaces Dagger + Dagger").
+  `ItemTooltip.equipped_for_compare` compares a two-hander with main + off hand together
+  (`ItemTooltip.EquippedPair`: summed stats and DPS) and an off-hand item or one-hander next to
+  a two-hander with that two-hander; `upgrade_direction` never calls a disarming item an
+  upgrade. Badges, bots (`Intermission.bot_equip_upgrades` / `bot_offer_choice`) and
+  `LootRoll.bot_choice` all use this one test (stats + DPS, not Item Level).
 - **Procs** (`core/items/proc_system.gd`, header documents the full vocabulary): building
   blocks bolt, chain, dot, nova, explode, extra_attack, buff, heal, drain, slow, stun, gold,
   resource (M3), shield, reflect, smite_heal, cheat_death; triggers on_hit (PPM), on_kill /
   when_struck (% chance), low_hp (`threshold` in HP percent), periodic, equip; `per_wave`
-  limit; proc damage is never a weapon hit (no chains) and never crits.
+  limit; proc damage is never a weapon hit (no chains) and never crits. On-hit procs roll once
+  per attack (the attacked target of a melee arc first; the first hit of a projectile fan /
+  pierce / explosion – `WeaponRunner.ProcGate`); damage, Executioner / Slayer, leech and stuns
+  stay per target.
 - **Exotic stats**: Attack / Spell Power add `power x base weapon cooldown` per hit (magic
   weapons – non-physical `WeaponData.school` – use Spell Power); Executioner / Slayer multiply;
   Parry ≤ 50%, melee only, riposte counts as an extra attack; count stats
-  (`Stats.INTEGER_STATS`) are whole numbers.
+  (`Stats.INTEGER_STATS`) are whole numbers. Armor Specialization is computed after the
+  weapons' bonus stats are applied (`Player.apply_equipment`).
 - **Between waves** (`scenes/ui/intermission.gd`): LOOT phase (`LootRollScreen`, 15 s per
   item, hidden choices, bots `LootRoll.bot_choice`, solo Take / Sell / Leave) then MARKET
   (`ShopPanel` centred, one `PlayerPanel` per hero scaled into its corner with
@@ -418,6 +440,8 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   - **Unplug / leave:** a pad that comes back is un-readied (auto-ready lasts only while it is
     unplugged); an unplugged player's shop cursor and tooltip are hidden;
     `PlayerManager.player_left` refreshes panels, chips, the shop cursors and the votes.
-- **Bots** (smoke / demo): buy the cheapest usable affordable offer (50%), equip upgrades
-  (`ItemTooltip.upgrade_direction`), sell junk when full. `SMOKE_RESULT` adds `items_bought`,
+- **Bots** (smoke / demo): equip upgrades from the backpack, then buy every affordable offer
+  that is an upgrade (cheapest first, one buy per bot per pass so the shared wallet is spread)
+  and wear it; sell non-upgrades when the backpack is full (never the last weapon); Need only
+  real upgrades (`LootRoll.bot_choice`). `SMOKE_RESULT` adds `items_bought`,
   `items_looted`, `loot_rolls`, `need_wins`, `greed_gold`.
