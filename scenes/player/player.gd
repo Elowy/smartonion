@@ -32,6 +32,8 @@ const COLLISION_MASK_WORLD := 1
 const ACCELERATION := 40.0
 const DECELERATION := 60.0
 const MOVE_DEADZONE := 0.05
+## Gap (m) kept between the body and the arena's outer walls (see _clamp_motion_to_arena).
+const WALL_GAP := 0.02
 ## Downed ghosts move at half speed (GDD 1).
 const GHOST_SPEED_MULT := 0.5
 ## HP fraction after a teammate revive / after a wave starts while downed.
@@ -280,9 +282,17 @@ func _update_movement(delta: float) -> void:
 	var target := Vector3(move.x, 0.0, move.y) * max_speed
 	var rate := ACCELERATION if move.length() > MOVE_DEADZONE else DECELERATION
 	velocity = Vector3(velocity.x, 0.0, velocity.z).move_toward(target, rate * delta)
-	_move_body(velocity * delta)
-	if Arena.current != null and is_inside_tree():
-		global_position = Arena.current.clamp_point(global_position, RADIUS)
+	var arena := Arena.current if is_inside_tree() else null
+	var motion := velocity * delta
+	if arena != null:
+		motion = _clamp_motion_to_arena(arena, motion)
+	_move_body(motion)
+	if arena != null:
+		# Safety net (spawn outside, physics push-out ...).
+		var here := global_position
+		var safe := arena.clamp_point(here, RADIUS)
+		if safe != here:
+			global_position = safe
 	if move.length() > MOVE_DEADZONE:
 		facing = Vector3(move.x, 0.0, move.y).normalized()
 	if model != null:
@@ -291,6 +301,25 @@ func _update_movement(delta: float) -> void:
 			look = _attack_look_dir
 		model.set_facing(look)
 		model.set_moving(clampf(velocity.length() / maxf(0.01, max_speed), 0.0, 1.0))
+
+
+## Keeps [param motion] inside the arena bounds (shrunk by RADIUS + WALL_GAP) and stops the
+## velocity component that pushes into an outer wall. The outer walls' inner faces lie on
+## the bounds, so the physics query below never touches them: sliding along a wall costs a
+## plain clamp instead of several capsule-vs-box casts per frame.
+func _clamp_motion_to_arena(arena: Arena, motion: Vector3) -> Vector3:
+	var here := global_position
+	var b := arena.get_bounds().grow(-(RADIUS + WALL_GAP))
+	if not b.has_area():
+		return motion
+	var dest := Vector3(here.x + motion.x, here.y + motion.y, here.z + motion.z)
+	var cx := clampf(dest.x, minf(b.position.x, here.x), maxf(b.end.x, here.x))
+	var cz := clampf(dest.z, minf(b.position.y, here.z), maxf(b.end.y, here.z))
+	if cx != dest.x:
+		velocity.x = 0.0
+	if cz != dest.z:
+		velocity.z = 0.0
+	return Vector3(cx - here.x, motion.y, cz - here.z)
 
 
 ## Moves by [param motion], sliding along walls. Uses move_and_collide so the motion is

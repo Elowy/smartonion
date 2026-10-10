@@ -51,6 +51,19 @@ func test_stats_from_class_and_weapons() -> void:
 	check_eq(mage.stats.get_raw(Stats.INTELLECT), 3.0, "tome intellect gone")
 
 
+func test_create_binds_bot_and_slot() -> void:
+	var slot := PlayerSlot.new(2, BotInput.new("bot:test", 5), PlayerManager.PLAYER_COLORS[2])
+	slot.class_data = null  # falls back to the default class
+	var p := Player.create(slot)
+	check(p.class_data == Db.get_default_class(), "default class without a pick")
+	check((slot.input as BotInput).body == p, "the bot steers this player")
+	check(slot.player == p, "slot.player set")
+	check_eq(p.name, "Player3", "named after the slot")
+	check_eq(p.hp, p.max_hp(), "full hp before entering the tree")
+	p.free()
+	check(slot.player == null, "freed player clears slot.player")
+
+
 func test_armor_reduces_damage() -> void:
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	p.stats.set_source(&"test", {Stats.ARMOR: 13.0})  # total 15 -> 50%
@@ -244,9 +257,25 @@ func test_movement_clamped_to_arena() -> void:
 	var previous := Arena.current
 	Arena.current = arena
 	var p := Fakes.spawn_player(world, 0, &"warrior")
-	(p.slot.input as ScriptedInput).move = Vector2(1, 0)
+	var input := p.slot.input as ScriptedInput
+	input.move = Vector2(1, 0)
 	p.global_position = Vector3(Arena.SIZE.x * 0.5 - 0.5, 0, 0)
 	Fakes.step(p, 1.0)
 	check(p.global_position.x <= Arena.SIZE.x * 0.5 - Player.RADIUS + 0.001, "clamped inside the arena")
+	check_near(p.velocity.x, 0.0, 0.001, "no velocity into the wall")
+	# Pushing diagonally into the wall slides along it.
+	input.move = Vector2(1, 1).normalized()
+	var z0 := p.global_position.z
+	Fakes.step(p, 0.5)
+	check(p.global_position.x <= Arena.SIZE.x * 0.5 - Player.RADIUS + 0.001, "still inside")
+	check(p.global_position.z - z0 > p.stats.move_speed() * 0.707 * 0.5 * 0.7, "slides along the wall")
+	# Outside the bounds (e.g. a bad spawn) it is pulled back in and can walk away freely.
+	input.move = Vector2(-1, 0)
+	p.global_position = Vector3(Arena.SIZE.x * 0.5 + 2.0, 0, 0)
+	Fakes.step(p, 1.0 / 60.0)
+	check(p.global_position.x <= Arena.SIZE.x * 0.5 - Player.RADIUS + 0.001, "pulled back inside")
+	var x0 := p.global_position.x
+	Fakes.step(p, 0.5)
+	check(p.global_position.x < x0 - 1.0, "walks away from the wall")
 	Arena.current = previous
 	arena.free()

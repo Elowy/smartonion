@@ -10,7 +10,7 @@ extends Node3D
 
 const PITCH_DEG := 57.0
 const FOV := 40.0
-const MIN_DISTANCE := 21.5
+const MIN_DISTANCE := 19.5
 const MAX_DISTANCE := 36.0
 ## Metres kept between the outermost players and the screen edge.
 const FRAME_MARGIN := 3.2

@@ -195,12 +195,19 @@ static func nearest_enemy(nodes: Array[Node], origin: Vector3, max_range: float)
 	var best_d := max_range * max_range
 	for node in nodes:
 		var e := node as Enemy
-		if e == null or not e.is_inside_tree() or e.is_dead():
+		if e == null or not e.is_inside_tree():
 			continue
-		var d := flat(e.global_position - origin).length_squared()
-		if d < best_d or (best == null and d <= best_d):
-			best_d = d
-			best = e
+		# Distance first (cheap), the script call is_dead() only for closer candidates.
+		var pos := e.global_position
+		var dx := pos.x - origin.x
+		var dz := pos.z - origin.z
+		var d := dx * dx + dz * dz
+		if d > best_d or (d == best_d and best != null):
+			continue
+		if e.is_dead():
+			continue
+		best_d = d
+		best = e
 	return best
 
 

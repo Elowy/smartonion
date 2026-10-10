@@ -124,20 +124,29 @@ func advance(delta: float) -> void:
 
 
 func _sweep(from: Vector3, to: Vector3) -> void:
-	var seg := WeaponRunner.flat(to - from)
-	var seg_len_sq := seg.length_squared()
+	# Hot path (every projectile x every enemy each tick): plain float maths first, the
+	# validity checks only for the few bodies close to the segment.
+	var sx := to.x - from.x
+	var sz := to.z - from.z
+	var seg_len_sq := sx * sx + sz * sz
+	var inv_len_sq := 1.0 / seg_len_sq if seg_len_sq > 0.0 else 0.0
+	var vs_enemies := team == TEAM_PLAYERS
 	var candidates: Array[Array] = []
 	for node in get_tree().get_nodes_in_group(_target_group()):
 		var body := node as Node3D
-		if not _is_valid_target(body):
+		if body == null:
 			continue
-		var rel := WeaponRunner.flat(body.global_position - from)
-		var t := 0.0
-		if seg_len_sq > 0.0:
-			t = clampf(rel.dot(seg) / seg_len_sq, 0.0, 1.0)
-		var closest := seg * t
-		var reach := _target_radius(body) + HIT_RADIUS
-		if rel.distance_squared_to(closest) <= reach * reach:
+		var pos := body.global_position
+		var rx := pos.x - from.x
+		var rz := pos.z - from.z
+		var t := clampf((rx * sx + rz * sz) * inv_len_sq, 0.0, 1.0)
+		var dx := rx - sx * t
+		var dz := rz - sz * t
+		var e := body as Enemy if vs_enemies else null
+		var reach := (e.radius if e != null else Player.RADIUS) + HIT_RADIUS
+		if dx * dx + dz * dz > reach * reach:
+			continue
+		if _is_valid_target(body):
 			candidates.append([t, body])
 	if candidates.is_empty():
 		return

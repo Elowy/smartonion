@@ -13,6 +13,12 @@ const MAX_TEXTS := 70
 ## Label3D uses fixed_size: pixel_size is the world size at 1 m, i.e. constant on screen.
 const TEXT_PIXEL_SIZE := 0.00046
 const TEXT_FONT_SIZE := 64
+## World height of ground decals (shock-wave rings) – they snap to the ground whatever
+## height the effect itself was spawned at (explosions happen at projectile height ...).
+const GROUND_Y := 0.04
+## Extra height added to [method slash_arc] positions (callers pass feet + 0.3 m), so the
+## swing reads at mid-body height.
+const ARC_LIFT := 0.3
 
 const _ARC_CODE := """
 shader_type spatial;
@@ -156,7 +162,7 @@ static func slash_arc(pos: Vector3, direction: Vector3, radius: float, arc_degre
 	if flat.length_squared() > 0.0001:
 		fx.rotation.y = atan2(-direction.x, -direction.z)
 	# Swing at mid-body height so it reads over the crowd.
-	fx.position.y += 0.55
+	fx.position.y += ARC_LIFT
 	_start(fx)
 
 
@@ -164,9 +170,9 @@ static func hit_spark(pos: Vector3, color: Color) -> void:
 	var fx := _effect(VfxEffect.Kind.SPARK, pos, 0.3)
 	if fx == null:
 		return
-	fx.size = 0.5
+	fx.size = 0.26
 	fx.color = color
-	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.4), 1.0)
+	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.4), 0.9)
 	fx.flash.position.y = 0.0
 	var p := _particles(fx, 9, 0.28, _spark_mesh(), Mats.particle(true))
 	p.particle_flag_align_y = true
@@ -183,6 +189,7 @@ static func hit_spark(pos: Vector3, color: Color) -> void:
 	_start(fx)
 
 
+## [param pos] is the body centre (the shock ring snaps to the ground).
 static func death_puff(pos: Vector3, color: Color, size: float = 1.0) -> void:
 	var fx := _effect(VfxEffect.Kind.PUFF, pos, 0.7)
 	if fx == null:
@@ -191,7 +198,7 @@ static func death_puff(pos: Vector3, color: Color, size: float = 1.0) -> void:
 	fx.color = Color(color.r, color.g, color.b, 0.75)
 	fx.ring = _ground_ring(fx)
 	var smoke := _particles(fx, 10, 0.6, _ball_mesh(), Mats.particle(false))
-	smoke.position.y = 0.4 * size
+	smoke.position.y = 0.05 * size
 	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 	smoke.emission_sphere_radius = 0.25 * size
 	smoke.direction = Vector3.UP
@@ -207,7 +214,7 @@ static func death_puff(pos: Vector3, color: Color, size: float = 1.0) -> void:
 	var light := color.lerp(Color(0.95, 0.93, 0.9), 0.55)
 	smoke.color_ramp = _fade_gradient(Color(light.r, light.g, light.b, 0.95), Color(light.r, light.g, light.b, 0.0))
 	var bits := _particles(fx, 6, 0.55, _chip_mesh(), Mats.particle(false))
-	bits.position.y = 0.5 * size
+	bits.position.y = 0.1 * size
 	bits.direction = Vector3.UP
 	bits.spread = 60.0
 	bits.initial_velocity_min = 2.5
@@ -226,10 +233,10 @@ static func explosion(pos: Vector3, radius: float, color: Color) -> void:
 	fx.size = maxf(radius, 0.3)
 	fx.color = color
 	fx.flash = _glow_ball(fx, color, 1.0)
-	fx.flash.position.y = 0.3
+	fx.flash.position.y = 0.0
 	fx.ring = _ground_ring(fx)
 	var embers := _particles(fx, 14, 0.5, _ball_mesh(), Mats.particle(true))
-	embers.position.y = 0.4
+	embers.position.y = 0.0
 	embers.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 	embers.emission_sphere_radius = radius * 0.3
 	embers.direction = Vector3.UP
@@ -317,10 +324,10 @@ static func pickup_sparkle(pos: Vector3) -> void:
 	var fx := _effect(VfxEffect.Kind.SPARKLE, pos, 0.4)
 	if fx == null:
 		return
-	fx.size = 0.35
+	fx.size = 0.2
 	fx.color = gold
-	fx.flash = _glow_ball(fx, gold, 1.0)
-	fx.flash.position.y = 0.2
+	fx.flash = _glow_ball(fx, gold, 0.85)
+	fx.flash.position.y = 0.0
 	var p := _particles(fx, 8, 0.4, _star_mesh(), Mats.particle(true))
 	p.direction = Vector3.UP
 	p.spread = 55.0
@@ -379,6 +386,8 @@ static func _start(fx: VfxEffect) -> void:
 	if parent is Node3D and (parent as Node3D).is_inside_tree():
 		origin = (parent as Node3D).global_transform.affine_inverse() * pos
 	fx.position = origin + local
+	if fx.ring != null:
+		fx.ring.position.y = GROUND_Y - (pos.y + local.y)
 	parent.add_child(fx)
 	for child in fx.get_children():
 		if child is CPUParticles3D:

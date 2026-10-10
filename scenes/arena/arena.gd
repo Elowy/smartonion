@@ -70,12 +70,13 @@ void fragment() {
 	g = mix(g, grass_light.rgb, smoothstep(0.5, 0.74, big + (mid - 0.5) * 0.45) * 0.85);
 	g = mix(g, grass_warm.rgb, smoothstep(0.64, 0.82, mid) * 0.3);
 	g *= 0.92 + 0.14 * stroke;
-	// Clover-like round speckles (one jittered dot per cell).
+	// Clover-like round speckles (one jittered dot per cell, sparse, varied size).
 	vec2 cell = floor(p * 2.2);
 	vec2 dot_center = cell + 0.25 + 0.5 * vec2(hash(cell), hash(cell + 7.1));
-	float dot_r = 0.12 + 0.12 * hash(cell + 3.3);
-	float speck = step(0.8, hash(cell + 1.7)) * (1.0 - smoothstep(dot_r * 0.6, dot_r, length(p * 2.2 - dot_center)));
-	g = mix(g, mix(grass_light.rgb, grass_warm.rgb, hash(cell + 9.0)), speck * 0.4);
+	float dot_r = 0.07 + 0.17 * hash(cell + 3.3);
+	float speck = step(0.86, hash(cell + 1.7)) * (1.0 - smoothstep(dot_r * 0.5, dot_r, length(p * 2.2 - dot_center)));
+	speck *= smoothstep(0.3, 0.6, mid + 0.25 * hash(cell + 4.4));
+	g = mix(g, mix(grass_light.rgb, grass_warm.rgb, hash(cell + 9.0)) * 1.04, speck * 0.28);
 	// Slightly darker, lusher grass along the inside of the walls.
 	vec2 edge = arena_half - abs(p);
 	float inside = step(0.0, min(edge.x, edge.y));
@@ -102,8 +103,12 @@ void fragment() {
 	vec3 dc = mix(dirt_dark.rgb, dirt_light.rgb, smoothstep(0.25, 0.7, mid) * 0.75 + stroke * 0.25);
 	vec2 pc = floor(p * 3.0);
 	vec2 pcen = pc + 0.3 + 0.4 * vec2(hash(pc + 2.0), hash(pc + 5.0));
-	float pebble = step(0.7, hash(pc)) * (1.0 - smoothstep(0.1, 0.16, length(p * 3.0 - pcen)));
-	dc = mix(dc, dirt_light.rgb * 1.25, pebble * 0.7);
+	float pr = 0.06 + 0.1 * hash(pc + 8.0);
+	float pd = length(p * 3.0 - pcen);
+	float pebble = step(0.84, hash(pc)) * (1.0 - smoothstep(pr * 0.7, pr, pd));
+	float pebble_shadow = step(0.84, hash(pc)) * (1.0 - smoothstep(pr, pr * 1.5, length(p * 3.0 - pcen - vec2(0.05, 0.06))));
+	dc *= 1.0 - 0.18 * max(pebble_shadow - pebble, 0.0);
+	dc = mix(dc, mix(dirt_light.rgb, vec3(0.74, 0.7, 0.62), 0.55) * 1.08, pebble * 0.75);
 	g *= 1.0 - rim * 0.25;
 	ALBEDO = mix(g, dc, dirt);
 	ROUGHNESS = 1.0;

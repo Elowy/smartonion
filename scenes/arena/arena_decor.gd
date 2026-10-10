@@ -5,7 +5,7 @@ extends RefCounted
 ## (forest chunks, bushes, rocks, props, grass, flowers) so it costs only a few draw calls.
 ## Uses its own seeded RNG – never RunState.rng.
 
-const STONE := Color(0.56, 0.55, 0.53)
+const STONE := Color(0.53, 0.5, 0.47)
 const MOSS := Color(0.42, 0.54, 0.3)
 const WOOD := Color(0.47, 0.31, 0.18)
 const DARK_WOOD := Color(0.34, 0.22, 0.13)
@@ -243,13 +243,13 @@ static func _tree(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
 	var canopy := top + Vector3(0, rng.randf_range(0.6, 1.0), 0)
 	var blobs := rng.randi_range(3, 5)
 	var size := rng.randf_range(1.3, 1.9)
-	k.add_sphere(size, MeshKit.xf(canopy, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), base.darkened(0.08), 10, 6)
+	k.add_sphere(size, MeshKit.xf(canopy, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), base.darkened(0.08), 12, 6)
 	for i in blobs:
 		var a := TAU * i / blobs + rng.randf_range(-0.4, 0.4)
 		var off := Vector3(sin(a) * size * 0.7, rng.randf_range(-0.2, 0.5), cos(a) * size * 0.7)
 		var c := base.lightened(rng.randf_range(-0.05, 0.12))
-		k.add_sphere(size * rng.randf_range(0.6, 0.8), MeshKit.xf(canopy + off, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), c, 9, 5)
-	k.add_sphere(size * 0.7, MeshKit.xf(canopy + Vector3(0, size * 0.6, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(0.16), 9, 5)
+		k.add_sphere(size * rng.randf_range(0.6, 0.8), MeshKit.xf(canopy + off, Vector3.ZERO, Vector3(1.0, 0.85, 1.0)), c, 11, 6)
+	k.add_sphere(size * 0.7, MeshKit.xf(canopy + Vector3(0, size * 0.6, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(0.16), 11, 6)
 
 
 static func _pine(k: MeshKit, p: Vector3, rng: RandomNumberGenerator) -> void:
@@ -322,7 +322,7 @@ static func _bush(k: MeshKit, p: Vector3, size: float, rng: RandomNumberGenerato
 		var a := rng.randf_range(0.0, TAU)
 		var off := Vector3(sin(a), 0, cos(a)) * size * rng.randf_range(0.2, 0.6)
 		var s := size * rng.randf_range(0.55, 0.85)
-		k.add_sphere(s, MeshKit.xf(p + off + Vector3(0, s * 0.55, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(rng.randf_range(0.0, 0.14)), 9, 5)
+		k.add_sphere(s, MeshKit.xf(p + off + Vector3(0, s * 0.55, 0), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)), base.lightened(rng.randf_range(0.0, 0.14)), 12, 6)
 	if rng.randf() < 0.3:
 		var bloom := [Color(0.98, 0.6, 0.75), Color(0.98, 0.95, 0.85), Color(1.0, 0.85, 0.3)][rng.randi_range(0, 2)] as Color
 		for i in 5:

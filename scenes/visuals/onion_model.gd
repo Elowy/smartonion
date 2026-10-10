@@ -34,6 +34,7 @@ const LEATHER := Color(0.4, 0.25, 0.14)
 const IVORY := Color(0.94, 0.9, 0.78)
 const SPROUT_GREEN := Color(0.38, 0.7, 0.22)
 const TABARD_BLUE := Color(0.17, 0.3, 0.68)
+const SCARF_RED := Color(0.66, 0.11, 0.13)
 
 ## Bulb silhouette: (radius, y) from the root up to the neck.
 const BULB_POINTS := [
@@ -390,6 +391,11 @@ func _apply_downed_look() -> void:
 			mi.material_override = _saved_materials[mi]
 	if not downed:
 		_saved_materials.clear()
+	var eyes := _face_mesh()
+	if eyes != null:
+		# The ghost casts no shadow, so floating eye shadows would look odd.
+		eyes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if downed \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for w in _weapon_nodes:
 		if w != null:
 			w.visible = not downed
@@ -751,12 +757,8 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 			var silver := acc.lerp(Color(0.8, 0.82, 0.88), 0.35)
 			_helm_dome(k, GOLD, silver)
 			for side: float in [-1.0, 1.0]:
-				for f in 4:
-					var feather := PackedVector2Array([Vector2(0, 0), Vector2(0.07, 0.1), Vector2(0.05, 0.34),
-						Vector2(0.0, 0.42), Vector2(-0.04, 0.25)])
-					var rot := Vector3(-10.0 - f * 20.0, 90.0 * side, -30.0 * side - f * 6.0 * side)
-					k.add_extrusion(feather, 0.03, MeshKit.xf(Vector3(0.33 * side, 0.8, 0.02 + f * 0.035), rot), Color(0.98, 0.98, 0.96), 0.85)
-				k.add_sphere(0.06, MeshKit.xf(Vector3(0.33 * side, 0.8, 0.03)), silver, 8, 4)
+				_helm_wing(k, side, Vector3(0.3 * side, 0.74, 0.06))
+				k.add_sphere(0.065, MeshKit.xf(Vector3(0.33 * side, 0.76, 0.03)), silver, 8, 4)
 			_belt(k, GOLD, Color(0.9, 0.2, 0.15))
 		&"wizard_hat":
 			var hat := acc
@@ -772,6 +774,22 @@ static func _gear_mesh(cd: ClassData) -> Mesh:
 			k.add_box(Vector3(0.12, 0.12, 0.08), MeshKit.xf(OnionModel.bulb_point(0.25, 125.0, 0.04), Vector3(0, 125, 0)), LEATHER.darkened(0.2))
 			var strap := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(32))) * Basis.from_scale(Vector3(1, 0.55, 1)), Vector3(0, 0.45, 0))
 			k.add_torus(0.385, 0.425, strap, LEATHER.darkened(0.1), 28, 4)
+			# Crimson scarf: a band along the hood's lower edge and two tails flapping behind,
+			# so the rogue reads from behind / above too.
+			var band := PackedVector2Array()
+			for p in bulb_profile():
+				if p.y >= 0.4 and p.y <= 0.5:
+					band.append(Vector2(p.x * 1.1 + 0.035, p.y + 0.03))
+			k.add_lathe(band, Transform3D(), SCARF_RED, 22, 54.0, 306.0)
+			var knot := bulb_point(0.47, 180.0, 0.06)
+			k.add_sphere(0.055, MeshKit.xf(knot, Vector3.ZERO, Vector3(1.3, 0.9, 0.8)), SCARF_RED.darkened(0.1), 8, 4)
+			for i in 2:
+				var side := -1.0 if i == 0 else 1.0
+				var length := 0.34 if i == 0 else 0.27
+				var ribbon := PackedVector2Array([Vector2(-0.045, 0.0), Vector2(0.045, 0.0), Vector2(0.04, length),
+					Vector2(0.0, length - 0.06), Vector2(-0.04, length)])
+				k.add_extrusion(ribbon, 0.022, MeshKit.xf(knot + Vector3(0.03 * side, -0.01, 0.0),
+					Vector3(112.0 + 10.0 * i, 18.0 * side, 0.0)), SCARF_RED.darkened(0.06 * i), 0.9)
 		&"horned_hood":
 			var dark := Color(0.17, 0.09, 0.2)
 			_hood_cap(k, dark)
@@ -812,6 +830,23 @@ static func _helm_dome(k: MeshKit, metal: Color, trim: Color) -> void:
 	for i in 10:
 		var a := TAU * i / 10.0
 		k.add_sphere(0.022, MeshKit.xf(Vector3(sin(a) * 0.392, 0.69, cos(a) * 0.392)), trim.lightened(0.3), 6, 3)
+
+
+## One swept-back feathered wing on the paladin helm (white feathers, golden root).
+static func _helm_wing(k: MeshKit, side: float, root: Vector3) -> void:
+	# Outline in (outwards, up) with a scalloped trailing edge.
+	var pts: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.03, 0.13), Vector2(0.11, 0.28), Vector2(0.23, 0.39),
+		Vector2(0.38, 0.46), Vector2(0.36, 0.34), Vector2(0.3, 0.35), Vector2(0.29, 0.23), Vector2(0.22, 0.25),
+		Vector2(0.2, 0.13), Vector2(0.13, 0.15), Vector2(0.1, 0.04), Vector2(0.04, 0.02)]
+	var wing := PackedVector2Array()
+	for p in pts:
+		wing.append(Vector2(p.x * side, p.y))
+	var xform := MeshKit.xf(root, Vector3(0, -34.0 * side, 0))
+	k.add_extrusion(wing, 0.035, xform, Color(0.98, 0.97, 0.94), 0.92)
+	var base := PackedVector2Array()
+	for p: Vector2 in [Vector2(-0.03, -0.03), Vector2(0.03, 0.13), Vector2(0.11, 0.2), Vector2(0.13, 0.1), Vector2(0.07, 0.0)]:
+		base.append(Vector2(p.x * side, p.y))
+	k.add_extrusion(base, 0.06, xform, GOLD, 0.9)
 
 
 static func _belt(k: MeshKit, belt: Color, buckle: Color) -> void:

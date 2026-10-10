@@ -217,7 +217,7 @@ static func parts_for(p_style: StringName, color: Color) -> Dictionary:
 			out["arm_pivot"] = Vector3(0.25, 0.5, -0.02)
 			out["head_y"] = 1.0
 			out["glow"] = MeshKit.cached("enemy:flame", func() -> Mesh: return _flame_mesh())
-			out["glow_pos"] = Vector3(0, 1.06, -0.02)
+			out["glow_pos"] = Vector3(0, 1.07, -0.02)
 			out["glow_color"] = Color(1.0, 0.62, 0.18)
 		&"gurgler":
 			out["arm_pivot"] = Vector3(0.36, 0.52, 0.0)
@@ -450,17 +450,26 @@ static func _troll_arm(k: MeshKit, skin: Color) -> void:
 	k.add_sphere(0.075, _xf(ha), skin.darkened(0.05), 8, 4)
 	var b := Basis.from_euler(Vector3(deg_to_rad(-70), 0, 0))
 	var t := Transform3D(b, ha)
-	k.add_cylinder(0.025, 0.025, 0.55, t * _xf(Vector3(0, 0.15, 0)), WOOD, 6)
-	var blade := PackedVector2Array([Vector2(0.02, 0.3), Vector2(0.12, 0.26), Vector2(0.2, 0.3),
-		Vector2(0.22, 0.4), Vector2(0.19, 0.5), Vector2(0.11, 0.48), Vector2(0.02, 0.44)])
-	k.add_extrusion(blade, 0.03, t, Color(0.7, 0.72, 0.75), 0.8)
-	k.add_cylinder(0.035, 0.035, 0.05, t * _xf(Vector3(0, -0.12, 0)), Color(0.85, 0.25, 0.2), 6)
+	k.add_cylinder(0.03, 0.03, 0.66, t * _xf(Vector3(0, 0.18, 0)), WOOD, 6)
+	# Big bearded throwing-axe head with a bright edge and a back spike.
+	var blade := PackedVector2Array([Vector2(0.02, 0.32), Vector2(0.12, 0.27), Vector2(0.2, 0.22),
+		Vector2(0.3, 0.26), Vector2(0.34, 0.38), Vector2(0.32, 0.5), Vector2(0.24, 0.58),
+		Vector2(0.14, 0.55), Vector2(0.02, 0.5)])
+	k.add_extrusion(blade, 0.035, t, Color(0.66, 0.68, 0.72), 0.82)
+	var edge := PackedVector2Array([Vector2(0.27, 0.25), Vector2(0.31, 0.26), Vector2(0.355, 0.38),
+		Vector2(0.335, 0.51), Vector2(0.25, 0.59), Vector2(0.23, 0.56), Vector2(0.3, 0.49), Vector2(0.32, 0.38)])
+	k.add_extrusion(edge, 0.04, t, Color(0.9, 0.92, 0.95), 0.8)
+	var spike := PackedVector2Array([Vector2(-0.02, 0.36), Vector2(-0.16, 0.42), Vector2(-0.02, 0.47)])
+	k.add_extrusion(spike, 0.03, t, Color(0.55, 0.56, 0.6), 0.8)
+	k.add_box(Vector3(0.07, 0.24, 0.06), t * _xf(Vector3(0.0, 0.42, 0)), Color(0.35, 0.33, 0.35))
+	for i in 2:
+		k.add_torus(0.028, 0.045, t * _xf(Vector3(0, -0.02 + i * 0.09, 0)), Color(0.85, 0.25, 0.2), 8, 4)
 
 
 static func _flame_mesh() -> Mesh:
 	var k := MeshKit.new()
-	k.add_sphere(0.055, _xf(Vector3(0, 0.03, 0)), Color.WHITE, 8, 4)
-	k.add_cylinder(0.0, 0.05, 0.12, _xf(Vector3(0, 0.1, 0)), Color.WHITE, 8)
+	k.add_sphere(0.075, _xf(Vector3(0, 0.05, 0), Vector3.ZERO, Vector3(1.0, 1.1, 1.0)), Color.WHITE, 10, 5)
+	k.add_cylinder(0.0, 0.07, 0.19, _xf(Vector3(0, 0.16, 0)), Color.WHITE, 10)
 	return k.build()
 
 
