@@ -8,20 +8,19 @@ extends TestCase
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const DT := 1.0 / 60.0
 ## Every keyboard key the tests press (released again in before_each / after_each).
-## Tests are synchronous and run inside ONE engine frame: a key that is mapped to a ui_* action
-## (Enter, Space, Esc, arrows) leaves Input.is_action_just_pressed() true for every test that
-## follows in that frame. So the sync tests use F (join / confirm) and D (right) only, and the
-## async tests that need the others wait one frame before they finish.
+## All tests here are synchronous on purpose: they never await a frame. The enemies tests
+## (which run later in the same engine frame) step bodies by hand and move_and_slide() then
+## uses Engine's last PROCESS delta, so a real frame advancing in between (headless frames are
+## ~1 ms) shortens every movement they measure. A press of a ui_* key (Enter, Space) leaves
+## Input.is_action_just_pressed() true for the rest of the frame, so _release_keys() also
+## resets the actions.
 const TEST_KEYS: Array[Key] = [KEY_ENTER, KEY_SPACE, KEY_KP_ENTER, KEY_F, KEY_D]
 
 var lobby: Lobby
 var main: Main
 var starts := 0
-var _async := false
-
-
-func is_async() -> bool:
-	return _async
+## Screens created by a test: freed in after_each even when a check bails out early.
+var _screens: Array[Node] = []
 
 
 func before_each() -> void:
@@ -34,6 +33,9 @@ func after_each() -> void:
 	_release_keys()
 	UiFakes.free_node(lobby)
 	lobby = null
+	for node in _screens:
+		UiFakes.free_node(node)
+	_screens.clear()
 	if main != null and is_instance_valid(main):
 		if main.get_parent() != null:
 			main.get_parent().remove_child(main)
@@ -58,6 +60,9 @@ func _key(code: Key, down: bool) -> void:
 func _release_keys() -> void:
 	for code in TEST_KEYS:
 		_key(code, false)
+	# A key press also marks its ui_* action as "just pressed" for the rest of the frame.
+	for action in InputMap.get_actions():
+		Input.action_release(action)
 
 
 func _make_lobby() -> Lobby:
@@ -207,7 +212,6 @@ func test_stick_held_while_joining_does_not_move_the_class_cursor() -> void:
 
 
 func test_all_keyboard_join_keys_join_and_confirm() -> void:
-	_async = true  # Enter / Space are ui_* keys: wait a frame at the end (see TEST_KEYS)
 	check_eq(KeyboardInput.JOIN_KEYS.size(), 4, "Enter, Space, Keypad Enter and F")
 	for code in KeyboardInput.JOIN_KEYS:
 		var key_name := OS.get_keycode_string(code)
@@ -227,8 +231,6 @@ func test_all_keyboard_join_keys_join_and_confirm() -> void:
 		_lobby_frame()
 		UiFakes.free_node(lobby)
 		lobby = null
-	await tree.process_frame
-	finished.emit()
 
 
 # --- Ghost slots ---------------------------------------------------------------------
@@ -289,6 +291,7 @@ func test_game_over_to_lobby_drops_the_ghost_slot() -> void:
 func _pause_menu() -> PauseMenu:
 	var menu := PauseMenu.create()
 	UiFakes.add_to_root(tree, menu)
+	_screens.append(menu)
 	return menu
 
 
@@ -476,26 +479,29 @@ func test_continue_without_removes_the_player_and_keeps_the_run_going() -> void:
 
 
 func test_continue_without_through_the_menu() -> void:
-	_async = true
 	_make_main()
-	var a := _human("pad:a")
+	_human("pad:a")
 	var b := _human("pad:b")
 	main.start_run()
 	b.connected = false
 	PlayerManager.device_disconnected.emit(PlayerManager.get_slot(1))
 	var menu := main.pause_menu
+	check(menu.drop_player_requested.is_connected(main.drop_player), "Main listens to the menu's drop request")
+	var dropped: Array[PlayerSlot] = []
+	menu.drop_player_requested.connect(func(s: PlayerSlot) -> void: dropped.append(s))
 	_menu_frame()
 	menu.move_selection(1)
 	check_eq(menu.selected, PauseMenu.DROP_BASE + 1, "Continue without P2 highlighted")
 	menu.pads.injected.append(JOY_BUTTON_A)
 	_menu_frame()
-	check(menu.visible, "the menu waits for Main (deferred signal)")
-	await tree.process_frame
+	check_eq(dropped.size(), 1, "A on the entry requests the drop")
+	check(dropped.size() == 1 and dropped[0] == PlayerManager.get_slot(1), "for P2's slot")
+	check(menu.visible, "the menu stays up until Main has handled it")
+	# Main's connection is deferred (the new state never sees the press): run what it queues.
+	main.drop_player(dropped[0])
 	check_eq(PlayerManager.count(), 1, "P2 removed")
 	check(not tree.paused and not menu.visible, "run resumed")
 	check_eq(main.state, Main.State.WAVE, "wave goes on")
-	check(a != null, "P1 stays")
-	finished.emit()
 
 
 func test_continue_without_keeps_pausing_while_another_pad_is_missing() -> void:
@@ -551,13 +557,13 @@ func test_dropping_the_only_living_player_ends_the_run() -> void:
 func _game_over_screen() -> GameOverScreen:
 	var screen := GameOverScreen.create()
 	UiFakes.add_to_root(tree, screen)
+	_screens.append(screen)
 	screen.open(false)
 	UiFakes.step(screen, GameOverScreen.INPUT_DELAY)
 	return screen
 
 
 func test_game_over_with_joined_slots_ignores_global_input() -> void:
-	_async = true  # Enter is ui_accept: wait a frame at the end (see TEST_KEYS)
 	var a := _human("pad:a")
 	var screen := _game_over_screen()
 	var backs: Array[int] = [0]
@@ -566,20 +572,16 @@ func test_game_over_with_joined_slots_ignores_global_input() -> void:
 	UiFakes.step(screen)
 	screen.pads.injected.append(JOY_BUTTON_START)
 	UiFakes.step(screen)
-	_key(KEY_ENTER, true)
-	check(Input.is_action_just_pressed(&"ui_accept"), "ui_accept is really down this frame")
+	_key(KEY_ENTER, true)  # ui_accept as well (whether Godot reports it as "just pressed" depends on the frame type)
 	UiFakes.step(screen)
 	_key(KEY_ENTER, false)
 	check_eq(backs[0], 0, "another device's A / ui_accept does not act for a joined player")
 	UiFakes.tap(screen, a, PlayerInput.Pad.A)
 	check_eq(backs[0], 1, "the slot's own A does")
 	UiFakes.free_node(screen)
-	await tree.process_frame
-	finished.emit()
 
 
 func test_game_over_falls_back_to_global_input_without_a_usable_slot() -> void:
-	_async = true  # Enter is ui_accept: wait a frame at the end (see TEST_KEYS)
 	var backs: Array[int] = [0]
 	var screen := _game_over_screen()
 	screen.back_to_menu_requested.connect(func() -> void: backs[0] += 1)
@@ -594,18 +596,15 @@ func test_game_over_falls_back_to_global_input_without_a_usable_slot() -> void:
 	screen.pads.injected.append(JOY_BUTTON_A)
 	UiFakes.step(screen)
 	check_eq(backs[0], 2, "all joined pads unplugged: global fallback")
-	# Bots only (demo): the keyboard's ui_accept still works.
+	# Bots only (demo): nobody can press a slot button, the global input still works.
 	UiFakes.reset_players()
 	PlayerManager.add_bot(&"warrior", 1)
 	screen.open(false)
 	UiFakes.step(screen, GameOverScreen.INPUT_DELAY)
-	_key(KEY_ENTER, true)
+	screen.pads.injected.append(JOY_BUTTON_START)
 	UiFakes.step(screen)
-	_key(KEY_ENTER, false)
-	check_eq(backs[0], 3, "bots only: ui_accept")
+	check_eq(backs[0], 3, "bots only: any controller's START")
 	UiFakes.free_node(screen)
-	await tree.process_frame
-	finished.emit()
 
 
 # --- Nav hysteresis -----------------------------------------------------------------------
