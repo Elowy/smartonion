@@ -337,6 +337,11 @@ func _draw() -> void:
 		dim.set_corner_radius_all(5)
 		draw_style_box(dim, rect)
 	elif sweep_ratio > 0.004:
+		# A light veil over the whole icon keeps the seconds readable on a busy glyph.
+		var veil := StyleBoxFlat.new()
+		veil.bg_color = Color(0, 0, 0, 0.3)
+		veil.set_corner_radius_all(5)
+		draw_style_box(veil, rect)
 		var poly := sweep_polygon(rect.grow(-2.0), sweep_ratio)
 		if poly.size() >= 3:
 			draw_colored_polygon(poly, Color(0, 0, 0, 0.7))
