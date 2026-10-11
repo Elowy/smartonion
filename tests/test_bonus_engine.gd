@@ -277,6 +277,11 @@ func test_proc_entries_reach_the_proc_system_rank_resolved() -> void:
 		"stats": {"extra_attack": 25.0}, "duration": 5.0, "label": ""}, "rank": 2, "id": "t_b", "label": "B"}
 	var gated := {"kind": "proc", "proc": {"trigger": "on_hit", "chance": 5.0, "effect": "bolt", "damage": 2.0},
 		"requires": {"weapon": "shield"}, "rank": 1, "id": "t_c", "label": "C"}
+	# Deltas, not totals: once ProcSystem.set_extra_procs rebuilds on its own (T-CORE-B), who
+	# calls refresh() and how often is ProcSystem's business; the engine's contract is "a
+	# changed source is handed off and rebuilt, an unchanged one is left alone".
+	var r0 := procs.refreshes
+	var h0 := procs.handed.size()
 	_put(p, [a, b, gated])
 	var defs: Array = procs.last_defs.get(PlayerBonuses.SOURCE_TALENTS, [])
 	check_eq(defs.size(), 2, "the shield-gated proc is not handed off")
@@ -285,13 +290,17 @@ func test_proc_entries_reach_the_proc_system_rank_resolved() -> void:
 	check_eq(defs[0]["duration"], 4.0, "unlisted key unscaled")
 	check(defs[0]["label"] == "Talent A" and defs[0]["id"] == "t_a", "label / id from the entry")
 	check(defs[1]["label"] == "" and defs[1]["stats"]["extra_attack"] == 25.0, "an explicit empty label stays; no scale list = unscaled")
-	check_eq(procs.refreshes, 1, "procs rebuilt once")
+	check_eq(procs.handed.size() - h0, 1, "one hand-off for the changed source")
+	check(procs.refreshes > r0, "procs rebuilt")
+	r0 = procs.refreshes
+	h0 = procs.handed.size()
 	_put(p, [a, b, gated, {"kind": "stats", "stats": {"crit": 1.0}, "rank": 1}])
-	check_eq(procs.refreshes, 1, "unchanged procs: no refresh")
-	check_eq(procs.handed.size(), 1, "and no hand-off")
+	check_eq(procs.refreshes, r0, "unchanged procs: no refresh")
+	check_eq(procs.handed.size(), h0, "and no hand-off")
+	r0 = procs.refreshes
 	_put(p, [{"kind": "stats", "stats": {"crit": 1.0}, "rank": 1}])
 	check(procs.last_defs[PlayerBonuses.SOURCE_TALENTS].is_empty(), "removed procs are handed off empty")
-	check_eq(procs.refreshes, 2, "and rebuilt")
+	check(procs.refreshes > r0, "and rebuilt")
 
 
 # --- scripts -----------------------------------------------------------------------------------
