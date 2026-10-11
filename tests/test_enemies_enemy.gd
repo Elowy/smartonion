@@ -36,19 +36,25 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	e1.free()
 
 	var e5 := Enemy.create(data, 5)
-	check_eq(e5.max_hp, 4.0 * (1.0 + 0.12 * 4.0), "wave 5 hp = 4 * (1 + 12% * 4)")
-	check_eq(e5.contact_damage, 1.0 * (1.0 + 0.08 * 4.0), "wave 5 contact damage = 1 * (1 + 8% * 4)")
+	check_near(e5.max_hp, 4.0 * (1.0 + 0.12 * 4.0) * pow(1.22, 4.0), 0.0001,
+			"wave 5 hp = 4 * (1 + 12% * 4) * 1.22^4")
+	check_near(e5.contact_damage, 1.0 * (1.0 + 0.15 * 4.0) * pow(1.08, 4.0), 0.0001,
+			"wave 5 contact damage = 1 * (1 + 15% * 4) * 1.08^4")
 	e5.free()
 
 
 func test_wave_scaling_follows_gdd() -> void:
-	# GDD 9: +12% HP and +8% damage per wave after the first, additive (not compounding).
+	# GDD 9: additive HP / damage growth per wave after the first (the fake data uses +12% /
+	# +8% and no compounding, see EFakes.enemy_data); on top of it a compounding factor.
 	var data := EFakes.enemy_data(EnemyData.Behavior.RANGED)
 	data.max_hp = 10.0
 	data.contact_damage = 3.0
 	data.projectile_damage = 4.0
-	check_eq(data.hp_growth, 0.12, "default hp growth")
-	check_eq(data.damage_growth, 0.08, "default damage growth")
+	var defaults := EnemyData.new()
+	check_eq(defaults.hp_growth, 0.12, "default hp growth")
+	check_eq(defaults.damage_growth, 0.15, "default damage growth")
+	check_eq(defaults.hp_compound, 0.22, "default hp compounding")
+	check_eq(defaults.damage_compound, 0.08, "default damage compounding")
 	check_eq(data.hp_at_wave(1), 10.0, "wave 1 = base hp")
 	check_eq(data.hp_at_wave(0), 10.0, "wave 0 / negative waves clamp to the base")
 	check_eq(data.hp_at_wave(11), 10.0 * 2.2, "wave 11: +120%")
@@ -57,25 +63,40 @@ func test_wave_scaling_follows_gdd() -> void:
 	check_eq(data.contact_damage_at_wave(11), 3.0 * 1.8, "wave 11 contact: +80%")
 	check_eq(data.projectile_damage_at_wave(1), 4.0, "wave 1 = base projectile damage")
 	check_eq(data.projectile_damage_at_wave(6), 4.0 * 1.4, "wave 6 projectile: +40%")
+	# The compounding factor multiplies the additive growth: (1 + g * n) * (1 + c)^n.
+	data.hp_compound = 0.25
+	data.damage_compound = 0.5
+	check_eq(data.hp_at_wave(1), 10.0, "wave 1 stays the base with compounding")
+	check_near(data.hp_at_wave(3), 10.0 * 1.24 * 1.5625, 0.0001, "wave 3: (1 + 24%) * 1.25^2")
+	check_near(data.contact_damage_at_wave(3), 3.0 * 1.16 * 2.25, 0.0001, "wave 3 contact: (1 + 16%) * 1.5^2")
+	check_near(data.projectile_damage_at_wave(3), 4.0 * 1.16 * 2.25, 0.0001, "wave 3 projectile")
+	check(data.hp_at_wave(25) > data.hp_at_wave(24) * 1.25, "compounding outgrows the additive part")
 	# Data driven: a difficulty can override the growth rates.
 	data.hp_growth = 0.2
+	data.hp_compound = 0.0
 	data.damage_growth = 0.0
+	data.damage_compound = 0.0
 	check_eq(data.hp_at_wave(6), 20.0, "custom hp growth")
 	check_eq(data.contact_damage_at_wave(6), 3.0, "no damage growth")
-	# Every shipped enemy uses the GDD defaults.
+	# Every shipped enemy uses the defaults.
 	for id in Db.enemies:
 		var d: EnemyData = Db.enemies[id]
-		check_eq(d.hp_growth, 0.12, "%s hp growth" % id)
-		check_eq(d.damage_growth, 0.08, "%s damage growth" % id)
+		check_eq(d.hp_growth, defaults.hp_growth, "%s hp growth" % id)
+		check_eq(d.damage_growth, defaults.damage_growth, "%s damage growth" % id)
+		check_eq(d.hp_compound, defaults.hp_compound, "%s hp compounding" % id)
+		check_eq(d.damage_compound, defaults.damage_compound, "%s damage compounding" % id)
 
 
 func test_enemy_stats_at_wave_include_coop_hp_only() -> void:
 	var data := Db.get_enemy(&"troll_axethrower")
 	RunState.start_run(4, 1)
 	var e := Enemy.create(data, 6)
-	check_eq(e.max_hp, data.max_hp * 1.6 * 1.6, "hp: base * (1 + 12% * 5) * coop 1.6")
-	check_eq(e.contact_damage, data.contact_damage * 1.4, "contact damage: no co-op factor")
-	check_eq(e.projectile_damage, data.projectile_damage * 1.4, "projectile damage: no co-op factor")
+	check_near(e.max_hp, data.max_hp * 1.6 * pow(1.22, 5.0) * 1.6, 0.0001,
+			"hp: base * (1 + 12% * 5) * 1.22^5 * coop 1.6")
+	check_near(e.contact_damage, data.contact_damage * 1.75 * pow(1.08, 5.0), 0.0001,
+			"contact damage: (1 + 15% * 5) * 1.08^5, no co-op factor")
+	check_near(e.projectile_damage, data.projectile_damage * 1.75 * pow(1.08, 5.0), 0.0001,
+			"projectile damage: no co-op factor")
 	e.free()
 
 

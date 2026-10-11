@@ -35,11 +35,11 @@ func _enemies() -> Array[Enemy]:
 
 func test_spawn_rate_formula() -> void:
 	check_eq(WaveDirector.spawn_rate(1), 0.9, "wave 1")
-	check_eq(WaveDirector.spawn_rate(5), 0.9 + 0.22 * 4.0, "wave 5")
-	check_eq(WaveDirector.spawn_rate(25, 2.8), (0.9 + 0.22 * 24.0) * 2.8, "wave 25, 4 players")
+	check_eq(WaveDirector.spawn_rate(5), 0.9 + 0.08 * 4.0, "wave 5")
+	check_eq(WaveDirector.spawn_rate(25, 2.8), (0.9 + 0.08 * 24.0) * 2.8, "wave 25, 4 players")
 	RunState.start_run(2, 1)
 	director.start_wave(3)
-	check_eq(director.spawn_budget_per_second(), (0.9 + 0.22 * 2.0) * 1.6, "2 players: +60%")
+	check_eq(director.spawn_budget_per_second(), (0.9 + 0.08 * 2.0) * 1.6, "2 players: +60%")
 	director.stop()
 
 
@@ -285,10 +285,10 @@ func test_max_enemies_respected() -> void:
 		check(director.alive_count() + director.pending_count() <= WaveDirector.MAX_ENEMIES,
 				"alive + pending <= MAX_ENEMIES")
 	check_eq(director.alive_count() + director.pending_count(), WaveDirector.MAX_ENEMIES, "filled up to the cap")
-	# Free room: spawning resumes.
+	# Free room: spawning resumes (enough time for a few groups at this wave's rate).
 	for i in 20:
 		dummies[i].free()
-	EFakes.step(director, 3.0)
+	EFakes.step(director, 3.0 + 8.0 / WaveDirector.spawn_rate(12) + WaveDirector.TELEGRAPH_TIME)
 	check(director.spawned_this_wave > 3, "spawns resume when room frees up")
 	check(director.alive_count() + director.pending_count() <= WaveDirector.MAX_ENEMIES, "still capped")
 
