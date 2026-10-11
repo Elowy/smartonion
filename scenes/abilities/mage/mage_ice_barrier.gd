@@ -9,11 +9,12 @@ extends AbilityEffect
 ## A frosty bubble shows it ([MageBarrierBubble]).
 ##
 ## Params (data/abilities/mage_ice_barrier.tres): shield, int_scaling, sp_scaling,
-## chill + chill_duration (Rank III: enemies touching the hero when the barrier absorbs a
-## hit are slowed), break_pct + break_radius + break_freeze (Rank V "Shattering Barrier":
-## when it breaks it explodes for break_pct % of its strength as Frost damage and freezes the
-## enemies around), ice_block (Rank V "Ice Block": when it breaks the hero is immune to
-## damage for that many seconds).
+## chill + chill_duration (Rank III: enemies touching the hero when a hit strikes the barrier
+## are slowed – any absorbed hit counts ([member ProcSystem.absorbed_total]), also one that a
+## shorter-lived shield on top soaked first), break_pct + break_radius + break_freeze (Rank V
+## "Shattering Barrier": when it breaks it explodes for break_pct % of its strength as Frost
+## damage and freezes the enemies around), ice_block (Rank V "Ice Block": when it breaks the
+## hero is immune to damage for that many seconds).
 ## The break is noticed in the physics tick (gameplay), never in the visual.
 
 ## Shield duration: until used up (ProcSystem clears shields at wave start anyway).
@@ -32,7 +33,8 @@ var active := false
 var strength := 0.0
 var breaks := 0
 
-var _last_hp := 0.0
+## ProcSystem.absorbed_total at the last tick (a rise = a hit struck the barrier).
+var _last_absorbed := 0.0
 var _chill := 0.0
 var _chill_duration := 2.0
 var _break_pct := 0.0
@@ -73,7 +75,7 @@ func cast(ctx: AbilityContext) -> bool:
 	p.procs.add_shield(amount, UNTIL_USED, SHIELD_SOURCE)
 	strength = amount
 	active = true
-	_last_hp = p.procs.shield_of(SHIELD_SOURCE)
+	_last_absorbed = p.procs.absorbed_total
 	_chill = ctx.num("chill", 0.0)
 	_chill_duration = ctx.num("chill_duration", 2.0)
 	_break_pct = ctx.num("break_pct", 0.0)
@@ -96,9 +98,12 @@ func tick(ctx: AbilityContext, _delta: float) -> void:
 		active = false
 		return
 	var hp := p.procs.shield_of(SHIELD_SOURCE)
-	if hp < _last_hp - EPSILON and _chill > 0.0 and p.is_inside_tree():
+	# Strikes: any shield soaked a blow (the barrier's own entry only drains once the shorter
+	# shields on top are gone, but the attacker still hit the bubble).
+	var absorbed := p.procs.absorbed_total
+	if absorbed > _last_absorbed + EPSILON and _chill > 0.0 and p.is_inside_tree():
 		_chill_attackers(p)
-	_last_hp = hp
+	_last_absorbed = absorbed
 	if hp <= EPSILON:
 		active = false
 		breaks += 1
@@ -143,7 +148,6 @@ func end_wave(ctx: AbilityContext) -> void:
 
 func _reset() -> void:
 	active = false
-	_last_hp = 0.0
 	_clear_block()
 
 

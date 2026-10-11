@@ -49,6 +49,13 @@ class MortalEnemy extends Enemy:
 		return t
 
 
+## A MortalEnemy that [method Enemy.despawn] takes out like a real one: dead (not live) at once,
+## HP untouched, still in the tree until the queued free runs at the end of the frame.
+class DespawnableEnemy extends MortalEnemy:
+	func is_dead() -> bool:
+		return _dead or hp <= 0.0
+
+
 var world: Node3D
 
 
@@ -498,6 +505,45 @@ func test_afflictions_wither_when_their_host_vanishes_without_dying() -> void:
 	check_eq(aff.bursts, 1, "a killed host bursts")
 
 
+func test_afflictions_wither_when_their_host_vanishes_in_the_same_frame() -> void:
+	var p := _warlock()
+	var hosts: Array[DespawnableEnemy] = []
+	for pos: Vector3 in [Vector3(5, 0, 0), Vector3(-5, 0, 0)]:
+		var e := DespawnableEnemy.new()
+		e.add_to_group(&"enemies")
+		world.add_child(e)
+		e.global_position = pos
+		hosts.append(e)
+	var neighbour := _enemy(Vector3(5.5, 0, 0.5))
+	var far_neighbour := _enemy(Vector3(-5.5, 0, 0.5))
+	EnemyGrid.mark_dirty()
+	var aff := WarlockAfflictions.of(p)
+	for e in hosts:
+		var s := aff.plant_seed(e, 1.0, 6.0, 5.0, 3.0)
+		check(s != null, "seeded")
+		s.pool_duration = 4.0  # Blighted Ground
+		s.pool_radius = 2.0
+		check(aff.corrupt(e, 1.0, 8.0, 2, 6.0) != null, "corrupted too")
+	# WaveDirector.stop() despawns the host while the afflictions have not ticked yet this frame:
+	# the node is still valid and in the tree with HP left, only no longer live.
+	var despawned := hosts[0]
+	despawned.despawn()
+	check(is_instance_valid(despawned) and despawned.is_inside_tree(), "still in the tree this frame")
+	check(despawned.hp > 0.0 and not WarlockSpell.is_live(despawned), "alive by HP, but not live")
+	# A host taken out of the tree alive (HP left, not yet freed).
+	var removed := hosts[1]
+	world.remove_child(removed)
+	aff._physics_process(DT)
+	check_eq(aff.bursts, 0, "no burst over a vanished host")
+	check_eq(aff.spreads, 0, "no spread either")
+	check_eq(aff.count(), 0, "their afflictions withered")
+	for e in [neighbour, far_neighbour]:
+		check(not aff.has(WarlockAfflictions.CORRUPTION, e), "nothing jumped to a neighbour")
+		check_eq(e.hits.size(), 0, "and nothing hit it")
+	check_eq(tree.get_nodes_in_group(&"ability_areas").size(), 0, "no Blighted Ground pool")
+	removed.free()
+
+
 # --- Summon Voidwalker -----------------------------------------------------------------------
 
 func test_voidwalker_is_summoned_and_taunts() -> void:
@@ -642,8 +688,17 @@ func test_fear_specs_dread_and_cower() -> void:
 	check(aff != null and aff.has(WarlockAfflictions.DREAD, e), "afraid enemies wither")
 	var rate := WarlockFear.dread_rate(p.stats, _params(p, &"fear"))
 	check(rate > 0.0, "dread rate")
+	# Rank V power (1.5) makes the fear last longer; the damage per second stays unranked, so
+	# the whole Dread grows with power once (like Radiant Bubble), not with power squared.
+	check_near(e.fear_left, 2.0 * 1.5, 0.001, "Rank V: the fear lasts 2 s x power")
+	var per_second := (3.0 + 0.4 * p.stats.get_raw(Stats.INTELLECT) + 1.0 * p.stats.get_raw(Stats.SPELL_POWER)) \
+			* CombatMath.damage_mult_for(p.stats, &"shadow")
+	check_near(rate, per_second, 0.001, "Dread per second: 3 + 40% Int + 100% SP, not x power")
 	_step(aff, 0.5)
 	check_near(e.hits[0], rate * 0.5 * 1.2, 0.001, "a DoT: Demonic Pact applies")
+	_step(aff, 3.0)
+	check_near(e.total(), per_second * 3.0 * 1.2, 0.01, "the whole fear: 3 s of Dread")
+	check(not aff.has(WarlockAfflictions.DREAD, e), "ends with the fear")
 	var p2 := Fakes.spawn_player(world, 1, &"warlock", Vector3(0, 0, 30))
 	var c := _enemy(Vector3(1, 0, 30))
 	var slot2 := _learn(p2, &"fear", 5, 1)

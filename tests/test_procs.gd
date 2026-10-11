@@ -469,19 +469,37 @@ func test_shields_keep_their_own_timers() -> void:
 	ps.add_shield(6.0, 4.0)
 	ps.add_shield(1.0, 2.0)
 	check_eq(ps.shield_of(&""), 7.0, "same source: one entry (the longer timer wins)")
+	check_eq(ps.absorbed_total, 0.0, "nothing soaked yet")
 	check_eq(ps.absorb(8.0), 0.0, "absorbed")
 	check_eq(ps.shield_of(&"barrier"), 9.0, "the shield that runs out first soaks first")
 	check_eq(ps.shield_of(&""), 0.0, "used up")
+	check_eq(ps.absorbed_total, 8.0, "every entry's soak counts")
 	check_eq(ps.absorb(12.0), 3.0, "the rest goes through")
 	check_eq(ps.shield_hp, 0.0, "all used up")
+	check_eq(ps.absorbed_total, 17.0, "only what the shields took")
+	ps.absorb(5.0)
+	check_eq(ps.absorbed_total, 17.0, "no shield: nothing soaked")
 	ps.add_shield(4.0, 1.0, &"barrier")
 	ps.add_shield(2.0, 1.0)
-	ps.shield_hp = 0.0
-	check_eq(ps.shield_hp, 0.0, "setting 0 clears every shield")
+	ps.clear_shields()
+	check_eq(ps.shield_hp, 0.0, "clear_shields removes every shield")
 	check_eq(ps.shield_of(&"barrier"), 0.0, "including the named ones")
 	ps.add_shield(4.0, 1.0, &"barrier")
 	ps.begin_wave()
 	check_eq(ps.shield_hp, 0.0, "wave start clears them")
+
+
+func test_shield_hp_is_read_only() -> void:
+	var ps := _hero().procs
+	ps.add_shield(10.0, 3600.0, &"barrier")
+	ps.add_shield(5.0, 4.0)
+	# A stray write (the old `shield_hp += x` idiom) must not wipe the named entries.
+	ps.set(&"shield_hp", ps.shield_hp + 3.0)
+	check_eq(ps.shield_of(&"barrier"), 10.0, "the named entry is untouched")
+	check_eq(ps.shield_of(&""), 5.0, "and so is the anonymous one")
+	check_eq(ps.shield_hp, 15.0, "the total still comes from the entries")
+	ps.set(&"shield_hp", 0.0)
+	check_eq(ps.shield_hp, 15.0, "writing 0 clears nothing either")
 
 
 func test_low_hp_shield_absorbs_and_rearms() -> void:

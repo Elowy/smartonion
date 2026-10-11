@@ -177,17 +177,19 @@ class Shield extends RefCounted:
 var player: Player
 ## Every active proc (equipment order).
 var procs: Array[Proc] = []
-## Total absorb shield HP of every entry (overhead health bar, tests). Setting it clears every
-## shield; a positive value then adds one anonymous shield of DEFAULT_SHIELD_DURATION.
+## Total absorb shield HP of every entry (overhead health bar, tests). Read-only: shields come
+## from [method add_shield] and go with [method absorb], their timers and [method clear_shields]
+## (an assignment has no effect, so it can never wipe a named entry such as Ice Barrier's).
 var shield_hp: float:
 	get:
 		var total := 0.0
 		for s in _shields:
 			total += s.hp
 		return total
-	set(value):
-		_shields.clear()
-		add_shield(value, DEFAULT_SHIELD_DURATION)
+## Damage the absorb shields have soaked so far, all entries together (only grows; never
+## reset). Effects compare it between ticks to notice hits on any shield (Ice Barrier's Rank
+## III chill: whichever shield soaked the blow, the attacker struck the barrier's bubble).
+var absorbed_total := 0.0
 ## Seconds left of the longest-lasting shield (0 = none).
 var shield_left: float:
 	get:
@@ -286,7 +288,7 @@ func begin_wave() -> void:
 		p.timer = p.interval
 	_dots.clear()
 	_clear_buffs()
-	_shields.clear()
+	clear_shields()
 
 
 ## Adds an absorb shield (shield procs, Word of Glory, Ice Barrier ...): [param amount] HP for
@@ -302,6 +304,11 @@ func add_shield(amount: float, duration: float, source: StringName = &"") -> voi
 		_shields.append(entry)
 	entry.hp += amount
 	entry.left = maxf(entry.left, duration)
+
+
+## Removes every absorb shield, named entries included ([method begin_wave], tests).
+func clear_shields() -> void:
+	_shields.clear()
 
 
 ## Shield HP left from [param source] (0 = none).
@@ -334,6 +341,7 @@ func absorb(damage: float) -> float:
 		rest -= taken
 		if s.hp <= 0.0001:
 			_shields.remove_at(first)
+	absorbed_total += damage - rest
 	if rest <= 0.0 and player != null:
 		Vfx.floating_text(player.self_text_position(1.0), "Absorb", SHIELD_COLOR, Player.SELF_TEXT_SIZE, 1.0)
 	return rest
