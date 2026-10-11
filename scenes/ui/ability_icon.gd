@@ -15,8 +15,10 @@ extends Control
 ##    resource cost in the top-right corner,
 ##  - the rank (GDD 6.3, [method set_rank]): one small gold diamond per rank (I–V) up the left
 ##    edge, orange once the Rank V specialisation is chosen; icons below SMALL_ICON (the 26 px
-##    auto-cast slots, the Trainer list) show the roman numeral on a dark plate in the
-##    bottom-left corner instead (five pips cannot be told apart there at 720p).
+##    auto-cast slots) show a small outlined roman numeral on a see-through plate tucked into
+##    the bottom-left corner instead (five pips cannot be told apart there at 720p; the plate
+##    covers as little of the glyph as it can). Rank 0 draws nothing (the lobby preview, the
+##    Trainer rows: their rank column shows the numeral).
 ## Empty slots draw a faint socket. The control is SIZE wide and SIZE + PROMPT_OVERHANG tall
 ## (the prompt pill hangs below the square) unless it is created without the prompt row
 ## (create(size, false): a plain square for the auto-cast slots and the Trainer list).
@@ -55,6 +57,13 @@ const MAX_RANK := 5
 ## Rank pips: gold, orange once the Rank V specialisation is chosen.
 const RANK_COLOR := Color(1.0, 0.86, 0.38)
 const RANK_SPEC_COLOR := Color(1.0, 0.52, 0.12)
+## Font size of the rank numeral on small icons (uses_rank_badge): small enough to stay in the
+## corner, outlined so it still reads at 720p.
+const RANK_BADGE_FONT := SMALL_FONT - 3
+## The numeral's gold, a little lighter than the pips': its thin strokes stand out at 720p.
+const RANK_BADGE_COLOR := Color(1.0, 0.93, 0.6)
+## Width of the numeral's dark outline (it keeps the strokes apart from the rim and the glyph).
+const RANK_BADGE_OUTLINE := 4
 ## Height of the capital roman numerals as a share of the font size (the rank badge's plate).
 const RANK_BADGE_CAP := 0.72
 const ROMAN: Array[String] = ["", "I", "II", "III", "IV", "V"]
@@ -384,7 +393,7 @@ func sweep_redraw_step() -> float:
 	return maxf(SWEEP_REDRAW_STEP, 1.0 / (4.0 * maxf(_side, 1.0)))
 
 
-## Small icons show the rank as a roman numeral instead of the pips (see [method _draw_rank]).
+## Small icons show the rank as a corner numeral instead of the pips (see [method _draw_rank]).
 func uses_rank_badge() -> bool:
 	return _side < SMALL_ICON
 
@@ -542,28 +551,33 @@ static func rank_pip_centers(sq: float, count: int, above_prompt: bool) -> Packe
 	return out
 
 
-## Baseline start of the rank numeral on a small icon of side [param sq]: the bottom-left
-## corner inside the rim ([param above_prompt]: above the prompt pill instead).
+## Baseline start of the rank numeral on a small icon of side [param sq]: tucked into the
+## bottom-left corner, just above the rim ([param above_prompt]: above the prompt pill instead).
 static func rank_badge_origin(sq: float, above_prompt: bool) -> Vector2:
-	return Vector2(4.0, sq - PROMPT_OVERHANG - 2.0 if above_prompt else sq - 4.0)
+	return Vector2(3.0, sq - PROMPT_OVERHANG - 2.0 if above_prompt else sq - 2.5)
 
 
-## The dark plate behind the rank numeral [param label] whose baseline starts at [param at].
+## The see-through plate behind the rank numeral [param label] whose baseline starts at
+## [param at]: about a pixel around the capitals and down onto the rim, so it covers as little
+## of the glyph as it can.
 static func rank_badge_rect(at: Vector2, label: String) -> Rect2:
-	var cap := SMALL_FONT * RANK_BADGE_CAP
-	return Rect2(at.x - 2.0, at.y - cap - 2.0, _text_width(label, SMALL_FONT) + 4.0, cap + 4.0)
+	var cap := RANK_BADGE_FONT * RANK_BADGE_CAP
+	return Rect2(at.x - 1.0, at.y - cap - 1.0, _text_width(label, RANK_BADGE_FONT) + 2.0, cap + 2.25)
 
 
 ## GDD 12: the rank on every icon. One small diamond per rank up the left edge; small icons
-## (uses_rank_badge) get the roman numeral on a dark plate in the bottom-left corner instead.
+## (uses_rank_badge) get the outlined roman numeral on a see-through plate in the bottom-left
+## corner instead.
 func _draw_rank(sq: float) -> void:
-	var fill := RANK_SPEC_COLOR if rank_spec else RANK_COLOR
 	if uses_rank_badge():
 		var label := roman(rank)
 		var at := rank_badge_origin(sq, show_prompt and prompt != "")
+		var font := UiTheme.bold_font()
 		draw_style_box(_shared_box(&"badge"), rank_badge_rect(at, label))
-		draw_string(UiTheme.bold_font(), at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, SMALL_FONT, fill)
+		draw_string_outline(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, RANK_BADGE_FONT, RANK_BADGE_OUTLINE, OUT)
+		draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, RANK_BADGE_FONT, RANK_SPEC_COLOR if rank_spec else RANK_BADGE_COLOR)
 		return
+	var fill := RANK_SPEC_COLOR if rank_spec else RANK_COLOR
 	var r := rank_pip_size(sq)
 	for c in rank_pip_centers(sq, rank, show_prompt and prompt != ""):
 		var o := r + 1.2
@@ -610,8 +624,8 @@ static func _shared_box(key: StringName) -> StyleBoxFlat:
 			s.set_border_width_all(1)
 			s.set_corner_radius_all(6)
 		&"badge":
-			s.bg_color = Color(OUT, 0.88)
-			s.set_corner_radius_all(3)
+			s.bg_color = Color(OUT, 0.7)
+			s.set_corner_radius_all(2)
 	_shared_boxes[key] = s
 	return s
 

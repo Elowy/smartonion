@@ -14,6 +14,11 @@ var panel: ShopPanel
 var p1: UiFakes.HumanInput
 var p2: UiFakes.HumanInput
 var bought: Array[Array] = []
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
@@ -101,7 +106,9 @@ func test_cards_and_grid_columns() -> void:
 
 func test_hidden_panel_catches_up_on_gold_when_shown() -> void:
 	# The Intermission stays in the tree, hidden, for the whole wave: gold pickups must not
-	# recolour every card of the hidden stall; it catches up when shown.
+	# recolour every card of the hidden stall; it catches up at the end of the frame it is shown
+	# in – unless refresh() rebuilt it first or it was hidden again in that frame.
+	_async = true
 	check_eq(panel.cards[1].price_label.get_theme_color(&"font_color"), UiTheme.RED, "20 g offer, empty wallet")
 	panel.hide()
 	for i in 5:
@@ -109,10 +116,26 @@ func test_hidden_panel_catches_up_on_gold_when_shown() -> void:
 	check_eq(panel.cards[1].price_label.get_theme_color(&"font_color"), UiTheme.RED, "hidden: no per-pickup update")
 	check_eq(panel._gold_label.text, "0", "hidden: the gold line waits")
 	panel.show()
+	await tree.process_frame
 	check_eq(panel.cards[1].price_label.get_theme_color(&"font_color"), UiTheme.GOLD, "shown: the price follows the wallet")
 	check_eq(panel._gold_label.text, "25", "shown: the gold line too")
 	RunState.add_gold(5)
 	check_eq(panel._gold_label.text, "30", "visible: every change")
+	# Intermission.open shows the market for a moment before the loot roll hides it again.
+	panel.hide()
+	RunState.add_gold(5)
+	panel.show()
+	check_eq(panel._gold_label.text, "30", "not caught up inside the visibility notification")
+	panel.hide()
+	await tree.process_frame
+	check_eq(panel._gold_label.text, "30", "a momentary show does not catch up")
+	check(panel._gold_stale, "still stale")
+	# The market start shows the panel and refreshes it at once: nothing left to catch up.
+	panel.show()
+	panel.refresh(PlayerManager.get_slots())
+	check(not panel._gold_stale, "refresh() rebuilt the prices and the gold line")
+	check_eq(panel._gold_label.text, "35", "the gold line is current")
+	finished.emit()
 
 
 func test_sold_lock_and_ping_markers() -> void:

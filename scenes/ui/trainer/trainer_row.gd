@@ -2,8 +2,9 @@ class_name TrainerRow
 extends PanelContainer
 ## One line of the Trainer list (GDD 6.3, TrainerTab): an AbilityRunner slot with its slot tag
 ## (the player's RT / LT / RB / LB button – keyboard LMB / RMB / Q / E – or a gear for the
-## auto-cast slots), the AbilityIcon with its rank (a numeral badge at this size), the name, the
-## rank as a roman numeral (I–V) and the Trainer price in the shared wallet's gold (red while the wallet cannot pay it,
+## auto-cast slots), the AbilityIcon (without a rank mark: the rank column right next to it
+## shows it), the name, the rank as a roman numeral (I–V, orange once specialised) and the
+## Trainer price in the shared wallet's gold (red while the wallet cannot pay it,
 ## "MAX" at Rank V, "Choose" while the Rank V specialisation is still open). An empty learned
 ## slot reads "Learn abilities on level-up". While A is held on an expensive rank the row fills
 ## up in the player's colour ([member hold_progress]).
@@ -153,13 +154,13 @@ func _build() -> void:
 
 ## Fills the row. [param p_rank] 1..5, [param price] 0 at max rank, [param affordable] colours
 ## the price, [param needs_spec] shows "Choose" instead of a price, [param spec_chosen] turns
-## the icon's rank orange.
+## the rank orange. The icon carries no rank of its own (rank 0): a corner numeral on the
+## 32 px icon would only hide its glyph next to [member rank_label].
 func show_ability(a: AbilityData, p_rank: int, price: int, affordable: bool, needs_spec: bool, spec_chosen: bool) -> void:
 	ability = a
 	icon.set_ability(a)
 	_update_style()
 	if a == null:
-		icon.set_rank(0)
 		name_label.text = EMPTY_TEXT
 		name_label.add_theme_font_size_override(&"font_size", 16)
 		name_label.add_theme_color_override(&"font_color", Color(0.55, 0.52, 0.48))
@@ -167,7 +168,6 @@ func show_ability(a: AbilityData, p_rank: int, price: int, affordable: bool, nee
 		price_label.text = ""
 		coin.visible = false
 		return
-	icon.set_rank(p_rank, spec_chosen)
 	icon.set_state(0.0, 0.0, true)
 	name_label.text = a.display_name
 	name_label.add_theme_font_size_override(&"font_size", NAME_FONT)

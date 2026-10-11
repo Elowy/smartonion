@@ -2,16 +2,16 @@ class_name TrainerTab
 extends Control
 ## The Trainer tab of a player's between-wave panel (GDD 6.3, 12; PlayerPanel tab 2): the hero's
 ## eight ability slots – core RT / LT, learned Active RB / LB, learned Auto-cast 1–4 – as
-## TrainerRow lines (slot tag, icon with its rank, name, Rank I–V, price of the next rank from
+## TrainerRow lines (slot tag, icon, name, Rank I–V, price of the next rank from
 ## the shared wallet, red when it cannot pay) next to a detail area for the selected ability:
-## kind and school, current rank, cooldown and power, the description filled from
-## AbilityRunner.params_for (ranks and item mods included), what the next rank adds
+## kind and school, current rank with the cooldown and power on the same row, the description
+## filled from AbilityRunner.params_for (ranks and item mods included), what the next rank adds
 ## (AbilityRanks.rank_text), the two Rank V specialisations (or the chosen one) and the price.
 ## The description gets the lines left under the next-rank and specialisation lines; a cut one
 ## ends in an ellipsis.
 ##
 ## Input (handle_input, the panel's per-player PlayerInput): up / down picks a learned row,
-## Y previews the description and the cooldown / power line at the next rank
+## Y previews the rank, the cooldown / power and the description at the next rank
 ## (AbilityRunner.params_at_rank, in green),
 ## A trains the next rank through Trainer.try_buy_rank. A rank that costs more than
 ## HOLD_SHARE of the wallet needs A held for HOLD_TIME (the shop's rule; the row fills up; letting
@@ -19,7 +19,8 @@ extends Control
 ## AbilityRunner.set_spec, B decides later – the row then reads "Choose" and A reopens it).
 ## Bots never use it (Trainer.bot_train). Feedback goes out through [signal message].
 ## While hidden (another tab, or the whole wave: the Intermission stays in the tree) wallet and
-## rank changes only mark the tab stale; it refreshes when it is shown again.
+## rank changes only mark the tab stale; it refreshes at the end of the frame it is shown in,
+## unless an explicit refresh() came first.
 
 ## Text for the panel's toast: [param bbcode] shown, [param plain] kept as PlayerPanel.last_message.
 signal message(bbcode: String, plain: String, color: Color, coin: bool)
@@ -39,6 +40,8 @@ const GROUP_GAP := 4
 const DETAIL_ICON := 46.0
 ## Font size of the detail texts (stats, description, next rank, specialisation).
 const DETAIL_FONT := 16
+## Room between the rank and the stats on their shared row.
+const RANK_ROW_GAP := 8
 ## The description never gets fewer lines than this (even when the other texts are long).
 const MIN_DESCRIPTION_LINES := 2
 const SCHOOL_NAMES: Dictionary[StringName, String] = {
@@ -57,8 +60,8 @@ var chooser: SpecChooser
 var detail_name: Label
 var detail_kind: Label
 var detail_rank: Label
-## "Cooldown 5.4 s · Power 125%" at the shown rank (green in the preview: Rank II and IV only
-## change these two).
+## "CD 5.4 s · Power 125%" at the shown rank, right of detail_rank on its row (green in the
+## preview: Rank II and IV only change these two).
 var detail_stats: Label
 var detail_description: Label
 ## "Next: Rank III – <what it adds>" (empty at Rank V).
@@ -414,14 +417,21 @@ func _build_detail() -> Control:
 	titles.add_child(detail_kind)
 	head.add_child(titles)
 	_detail_box.add_child(head)
+	# The rank and the cooldown / power stats share one row (the stats right-aligned in the room
+	# the short rank text leaves), so the description keeps that line.
+	var rank_row := UiTheme.hbox(RANK_ROW_GAP)
 	detail_rank = UiTheme.label("", &"", UiTheme.FONT_SMALL, UiTheme.GOLD)
 	detail_rank.add_theme_font_override(&"font", UiTheme.bold_font())
-	_detail_box.add_child(detail_rank)
+	rank_row.add_child(detail_rank)
 	detail_stats = UiTheme.label("", &"", DETAIL_FONT, UiTheme.TEXT_DIM)
+	detail_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_stats.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	detail_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	detail_stats.clip_text = true
 	detail_stats.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	detail_stats.custom_minimum_size.x = 40
-	_detail_box.add_child(detail_stats)
+	rank_row.add_child(detail_stats)
+	_detail_box.add_child(rank_row)
 	# The texts live in a clipping holder without a minimum size: a long description is cut off
 	# instead of pushing the price out of the panel. _fit_description sizes it to the room left.
 	var holder := Control.new()
@@ -500,7 +510,7 @@ func _on_gold_changed(_gold: int, _delta: int) -> void:
 
 ## Refreshes now when the tab is on screen, else marks it stale (the Intermission keeps the
 ## panels in the tree, hidden, through the whole wave: gold pickups must not rebuild them).
-## The refresh follows on NOTIFICATION_VISIBILITY_CHANGED. True when it refreshed.
+## The refresh follows when the tab is shown again (_catch_up). True when it refreshed.
 func _refresh_if_shown() -> bool:
 	if not is_visible_in_tree():
 		_stale = true
@@ -511,6 +521,15 @@ func _refresh_if_shown() -> bool:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_VISIBILITY_CHANGED and _stale and is_visible_in_tree():
+		_catch_up.call_deferred()
+
+
+## The stale tab was shown: refreshes at the end of the frame unless that is no longer needed.
+## The callers that show the tab refresh it themselves right after (PlayerPanel.set_tab, the
+## market start), and refresh() clears _stale, so one rebuild per transition; a show undone in
+## the same frame (Intermission.open before the loot roll hides the market) finds it hidden.
+func _catch_up() -> void:
+	if _stale and is_visible_in_tree():
 		refresh()
 
 
@@ -573,7 +592,8 @@ func _update_detail() -> void:
 	detail_name.text = a.display_name
 	detail_kind.text = "%s · %s" % [TrainerRow.kind_name(selected), SCHOOL_NAMES.get(a.school, String(a.school).capitalize())]
 	var preview := preview_next and rank < AbilityRanks.MAX_RANK
-	detail_rank.text = "Rank %s of V" % AbilityIcon.roman(rank + 1 if preview else rank) + (" (preview)" if preview else "")
+	# Green marks the preview (no "(preview)" suffix: the row keeps its room for the stats).
+	detail_rank.text = "Rank %s" % AbilityIcon.roman(rank + 1 if preview else rank)
 	detail_rank.add_theme_color_override(&"font_color", UiTheme.GREEN if preview else UiTheme.GOLD)
 	var params := r.params_at_rank(a, rank + 1, spec) if preview else r.params_for(a)
 	detail_stats.text = stats_text(r, a, params)
@@ -627,16 +647,17 @@ func _fit_description() -> void:
 		detail_description.max_lines_visible = lines
 
 
-## "Cooldown 5.4 s · Power 125%" for [param a] with [param params] (AbilityRunner.params_for or
+## "CD 5.4 s · Power 125%" for [param a] with [param params] (AbilityRunner.params_for or
 ## params_at_rank): the cooldown after Haste and Cooldown Reduction
 ## (AbilityRunner.cooldown_from_params) and the damage / effect multiplier ("power").
-## Abilities without a cooldown show the power only.
+## Abilities without a cooldown show the power only. Short enough to sit right of "Rank III"
+## on the detail's rank row.
 static func stats_text(r: AbilityRunner, a: AbilityData, params: Dictionary) -> String:
 	var power := "Power %d%%" % roundi(float(params.get("power", 1.0)) * 100.0)
 	var cooldown := r.cooldown_from_params(a, params) if r != null else float(params.get("cooldown", 0.0))
 	if cooldown <= 0.0:
 		return power
-	return "Cooldown %s s · %s" % [AbilityIcon.format_number(snappedf(cooldown, 0.1)), power]
+	return "CD %s s · %s" % [AbilityIcon.format_number(snappedf(cooldown, 0.1)), power]
 
 
 ## "Next: Rank III – +1 knife": what reaching [param rank] adds (AbilityRanks.rank_text).
