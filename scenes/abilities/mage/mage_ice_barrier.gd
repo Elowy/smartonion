@@ -2,8 +2,11 @@ class_name MageIceBarrier
 extends AbilityEffect
 ## Ice Barrier (GDD 6.4, Mage, Auto-cast): an absorb shield ([method ProcSystem.add_shield])
 ## of (shield + int_scaling x Intellect + sp_scaling x Spell Power) x power that holds until
-## it is used up (or the wave ends). It is recast whenever the hero has no shield left, the
-## cooldown is over and an enemy is around. A frosty bubble shows it ([MageBarrierBubble]).
+## it is used up (or the wave ends). It is its own ProcSystem shield entry
+## ([constant SHIELD_SOURCE]): other shields on the hero (item procs, a Paladin's) keep their
+## own timers, soak first when they run out sooner and neither block nor break the barrier.
+## It is recast whenever the barrier is gone, the cooldown is over and an enemy is around.
+## A frosty bubble shows it ([MageBarrierBubble]).
 ##
 ## Params (data/abilities/mage_ice_barrier.tres): shield, int_scaling, sp_scaling,
 ## chill + chill_duration (Rank III: enemies touching the hero when the barrier absorbs a
@@ -15,6 +18,8 @@ extends AbilityEffect
 
 ## Shield duration: until used up (ProcSystem clears shields at wave start anyway).
 const UNTIL_USED := 3600.0
+## The barrier's ProcSystem shield entry.
+const SHIELD_SOURCE := &"ice_barrier"
 ## Auto-cast only with an enemy within this range (no barrier for an empty arena).
 const AUTO_RANGE := 14.0
 ## Enemies this close to the hero's body count as the ones that struck the barrier.
@@ -45,10 +50,10 @@ static func shield_amount(ctx: AbilityContext) -> float:
 	return maxf(0.0, base) * ctx.num("power", 1.0)
 
 
-## Only when the hero has no shield left.
+## Only when the hero's barrier is gone (other shields do not count).
 func can_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player
-	return p != null and p.procs != null and p.procs.shield_hp <= EPSILON
+	return p != null and p.procs != null and p.procs.shield_of(SHIELD_SOURCE) <= EPSILON
 
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
@@ -65,10 +70,10 @@ func cast(ctx: AbilityContext) -> bool:
 	var amount := shield_amount(ctx)
 	if amount <= 0.0:
 		return false
-	p.procs.add_shield(amount, UNTIL_USED)
+	p.procs.add_shield(amount, UNTIL_USED, SHIELD_SOURCE)
 	strength = amount
 	active = true
-	_last_hp = p.procs.shield_hp
+	_last_hp = p.procs.shield_of(SHIELD_SOURCE)
 	_chill = ctx.num("chill", 0.0)
 	_chill_duration = ctx.num("chill_duration", 2.0)
 	_break_pct = ctx.num("break_pct", 0.0)
@@ -90,7 +95,7 @@ func tick(ctx: AbilityContext, _delta: float) -> void:
 	if p == null or p.procs == null:
 		active = false
 		return
-	var hp := p.procs.shield_hp
+	var hp := p.procs.shield_of(SHIELD_SOURCE)
 	if hp < _last_hp - EPSILON and _chill > 0.0 and p.is_inside_tree():
 		_chill_attackers(p)
 	_last_hp = hp

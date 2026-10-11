@@ -4,14 +4,21 @@ extends Node3D
 ## shell and a ring of crystals for as long as the freeze lasts (the freeze itself is the
 ## enemy's stun). With [member shatter_damage] > 0 (Frost Nova "Shatter") the ice bursts
 ## when it melts: Frost damage to the enemy and every enemy within [member shatter_radius]
-## (the caster's ProcSystem.deal_raw(..., &"ability")). Child of the enemy – freed with it;
-## an enemy that dies frozen does not shatter. One per caster per enemy: a new freeze
-## extends it.
+## (the caster's ProcSystem.deal_raw(..., &"ability")). The ice of one nova shares a
+## [MageFrozen.ShatterGroup]: each enemy takes that nova's shatter at most once, however many
+## frozen neighbours burst around it. Child of the enemy – freed with it; an enemy that dies
+## frozen does not shatter. One per caster per enemy: a new freeze extends it.
 
 const EPSILON := 0.0001
 const SHELL_COLOR := Color(0.7, 0.9, 1.0, 0.32)
 const CRYSTAL_COLOR := Color(0.72, 0.92, 1.0)
 const CRYSTALS := 5
+
+
+## Enemies the shatters of one Frost Nova already hit (instance ids), shared by its ice.
+class ShatterGroup extends RefCounted:
+	var hit: Dictionary[int, bool] = {}
+
 
 var caster: Player
 var enemy: Enemy
@@ -19,6 +26,8 @@ var enemy: Enemy
 var left := 1.5
 var shatter_damage := 0.0
 var shatter_radius := 1.5
+## Shared with the rest of the nova's ice (null: this ice shatters on its own).
+var shatter_group: ShatterGroup
 var shattered := false
 ## Enemies the shatter damaged (tests).
 var shatter_hits := 0
@@ -28,7 +37,7 @@ var _body: Node3D
 
 
 static func apply(e: Enemy, p_caster: Player, duration: float, p_shatter_damage: float = 0.0,
-		p_shatter_radius: float = 1.5) -> MageFrozen:
+		p_shatter_radius: float = 1.5, p_group: ShatterGroup = null) -> MageFrozen:
 	if not MageSpell.is_live(e) or duration <= 0.0:
 		return null
 	var key := "MageFrozen%d" % (p_caster.get_instance_id() if p_caster != null else 0)
@@ -46,6 +55,8 @@ static func apply(e: Enemy, p_caster: Player, duration: float, p_shatter_damage:
 		ice.shatter_radius = maxf(ice.shatter_radius, p_shatter_radius) if ice.shatter_damage > 0.0 \
 				else p_shatter_radius
 		ice.shatter_damage = maxf(ice.shatter_damage, p_shatter_damage)
+		if p_group != null:
+			ice.shatter_group = p_group
 	return ice
 
 
@@ -63,14 +74,21 @@ func _physics_process(delta: float) -> void:
 	_end()
 
 
-## Bursts the ice now: shatter damage around the enemy (once).
+## Bursts the ice now: shatter damage around the enemy (once), skipping enemies another ice
+## of the same nova already shattered on.
 func shatter() -> void:
 	if shattered or not MageSpell.is_live(enemy):
 		return
 	shattered = true
 	var center := enemy.global_position
+	if shatter_group == null:
+		shatter_group = ShatterGroup.new()
 	if is_instance_valid(caster) and caster.procs != null:
 		for e in MageSpell.enemies_in(enemy.get_tree(), center, shatter_radius):
+			var id := e.get_instance_id()
+			if shatter_group.hit.has(id):
+				continue
+			shatter_group.hit[id] = true
 			if caster.procs.deal_raw(e, shatter_damage, MageSpell.FROST, true, &"ability") > 0.0:
 				shatter_hits += 1
 	MageFx.shatter(center + Vector3.UP * Enemy.BODY_CENTER_HEIGHT, shatter_radius)
