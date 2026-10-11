@@ -1,8 +1,9 @@
 extends TestCase
 ## M4 HUD (GDD 6.2, 12): the unit frame's AbilityBar shows the learned Active slots (RB / LB with
-## prompts) and the 2 x 2 auto-cast cluster (small icons, gear mark, sweep, no prompt), rank pips
-## on every icon, and every class's frame stays within UnitFrame.MAX_HEIGHT / MAX_WIDTH with all
-## eight slots filled. Plus the glyph rule: every shipped ability id has its own glyph.
+## prompts) and the 2 x 2 auto-cast cluster (small icons, gear mark, sweep, no prompt), the rank
+## on every icon (pips, a numeral badge on the small ones), and every class's frame stays within
+## UnitFrame.MAX_HEIGHT / MAX_WIDTH with all eight slots filled. Plus the glyph rule (every
+## shipped ability id has its own glyph) and the icon redraw cost (sweep step, glyph layer).
 
 const Fakes := preload("res://tests/test_ui_m3_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
@@ -150,9 +151,8 @@ func test_rank_pips_follow_ranks_and_specs() -> void:
 	for c in pips:
 		check(c.y - AbilityIcon.rank_pip_size(42.0) >= 0.0 and c.y + AbilityIcon.rank_pip_size(42.0) <= 42.0 - AbilityIcon.PROMPT_OVERHANG,
 			"pip %s stays inside the icon, above the prompt pill" % c)
-	for c in AbilityIcon.rank_pip_centers(AbilityBar.AUTO_ICON_SIZE, 5, false):
-		check(c.y - AbilityIcon.rank_pip_size(26.0) >= 0.0 and c.y + AbilityIcon.rank_pip_size(26.0) <= 26.0,
-			"small icon pip %s inside" % c)
+	check(not bar.icons[2].uses_rank_badge(), "button icons: pips")
+	check(bar.icons[4].uses_rank_badge(), "the small auto-cast icons show a numeral instead")
 	frame.unbind()
 	check_eq(bar.icons[2].rank, 0, "unbound: no pips")
 	check_eq(AbilityIcon.roman(4), "IV", "roman numerals")
@@ -292,6 +292,117 @@ func test_new_glyphs_draw() -> void:
 			icon.queue_redraw()
 			count += 1
 	check_eq(count, 34 * 3, "34 new glyphs at three sizes")
+	await tree.process_frame
+	await tree.process_frame
+	finished.emit()
+
+
+# --- Redraw cost and the small rank badge ------------------------------------------------------
+
+## Runs a [param seconds] cooldown on [param icon] at 60 Hz (one set_state per frame, like
+## AbilityBar) and returns the sweep ratios of the overlay draws.
+func _run_cooldown(icon: AbilityIcon, seconds: float) -> Array[float]:
+	var drawn: Array[float] = []
+	icon.draw.connect(func() -> void: drawn.append(icon.sweep_ratio))
+	var left := seconds
+	while left > 0.0:
+		icon.set_state(left / seconds, left, false)
+		await tree.process_frame
+		left -= 1.0 / 60.0
+	icon.set_state(0.0, 0.0, true)
+	await tree.process_frame
+	return drawn
+
+
+func test_small_icons_redraw_once_per_pixel_of_sweep_and_keep_the_glyph() -> void:
+	# Regression: every icon redrew on each 0.004-turn sweep step (~0.3 px on a 26 px icon) and
+	# whenever the hidden seconds changed, re-recording the whole two-pass glyph each time.
+	_async = true
+	var small := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
+	small.show_prompt = false
+	small.show_cooldown_text = false
+	small.set_ability(learned(&"auto", AbilityData.Kind.AUTO))
+	var big := AbilityIcon.create(AbilityIcon.SIZE)
+	big.set_ability(learned(&"button", AbilityData.Kind.ACTIVE))
+	for icon in [small, big]:
+		tree.root.add_child(icon)
+		nodes.append(icon)
+	await tree.process_frame
+	var glyph_draws: Array[int] = [0]
+	small._glyph_layer.draw.connect(func() -> void: glyph_draws[0] += 1)
+	var drawn := await _run_cooldown(small, 6.0)
+	var step := 1.0 / (4.0 * AbilityBar.AUTO_ICON_SIZE)
+	check(drawn.size() <= ceili(1.0 / step) + 4, "about one redraw per pixel of sweep edge (%d draws)" % drawn.size())
+	check(drawn.size() >= floori(0.8 / step), "but still a smooth sweep (%d draws)" % drawn.size())
+	var worst := 0.0
+	for i in range(1, drawn.size()):
+		worst = maxf(worst, absf(drawn[i] - drawn[i - 1]))
+	check(worst <= step * 1.6, "no visible jump (worst %s)" % worst)
+	check_eq(drawn.back(), 0.0, "ends empty")
+	check_eq(glyph_draws[0], 0, "the glyph layer is not re-recorded by the sweep")
+	small.set_ability(learned(&"other", AbilityData.Kind.AUTO))
+	await tree.process_frame
+	check_eq(glyph_draws[0], 1, "a new ability redraws the glyph")
+	# The big icon with its seconds keeps the fine step (and redraws on every new second).
+	var big_drawn := await _run_cooldown(big, 6.0)
+	check(big_drawn.size() >= 150, "big icon: fine steps (%d draws)" % big_drawn.size())
+	finished.emit()
+
+
+func test_sweep_ending_without_a_state_flip_is_drawn_empty() -> void:
+	# A recharging second charge: the slot stays ready (no seconds, no ready flip) while the sweep
+	# runs out – the last step to 0 must still be drawn, or a sliver and the veil would stay.
+	_async = true
+	var icon := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
+	icon.show_cooldown_text = false
+	icon.set_ability(learned(&"charges", AbilityData.Kind.AUTO))
+	tree.root.add_child(icon)
+	nodes.append(icon)
+	var drawn: Array[float] = []
+	icon.draw.connect(func() -> void: drawn.append(icon.sweep_ratio))
+	icon.set_state(0.5, 0.0, true)
+	await tree.process_frame
+	var sliver := icon.sweep_redraw_step() * 0.7
+	icon.set_state(sliver, 0.0, true)
+	await tree.process_frame
+	check_eq(drawn.back(), sliver, "a last sliver (with the veil) is drawn")
+	icon.set_state(0.0, 0.0, true)
+	await tree.process_frame
+	check_eq(drawn.back(), 0.0, "the step to empty is drawn although it is below the redraw step")
+	finished.emit()
+
+
+func test_small_icons_show_the_rank_as_a_numeral() -> void:
+	# Five 2 px pips cannot be counted on a 26 px icon at 1280 x 720: small icons draw the roman
+	# numeral on a dark plate in the bottom-left corner instead (orange once specialised).
+	_async = true
+	var small := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
+	var trainer_row := AbilityIcon.create(TrainerRow.ICON_SIZE, false)
+	var button := AbilityIcon.create(42.0)
+	check(small.uses_rank_badge() and trainer_row.uses_rank_badge(), "below SMALL_ICON: the numeral")
+	check(not button.uses_rank_badge(), "button icons keep the pips")
+	for sq: float in [AbilityBar.AUTO_ICON_SIZE, TrainerRow.ICON_SIZE]:
+		for r in range(1, AbilityIcon.MAX_RANK + 1):
+			var plate := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, false), AbilityIcon.roman(r))
+			check(plate.position.x >= 2.0 and plate.end.y <= sq - 2.0, "%s px Rank %d: the plate %s sits inside the rim" % [sq, r, plate])
+			check(plate.end.x <= sq - 3.0, "%s px Rank %d: and clear of the right edge (%s)" % [sq, r, plate])
+			check(plate.position.y >= sq * 0.3, "%s px Rank %d: in the bottom part, clear of the top corner texts (%s)" % [sq, r, plate])
+		var above := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, true), "III")
+		check(above.end.y <= sq - AbilityIcon.PROMPT_OVERHANG, "%s px: above a prompt pill (%s)" % [sq, above])
+	# Drawn for real at every rank, specialised or not.
+	var box := HBoxContainer.new()
+	tree.root.add_child(box)
+	nodes.append(box)
+	for r in range(1, AbilityIcon.MAX_RANK + 1):
+		for spec: bool in [false, true]:
+			var icon := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
+			icon.set_ability(learned(StringName("r%d" % r), AbilityData.Kind.AUTO))
+			icon.set_rank(r, spec)
+			icon.set_charges(1, 2)
+			icon.set_state(0.5, 2.0, false)
+			box.add_child(icon)
+	for icon: AbilityIcon in [small, trainer_row, button]:
+		icon.free()
 	await tree.process_frame
 	await tree.process_frame
 	finished.emit()
