@@ -245,6 +245,123 @@ func test_text_helpers() -> void:
 	check_eq(ItemTooltip.fmt_number(6.0), "6", "whole numbers")
 
 
+# --- Tier sets (M5) ---------------------------------------------------------------------------
+
+## A tier-set piece "set_<class>_<slot>" as the generator makes it (wave 8, bought).
+static func set_piece(class_id: StringName, slot: String) -> ItemInstance:
+	return ItemGenerator.from_unique(Db.get_unique(StringName("set_%s_%s" % [class_id, slot])), 8, false,
+			RandomNumberGenerator.new())
+
+
+## Every shown label whose text is exactly [param text] (a piece name can also be the title).
+func _exact(text: String) -> Array[Label]:
+	var out: Array[Label] = []
+	for l in ItemTooltip._labels(tip):
+		if l.text == text:
+			out.append(l)
+	return out
+
+
+func _index_of(text: String) -> int:
+	return Array(tip.line_texts()).find(text)
+
+
+func test_set_block_for_the_viewers_equipment() -> void:
+	var warrior := Db.get_class_data(&"warrior")
+	var eq := Equipment.new(warrior)
+	eq.slots[Items.EquipSlot.HEAD] = set_piece(&"warrior", "head")
+	eq.slots[Items.EquipSlot.LEGS] = set_piece(&"warrior", "legs")
+	var chest := set_piece(&"warrior", "chest")
+	tip.viewer_equipment = eq
+	tip.show_item(chest, warrior)
+	check(tip.find_line("Part of the") == null, "the old one-liner is gone")
+	var header := tip.find_line("Battlegear of Fury (2/5)", true)
+	check(header != null and _color(header).is_equal_approx(ItemTooltip.SET_NAME_COLOR), "set name + worn count in gold: %s" % tip.line_texts())
+	for piece_name in ["Helm of Fury", "Legplates of Fury"]:
+		var l := _exact(piece_name)
+		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "%s worn: bright" % piece_name)
+	for piece_name in ["Pauldrons of Fury", "Gauntlets of Fury"]:
+		var l := _exact(piece_name)
+		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING), "%s missing: grey" % piece_name)
+	var own := _exact("Breastplate of Fury")
+	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING),
+		"the shown piece is listed too (grey until worn)")
+	var two := tip.find_line("(2) Set: Increases your Rage generation by 10%.", true)
+	check(two != null and _color(two).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "active 2-piece bonus green")
+	var four := tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)
+	check(four != null and _color(four).is_equal_approx(ItemTooltip.DIM), "inactive 4-piece bonus grey")
+	check(_index_of("Classes: Warrior") < _index_of("Battlegear of Fury (2/5)"), "after the Classes line")
+	check(_index_of("(4) Set: Whirlwind has a 30% chance to cost no Rage.") < _index_of("\"%s\"" % chest.flavor), "before the flavor text")
+	eq.slots[Items.EquipSlot.CHEST] = chest
+	eq.slots[Items.EquipSlot.HANDS] = set_piece(&"warrior", "hands")
+	tip.show_item(chest, warrior)
+	check(tip.find_line("Battlegear of Fury (4/5)", true) != null, "4 worn")
+	own = _exact("Breastplate of Fury")
+	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "now worn")
+	four = tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)
+	check(four != null and _color(four).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "4-piece bonus active")
+
+
+func test_set_block_without_equipment() -> void:
+	tip.viewer_equipment = null
+	tip.show_item(set_piece(&"mage", "head"), Db.get_class_data(&"mage"))
+	var header := tip.find_line("Regalia of the Arcane (5 pieces)", true)
+	check(header != null and _color(header).is_equal_approx(ItemTooltip.SET_NAME_COLOR), "(5 pieces) without equipment")
+	for piece_name in ["Mantle of the Arcane", "Robes of the Arcane", "Gloves of the Arcane", "Leggings of the Arcane"]:
+		var l := _exact(piece_name)
+		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING), "%s grey" % piece_name)
+	for prefix in ["(2) Set: ", "(4) Set: "]:
+		var l := tip.find_line(prefix)
+		check(l != null and _color(l).is_equal_approx(ItemTooltip.DIM), "%s grey" % prefix)
+	check(tip.find_line("(4) Set: Casting Blink increases your damage by 30% for 3 sec. Can only occur once every 6 sec.", true) != null,
+		"4-piece text")
+
+
+func test_set_block_of_an_unknown_set() -> void:
+	var odd := armor("Odd Helm", Items.SlotType.HEAD, ClassData.ArmorType.CLOTH, 3, {"stamina": 2})
+	odd.set_id = &"zz_unknown_set"
+	tip.show_item(odd)
+	var l := tip.find_line("Part of the Zz Unknown Set set", true)
+	check(l != null and _color(l).is_equal_approx(ItemTooltip.DIM), "no SetData: the plain line: %s" % tip.line_texts())
+
+
+func test_upgrade_direction_values_set_thresholds() -> void:
+	var warrior := Db.get_class_data(&"warrior")
+	var eq := Equipment.new(warrior)
+	eq.slots[Items.EquipSlot.HEAD] = set_piece(&"warrior", "head")
+	var set_shoulders := set_piece(&"warrior", "shoulders")
+	var set_score := ItemTooltip.item_score(set_shoulders, warrior)
+	# Plain shoulders a bit better (within 30%) and much better (more than 30%).
+	var better := armor("Better", Items.SlotType.SHOULDERS, ClassData.ArmorType.PLATE, 3, {"strength": 7, "stamina": 6, "armor": 2})
+	var much := armor("Much", Items.SlotType.SHOULDERS, ClassData.ArmorType.PLATE, 3, {"strength": 10, "stamina": 7, "armor": 2})
+	var b_score := ItemTooltip.item_score(better, warrior)
+	var m_score := ItemTooltip.item_score(much, warrior)
+	check(set_score < b_score and set_score >= b_score * 0.7, "fixture: %.1f is within 30%% below %.1f" % [set_score, b_score])
+	check(set_score < m_score * 0.7, "fixture: %.1f is more than 30%% below %.1f" % [set_score, m_score])
+	eq.slots[Items.EquipSlot.SHOULDERS] = better
+	check_eq(ItemTooltip.upgrade_direction(set_shoulders, better, warrior), -1, "without equipment: stats only")
+	check_eq(ItemTooltip.upgrade_direction(set_shoulders, better, warrior, eq), 1, "completes the 2-piece: upgrade")
+	eq.slots[Items.EquipSlot.SHOULDERS] = much
+	check_eq(ItemTooltip.upgrade_direction(set_shoulders, much, warrior, eq), -1, "more than 30% worse: no")
+	# The other way round: keep an active bonus unless the new item is far better.
+	eq.slots[Items.EquipSlot.SHOULDERS] = set_shoulders
+	check_eq(ItemTooltip.upgrade_direction(better, set_shoulders, warrior), 1, "stats alone: better")
+	check_eq(ItemTooltip.upgrade_direction(better, set_shoulders, warrior, eq), -1, "but it breaks the 2-piece bonus")
+	check_eq(ItemTooltip.upgrade_direction(much, set_shoulders, warrior, eq), 1, "far better: worth it")
+	# A third piece crosses no threshold: plain stats.
+	var plain_chest := armor("Chest", Items.SlotType.CHEST, ClassData.ArmorType.PLATE, 3, {"strength": 10, "stamina": 8, "armor": 3})
+	eq.slots[Items.EquipSlot.CHEST] = plain_chest
+	var set_chest := set_piece(&"warrior", "chest")
+	check(ItemTooltip.item_score(set_chest, warrior) < ItemTooltip.item_score(plain_chest, warrior) - ItemTooltip.UPGRADE_THRESHOLD,
+		"fixture: the set chest is weaker")
+	check_eq(ItemTooltip.upgrade_direction(set_chest, plain_chest, warrior, eq), -1, "3rd piece: no threshold, stats decide")
+	# Bots: the same rule (Intermission.is_bot_upgrade / bot_equip_upgrades).
+	eq.slots[Items.EquipSlot.SHOULDERS] = better
+	eq.backpack.append(set_shoulders)
+	check(ItemTooltip.upgrade_direction(set_shoulders, ItemTooltip.equipped_for_compare(set_shoulders, eq), warrior, eq) > 0,
+		"a bot would put the set shoulders on")
+
+
 # --- ItemIcon / ItemArt ---------------------------------------------------------------------------
 
 func test_item_icon_state() -> void:

@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"regalia_of_the_arcane"
+display_name = "Regalia of the Arcane"
+class_id = &"mage"
+piece_ids = Array[StringName]([&"set_mage_head", &"set_mage_shoulders", &"set_mage_chest", &"set_mage_hands", &"set_mage_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "stats",
+"stats": {
+"haste": 10.0
+}
+}],
+"pieces": 2,
+"text": "Increases your Haste by 10%."
+}, {
+"effects": [{
+"kind": "proc",
+"proc": {
+"ability": "blink",
+"duration": 3.0,
+"effect": "buff",
+"icd": 6.0,
+"stats": {
+"damage_pct": 30.0
+},
+"trigger": "on_cast"
+}
+}],
+"pieces": 4,
+"text": "Casting Blink increases your damage by 30% for 3 sec. Can only occur once every 6 sec."
+}])
