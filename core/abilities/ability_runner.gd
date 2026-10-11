@@ -524,7 +524,12 @@ func on_kill(enemy: Node3D) -> void:
 		mastery.on_kill(enemy)
 
 
+## The player is about to be freed: every slotted effect ends what it started (buffs on
+## allies, pets, areas) like at a wave end, then the Mastery tears down.
 func teardown() -> void:
+	for a in slots:
+		if a != null and _effects.has(a.id):
+			_effects[a.id].end_wave(_light_context(a))
 	if mastery != null:
 		mastery.teardown()
 

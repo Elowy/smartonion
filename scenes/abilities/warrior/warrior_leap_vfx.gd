@@ -45,7 +45,8 @@ static func spawn_crater(area: Node3D, p_radius: float, seconds: float) -> Warri
 	fx.fade_in = 0.1
 	fx.fade_out = 0.4
 	area.add_child(fx)
-	fx.position = Vector3(0.0, GROUND_Y, 0.0)
+	# Just above the area's own disc (y 0.06) so the cracks show on top of it.
+	fx.position = Vector3(0.0, 0.075, 0.0)
 	return fx
 
 
