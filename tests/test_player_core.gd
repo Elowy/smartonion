@@ -509,3 +509,31 @@ func test_is_reviving_next_to_a_ghost() -> void:
 	check(not p1.is_reviving(), "a ghost does not revive")
 	p2.global_position = Vector3(Player.REVIVE_RADIUS + 0.5, 0, 0)
 	check(not p2.is_reviving(), "out of the circle")
+
+
+func test_damage_taken_mults_death_guards_and_shields() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	p.stats.set_source(&"test", {Stats.ARMOR: -2.0})  # no armour: raw damage lands
+	var hp := p.hp
+	p.damage_taken_mults[&"shield_wall"] = 0.5
+	p.take_damage(4.0)
+	check_near(hp - p.hp, 2.0, 0.001, "-50% damage taken")
+	p.begin_wave()
+	check(p.damage_taken_mults.is_empty(), "cleared at wave start")
+	p.invulnerable_left = 0.0
+	p.procs.add_shield(5.0, 10.0)
+	hp = p.hp
+	p.take_damage(3.0)
+	check_eq(p.hp, hp, "the shield took it")
+	p.invulnerable_left = 0.0
+	var used := [false]
+	p.death_guards.append(func() -> bool:
+		if used[0]:
+			return false
+		used[0] = true
+		return true)
+	p.take_damage(999.0)
+	check(not p.downed and p.hp >= 1.0, "a death guard keeps the hero up at 1 HP")
+	p.invulnerable_left = 0.0
+	p.take_damage(999.0)
+	check(p.downed, "but only while it allows")

@@ -121,6 +121,12 @@ var healer_seconds_left := -1.0
 var invulnerable_left := 0.0
 ## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
 var stealth_left := 0.0
+## Named incoming-damage multipliers (Shield Wall 0.5 ...), applied after armour; cleared at
+## wave start.
+var damage_taken_mults: Dictionary[StringName, float] = {}
+## Callables returning true to survive a lethal hit at 1 HP (Cheat Death ...); item
+## cheat-death procs are tried first.
+var death_guards: Array[Callable] = []
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -197,6 +203,16 @@ func is_stealthed() -> bool:
 	return stealth_left > 0.0
 
 
+## A lethal hit is about to land: item cheat-death procs first, then [member death_guards].
+func _prevent_death() -> bool:
+	if procs != null and procs.try_cheat_death():
+		return true
+	for guard in death_guards:
+		if guard.is_valid() and guard.call():
+			return true
+	return false
+
+
 ## Alive and standing next to a downed teammate (reviving it) – bots must not dash away.
 func is_reviving() -> bool:
 	if downed or not is_inside_tree():
@@ -233,6 +249,7 @@ func begin_wave() -> void:
 	stealth_left = 0.0
 	forced_crits = 0
 	damage_mults.clear()
+	damage_taken_mults.clear()
 	for runner in weapons:
 		runner.reset()
 	if procs != null:
@@ -271,6 +288,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			_thorns(attacker, kind)
 			return
 	var dmg := CombatMath.incoming_damage(amount, stats, kind)
+	for m: float in damage_taken_mults.values():
+		dmg *= maxf(0.0, m)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
@@ -278,8 +297,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			_thorns(attacker, kind)
 			procs.on_struck(valid_source, 0.0)
 			return
-		if dmg >= hp and procs.try_cheat_death():
-			dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
+	if dmg >= hp and _prevent_death():
+		dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
 	hp = maxf(0.0, hp - dmg)
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:

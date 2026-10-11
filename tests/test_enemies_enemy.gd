@@ -420,3 +420,28 @@ func test_freed_players_are_handled() -> void:
 ## Another fake player type (as a second Player subclass instance in the group).
 class FakeLookup extends EFakes.FakePlayer:
 	pass
+
+
+func test_fear_runs_away_without_attacking() -> void:
+	var player := EFakes.spawn_player(world, Vector3.ZERO)
+	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3(0.6, 0.0, 0.0))
+	e.apply_fear(1.0, Vector3.ZERO)
+	check(e.is_feared(), "feared")
+	EFakes.step(e, 0.5)
+	check_eq(player.fake_hits.size(), 0, "no contact damage while feared")
+	check(e.global_position.x > 0.9, "runs away from the source")
+	EFakes.step(e, 0.6)
+	check(not e.is_feared(), "wears off")
+
+
+func test_taunt_chases_the_taunter() -> void:
+	EFakes.spawn_player(world, Vector3(-6.0, 0.0, 0.0))
+	var decoy := Node3D.new()
+	EFakes.arena_of(world).entities.add_child(decoy)
+	decoy.global_position = Vector3(6.0, 0.0, 0.0)
+	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3.ZERO)
+	e.apply_taunt(decoy, 2.0)
+	EFakes.step(e, 0.5)
+	check(e.global_position.x > 0.5, "walks to the taunter, not the player")
+	decoy.free()
+	check(not e.is_taunted(), "a freed taunter ends the taunt")

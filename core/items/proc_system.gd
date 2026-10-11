@@ -266,6 +266,15 @@ func begin_wave() -> void:
 
 
 ## Damage left after the absorb shield took its share ("Absorb" text when it took all).
+## Adds an absorb shield (Ice Barrier, shield procs): [param amount] HP for up to
+## [param duration] seconds (shields stack; the longer timer wins).
+func add_shield(amount: float, duration: float) -> void:
+	if amount <= 0.0:
+		return
+	shield_hp += amount
+	shield_left = maxf(shield_left, duration)
+
+
 func absorb(damage: float) -> float:
 	if shield_hp <= 0.0 or damage <= 0.0:
 		return damage
