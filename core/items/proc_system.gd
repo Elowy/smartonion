@@ -52,6 +52,32 @@ extends Node
 ## All rolls use RunState.rng (only when a roll is needed), target queries go through
 ## [EnemyGrid]. When-struck enchants on WEAPON items are meant for shields only (the
 ## generator's job).
+##
+## M5 (talents and set bonuses, also open to unique items):
+## - Extra procs: [method set_extra_procs] stores the rank-resolved "proc" entries of a
+##   source (PlayerBonuses: &"talents", &"set_bonus"; it calls [method refresh] afterwards),
+##   [method refresh] builds them after the items ([method proc_from_params]: numbers used as
+##   written, the label defaults to the entry's label – the talent / set name).
+## - Triggers: "on_crit" (the attack's first hit crit – inside [method on_hit], same once-per-
+##   attack gate; chance default 100), "on_cast" ([method on_ability_cast]; filter "ability"
+##   id or "match" dict as BonusVocabulary.matches – none = every cast), "wave_start"
+##   ([method after_wave_start], after the class resources were reset), "on_dodge" /
+##   "on_parry" / "on_block" ([method on_avoided]; the attacker is the target, extra_attack
+##   allowed). "periodic" rolls "chance" once per interval.
+## - Keys: "every" (N: every Nth qualifying event fires instead of the chance roll; the count
+##   carries over while the proc is on cooldown / spent for the wave and resets at wave start),
+##   "hit_pct" (on_hit / on_crit: every damaging block – bolt, chain, nova, explode, drain,
+##   reflect, smite_heal – deals that % of the hit's base amount (Player.on_hit_dealt) through
+##   deal_raw(..., target_bonus = false, &"proc"); a dot takes it as its total and ticks with
+##   target_bonus = false; a drain heals what it dealt), "max_hp_pct" (heal / shield: % of the
+##   receiver's Max HP, added to "amount"), "target": "self" | "lowest_ally" (heal, shield),
+##   "label": "" (no floating text of any block).
+## - Blocks: cooldown {ability | match, reduce (s) | reset: true} (AbilityRunner.reduce_cooldown:
+##   one charge back at most / set_cooldown(a, 0)), forced_crit {count} (Player.forced_crits),
+##   resource {resource: <id> | "primary", value} (ClassResource.add(value, true): Resource
+##   Regen scales bars, pips are exact) next to the item form resource {amount}.
+## - Labels: buff, shield, cheat_death, cooldown, forced_crit, resource {resource} (and heal of
+##   talent / set procs) show the proc's label above the hero; damaging blocks show numbers.
 
 ## A proc fired (effect id = block id). Also for no-op blocks such as resource.
 signal proc_fired(proc_id: StringName, effect: StringName)
@@ -62,6 +88,14 @@ const TRIGGER_WHEN_STRUCK := &"when_struck"
 const TRIGGER_LOW_HP := &"low_hp"
 const TRIGGER_PERIODIC := &"periodic"
 const TRIGGER_EQUIP := &"equip"
+const TRIGGER_ON_CRIT := &"on_crit"
+const TRIGGER_ON_CAST := &"on_cast"
+const TRIGGER_WAVE_START := &"wave_start"
+const TRIGGER_ON_DODGE := &"on_dodge"
+const TRIGGER_ON_PARRY := &"on_parry"
+const TRIGGER_ON_BLOCK := &"on_block"
+## Triggers whose event is a weapon hit: "hit_pct" only works there.
+const HIT_TRIGGERS: Array[StringName] = [TRIGGER_ON_HIT, TRIGGER_ON_CRIT]
 
 ## Every building block ProcSystem runs (unknown effect ids are ignored – e.g. M3 ability
 ## modifiers on uniques).
@@ -70,6 +104,8 @@ const BLOCKS: Array[StringName] = [
 	&"drain", &"slow", &"stun", &"gold", &"shield", &"reflect", &"smite_heal", &"cheat_death",
 	&"resource",
 ]
+## The M5 blocks (BonusVocabulary.PROC_BLOCKS = BLOCKS + these): cooldown, forced_crit.
+const EXTRA_BLOCKS: Array[StringName] = [&"cooldown", &"forced_crit"]
 ## Blocks that need a living enemy to do anything (periodic / low-HP procs wait for one).
 const NEEDS_ENEMY: Array[StringName] = [
 	&"bolt", &"chain", &"dot", &"nova", &"explode", &"extra_attack", &"drain", &"slow", &"stun",
@@ -123,12 +159,24 @@ class Proc extends RefCounted:
 	var interval := DEFAULT_INTERVAL
 	var per_wave := 0
 	var item: ItemInstance
+	## M5 "every": fires on every Nth qualifying event instead of rolling (0 = off).
+	var every := 0
+	## M5 "hit_pct" (on_hit / on_crit only): damaging blocks deal this % of the hit's base
+	## amount (0 = their "damage").
+	var hit_pct := 0.0
+	## M5: a talent / set proc (set_extra_procs) – its heal shows the label too.
+	var extra := false
+	## M5 on_cast filter: an ability id, else a BonusVocabulary "match" dict (both empty = any).
+	var cast_ability: StringName = &""
+	var cast_match: Dictionary = {}
 	# Runtime state.
 	var cd_left := 0.0
 	var timer := 0.0
 	var armed := true
 	var fired_wave := 0
 	var fired_total := 0
+	## Qualifying events counted towards "every" (reset at wave start).
+	var counter := 0
 
 	func num(key: String, default: float = 0.0) -> float:
 		var v: Variant = params.get(key, default)
@@ -154,6 +202,8 @@ class Dot extends RefCounted:
 	var spread := 0.0
 	var generation := 0
 	var last_pos := Vector3.ZERO
+	## Executioner / Slayer on the ticks (false for a "hit_pct" dot – derived from a hit).
+	var target_bonus := true
 
 
 ## A running temporary stat buff.
@@ -207,6 +257,12 @@ var _when_struck: Array[Proc] = []
 var _low_hp: Array[Proc] = []
 var _periodic: Array[Proc] = []
 var _cheat_death: Array[Proc] = []
+var _on_crit: Array[Proc] = []
+var _on_cast: Array[Proc] = []
+var _wave_start: Array[Proc] = []
+var _on_dodge: Array[Proc] = []
+var _on_parry: Array[Proc] = []
+var _on_block: Array[Proc] = []
 var _dots: Array[Dot] = []
 var _buffs: Array[Buff] = []
 ## Absorb shields, one entry per source; each runs out on its own timer.
@@ -216,9 +272,11 @@ var _equip_sources: Array[StringName] = []
 var _gold_carry := 0.0
 var _depth := 0
 var _next_uid := 1
-## M5, see PlayerBonuses: proc params dicts of talents / set bonuses per source
-## (set_extra_procs; not built into procs yet – T-CORE-B).
+## M5, see PlayerBonuses: the proc defs of talents / set bonuses per source
+## ([method set_extra_procs]), built into [member procs] by [method refresh] after the items.
 var _extra_defs: Dictionary[StringName, Array] = {}
+## Base amount of the weapon hit being resolved (on_hit / on_crit procs; "hit_pct").
+var _hit_base := 0.0
 
 
 static func create(owner_player: Player) -> ProcSystem:
@@ -228,8 +286,10 @@ static func create(owner_player: Player) -> ProcSystem:
 	return ps
 
 
-## Rebuilds the active enchant list from the player's equipment (call on equipment.changed).
-## Running buffs from the old list end; DoTs already on enemies keep ticking.
+## Rebuilds the active list (call on equipment.changed): the equipped items' enchants and
+## unique effects, then the talent / set procs of [method set_extra_procs] (source order,
+## then entry order). Running buffs from the old list end; DoTs already on enemies keep
+## ticking.
 func refresh() -> void:
 	_clear_buffs()
 	for source in _equip_sources:
@@ -237,32 +297,52 @@ func refresh() -> void:
 			player.stats.remove_source(source)
 	_equip_sources.clear()
 	procs.clear()
-	for list: Array[Proc] in [_on_hit, _on_kill, _when_struck, _low_hp, _periodic, _cheat_death]:
+	for list: Array[Proc] in [_on_hit, _on_kill, _when_struck, _low_hp, _periodic, _cheat_death,
+			_on_crit, _on_cast, _wave_start, _on_dodge, _on_parry, _on_block]:
 		list.clear()
-	if player == null or player.equipment == null:
+	if player == null:
 		return
-	for s in Items.EquipSlot.values():
-		var item := player.equipment.get_item(s)
-		if item == null:
-			continue
-		for roll in item.proc_enchants():
-			_add(proc_from_enchant(roll, item))
-		if item.unique_effect != &"":
-			_add(proc_from_unique(item))
+	if player.equipment != null:
+		for s in Items.EquipSlot.values():
+			var item := player.equipment.get_item(s)
+			if item == null:
+				continue
+			for roll in item.proc_enchants():
+				_add(proc_from_enchant(roll, item))
+			if item.unique_effect != &"":
+				_add(proc_from_unique(item))
+	for source: StringName in _extra_defs:
+		var defs: Array = _extra_defs[source]
+		for i in defs.size():
+			_add(proc_from_def(defs[i], source, i))
 
 
-## A weapon hit landed (not called for proc damage). [param is_extra]: a hit of an extra
-## attack – it cannot trigger extra_attack procs.
-func on_hit(target: Node3D, _damage: float, weapon: WeaponData, _is_crit: bool, is_extra: bool = false) -> void:
-	if _on_hit.is_empty() or not _active():
+## A weapon hit landed (not called for proc damage). [param damage]: the hit's base amount
+## (Player.on_hit_dealt; what "hit_pct" blocks derive from). [param is_crit]: on_crit procs
+## fire too. [param is_extra]: a hit of an extra attack – it cannot trigger extra_attack procs.
+## Called once per attack (the ProcGate hit), so on_hit / on_crit roll once per attack.
+func on_hit(target: Node3D, damage: float, weapon: WeaponData, is_crit: bool, is_extra: bool = false) -> void:
+	if (_on_hit.is_empty() and (not is_crit or _on_crit.is_empty())) or not _active():
 		return
 	var cd := weapon.cooldown if weapon != null else 1.0
 	var pos := _pos_of(target)
+	# An extra_attack block resolves its hits right away (re-entering on_hit): keep ours.
+	var outer_base := _hit_base
+	_hit_base = damage
 	for p in _on_hit:
 		if is_extra and p.effect == &"extra_attack":
 			continue
 		var c := CombatMath.ppm_chance(p.ppm, cd) if p.ppm > 0.0 else p.chance / 100.0
 		_try_fire(p, c, target, pos, weapon)
+		_hit_base = damage
+	if is_crit:
+		for p in _on_crit:
+			if is_extra and p.effect == &"extra_attack":
+				continue
+			var c := CombatMath.ppm_chance(p.ppm, cd) if p.ppm > 0.0 else p.chance / 100.0
+			_try_fire(p, c, target, pos, weapon)
+			_hit_base = damage
+	_hit_base = outer_base
 
 
 func on_kill(enemy: Node3D) -> void:
@@ -285,39 +365,95 @@ func on_struck(attacker: Node3D, _damage: float) -> void:
 
 
 ## M5, see PlayerBonuses: the proc entries of [param source] (&"talents", &"set_bonus"),
-## rank-resolved ProcSystem params dicts (BonusVocabulary). P0 stub: stored only (T-CORE-B
-## builds them into procs in refresh()).
+## rank-resolved. Each def is either a whole entry ({"kind": "proc", "proc": {...}, "label",
+## "id", ...}: the "proc" dict is used, the entry's label is the default label, its id the
+## proc id) or a bare ProcSystem params dict (its own "label" / "id" keys, if any). Stores
+## only: replaces the source's defs (an empty array removes the source; identical defs are a
+## no-op), and the next [method refresh] builds them – the caller (PlayerBonuses) refreshes
+## once after handing over every changed source.
 func set_extra_procs(source: StringName, defs: Array[Dictionary]) -> void:
-	_extra_defs[source] = defs.duplicate(true)
+	if _same_defs(_extra_defs.get(source, []), defs):
+		return
+	if defs.is_empty():
+		_extra_defs.erase(source)
+	else:
+		_extra_defs[source] = defs.duplicate(true)
 
 
-## M5, see PlayerBonuses: one of the player's abilities was cast (on_cast trigger).
-## P0 stub: nothing fires yet.
-func on_ability_cast(_ability: AbilityData) -> void:
-	pass
+## The extra defs of [param source] as stored (tests, UI; empty when none).
+func extra_defs(source: StringName) -> Array:
+	return _extra_defs.get(source, [])
 
 
-## M5, see PlayerBonuses: the player dodged / parried / blocked ([param _kind] &"dodge" /
-## &"parry" / &"block") a hit of [param _attacker] (may be null) – on_dodge / on_parry /
-## on_block triggers. P0 stub: nothing fires yet.
-func on_avoided(_kind: StringName, _attacker: Node3D) -> void:
-	pass
+static func _same_defs(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for i in a.size():
+		if typeof(a[i]) != TYPE_DICTIONARY or typeof(b[i]) != TYPE_DICTIONARY or a[i] != b[i]:
+			return false
+	return true
 
 
-## M5, see PlayerBonuses: called by Player.begin_wave after the class resources were reset
-## (AbilityRunner.begin_wave), so a wave_start proc's resource / cooldown effect is not wiped.
-## P0 stub: nothing fires yet.
+## M5: one of the player's abilities was cast (Player._on_ability_cast) – on_cast procs whose
+## filter matches it fire (no hit target: damaging blocks pick the nearest enemy).
+func on_ability_cast(ability: AbilityData) -> void:
+	if _on_cast.is_empty() or ability == null or not _active():
+		return
+	var pos := _player_pos()
+	var class_id := player.class_data.id if player.class_data != null else &""
+	for p in _on_cast:
+		if _cast_matches(p, ability, class_id):
+			_try_fire(p, p.chance / 100.0, null, pos, null)
+
+
+static func _cast_matches(p: Proc, ability: AbilityData, class_id: StringName) -> bool:
+	if p.cast_ability != &"":
+		return ability.id == p.cast_ability
+	if not p.cast_match.is_empty():
+		return BonusVocabulary.matches(p.cast_match, ability, class_id)
+	return true
+
+
+## M5: the player dodged / parried / blocked ([param kind] &"dodge" / &"parry" / &"block",
+## Player.take_damage) a hit of [param attacker] (may be null) – on_dodge / on_parry /
+## on_block procs fire with the attacker as their target.
+func on_avoided(kind: StringName, attacker: Node3D) -> void:
+	var list: Array[Proc] = _on_dodge
+	match kind:
+		&"parry":
+			list = _on_parry
+		&"block":
+			list = _on_block
+		&"dodge":
+			pass
+		_:
+			return
+	if list.is_empty() or not _active():
+		return
+	var pos := _pos_of(attacker)
+	for p in list:
+		_try_fire(p, p.chance / 100.0, attacker, pos, null)
+
+
+## M5: called by Player.begin_wave after the class resources were reset
+## (AbilityRunner.begin_wave), so a wave_start proc's resource / cooldown effect is not wiped:
+## the wave_start procs fire here (after [method begin_wave] re-armed them).
 func after_wave_start() -> void:
-	pass
+	if _wave_start.is_empty() or not _active():
+		return
+	var pos := _player_pos()
+	for p in _wave_start:
+		_try_fire(p, p.chance / 100.0, null, pos, null)
 
 
-## Wave start: cooldowns, per-wave limits and low-HP triggers re-arm; DoTs, timed buffs and
-## shields from the last wave end.
+## Wave start: cooldowns, per-wave limits, "every" counters and low-HP triggers re-arm; DoTs,
+## timed buffs and shields from the last wave end.
 func begin_wave() -> void:
 	for p in procs:
 		p.cd_left = 0.0
 		p.fired_wave = 0
 		p.armed = true
+		p.counter = 0
 		p.timer = p.interval
 	_dots.clear()
 	_clear_buffs()
@@ -505,6 +641,46 @@ static func proc_from_unique(item: ItemInstance) -> Proc:
 	return p
 
 
+## The proc of a talent / set "proc" entry (M5): [param params] is a ProcSystem params dict
+## (BonusVocabulary, already rank-resolved), used as written (no enchant multiplier, no
+## "_fixed" keys). Its own "label" wins (even "" – silent); otherwise [param label] (the talent /
+## set name). [param id] names it (fire_count, dot_stacks); default the effect id.
+static func proc_from_params(params: Dictionary, label: String = "", id: StringName = &"") -> Proc:
+	var p := Proc.new()
+	p.extra = true
+	var copy: Dictionary = params.duplicate(true)
+	for key: Variant in copy:
+		p.params[String(key)] = copy[key]
+	p.effect = StringName(p.text("effect"))
+	p.id = id if id != &"" else p.effect
+	p.label = p.text("label") if p.params.has("label") else label
+	p.trigger = StringName(p.text("trigger", String(TRIGGER_EQUIP)))
+	p.school = StringName(p.text("school", "physical"))
+	p.ppm = p.num("ppm")
+	p.chance = p.num("chance", 100.0)
+	p.icd = p.num("icd")
+	_read_trigger_keys(p)
+	return p
+
+
+## The proc of one [method set_extra_procs] def of [param source] (index [param index]): a
+## whole entry ("proc" dict + the entry's "label" / "id") or a bare params dict. Null when it
+## holds no params.
+static func proc_from_def(def: Variant, source: StringName = &"", index: int = 0) -> Proc:
+	if typeof(def) != TYPE_DICTIONARY:
+		return null
+	var d: Dictionary = def
+	var params: Dictionary = d
+	var label := ""
+	if typeof(d.get("proc")) == TYPE_DICTIONARY:
+		params = d["proc"]
+		label = str(d.get("label", ""))
+	var id := StringName(str(d.get("id", "")))
+	if id == &"":
+		id = StringName("%s:%d" % [source, index])
+	return proc_from_params(params, label, id)
+
+
 static func trigger_for_kind(kind: EnchantData.Kind) -> StringName:
 	match kind:
 		EnchantData.Kind.ON_HIT:
@@ -521,6 +697,12 @@ static func _read_trigger_keys(p: Proc) -> void:
 	p.interval = maxf(0.1, p.num("interval", DEFAULT_INTERVAL))
 	p.per_wave = int(p.num("per_wave", 1.0 if p.effect == &"cheat_death" else 0.0))
 	p.timer = p.interval
+	p.every = maxi(0, roundi(p.num("every")))
+	p.hit_pct = maxf(0.0, p.num("hit_pct")) if p.trigger in HIT_TRIGGERS else 0.0
+	if p.trigger == TRIGGER_ON_CAST:
+		p.cast_ability = StringName(p.text("ability")) if p.params.has("ability") else &""
+		var m: Variant = p.params.get("match")
+		p.cast_match = m if typeof(m) == TYPE_DICTIONARY else {}
 
 
 static func _scaled(d: Dictionary, mult: float) -> Dictionary:
@@ -532,7 +714,7 @@ static func _scaled(d: Dictionary, mult: float) -> Dictionary:
 
 
 func _add(p: Proc) -> void:
-	if p == null or p.effect not in BLOCKS:
+	if p == null or (p.effect not in BLOCKS and p.effect not in EXTRA_BLOCKS):
 		return
 	p.uid = _next_uid
 	_next_uid += 1
@@ -551,6 +733,18 @@ func _add(p: Proc) -> void:
 			_low_hp.append(p)
 		TRIGGER_PERIODIC:
 			_periodic.append(p)
+		TRIGGER_ON_CRIT:
+			_on_crit.append(p)
+		TRIGGER_ON_CAST:
+			_on_cast.append(p)
+		TRIGGER_WAVE_START:
+			_wave_start.append(p)
+		TRIGGER_ON_DODGE:
+			_on_dodge.append(p)
+		TRIGGER_ON_PARRY:
+			_on_parry.append(p)
+		TRIGGER_ON_BLOCK:
+			_on_block.append(p)
 		_:
 			if p.effect == &"buff" and player != null:
 				var source := StringName("proc_equip:%d" % p.uid)
@@ -564,11 +758,20 @@ func _active() -> bool:
 	return player != null and is_instance_valid(player) and player.is_alive()
 
 
+## One qualifying event of [param p]: with "every" the Nth event fires (no roll; the count
+## keeps growing while the proc cannot fire, so the next event that can fires), else
+## [param chance] (0..1) is rolled – a RunState.rng draw only below 1.
 func _try_fire(p: Proc, chance: float, target: Node3D, pos: Vector3, weapon: WeaponData) -> bool:
+	if p.every > 0:
+		p.counter += 1
+		if p.counter < p.every:
+			return false
+		chance = 1.0
 	if p.cd_left > 0.0 or (p.per_wave > 0 and p.fired_wave >= p.per_wave) or _depth >= MAX_DEPTH:
 		return false
 	if chance <= 0.0 or (chance < 1.0 and RunState.rng.randf() >= chance):
 		return false
+	p.counter = 0
 	_mark_fired(p)
 	_depth += 1
 	_run(p, target, pos, weapon)
@@ -592,8 +795,10 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 		&"dot":
 			var e := _target_enemy(target, pos)
 			if e != null:
-				_apply_dot(e, p, p.num("damage"), p.num("duration", DEFAULT_DOT_DURATION),
-						int(p.num("stacks", 1.0)), p.num("spread"), 0, -1.0)
+				var derived := p.hit_pct > 0.0
+				var total := _hit_base * p.hit_pct / 100.0 if derived else p.num("damage")
+				_apply_dot(e, p, total, p.num("duration", DEFAULT_DOT_DURATION),
+						int(p.num("stacks", 1.0)), p.num("spread"), 0, -1.0, not derived)
 				_riders(p, e, false)
 		&"nova":
 			var center := _player_pos()
@@ -611,13 +816,15 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 		&"buff":
 			_buff(p)
 		&"heal":
-			var who := player if p.text("target", "self") != "lowest_ally" else _lowest_ally()
-			who.heal(p.num("amount"))
+			var who := _receiver(p)
+			who.heal(_amount_for(p, who))
+			if p.extra:
+				_label(p, Player.HEAL_TEXT_COLOR)
 		&"drain":
 			var e := _target_enemy(target, pos)
 			if e != null:
 				var hp_before := e.hp
-				var dealt := deal(e, p.num("damage"), p.school)
+				var dealt := _strike(p, e)
 				ProcVfx.beam(_chest(e), player.get_chest_position(), ProcVfx.school_color(p.school))
 				_riders(p, e)
 				player.heal(minf(dealt, maxf(0.0, hp_before)))
@@ -639,27 +846,103 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 				RunState.add_gold(whole)
 				Vfx.floating_text(pos + Vector3.UP * 1.0, "+%d" % whole, GOLD_COLOR, 0.8)
 		&"shield":
-			add_shield(p.num("amount"), p.num("duration", DEFAULT_SHIELD_DURATION))
+			var who := _receiver(p)
+			var into: ProcSystem = self if who == player else who.procs
+			if into != null:
+				into.add_shield(_amount_for(p, who), p.num("duration", DEFAULT_SHIELD_DURATION))
 			_label(p, SHIELD_COLOR)
 		&"reflect":
 			var e := _target_enemy(target, pos)
 			if e != null:
 				ProcVfx.beam(player.get_chest_position(), _chest(e), ProcVfx.school_color(p.school))
-				deal(e, p.num("damage"), p.school)
+				_strike(p, e)
 				_riders(p, e)
 		&"smite_heal":
 			var e := _target_enemy(target, pos)
 			if e != null:
 				var color := ProcVfx.school_color(p.school)
 				Vfx.hit_spark(_chest(e), color)
-				deal(e, p.num("damage"), p.school)
+				_strike(p, e)
 				_riders(p, e)
 				var ally := _lowest_ally()
 				ProcVfx.beam(_chest(e), ally.get_chest_position(), color)
 				ally.heal(p.num("heal"))
 		&"resource":
-			if player.abilities != null:
+			if player.abilities == null:
+				return
+			if p.params.has("resource"):
+				_resource(p)
+			else:
 				player.abilities.gain_from_proc(p.num("amount", 1.0))
+		&"cooldown":
+			_cooldown(p)
+		&"forced_crit":
+			player.forced_crits += maxi(1, roundi(p.num("count", 1.0)))
+			_label(p, WeaponRunner.CRIT_TEXT_COLOR)
+
+
+## The damage of a damaging block on [param e]: with "hit_pct", that share of the triggering
+## hit's base amount, dealt raw (target_bonus false: Executioner / Slayer are not added again,
+## the outgoing multipliers of &"proc" apply once – the one derived-damage rule); else the
+## block's base "damage" through [method deal]. Returns the damage dealt.
+func _strike(p: Proc, e: Enemy) -> float:
+	if p.hit_pct > 0.0:
+		return deal_raw(e, _hit_base * p.hit_pct / 100.0, p.school, false, &"proc")
+	return deal(e, p.num("damage"), p.school)
+
+
+## The hero a heal / shield goes to: "target" self (default) or lowest_ally.
+func _receiver(p: Proc) -> Player:
+	return _lowest_ally() if p.text("target", "self") == "lowest_ally" else player
+
+
+## "amount" + "max_hp_pct" % of [param who]'s (the receiver's) Max HP.
+func _amount_for(p: Proc, who: Player) -> float:
+	var amount := p.num("amount")
+	var pct := p.num("max_hp_pct")
+	if pct != 0.0 and who != null:
+		amount += who.max_hp() * pct / 100.0
+	return amount
+
+
+## resource {resource: <id> | "primary", value}: ClassResource.add(value, true) – Resource
+## Regen scales bar resources, pips get exactly value.
+func _resource(p: Proc) -> void:
+	var id := StringName(p.text("resource"))
+	var res := player.abilities.primary_resource() if id == &"primary" else player.abilities.get_resource(id)
+	if res == null:
+		return
+	res.add(p.num("value"), true)
+	_label(p, res.data.color if res.data != null else Color.WHITE)
+
+
+## cooldown {ability | match, reduce: s | reset: true} on every slotted ability it names:
+## reset = AbilityRunner.set_cooldown(a, 0) (every charge back), reduce =
+## AbilityRunner.reduce_cooldown (one charge back at most).
+func _cooldown(p: Proc) -> void:
+	var runner := player.abilities
+	if runner == null:
+		return
+	var id := StringName(p.text("ability")) if p.params.has("ability") else &""
+	var m: Variant = p.params.get("match")
+	var filter: Dictionary = m if typeof(m) == TYPE_DICTIONARY else {}
+	if id == &"" and filter.is_empty():
+		return
+	var reset: bool = typeof(p.params.get("reset")) == TYPE_BOOL and p.params["reset"]
+	var seconds := p.num("reduce")
+	var class_id := player.class_data.id if player.class_data != null else &""
+	for a in runner.slots:
+		if a == null:
+			continue
+		if id != &"" and a.id != id:
+			continue
+		if id == &"" and not BonusVocabulary.matches(filter, a, class_id):
+			continue
+		if reset:
+			runner.set_cooldown(a, 0.0)
+		elif seconds > 0.0:
+			runner.reduce_cooldown(a, seconds)
+	_label(p, ProcVfx.school_color(&"arcane"))
 
 
 func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:
@@ -669,7 +952,7 @@ func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:
 	var color := ProcVfx.school_color(p.school)
 	ProcVfx.bolt(player.get_chest_position(), _chest(e), color)
 	Vfx.hit_spark(_chest(e), color)
-	deal(e, p.num("damage"), p.school)
+	_strike(p, e)
 	_riders(p, e)
 
 
@@ -681,13 +964,12 @@ func _chain(p: Proc, target: Node3D, pos: Vector3) -> void:
 	var hit_ids: Array[int] = []
 	var from := player.get_chest_position()
 	var count := maxi(1, roundi(p.num("targets", 3.0)))
-	var damage := p.num("damage")
 	while e != null and hit_ids.size() < count:
 		hit_ids.append(e.get_instance_id())
 		var at := _chest(e)
 		var here := e.global_position
 		ProcVfx.beam(from, at, color)
-		deal(e, damage, p.school)
+		_strike(p, e)
 		_riders(p, e)
 		from = at
 		e = _nearest_new(here, CHAIN_RANGE, hit_ids) if hit_ids.size() < count else null
@@ -698,11 +980,10 @@ func _area(p: Proc, center: Vector3) -> void:
 	var radius := p.num("radius", DEFAULT_RADIUS) * CombatMath.area_mult(player.stats)
 	var color := ProcVfx.school_color(p.school)
 	Vfx.explosion(Vector3(center.x, 0.1, center.z), radius, color)
-	var damage := p.num("damage")
 	for e in _enemies_within(center, radius):
 		if not _is_live(e):
 			continue
-		deal(e, damage, p.school)
+		_strike(p, e)
 		_riders(p, e)
 
 
@@ -779,14 +1060,16 @@ func _clear_buffs() -> void:
 
 
 ## Adds a DoT stack of [param p] to [param e] (or starts one). [param rate] < 0: computed from
-## [param total_base] (proc damage over [param duration] seconds).
+## [param total_base] over [param duration] seconds – as proc damage (Spell / Attack Power,
+## damage %) when [param target_bonus], else as it is (a "hit_pct" total derived from a hit:
+## its ticks skip Executioner / Slayer).
 func _apply_dot(e: Enemy, p: Proc, total_base: float, duration: float, max_stacks: int, spread: float,
-		generation: int, rate: float) -> void:
+		generation: int, rate: float, target_bonus: bool = true) -> void:
 	if not _is_live(e) or (total_base <= 0.0 and rate <= 0.0):
 		return
 	duration = maxf(DOT_TICK, duration)
 	if rate < 0.0:
-		rate = CombatMath.proc_damage(total_base, p.school, player.stats) / duration
+		rate = (CombatMath.proc_damage(total_base, p.school, player.stats) if target_bonus else total_base) / duration
 	var id := e.get_instance_id()
 	for d in _dots:
 		if d.target_id == id and d.proc == p:
@@ -807,6 +1090,7 @@ func _apply_dot(e: Enemy, p: Proc, total_base: float, duration: float, max_stack
 	dot.spread = spread
 	dot.generation = generation
 	dot.last_pos = e.global_position
+	dot.target_bonus = target_bonus
 	_dots.append(dot)
 
 
@@ -819,7 +1103,7 @@ func _spread(d: Dot) -> void:
 		if not _is_live(e) or dot_stacks(e, d.proc.id) > 0:
 			continue
 		ProcVfx.beam(d.last_pos + Vector3.UP * Player.CHEST_HEIGHT, _chest(e), color)
-		_apply_dot(e, d.proc, 0.0, d.duration, d.max_stacks, d.spread, d.generation + 1, d.rate)
+		_apply_dot(e, d.proc, 0.0, d.duration, d.max_stacks, d.spread, d.generation + 1, d.rate, d.target_bonus)
 		n += 1
 
 
@@ -896,7 +1180,7 @@ func _tick_dots(delta: float) -> void:
 		var amount := d.owed
 		d.owed = 0.0
 		if amount > 0.0:
-			deal_raw(e, amount, d.school, true, &"dot")
+			deal_raw(e, amount, d.school, d.target_bonus, &"dot")
 		var died := not _is_live(e)
 		if d.left <= TIME_EPSILON or died:
 			if i < _dots.size() and _dots[i] == d:
