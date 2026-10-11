@@ -1,8 +1,8 @@
 class_name GeneralAuraVfx
 extends Node3D
 ## The look of a [GeneralBuff] on a hero (purely visual, procedural):
-##   BANDAGE – two cream bandage bands wound round the onion (slowly turning) and little green
-##             crosses rising from it;
+##   BANDAGE – a green heal glow on the ground, two cream bandage bands wound round the onion
+##             (slowly turning) and little green crosses rising from it;
 ##   SPRINT  – kicked-up dust trailing behind the feet and a pale wind ring on the ground;
 ##   BERSERK – a pulsing blood-red ring at the feet and rising embers.
 ## A child of the buff (so of the hero); [method release] lets it fade out on its own when the
@@ -108,34 +108,36 @@ func _apply_alpha(strength: float) -> void:
 # --- Builders ----------------------------------------------------------------------------------
 
 func _build_bandage() -> void:
-	# Two bands round the bulb (its widest part is ~0.4 m at 0.35-0.6 m height), tilted a bit.
+	# A soft green heal glow on the ground (reads from the top-down camera) and two bands
+	# wound round the bulb, wide enough to show past robes and hat brims.
+	_ground_ring(0.8, Color(HEAL_COLOR.r, HEAL_COLOR.g, HEAL_COLOR.b, 0.5))
 	for i in 2:
 		var spin := Node3D.new()
 		spin.name = "Band%d" % i
-		var y := 0.36 + 0.24 * i
+		var y := 0.3 + 0.24 * i
 		spin.position.y = y
 		spin.set_meta(&"base_y", y)
 		add_child(spin)
-		var band := _mesh_part(_band_mesh(), BANDAGE_COLOR, 0.95)
-		band.rotation_degrees = Vector3(9.0 if i == 0 else -7.0, 0.0, 6.0 if i == 0 else -5.0)
-		band.scale = Vector3.ONE * (1.0 if i == 0 else 0.93)
+		var band := _mesh_part(_band_mesh(), BANDAGE_COLOR, 1.0)
+		band.rotation_degrees = Vector3(14.0 if i == 0 else -11.0, 0.0, 8.0 if i == 0 else -7.0)
+		band.scale = Vector3.ONE * (1.0 if i == 0 else 0.92)
 		spin.add_child(band)
 		_spinners.append(spin)
-	var crosses := _emitter(8, 0.9, _cross_mesh(), Mats.particle(false, true))
-	crosses.position.y = 0.6
+	var crosses := _emitter(12, 1.0, _cross_mesh(), Mats.particle(false, true))
+	crosses.position.y = 0.5
 	crosses.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	crosses.emission_ring_axis = Vector3.UP
-	crosses.emission_ring_radius = 0.5
-	crosses.emission_ring_inner_radius = 0.35
+	crosses.emission_ring_radius = 0.6
+	crosses.emission_ring_inner_radius = 0.4
 	crosses.emission_ring_height = 0.4
 	crosses.direction = Vector3.UP
 	crosses.spread = 10.0
 	crosses.gravity = Vector3.ZERO
-	crosses.initial_velocity_min = 0.6
-	crosses.initial_velocity_max = 1.0
-	crosses.scale_amount_min = 0.8
-	crosses.scale_amount_max = 1.2
-	crosses.color_ramp = _ramp(Color(HEAL_COLOR.r, HEAL_COLOR.g, HEAL_COLOR.b, 0.95),
+	crosses.initial_velocity_min = 0.7
+	crosses.initial_velocity_max = 1.1
+	crosses.scale_amount_min = 1.3
+	crosses.scale_amount_max = 1.8
+	crosses.color_ramp = _ramp(Color(HEAL_COLOR.r, HEAL_COLOR.g, HEAL_COLOR.b, 1.0),
 			Color(HEAL_COLOR.r, HEAL_COLOR.g, HEAL_COLOR.b, 0.0))
 
 
@@ -237,15 +239,15 @@ static func _ramp(from: Color, to: Color) -> Gradient:
 	return g
 
 
-## A flat ring of bandage cloth (radius ~0.43 m) with two red stripes.
+## A flat ring of bandage cloth (radius ~0.5 m) with two red stripes.
 static func _band_mesh() -> Mesh:
 	return MeshKit.cached("general:bandage_band", func() -> Mesh:
 		var k := MeshKit.new()
-		k.add_cylinder(0.43, 0.44, 0.075, Transform3D.IDENTITY, Color.WHITE, 28)
-		k.add_cylinder(0.445, 0.445, 0.012, MeshKit.xf(Vector3(0, 0.022, 0)), BANDAGE_STRIPE, 28)
-		k.add_cylinder(0.445, 0.445, 0.012, MeshKit.xf(Vector3(0, -0.022, 0)), BANDAGE_STRIPE, 28)
+		k.add_cylinder(0.5, 0.51, 0.1, Transform3D.IDENTITY, Color.WHITE, 32, false)
+		k.add_cylinder(0.515, 0.515, 0.014, MeshKit.xf(Vector3(0, 0.03, 0)), BANDAGE_STRIPE, 32, false)
+		k.add_cylinder(0.515, 0.515, 0.014, MeshKit.xf(Vector3(0, -0.03, 0)), BANDAGE_STRIPE, 32, false)
 		# A loose end hanging from the knot.
-		k.add_box(Vector3(0.06, 0.16, 0.012), MeshKit.xf(Vector3(0.0, -0.08, -0.44), Vector3(0, 0, 12)), Color.WHITE)
+		k.add_box(Vector3(0.08, 0.2, 0.014), MeshKit.xf(Vector3(0.0, -0.1, -0.51), Vector3(0, 0, 12)), Color.WHITE)
 		return k.build())
 
 

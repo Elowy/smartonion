@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_shuriken_toss.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shuriken_toss"
+display_name = "Shuriken Toss"
+description = "Throws {shuriken} shuriken in a fan at the nearest enemy, each for {damage_pct}% weapon damage."
+class_id = &"rogue"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 4.0
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 100.0,
+"pierce": 0,
+"range": 11.0,
+"shuriken": 3,
+"speed": 20.0,
+"spread": 30.0,
+"volley_delay": 0.25,
+"volleys": 1
+}
+icon = &"shuriken_toss"
+color = Color(0.78, 0.86, 1, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"shuriken_add": 2}
+rank3_text = "+2 shuriken"
+specs = Array[Dictionary]([{"name": "Razor Stars", "text": "Shuriken pass through 2 more enemies and fly 4 m further.", "mods": {"pierce_add": 2, "range_add": 4.0}}, {"name": "Twin Volley", "text": "A second fan of shuriken follows a moment later.", "mods": {"volleys_add": 1}}])

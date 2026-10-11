@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_ice_barrier.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ice_barrier"
+display_name = "Ice Barrier"
+description = "Wraps you in ice that absorbs {shield} damage (more with Intellect and Spell Power) until it breaks. Cast again once it is gone."
+class_id = &"mage"
+school = &"frost"
+resource = &""
+cost = 0.0
+cooldown = 12.0
+targeting = 0
+cast_range = 0.0
+effect = ExtResource("2_effect")
+params = {
+"break_freeze": 1.0,
+"break_pct": 0.0,
+"break_radius": 3.5,
+"chill": 0.0,
+"chill_duration": 2.0,
+"ice_block": 0.0,
+"int_scaling": 0.5,
+"shield": 4.0,
+"sp_scaling": 0.5
+}
+icon = &"ice_barrier"
+color = Color(0.55, 0.85, 1.0, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"chill_add": 50.0
+}
+rank3_text = "Enemies that strike the barrier are slowed by 50% for 2 sec"
+specs = Array[Dictionary]([{
+"mods": {
+"break_pct_add": 100.0
+},
+"name": "Shattering Barrier",
+"text": "When the barrier breaks it explodes: Frost damage equal to its strength to enemies within 3.5 m, freezing them for 1 sec."
+}, {
+"mods": {
+"ice_block_add": 1.5
+},
+"name": "Ice Block",
+"text": "When the barrier breaks you are encased in ice: immune to damage for 1.5 sec."
+}])

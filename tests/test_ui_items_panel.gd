@@ -327,7 +327,7 @@ func test_trade_to_full_backpack_is_refused() -> void:
 
 # --- Misc --------------------------------------------------------------------------------------
 
-func test_y_toggles_comparison_and_tabs_are_locked() -> void:
+func test_y_toggles_comparison_and_tabs_switch() -> void:
 	var slot := _join(&"warrior")
 	var panel := _panel(slot)
 	var eq := _eq(slot)
@@ -342,7 +342,15 @@ func test_y_toggles_comparison_and_tabs_are_locked() -> void:
 	_tap(panel, slot, PlayerInput.Pad.Y)
 	check(panel.tooltip.find_line("If you replace this item:") != null, "and back on")
 	_tap(panel, slot, PlayerInput.Pad.RT)
-	check_eq(panel.last_message, "Trainer: coming soon", "locked tab")
+	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "RT opens the Trainer")
+	check(panel.trainer.visible and not panel.tooltip.visible, "the Trainer replaces the paper doll and its tooltip")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.last_message, "Talents: coming soon", "locked tab")
+	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "stays on the Trainer")
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "LT goes back to Character")
+	check(panel.tooltip.visible, "the item tooltip is back")
+	panel.last_message = ""
 	_tap(panel, slot, PlayerInput.Pad.LT)
 	check_eq(panel.last_message, "Talents: coming soon", "wraps to Talents")
 	check_eq(panel.active_tab, 0, "stays on Character")

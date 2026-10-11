@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_divine_shield.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"divine_shield"
+display_name = "Divine Shield"
+description = "A golden bubble makes you immune to all damage for {duration} sec."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 40.0
+targeting = 0
+cast_range = 0.0
+effect = ExtResource("2_effect")
+params = {
+"aura_damage": 0.0,
+"aura_radius": 2.5,
+"aura_spell_power_scale": 0.25,
+"aura_tick": 0.5,
+"duration": 3.0,
+"heal_max_hp": 0.0,
+"share_range": 0.0
+}
+icon = &"divine_shield"
+color = Color(1, 0.88, 0.5, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {
+"heal_max_hp": 25.0
+}
+rank3_text = "Also heals you for 25% of max HP"
+specs = Array[Dictionary]([{
+"mods": {
+"aura_damage": 40.0
+},
+"name": "Radiant Bubble",
+"text": "The bubble burns enemies within 2.5 m: 40% weapon damage as Holy damage every 0.5 sec."
+}, {
+"mods": {
+"share_range": 8.0
+},
+"name": "Sheltering Light",
+"text": "Also shields the most wounded ally within 8 m."
+}])

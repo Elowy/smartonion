@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_sprint.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"sprint"
+display_name = "Sprint"
+description = "Break into a sprint: +{speed}% movement Speed for {duration} sec."
+class_id = &""
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 12.0
+targeting = 0
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"allies": false,
+"ally_range": 8.0,
+"auto_hp": 45.0,
+"dodge": 0.0,
+"duration": 3.0,
+"speed": 50.0,
+"trail": false,
+"trail_duration": 2.0,
+"trail_radius": 1.2,
+"trail_slow": 40.0
+}
+icon = &"sprint"
+color = Color(1, 0.85, 0.45, 1)
+kind = 1
+card_weight = 0.8
+rank3 = {
+"dodge_add": 20.0
+}
+rank3_text = "+20% Dodge while sprinting"
+specs = Array[Dictionary]([{
+"mods": {
+"allies": true
+},
+"name": "Rallying Sprint",
+"text": "Allies within 8 m sprint with you."
+}, {
+"mods": {
+"trail": true
+},
+"name": "Trailblazer",
+"text": "You kick up a dust trail that slows enemies by 40%."
+}])

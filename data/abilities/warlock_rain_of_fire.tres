@@ -20,10 +20,17 @@ params = {
 "auto_cast_min": 4,
 "damage": 2.0,
 "duration": 4.0,
+"follows": false,
 "intellect_scale": 0.3,
 "radius": 3.0,
 "spell_power_scale": 1.0,
+"storms": 1,
 "tick": 0.5
 }
 icon = &"rain_of_fire"
 color = Color(1, 0.45, 0.12, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{"name": "Walking Inferno", "text": "Rain of Fire centres on you and moves with you, and lasts 1 sec longer.", "mods": {"follows": true, "duration_add": 1.0}}, {"name": "Twin Storms", "text": "A second circle of fire falls on the next-densest group.", "mods": {"storms": 2}}])

@@ -4,17 +4,22 @@ extends PanelContainer
 ## class initial, "P1 · Warrior", green HP bar with "hp / max", the class resources
 ## (ResourceDisplay: a coloured bar with "value / max", pips for Holy Power / Soul Shards; a
 ## secondary pip row - the Rogue's Combo Points - sits inline at the inner end of the name row),
-## the ability icons beside the bars on the frame's inner side (AbilityBar: the core abilities
-## with this player's button prompts, cooldown sweep and dimming) and a DOWNED overlay over the
-## bars: the revive progress (teammates' or the Spirit Healer's, whichever is further along) and
-## the hint "Go to the Spirit Healer".
+## the ability icons beside the bars on the frame's inner side (AbilityBar: RT / LT core and
+## RB / LB learned Active abilities with this player's button prompts, then the 2 x 2 cluster of
+## learned Auto-cast abilities behind a gear mark; cooldown sweep, dimming and rank pips on
+## every icon) and a DOWNED overlay over the bars: the revive progress (teammates' or the Spirit
+## Healer's, whichever is further along) and the hint "Go to the Spirit Healer".
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge, icons on the inside.
+## Learned abilities make the frame wider (towards the screen centre), never taller.
 
-## Compact (it sits in a screen corner over the playfield): ~430 x 104 reference px. The height
-## matters most – CameraRig keeps the heroes out of full-width bands at the top / bottom of the
+## Compact (it sits in a screen corner over the playfield): ~430 x 104 reference px with the
+## core abilities, up to MAX_WIDTH with every learned slot filled. The height matters most – CameraRig keeps the heroes out of full-width bands at the top / bottom of the
 ## screen, so frames must stay within MAX_HEIGHT (alive, downed, with pips).
 const WIDTH := 430.0
 const MAX_HEIGHT := 112.0
+## Widest frame (all eight ability slots filled): the top frames must leave the wave / timer
+## plaque in the middle free (1920 px canvas).
+const MAX_WIDTH := 640.0
 const PORTRAIT_SIZE := 76.0
 ## Ability icon side (the prompt pill hangs AbilityIcon.PROMPT_OVERHANG below it).
 const ABILITY_ICON_SIZE := 42.0

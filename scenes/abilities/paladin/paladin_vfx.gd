@@ -220,7 +220,7 @@ func _animate(delta: float) -> void:
 			_spin.rotation.y = -TAU * STORM_TURNS * (1.0 - pow(1.0 - t, 2.0))
 			var grow := lerpf(0.35, 1.08, sqrt(t))
 			_ring.scale = Vector3(radius * 2.0 * grow, 1.0, radius * 2.0 * grow)
-			Mats.set_ring(_ring, Color(LIGHT.r, LIGHT.g, LIGHT.b, 0.85 * (1.0 - t)), 0.82, 0.97, 0.12 * (1.0 - t))
+			Mats.set_ring(_ring, Color(GOLD.r, GOLD.g, GOLD.b, 0.8 * (1.0 - t)), 0.9, 0.98, 0.08 * (1.0 - t))
 			_set_alpha(fade)
 		Kind.CROWN:
 			var pop := minf(1.0, age / 0.18)
@@ -296,16 +296,16 @@ func _build_storm() -> void:
 	_spin.position.y = 0.55
 	add_child(_spin)
 	var arc_mesh := MeshKit.cached("paladin:storm_arc", func() -> Mesh:
-		return MeshKit.new().add_arc(0.45, 1.0, 110.0, Transform3D.IDENTITY, Color.WHITE, 18).build())
+		return MeshKit.new().add_arc(0.55, 1.0, 100.0, Transform3D.IDENTITY, Color.WHITE, 18).build())
 	var edge_mesh := MeshKit.cached("paladin:storm_edge", func() -> Mesh:
-		return MeshKit.new().add_arc(0.9, 1.0, 110.0, Transform3D.IDENTITY, Color.WHITE, 18).build())
+		return MeshKit.new().add_arc(0.93, 1.0, 100.0, Transform3D.IDENTITY, Color.WHITE, 18).build())
 	for i in STORM_ARCS:
 		var yaw := TAU * float(i) / float(STORM_ARCS)
-		var arc := _part(arc_mesh, GOLD, 0.45)
+		var arc := _part(arc_mesh, Color(1.0, 0.88, 0.5), 0.5, false)
 		arc.rotation.y = yaw
 		arc.scale = Vector3(radius, 1.0, radius)
 		_spin.add_child(arc)
-		var edge := _part(edge_mesh, LIGHT, 0.9)
+		var edge := _part(edge_mesh, Color(1.0, 0.85, 0.4), 0.8)
 		edge.rotation.y = yaw
 		edge.position.y = 0.02
 		edge.scale = Vector3(radius, 1.0, radius)

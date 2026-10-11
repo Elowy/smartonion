@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_bandage.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bandage"
+display_name = "Bandage"
+description = "Bandage your wounds: heal {heal_pct}% of your max health over {duration} sec. Taking damage does not interrupt it."
+class_id = &""
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 20.0
+targeting = 0
+cast_range = 6.0
+effect = ExtResource("2_effect")
+params = {
+"ally_range": 6.0,
+"auto_hp": 50.0,
+"damage_reduction": 0.0,
+"duration": 3.0,
+"heal_pct": 30.0,
+"instant": false,
+"targets": 1,
+"tick": 0.5
+}
+icon = &"bandage"
+color = Color(0.97, 0.93, 0.8, 1)
+kind = 1
+card_weight = 0.8
+rank3 = {
+"targets_add": 1
+}
+rank3_text = "Also bandages the most wounded ally within 6 m"
+specs = Array[Dictionary]([{
+"mods": {
+"instant": true
+},
+"name": "Quick Wrap",
+"text": "The whole heal lands at once."
+}, {
+"mods": {
+"damage_reduction_add": 25.0
+},
+"name": "Padded Wraps",
+"text": "Take 25% less damage while bandaged."
+}])

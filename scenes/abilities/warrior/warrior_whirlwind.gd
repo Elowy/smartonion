@@ -70,7 +70,6 @@ func cast(ctx: AbilityContext) -> bool:
 	_spin.slow = ctx.num("slow")
 	_spin.slow_duration = ctx.num("slow_duration", DEFAULT_SLOW_DURATION)
 	_spin.leech = ctx.num("leech")
-	_spin.rage_per_hit = 0.0
 	_spin.spark_color = SPARK_COLOR
 	_spin.look = WarriorSpinVfx.spawn(_player, _spin.radius, duration, ctx.ability.color)
 	if not _player.downed_changed.is_connected(_on_downed_changed):

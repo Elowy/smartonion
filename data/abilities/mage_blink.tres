@@ -17,9 +17,31 @@ targeting = 3
 cast_range = 6.0
 effect = ExtResource("2_effect")
 params = {
+"burst_damage": 0.0,
+"burst_int_scaling": 0.6,
+"burst_radius": 3.0,
 "charges": 1,
 "distance": 6.0,
-"invulnerable": 0.4
+"invulnerable": 0.4,
+"nova_freeze": 0.0,
+"nova_radius": 3.0
 }
 icon = &"blink"
 color = Color(0.78, 0.52, 1, 1)
+rank3 = {
+"charges_add": 1
+}
+rank3_text = "+1 charge"
+specs = Array[Dictionary]([{
+"mods": {
+"nova_freeze_add": 1.5
+},
+"name": "Frost Blink",
+"text": "Enemies within 3 m of the spot you leave are frozen for 1.5 sec."
+}, {
+"mods": {
+"burst_damage_add": 4.0
+},
+"name": "Arcane Burst",
+"text": "An arcane explosion where you arrive deals Arcane damage to enemies within 3 m (scales with Intellect and Spell Power)."
+}])

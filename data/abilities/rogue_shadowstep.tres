@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_shadowstep.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shadowstep"
+display_name = "Shadowstep"
+description = "Step through the shadows behind an enemy ahead of you. Your next hit is a guaranteed critical strike, and you deal {damage_pct}% more damage for {buff_duration} sec."
+class_id = &"rogue"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"buff_duration": 3.0,
+"damage_pct": 15.0,
+"forced_crits": 1,
+"invulnerable": 0.3,
+"strike_pct": 0.0,
+"stun": 0.0
+}
+icon = &"shadowstep"
+color = Color(0.55, 0.4, 0.85, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"forced_crits_add": 1}
+rank3_text = "Your next 2 hits are guaranteed critical strikes"
+specs = Array[Dictionary]([{"name": "Ambush", "text": "Shadowstep ends in a 250% weapon damage strike on the target that stuns it for 1 sec.", "mods": {"strike_pct_add": 250.0, "stun": 1.0}}, {"name": "Twin Shadows", "text": "Shadowstep has 2 charges.", "mods": {"charges_add": 1}}])

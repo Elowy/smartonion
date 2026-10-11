@@ -21,8 +21,27 @@ params = {
 "duration": 3.0,
 "int_scaling": 0.5,
 "radius": 3.5,
+"follow": false,
+"freeze": 0.0,
 "slow": 40.0,
 "tick": 0.5
 }
 icon = &"blizzard"
 color = Color(0.55, 0.85, 1, 1)
+rank3 = {
+"duration_add": 1.0
+}
+rank3_text = "+1 sec of hail"
+specs = Array[Dictionary]([{
+"mods": {
+"follow": true
+},
+"name": "Wandering Storm",
+"text": "The storm follows the enemy it was cast on."
+}, {
+"mods": {
+"freeze_add": 1.0
+},
+"name": "Permafrost",
+"text": "The hail freezes each enemy for 1 sec the first time it hits it."
+}])

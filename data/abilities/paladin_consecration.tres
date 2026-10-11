@@ -20,10 +20,31 @@ params = {
 "damage": 2.5,
 "duration": 4.0,
 "follows": false,
+"heal": 0.0,
+"heal_spell_power_scale": 0.0,
 "radius": 3.0,
+"slow": 0.0,
 "spell_power_scale": 1.0,
 "strength_scale": 0.25,
 "tick": 0.5
 }
 icon = &"consecration"
 color = Color(1, 0.84, 0.35, 1)
+rank3 = {
+"radius_add": 1.0
+}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{
+"mods": {
+"heal": 0.5,
+"heal_spell_power_scale": 0.25
+},
+"name": "Hallowed Ground",
+"text": "The ground also heals heroes standing in it for 0.5 HP every 0.5 sec (+Spell Power)."
+}, {
+"mods": {
+"slow": 50.0
+},
+"name": "Binding Ground",
+"text": "Enemies standing in the consecrated ground are slowed by 50%."
+}])

@@ -94,10 +94,10 @@ static func _wisps_mesh() -> Mesh:
 	for i in 3:
 		var a := TAU * float(i) / 3.0
 		var head := Vector3(cos(a), 0.0, sin(a)) * ORBIT_RADIUS
-		k.add_sphere(0.075, MeshKit.xf(head), Color.WHITE, 8, 4)
+		k.add_sphere(0.095, MeshKit.xf(head), Color.WHITE, 8, 4)
 		for j in 3:
 			var b := a - 0.22 * float(j + 1)
-			var r := 0.055 - 0.014 * float(j)
+			var r := 0.07 - 0.017 * float(j)
 			var y := 0.03 * float(j + 1)
 			k.add_sphere(r, MeshKit.xf(Vector3(cos(b), 0.0, sin(b)) * ORBIT_RADIUS + Vector3(0, y, 0)), Color.WHITE, 6, 3)
 	return k.build()

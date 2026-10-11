@@ -30,9 +30,11 @@ static func material(color: Color) -> StandardMaterial3D:
 
 
 ## Adds a faded part: [param mesh] in [param color] (its alpha is the part's full opacity)
-## under [param parent] (default: this node).
-func add_part(mesh: Mesh, color: Color, parent: Node3D = null) -> MeshInstance3D:
+## under [param parent] (default: this node). With [param vertex_colors] the mesh's own vertex
+## colours (MeshKit) are tinted by [param color].
+func add_part(mesh: Mesh, color: Color, parent: Node3D = null, vertex_colors: bool = false) -> MeshInstance3D:
 	var m := material(color)
+	m.vertex_color_use_as_albedo = vertex_colors
 	_materials.append(m)
 	_alphas.append(color.a)
 	var mi := MeshInstance3D.new()

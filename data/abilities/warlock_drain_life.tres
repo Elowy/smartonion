@@ -22,9 +22,16 @@ params = {
 "duration": 2.0,
 "heal_pct": 100.0,
 "intellect_scale": 0.3,
+"overheal_shield": 0.0,
 "range": 8.0,
 "spell_power_scale": 1.0,
+"targets": 1,
 "tick": 0.4
 }
 icon = &"drain_life"
 color = Color(0.55, 0.9, 0.35, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"duration_add": 1.0}
+rank3_text = "+1 sec channel"
+specs = Array[Dictionary]([{"name": "Soul Siphon", "text": "Drains up to 3 enemies at once.", "mods": {"targets": 3}}, {"name": "Dark Bargain", "text": "Healing beyond full health becomes an absorb shield (up to 50% of your Max HP, 6 sec).", "mods": {"overheal_shield": 50.0}}])

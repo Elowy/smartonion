@@ -19,6 +19,7 @@ effect = ExtResource("2_effect")
 params = {
 "damage_pct": 150.0,
 "duration": 1.0,
+"leech": 0.0,
 "radius": 3.0,
 "slow": 0.0,
 "slow_duration": 1.5,
@@ -26,3 +27,22 @@ params = {
 }
 icon = &"whirlwind"
 color = Color(0.9, 0.3, 0.2, 1)
+kind = 0
+card_weight = 0.0
+rank3 = {
+"radius_add": 1.0
+}
+rank3_text = "+1 m reach"
+specs = Array[Dictionary]([{
+"mods": {
+"cost_add": -15.0
+},
+"name": "Unrelenting",
+"text": "Whirlwind costs 15 less Rage."
+}, {
+"mods": {
+"leech_add": 15.0
+},
+"name": "Bloodbath",
+"text": "Heal for 15% of the damage Whirlwind deals."
+}])

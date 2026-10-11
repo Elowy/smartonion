@@ -84,9 +84,9 @@ func _build_streak(length: float, color: Color) -> void:
 	# A darker core line makes it read as a shadow, not a light beam.
 	var core := MeshInstance3D.new()
 	var core_quad := PlaneMesh.new()
-	core_quad.size = Vector2(STREAK_WIDTH * 0.35, length)
+	core_quad.size = Vector2(STREAK_WIDTH * 0.25, length)
 	core.mesh = core_quad
-	core.material_override = Mats.unshaded(Color(0.1, 0.06, 0.18, 0.5))
+	core.material_override = Mats.unshaded(Color(0.16, 0.08, 0.3, 0.4))
 	core.position.y = 0.01
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(core)

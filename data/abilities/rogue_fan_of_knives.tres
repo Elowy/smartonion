@@ -21,8 +21,15 @@ params = {
 "damage_pct": 110.0,
 "knives": 10,
 "pierce": 1,
+"poison_hits": false,
 "range": 7.0,
+"returns": 0,
 "speed": 16.0
 }
 icon = &"fan_of_knives"
 color = Color(0.82, 0.88, 1, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"knives_add": 2}
+rank3_text = "+2 knives"
+specs = Array[Dictionary]([{"name": "Deadly Fan", "text": "Every knife that hits poisons its target, not only critical hits.", "mods": {"poison_hits": true}}, {"name": "Returning Blades", "text": "Knives fly back after reaching their range, hitting enemies again on the way.", "mods": {"returns": 1}}])

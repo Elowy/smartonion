@@ -167,9 +167,10 @@ func test_ability_bar_shows_the_core_slots_and_reserves_the_learned_ones() -> vo
 	var b := Fakes.ability(&"charge", &"", 0.0, 8.0)
 	var p := _hero([Fakes.rage()], [a, b])
 	var bar := frame.ability_bar
-	check_eq(bar.icons.size(), 4, "four slots")
+	check_eq(bar.icons.size(), AbilityRunner.MAX_SLOTS, "one icon per slot")
 	check(bar.icons[0].visible and bar.icons[1].visible, "core slots shown")
 	check(not bar.icons[2].visible and not bar.icons[3].visible, "learned slots hidden until slotted")
+	check(not bar.auto_cluster.visible, "no auto-cast cluster before an auto-cast ability is learned")
 	check(bar.icons[0].ability == a and bar.icons[1].ability == b, "icons show the slot abilities")
 	check_eq(bar.icons[0].cost, 40.0, "cost shown")
 	check_eq(bar.icons[1].cost, 0.0, "free ability: no cost")
@@ -207,7 +208,7 @@ func test_learned_slots_show_q_and_e_on_the_keyboard() -> void:
 	var abilities: Array[AbilityData] = [Fakes.ability(&"a"), Fakes.ability(&"b"), Fakes.ability(&"c"), Fakes.ability(&"d")]
 	_hero([], abilities, KeyboardInput.new())
 	var prompts: Array[String] = []
-	for icon in frame.ability_bar.icons:
+	for icon in frame.ability_bar.icons.slice(0, AbilityBar.BUTTON_SLOTS):
 		prompts.append(icon.prompt)
 	check_eq(prompts, ["LMB", "RMB", "Q", "E"] as Array[String], "keyboard: LMB / RMB / Q / E")
 
@@ -230,7 +231,7 @@ func test_bound_icons_carry_the_prompts_of_their_device() -> void:
 	check_eq(kb_frame.ability_bar.alignment, BoxContainer.ALIGNMENT_END, "right-hand frames are mirrored")
 	# Neighbouring prompt pills never touch: "LMB" / "RMB" are wider than the icons.
 	for bar: AbilityBar in [frame.ability_bar, kb_frame.ability_bar]:
-		var pitch := bar.icons[0].icon_side() + bar.get_theme_constant(&"separation")
+		var pitch := bar.icons[0].icon_side() + bar.button_separation()
 		var pills := (bar.icons[0].prompt_width() + bar.icons[1].prompt_width()) * 0.5
 		check(pitch >= pills + AbilityBar.PILL_GAP - 0.5, "pills %s apart at a %s px pitch" % [pills, pitch])
 

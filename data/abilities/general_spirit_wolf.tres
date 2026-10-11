@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_spirit_wolf.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"spirit_wolf"
+display_name = "Spirit Wolf"
+description = "Summons a spirit wolf for {duration} sec. It hunts the enemies around you, biting for {bite_pct}% weapon damage as Nature damage every {bite_interval} sec."
+class_id = &""
+school = &"nature"
+resource = &""
+cost = 0.0
+cooldown = 20.0
+targeting = 1
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"bite_interval": 1.2,
+"bite_pct": 35.0,
+"duration": 12.0,
+"heal_pct": 0.0,
+"leash": 8.0,
+"slow": 0.0,
+"slow_duration": 1.5,
+"wolves": 1
+}
+icon = &"spirit_wolf"
+color = Color(0.6, 0.88, 1, 1)
+kind = 2
+card_weight = 0.8
+rank3 = {
+"wolves_add": 1
+}
+rank3_text = "+1 wolf"
+specs = Array[Dictionary]([{
+"mods": {
+"slow_add": 30.0,
+"wolves_add": 1
+},
+"name": "Feral Pack",
+"text": "+1 wolf, and bites slow enemies by 30%."
+}, {
+"mods": {
+"heal_pct_add": 30.0
+},
+"name": "Spirit Link",
+"text": "Bites heal you for 30% of the damage they deal."
+}])

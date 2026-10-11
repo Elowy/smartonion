@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_pyroblast.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"pyroblast"
+display_name = "Pyroblast"
+description = "Gathers a huge fireball for {windup} sec while you keep moving, then hurls it at the toughest enemy in range: heavy Fire damage and a burn for {burn_pct}% more over {burn_duration} sec."
+class_id = &"mage"
+school = &"fire"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 1
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"burn_duration": 4.0,
+"burn_pct": 30.0,
+"damage": 18.0,
+"int_scaling": 2.5,
+"pierce": 0,
+"sp_scaling": 2.0,
+"speed": 13.0,
+"splash_pct": 50.0,
+"splash_radius": 0.0,
+"windup": 1.0
+}
+icon = &"pyroblast"
+color = Color(1.0, 0.36, 0.08, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {
+"splash_radius_add": 2.5
+}
+rank3_text = "Explodes on impact: enemies within 2.5 m take 50% damage"
+specs = Array[Dictionary]([{
+"mods": {
+"pierce_add": 99
+},
+"name": "Pyroclasm",
+"text": "The fireball burns through every enemy in its path."
+}, {
+"mods": {
+"cooldown_pct": -30.0,
+"windup": 0.0
+},
+"name": "Hot Streak",
+"text": "Pyroblast is cast instantly (no wind-up) and its cooldown is 30% shorter."
+}])

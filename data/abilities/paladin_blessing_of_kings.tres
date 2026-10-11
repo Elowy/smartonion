@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_blessing_of_kings.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"blessing_of_kings"
+display_name = "Blessing of Kings"
+description = "Every hero gains {stat_pct}% of their own stats (Max HP, Strength, Agility, Intellect, Armor, Spirit, secondary stats, Attack and Spell Power) for {duration} sec."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 15.0
+targeting = 0
+cast_range = 0.0
+effect = ExtResource("2_effect")
+params = {
+"duration": 10.0,
+"might": 0.0,
+"sanctuary": 0.0,
+"stat_pct": 5.0
+}
+icon = &"blessing_of_kings"
+color = Color(1, 0.82, 0.35, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"duration_add": 5.0
+}
+rank3_text = "+5 sec duration"
+specs = Array[Dictionary]([{
+"mods": {
+"might": 10.0
+},
+"name": "Blessing of Might",
+"text": "Blessed heroes also deal 10% more damage."
+}, {
+"mods": {
+"sanctuary": 10.0
+},
+"name": "Blessing of Sanctuary",
+"text": "Blessed heroes also take 10% less damage."
+}])

@@ -32,7 +32,6 @@ const EPSILON := 0.0001
 const MIN_SPREAD_LEFT := 0.5
 ## Safety cap of afflictions per Warlock (new ones are refused beyond it).
 const MAX_AFFLICTIONS := 60
-const BURST_COLOR := Color(0.6, 0.3, 0.95)
 const POOL_COLOR := Color(0.35, 0.8, 0.2, 0.32)
 
 
@@ -47,7 +46,8 @@ class Affliction extends RefCounted:
 	var tick_left := 0.5
 	var owed := 0.0
 	var last_pos := Vector3.ZERO
-	var marker: WarlockAfflictionMarker
+	## The WarlockAfflictionMarker on the enemy (may be freed with the enemy).
+	var marker: Variant = null
 	var done := false
 	## Damage dealt so far (tests, stats).
 	var dealt := 0.0
@@ -224,8 +224,9 @@ func _step(a: Affliction, delta: float) -> void:
 		_host_died(a)
 		return
 	a.last_pos = e.global_position
-	if a.marker != null and is_instance_valid(a.marker) and a.duration > 0.0:
-		a.marker.ripeness = 1.0 - clampf(a.left / a.duration, 0.0, 1.0)
+	var look := _marker_of(a)
+	if look != null and a.duration > 0.0:
+		look.ripeness = 1.0 - clampf(a.left / a.duration, 0.0, 1.0)
 	a.owed += a.rate * clampf(a.left, 0.0, delta)
 	a.left -= delta
 	a.tick_left -= delta
@@ -282,7 +283,7 @@ func _burst(a: Affliction, center: Vector3) -> void:
 		return
 	center = Vector3(center.x, 0.0, center.z)
 	bursts += 1
-	WarlockSeedBurstVfx.spawn(center, a.burst_radius)
+	WarlockVfx.seed_burst(center, a.burst_radius)
 	var victims := WarlockSpell.enemies_in_circle(get_tree(), center, a.burst_radius)
 	for v in victims:
 		if WarlockSpell.is_live(v) and player.procs != null:
@@ -331,10 +332,16 @@ func _compact() -> void:
 
 
 func _ensure_marker(a: Affliction, e: Enemy) -> void:
-	if a.marker != null and is_instance_valid(a.marker):
+	if _marker_of(a) != null:
 		return
 	var look := WarlockAfflictionMarker.FEAR if a.kind == DREAD else a.kind
 	a.marker = WarlockAfflictionMarker.attach(e, look)
+
+
+static func _marker_of(a: Affliction) -> WarlockAfflictionMarker:
+	if a.marker == null or not is_instance_valid(a.marker):
+		return null
+	return a.marker as WarlockAfflictionMarker
 
 
 func _index(kind: StringName) -> Dictionary:

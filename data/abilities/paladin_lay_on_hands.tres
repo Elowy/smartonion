@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_lay_on_hands.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"lay_on_hands"
+display_name = "Lay on Hands"
+description = "Fully heals the hero with the lowest health within 15 m (you included). Cannot revive."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 60.0
+targeting = 0
+cast_range = 15.0
+effect = ExtResource("2_effect")
+params = {
+"group_heal": 0.0,
+"guard": 0.0,
+"guard_duration": 6.0,
+"shield_duration": 8.0,
+"shield_max_hp": 0.0
+}
+icon = &"lay_on_hands"
+color = Color(1, 0.93, 0.62, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {
+"shield_max_hp": 20.0
+}
+rank3_text = "The healed hero also gets an absorb shield worth 20% of max HP"
+specs = Array[Dictionary]([{
+"mods": {
+"group_heal": 60.0
+},
+"name": "Hands of Mercy",
+"text": "Instead of one full heal, every hero within 15 m is healed for 60% of their max HP."
+}, {
+"mods": {
+"guard": 50.0
+},
+"name": "Guardian's Touch",
+"text": "The healed hero also takes 50% less damage for 6 sec."
+}])

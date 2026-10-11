@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/summon_voidwalker.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"summon_voidwalker"
+display_name = "Summon Voidwalker"
+description = "A Voidwalker guards you: it draws nearby enemies to itself and pummels them, and its Torment taunts every enemy within {torment_radius} m for {torment_duration} sec. It cannot be killed."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 0
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"attack_interval": 1.5,
+"attack_range": 1.6,
+"auto_cast_min": 1,
+"damage": 2.0,
+"damage_reduction": 0.0,
+"intellect_scale": 0.3,
+"spell_power_scale": 1.0,
+"taunt_duration": 1.5,
+"taunt_interval": 1.0,
+"taunt_radius": 3.0,
+"torment_damage_mult": 0.0,
+"torment_duration": 3.0,
+"torment_radius": 5.0,
+"torment_slow": 0.0
+}
+icon = &"summon_voidwalker"
+color = Color(0.35, 0.42, 0.95, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"torment_radius_add": 1.5, "taunt_radius_add": 1.0}
+rank3_text = "+1.5 m Torment and +1 m threat radius"
+specs = Array[Dictionary]([{"name": "Shared Pain", "text": "While the Voidwalker is out you take 20% less damage.", "mods": {"damage_reduction": 20.0}}, {"name": "Consuming Shadows", "text": "Torment also deals 4x fist damage and slows enemies by 40%.", "mods": {"torment_damage_mult": 4.0, "torment_slow": 40.0}}])

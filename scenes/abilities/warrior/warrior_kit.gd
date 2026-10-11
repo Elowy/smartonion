@@ -177,28 +177,6 @@ static func body_fits(player: Player, pos: Vector3) -> bool:
 	return player.get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
 
 
-## The living enemy within [param reach] of [param player] with the most other enemies within
-## [param radius] of it (ties: the first found), null when none. [param min_count] = fewest
-## enemies (itself included) the group must have.
-static func densest_enemy(player: Player, reach: float, radius: float, min_count: int = 1) -> Enemy:
-	if player == null or not player.is_inside_tree():
-		return null
-	var tree := player.get_tree()
-	var best: Enemy = null
-	var best_count := maxi(0, min_count - 1)
-	for node in EnemyGrid.gather_around(tree, player.global_position, reach):
-		var e := node as Enemy
-		if e == null or e.is_dead():
-			continue
-		if WeaponRunner.flat(e.global_position - player.global_position).length() > reach:
-			continue
-		var count := EnemyGrid.count_around(tree, e.global_position, radius)
-		if count > best_count:
-			best_count = count
-			best = e
-	return best
-
-
 ## True when [param e] is an elite or a boss.
 static func is_big(e: Enemy) -> bool:
 	return e != null and is_instance_valid(e) and e.is_elite()
@@ -209,3 +187,10 @@ static func shout_text(player: Player, text: String, color: Color) -> void:
 	if player == null or not player.is_inside_tree():
 		return
 	Vfx.floating_text(player.self_text_position(1.0), text, color, Player.SELF_TEXT_SIZE, 1.0)
+
+
+## Shakes the shared camera ([param strength] ~0.1 hit .. 1.0 boss slam).
+static func shake(strength: float) -> void:
+	var arena := Arena.current
+	if arena != null and is_instance_valid(arena) and is_instance_valid(arena.camera):
+		arena.camera.shake(strength)

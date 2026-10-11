@@ -3,8 +3,12 @@ extends AbilityEffect
 ## Mage ability Blizzard (GDD 3.2): hail on the densest group of enemies within reach – an
 ## [AbilityArea] of frost that ticks spell damage and slows everything inside for a few
 ## seconds. The numbers are params of data/abilities/mage_blizzard.tres:
-##   radius (m), duration (s), tick (s), damage + int_scaling x Intellect (per tick, base),
-##   slow (%). Items change them through ability_mod (e.g. Frostweave Cowl: radius_pct +30).
+##   radius (m), duration (s), tick (s), damage + int_scaling x Intellect (per tick, base;
+##   x "power" from ranks II / IV), slow (%). Items change them through ability_mod (e.g.
+##   Frostweave Cowl: radius_pct +30).
+## Ranks (GDD 6.3): Rank III duration_add +1 s; Rank V "Wandering Storm" (follow: the storm
+## follows the enemy it was cast on) or "Permafrost" (freeze: the hail freezes each enemy
+## once – AbilityArea.stun).
 
 const FROST := &"frost"
 const AREA_COLOR := Color(0.55, 0.85, 1.0, 0.35)
@@ -27,7 +31,8 @@ func can_cast(ctx: AbilityContext) -> bool:
 func cast(ctx: AbilityContext) -> bool:
 	if ctx.target == null or ctx.player == null:
 		return false
-	var center := cluster_center(ctx)
+	var follow := ctx.flag("follow")
+	var center := ctx.target.global_position if follow else cluster_center(ctx)
 	var area := AbilityArea.spawn(ctx.player, center, ctx.num("radius", DEFAULT_RADIUS),
 			ctx.num("duration", DEFAULT_DURATION), AREA_COLOR)
 	if not area.is_inside_tree():
@@ -37,6 +42,9 @@ func cast(ctx: AbilityContext) -> bool:
 	area.tick_interval = maxf(0.05, ctx.num("tick", DEFAULT_TICK))
 	area.damage_per_tick = tick_damage(ctx)
 	area.slow_pct = ctx.num("slow", 0.0)
+	area.stun = maxf(0.0, ctx.num("freeze", 0.0))
+	if follow:
+		area.follow = ctx.target
 	BlizzardShards.attach(area)
 	_areas.append(area)
 	return true
@@ -46,7 +54,7 @@ func wants_auto_cast(ctx: AbilityContext) -> bool:
 	if ctx.target == null or not ctx.target.is_inside_tree():
 		return false
 	var radius := ctx.num("radius", DEFAULT_RADIUS)
-	var center := cluster_center(ctx)
+	var center := ctx.target.global_position if ctx.flag("follow") else cluster_center(ctx)
 	if cluster_size(ctx.target.get_tree(), center, radius) < BOT_MIN_CLUSTER:
 		return false
 	_prune()
@@ -56,10 +64,11 @@ func wants_auto_cast(ctx: AbilityContext) -> bool:
 	return true
 
 
-## Damage of one tick (Frost spell: base + Intellect scaling, Spell Power, Versatility, school %).
+## Damage of one tick (Frost spell: base + Intellect scaling, Spell Power, Versatility,
+## school %; x the rank's power).
 static func tick_damage(ctx: AbilityContext) -> float:
 	var base := ctx.num("damage") + ctx.num("int_scaling") * ctx.player.stats.get_raw(Stats.INTELLECT)
-	return CombatMath.proc_damage(base, FROST, ctx.player.stats)
+	return CombatMath.proc_damage(base, FROST, ctx.player.stats) * ctx.num("power", 1.0)
 
 
 ## Where the hail falls: the centroid of the enemies around the targeted one – or that

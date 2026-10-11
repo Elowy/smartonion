@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_engineers_bomb.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"engineers_bomb"
+display_name = "Engineer's Bomb"
+description = "Throws a bomb at the densest group of enemies. It explodes for Fire damage in a {radius} m circle (scales with your primary stat and Attack or Spell Power)."
+class_id = &""
+school = &"fire"
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 2
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"bomblet_pct": 40.0,
+"bomblet_radius": 1.4,
+"bomblets": 0,
+"bombs": 1,
+"burn_duration": 0.0,
+"burn_pct": 15.0,
+"burn_tick": 0.5,
+"damage": 8.0,
+"flight_time": 0.55,
+"min_cluster": 2,
+"primary_scale": 0.75,
+"radius": 2.5
+}
+icon = &"engineers_bomb"
+color = Color(1, 0.55, 0.2, 1)
+kind = 2
+card_weight = 0.8
+rank3 = {
+"bombs_add": 1
+}
+rank3_text = "+1 bomb, thrown at the next group"
+specs = Array[Dictionary]([{
+"mods": {
+"bomblets_add": 4
+},
+"name": "Cluster Bomb",
+"text": "Bursts into 4 bomblets that explode again for 40% damage each."
+}, {
+"mods": {
+"burn_duration_add": 4.0
+},
+"name": "Incendiary Bomb",
+"text": "Leaves burning ground for 4 sec."
+}])

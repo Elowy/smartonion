@@ -2,8 +2,8 @@ class_name WarriorSpin
 extends RefCounted
 ## A storm of blades around an anchor – the hero (Whirlwind, Bladestorm) or a thrown axe
 ## (Bladestorm's "Ravager"): every [member interval] seconds every enemy whose body touches the
-## circle of [member radius] takes [member hit_pct] % weapon damage. Riders: a slow, leech
-## (the hero heals [member leech] % of the damage dealt) and Rage per enemy hit.
+## circle of [member radius] takes [member hit_pct] % weapon damage. Riders: a slow and leech
+## (the hero heals [member leech] % of the damage dealt).
 ## Driven by the owning effect's tick() (physics, only while the hero lives); [method stop]
 ## ends it at once and frees its look.
 
@@ -23,8 +23,6 @@ var slow := 0.0
 var slow_duration := DEFAULT_SLOW_DURATION
 ## % of the damage dealt healed to the hero.
 var leech := 0.0
-## Rage per enemy hit.
-var rage_per_hit := 0.0
 var spark_color := Color(1.0, 0.55, 0.3)
 ## The storm's look (freed by stop()).
 var look: Node3D
@@ -107,11 +105,9 @@ func pulse() -> void:
 	hits += count
 	if leech > 0.0 and dealt > 0.0:
 		player.heal(dealt * leech / 100.0)
-	if rage_per_hit > 0.0 and count > 0:
-		WarriorKit.add_rage(player, rage_per_hit * count)
 
 
 func _finish(free_look: bool) -> void:
-	if free_look and look != null and is_instance_valid(look) and not look.is_queued_for_deletion():
+	if free_look and is_instance_valid(look) and not look.is_queued_for_deletion():
 		look.queue_free()
 	look = null

@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/corruption.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"corruption"
+display_name = "Corruption"
+description = "Curses the nearest uncorrupted enemy (up to {targets} per cast) with Shadow damage over {duration} sec. When a corrupted enemy dies, the curse jumps with its remaining time to an enemy within {spread_radius} m. Scales with Intellect and Spell Power."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 4.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"damage": 1.2,
+"duration": 8.0,
+"heal_pct": 0.0,
+"intellect_scale": 0.22,
+"spell_power_scale": 0.5,
+"spread_radius": 4.0,
+"spread_targets": 1,
+"targets": 1
+}
+icon = &"corruption"
+color = Color(0.62, 0.3, 0.95, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"targets_add": 1}
+rank3_text = "+1 enemy corrupted per cast"
+specs = Array[Dictionary]([{"name": "Contagion", "text": "When a corrupted enemy dies, Corruption spreads to up to 3 nearby enemies.", "mods": {"spread_targets_add": 2}}, {"name": "Siphon Life", "text": "Corruption heals you for 30% of the damage it deals.", "mods": {"heal_pct_add": 30.0}}])
