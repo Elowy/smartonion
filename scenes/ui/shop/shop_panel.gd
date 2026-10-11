@@ -3,9 +3,13 @@ extends Control
 ## The shared shop in the middle of the between-wave screen (GDD 10, 12): a goblin merchant's
 ## stall ("The Goblin's Goods", ShopMerchant) showing Shop.offers as item cards
 ## (ShopOfferCard: icon, name in rarity colour, price, lock / ping markers, usable-by pips per
-## player), one colour-coded cursor per player (nested outlines + a corner tag in the player's
-## corner when several share a card), reroll vote pips + cost and the shared gold at the top,
-## and a short feedback / spending log ("P3 bought [Runed Plate Helm] – 62 g", "Backpack full").
+## player, an anvil above the pip of every player who could forge the offered weapon), one
+## colour-coded cursor per player (nested outlines + a corner tag in the player's corner when
+## several share a card), reroll vote pips + cost and the shared gold at the top, and a short
+## feedback / spending log ("P3 bought [Runed Plate Helm] – 62 g", "Backpack full").
+## Forging (GDD 4.1): with a full backpack, buying a weapon the buyer has a forge partner for
+## forges at once (Shop.BuyResult.FORGED): no "Backpack full", and the log says
+## "P1 bought and forged [Rare Dagger] – 62 g".
 ##
 ## Per player (handle_input, called by the Intermission for every slot whose focus is the
 ## shop): d-pad / stick moves the cursor, A buys (hold A for HOLD_TIME when the price is more
@@ -300,12 +304,13 @@ func buy_block_reason(slot: PlayerSlot, index: int) -> String:
 	var eq := equipment_of(slot)
 	if eq == null:
 		return "No hero to carry it"
-	if not eq.has_space():
+	if not eq.has_space() and not shop.forges_on_buy(index, slot):
 		return "Backpack full"
 	return ""
 
 
 ## Buys offer [param index] for [param slot] (no hold check) with feedback. True on success.
+## An auto-forge (full backpack, Shop.last_forged) reports and emits the forged weapon.
 func try_buy(slot: PlayerSlot, index: int) -> bool:
 	var reason := buy_block_reason(slot, index)
 	if reason != "":
@@ -317,8 +322,14 @@ func try_buy(slot: PlayerSlot, index: int) -> bool:
 	if not shop.buy(index, slot):
 		_say_to(slot, "The goblin refuses the deal")
 		return false
-	_say("%s bought %s – %s g" % [player_tag(slot), item_link(item), UiTheme.format_int(price)],
-		"%s bought [%s] – %d g" % [slot.label(), item.display_name, price])
+	var forged := shop.last_forged
+	if forged != null:
+		_say("%s bought and forged %s – %s g" % [player_tag(slot), item_link(forged), UiTheme.format_int(price)],
+			"%s bought and forged [%s] – %d g" % [slot.label(), forged.display_name, price])
+		item = forged
+	else:
+		_say("%s bought %s – %s g" % [player_tag(slot), item_link(item), UiTheme.format_int(price)],
+			"%s bought [%s] – %d g" % [slot.label(), item.display_name, price])
 	item_bought.emit(slot.index, item)
 	_update_cards()
 	return true

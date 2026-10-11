@@ -4,11 +4,15 @@ extends Control
 ## slot / armor type, the price with a coin (red while the shared wallet cannot pay it), a
 ## padlock in the colour of the player who locked it, "P2 wants" tags for pings, one small
 ## usable-by pip per player (crossed out when that class cannot use it, a green arrow when it
-## is an upgrade for that player) and a "SOLD" stamp once bought.
+## is an upgrade for that player), a small anvil in the player's colour sitting on the pip of
+## every player who has a forge partner for the offered weapon (Forge.offer_forge_slots – full
+## backpack or not, GDD 4.1) and a "SOLD" stamp once bought.
 
 const CARD_SIZE := Vector2(124, 212)
 const ICON_SIZE := 64.0
 const PIP_SIZE := Vector2(24, 18)
+## The anvil drawn on a usable-by pip (forge partner) – width x height.
+const ANVIL_SIZE := Vector2(22, 13)
 
 var index := -1
 var offer: Shop.Offer
@@ -19,6 +23,8 @@ var price_label: Label
 
 ## Per joined slot index: 0 = cannot use, 1 = can use, 2 = can use and an upgrade.
 var _usable: Dictionary[int, int] = {}
+## Slot indices with a forge partner for the offered weapon (anvil pips).
+var _forge: Array[int] = []
 var _colors: Dictionary[int, Color] = {}
 var _content: VBoxContainer
 var _overlay: Control
@@ -114,6 +120,7 @@ func set_offer(p_offer: Shop.Offer, slots: Array[PlayerSlot]) -> void:
 	type_label.text = type_text(item)
 	_usable.clear()
 	_colors.clear()
+	_forge = Forge.offer_forge_slots(item, slots) if item != null else ([] as Array[int])
 	for s in slots:
 		_colors[s.index] = s.color
 		if item == null:
@@ -153,6 +160,46 @@ func update_state() -> void:
 
 func is_affordable() -> bool:
 	return offer != null and RunState.gold >= offer.price
+
+
+## Whether the player of [param slot_index] has a forge partner for this offer (anvil pip).
+func has_anvil(slot_index: int) -> bool:
+	return slot_index in _forge
+
+
+## Slot indices with an anvil pip, in slot order (tests, screenshots).
+func anvil_slots() -> Array[int]:
+	var out: Array[int] = _forge.duplicate()
+	out.sort()
+	return out
+
+
+## A small anvil (pointed horn to the left, flat face, waist, flared foot) centred on
+## [param center], [param box] wide and high: a dark rim, then [param color], then a highlight
+## along the face (readable on a pip of the same colour).
+static func draw_anvil(ci: CanvasItem, center: Vector2, box: Vector2, color: Color) -> void:
+	var w := box.x
+	var h := box.y
+	var top := center.y - h * 0.5
+	var left := center.x - w * 0.5
+	var pts := PackedVector2Array([
+		Vector2(left, top + h * 0.08),               # horn tip
+		Vector2(left + w * 0.25, top),               # face
+		Vector2(left + w, top),
+		Vector2(left + w, top + h * 0.4),
+		Vector2(left + w * 0.74, top + h * 0.48),    # waist
+		Vector2(left + w * 0.74, top + h * 0.7),
+		Vector2(left + w * 0.92, top + h),           # foot
+		Vector2(left + w * 0.18, top + h),
+		Vector2(left + w * 0.36, top + h * 0.7),
+		Vector2(left + w * 0.36, top + h * 0.48),
+		Vector2(left + w * 0.24, top + h * 0.42),    # under the horn
+	])
+	var outline := pts.duplicate()
+	outline.append(pts[0])
+	ci.draw_polyline(outline, Color(0, 0, 0, 0.9), 3.0, true)
+	ci.draw_colored_polygon(pts, color)
+	ci.draw_line(Vector2(left + w * 0.28, top + 1.2), Vector2(left + w - 1.2, top + 1.2), color.lightened(0.5), 1.2)
 
 
 # --- Drawing ------------------------------------------------------------------------
@@ -221,6 +268,9 @@ func _draw_overlay() -> void:
 			var ac := pip.position + Vector2(pip.size.x - 7, pip.size.y * 0.5)
 			ci.draw_colored_polygon(PackedVector2Array([ac + Vector2(0, -6), ac + Vector2(5, 2), ac + Vector2(-5, 2)]), UiTheme.GREEN)
 			ci.draw_rect(Rect2(ac + Vector2(-1.5, 2), Vector2(3, 4)), UiTheme.GREEN)
+		if slot_index in _forge and not offer.sold:
+			# The anvil sits on top of the pip: "P1 can forge this".
+			draw_anvil(ci, Vector2(pip.get_center().x, pip.position.y - ANVIL_SIZE.y * 0.5 - 2.0), ANVIL_SIZE, col.lightened(0.35))
 		x += PIP_SIZE.x + 4.0
 	if offer.sold:
 		_draw_sold_stamp(ci)

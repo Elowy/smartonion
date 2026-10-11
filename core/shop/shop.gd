@@ -30,9 +30,13 @@ extends RefCounted
 ##   and the reroll step ([method try_reroll]) are separate: the UI re-runs the step every
 ##   frame while votes stand (a voter unplugged, gold arrived) and drops the votes of
 ##   players who are no longer voters ([method prune_votes]).
-## - Buy: the shared wallet pays, the item goes into the buyer's backpack. A full backpack,
-##   a sold offer or an empty wallet refuses without spending anything ([method try_buy]
-##   tells which).
+## - Buy: the shared wallet pays, the item goes into the buyer's backpack. A sold offer or an
+##   empty wallet refuses without spending anything ([method try_buy] tells which). A full
+##   backpack refuses too – unless the offer is a weapon the buyer has a forge partner for
+##   (Forge.partner_for, GDD 4.1): then the purchase forges at once (BuyResult.FORGED,
+##   Forge.forge_with_offer – the bought weapon never enters the backpack; spend kind
+##   &"shop_forge", label "<name> (forged)"; the result is [member last_forged]). With room in
+##   the backpack the item goes there as usual, partner or not (forging is the player's call).
 
 signal changed
 ## An offer was sold (offer index, buyer slot index, price) - for the spending log.
@@ -40,7 +44,8 @@ signal bought(index: int, slot_index: int, price: int)
 ## The stall was rerolled (new rerolls_this_round).
 signal rerolled(count: int)
 
-enum BuyResult { OK, INVALID_OFFER, SOLD, NO_PLAYER, BACKPACK_FULL, NOT_ENOUGH_GOLD }
+## FORGED: bought and forged with a partner at once (full backpack, see the class doc).
+enum BuyResult { OK, INVALID_OFFER, SOLD, NO_PLAYER, BACKPACK_FULL, NOT_ENOUGH_GOLD, FORGED }
 
 ## Offers per player that are guaranteed usable by the player's class.
 const USABLE_PER_PLAYER := 2
@@ -69,6 +74,8 @@ var offers: Array[Offer] = []
 var reroll_votes: Dictionary[int, bool] = {}
 var rerolls_this_round := 0
 var wave := 1
+## The weapon the last [method try_buy] forged (BuyResult.FORGED); null after any other result.
+var last_forged: ItemInstance
 
 ## The slots of the current round (class bias for the offers; set by open_round).
 var _slots: Array[PlayerSlot] = []
@@ -118,13 +125,17 @@ func reroll_cost() -> int:
 	return wave * 2 + 2 + 2 * rerolls_this_round
 
 
-## Buys offer [param index] for [param slot] (shared wallet, item into that player's backpack).
+## Buys offer [param index] for [param slot] (shared wallet, item into that player's backpack
+## – or forged at once when the backpack is full, see the class doc). True on success.
 func buy(index: int, slot: PlayerSlot) -> bool:
-	return try_buy(index, slot) == BuyResult.OK
+	var result := try_buy(index, slot)
+	return result == BuyResult.OK or result == BuyResult.FORGED
 
 
-## [method buy] with the reason for a refusal (nothing is spent unless the result is OK).
+## [method buy] with the reason for a refusal (nothing is spent unless the result is OK or
+## FORGED).
 func try_buy(index: int, slot: PlayerSlot) -> BuyResult:
+	last_forged = null
 	var o := offer_at(index)
 	if o == null or o.item == null:
 		return BuyResult.INVALID_OFFER
@@ -136,18 +147,50 @@ func try_buy(index: int, slot: PlayerSlot) -> BuyResult:
 	if player == null or player.equipment == null:
 		return BuyResult.NO_PLAYER
 	if not player.equipment.has_space():
-		return BuyResult.BACKPACK_FULL
+		return _buy_and_forge(index, o, slot, player.equipment)
 	if not RunState.try_spend_for(o.price, slot.index, &"shop", o.item.display_name):
 		return BuyResult.NOT_ENOUGH_GOLD
 	if not player.equipment.add_to_backpack(o.item):
 		RunState.add_gold(o.price)  # cannot happen (space was checked) - never keep the gold
 		return BuyResult.BACKPACK_FULL
+	_sell(index, o, slot)
+	return BuyResult.OK
+
+
+## Whether buying offer [param index] would forge for [param slot]'s hero right now: a full
+## backpack and a forge partner for the offered weapon (with a place for the result).
+func forges_on_buy(index: int, slot: PlayerSlot) -> bool:
+	var o := offer_at(index)
+	if o == null or o.item == null or o.sold or slot == null:
+		return false
+	var player := slot.player as Player
+	if player == null or player.equipment == null or player.equipment.has_space():
+		return false
+	var partner := Forge.partner_for(player.equipment, o.item)
+	return partner != null and Forge.can_place(player.equipment, o.item, partner)
+
+
+## The full-backpack purchase: forges with the partner (Forge.forge_with_offer) or refuses.
+func _buy_and_forge(index: int, o: Offer, slot: PlayerSlot, eq: Equipment) -> BuyResult:
+	if not forges_on_buy(index, slot):
+		return BuyResult.BACKPACK_FULL
+	if not RunState.try_spend_for(o.price, slot.index, &"shop_forge", "%s (forged)" % o.item.display_name):
+		return BuyResult.NOT_ENOUGH_GOLD
+	var result := Forge.forge_with_offer(eq, o.item)
+	if result == null:
+		RunState.add_gold(o.price)  # cannot happen (forges_on_buy checked) - never keep the gold
+		return BuyResult.BACKPACK_FULL
+	last_forged = result
+	_sell(index, o, slot)
+	return BuyResult.FORGED
+
+
+func _sell(index: int, o: Offer, slot: PlayerSlot) -> void:
 	o.sold = true
 	o.locked_by = -1
 	o.pinged_by.clear()
 	bought.emit(index, slot.index, o.price)
 	changed.emit()
-	return BuyResult.OK
 
 
 ## Locks an unsold offer for the next round (shows who locked it); toggling a locked offer

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"sword"
+display_name = "Oathcleaver"
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"every": 3,
+"hit_pct": 60.0,
+"at": "target",
+"radius": 2.5,
+"school": "physical"
+}
+unique_text = "Every 3rd hit cleaves: 60% of the hit to the target and every enemy within 2.5 m of it."
+flavor = "Sworn to guard the weak. Forged to go through whatever stands in the way."
