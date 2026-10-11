@@ -107,4 +107,4 @@ static func disc_mesh() -> Mesh:
 ## Ground crack: a thin wedge 1 m long pointing along -Z from the origin.
 static func crack_mesh() -> Mesh:
 	return MeshKit.cached("warrior:crack", func() -> Mesh:
-		return MeshKit.new().add_arc(0.0, 1.0, 7.0, Transform3D.IDENTITY, Color.WHITE, 2).build())
+		return MeshKit.new().add_arc(0.1, 1.0, 4.0, Transform3D.IDENTITY, Color.WHITE, 2).build())

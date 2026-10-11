@@ -8,7 +8,7 @@ enum Mode { WAVE, MARK }
 
 const WAVE_LIFE := 0.7
 const WAVES := 3
-const WAVE_COLOR := Color(1.0, 0.45, 0.2, 0.6)
+const WAVE_COLOR := Color(1.0, 0.45, 0.2, 0.45)
 const MARK_COLOR := Color(1.0, 0.35, 0.2, 0.55)
 ## Commanding Shout (damage taken down) marks are steel blue.
 const GUARD_COLOR := Color(0.55, 0.75, 1.0, 0.55)
@@ -71,7 +71,7 @@ static func chevron_mesh() -> Mesh:
 func _ready() -> void:
 	if mode == Mode.WAVE:
 		for i in WAVES:
-			var w := add_part(ring_mesh(0.9, 64), tint)
+			var w := add_part(ring_mesh(0.95, 64), tint)
 			w.position.y = 0.005 * float(i)
 			_waves.append(w)
 	else:

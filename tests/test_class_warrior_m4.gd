@@ -139,12 +139,13 @@ static func _known_params(a: AbilityData) -> Dictionary:
 	return out
 
 
-## The param a mod key changes ("<p>_add" / "<p>_pct" -> p, anything else itself).
-static func _mod_target(key: String, value: Variant) -> String:
+## The param a mod key changes (AbilityRunner.apply_mods: "<p>_add" -> p; "<p>_pct" -> p when
+## p is a param, else the key itself; anything else itself).
+static func _mod_target(key: String, value: Variant, params: Dictionary) -> String:
 	if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
 		if key.ends_with("_add"):
 			return key.trim_suffix("_add")
-		if key.ends_with("_pct"):
+		if key.ends_with("_pct") and params.has(key.trim_suffix("_pct")):
 			return key.trim_suffix("_pct")
 	return key
 
@@ -196,7 +197,7 @@ func test_descriptions_ranks_and_specs_resolve() -> void:
 		check(not a.rank3.is_empty(), "%s has a Rank III effect" % id)
 		check(not a.rank3_text.is_empty() and not a.rank3_text.contains("{"), "%s Rank III text" % id)
 		for key: String in a.rank3:
-			check(known.has(_mod_target(key, a.rank3[key])), "%s rank3 %s targets a param" % [id, key])
+			check(known.has(_mod_target(key, a.rank3[key], known)), "%s rank3 %s targets a param" % [id, key])
 		check_eq(a.specs.size(), 2, "%s has two specialisations" % id)
 		var names := {}
 		for spec in a.specs:
@@ -207,8 +208,42 @@ func test_descriptions_ranks_and_specs_resolve() -> void:
 			var mods: Dictionary = spec.get("mods", {})
 			check(not mods.is_empty(), "%s spec %s mods" % [id, spec_name])
 			for key: String in mods:
-				check(known.has(_mod_target(key, mods[key])), "%s spec %s: %s targets a param" % [id, spec_name, key])
+				check(known.has(_mod_target(key, mods[key], known)), "%s spec %s: %s targets a param" % [id, spec_name, key])
 		check_eq(names.size(), 2, "%s: two different specs" % id)
+
+
+## Every Rank III / Rank V mod really changes the param it is meant for (runner.params_at_rank:
+## the same path the effects read), and nothing else besides power / cooldown.
+func test_rank_and_spec_mods_change_their_params() -> void:
+	var p := _hero()
+	var runner := p.abilities
+	for id in LEARNED + CORE:
+		var a := Db.get_ability(id)
+		var known := _known_params(a)
+		var r2 := runner.params_at_rank(a, 2)
+		var r3 := runner.params_at_rank(a, 3)
+		for key: String in a.rank3:
+			var target := _mod_target(key, a.rank3[key], known)
+			check(r3.get(target) != r2.get(target), "%s Rank III changes %s (%s -> %s)" % [id, target, r2.get(target), r3.get(target)])
+		for k: String in r3:
+			if k not in ["power", "cooldown"] and r3[k] != r2.get(k):
+				check(a.rank3.keys().any(func(m: String) -> bool: return _mod_target(m, a.rank3[m], known) == k),
+						"%s Rank III changes only its own params (%s)" % [id, k])
+		var r5 := runner.params_at_rank(a, 5)
+		for i in a.specs.size():
+			var mods: Dictionary = a.specs[i].get("mods", {})
+			var spec := runner.params_at_rank(a, 5, i)
+			for key: String in mods:
+				var target := _mod_target(key, mods[key], known)
+				check(spec.get(target) != r5.get(target), "%s spec %d changes %s (%s -> %s)" % [id, i, target, r5.get(target), spec.get(target)])
+			for k: String in spec:
+				if spec[k] != r5.get(k):
+					check(mods.keys().any(func(m: String) -> bool: return _mod_target(m, mods[m], known) == k),
+							"%s spec %d changes only its own params (%s)" % [id, i, k])
+	check_near(float(runner.params_at_rank(Db.get_ability(&"heroic_leap"), 5, 1)["radius"]), 4.5, 0.001,
+			"Shockwave: radius_pct scales the radius")
+	check_near(float(runner.params_at_rank(Db.get_ability(&"execute"), 3)["threshold"]), 30.0, 0.001,
+			"Execute Rank III: 30% threshold")
 
 
 func test_every_learned_ability_casts() -> void:

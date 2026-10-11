@@ -29,7 +29,7 @@ const TAUNT_INTERVAL := 1.0
 const TAUNT_DURATION := 1.5
 const CRUMBLE_TIME := 0.45
 ## Back to the Warlock when it is further than this (and nothing to fight).
-const HOME_DISTANCE := 3.0
+const HOME_DISTANCE := 3.5
 
 var owner_player: Player
 var model: WarlockInfernalModel

@@ -23,9 +23,9 @@ extends Node3D
 const SCHOOL := &"shadow"
 const DAMAGE_REDUCTION_KEY := &"voidwalker"
 ## Preferred spot without threats: behind the Warlock's right shoulder.
-const FOLLOW_DISTANCE := 1.7
-const ORBIT_BACK := 0.6
-const ORBIT_SIDE := -0.8
+const FOLLOW_DISTANCE := 2.2
+const ORBIT_BACK := 0.45
+const ORBIT_SIDE := -0.9
 ## With a threat: this far from the Warlock towards it (never closer than the threat).
 const GUARD_DISTANCE := 3.5
 const GUARD_MIN := 2.0

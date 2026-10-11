@@ -11,7 +11,8 @@ const SHIELD_COLOR := Color(0.75, 0.82, 0.95, 0.85)
 const SPIKED_COLOR := Color(1.0, 0.55, 0.45, 0.85)
 const LAST_STAND_COLOR := Color(1.0, 0.85, 0.4, 0.85)
 const SHIELDS := 4
-const SHIELD_ORBIT := 1.0
+const SHIELD_ORBIT := 1.05
+const SHIELD_SCALE := 1.35
 const TURNS_PER_SECOND := 0.3
 const GROUND_Y := 0.05
 
@@ -76,6 +77,7 @@ func _ready() -> void:
 		var s := add_part(mesh, tint, _orbit, true)
 		s.position = Vector3(sin(yaw), 0.0, cos(yaw)) * SHIELD_ORBIT
 		s.rotation.y = yaw
+		s.scale = Vector3.ONE * SHIELD_SCALE
 	_animate(0.0)
 
 

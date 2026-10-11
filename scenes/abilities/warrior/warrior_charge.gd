@@ -187,8 +187,12 @@ func _arrive(player: Player) -> void:
 		victims[e.get_instance_id()] = e
 	var impact := WarriorKit.weapon_damage(player) * _impact_pct / 100.0
 	for id in victims:
-		var e := victims[id]
-		if is_instance_valid(e) and not e.is_dead():
+		# (An enemy run over earlier may have died and been freed meanwhile.)
+		var v: Variant = victims[id]
+		if not is_instance_valid(v):
+			continue
+		var e := v as Enemy
+		if not e.is_dead():
 			e.apply_stun(_stun)
 			if impact > 0.0 and player.procs != null:
 				player.procs.deal_raw(e, impact, _school, true, &"ability")

@@ -163,8 +163,11 @@ func test_m4_abilities_are_in_the_warlock_pool() -> void:
 
 
 ## Rank III and both specs of every Warlock ability (M4 + core) only touch params the effect
-## reads (every key exists in the params), and every description placeholder is filled.
+## reads (every changed param exists in the params), every description placeholder is filled,
+## and applying each mod really changes the param it is meant for (AbilityRunner.apply_mods:
+## "<p>_add" adds to p, "<p>_pct" scales p when p exists, any other key sets itself).
 func test_rank3_and_specs_use_known_params() -> void:
+	var p := _warlock()
 	var ids: Array[StringName] = []
 	ids.append_array(M4_IDS)
 	ids.append_array([&"rain_of_fire", &"drain_life"])
@@ -173,24 +176,32 @@ func test_rank3_and_specs_use_known_params() -> void:
 		check(not a.rank3.is_empty(), "%s rank III" % id)
 		check(a.rank3_text != "", "%s rank III text" % id)
 		check_eq(a.specs.size(), 2, "%s has 2 specs" % id)
-		var mods: Array[Dictionary] = [a.rank3]
-		for s in a.specs:
-			check(String(s.get("name", "")) != "" and String(s.get("text", "")) != "", "%s spec name / text" % id)
-			mods.append(s.get("mods", {}))
-		for m in mods:
-			check(not m.is_empty(), "%s mods not empty" % id)
-			for key: String in m:
-				var base := key
-				if key.ends_with("_add"):
-					base = key.trim_suffix("_add")
-				elif key.ends_with("_pct"):
-					base = key.trim_suffix("_pct")
-				check(a.params.has(base) or base in ["cooldown", "cost", "charges", "power"],
-						"%s: %s changes a param the effect knows" % [id, key])
-				check(base == key or not a.params.has(key),
-						"%s: mod %s is read as a modifier of %s, not as the param itself" % [id, key, base])
+		_check_mods_change(p, a, a.rank3, p.abilities.params_at_rank(a, 2), p.abilities.params_at_rank(a, 3),
+				"rank III")
+		var r4 := p.abilities.params_at_rank(a, 4)
+		for i in a.specs.size():
+			var spec := a.specs[i]
+			check(String(spec.get("name", "")) != "" and String(spec.get("text", "")) != "", "%s spec name / text" % id)
+			_check_mods_change(p, a, spec.get("mods", {}), r4, p.abilities.params_at_rank(a, 5, i),
+					"spec %s" % spec.get("name", i))
 		var text := AbilityIcon.format_description(a, a.params)
 		check(not text.contains("{"), "%s description filled: %s" % [id, text])
+
+
+## Every key of [param mods] changes its intended param between [param before] and [param after].
+func _check_mods_change(_p: Player, a: AbilityData, mods: Dictionary, before: Dictionary, after: Dictionary,
+		what: String) -> void:
+	check(not mods.is_empty(), "%s %s mods not empty" % [a.id, what])
+	for key: String in mods:
+		var target := key
+		if key.ends_with("_add"):
+			target = key.trim_suffix("_add")
+		elif key.ends_with("_pct") and before.has(key.trim_suffix("_pct")):
+			target = key.trim_suffix("_pct")
+		check(a.params.has(target) or target in ["cooldown", "cost", "charges", "power"],
+				"%s %s: %s changes %s, a param the effect knows" % [a.id, what, key, target])
+		check(before.get(target) != after.get(target),
+				"%s %s: %s really changes %s (%s -> %s)" % [a.id, what, key, target, before.get(target), after.get(target)])
 
 
 func test_ranks_scale_power_and_merge_specs() -> void:

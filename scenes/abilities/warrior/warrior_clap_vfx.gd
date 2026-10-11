@@ -8,7 +8,7 @@ const LIFE := 0.5
 const CRACKS := 8
 const WAVE_COLOR := Color(0.62, 0.82, 1.0, 0.75)
 const FLASH_COLOR := Color(0.85, 0.93, 1.0, 0.45)
-const CRACK_COLOR := Color(0.32, 0.27, 0.22, 0.8)
+const CRACK_COLOR := Color(0.3, 0.26, 0.22, 0.6)
 const RIM_COLOR := Color(0.75, 0.88, 1.0, 0.35)
 const GROUND_Y := 0.05
 

@@ -11,7 +11,7 @@ const CRACKS := 10
 const MARKER_COLOR := Color(1.0, 0.55, 0.2, 0.7)
 const DUST_COLOR := Color(0.78, 0.66, 0.48, 0.8)
 const FLASH_COLOR := Color(1.0, 0.8, 0.45, 0.5)
-const CRACK_COLOR := Color(0.28, 0.2, 0.14, 0.85)
+const CRACK_COLOR := Color(0.28, 0.2, 0.14, 0.7)
 const GROUND_Y := 0.05
 
 var mode := Mode.IMPACT
@@ -60,7 +60,7 @@ func _ready() -> void:
 			var crack := add_part(crack_mesh(), CRACK_COLOR)
 			crack.rotation.y = TAU * float(i) / float(CRACKS) + (0.2 if i % 3 == 0 else -0.1)
 			var length := radius * (0.75 if i % 2 == 0 else 0.5)
-			crack.scale = Vector3(length * 1.6, 1.0, length)
+			crack.scale = Vector3(length * 1.3, 1.0, length)
 			crack.position.y = -0.005
 	_animate(0.0)
 
