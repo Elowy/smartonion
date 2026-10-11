@@ -10,6 +10,7 @@ display_name = "Drain Life"
 description = "Drains the nearest enemy for {duration} sec, healing you for {heal_pct}% of the Shadow damage. You keep moving; the drain jumps on when the target dies."
 class_id = &"warlock"
 school = &"shadow"
+tags = Array[StringName]([&"heal", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 8.0

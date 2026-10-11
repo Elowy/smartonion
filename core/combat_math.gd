@@ -23,6 +23,9 @@ const EXECUTE_THRESHOLD := 0.3
 const PARRY_CAP := 50.0
 ## A block absorbs this fraction of the hit before Block Value (Player.BLOCK_DAMAGE_MULT).
 const BASE_BLOCK_ABSORB := 0.5
+## A block never absorbs more than this fraction, whatever the Block Value (M5: block chance
+## from talents / sets must not turn blocks into immunity).
+const BLOCK_ABSORB_CAP := 0.85
 
 
 ## Flat damage of one weapon hit before the % multipliers: base damage + stat scaling +
@@ -111,9 +114,9 @@ static func area_mult(stats: StatBlock) -> float:
 	return maxf(0.1, 1.0 + stats.get_raw(Stats.AREA_SIZE) / 100.0)
 
 
-## Fraction (0..1) of a blocked hit that is absorbed: half, + Block Value %.
+## Fraction (0..BLOCK_ABSORB_CAP) of a blocked hit that is absorbed: half, + Block Value %.
 static func block_absorb(block_value_pct: float) -> float:
-	return clampf(BASE_BLOCK_ABSORB * (1.0 + block_value_pct / 100.0), 0.0, 1.0)
+	return clampf(BASE_BLOCK_ABSORB * (1.0 + block_value_pct / 100.0), 0.0, BLOCK_ABSORB_CAP)
 
 
 ## Exact XP for picking up [param amount] with [param xp_gain_pct] percent XP Gain.

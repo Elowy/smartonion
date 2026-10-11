@@ -25,7 +25,13 @@ extends Node
 ## - Main processes ALWAYS (it drives the dev harness while the tree is paused); the Arena and
 ##   the HUD layer are PAUSABLE, WaveDirector forces PAUSABLE, and the Intermission,
 ##   GameOverScreen and PauseMenu are ALWAYS.
-## Command line (--smoke, --demo, --screenshot, --view ...): see LaunchOptions.
+## - M5: the WaveDirector gets a GoblinSpawner child ([member goblin_spawner]; its
+##   announcements become HUD banners). A run applies the launch options' test hooks right
+##   after RunState.start_run (which resets them): GoblinSpawner.chance_override,
+##   EliteAffixes.rate_mult, PlayerPanel.debug_start_tab and the start level
+##   (RunState.set_start_level, before the heroes spawn).
+## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
+## --start-level, --panel-tab ...): see LaunchOptions. SMOKE_RESULT keys: see smoke_result().
 
 signal state_changed(state: State)
 ## A run ended (before the Game Over screen opens).
@@ -67,6 +73,8 @@ var options: LaunchOptions
 var state := State.BOOT
 var arena: Arena
 var wave_director: WaveDirector
+## Child of the WaveDirector (M5): the Loot Goblin's spawner.
+var goblin_spawner: GoblinSpawner
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -224,6 +232,12 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	RunState.start_run(slots.size(), options.run_seed())
+	# Test hooks (start_run reset the statics to their defaults).
+	GoblinSpawner.chance_override = options.goblin_chance
+	EliteAffixes.rate_mult = options.elite_mult
+	PlayerPanel.debug_start_tab = options.panel_tab
+	if options.start_level > RunState.START_LEVEL:
+		RunState.set_start_level(options.start_level)
 	first_wave = options.start_wave
 	wave = 0
 	waves_completed = 0
@@ -247,6 +261,9 @@ func start_run() -> void:
 	wave_director = WaveDirector.create(arena)
 	add_child(wave_director)
 	wave_director.wave_cleared.connect(_on_wave_cleared)
+	goblin_spawner = GoblinSpawner.create(wave_director)
+	wave_director.add_child(goblin_spawner)
+	goblin_spawner.announced.connect(_on_announced)
 
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
@@ -547,6 +564,7 @@ func _teardown_run() -> void:
 	intermission = null
 	hud = null
 	wave_director = null
+	goblin_spawner = null  # freed with the director
 	arena = null
 	players.clear()
 	_disconnected.clear()
@@ -611,10 +629,11 @@ func _on_wave_cleared(n: int) -> void:
 	if state != State.WAVE or n != wave:
 		return
 	waves_completed += 1
-	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; %s" % [
+	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; elites %d/%d, goblin %d/%d/%d; %s" % [
 		n, (Time.get_ticks_msec() - _wave_start_msec) / 1000.0, RunState.kills, RunState.gold,
 		RunState.level, living_player_count(), players.size(), players_downed, items_looted, items_bought,
-		_wave_perf.summary()])
+		RunState.elites_killed, RunState.elites_spawned, RunState.goblins_spawned,
+		RunState.goblins_killed, RunState.goblins_escaped, _wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
 		if n >= RunState.TOTAL_WAVES:
 			RunState.end_run(true)
@@ -655,6 +674,12 @@ func _on_ranks_trained(_slot_index: int, count: int) -> void:
 
 func _on_bot_rerolled(_slot_index: int, _cost: int) -> void:
 	shop_rerolls += 1
+
+
+## GoblinSpawner.announced: a banner on the HUD ("A Loot Goblin appeared!").
+func _on_announced(text: String, color: Color) -> void:
+	if hud != null:
+		hud.show_banner(text, color)
 
 
 func _on_team_loot_changed() -> void:
@@ -795,12 +820,23 @@ func _finish_smoke(result: String) -> void:
 	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
 
 
-## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line").
+## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line"). M5 keys: elites_spawned,
+## elites_killed, goblins_spawned, goblins_killed, goblins_escaped, weapons_forged,
+## talent_points_spent (all heroes), talent_resets, set_bonuses (active bonuses of all heroes),
+## gold_spent (RunState.try_spend_for).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
 	for slot_index in RunState.need_wins_by_player:
 		need_wins += RunState.need_wins_by_player[slot_index]
+	var talent_points := 0
+	var set_bonuses := 0
+	for p in players:
+		if not is_instance_valid(p):
+			continue
+		if p.talents != null:
+			talent_points += p.talents.points_spent()
+		set_bonuses += SetBonuses.active_count(p.equipment)
 	var data := {
 		"result": result,
 		"waves_completed": waves_completed,
@@ -823,6 +859,16 @@ func smoke_result(result: String) -> Dictionary:
 		"abilities_learned": abilities_learned(),
 		"ranks_trained": ranks_trained,
 		"shop_rerolls": shop_rerolls,
+		"elites_spawned": RunState.elites_spawned,
+		"elites_killed": RunState.elites_killed,
+		"goblins_spawned": RunState.goblins_spawned,
+		"goblins_killed": RunState.goblins_killed,
+		"goblins_escaped": RunState.goblins_escaped,
+		"weapons_forged": RunState.weapons_forged,
+		"talent_points_spent": talent_points,
+		"talent_resets": RunState.talent_resets,
+		"set_bonuses": set_bonuses,
+		"gold_spent": RunState.gold_spent,
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),

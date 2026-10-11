@@ -8,6 +8,10 @@ var data: ResourceData
 var value := 0.0
 ## Multiplier on every gain and on regeneration (Resource Regen stat, GDD 2.4.1).
 var gain_mult := 1.0
+## M5 talent / set "resource" entries: "<field>_add" per BonusVocabulary.RESOURCE_FIELDS
+## ({"start_value_add": 5.0}), summed and rank-resolved by PlayerBonuses. P0: stored only –
+## T-CORE-B reads it wherever the field is used.
+var bonus: Dictionary = {}
 var _since_combat := 999.0
 var _hits := 0
 var _kills := 0
@@ -17,6 +21,11 @@ func _init(p_data: ResourceData = null) -> void:
 	data = p_data
 	if data != null:
 		value = data.start_value
+
+
+## Replaces [member bonus] with a copy of [param p_bonus] (PlayerBonuses hand-off, M5).
+func set_bonus(p_bonus: Dictionary) -> void:
+	bonus = p_bonus.duplicate(true)
 
 
 func max_value() -> float:

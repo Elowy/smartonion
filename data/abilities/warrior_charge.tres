@@ -10,6 +10,7 @@ display_name = "Charge"
 description = "Rush up to {distance} m in your movement direction. Enemies you hit and everything where you land are stunned for {stun} sec. You cannot be hurt while charging."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"movement", &"cc"])
 resource = &""
 cost = 0.0
 cooldown = 8.0

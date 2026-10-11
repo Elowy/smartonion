@@ -10,6 +10,7 @@ display_name = "Fan of Knives"
 description = "Throws {knives} knives in every direction, each for {damage_pct}% weapon damage and piercing the first enemy it hits. Spends all Combo Points: +{combo_bonus_pct}% damage per point."
 class_id = &"rogue"
 school = &"physical"
+tags = Array[StringName]([&"aoe", &"projectile", &"weapon"])
 resource = &"energy"
 cost = 35.0
 cooldown = 0.0

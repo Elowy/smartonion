@@ -10,6 +10,7 @@ display_name = "War Stomp"
 description = "When enemies crowd you, stomp the ground: enemies within {radius} m take {damage_pct}% weapon damage and are stunned for {stun} sec."
 class_id = &""
 school = &"physical"
+tags = Array[StringName]([&"aoe", &"cc", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

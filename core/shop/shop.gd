@@ -137,7 +137,7 @@ func try_buy(index: int, slot: PlayerSlot) -> BuyResult:
 		return BuyResult.NO_PLAYER
 	if not player.equipment.has_space():
 		return BuyResult.BACKPACK_FULL
-	if not RunState.try_spend(o.price):
+	if not RunState.try_spend_for(o.price, slot.index, &"shop", o.item.display_name):
 		return BuyResult.NOT_ENOUGH_GOLD
 	if not player.equipment.add_to_backpack(o.item):
 		RunState.add_gold(o.price)  # cannot happen (space was checked) - never keep the gold
@@ -191,7 +191,7 @@ func vote_reroll(slot_index: int, joined: Array[int], rng: RandomNumberGenerator
 ## The between-wave screen calls it every frame while votes are standing, so a reroll also
 ## fires when the last missing voter unplugs or the gold arrives after the last vote.
 func try_reroll(joined: Array[int], rng: RandomNumberGenerator) -> bool:
-	if not reroll_ready(joined) or not RunState.try_spend(reroll_cost()):
+	if not reroll_ready(joined) or not RunState.try_spend_for(reroll_cost(), -1, &"shop_reroll", "Stall reroll"):
 		return false
 	var positions := rerollable_positions()
 	for i in positions:

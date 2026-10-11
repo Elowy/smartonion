@@ -10,6 +10,7 @@ display_name = "Killing Spree"
 description = "For {duration} sec, blink from enemy to enemy, striking one every {interval} sec for {damage_pct}% weapon damage. You take {damage_taken_pct}% less damage meanwhile."
 class_id = &"rogue"
 school = &"physical"
+tags = Array[StringName]([&"movement", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 18.0

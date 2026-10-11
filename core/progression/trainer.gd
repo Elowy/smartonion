@@ -3,17 +3,26 @@ extends RefCounted
 ## The class Trainer (GDD 6.3), a tab of the between-waves panel: buy the next rank of a
 ## slotted ability (core ones included) from the shared wallet.
 
-## Buys the next rank of [param ability_id] for [param player]. Rank V then needs a
-## specialisation (AbilityRunner.needs_spec).
+## Buys the next rank of [param ability_id] for [param player] (logged in the wallet's spend
+## log as "<Ability> Rank III"). Rank V then needs a specialisation (AbilityRunner.needs_spec).
 static func try_buy_rank(player: Player, ability_id: StringName) -> bool:
 	var runner := player.abilities if player != null else null
 	if runner == null or not runner.can_rank_up(ability_id):
 		return false
 	var price := runner.trainer_price(ability_id)
-	if not RunState.try_spend(price):
+	var slot_index := player.slot.index if player.slot != null else -1
+	if not RunState.try_spend_for(price, slot_index, &"trainer", spend_label(runner, ability_id)):
 		return false
 	runner.rank_up(ability_id)
 	return true
+
+
+## "Fireball Rank III": the ability and the rank [param runner] would buy next.
+static func spend_label(runner: AbilityRunner, ability_id: StringName) -> String:
+	var at := runner.slot_of(ability_id)
+	var ability := runner.slots[at] if at >= 0 else Db.get_ability(ability_id)
+	var name := ability.display_name if ability != null else String(ability_id)
+	return "%s Rank %s" % [name, AbilityIcon.roman(runner.rank_of(ability_id) + 1)]
 
 
 ## Bot use (smoke / demo): rank up its cheapest ability while the wallet keeps at least

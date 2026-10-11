@@ -10,6 +10,7 @@ display_name = "Word of Glory"
 description = "Heals you and the most wounded ally within 8 m. If an ally within 8 m is down, instantly resurrects them at 40% health instead."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"heal"])
 resource = &"holy_power"
 cost = 3.0
 cooldown = 0.0

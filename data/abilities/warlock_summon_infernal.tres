@@ -10,6 +10,7 @@ display_name = "Summon Infernal"
 description = "An Infernal crashes onto the densest group, burning and stunning everything within {impact_radius} m, then smashes enemies for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
+tags = Array[StringName]([&"pet", &"aoe", &"cc"])
 resource = &"soul_shard"
 cost = 1.0
 cooldown = 45.0

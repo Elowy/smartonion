@@ -10,6 +10,7 @@ display_name = "Bandage"
 description = "Bandage your wounds: heal {heal_pct}% of your max health over {duration} sec. Taking damage does not interrupt it."
 class_id = &""
 school = &"physical"
+tags = Array[StringName]([&"heal"])
 resource = &""
 cost = 0.0
 cooldown = 20.0

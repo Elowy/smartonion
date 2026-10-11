@@ -10,6 +10,7 @@ display_name = "Blizzard"
 description = "Calls down hail on the densest group of enemies for {duration} sec, dealing Frost damage every {tick} sec and slowing them by {slow}%."
 class_id = &"mage"
 school = &"frost"
+tags = Array[StringName]([&"aoe", &"cc", &"ground", &"spell"])
 resource = &"mana"
 cost = 50.0
 cooldown = 0.0

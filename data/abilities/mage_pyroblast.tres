@@ -10,6 +10,7 @@ display_name = "Pyroblast"
 description = "Gathers a huge fireball for {windup} sec while you keep moving, then hurls it at the toughest enemy in range: heavy Fire damage and a burn for {burn_pct}% more over {burn_duration} sec."
 class_id = &"mage"
 school = &"fire"
+tags = Array[StringName]([&"projectile", &"dot", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

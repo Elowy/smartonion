@@ -91,8 +91,18 @@ func test_shield_block_halves_damage() -> void:
 	shield.block_chance = 100.0
 	p.equip_weapons(Db.get_weapon(&"sword"), shield)
 	p.stats.set_source(&"test", {Stats.ARMOR: -4.0})  # 2 class + 2 shield - 4 = 0
-	p.take_damage(10.0)
-	check_eq(p.hp, 10.0, "blocked hit deals half")
+	# M5: the total block chance is capped at Stats.BLOCK_CAP (50%) – hit until one is blocked.
+	check_eq(p.block_chance(), Stats.BLOCK_CAP, "block chance capped")
+	var blocked := 0
+	for _i in 64:
+		p.hp = p.max_hp()
+		p.invulnerable_left = 0.0
+		p.take_damage(10.0)
+		check(is_equal_approx(p.hp, p.max_hp() - 5.0) or is_equal_approx(p.hp, p.max_hp() - 10.0),
+			"a hit deals 10, or half when blocked (hp %s)" % p.hp)
+		if is_equal_approx(p.hp, p.max_hp() - 5.0):
+			blocked += 1
+	check(blocked > 10 and blocked < 54, "about half the hits blocked (got %d)" % blocked)
 
 
 func test_dodge_avoids_whole_hit() -> void:

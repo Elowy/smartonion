@@ -10,6 +10,7 @@ display_name = "Lay on Hands"
 description = "Fully heals the hero with the lowest health within 15 m (you included). Cannot revive."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"heal"])
 resource = &""
 cost = 0.0
 cooldown = 60.0

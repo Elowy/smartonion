@@ -10,6 +10,7 @@ display_name = "Arcane Missiles"
 description = "Launches {missiles} arcane missiles at random enemies within range, each dealing Arcane damage (scales with Intellect and Spell Power)."
 class_id = &"mage"
 school = &"arcane"
+tags = Array[StringName]([&"projectile", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 6.0

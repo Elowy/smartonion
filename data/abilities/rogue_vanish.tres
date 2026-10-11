@@ -10,6 +10,7 @@ display_name = "Vanish"
 description = "Melt into the shadows for {duration} sec: enemies lose track of you and cannot hit you, and you recover {heal_max_hp_pct}% of your max health. Your next hit is a guaranteed critical strike."
 class_id = &"rogue"
 school = &"physical"
+tags = Array[StringName]([&"stealth", &"heal"])
 resource = &""
 cost = 0.0
 cooldown = 15.0
