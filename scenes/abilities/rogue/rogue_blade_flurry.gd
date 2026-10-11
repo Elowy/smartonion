@@ -7,8 +7,9 @@ extends AbilityEffect
 ##
 ## Listens to Player.hit_dealt while active. The echo is ability damage
 ## (ProcSystem.deal_raw(..., &"ability")), not a weapon hit, so it never echoes again, rolls
-## no procs and gives no Combo Points; the hit's own outgoing multipliers are taken out first
-## (deal_raw applies them again for the new target), its crit is kept.
+## no procs and gives no Combo Points; the hit's own outgoing multipliers and the struck
+## enemy's Executioner / Slayer bonus are taken out first (deal_raw applies them again for
+## the new target, with that target's own bonus), its crit is kept.
 ## Rank III: +1 extra target. Rank V: "Relentless Flurry" ([code]extend_on_kill[/code]: every
 ## kill while it lasts adds that many seconds, up to [code]max_extend[/code]) or "Adrenaline
 ## Rush" ([code]haste_pct[/code] % Haste x power while it lasts, StatBlock source
@@ -114,9 +115,11 @@ func end() -> void:
 
 
 ## Damage of one echo of a weapon hit that dealt [param hit_damage] (after the owner's outgoing
-## multiplier [param outgoing]) – before deal_raw re-applies the multipliers.
-static func echo_damage(hit_damage: float, outgoing: float, pct: float, power: float) -> float:
-	return maxf(0.0, hit_damage) / maxf(0.01, outgoing) * pct / 100.0 * power
+## multiplier [param outgoing] and the struck enemy's target bonus [param target_bonus]) –
+## before deal_raw re-applies the multipliers.
+static func echo_damage(hit_damage: float, outgoing: float, pct: float, power: float,
+		target_bonus: float = 1.0) -> float:
+	return maxf(0.0, hit_damage) / maxf(0.01, outgoing) / maxf(0.01, target_bonus) * pct / 100.0 * power
 
 
 func _on_hit_dealt(damage: float, target: Node3D) -> void:
@@ -125,7 +128,15 @@ func _on_hit_dealt(damage: float, target: Node3D) -> void:
 			or not is_instance_valid(target) or not target.is_inside_tree():
 		return
 	var school := _player.main_hand.school if _player.main_hand != null else CombatMath.SCHOOL_PHYSICAL
-	var amount := echo_damage(damage, _player.outgoing_damage_mult(target, school, &"weapon"), _pct, _power)
+	# The struck enemy's Executioner / Slayer, judged at its HP before the hit (Enemy.take_damage
+	# does not clamp, so hp + damage is that HP even after a killing blow).
+	var bonus := 1.0
+	var hit := target as Enemy
+	if hit != null and hit.max_hp > 0.0:
+		var before := clampf((hit.hp + damage) / hit.max_hp, 0.0, 1.0)
+		bonus = CombatMath.target_damage_mult(_player.stats, before, hit.is_elite())
+	var amount := echo_damage(damage, _player.outgoing_damage_mult(target, school, &"weapon"), _pct, _power,
+			bonus)
 	if amount <= 0.0:
 		return
 	var skip: Dictionary[int, bool] = {target.get_instance_id(): true}
@@ -140,7 +151,7 @@ func _on_hit_dealt(damage: float, target: Node3D) -> void:
 		var at := e.global_position + Vector3.UP * 0.7
 		ProcVfx.beam(from, at, ECHO_COLOR)
 		Vfx.hit_spark(at, ECHO_COLOR)
-		_player.procs.deal_raw(e, amount, CombatMath.SCHOOL_PHYSICAL, false, &"ability")
+		_player.procs.deal_raw(e, amount, CombatMath.SCHOOL_PHYSICAL, true, &"ability")
 	_echoing = false
 
 

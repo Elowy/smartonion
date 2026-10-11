@@ -4,7 +4,8 @@ extends AbilityEffect
 ## at 1 HP instead, once per [code]cooldown[/code] (60) s. It then gets
 ## [code]invulnerable[/code] (1) s of invulnerability and – on the next physics tick, after
 ## the lethal hit settled – recovers [code]heal_max_hp_pct[/code] (15) % of its max HP x
-## "power". The cooldown runs in the AbilityRunner, so the HUD shows it like any other.
+## "power". The cooldown runs in the AbilityRunner, so the HUD shows it like any other; each
+## save spends one charge (AbilityRunner.spend_charge), so item "charges" give extra saves.
 ## Rank III: +1 s invulnerability. Rank V: "Shadow Escape" ([code]stealth[/code] s of Vanish
 ## stealth + [code]forced_crits[/code] guaranteed crits) or "Death's Reprisal"
 ## ([code]burst_pct[/code] % of a weapon hit x power to every enemy within
@@ -107,7 +108,8 @@ func _on_lethal_hit() -> bool:
 	if _player.downed or runner.charges_available(_ability) <= 0:
 		return false
 	var params := runner.params_for(_ability)
-	runner.set_cooldown(_ability, runner.cooldown_of(_ability))
+	# Like a cast: one charge goes, the recharge starts unless it already runs.
+	runner.spend_charge(_ability)
 	runner.ability_cast.emit(runner.slot_of(_ability.id), _ability)
 	saves += 1
 	var power := float(params.get("power", 1.0))
