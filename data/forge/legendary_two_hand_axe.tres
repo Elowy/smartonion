@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"two_hand_axe"
+display_name = "Reaper's Due"
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"every": 4,
+"hit_pct": 75.0,
+"at": "self",
+"radius": 3.0,
+"dot": 10.0,
+"dot_duration": 4.0,
+"school": "physical"
+}
+unique_text = "Every 4th hit becomes a whirling cleave: 75% of the hit to every enemy within 3 m of you, and they bleed for 10 damage over 4 sec."
+flavor = "Every swing collects what is owed."

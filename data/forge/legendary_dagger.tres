@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"dagger"
+display_name = "Nettlefang"
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"every": 4,
+"hit_pct": 100.0,
+"school": "nature",
+"dot": 6.0,
+"dot_duration": 4.0,
+"dot_stacks": 3
+}
+unique_text = "Every 4th hit throws a poison blade: 100% of the hit as Nature damage, and the target is poisoned for 6 Nature damage over 4 sec (stacks 3 times)."
+flavor = "Its bite is small. Its venom is not."

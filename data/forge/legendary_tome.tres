@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"tome"
+display_name = "The Whispering Codex"
+unique_effect = &"drain"
+unique_params = {
+"trigger": "on_hit",
+"every": 5,
+"hit_pct": 120.0,
+"school": "shadow"
+}
+unique_text = "Every 5th attack, the codex whispers a curse: 120% of the hit as Shadow damage, healing you for the damage dealt."
+flavor = "Some pages read you back."
