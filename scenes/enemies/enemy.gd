@@ -99,9 +99,9 @@ var max_hp := 1.0
 var radius := 0.45
 var model: EnemyModel
 
-## Contact damage per hit at this enemy's wave.
+## Contact damage per hit at this enemy's wave and party size (RunState.coop_damage_mult()).
 var contact_damage := 1.0
-## Damage of each thrown projectile (RANGED) at this enemy's wave.
+## Damage of each thrown projectile (RANGED) at this enemy's wave and party size.
 var projectile_damage := 1.0
 ## Walking speed (m/s) incl. the per-enemy jitter.
 var move_speed := 2.4
@@ -178,8 +178,8 @@ static func create(p_data: EnemyData, p_wave: int) -> Enemy:
 	e.radius = p_data.radius
 	e.max_hp = maxf(1.0, p_data.hp_at_wave(e.wave) * RunState.coop_hp_mult())
 	e.hp = e.max_hp
-	e.contact_damage = p_data.contact_damage_at_wave(e.wave)
-	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave)
+	e.contact_damage = p_data.contact_damage_at_wave(e.wave) * RunState.coop_damage_mult()
+	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave) * RunState.coop_damage_mult()
 	var rng := RunState.rng
 	e.move_speed = p_data.move_speed * (1.0 + rng.randf_range(-MOVE_SPEED_JITTER, MOVE_SPEED_JITTER))
 	e._weave_phase = rng.randf() * TAU

@@ -3,6 +3,8 @@ extends TestCase
 
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const DT := 1.0 / 60.0
+## RunState.coop_damage_mult() for 1..4 players (GDD 9).
+const COOP_DAMAGE: Array[float] = [0.35, 0.45, 0.6, 0.8]
 
 var world: Node3D
 
@@ -38,8 +40,8 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	var e5 := Enemy.create(data, 5)
 	check_near(e5.max_hp, 4.0 * (1.0 + 0.12 * 4.0) * pow(1.22, 4.0), 0.0001,
 			"wave 5 hp = 4 * (1 + 12% * 4) * 1.22^4")
-	check_near(e5.contact_damage, 1.0 * (1.0 + 0.15 * 4.0) * pow(1.08, 4.0), 0.0001,
-			"wave 5 contact damage = 1 * (1 + 15% * 4) * 1.08^4")
+	check_near(e5.contact_damage, 1.0 * (1.0 + 0.15 * 4.0) * pow(1.08, 4.0) * COOP_DAMAGE[0], 0.0001,
+			"wave 5 contact damage = 1 * (1 + 15% * 4) * 1.08^4 * the solo damage factor")
 	e5.free()
 
 
@@ -87,17 +89,41 @@ func test_wave_scaling_follows_gdd() -> void:
 		check_eq(d.damage_compound, defaults.damage_compound, "%s damage compounding" % id)
 
 
-func test_enemy_stats_at_wave_include_coop_hp_only() -> void:
+func test_enemy_stats_at_wave_include_coop_scaling() -> void:
 	var data := Db.get_enemy(&"troll_axethrower")
 	RunState.start_run(4, 1)
 	var e := Enemy.create(data, 6)
 	check_near(e.max_hp, data.max_hp * 1.6 * pow(1.22, 5.0) * 1.6, 0.0001,
 			"hp: base * (1 + 12% * 5) * 1.22^5 * coop 1.6")
-	check_near(e.contact_damage, data.contact_damage * 1.75 * pow(1.08, 5.0), 0.0001,
-			"contact damage: (1 + 15% * 5) * 1.08^5, no co-op factor")
-	check_near(e.projectile_damage, data.projectile_damage * 1.75 * pow(1.08, 5.0), 0.0001,
-			"projectile damage: no co-op factor")
+	check_near(e.contact_damage, data.contact_damage * 1.75 * pow(1.08, 5.0) * COOP_DAMAGE[3], 0.0001,
+			"contact damage: (1 + 15% * 5) * 1.08^5 * the 4-player damage factor")
+	check_near(e.projectile_damage, data.projectile_damage * 1.75 * pow(1.08, 5.0) * COOP_DAMAGE[3], 0.0001,
+			"projectile damage: the same co-op factor")
 	e.free()
+
+
+func test_coop_damage_mult_by_party_size() -> void:
+	# GDD 9: smaller parties take softer hits (alone, the first down ends the run).
+	for n in range(1, 5):
+		RunState.start_run(n, 1)
+		check_near(RunState.coop_damage_mult(), COOP_DAMAGE[n - 1], 0.0001, "%d player(s)" % n)
+	for n in range(1, 4):
+		check(COOP_DAMAGE[n - 1] < COOP_DAMAGE[n], "%d players hit softer than %d" % [n, n + 1])
+	check(COOP_DAMAGE[3] <= 1.0, "never harder than the EnemyData curve")
+
+
+func test_enemy_damage_scales_with_party_size() -> void:
+	var data := Db.get_enemy(&"troll_axethrower")
+	for n in range(1, 5):
+		RunState.start_run(n, 1)
+		var e := Enemy.create(data, 10)
+		check_near(e.contact_damage, data.contact_damage_at_wave(10) * COOP_DAMAGE[n - 1], 0.0001,
+				"%d player(s): contact damage x the party factor" % n)
+		check_near(e.projectile_damage, data.projectile_damage_at_wave(10) * COOP_DAMAGE[n - 1], 0.0001,
+				"%d player(s): projectile damage x the party factor" % n)
+		check_near(e.max_hp, data.hp_at_wave(10) * (1.0 + 0.2 * (n - 1)), 0.0001,
+				"%d player(s): hp keeps its own co-op factor" % n)
+		e.free()
 
 
 func test_hp_scales_with_coop() -> void:
@@ -120,7 +146,8 @@ func test_contact_damage_respects_cooldown() -> void:
 	e._physics_process(DT)
 	check_eq(player.fake_hits.size(), 1, "first touch hits at once")
 	if player.fake_hits.size() == 1:
-		check_eq(player.fake_hits[0], data.contact_damage_at_wave(3), "wave-scaled contact damage")
+		check_near(player.fake_hits[0], data.contact_damage_at_wave(3) * RunState.coop_damage_mult(), 0.0001,
+				"wave- and party-scaled contact damage")
 		check_eq(player.fake_kinds[0], CombatMath.KIND_MELEE, "melee kind")
 		check(player.fake_sources[0] == e, "enemy is the source")
 	EFakes.step(e, 0.9)
@@ -378,7 +405,8 @@ func test_ranged_keeps_distance_and_throws() -> void:
 	if not axes.is_empty():
 		var axe := axes[0]
 		check_eq(axe.team, Projectile.TEAM_ENEMIES, "enemy team")
-		check_eq(axe.damage, data.projectile_damage_at_wave(3), "wave-scaled projectile damage")
+		check_near(axe.damage, data.projectile_damage_at_wave(3) * RunState.coop_damage_mult(), 0.0001,
+				"wave- and party-scaled projectile damage")
 		check(axe.attacker == e, "attacker is the enemy")
 		check(axe.direction.x < -0.9, "aimed at the player (-X)")
 	check_eq(player.fake_hits.size(), 0, "never touched the player")
