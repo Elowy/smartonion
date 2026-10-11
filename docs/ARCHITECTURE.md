@@ -97,10 +97,11 @@ the new screen never sees the button press that closed the old one.
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
    move) → if n == 25 → GAME_OVER (victory), else **INTERMISSION** (tree paused,
    `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
-   `Intermission.open(n, RunState.pending_level_ups)`, players ready with A, bots and unplugged
+   `Intermission.open(n, RunState.pending_level_ups)`: loot roll → level-up cards (when levels
+   were gained) → market; players ready with START, bots and unplugged
    devices auto-ready; after `Intermission.auto_continue_time` – default
    `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
-   everyone is ready) → `pending_level_ups = 0` (choices arrive in M4) → wave n+1.
+   everyone is ready) → `pending_level_ups = 0` (the cards resolved them) → wave n+1.
 5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
    `GameOverScreen.open(victory)`. A / START → **LOBBY with the same players** (ready again);
    the main menu only through the lobby's Back.
@@ -477,7 +478,8 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   (`Stats.INTEGER_STATS`) are whole numbers. Armor Specialization is computed after the
   weapons' bonus stats are applied (`Player.apply_equipment`).
 - **Between waves** (`scenes/ui/intermission.gd`): LOOT phase (`LootRollScreen`, 15 s per
-  item, hidden choices, bots `LootRoll.bot_choice`, solo Take / Sell / Leave) then MARKET
+  item, hidden choices, bots `LootRoll.bot_choice`, solo Take / Sell / Leave), then the M4
+  LEVEL_UP phase (see "M4: level-up cards between waves"), then MARKET
   (`ShopPanel` centred, one `PlayerPanel` per hero scaled into its corner with
   `tooltip_inside = true`). Per player: LB / RB switch focus shop ↔ own panel, A buys
   (hold when > 50% of the wallet), X lock, R3 / Tab ping, Y reroll vote, START ready, B
@@ -571,3 +573,64 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
 - Ability damage: use `CombatMath.weapon_hit_damage(player.main_hand, player.stats) x pct`
   for weapon-based abilities, `CombatMath.proc_damage(base, school, stats)` for spells, and
   deal it with `player.procs.deal_raw(enemy, amount, school, true, &"ability")`.
+
+## M4: level-up cards between waves
+
+```
+scenes/ui/level_up/  LevelUpScreen (the phase, layout, timer, bots), LevelUpPanel (one
+                     player's region + state machine), LevelCardView (one card, drawn in code)
+core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; see the M4 core)
+```
+
+- **Phase order** (`Intermission.Phase`): LOOT (team loot only) → **LEVEL_UP** (only when
+  `level_ups` > 0 and some slot has a hero – `Intermission.wants_level_up()`) → MARKET. The
+  market's auto-continue countdown starts only with MARKET. Main passes
+  `RunState.pending_level_ups` to `Intermission.open` and clears it when the next wave starts.
+- **Layout** (1920x1080 canvas, `LevelUpScreen`): a header band (`HEADER_HEIGHT` 94: "Level Up!",
+  the levels, the shared gold and the "Auto-pick in N s" bar) and one `LevelUpPanel`
+  (`DESIGN_SIZE` 936x476) per hero: 3–4 players in their quarters like the HUD / market (P1
+  top-left, P2 top-right, P3 bottom-left, P4 bottom-right, by slot index), two players side by
+  side in the middle band, a solo player centred at `SOLO_SCALE` 1.45. Panel: header in the
+  player's colour (portrait, Pn, class, "Level 6 – pick 1 of 5 (2 left)"), 5 `LevelCardView`s
+  (172x356), the player's own prompts (`UiGlyph.for_input`: key caps for the keyboard) with
+  the reroll price (red when the wallet cannot pay) and a message line.
+- **Cards** (`LevelCardView`): ability cards – ribbon "New Active" / "New Auto-cast" (green)
+  or "Rank II → III" (gold), `AbilityIcon`, name, school · cost · cooldown (a rank-up that
+  shortens it shows "3.6 → 3.2 s"), `AbilityRanks.rank_text` in green (Rank V names both
+  specs), the description via `AbilityIcon.format_description(ability, params)` – `runner.params_for`
+  for new abilities, the next rank's params for rank-ups (`LevelCardView.next_rank_params`
+  mirrors `AbilityRunner.params_for` at rank + 1) – and a red "Slots full – replaces one"
+  strip when the kind's slots are all taken. Stat cards: ribbon, gem and title in the Items
+  rarity colour, `LevelCard.lines()`. The player's cursor lifts the card with a border / glow
+  in the player's colour.
+- **Per player** (`LevelUpPanel`, only `PlayerSlot.input`): CARDS (◀ ▶, A pick, Y reroll for
+  `LevelUpDeck.reroll_price(cleared wave, rerolls)` from the shared wallet via
+  `RunState.try_spend` – per player, rising +2 per reroll in this round, refused with "Not
+  enough gold" when broke) → REPLACE when a new ability's kind is full (the slots of that kind
+  with icon, name, rank and refund `AbilityRanks.replace_refund(rank, RunState.wave)`; A =
+  `LevelUpDeck.apply(player, card, slot)`, the refund goes to the wallet; B back) → SPEC when a
+  pick reached Rank V and `runner.needs_spec` (two specs, A = `runner.set_spec`, no way back)
+  → next hand / DONE (summary of the picks). One pick per level gained; the next hand is
+  drawn after each pick so it reflects what was learned.
+- **Randomness**: when the phase opens every player (slot order) gets their own
+  `RandomNumberGenerator` seeded with `RunState.rng.randi()`; all of that player's hands and
+  rerolls come from it. Hands are reproducible per seed, one player's rerolls / pick timing
+  never change another player's cards, and `RunState.rng` advances by exactly one draw per
+  player whatever the humans do (the shop round after it stays reproducible).
+- **Automatic picks** (`LevelUpPanel.auto_pick` / `auto_finish`): `LevelUpDeck.bot_pick`,
+  never a card that needs a replacement (other cards are tried if one fails to apply); a
+  pending specialisation takes the highlighted one (bots: the first). Bots
+  (`PlayerSlot.is_bot()`) pick at once, or after `LevelUpScreen.bot_think_time` per pick with a
+  visible cursor walk (demo: `Main.DEMO_LEVEL_UP_THINK_TIME` 1 s); unplugged pads (also when
+  unplugged mid-phase) pick at once. The countdown `PICK_TIME` 40 s + `EXTRA_PICK_TIME` 20 s per
+  further level (`LevelUpScreen.pick_time` ≤ 0 = off) auto-finishes every idle human.
+- **Input hygiene**: the phase swallows every human's held buttons / stick when it opens,
+  skips the opening frame and ignores A / Y / B for `LevelUpScreen.INPUT_LOCKOUT` (0.4 s);
+  each new hand / sub-prompt ignores A / Y for `LevelUpPanel.PICK_INPUT_DELAY` (0.3 s), so a
+  mashed A never picks an unseen card. A player who leaves loses their panel; the phase ends
+  when everyone left is done.
+- **Trainer bots** (smoke / demo, after their market shopping): `Intermission._bots_train`
+  calls `Trainer.bot_train(player, reserve)` for every bot in slot order with an even share of
+  the gold above `Intermission.bot_train_reserve` (one Uncommon item at the next wave's price
+  per two bots), so the shop still gets gold next round. `SMOKE_RESULT` adds `level_cards`
+  (cards picked), `abilities_learned` (learned slots filled at the end) and `ranks_trained`.

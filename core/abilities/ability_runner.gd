@@ -426,13 +426,19 @@ func params_for(ability: AbilityData) -> Dictionary:
 	var cached: Variant = _params_cache.get(ability.id)
 	if cached != null:
 		return cached
-	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1, "power": 1.0}
-	base.merge(ability.params, true)
-	var ranked := apply_mods(base, AbilityRanks.mods_for(ability, rank_of(ability.id), spec_of(ability.id)))
-	var out := apply_mods(ranked, player.ability_mods(ability.id) if player != null else {})
+	var out := params_at_rank(ability, rank_of(ability.id), spec_of(ability.id))
 	out.make_read_only()
 	_params_cache[ability.id] = out
 	return out
+
+
+## [method params_for] as it would be at [param rank] with specialisation [param spec]
+## (previews: level-up rank-up cards, the Trainer). Not cached, a fresh dictionary.
+func params_at_rank(ability: AbilityData, rank: int, spec: int = -1) -> Dictionary:
+	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1, "power": 1.0}
+	base.merge(ability.params, true)
+	var ranked := apply_mods(base, AbilityRanks.mods_for(ability, clampi(rank, 1, AbilityRanks.MAX_RANK), spec))
+	return apply_mods(ranked, player.ability_mods(ability.id) if player != null else {})
 
 
 ## Drops the cached params (item mods or ranks changed).

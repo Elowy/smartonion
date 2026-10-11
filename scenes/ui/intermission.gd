@@ -4,7 +4,10 @@ extends Control
 ##
 ##   LOOT   – only when RunState.team_loot holds items: the full-screen LootRollScreen rolls
 ##            RunState.take_team_loot() (Need / Greed / Pass, solo Take / Sell / Leave).
-##   (level-up cards come here in M4)
+##   LEVEL_UP – only when the team gained levels this wave (level_ups > 0) and someone has a
+##            hero: the full-screen LevelUpScreen (GDD 6.1) – every hero picks 1 of 5 cards per
+##            level gained in their own quarter, with their own controller (bots / unplugged
+##            pads automatically, idle humans after the countdown).
 ##   MARKET – RunState.shop.open_round(cleared_wave, slots, RunState.rng) once per open; the
 ##            shared ShopPanel (goblin stall) in the middle, one PlayerPanel per player with a
 ##            hero in that player's corner (P1 top-left, P2 top-right, P3 bottom-left,
@@ -20,8 +23,11 @@ extends Control
 ## are ready (a pad that comes back is un-readied); with [member bot_shopping] (smoke / demo)
 ## every bot buys every affordable offer that is an upgrade for it (cheapest first,
 ## round-robin over the bots – bot_offer_choice) and equips what ItemTooltip.upgrade_direction
-## calls an upgrade. Everyone ready -> continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of MARKET the next wave
-## starts anyway (the countdown does not run during the loot roll).
+## calls an upgrade; then they buy ability ranks from the Trainer with what is left above a reserve
+## (_bots_train: Trainer.bot_train, the wallet shared out evenly). Everyone ready ->
+## continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of
+## MARKET the next wave starts anyway (the countdown does not run during the loot roll and the
+## level-up cards).
 ## See docs/ARCHITECTURE.md.
 
 signal continue_requested
@@ -29,8 +35,12 @@ signal continue_requested
 signal item_bought(slot_index: int, item: ItemInstance)
 ## One loot roll was resolved and applied (statistics).
 signal loot_rolled(roll: LootRoll)
+## A player picked a level-up card (statistics).
+signal level_card_picked(slot_index: int, card: LevelCard)
+## A bot bought [param count] ability ranks from the Trainer (statistics).
+signal ranks_trained(slot_index: int, count: int)
 
-enum Phase { CLOSED, LOOT, MARKET }
+enum Phase { CLOSED, LOOT, LEVEL_UP, MARKET }
 
 ## GDD 12: seconds after which the next wave starts even if not everyone is ready.
 const AUTO_CONTINUE_TIME := 60.0
@@ -49,6 +59,9 @@ const PANEL_AREA := Vector2(580, 518)
 ## Vertical shift of the stall (between the header and the ready chips).
 const STALL_OFFSET_Y := -8.0
 const CHIP_SIZE := Vector2(170, 56)
+## Smoke / demo bots keep this many Uncommon items' worth of gold (next wave's price) per two
+## bots when they train after shopping, so the shop still gets their gold next round.
+const BOT_TRAIN_RESERVE_RARITY := Items.Rarity.UNCOMMON
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -78,6 +91,7 @@ var countdown_label: Label
 var time_left := -1.0
 var shop_panel: ShopPanel
 var loot_screen: LootRollScreen
+var level_up_screen: LevelUpScreen
 ## Slot index -> that player's personal panel (only players with a hero get one).
 var panels: Dictionary[int, PlayerPanel] = {}
 ## Slot index -> true while the player's input goes to their own panel (else the shop).
@@ -129,11 +143,19 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	_fill()
 	_update_countdown()
 	_refresh_chips(true)
+	level_up_screen.close()
 	show()
 	if not RunState.team_loot.is_empty():
 		_start_loot()
+	elif wants_level_up():
+		_start_level_up()
 	else:
 		_start_market()
+
+
+## The team gained levels this wave and somebody has a hero to pick cards for.
+func wants_level_up() -> bool:
+	return level_ups > 0 and not LevelUpScreen.pickers(PlayerManager.get_slots()).is_empty()
 
 
 ## Bots and players whose device is unplugged never block the next wave.
@@ -149,6 +171,7 @@ func is_open() -> bool:
 func set_backdrop_opacity(alpha: float) -> void:
 	_backdrop.modulate.a = alpha
 	loot_screen.set_backdrop_opacity(alpha)
+	level_up_screen.set_backdrop_opacity(alpha)
 
 
 ## Moves [param slot_index]'s input focus to their own panel ([param on]) or to the shop.
@@ -184,12 +207,29 @@ func _start_loot() -> void:
 
 func _on_loot_finished() -> void:
 	if phase == Phase.LOOT and not _done:
+		if wants_level_up():
+			_start_level_up()
+		else:
+			_start_market()
+
+
+func _start_level_up() -> void:
+	phase = Phase.LEVEL_UP
+	loot_screen.hide()
+	_market_root.visible = false
+	_swallow_humans()
+	level_up_screen.open(PlayerManager.get_slots(), level_ups, cleared_wave)
+
+
+func _on_level_up_finished() -> void:
+	if phase == Phase.LEVEL_UP and not _done:
 		_start_market()
 
 
 func _start_market() -> void:
 	phase = Phase.MARKET
 	loot_screen.hide()
+	level_up_screen.close()
 	_market_root.visible = true
 	time_left = auto_continue_time if auto_continue_time > 0.0 else -1.0
 	_countdown_second = -1
@@ -316,6 +356,11 @@ func _build() -> void:
 	loot_screen.roll_resolved.connect(func(r: LootRoll) -> void: loot_rolled.emit(r))
 	loot_screen.visible = false
 	add_child(loot_screen)
+
+	level_up_screen = LevelUpScreen.create()
+	level_up_screen.finished.connect(_on_level_up_finished)
+	level_up_screen.card_picked.connect(func(i: int, c: LevelCard) -> void: level_card_picked.emit(i, c))
+	add_child(level_up_screen)
 	visible = false
 
 
@@ -520,7 +565,12 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if not visible or _done or phase != Phase.MARKET:
+	if not visible or _done:
+		return
+	if phase == Phase.LEVEL_UP:
+		level_up_screen.update(delta)
+		return
+	if phase != Phase.MARKET:
 		return
 	_market_time += delta
 	if time_left > 0.0:
@@ -613,9 +663,39 @@ func _bots_shop() -> void:
 			bot_equip_upgrades(s)
 			if eq == null or eq.backpack.has(item):
 				shoppers.erase(s)  # no room for what it would push out: done for this round
+	_bots_train()
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
 			panels[s.index].refresh()
+
+
+## After shopping, smoke / demo bots buy ability ranks from the Trainer (Trainer.bot_train,
+## cheapest rank first) with the gold above [method bot_train_reserve]; the spendable gold is
+## shared out evenly over the bots in slot order. Returns the ranks bought.
+func _bots_train() -> int:
+	var trainees: Array[PlayerSlot] = []
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.abilities != null:
+			trainees.append(s)
+	var reserve := bot_train_reserve(cleared_wave, trainees.size())
+	var total := 0
+	for k in trainees.size():
+		var share := floori(float(RunState.gold - reserve) / float(trainees.size() - k))
+		if share <= 0:
+			break
+		var s := trainees[k]
+		var n := Trainer.bot_train(s.player as Player, RunState.gold - share)
+		if n > 0:
+			total += n
+			ranks_trained.emit(s.index, n)
+	return total
+
+
+## Gold the training bots leave in the wallet: one Uncommon item at the next wave's price per
+## two bots (at least one).
+static func bot_train_reserve(p_cleared_wave: int, bots: int) -> int:
+	return ItemGenerator.price_for(BOT_TRAIN_RESERVE_RARITY, p_cleared_wave + 1) * maxi(1, ceili(bots / 2.0))
 
 
 ## Index of the cheapest offer in [param p_shop] that the wallet can pay and that is an
@@ -706,6 +786,8 @@ func _on_player_left(slot: PlayerSlot) -> void:
 	panel_focus.erase(slot.index)
 	if not is_open():
 		return
+	if phase == Phase.LEVEL_UP:
+		level_up_screen.remove_slot(slot.index)
 	if phase == Phase.MARKET:
 		var slots := PlayerManager.get_slots()
 		_sync_panels(slots)
