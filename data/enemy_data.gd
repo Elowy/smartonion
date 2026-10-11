@@ -69,12 +69,14 @@ func hp_at_wave(wave: int) -> float:
 	return max_hp * hp_mult_at_wave(wave)
 
 
-## Contact damage at [param wave]: contact_damage * [method damage_mult_at_wave] (GDD 9).
+## Contact damage at [param wave] before the party-size factor (Enemy multiplies by
+## RunState.coop_damage_mult()): contact_damage * [method damage_mult_at_wave] (GDD 9).
 func contact_damage_at_wave(wave: int) -> float:
 	return contact_damage * damage_mult_at_wave(wave)
 
 
-## Projectile damage at [param wave]: projectile_damage * [method damage_mult_at_wave].
+## Projectile damage at [param wave] before the party-size factor (as
+## [method contact_damage_at_wave]): projectile_damage * [method damage_mult_at_wave].
 func projectile_damage_at_wave(wave: int) -> float:
 	return projectile_damage * damage_mult_at_wave(wave)
 
