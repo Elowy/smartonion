@@ -714,7 +714,6 @@ func _ally_target(here: Vector3, reach: float, prefer_downed: bool) -> Node3D:
 
 
 ## A ghost the Spirit Healer's pulse revives (at full HP) within PaladinWordOfGlory.HEALER_SOON
-## seconds (0 <= Player.healer_seconds_left <= that; -1 = not waiting in the circle): a revive
-## goes to another ghost instead.
+## seconds: a revive goes to another ghost instead (the same rule Word of Glory checks).
 static func _healer_raises_soon(p: Player) -> bool:
-	return p.healer_seconds_left >= 0.0 and p.healer_seconds_left <= PaladinWordOfGlory.HEALER_SOON
+	return PaladinWordOfGlory.healer_raises_soon(p)

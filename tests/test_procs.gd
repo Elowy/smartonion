@@ -493,13 +493,12 @@ func test_shield_hp_is_read_only() -> void:
 	var ps := _hero().procs
 	ps.add_shield(10.0, 3600.0, &"barrier")
 	ps.add_shield(5.0, 4.0)
-	# A stray write (the old `shield_hp += x` idiom) must not wipe the named entries.
-	ps.set(&"shield_hp", ps.shield_hp + 3.0)
+	# A stray write (the old `shield_hp += x` idiom) only reports an error (one deliberate
+	# write here) and must not wipe the named entries.
+	ps.set(&"shield_hp", 0.0)
 	check_eq(ps.shield_of(&"barrier"), 10.0, "the named entry is untouched")
 	check_eq(ps.shield_of(&""), 5.0, "and so is the anonymous one")
 	check_eq(ps.shield_hp, 15.0, "the total still comes from the entries")
-	ps.set(&"shield_hp", 0.0)
-	check_eq(ps.shield_hp, 15.0, "writing 0 clears nothing either")
 
 
 func test_low_hp_shield_absorbs_and_rearms() -> void:

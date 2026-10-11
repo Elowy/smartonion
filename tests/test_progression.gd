@@ -171,7 +171,8 @@ func test_spec_mods_are_a_copy() -> void:
 	check_eq(AbilityRanks.spec_mods(a, 5, 0), {"bounces": 2, "chain": [1, 2]}, "the next call sees the original")
 	var summary := AbilityRanks.mods_for(a, 5, 0)
 	summary["bounces"] = 7
-	check_eq(a.specs[0]["mods"]["bounces"], 2, "nor through mods_for")
+	(summary["chain"] as Array).append(4)
+	check_eq(a.specs[0]["mods"], {"bounces": 2, "chain": [1, 2]}, "nor through mods_for (nested values too)")
 
 
 func test_auto_slots_cast_by_themselves_for_humans() -> void:

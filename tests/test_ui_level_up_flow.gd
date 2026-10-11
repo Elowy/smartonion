@@ -190,6 +190,54 @@ func test_rich_bots_reroll_the_stall_and_shop_again() -> void:
 	check(shop.reroll_votes.is_empty(), "no bot vote left standing")
 
 
+## The production path end to end: a real Shop (vote_reroll -> try_reroll with the one bot's
+## vote, reroll_cost paid, offers redrawn from RunState.rng), the bots buying the redrawn
+## offers and the loop stopping once nothing is left to reroll.
+func test_bots_reroll_a_real_stall_and_buy_the_redraw() -> void:
+	RunState.start_run(2, 5)
+	RunState.wave = 20
+	var real := Shop.new()
+	RunState.shop = real
+	RunState.add_gold(1000)
+	world = MarketFakes.make_world(tree)
+	screen = Intermission.create()
+	screen.bot_shopping = true
+	screen.bot_buy_chance = 1.0
+	screen.bot_rerolled.connect(func(i: int, cost: int) -> void: rerolled.append([i, cost]))
+	tree.root.add_child(screen)
+	var warrior := MarketFakes.bot_with_hero(world, "bot:a", &"warrior")
+	var mage := MarketFakes.bot_with_hero(world, "bot:b", &"mage")
+	_max_ranks(warrior)
+	_max_ranks(mage)
+	screen.open(20, 0)
+	check(not real.offers.is_empty(), "the stall is stocked")
+	# Nothing on the stall is an upgrade: only a reroll can give the bots something to buy.
+	var useless := _useless_items(real.offers.size())
+	for i in real.offers.size():
+		real.offers[i].item = useless[i]
+	var start := RunState.gold
+	_step()
+	_step()
+	check(not rerolled.is_empty(), "the bots rerolled the stall")
+	check_eq(real.rerolls_this_round, rerolled.size(), "every reroll went through the real shop")
+	check_eq(rerolled[0][1], 42, "the first reroll costs wave 20 x 2 + 2")
+	var redrawn := 0
+	var spent_on_items := 0
+	for o in real.offers:
+		if not useless.has(o.item):
+			redrawn += 1
+		if o.sold:
+			spent_on_items += o.price
+	check(redrawn > 0, "the reroll redrew the offers")
+	check(spent_on_items > 0, "and the bots bought from the redraw")
+	var spent_on_rerolls := 0
+	for r in rerolled:
+		spent_on_rerolls += int(r[1])
+	check_eq(RunState.gold, start - spent_on_rerolls - spent_on_items, "rerolls and items paid from the wallet")
+	check(real.reroll_votes.is_empty(), "no bot vote left standing")
+	check(rerolled.size() <= Intermission.BOT_MAX_REROLLS, "within the cap")
+
+
 func test_bots_reroll_only_with_gold_well_above_the_reserve() -> void:
 	var keep := Intermission.BOT_REROLL_RESERVE_MULT * Intermission.bot_train_reserve(3, 2)
 	_market(keep + 8 + 9, null, _useless_items(3))

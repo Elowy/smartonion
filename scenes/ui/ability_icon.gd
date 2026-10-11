@@ -64,8 +64,11 @@ const RANK_BADGE_FONT := SMALL_FONT - 3
 const RANK_BADGE_COLOR := Color(1.0, 0.93, 0.6)
 ## Width of the numeral's dark outline (it keeps the strokes apart from the rim and the glyph).
 const RANK_BADGE_OUTLINE := 4
-## Height of the capital roman numerals as a share of the font size (the rank badge's plate).
-const RANK_BADGE_CAP := 0.72
+## Height of the capital roman numerals as a share of the font size (measured ink of the bold
+## UI font in a render) and how far the outline reaches past them: the badge's plate backs the
+## whole outlined numeral.
+const RANK_BADGE_CAP := 0.82
+const RANK_BADGE_OUTLINE_REACH := 1.0
 const ROMAN: Array[String] = ["", "I", "II", "III", "IV", "V"]
 
 const SCHOOL_COLORS: Dictionary[StringName, Color] = {
@@ -558,11 +561,13 @@ static func rank_badge_origin(sq: float, above_prompt: bool) -> Vector2:
 
 
 ## The see-through plate behind the rank numeral [param label] whose baseline starts at
-## [param at]: about a pixel around the capitals and down onto the rim, so it covers as little
-## of the glyph as it can.
+## [param at]: exactly the outlined capitals and down onto the rim (the outline is the
+## padding), so it covers as little of the glyph as it can.
 static func rank_badge_rect(at: Vector2, label: String) -> Rect2:
 	var cap := RANK_BADGE_FONT * RANK_BADGE_CAP
-	return Rect2(at.x - 1.0, at.y - cap - 1.0, _text_width(label, RANK_BADGE_FONT) + 2.0, cap + 2.25)
+	var reach := RANK_BADGE_OUTLINE_REACH
+	return Rect2(at.x - reach, at.y - cap - reach, _text_width(label, RANK_BADGE_FONT) + reach * 2.0,
+			cap + reach + 1.25)
 
 
 ## GDD 12: the rank on every icon. One small diamond per rank up the left edge; small icons

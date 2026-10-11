@@ -62,6 +62,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var heroes: Array[Player] = [player]
 	if ctx.flag("allies"):
 		heroes.append_array(GeneralKit.allies_near(player, ctx.num("ally_range", 8.0)))
+	var own_time := duration
 	for p in heroes:
 		var hero_mods := mods
 		var hero_time := duration
@@ -72,9 +73,11 @@ func cast(ctx: AbilityContext) -> bool:
 			hero_mods = merged_stats(running.stat_mods, mods)
 			hero_time = maxf(duration, running.left)
 		GeneralBuff.apply(p, KEY, hero_time, hero_mods, 1.0, GeneralAuraVfx.Style.SPRINT)
+		if p == player:
+			own_time = hero_time
 	if ctx.flag("trail"):
 		_player = player
-		_trail_left = duration
+		_trail_left = own_time  # as long as the caster's own (possibly merged) Sprint
 		_trail_timer = 0.0
 		_trail_slow = clampf(ctx.num("trail_slow", 40.0) * ctx.num("power", 1.0), 0.0, 90.0)
 		_trail_radius = maxf(0.3, ctx.num("trail_radius", 1.2))

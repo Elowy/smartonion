@@ -179,13 +179,16 @@ var player: Player
 var procs: Array[Proc] = []
 ## Total absorb shield HP of every entry (overhead health bar, tests). Read-only: shields come
 ## from [method add_shield] and go with [method absorb], their timers and [method clear_shields]
-## (an assignment has no effect, so it can never wipe a named entry such as Ice Barrier's).
+## (an assignment only reports an error, so it can never wipe a named entry such as Ice
+## Barrier's, and a stray write shows up in smoke runs and the test log).
 var shield_hp: float:
 	get:
 		var total := 0.0
 		for s in _shields:
 			total += s.hp
 		return total
+	set(_value):
+		push_error("ProcSystem.shield_hp is read-only: use add_shield() / clear_shields()")
 ## Damage the absorb shields have soaked so far, all entries together (only grows; never
 ## reset). Effects compare it between ticks to notice hits on any shield (Ice Barrier's Rank
 ## III chill: whichever shield soaked the blow, the attacker struck the barrier's bubble).
