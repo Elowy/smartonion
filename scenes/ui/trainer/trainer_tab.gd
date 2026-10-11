@@ -2,19 +2,25 @@ class_name TrainerTab
 extends Control
 ## The Trainer tab of a player's between-wave panel (GDD 6.3, 12; PlayerPanel tab 2): the hero's
 ## eight ability slots – core RT / LT, learned Active RB / LB, learned Auto-cast 1–4 – as
-## TrainerRow lines (slot tag, icon with rank pips, name, Rank I–V, price of the next rank from
+## TrainerRow lines (slot tag, icon, name, Rank I–V, price of the next rank from
 ## the shared wallet, red when it cannot pay) next to a detail area for the selected ability:
-## kind and school, current rank, the description filled from AbilityRunner.params_for (ranks
-## and item mods included), what the next rank adds (AbilityRanks.rank_text), the two Rank V
-## specialisations (or the chosen one) and the price.
+## kind and school, current rank with the cooldown and power on the same row, the description
+## filled from AbilityRunner.params_for (ranks and item mods included), what the next rank adds
+## (AbilityRanks.rank_text), the two Rank V specialisations (or the chosen one) and the price.
+## The description gets the lines left under the next-rank and specialisation lines; a cut one
+## ends in an ellipsis.
 ##
 ## Input (handle_input, the panel's per-player PlayerInput): up / down picks a learned row,
-## Y previews the description at the next rank (AbilityRunner.params_at_rank, in green),
+## Y previews the rank, the cooldown / power and the description at the next rank
+## (AbilityRunner.params_at_rank, in green),
 ## A trains the next rank through Trainer.try_buy_rank. A rank that costs more than
 ## HOLD_SHARE of the wallet needs A held for HOLD_TIME (the shop's rule; the row fills up; letting
 ## go, moving or B cancels). Reaching Rank V opens the SpecChooser (left / right, A learns
 ## AbilityRunner.set_spec, B decides later – the row then reads "Choose" and A reopens it).
 ## Bots never use it (Trainer.bot_train). Feedback goes out through [signal message].
+## While hidden (another tab, or the whole wave: the Intermission stays in the tree) wallet and
+## rank changes only mark the tab stale; it refreshes at the end of the frame it is shown in,
+## unless an explicit refresh() came first.
 
 ## Text for the panel's toast: [param bbcode] shown, [param plain] kept as PlayerPanel.last_message.
 signal message(bbcode: String, plain: String, color: Color, coin: bool)
@@ -32,6 +38,12 @@ const ROW_GAP := 3
 ## Extra room between the core, Active and Auto-cast groups of rows.
 const GROUP_GAP := 4
 const DETAIL_ICON := 46.0
+## Font size of the detail texts (stats, description, next rank, specialisation).
+const DETAIL_FONT := 16
+## Room between the rank and the stats on their shared row.
+const RANK_ROW_GAP := 8
+## The description never gets fewer lines than this (even when the other texts are long).
+const MIN_DESCRIPTION_LINES := 2
 const SCHOOL_NAMES: Dictionary[StringName, String] = {
 	&"physical": "Physical", &"fire": "Fire", &"frost": "Frost", &"arcane": "Arcane",
 	&"holy": "Holy", &"shadow": "Shadow", &"nature": "Nature",
@@ -48,6 +60,9 @@ var chooser: SpecChooser
 var detail_name: Label
 var detail_kind: Label
 var detail_rank: Label
+## "CD 5.4 s · Power 125%" at the shown rank, right of detail_rank on its row (green in the
+## preview: Rank II and IV only change these two).
+var detail_stats: Label
 var detail_description: Label
 ## "Next: Rank III – <what it adds>" (empty at Rank V).
 var detail_next: Label
@@ -56,6 +71,8 @@ var detail_price: Label
 
 var _runner: AbilityRunner
 var _focused := false
+## A wallet / rank change arrived while hidden: refresh when shown again.
+var _stale := false
 ## {"slot": int, "id": StringName, "price": int, "time": float} while A is held on an expensive rank.
 var _hold: Dictionary[String, Variant] = {}
 var _detail_icon: AbilityIcon
@@ -144,6 +161,7 @@ func is_choosing_spec() -> bool:
 
 ## Rebuilds every row and the detail area from the hero's AbilityRunner.
 func refresh() -> void:
+	_stale = false
 	_bind_runner(runner())
 	var r := _runner
 	var input := slot.input if slot != null else null
@@ -399,11 +417,23 @@ func _build_detail() -> Control:
 	titles.add_child(detail_kind)
 	head.add_child(titles)
 	_detail_box.add_child(head)
+	# The rank and the cooldown / power stats share one row (the stats right-aligned in the room
+	# the short rank text leaves), so the description keeps that line.
+	var rank_row := UiTheme.hbox(RANK_ROW_GAP)
 	detail_rank = UiTheme.label("", &"", UiTheme.FONT_SMALL, UiTheme.GOLD)
 	detail_rank.add_theme_font_override(&"font", UiTheme.bold_font())
-	_detail_box.add_child(detail_rank)
+	rank_row.add_child(detail_rank)
+	detail_stats = UiTheme.label("", &"", DETAIL_FONT, UiTheme.TEXT_DIM)
+	detail_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_stats.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	detail_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	detail_stats.clip_text = true
+	detail_stats.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	detail_stats.custom_minimum_size.x = 40
+	rank_row.add_child(detail_stats)
+	_detail_box.add_child(rank_row)
 	# The texts live in a clipping holder without a minimum size: a long description is cut off
-	# instead of pushing the price out of the panel.
+	# instead of pushing the price out of the panel. _fit_description sizes it to the room left.
 	var holder := Control.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -412,15 +442,13 @@ func _build_detail() -> Control:
 	_texts = UiTheme.vbox(3)
 	_texts.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	holder.add_child(_texts)
-	detail_description = UiTheme.wrapped_label("", &"", 16, UiTheme.TEXT)
-	detail_description.max_lines_visible = 5
-	_texts.add_child(detail_description)
-	detail_next = UiTheme.wrapped_label("", &"", 16, UiTheme.GREEN)
-	detail_next.max_lines_visible = 3
-	_texts.add_child(detail_next)
-	detail_spec = UiTheme.wrapped_label("", &"", 16, AbilityIcon.RANK_SPEC_COLOR)
-	detail_spec.max_lines_visible = 3
-	_texts.add_child(detail_spec)
+	detail_description = _detail_text(UiTheme.TEXT, 5)
+	detail_next = _detail_text(UiTheme.GREEN, 3)
+	detail_spec = _detail_text(AbilityIcon.RANK_SPEC_COLOR, 3)
+	# Every layout of the texts column (text, width or line count changes) and every holder
+	# resize re-fits the description.
+	_texts.sort_children.connect(_fit_description)
+	holder.resized.connect(_fit_description)
 	_price_row = UiTheme.hbox(6)
 	_price_row.alignment = BoxContainer.ALIGNMENT_END
 	var cap := UiTheme.label("Train", &"", UiTheme.FONT_SMALL, UiTheme.TEXT_DIM)
@@ -432,10 +460,22 @@ func _build_detail() -> Control:
 	detail_price.add_theme_font_override(&"font", UiTheme.bold_font())
 	_price_row.add_child(detail_price)
 	_detail_box.add_child(_price_row)
-	_empty_hint = UiTheme.wrapped_label("", &"", 16, UiTheme.TEXT_DIM)
+	_empty_hint = UiTheme.wrapped_label("", &"", DETAIL_FONT, UiTheme.TEXT_DIM)
 	_empty_hint.visible = false
 	_detail_box.add_child(_empty_hint)
 	return panel
+
+
+## A wrapped detail text in the clipped texts column, at most [param max_lines] lines; a longer
+## text ends in an ellipsis. No extra line spacing (the font's own line height is ~1.4 em): the
+## holder fits one more line.
+func _detail_text(color: Color, max_lines: int) -> Label:
+	var l := UiTheme.wrapped_label("", &"", DETAIL_FONT, color)
+	l.max_lines_visible = max_lines
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	l.add_theme_constant_override(&"line_spacing", 0)
+	_texts.add_child(l)
+	return l
 
 
 # --- Refresh helpers ------------------------------------------------------------------------------
@@ -460,13 +500,37 @@ func _unbind_runner() -> void:
 
 
 func _on_ranks_changed(_id: StringName) -> void:
-	refresh()
+	_refresh_if_shown()
 
 
 func _on_gold_changed(_gold: int, _delta: int) -> void:
-	if _runner != null:
-		refresh()
+	if _runner != null and _refresh_if_shown():
 		prompts_changed.emit()
+
+
+## Refreshes now when the tab is on screen, else marks it stale (the Intermission keeps the
+## panels in the tree, hidden, through the whole wave: gold pickups must not rebuild them).
+## The refresh follows when the tab is shown again (_catch_up). True when it refreshed.
+func _refresh_if_shown() -> bool:
+	if not is_visible_in_tree():
+		_stale = true
+		return false
+	refresh()
+	return true
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _stale and is_visible_in_tree():
+		_catch_up.call_deferred()
+
+
+## The stale tab was shown: refreshes at the end of the frame unless that is no longer needed.
+## The callers that show the tab refresh it themselves right after (PlayerPanel.set_tab, the
+## market start), and refresh() clears _stale, so one rebuild per transition; a show undone in
+## the same frame (Intermission.open before the loot roll hides the market) finds it hidden.
+func _catch_up() -> void:
+	if _stale and is_visible_in_tree():
+		refresh()
 
 
 func _first_learned() -> int:
@@ -528,14 +592,15 @@ func _update_detail() -> void:
 	detail_name.text = a.display_name
 	detail_kind.text = "%s · %s" % [TrainerRow.kind_name(selected), SCHOOL_NAMES.get(a.school, String(a.school).capitalize())]
 	var preview := preview_next and rank < AbilityRanks.MAX_RANK
-	detail_rank.text = "Rank %s of V" % AbilityIcon.roman(rank + 1 if preview else rank) + (" (preview)" if preview else "")
+	# Green marks the preview (no "(preview)" suffix: the row keeps its room for the stats).
+	detail_rank.text = "Rank %s" % AbilityIcon.roman(rank + 1 if preview else rank)
 	detail_rank.add_theme_color_override(&"font_color", UiTheme.GREEN if preview else UiTheme.GOLD)
 	var params := r.params_at_rank(a, rank + 1, spec) if preview else r.params_for(a)
+	detail_stats.text = stats_text(r, a, params)
+	detail_stats.add_theme_color_override(&"font_color", UiTheme.GREEN if preview else UiTheme.TEXT_DIM)
 	detail_description.text = AbilityIcon.format_description(a, params)
 	detail_description.add_theme_color_override(&"font_color", UiTheme.GREEN.lightened(0.35) if preview else UiTheme.TEXT)
 	detail_description.visible = detail_description.text != ""
-	# From Rank IV on the specialisation lines need the room.
-	detail_description.max_lines_visible = 4 if rank >= AbilityRanks.MAX_RANK - 1 and not a.specs.is_empty() else 5
 	var next := rank + 1
 	if rank >= AbilityRanks.MAX_RANK:
 		detail_next.text = ""
@@ -544,6 +609,7 @@ func _update_detail() -> void:
 		detail_next.text = next_rank_text(a, next)
 	detail_spec.text = _spec_text(a, rank, spec)
 	detail_spec.visible = detail_spec.text != ""
+	_fit_description()
 	var price := r.trainer_price(a.id)
 	if r.needs_spec(a.id):
 		detail_price.text = "Choose a specialization"
@@ -560,6 +626,38 @@ func _update_detail() -> void:
 		detail_price.add_theme_color_override(&"font_color", UiTheme.GOLD if RunState.gold >= price else UiTheme.RED)
 		_price_row.get_child(0).visible = true
 		_price_coin.visible = true
+
+
+## Gives the description the whole lines the clip holder has left under the next-rank and
+## specialisation lines (those are never cut), at least MIN_DESCRIPTION_LINES. Runs once the
+## layout is known (texts column sorted, holder resized) and after every detail update.
+func _fit_description() -> void:
+	var holder := _texts.get_parent() as Control
+	if holder.size.y <= 0.0 or _texts.size.x <= 0.0:
+		return
+	var gap := float(_texts.get_theme_constant(&"separation"))
+	var room := holder.size.y
+	for l: Label in [detail_next, detail_spec]:
+		if l.visible:
+			room -= l.get_combined_minimum_size().y + gap
+	var spacing := float(detail_description.get_theme_constant(&"line_spacing"))
+	var line_h := float(detail_description.get_line_height()) + spacing
+	var lines := maxi(MIN_DESCRIPTION_LINES, floori((room + spacing) / line_h))
+	if detail_description.max_lines_visible != lines:
+		detail_description.max_lines_visible = lines
+
+
+## "CD 5.4 s · Power 125%" for [param a] with [param params] (AbilityRunner.params_for or
+## params_at_rank): the cooldown after Haste and Cooldown Reduction
+## (AbilityRunner.cooldown_from_params) and the damage / effect multiplier ("power").
+## Abilities without a cooldown show the power only. Short enough to sit right of "Rank III"
+## on the detail's rank row.
+static func stats_text(r: AbilityRunner, a: AbilityData, params: Dictionary) -> String:
+	var power := "Power %d%%" % roundi(float(params.get("power", 1.0)) * 100.0)
+	var cooldown := r.cooldown_from_params(a, params) if r != null else float(params.get("cooldown", 0.0))
+	if cooldown <= 0.0:
+		return power
+	return "CD %s s · %s" % [AbilityIcon.format_number(snappedf(cooldown, 0.1)), power]
 
 
 ## "Next: Rank III – +1 knife": what reaching [param rank] adds (AbilityRanks.rank_text).

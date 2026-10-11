@@ -539,6 +539,20 @@ func test_damage_taken_mults_death_guards_and_shields() -> void:
 	check(p.downed, "but only while it allows")
 
 
+func test_overhead_bar_follows_hp_and_shield() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	check(p.model.is_hp_bar_visible(), "health bar above the P1 marker")
+	p.stats.set_source(&"test", {Stats.ARMOR: -2.0})
+	p.take_damage(p.max_hp() * 0.4)
+	check_near(p.model.hp_bar_fill(), 0.6, 0.02, "bar shows the HP left")
+	p.procs.add_shield(p.max_hp() * 0.2, 10.0)
+	p._physics_process(1.0 / 60.0)
+	check_near(p.model.shield_ratio, 0.2, 0.001, "shield pushed to the bar")
+	p.procs.begin_wave()
+	p._physics_process(1.0 / 60.0)
+	check_eq(p.model.shield_ratio, 0.0, "gone with the shield")
+
+
 func test_every_hero_starts_with_base_mastery() -> void:
 	for class_id in Db.class_ids:
 		var p := Player.create(Fakes.make_slot(0, class_id))

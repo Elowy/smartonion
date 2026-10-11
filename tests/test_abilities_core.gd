@@ -2,6 +2,7 @@ extends TestCase
 ## Ability core (M3): resources, cooldowns, casting, item mods.
 
 const DT := 1.0 / 60.0
+const Fakes := preload("res://tests/player_fakes.gd")
 
 
 class CountingEffect extends AbilityEffect:
@@ -286,3 +287,57 @@ func test_keyboard_learned_slots_are_q_then_e() -> void:
 	check_eq(kb.ability_button(2), PlayerInput.Pad.LB, "Q = learned 1")
 	check_eq(kb.ability_button(3), PlayerInput.Pad.RB, "E = learned 2")
 	check_eq(ScriptedInput.new("x").ability_button(2), PlayerInput.Pad.RB, "pads: RB = learned 1")
+
+
+## DENSEST_CLUSTER only picks enemies within the cast range: the grid hands back whole cells,
+## so a diagonal pack ~13 m away must not be targeted by a 10 m ability.
+func test_densest_cluster_stays_in_cast_range() -> void:
+	var p := _make_player()
+	var a := _ability(0.0, 1.0)
+	a.targeting = AbilityData.Targeting.DENSEST_CLUSTER
+	a.cast_range = 10.0
+	Fakes.spawn_enemy(_root, Vector3(9.5, 0.0, 9.5))
+	Fakes.spawn_enemy(_root, Vector3(9.9, 0.0, 9.9))
+	EnemyGrid.mark_dirty()
+	check(p.abilities.build_context(a).target == null, "a pack 13.4 m away is out of range")
+	var near := Fakes.spawn_enemy(_root, Vector3(6.0, 0.0, 0.0))
+	EnemyGrid.mark_dirty()
+	check(p.abilities.build_context(a).target == near, "the lone enemy in range beats the pack outside it")
+	EnemyGrid.mark_dirty()
+
+
+class TickContextEffect extends AbilityEffect:
+	var seen: Array[AbilityContext] = []
+	var ranks: Array[int] = []
+	var powers: Array[float] = []
+	var points: Array[Vector3] = []
+	func tick(ctx: AbilityContext, _delta: float) -> void:
+		seen.append(ctx)
+		ranks.append(ctx.rank)
+		powers.append(ctx.num("power", 1.0))
+		points.append(ctx.point)
+
+
+## Effects tick with one context per ability (no allocation per slot per tick), refreshed on
+## every tick; changing the slots starts a fresh one.
+func test_tick_context_is_reused_and_refreshed() -> void:
+	var p := _make_player()
+	var r := p.abilities
+	var a := _ability(0.0, 1.0)
+	a.id = &"test_ticker"
+	a.effect = TickContextEffect
+	r.set_slot(1, a)
+	var effect := r.effect_for(a) as TickContextEffect
+	r._physics_process(DT)
+	check(r.rank_up(a.id), "Rank II")
+	p.global_position = Vector3(3.0, 0.0, 1.0)
+	r._physics_process(DT)
+	check_eq(effect.seen.size(), 2, "two ticks")
+	check(effect.seen[0] == effect.seen[1], "the same context object")
+	check_eq(effect.ranks, [1, 2] as Array[int], "rank refreshed")
+	check_near(effect.powers[1], 1.25, 0.0001, "params refreshed")
+	check(effect.points[1].is_equal_approx(Vector3(3.0, 0.0, 1.0)), "position refreshed")
+	r.set_slot(1, null)
+	r.set_slot(1, a)
+	r._physics_process(DT)
+	check(effect.seen[2] != effect.seen[1], "a slot change drops the old context")

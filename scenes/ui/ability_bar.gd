@@ -11,8 +11,9 @@ extends HBoxContainer
 ##    inner end of the bar; shown once any auto-cast ability is learned (the free slots of the
 ##    cluster as faint sockets).
 ## Every icon shows a clockwise cooldown sweep, a dim state while the ability cannot be used, a
-## short flash on AbilityRunner.ability_cast and its rank (AbilityIcon.set_rank: gold pips I–V,
-## orange once the Rank V specialisation is chosen; follows AbilityRunner.ranks_changed).
+## short flash on AbilityRunner.ability_cast and its rank (AbilityIcon.set_rank: gold pips I–V –
+## a small corner numeral on the auto-cast icons –, orange once the Rank V specialisation is
+## chosen; follows AbilityRunner.ranks_changed).
 ## Everything is pushed from the runner (one AbilityRunner.slot_state per filled slot and
 ## rendered frame, nothing while the bar is hidden); the bar never touches gameplay state.
 ## Mirrored bars (right-hand frames) put the auto-cast cluster on the left (the inner side).

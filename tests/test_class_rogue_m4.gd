@@ -280,6 +280,21 @@ func test_shuriken_twin_volley_stops_with_the_wave() -> void:
 	check_eq(_blades().size(), n, "no second volley after the wave ended")
 
 
+func test_shuriken_twin_volley_stops_when_the_rogue_goes_down() -> void:
+	_enemy(Vector3(0, 0, -5))
+	var slot := _learn_at(&"shuriken_toss", 5, 1)
+	check(rogue.abilities.try_cast(slot), "cast")
+	var n := _blades().size()
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(rogue.downed, "down within the volley delay")
+	_run(1.0)
+	rogue.revive()
+	check(rogue.abilities.remaining(slot) > 0.6, "(still on cooldown: no fresh cast below)")
+	_run(0.4)
+	check_eq(_blades().size(), n, "no free second volley after the revive")
+
+
 # --- Blade Flurry ----------------------------------------------------------------------------
 
 func test_blade_flurry_echoes_weapon_hits_on_a_second_enemy() -> void:
@@ -310,6 +325,25 @@ func test_blade_flurry_echoes_weapon_hits_on_a_second_enemy() -> void:
 	var n := b.fake_hits()
 	WeaponRunner.apply_hit(rogue, a, 10.0, false, Vector3.ZERO, 0.0, 0.5, rogue.main_hand)
 	check_eq(b.fake_hits(), n, "no more echoes")
+
+
+func test_blade_flurry_echo_uses_the_echo_targets_own_bonus() -> void:
+	rogue.stats.set_source(&"executioner", {Stats.EXECUTIONER: 50.0})
+	var a := _enemy(Vector3(0, 0, -1.2))
+	var b := _enemy(Vector3(1.5, 0, -1.2))
+	check(rogue.abilities.try_cast(_learn(&"blade_flurry")), "cast")
+	b.hp = 100.0
+	WeaponRunner.apply_hit(rogue, a, 10.0, false, Vector3.ZERO, 0.0, 0.5, rogue.main_hand)
+	check_near(a.fake_damage_log[0], 10.0, 0.001, "(a healthy target: no Executioner)")
+	check_near(b.fake_damage_log[0], 10.0 * 0.5 * 1.5, 0.001, "a low echo target gets its own Executioner")
+	a.hp = 100.0
+	b.hp = 1000.0
+	WeaponRunner.apply_hit(rogue, a, 10.0, false, Vector3.ZERO, 0.0, 0.5, rogue.main_hand)
+	check_near(a.fake_damage_log[1], 15.0, 0.001, "(the low target takes +50%)")
+	check_near(b.fake_damage_log[1], 5.0, 0.001, "a healthy echo target does not inherit it")
+	a.hp = 10.0
+	WeaponRunner.apply_hit(rogue, a, 10.0, false, Vector3.ZERO, 0.0, 0.5, rogue.main_hand)
+	check_near(b.fake_damage_log[2], 5.0, 0.001, "nor from a killing blow")
 
 
 func test_blade_flurry_echoes_thrown_blades_too() -> void:
@@ -543,6 +577,32 @@ func test_cheat_death_saves_from_a_killing_blow_once_per_minute() -> void:
 	rogue.invulnerable_left = 0.0
 	rogue.take_damage(9999.0)
 	check(not rogue.downed, "saves again")
+
+
+func test_cheat_death_spends_a_charge_per_save() -> void:
+	var item := ItemInstance.new()
+	item.slot_type = Items.SlotType.TRINKET
+	item.armor_type = Items.NO_ARMOR
+	item.unique_effect = &"ability_mod"
+	item.unique_params = {"ability": "cheat_death", "mods": {"charges_add": 1.0}}
+	check(rogue.equipment.equip(item), "equip a +1 charge item")
+	var slot := _learn(&"cheat_death")
+	var a := Db.get_ability(&"cheat_death")
+	check_eq(rogue.abilities.charges_max(a), 2, "two charges")
+	_run(DT)
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(not rogue.downed, "first save")
+	check_eq(rogue.abilities.charges_available(a), 1, "a charge spent")
+	_run(10.0)
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(not rogue.downed, "second save")
+	check_eq(rogue.abilities.charges_available(a), 0, "both spent")
+	check_near(rogue.abilities.remaining(slot), 50.0, 0.05, "the running recharge is not restarted")
+	rogue.invulnerable_left = 0.0
+	rogue.take_damage(9999.0)
+	check(rogue.downed, "two charges, two saves")
 
 
 func test_cheat_death_is_never_cast() -> void:

@@ -19,6 +19,12 @@ class EliteFake extends Fakes.FakeEnemy:
 		return true
 
 
+## A fake boss (an elite that Execute never kills outright).
+class BossFake extends EliteFake:
+	func is_boss() -> bool:
+		return true
+
+
 var world: Node3D
 var arena: EFakes.TestArena
 
@@ -62,7 +68,14 @@ func _fake(pos: Vector3, hp: float = 1000.0) -> Fakes.FakeEnemy:
 
 
 func _elite(pos: Vector3, hp: float = 1000.0) -> EliteFake:
-	var e := EliteFake.new()
+	return _place(EliteFake.new(), pos, hp)
+
+
+func _boss(pos: Vector3, hp: float = 1000.0) -> BossFake:
+	return _place(BossFake.new(), pos, hp) as BossFake
+
+
+func _place(e: EliteFake, pos: Vector3, hp: float) -> EliteFake:
 	e.add_to_group(&"enemies")
 	world.add_child(e)
 	e.global_position = pos
@@ -579,19 +592,40 @@ func test_execute_prefers_the_enemy_it_can_execute() -> void:
 	check(low.hp <= 0.0, "the low one is executed")
 
 
-func test_execute_elites_take_double_damage_instead() -> void:
+func test_execute_bosses_take_double_damage_instead() -> void:
 	var p := _hero()
-	var boss := _elite(Vector3(2.0, 0.0, 0.0), 150.0)
+	var boss := _boss(Vector3(2.0, 0.0, 0.0), 150.0)
 	var slot := _learn(p, &"execute")
 	var ex := _effect(p, slot) as WarriorExecute
 	check(p.abilities.try_cast(slot), "cast")
 	check_near(boss.fake_damage_log[0], _hit(p) * 3.0 * 2.0, 0.01, "double damage below the threshold")
-	check(boss.hp > 0.0, "an elite is never killed outright")
+	check(boss.hp > 0.0, "a boss is never killed outright")
 	check_eq(ex.last_executed, 0, "no execution")
 	boss.hp = 900.0
 	p.abilities.set_cooldown(p.abilities.slots[slot], 0.0)
 	p.abilities.try_cast(slot)
 	check_near(boss.fake_damage_log[1], _hit(p) * 3.0, 0.01, "normal damage above it")
+	var text := AbilityIcon.format_description(Db.get_ability(&"execute"), _ctx(p, slot).params)
+	check("bosses take 2x" in text and not "elite" in text, "the text names bosses only: %s" % text)
+
+
+func test_execute_kills_elites_below_the_threshold() -> void:
+	var p := _hero()
+	var elite := _elite(Vector3(2.0, 0.0, 0.0), 150.0)
+	var slot := _learn(p, &"execute")
+	var ex := _effect(p, slot) as WarriorExecute
+	check(WarriorExecute.is_executable(elite, 20.0), "an elite below 20% is executable")
+	check(p.abilities.try_cast(slot), "cast")
+	check(elite.hp <= 0.0, "an elite dies outright: %s HP left" % elite.hp)
+	check_eq(ex.last_executed, 1, "an execution")
+	var p2 := _hero(Vector3(0.0, 0.0, 20.0), 1)
+	_elite(Vector3(2.0, 0.0, 20.0), 900.0)
+	var low := _fake(Vector3(-2.0, 0.0, 20.0), 150.0)
+	var boss := _boss(Vector3(0.0, 0.0, 22.0), 100.0)
+	check(not WarriorExecute.is_executable(boss, 20.0), "a boss below 20% is not")
+	check(WarriorExecute.pick_victim(p2, 3.5, 20.0) == low, "an executable enemy goes first")
+	low.hp = 900.0
+	check(WarriorExecute.pick_victim(p2, 3.5, 20.0) == boss, "then the elite / boss with the lowest HP share")
 
 
 func test_execute_power_and_rank_three_threshold() -> void:
@@ -823,6 +857,27 @@ func test_shield_wall_last_stand_survives_lethal_hits() -> void:
 	check(p.death_guards.is_empty(), "the guard ends with the wall")
 	_hit_taken(p, 5000.0)
 	check(not p.is_alive(), "no wall, no miracle")
+
+
+func test_shield_wall_last_stand_goes_before_an_item_cheat_death() -> void:
+	var p := _hero()
+	var shard := ItemGenerator.from_unique(Db.get_unique(&"shard_of_everfrost"), 1, false, RunState.rng,
+			p.class_data)
+	check(p.equipment.equip(shard), "wears the Shard of Everfrost (cheat death once per wave)")
+	var slot := _learn(p, &"shield_wall", 5, 0)
+	var wall := _effect(p, slot) as WarriorShieldWall
+	p.abilities.try_cast(slot)
+	p.hp = 5.0
+	_hit_taken(p, 5000.0)
+	check(p.is_alive(), "survived")
+	check_eq(wall.saves, 1, "the free Last Stand took the lethal hit")
+	wall.end()
+	p.hp = 5.0
+	_hit_taken(p, 5000.0)
+	check(p.is_alive(), "the Shard was kept for a lethal hit after the wall")
+	p.hp = 5.0
+	_hit_taken(p, 5000.0)
+	check(not p.is_alive(), "(and then it is spent for the wave)")
 
 
 func test_shield_wall_spiked_wall_retaliates() -> void:
@@ -1112,3 +1167,36 @@ func test_charge_ends_with_the_wave() -> void:
 	p.abilities.try_cast(1)
 	p.end_wave()
 	check(not ch.is_dashing(), "no dash in the market")
+
+
+func test_charge_and_heroic_leap_exclude_each_other() -> void:
+	_arena()
+	var p := _hero()
+	(p.slot.input as ScriptedInput).move = Vector2(1.0, 0.0)
+	var ahead := _real(Vector3(6.0, 0.0, 0.0))
+	for pos: Vector3 in [Vector3(0.0, 0.0, -8.0), Vector3(0.6, 0.0, -8.5), Vector3(-0.6, 0.0, -7.5)]:
+		_fake(pos)
+	var slot := _learn(p, &"heroic_leap")
+	var leap := _effect(p, slot) as WarriorHeroicLeap
+	var charge := _effect(p, 1) as WarriorCharge
+	# In the air: a Charge press is refused (and refunded); the leap would throw the dash away.
+	check(p.abilities.try_cast(slot), "leap")
+	check(not p.abilities.can_cast(1), "no Charge in the air")
+	check(not p.abilities.try_cast(1), "a Charge press mid-leap is refused")
+	check_eq(p.abilities.remaining(1), 0.0, "and refunded")
+	_step(p, 0.8)
+	check(not leap.is_flying(), "landed")
+	check(p.global_position.distance_to(leap.landing_point()) < 0.01, "where the leap aimed")
+	# Mid-dash: the leap waits (a bot's pass casts Charge first, then judges the leap).
+	p.abilities.set_cooldown(p.abilities.slots[slot], 0.0)
+	p.global_position = Vector3.ZERO
+	EnemyGrid.mark_dirty()
+	check(p.abilities.try_cast(1), "charge")
+	check(charge.is_dashing(), "dashing")
+	check(not _wants(p, slot), "a bot does not leap mid-dash")
+	check(not p.abilities.try_cast(slot), "a leap press mid-dash is refused")
+	check_eq(p.abilities.remaining(slot), 0.0, "and refunded")
+	_step(p, 0.6)
+	check(not charge.is_dashing(), "the dash ends")
+	check(ahead.stun_left > 0.0, "the Charge reached its target and stunned it")
+	check(p.abilities.can_cast(slot), "the leap is ready again")

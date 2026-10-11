@@ -8,9 +8,10 @@ extends AbilityEffect
 ## Params: radius, duration (x "power": Ranks II / IV make it last longer), cower (Cower:
 ## enemies freeze in place – a stun of the same length + cower_bonus s – instead of running),
 ## dread_damage / dread_intellect_scale / dread_spell_power_scale (Dread: Shadow damage per
-## second while they are afraid, a DoT: Demonic Pact; x "power"), auto_cast_min (bots:
-## enemies in the radius), auto_cast_hp (bots: with fewer, cast below this HP % or while
-## reviving a teammate).
+## second while they are afraid, a DoT: Demonic Pact; not x "power": power already makes the
+## fear – and so the Dread – last longer, so the total grows with power once, not squared),
+## auto_cast_min (bots: enemies in the radius), auto_cast_hp (bots: with fewer, cast below
+## this HP % or while reviving a teammate).
 ## Rank III: +1.5 m radius. Rank V: Dread (afraid enemies wither) or Cower (they freeze).
 
 ## Feared enemies of the last cast (tests).
@@ -24,10 +25,13 @@ static func fear_duration(params: Dictionary) -> float:
 	return maxf(0.1, float(params.get("duration", 2.0))) * WarlockSpell.power(params)
 
 
+## Dread's Shadow damage per second, without the rank "power" (it lengthens the fear instead).
 static func dread_rate(stats: StatBlock, params: Dictionary, school: StringName = &"shadow") -> float:
 	if float(params.get("dread_damage", 0.0)) <= 0.0:
 		return 0.0
-	return WarlockSpell.damage(stats, params, school, "dread_")
+	var unranked := params.duplicate()
+	unranked["power"] = 1.0
+	return WarlockSpell.damage(stats, unranked, school, "dread_")
 
 
 ## Needs at least one enemy within the radius.

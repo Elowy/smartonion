@@ -74,12 +74,20 @@ the new screen never sees the button press that closed the old one.
      (`Player.GHOST_SPEED_MULT` = 1) and that enemies ignore.
    - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
      one at `Arena.SPIRIT_HEALER_POINT` (the centre; no decor there) as its own child (not an
-     entity), `Arena.current.spirit_healer`; no collision. Every physics tick (before the
-     entities, paused with the arena) every ghost within `HEAL_RADIUS` (1.6 m, flat XZ)
-     channels; after `CHANNEL_TIME` (1 s) `revive(REVIVE_HP_RATIO = 1.0)` +
-     `Vfx.resurrect_column` + "Resurrected!" and the `resurrected(player)` signal. Leaving the
-     circle resets that ghost's channel; several ghosts channel at once; the living are not
-     affected. It writes `Player.healer_channel` / `healer_seconds_left`, and the ghost's cast
+     entity), `Arena.current.spirit_healer`; no collision.
+     - It is only drawn while a ghost exists (`is_active()`, `is_shown()`). `_shown` fades
+       it in over `APPEAR_TIME` (0.6 s): alpha, a rising and growing spirit, a growing ring
+       and a soft flash. It fades out the same way and the node's `visible` is false when
+       nobody is down.
+     - The pulse runs regardless. Every physics tick (before the
+     entities, paused with the arena) its countdown `pulse_left` runs down from
+     `PULSE_INTERVAL` (10 s; restarted by `begin_wave` on `RunState.wave_changed`); at 0
+     every ghost within `HEAL_RADIUS` (1.6 m, flat XZ) without Resurrection Sickness
+     (`will_revive`) gets `revive(REVIVE_HP_RATIO = 1.0)` + `Vfx.resurrect_column` +
+     "Resurrected!", `Player.res_sickness_left = Player.RES_SICKNESS_TIME` (15 s; ticks in
+     `Player._physics_process`, cleared at wave start; blocks only the healer) and the
+     `resurrected(player)` signal. A Label3D shows the seconds above the spirit while ghosts
+     exist; the living are not affected. It writes `Player.healer_channel` / `healer_seconds_left`, and the ghost's cast
      bar shows whichever revive (teammates' or the healer's) is further along, in
      `SpiritHealer.CAST_COLOR` for the healer; whichever finishes first revives. Look:
      procedural winged spirit (own copies of `Mats.ghost`), halo, rune circle on
@@ -146,10 +154,17 @@ the new screen never sees the button press that closed the old one.
   `CombatMath.incoming_damage` (not rounded – small Armor / Versatility / Avoidance values
   count; at least 1); i-frames `INVULNERABLE_AFTER_HIT`. HP may be fractional: only the
   displayed numbers are rounded (floating text to one decimal, unit frames round up).
-- Enemy stats at wave w (GDD 9, additive): HP `data.hp_at_wave(w) * RunState.coop_hp_mult()`
-  = `max_hp * (1 + hp_growth * (w - 1)) * coop`, contact / projectile damage
-  `base * (1 + damage_growth * (w - 1))`; `EnemyData.hp_growth` = 0.12 and `damage_growth`
-  = 0.08 by default (a future DifficultyData may override them).
+- Enemy stats at wave w (GDD 9), n = w - 1:
+  - HP: `data.hp_at_wave(w) * RunState.coop_hp_mult()` =
+    `max_hp * (1 + hp_growth * n) * (1 + hp_compound)^n * coop`.
+  - Contact / projectile damage: `data.contact_damage_at_wave(w) * RunState.coop_damage_mult()`
+    = `base * (1 + damage_growth * n) * (1 + damage_compound)^n * party`. Uses
+    `EnemyData.growth_mult` and is applied once in `Enemy.create`.
+  - Defaults: `hp_growth` 0.12, `hp_compound` 0.22, `damage_growth` 0.15, `damage_compound`
+    0.08. A future DifficultyData may override them.
+  - `party` = `RunState.COOP_DAMAGE_MULTS[players - 1]` = 0.35 / 0.45 / 0.6 / 0.8 for 1–4
+    players: small parties have fewer rescuers (solo: the first down is defeat) and more
+    enemies per head.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -183,7 +198,7 @@ the new screen never sees the button press that closed the old one.
 - Duration `RunState.wave_duration(w)` (GDD 1): waves 1–10 `min(60, 20 + 5 * (w - 1))` s,
   above 10 `60 + 10 * (w - 10)` s (11 → 70 s, 15 → 110 s, 20 → 160 s, 25 → 210 s; a full
   run is 42 minutes of fighting). Spawn budget per second
-  `(0.9 + 0.22 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
+  `(0.9 + 0.08 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
   `first_wave <= w`; group size in `[group_min, group_max]`; position = random arena point
   ≥ 6 m from every living player, preferably on screen outside the HUD
   (`CameraRig.get_safe_ground_rect()`; 16 tries there, then 8 anywhere in the arena);
@@ -210,16 +225,21 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--time-scale=X` | Overrides the time scale. |
 
 `SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `kills`, `gold`,
+`gold_at_last_shop` (the shared wallet when the last market closed, i.e. the gold carried into
+the last wave; `gold` also holds the last wave's haul, which no shop follows),
 `level`, `players_downed`, `revives`, `wipes`, `errors`, `warnings`, `error_samples`,
 `game_time`, `real_time`, and `perf` – physics tick times measured by `PhysicsClock` and
 grouped by living enemies (`RunPerf`): `physics_ms_avg`, `physics_ms_at_peak` (ticks with
 ≥ 80% of the peak enemy count), `script_ms_at_peak`, `physics_ms_max`, and
 `monitor_physics_ms_at_peak` (`Performance.TIME_PHYSICS_PROCESS`, which is the slowest tick of
-the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line.
+the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line, and each
+closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1 (R bot
+rerolls so far)`.
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
 crowded), avoid walls, stay near the team and run to downed teammates within
 `BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
-and waits inside its circle (`HEALER_STOP_DISTANCE`).
+and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
+a living teammate instead.
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
 `PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
 -1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
@@ -252,6 +272,16 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     crowds). `Player.create` sets it; "" hides it (lobby previews). Over a ghost it bobs and
     is lifted above the "Resurrecting" cast bar. Downed: the player-colour ring stays and
     pulses, the revive circle is tinted with the ghost's own colour, ghost alpha 0.6.
+  - Overhead health bar (child `Marker/HpBar`): three fixed-size, no-depth-test Sprite3Ds –
+    framed back, HP fill (`region_rect` width = HP ratio, coloured by
+    `OnionModel.hp_bar_color`: green → yellow → red) and the absorb-shield segment.
+    - Its bottom edge sits on the marker origin (`MARKER_Y`); `_lift_plate` raises the
+      diamond and tag above it.
+    - `set_hp_ratio` drives the fill. `Player._physics_process` pushes
+      `procs.shield_hp / max_hp()` through `set_shield_ratio`, which is a no-op when the
+      value is unchanged.
+    - Hidden with the marker and while downed (the diamond drops back onto the origin).
+    - Test helpers: `is_hp_bar_visible()`, `hp_bar_fill()`, `hp_bar_shield()`.
   - `Mats.set_ring_stroke(node, amount)` – dark outline + white inner stroke on a ground
     ring (player rings use it, so the player colour reads on any ground / class colour).
   - Heroes never fully overlap: `Player.separation_offset` – a soft push (no physics
@@ -324,7 +354,9 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
   plaque. Unit frames hide when their player is freed; while downed they show the revive
   progress (teammates' or the Spirit Healer's, whichever is further along; spirit blue for the
-  healer) and the hint "Go to the Spirit Healer" (`UnitFrame.GHOST_HINT`).
+  healer) and a hint: "Go to the Spirit Healer (7 s)" (`GHOST_HINT` + the next pulse),
+  "Spirit Healer: 7 s" in its circle (`WAITING_HINT`), "Resurrection Sickness: 12 s"
+  (`SICKNESS_HINT`).
   Frame layout: `[portrait | name row over (HP + resource bars | ability icons)]`, mirrored
   for P2 / P4 (portrait outside, icons on the inner side). The bars cell is as tall as the
   DOWNED overlay, so going down never changes the frame height.
@@ -350,9 +382,26 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     `AbilityData.color` / school; clockwise cooldown pie (`sweep_polygon`) + seconds
     (`format_cooldown`: one decimal under 3 s), dimmed when off cooldown but unusable (red
     cost), cast flash, charge counter (top-left, while `charges_max` > 1), cost (top-right),
-    prompt pill hanging below. `set_state` only redraws when the text / state changed or the
-    pie moved `SWEEP_REDRAW_STEP` since the last drawn ratio (smooth for long cooldowns);
-    StyleBoxes are cached. Also used by the lobby cards (abilities + Mastery line;
+    prompt pill hanging below.
+    - Redraws: `set_state` only redraws when one of these changed:
+      - the shown seconds (`show_cooldown_text`);
+      - the dim / ready state;
+      - the pie crossed to or from empty;
+      - the pie moved `sweep_redraw_step()` since the last drawn ratio (`SWEEP_REDRAW_STEP`
+        0.004, or about 1 px of edge on smaller icons: 1 / (4 × side)).
+    - Layers: the background and glyph are drawn by an internal child `GlyphLayer`
+      (`show_behind_parent`), which only re-records on `set_ability` / glyph / tint changes.
+      A sweep redraw therefore re-records only the overlay (sweep, veil, flash, rim, texts,
+      rank, prompt). StyleBoxes are cached.
+    - Rank: gold diamond pips up the left edge. Icons below `SMALL_ICON` (the 26 px auto-cast
+      icons) show the roman numeral instead (`uses_rank_badge`):
+      - outlined, at `RANK_BADGE_FONT` = `SMALL_FONT` − 3;
+      - on a see-through plate (alpha 0.7) that backs exactly the outlined numeral, tucked
+        into the bottom-left corner on the rim (`rank_badge_origin` / `rank_badge_rect`;
+        about a fifth of the icon).
+
+      Both turn orange once specialised. Rank 0 draws no rank: the lobby preview and the
+      Trainer rows, whose rank column shows it. Also used by the lobby cards (abilities + Mastery line;
     `LobbyCard.mastery_parts` splits "Name: text" and capitalises the text, which must fit
     `MASTERY_MAX_LINES` 3 at the 1920x1080 canvas – every 16:9 window size, 720p included).
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
@@ -484,8 +533,13 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   (hold when > 50% of the wallet), X lock, R3 / Tab ping, Y reroll vote, START ready, B
   unready unless the panel consumed it (`last_input_consumed`; the shop consumes the B that
   cancels a hold-to-buy); panel tabs on LT / RT. The 60 s
-  auto-continue runs only in MARKET. The HUD is hidden during the intermission; the HUD shows a
-  "Team Loot: N" counter during waves.
+  auto-continue runs only in MARKET. The HUD is hidden during the intermission. The
+  Intermission itself stays in the tree, hidden, during waves, so `ShopPanel` and
+  `TrainerTab` skip `RunState.gold_changed` work while not visible in the tree. They catch
+  up once at the end of the frame they are shown in (deferred). `refresh()` clears their
+  stale mark, so the market start's own refresh is the only rebuild, and `Intermission.open`'s
+  momentary show before the loot roll does nothing. During waves the HUD shows a
+  "Team Loot: N" counter.
   - **Input guards** (co-op, one screen): the loot roll and the market swallow every human's
     held buttons / stick (`PlayerInput.swallow()`) when they open and when the market starts
     after the roll; A and X (buy / lock) are additionally ignored for
@@ -522,9 +576,16 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   `ability_just_pressed` in `_process`; cooldown = `cooldown x stats.cooldown_mult() x
   (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
   gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
-  NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`); bots
-  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast` (every 0.25 s; one targeting
-  pass per decision). Keyboard: LMB / RMB = slots 0 / 1, Q = slot 2, E = slot 3
+  NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`, which picks the
+  nearest ghost in range but skips one the Spirit Healer revives within
+  `PaladinWordOfGlory.HEALER_SOON`, so Word of Glory revives another ghost instead of
+  healing); bots
+  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast`.
+  - Timing: every `AUTO_CAST_INTERVAL` 0.25 s, which is exactly 15 ticks at 60 Hz.
+    `begin_wave` staggers the players' passes by slot index, so P1–P4 first pass on ticks
+    1 / 4 / 8 / 12.
+  - One targeting pass per decision. DENSEST_CLUSTER only considers enemies whose centre is
+    within `cast_range`. Keyboard: LMB / RMB = slots 0 / 1, Q = slot 2, E = slot 3
   (`KeyboardInput.ability_button`); controllers use `PlayerInput.ABILITY_BUTTONS`.
 - `params_for(ability)` (base cooldown / cost / charges + `AbilityData.params` + item mods) is
   **cached per ability and read-only** – copy it before changing anything.
@@ -532,15 +593,23 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   mods), any future rank change. `slot_state(i)` gives the HUD everything from one lookup;
   `is_ready(i)` = alive, off cooldown, affordable (no targeting); `can_cast` adds the effect's
   own check with full targeting.
+- Effects' `tick(ctx, delta)` gets one reused `AbilityContext` per ability id. It is
+  refreshed every tick and dropped on `set_slot` / `forget`. An effect must not keep a ctx
+  past the call.
 - Charges: `params.charges` (default 1, e.g. Blink + the Band of the Blinking Star); the
   recharge timer runs while charges are spent, each expiry returns one
   (`charges_max` / `charges_available`; `remaining()` is 0 while a charge is left).
   `set_cooldown(ability, s)` lets effects shorten / reset a running recharge (≤ 0 = ready).
+  `spend_charge(ability)` uses one charge as a cast would, for self-triggering passives such
+  as Cheat Death. `cooldown_from_params(ability, params)` gives the cooldown for a preview
+  params dict.
 - Wave hooks: `begin_wave` (resources / cooldowns reset, `AbilityEffect.begin_wave`,
   `MasteryEffect.begin_wave`; `Player.begin_wave` also clears `forced_crits` and
   `damage_mults`) and `end_wave` (`AbilityEffect.end_wave(ctx)`, `MasteryEffect.end_wave()`,
   via `Player.end_wave()` before the intermission: auras / buffs must not show in the
-  market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`.
+  market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`,
+  and again by `Main.open_intermission()` for areas that landed during the "Wave cleared!"
+  pause.
 - `MasteryEffect.tick` runs every physics tick, **also while downed** (Ignite / Deadly Poison
   DoTs keep burning like item DoTs); pets and auras check `player.is_alive()` themselves.
   Ability effects only tick while alive.
@@ -631,8 +700,18 @@ core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; s
 - **Trainer bots** (smoke / demo, after their market shopping): `Intermission._bots_train`
   calls `Trainer.bot_train(player, reserve)` for every bot in slot order with an even share of
   the gold above `Intermission.bot_train_reserve` (one Uncommon item at the next wave's price
-  per two bots), so the shop still gets gold next round. `SMOKE_RESULT` adds `level_cards`
-  (cards picked), `abilities_learned` (learned slots filled at the end) and `ranks_trained`.
+  per two bots), so the shop still gets gold next round.
+  - Then `Intermission._bots_reroll` spends the gold neither the offers nor the Trainer could
+    take, while the wallet keeps `BOT_REROLL_RESERVE_MULT` (2) × `bot_train_reserve` after
+    paying `Shop.reroll_cost()`.
+  - Each time, one shopping bot (in turn) votes a reroll alone
+    (`Shop.vote_reroll(index, [index], RunState.rng)`) and the bots run their buying passes
+    again (`_bots_buy`).
+  - At most `BOT_MAX_REROLLS` (3) per round, and never while a human with a working device
+    can vote (`ShopPanel.voter_indices()` not empty).
+
+  `SMOKE_RESULT` adds `level_cards` (cards picked), `abilities_learned` (learned slots filled
+  at the end), `ranks_trained` and `shop_rerolls` (`Intermission.bot_rerolled`).
 
 
 ## M4: ranks, learned abilities, Trainer
@@ -652,8 +731,10 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   `rank_up` / `set_spec` / `needs_spec` / `params_at_rank` (previews) / `teardown` (every
   slotted effect gets `end_wave`, then the Mastery's teardown).
 - **Ranks** (`AbilityRanks`, GDD 6.3): Rank II and IV `"power_pct"` +25 and `"cooldown_pct"`
-  −10 each; Rank III merges `AbilityData.rank3`; Rank V merges the chosen
-  `AbilityData.specs[i]["mods"]`. Every effect multiplies its damage / heal / shield / buff
+  −10 each; Rank III merges `AbilityData.rank3`. Rank V's chosen
+  `AbilityData.specs[i]["mods"]` (`AbilityRanks.spec_mods`, a deep copy) apply as a second `apply_mods`
+  pass after the rank mods, then the item mods come last. So a spec's `_pct` scales the
+  Rank IV value (Hot Streak: 10 s × 0.8 × 0.7 = 5.6 s). Every effect multiplies its damage / heal / shield / buff
   amounts by `ctx.num("power", 1.0)`. Trainer price `25 × rank × (1 + 0.08 × (wave − 1))`.
   Core abilities train too. `apply_mods`: `<param>_add` adds, `<param>_pct` scales an existing
   `<param>` (else it sets the key itself), anything else replaces – a data test per kit
@@ -661,8 +742,18 @@ scenes/abilities/general/        the six general abilities (class_id empty)
 - **Level-up cards** (`LevelUpDeck`): 5 cards, about half ability cards (new learned
   abilities from `Db.ability_pool(class)` – class + general, unlocked, `card_weight` > 0 – or
   free rank-ups of slotted abilities incl. core ones), at least one ability and one stat
-  card; full slots of a kind make new abilities of that kind rarer (×0.3) and rank-ups more
-  likely; stat cards (`StatCards`): rarity Common 50 / Uncommon 30 / Rare 15 / Epic 5, 1–3
+  card.
+  - Full slots of a kind make new abilities of that kind rarer (×0.3) and rank-ups more
+    likely.
+  - A card that would need a replacement (a new ability whose kind is full) also counts only
+    `FULL_SLOTS_MIN_SHARE` (0.2) of its weight. The per-card ability chance is
+    `ABILITY_SHARE` 0.5 × (usable + 0.2 × replacement-only weight) / total weight
+    (`LevelUpDeck.ability_share`), and ability cards are picked from
+    `LevelUpDeck.pick_weights` (replacement-only ×0.2).
+  - So rank-ups keep their 0.5 × weight / total chance per card, and what full slots take
+    goes to stat cards. With every slot full at Rank V that is 10% per card, plus the
+    one-ability-card guarantee.
+  - Stat cards (`StatCards`): rarity Common 50 / Uncommon 30 / Rare 15 / Epic 5, 1–3
   stats from a weighted table with whole amounts (the class's own primary stat only). Stat
   cards go to the Player source `&"level_cards"`; team levels themselves give only +1 Stamina
   (`&"level"`). Every hero also has `Stats.BASE_MASTERY` 5 (`&"base"`; test heroes from
@@ -672,33 +763,80 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   `ShopPanel.HOLD_TIME` above half the wallet), Y previews the next rank, Rank V opens
   `SpecChooser` (B = later, the row shows "Choose"). Bots: `Trainer.bot_train` from the
   intermission.
+  - The Y preview shows the rank, the description and the `CD X s · Power Y%` stats in green.
+    The stats sit right-aligned on the rank row (`TrainerTab.stats_text` via
+    `AbilityRunner.cooldown_from_params`), so the description keeps that line.
+  - The detail description gets the whole lines left in its clip holder under the next-rank
+    and specialisation lines (`_fit_description`, at least `MIN_DESCRIPTION_LINES`), with an
+    ellipsis when cut.
+  - The row icons carry no rank of their own; the rank column shows it.
+  - While hidden, the tab skips gold and rank refreshes and only marks itself stale. It
+    catches up once at the end of the frame it is shown in (`call_deferred` from
+    NOTIFICATION_VISIBILITY_CHANGED). An explicit `refresh()` first (`PlayerPanel.set_tab`,
+    the market start) cancels the catch-up.
 - **HUD**: `AbilityBar` shows the four button slots (prompts per device) and a 2×2 cluster of
-  26 px auto-cast icons (sweep only) once an auto-cast ability is learned; every icon carries
-  rank pips (orange once specialised). Frames stay ≤ 112 px tall (wider with learned slots).
-- **Core hooks for the kits**: `ProcSystem.add_shield(amount, duration)` (one shared pool with
-  item shields), `Player.damage_taken_mults` (named incoming multipliers, cleared at wave
-  start), `Player.death_guards` (Callables tried after item cheat-death procs),
-  `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)`.
+  26 px auto-cast icons (sweep only) once an auto-cast ability is learned. Every icon carries
+  its rank: pips on the button icons, a small corner numeral on the 26 px auto-cast icons,
+  orange once specialised. Frames stay ≤ 112 px tall (wider with learned slots).
+- **Core hooks for the kits**:
+  - `ProcSystem.add_shield(amount, duration, source := &"")`: one entry per source, each on
+    its own timer. `absorb` drains the entry that runs out first. `shield_hp` is the total
+    and `shield_of(source)` gives one entry's HP. Item procs and most kit shields share the
+    anonymous `&""` entry.
+    - `shield_hp` is read-only: assigning it only reports an error.
+    - `clear_shields()` empties every entry (begin_wave, tests).
+    - `absorbed_total` is the running sum of damage any shield soaked. It is never reset, so
+      effects compare it between ticks.
+  - `Player.damage_taken_mults`: named incoming multipliers, cleared at wave start.
+  - `Player.death_guards`: Callables tried *before* the limited item cheat-death procs, so a
+    free or recharging guard such as Last Stand or Cheat Death never uses one up.
+  - Also `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)` and
+    `Enemy.is_boss()` (false until bosses exist).
 - **Kit helpers** (per class folder; all damage through `ProcSystem.deal_raw` with sources
   `&"ability"`, `&"dot"`, `&"pet"`):
   - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Bladestorm / Ravager), `WarriorFx`
     (VFX base); Bladestorm's "cannot be slowed" is the stat source `&"bladestorm"` cancelling
-    negative Speed.
+    negative Speed. `WarriorKit.is_displaced(player)` makes Charge and Heroic Leap exclusive:
+    neither starts while the other moves the hero. Execute instantly kills elites too; only
+    bosses (`Enemy.is_boss()`) take `boss_mult` × damage instead.
   - Mage: `MageSpell` (spell damage with a per-spell Spell Power factor, freeze), `MageBolt`
     (Projectile subclass dealing ability damage: burn / splash / bounce / pierce / homing),
     `MageBurn` / `MageFrozen` (nodes on the enemy), `MageMeteorStrike` (group
-    `ability_areas`). Ice Barrier = `add_shield(amount, 3600)` (until used up / wave end).
+    `ability_areas`).
+    - Ice Barrier = `add_shield(amount, 3600, &"ice_barrier")`, its own entry
+      (`MageIceBarrier.SHIELD_SOURCE`), lasting until used up or wave end. Other shields
+      neither block its recast nor inherit its timer.
+    - Its Rank III chill fires when `ProcSystem.absorbed_total` grew while the barrier is up,
+      so a hit soaked by a shorter-lived shield on top still chills. A shield expiring on its
+      timer does not.
+    - Frost Nova's Shatter: the ice of one nova shares a `MageFrozen.ShatterGroup`, so each
+      enemy takes one nova's shatter at most once.
   - Paladin: `PaladinKit` (holy strike damage, heals, per-Paladin buff keys),
     `PaladinHolyMissile` (homing / ricochet hammer and shield), `PaladinVfx`. Blessing of
     Kings = stat source `kings:paladin<slot>` per hero; Lay on Hands never revives (only Word
-    of Glory and the Spirit Healer / teammates do).
+    of Glory and the Spirit Healer / teammates do). Word of Glory does not revive a ghost the
+    Spirit Healer revives within `PaladinWordOfGlory.HEALER_SOON` (1 s,
+    `Player.healer_seconds_left`); it heals instead. Radiant Bubble ticks are not scaled by
+    power: power only lengthens the bubble.
   - Rogue: `RogueBlade` (Projectile subclass for knives / shuriken: weapon hits, optional
     poison and returning), `RogueVanish.shroud()` (stealth + silhouette for other effects);
-    Cheat Death is a `Player.death_guards` entry with the runner's cooldown.
+    Cheat Death is a `Player.death_guards` entry with the runner's cooldown; each save spends
+    one charge (`AbilityRunner.spend_charge`). Blade Flurry echoes carry each echo target's
+    own Executioner / Slayer bonus, not the struck enemy's.
   - Warlock: `WarlockSpell`, `WarlockAfflictions` (one DoT manager node per Warlock, ticks
-    while downed; Demonic Pact on `"dot"` / `"pet"`), pets (Voidwalker taunts, Infernal for
-    8 s) that free themselves when their owner is gone; `damage_taken_mults["voidwalker"]`.
+    while downed; Demonic Pact on `"dot"` / `"pet"`). Afflictions listen to `Enemy.died`. A
+    host that vanishes without dying (the wave-end despawn) only ends its afflictions: no
+    seed burst, no Corruption spread, no Blighted Ground. Fear's Dread deals its damage per
+    second without the rank power (`WarlockFear.dread_rate`): power lengthens the fear, so
+    the Dread total scales with power once (the same rule as Radiant Bubble).
+    Pets (Voidwalker taunts, Infernal for 8 s) free themselves when their owner is gone;
+    `damage_taken_mults["voidwalker"]`.
   - General: `GeneralKit` (weapon damage normalised to a 1 s swing, spell damage with the
     best of Attack / Spell Power), `GeneralBuff` (timed hero buff: named stat source +
     damage-taken multiplier, refreshed not stacked), Spirit Wolf pet; Bandage is not
     interrupted by damage.
+    - A Sprint cast (own or Rallying) never weakens or shortens a running Sprint. Per stat
+      the higher value and the longer time are kept (`GeneralSprint.merged_stats`), so a
+      refresh may extend a rally's numbers. The Trailblazer trail lasts as long as the
+      caster's own merged Sprint.
+    - Bandage Rank III's extra bandage goes to the most wounded unbandaged ally.

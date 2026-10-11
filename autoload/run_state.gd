@@ -21,6 +21,12 @@ const ELITE_WAVES: Array[int] = [20]
 const START_LEVEL := 1
 ## Talent points come from this level on (GDD 7.1: one per level from level 10).
 const TALENT_START_LEVEL := 10
+## Enemy damage multiplier by party size (index = players - 1; [method coop_damage_mult],
+## GDD 9). Smaller parties take softer hits: the fewer heroes, the fewer can revive a downed
+## one (alone, the first down ends the run) and the more enemies each faces (the +60% count
+## per extra player is less than one more share). About x1.3 per extra player; even a full
+## party stays below the plain EnemyData curve.
+const COOP_DAMAGE_MULTS: Array[float] = [0.35, 0.45, 0.6, 0.8]
 
 var active := false
 var victory := false
@@ -229,6 +235,12 @@ func coop_count_mult() -> float:
 ## Enemy HP multiplier for additional players (+20% per extra player).
 func coop_hp_mult() -> float:
 	return 1.0 + 0.2 * (player_count - 1)
+
+
+## Enemy contact / projectile damage multiplier for the party size (GDD 9), see
+## [constant COOP_DAMAGE_MULTS].
+func coop_damage_mult() -> float:
+	return COOP_DAMAGE_MULTS[clampi(player_count, 1, COOP_DAMAGE_MULTS.size()) - 1]
 
 
 static func is_boss_wave(w: int) -> bool:

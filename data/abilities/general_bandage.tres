@@ -33,7 +33,7 @@ card_weight = 0.8
 rank3 = {
 "targets_add": 1
 }
-rank3_text = "Also bandages the most wounded ally within 6 m"
+rank3_text = "Also bandages the most wounded unbandaged ally within 6 m"
 specs = Array[Dictionary]([{
 "mods": {
 "instant": true

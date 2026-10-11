@@ -1,8 +1,9 @@
 class_name MageBarrierBubble
 extends Node3D
 ## Look of a Mage's Ice Barrier: a faceted, frosty bubble around the hero with three ice
-## shards circling it; it thins out as the absorb shield wears down. Child of the hero.
-## Purely visual: it shatters away by itself once the hero has no shield left or goes down;
+## shards circling it; it thins out as the barrier's shield entry
+## ([constant MageIceBarrier.SHIELD_SOURCE]) wears down. Child of the hero.
+## Purely visual: it shatters away by itself once the barrier is used up or the hero goes down;
 ## [method finish] removes it quietly (wave end, forget).
 
 const SHELL_COLOR := Color(0.62, 0.86, 1.0, 0.16)
@@ -12,7 +13,7 @@ const RADIUS := 0.85
 const CENTER_Y := 0.62
 
 var player: Player
-## Shield HP at full strength (the bubble thins with procs.shield_hp / max_amount).
+## Shield HP at full strength (the bubble thins with the barrier's shield HP / max_amount).
 var max_amount := 1.0
 var _age := 0.0
 var _shell: MeshInstance3D
@@ -50,12 +51,13 @@ func finish() -> void:
 
 func _process(delta: float) -> void:
 	_age += delta
-	if player == null or not is_instance_valid(player) or player.downed or player.procs == null \
-			or player.procs.shield_hp <= 0.0:
+	var hp := player.procs.shield_of(MageIceBarrier.SHIELD_SOURCE) \
+			if player != null and is_instance_valid(player) and player.procs != null else 0.0
+	if hp <= 0.0 or player.downed:
 		MageFx.shatter(global_position + Vector3.UP * CENTER_Y, 1.0)
 		finish()
 		return
-	var ratio := clampf(player.procs.shield_hp / max_amount, 0.0, 1.0)
+	var ratio := clampf(hp / max_amount, 0.0, 1.0)
 	var grow := smoothstep(0.0, 0.18, _age)
 	if _shell != null:
 		var pulse := 1.0 + 0.03 * sin(_age * 5.0)

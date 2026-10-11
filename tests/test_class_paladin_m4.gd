@@ -132,6 +132,13 @@ func _down(p: Player) -> void:
 	p.take_damage(1000.0)
 
 
+func _sum(values: Array[float]) -> float:
+	var total := 0.0
+	for v in values:
+		total += v
+	return total
+
+
 # --- Data -------------------------------------------------------------------------------------
 
 func test_learned_ability_data() -> void:
@@ -739,7 +746,9 @@ func test_divine_shield_radiant_spec_burns() -> void:
 	check_eq(near.fake_hits(), 9, "burned every 0.5 s while shielded")
 	check_eq(far.fake_hits(), 0, "out of reach")
 	if near.fake_hits() > 0:
-		check_near(near.fake_damage_log[0], MACE_HIT * 0.4 * 1.5, 0.001, "40% weapon damage x power")
+		# Power already lengthens the bubble (more ticks); each tick stays at 40%.
+		check_near(near.fake_damage_log[0], MACE_HIT * 0.4, 0.001, "40% weapon damage per tick")
+	check_near(_sum(near.fake_damage_log), MACE_HIT * 0.4 * 9.0, 0.001, "power counted once: 9 x 40%")
 
 
 func test_divine_shield_sheltering_spec_shares() -> void:

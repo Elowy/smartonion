@@ -8,6 +8,8 @@ extends AbilityEffect
 ##   speed, duration   +% Speed (x power) and seconds
 ##   dodge             +% Dodge while sprinting (x power; Rank III: +20)
 ##   allies, ally_range  Rallying Sprint (spec): living teammates within ally_range m sprint too
+##                     (with the caster's numbers – never weaker or shorter than a Sprint the
+##                     teammate already runs: see [method merged_stats])
 ##   trail             Trailblazer (spec): the sprinter leaves a dust trail – small AbilityAreas
 ##   trail_slow, trail_radius, trail_duration   (slow % x power, m, s) every TRAIL_SPACING s
 ##   auto_hp           bots sprint away below this % of max HP with an enemy within
@@ -60,11 +62,22 @@ func cast(ctx: AbilityContext) -> bool:
 	var heroes: Array[Player] = [player]
 	if ctx.flag("allies"):
 		heroes.append_array(GeneralKit.allies_near(player, ctx.num("ally_range", 8.0)))
+	var own_time := duration
 	for p in heroes:
-		GeneralBuff.apply(p, KEY, duration, mods, 1.0, GeneralAuraVfx.Style.SPRINT)
+		var hero_mods := mods
+		var hero_time := duration
+		var running := GeneralBuff.find(p, KEY)
+		if running != null:
+			# A running Sprint (a teammate's own, item-boosted one; a Rallying Sprint the hero is
+			# under) keeps its stronger numbers and its longer time.
+			hero_mods = merged_stats(running.stat_mods, mods)
+			hero_time = maxf(duration, running.left)
+		GeneralBuff.apply(p, KEY, hero_time, hero_mods, 1.0, GeneralAuraVfx.Style.SPRINT)
+		if p == player:
+			own_time = hero_time
 	if ctx.flag("trail"):
 		_player = player
-		_trail_left = duration
+		_trail_left = own_time  # as long as the caster's own (possibly merged) Sprint
 		_trail_timer = 0.0
 		_trail_slow = clampf(ctx.num("trail_slow", 40.0) * ctx.num("power", 1.0), 0.0, 90.0)
 		_trail_radius = maxf(0.3, ctx.num("trail_radius", 1.2))
@@ -110,6 +123,15 @@ static func buff_stats(ctx: AbilityContext) -> Dictionary:
 	if dodge > 0.0:
 		mods[Stats.DODGE] = dodge
 	return mods
+
+
+## A new cast meets a running Sprint: per stat the higher of [param running] and
+## [param cast_mods] (a refresh never makes a hero slower).
+static func merged_stats(running: Dictionary, cast_mods: Dictionary) -> Dictionary:
+	var out := running.duplicate()
+	for stat: Variant in cast_mods:
+		out[stat] = maxf(float(out.get(stat, 0.0)), float(cast_mods[stat]))
+	return out
 
 
 func _drop_trail() -> void:

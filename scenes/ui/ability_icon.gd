@@ -14,10 +14,16 @@ extends Control
 ##  - the button prompt ("RT", "LMB" ...) as a small pill straddling the bottom edge, the
 ##    resource cost in the top-right corner,
 ##  - the rank (GDD 6.3, [method set_rank]): one small gold diamond per rank (I–V) up the left
-##    edge, orange once the Rank V specialisation is chosen.
+##    edge, orange once the Rank V specialisation is chosen; icons below SMALL_ICON (the 26 px
+##    auto-cast slots) show a small outlined roman numeral on a see-through plate tucked into
+##    the bottom-left corner instead (five pips cannot be told apart there at 720p; the plate
+##    covers as little of the glyph as it can). Rank 0 draws nothing (the lobby preview, the
+##    Trainer rows: their rank column shows the numeral).
 ## Empty slots draw a faint socket. The control is SIZE wide and SIZE + PROMPT_OVERHANG tall
 ## (the prompt pill hangs below the square) unless it is created without the prompt row
 ## (create(size, false): a plain square for the auto-cast slots and the Trainer list).
+## The background and the glyph sit in a child layer drawn behind the icon (GlyphLayer): they are
+## recorded again only when the ability changes, not on every cooldown-sweep step.
 
 enum Glyph {
 	GENERIC, PHYSICAL, WHIRLWIND, DASH, BLIZZARD, BLINK, CONSECRATION, HEAL, KNIVES, VANISH,
@@ -38,7 +44,8 @@ const PROMPT_FONT := 18
 const COOLDOWN_FONT := 22
 const COST_FONT := 18
 const FLASH_TIME := 0.32
-## The cooldown pie is redrawn once it moved this share of a full turn (~1.4 degrees).
+## The cooldown pie is redrawn once it moved this share of a full turn (~1.4 degrees), or about
+## one pixel of its edge on smaller icons ([method sweep_redraw_step]).
 const SWEEP_REDRAW_STEP := 0.004
 ## Glyph half-extent as a share of the half icon size.
 const GLYPH_SCALE := 0.74
@@ -50,6 +57,18 @@ const MAX_RANK := 5
 ## Rank pips: gold, orange once the Rank V specialisation is chosen.
 const RANK_COLOR := Color(1.0, 0.86, 0.38)
 const RANK_SPEC_COLOR := Color(1.0, 0.52, 0.12)
+## Font size of the rank numeral on small icons (uses_rank_badge): small enough to stay in the
+## corner, outlined so it still reads at 720p.
+const RANK_BADGE_FONT := SMALL_FONT - 3
+## The numeral's gold, a little lighter than the pips': its thin strokes stand out at 720p.
+const RANK_BADGE_COLOR := Color(1.0, 0.93, 0.6)
+## Width of the numeral's dark outline (it keeps the strokes apart from the rim and the glyph).
+const RANK_BADGE_OUTLINE := 4
+## Height of the capital roman numerals as a share of the font size (measured ink of the bold
+## UI font in a render) and how far the outline reaches past them: the badge's plate backs the
+## whole outlined numeral.
+const RANK_BADGE_CAP := 0.82
+const RANK_BADGE_OUTLINE_REACH := 1.0
 const ROMAN: Array[String] = ["", "I", "II", "III", "IV", "V"]
 
 const SCHOOL_COLORS: Dictionary[StringName, Color] = {
@@ -125,9 +144,15 @@ const TOKEN_RULES: Array[Array] = [
 
 var ability: AbilityData
 var slot_index := -1
-var glyph := Glyph.GENERIC
+var glyph := Glyph.GENERIC:
+	set(value):
+		glyph = value
+		_queue_base_redraw()
 ## Resolved tint (AbilityData.color, or the school colour).
-var icon_color := Color.WHITE
+var icon_color := Color.WHITE:
+	set(value):
+		icon_color = value
+		_queue_base_redraw()
 ## Button prompt text ("RT", "LMB" ...); "" hides the pill.
 var prompt := ""
 ## Keyboard prompts are drawn as a light key cap, controller prompts as a dark pill.
@@ -166,12 +191,36 @@ var _text_cache := ""
 var _drawn_ratio := -1.0
 ## Side of the icon square (the control is a little taller: the prompt pill hangs below it).
 var _side := SIZE
+## Background + glyph (or the empty socket), behind this control's own drawing.
+var _glyph_layer: GlyphLayer
+
+
+## The static part of the icon: background and glyph, or the empty socket. Drawn behind the
+## icon (show_behind_parent), so the icon's own _draw (sweep, veil, flash, rim, texts, rank,
+## prompt) can redraw every few frames without re-recording the two-pass glyph.
+class GlyphLayer extends Control:
+	var icon: AbilityIcon
+
+	func _draw() -> void:
+		if icon != null:
+			icon._draw_base(self)
+
+
+func _init() -> void:
+	_glyph_layer = GlyphLayer.new()
+	_glyph_layer.name = "Glyph"
+	_glyph_layer.icon = self
+	_glyph_layer.show_behind_parent = true
+	_glyph_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glyph_layer.size = Vector2(_side, _side)
+	add_child(_glyph_layer, false, Node.INTERNAL_MODE_FRONT)
 
 
 ## [param with_prompt_row] false: a plain square (no room for the button prompt pill below it).
 static func create(p_size: float = SIZE, with_prompt_row: bool = true) -> AbilityIcon:
 	var i := AbilityIcon.new()
 	i._side = p_size
+	i._glyph_layer.size = Vector2(p_size, p_size)
 	i.has_prompt_row = with_prompt_row
 	i.custom_minimum_size = Vector2(p_size, p_size + (PROMPT_OVERHANG if with_prompt_row else 0.0))
 	i.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -295,6 +344,7 @@ func set_ability(a: AbilityData, p_cost: float = -1.0, p_cost_color: Color = Col
 	else:
 		cost = 0.0
 	queue_redraw()
+	_queue_base_redraw()
 
 
 ## Updates the cost shown in the corner (item mods can change it).
@@ -318,13 +368,14 @@ func set_prompt(text: String, keyboard: bool = false) -> void:
 	queue_redraw()
 
 
-## Pushes the live state. Only redraws when something visible changed.
+## Pushes the live state. Only redraws when something visible changed: the seconds (when
+## shown), the sweep by [method sweep_redraw_step] or to / from empty, dim or ready.
 func set_state(p_ratio: float, p_left: float, p_ready: bool) -> void:
 	var ratio := clampf(p_ratio, 0.0, 1.0)
 	var text := format_cooldown(p_left)
 	var dim := not p_ready and p_left <= 0.0
-	var changed := text != _text_cache or absf(ratio - _drawn_ratio) >= SWEEP_REDRAW_STEP \
-		or dim != dimmed or p_ready != usable
+	var changed := (show_cooldown_text and text != _text_cache) or absf(ratio - _drawn_ratio) >= sweep_redraw_step() \
+		or (ratio <= 0.0) != (_drawn_ratio <= 0.0) or dim != dimmed or p_ready != usable
 	sweep_ratio = ratio
 	cooldown_left = maxf(p_left, 0.0)
 	usable = p_ready
@@ -337,6 +388,17 @@ func set_state(p_ratio: float, p_left: float, p_ready: bool) -> void:
 
 func cooldown_text() -> String:
 	return _text_cache
+
+
+## Share of a full turn the sweep must move before it is redrawn: about one pixel of its edge
+## (the edge runs along the 4 x side perimeter), never finer than SWEEP_REDRAW_STEP.
+func sweep_redraw_step() -> float:
+	return maxf(SWEEP_REDRAW_STEP, 1.0 / (4.0 * maxf(_side, 1.0)))
+
+
+## Small icons show the rank as a corner numeral instead of the pips (see [method _draw_rank]).
+func uses_rank_badge() -> bool:
+	return _side < SMALL_ICON
 
 
 ## Side of the icon square (the control is PROMPT_OVERHANG taller).
@@ -378,7 +440,9 @@ func _process(delta: float) -> void:
 # --- Drawing ----------------------------------------------------------------------------
 
 # Glyph drawing state: every glyph function runs twice, pass 0 = dark outlines, pass 1 = fills,
-# so overlapping parts of one glyph never leave outline seams between them.
+# so overlapping parts of one glyph never leave outline seams between them. _ci is the canvas
+# item drawn on (the GlyphLayer, set by _draw_base).
+var _ci: CanvasItem
 var _pass := 0
 var _c := Vector2.ZERO
 var _h := 1.0
@@ -388,11 +452,18 @@ var _hi := Color.WHITE
 var _deep := Color.WHITE
 
 
-func _draw() -> void:
+## The glyph layer redraws only for a new ability / glyph / tint.
+func _queue_base_redraw() -> void:
+	if _glyph_layer != null:
+		_glyph_layer.queue_redraw()
+
+
+## Background and glyph (or the empty socket) onto [param ci], the GlyphLayer behind the icon.
+func _draw_base(ci: CanvasItem) -> void:
 	var sq := _side
 	var rect := Rect2(0, 0, sq, sq)
 	if ability == null:
-		draw_style_box(_shared_box(&"socket"), rect)
+		ci.draw_style_box(_shared_box(&"socket"), rect)
 		return
 	var base := icon_color
 	_tone = base.lightened(0.35)
@@ -401,17 +472,26 @@ func _draw() -> void:
 
 	var bg := _own_box(&"bg")
 	bg.bg_color = base.darkened(0.72)
-	draw_style_box(bg, rect)
-	draw_circle(rect.get_center(), sq * 0.4, Color(base, 0.22))
-	draw_rect(Rect2(3, 3, sq - 6, sq * 0.34), Color(1, 1, 1, 0.05))
+	ci.draw_style_box(bg, rect)
+	ci.draw_circle(rect.get_center(), sq * 0.4, Color(base, 0.22))
+	ci.draw_rect(Rect2(3, 3, sq - 6, sq * 0.34), Color(1, 1, 1, 0.05))
 
 	_c = rect.get_center()
 	_h = sq * 0.5 * GLYPH_SCALE
 	_ow = maxf(1.5, sq / 24.0)
+	_ci = ci
 	for p in 2:
 		_pass = p
 		_draw_glyph(glyph)
+	_ci = null
 
+
+## Everything over the glyph: dim / cooldown sweep, flash, rim, seconds, cost, charges, rank, prompt.
+func _draw() -> void:
+	if ability == null:
+		return
+	var sq := _side
+	var rect := Rect2(0, 0, sq, sq)
 	if dimmed:
 		draw_style_box(_shared_box(&"dim"), rect)
 	elif sweep_ratio > 0.004:
@@ -448,8 +528,8 @@ func _draw() -> void:
 	if charges_max > 1:
 		var count := str(charges)
 		var cw := _text_width(count, corner_font)
-		# Right of the rank pips' column.
-		var left := 4.0 + (rank_pip_size(sq) * 2.0 + 1.0 if rank > 0 else 0.0)
+		# Right of the rank pips' column (small icons have their rank in the bottom corner).
+		var left := 4.0 + (rank_pip_size(sq) * 2.0 + 1.0 if rank > 0 and not uses_rank_badge() else 0.0)
 		_text(count, Vector2(cw * 0.5 + left, corner_y), corner_font, UiTheme.GOLD_BRIGHT if charges > 0 else UiTheme.RED.lightened(0.15), 5)
 	if rank > 0:
 		_draw_rank(sq)
@@ -474,10 +554,36 @@ static func rank_pip_centers(sq: float, count: int, above_prompt: bool) -> Packe
 	return out
 
 
-## One small diamond per rank up the left edge (GDD 12: rank shown on every icon).
+## Baseline start of the rank numeral on a small icon of side [param sq]: tucked into the
+## bottom-left corner, just above the rim ([param above_prompt]: above the prompt pill instead).
+static func rank_badge_origin(sq: float, above_prompt: bool) -> Vector2:
+	return Vector2(3.0, sq - PROMPT_OVERHANG - 2.0 if above_prompt else sq - 2.5)
+
+
+## The see-through plate behind the rank numeral [param label] whose baseline starts at
+## [param at]: exactly the outlined capitals and down onto the rim (the outline is the
+## padding), so it covers as little of the glyph as it can.
+static func rank_badge_rect(at: Vector2, label: String) -> Rect2:
+	var cap := RANK_BADGE_FONT * RANK_BADGE_CAP
+	var reach := RANK_BADGE_OUTLINE_REACH
+	return Rect2(at.x - reach, at.y - cap - reach, _text_width(label, RANK_BADGE_FONT) + reach * 2.0,
+			cap + reach + 1.25)
+
+
+## GDD 12: the rank on every icon. One small diamond per rank up the left edge; small icons
+## (uses_rank_badge) get the outlined roman numeral on a see-through plate in the bottom-left
+## corner instead.
 func _draw_rank(sq: float) -> void:
-	var r := rank_pip_size(sq)
+	if uses_rank_badge():
+		var label := roman(rank)
+		var at := rank_badge_origin(sq, show_prompt and prompt != "")
+		var font := UiTheme.bold_font()
+		draw_style_box(_shared_box(&"badge"), rank_badge_rect(at, label))
+		draw_string_outline(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, RANK_BADGE_FONT, RANK_BADGE_OUTLINE, OUT)
+		draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, RANK_BADGE_FONT, RANK_SPEC_COLOR if rank_spec else RANK_BADGE_COLOR)
+		return
 	var fill := RANK_SPEC_COLOR if rank_spec else RANK_COLOR
+	var r := rank_pip_size(sq)
 	for c in rank_pip_centers(sq, rank, show_prompt and prompt != ""):
 		var o := r + 1.2
 		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -o), c + Vector2(o, 0), c + Vector2(0, o), c + Vector2(-o, 0)]), OUT)
@@ -501,7 +607,7 @@ static func draw_gear(ci: CanvasItem, center: Vector2, r: float, fill: Color, ou
 	ci.draw_circle(center, r * 0.2, fill.darkened(0.5), true, -1.0, true)
 
 
-## A StyleBoxFlat shared by every icon (socket, dim, veil, outer): built once, never changed.
+## A StyleBoxFlat shared by every icon (socket, dim, veil, outer, badge): built once, never changed.
 static func _shared_box(key: StringName) -> StyleBoxFlat:
 	var s: StyleBoxFlat = _shared_boxes.get(key)
 	if s != null:
@@ -522,6 +628,9 @@ static func _shared_box(key: StringName) -> StyleBoxFlat:
 			s.border_color = Color(0, 0, 0, 0.9)
 			s.set_border_width_all(1)
 			s.set_corner_radius_all(6)
+		&"badge":
+			s.bg_color = Color(OUT, 0.7)
+			s.set_corner_radius_all(2)
 	_shared_boxes[key] = s
 	return s
 
@@ -623,50 +732,50 @@ func _poly(pts: PackedVector2Array, col: Color, layered: bool = false) -> void:
 	if _pass == 0 and not layered:
 		var closed := m.duplicate()
 		closed.append(m[0])
-		draw_polyline(closed, OUT, _ow * 2.0, true)
+		_ci.draw_polyline(closed, OUT, _ow * 2.0, true)
 	elif _pass == 1:
 		if layered:
 			var closed := m.duplicate()
 			closed.append(m[0])
-			draw_polyline(closed, OUT, _ow * 1.4, true)
-		draw_colored_polygon(m, col)
+			_ci.draw_polyline(closed, OUT, _ow * 1.4, true)
+		_ci.draw_colored_polygon(m, col)
 
 
 func _circ(center: Vector2, r: float, col: Color, layered: bool = false) -> void:
 	if _pass == 0 and not layered:
-		draw_circle(_p(center), r * _h + _ow, OUT, true, -1.0, true)
+		_ci.draw_circle(_p(center), r * _h + _ow, OUT, true, -1.0, true)
 	elif _pass == 1:
 		if layered:
-			draw_circle(_p(center), r * _h + _ow * 0.7, OUT, true, -1.0, true)
-		draw_circle(_p(center), r * _h, col, true, -1.0, true)
+			_ci.draw_circle(_p(center), r * _h + _ow * 0.7, OUT, true, -1.0, true)
+		_ci.draw_circle(_p(center), r * _h, col, true, -1.0, true)
 
 
 func _stroke(pts: PackedVector2Array, w: float, col: Color) -> void:
 	var m := _map(pts)
 	if _pass == 0:
-		draw_polyline(m, OUT, w * _h + _ow * 2.0, true)
-		draw_circle(m[0], w * _h * 0.5 + _ow, OUT, true, -1.0, true)
-		draw_circle(m[m.size() - 1], w * _h * 0.5 + _ow, OUT, true, -1.0, true)
+		_ci.draw_polyline(m, OUT, w * _h + _ow * 2.0, true)
+		_ci.draw_circle(m[0], w * _h * 0.5 + _ow, OUT, true, -1.0, true)
+		_ci.draw_circle(m[m.size() - 1], w * _h * 0.5 + _ow, OUT, true, -1.0, true)
 	else:
-		draw_polyline(m, col, w * _h, true)
-		draw_circle(m[0], w * _h * 0.5, col, true, -1.0, true)
-		draw_circle(m[m.size() - 1], w * _h * 0.5, col, true, -1.0, true)
+		_ci.draw_polyline(m, col, w * _h, true)
+		_ci.draw_circle(m[0], w * _h * 0.5, col, true, -1.0, true)
+		_ci.draw_circle(m[m.size() - 1], w * _h * 0.5, col, true, -1.0, true)
 
 
 ## Fill-pass-only variants: highlights and engraved details without an outline.
 func _d_poly(pts: PackedVector2Array, col: Color) -> void:
 	if _pass == 1:
-		draw_colored_polygon(_map(pts), col)
+		_ci.draw_colored_polygon(_map(pts), col)
 
 
 func _d_circ(center: Vector2, r: float, col: Color) -> void:
 	if _pass == 1:
-		draw_circle(_p(center), r * _h, col, true, -1.0, true)
+		_ci.draw_circle(_p(center), r * _h, col, true, -1.0, true)
 
 
 func _d_stroke(pts: PackedVector2Array, w: float, col: Color) -> void:
 	if _pass == 1:
-		draw_polyline(_map(pts), col, w * _h, true)
+		_ci.draw_polyline(_map(pts), col, w * _h, true)
 
 
 static func _rect_pts(x0: float, y0: float, x1: float, y1: float) -> PackedVector2Array:

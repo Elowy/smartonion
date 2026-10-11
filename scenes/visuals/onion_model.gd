@@ -37,10 +37,11 @@ const CHANNEL_GOLD := Color(1.0, 0.84, 0.36)
 const CHANNEL_TARGET_HEIGHT := 0.85
 ## Base alpha of the translucent downed ghost (the rim adds more).
 const GHOST_ALPHA := 0.6
-## Player marker ("P2" + nameplate diamond, see [method set_tag]): height of its bottom tip
-## above a living hero / a floating ghost, and above the "Resurrecting" cast bar text. The
-## marker is drawn at a fixed screen size and on top of everything (shows through crowds).
-const MARKER_Y := 1.8
+## Player marker ("P2" + nameplate diamond + health bar, see [method set_tag]): height of
+## its origin above a living hero (the bar's bottom edge) / a floating ghost and above the
+## "Resurrecting" cast bar text (the diamond's bottom tip, no bar). The marker is drawn at a
+## fixed screen size and on top of everything (shows through crowds).
+const MARKER_Y := 1.9
 const MARKER_GHOST_Y := 2.05
 const MARKER_GHOST_BOB := 0.09
 ## World lift that puts the marker above the cast bar label for the gameplay camera pitch
@@ -50,6 +51,20 @@ const MARKER_CAST_Y := CAST_BAR_Y + 1.3
 const MARKER_DIAMOND_PIXEL := 0.00038
 const MARKER_LABEL_PIXEL := 0.00037
 const MARKER_TEX_SIZE := Vector2i(40, 52)
+## Overhead health bar: its bottom edge sits on the marker origin (just above the head)
+## and lifts the diamond + tag above it; hidden with the marker and while downed (the
+## diamond drops back onto the origin). Same fixed screen size, drawn on top of everything.
+## Texels are ~1 px at 1080p.
+const HP_BAR_PIXEL := 0.00068
+## Whole bar incl. the dark frame / fill area inside it (texels).
+const HP_BAR_SIZE := Vector2i(84, 14)
+const HP_BAR_BORDER := 2
+## Screen gap (bar texels) between the bar's top edge and the diamond's bottom tip.
+const HP_BAR_GAP := 3.0
+const HP_BAR_BACK := Color(0.2, 0.04, 0.04, 0.85)
+const HP_BAR_YELLOW := Color(1.0, 0.8, 0.18)
+## Absorb shield segment (ProcSystem.shield_hp) after the HP fill, over it when it overflows.
+const HP_BAR_SHIELD := Color(0.75, 0.92, 1.0, 0.9)
 ## Revive area ring alpha (tinted with the downed player's own colour).
 const REVIVE_AREA_ALPHA := 0.7
 ## Purple flames (GDD 13: "horned hood and purple flames") on the warlock's horns.
@@ -79,12 +94,15 @@ const BULB_POINTS := [
 
 static var _profile_cache := PackedVector2Array()
 static var _marker_texture: Texture2D
+static var _hp_bar_textures: Array[Texture2D] = []
 
 var class_data: ClassData
 var player_color := Color.WHITE
 var hp_ratio := 1.0
 var downed := false
 var revive_progress := 0.0
+## Absorb shield / max HP shown on the overhead health bar (see [method set_shield_ratio]).
+var shield_ratio := 0.0
 ## Player tag shown on the marker above the head ("P1" ...); "" hides the marker.
 var tag := ""
 
@@ -107,6 +125,9 @@ var _flames: Array[Node3D] = []
 var _marker: Node3D
 var _marker_label: Label3D
 var _marker_diamond: Sprite3D
+var _hp_bar: Node3D
+var _hp_fill: Sprite3D
+var _hp_shield: Sprite3D
 var _weapon_nodes: Array[Node3D] = [null, null]
 var _weapon_data: Array[WeaponData] = [null, null]
 ## Toon-shaded meshes that take the hit flash and the ghost material.
@@ -158,6 +179,9 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_flames.clear()
 	_cast_bar = null
 	_cast_label = null
+	_hp_bar = null
+	_hp_fill = null
+	_hp_shield = null
 	_channel_glows.clear()
 	_beam = null
 	_build_ground_decals()
@@ -251,6 +275,42 @@ func set_hp_ratio(ratio: float) -> void:
 			Mats.set_overlay(_bulb, Color(1, 1, 1), _flash * 0.85)
 	for i in _peels.size():
 		_peels[i].visible = not downed and hp_ratio < PEEL_THRESHOLDS[i]
+	_update_hp_bar()
+
+
+## Absorb shield as a share of max HP: a pale segment after the HP fill on the overhead bar
+## (laid over the fill's end when HP + shield exceeds the bar).
+func set_shield_ratio(ratio: float) -> void:
+	ratio = clampf(ratio, 0.0, 1.0)
+	if is_equal_approx(ratio, shield_ratio):
+		return
+	shield_ratio = ratio
+	_update_hp_bar()
+
+
+func is_hp_bar_visible() -> bool:
+	return is_marker_visible() and _hp_bar != null and _hp_bar.visible
+
+
+## Width of the visible HP fill as a fraction of the bar (0..1).
+func hp_bar_fill() -> float:
+	return _hp_fill.region_rect.size.x / _hp_inner().x if _hp_fill != null else 0.0
+
+
+## Visible shield segment as (start, end) fractions of the bar; zero when there is none.
+func hp_bar_shield() -> Vector2:
+	if _hp_shield == null or not _hp_shield.visible:
+		return Vector2.ZERO
+	var w := _hp_inner().x
+	var start := _hp_shield.offset.x + w * 0.5
+	return Vector2(start, start + _hp_shield.region_rect.size.x) / w
+
+
+## Bar colour: green when healthy, yellow at half, red when nearly dead.
+static func hp_bar_color(ratio: float) -> Color:
+	if ratio >= 0.5:
+		return HP_BAR_YELLOW.lerp(UiTheme.HP_GREEN, (ratio - 0.5) * 2.0)
+	return UiTheme.RED.lerp(HP_BAR_YELLOW, ratio * 2.0)
 
 
 ## Downed: translucent crying onion ghost. false restores the normal look.
@@ -642,8 +702,7 @@ func _build_marker() -> void:
 	_marker_diamond.name = "Diamond"
 	_marker_diamond.texture = marker_texture()
 	_marker_diamond.pixel_size = MARKER_DIAMOND_PIXEL
-	# Bottom tip on the marker origin, the diamond grows upwards.
-	_marker_diamond.offset = Vector2(0, MARKER_TEX_SIZE.y * 0.5)
+	# Bottom tip on the marker origin (above the health bar, see _lift_plate), grows upwards.
 	_marker_diamond.modulate = Color(player_color.r, player_color.g, player_color.b, 1.0)
 	_marker_diamond.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_marker_diamond.fixed_size = true
@@ -664,8 +723,7 @@ func _build_marker() -> void:
 	_marker_label.modulate = player_color.lightened(0.3)
 	_marker_label.outline_modulate = Color(0.06, 0.035, 0.045)
 	_marker_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	# Sits on the diamond's top tip (both scale with depth the same way).
-	_marker_label.offset = Vector2(0, MARKER_TEX_SIZE.y * MARKER_DIAMOND_PIXEL / MARKER_LABEL_PIXEL - 10.0)
+	# Sits on the diamond's top tip (both scale with depth the same way, see _lift_plate).
 	_marker_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_marker_label.fixed_size = true
 	_marker_label.no_depth_test = true
@@ -675,7 +733,81 @@ func _build_marker() -> void:
 	_marker_label.outline_render_priority = 27
 	_marker_label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_marker.add_child(_marker_label)
+	_build_hp_bar()
 	_update_marker(0.0)
+
+
+## Health bar between the head and the diamond: dark framed back, HP fill (region width =
+## HP ratio, left-aligned) and the absorb shield segment.
+func _build_hp_bar() -> void:
+	var tex := hp_bar_textures()
+	_hp_bar = _node("HpBar", _marker)
+	var center_y := HP_BAR_SIZE.y * 0.5
+	var back := _hp_sprite("Back", tex[0], 23)
+	back.offset = Vector2(0, center_y)
+	var inner := _hp_inner()
+	_hp_fill = _hp_sprite("Fill", tex[1], 24)
+	_hp_fill.centered = false
+	_hp_fill.region_enabled = true
+	_hp_fill.offset = Vector2(-inner.x * 0.5, center_y - inner.y * 0.5)
+	_hp_shield = _hp_sprite("Shield", tex[1], 25)
+	_hp_shield.centered = false
+	_hp_shield.region_enabled = true
+	_hp_shield.modulate = HP_BAR_SHIELD
+	_update_hp_bar()
+
+
+func _hp_sprite(n: String, texture: Texture2D, priority: int) -> Sprite3D:
+	var s := Sprite3D.new()
+	s.name = n
+	s.texture = texture
+	s.pixel_size = HP_BAR_PIXEL
+	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	s.fixed_size = true
+	s.no_depth_test = true
+	s.shaded = false
+	s.double_sided = true
+	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+	s.render_priority = priority
+	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_hp_bar.add_child(s)
+	return s
+
+
+## Diamond (bottom tip) + tag on top of the health bar, or right on the marker origin
+## when the bar is hidden. Offsets are in each sprite's own texels.
+func _lift_plate(over_bar: bool) -> void:
+	var lift := (HP_BAR_SIZE.y + HP_BAR_GAP) * HP_BAR_PIXEL if over_bar else 0.0
+	_marker_diamond.offset = Vector2(0, MARKER_TEX_SIZE.y * 0.5 + lift / MARKER_DIAMOND_PIXEL)
+	_marker_label.offset = Vector2(0, (MARKER_TEX_SIZE.y * MARKER_DIAMOND_PIXEL + lift) / MARKER_LABEL_PIXEL - 10.0)
+
+
+static func _hp_inner() -> Vector2:
+	return Vector2(HP_BAR_SIZE - Vector2i.ONE * HP_BAR_BORDER * 2)
+
+
+func _update_hp_bar() -> void:
+	if _hp_bar == null:
+		return
+	# A ghost has no health: the cast bar / Spirit Healer hints take over.
+	_hp_bar.visible = not downed
+	_lift_plate(_hp_bar.visible)
+	var inner := _hp_inner()
+	var fill_w := roundf(inner.x * hp_ratio)
+	if hp_ratio > 0.0:
+		fill_w = maxf(fill_w, 1.0)  # a sliver of life stays visible
+	_hp_fill.visible = fill_w > 0.0
+	_hp_fill.region_rect = Rect2(0, 0, fill_w, inner.y)
+	var c := hp_bar_color(hp_ratio)
+	_hp_fill.modulate = Color(c.r, c.g, c.b, 1.0)
+	var shield_w := roundf(inner.x * shield_ratio)
+	_hp_shield.visible = shield_w > 0.0
+	if not _hp_shield.visible:
+		return
+	var start := minf(fill_w, inner.x - shield_w)
+	_hp_shield.region_rect = Rect2(0, 0, shield_w, inner.y)
+	_hp_shield.offset = Vector2(-inner.x * 0.5 + start, _hp_fill.offset.y)
 
 
 ## Marker height / visibility: above the head, bobbing over a ghost, lifted above the
@@ -733,6 +865,24 @@ static func marker_texture() -> Texture2D:
 			img.set_pixel(x, y, Color(c.r, c.g, c.b, a))
 	_marker_texture = ImageTexture.create_from_image(img)
 	return _marker_texture
+
+
+## [back, fill]: the framed dark bar and the white fill strip (a lighter top row and a
+## darker bottom row give it some volume; tinted through modulate). Built once.
+static func hp_bar_textures() -> Array[Texture2D]:
+	if not _hp_bar_textures.is_empty():
+		return _hp_bar_textures
+	var dark := Color(0.06, 0.035, 0.045)
+	var back := Image.create(HP_BAR_SIZE.x, HP_BAR_SIZE.y, false, Image.FORMAT_RGBA8)
+	back.fill(dark)
+	back.fill_rect(Rect2i(Vector2i.ONE * HP_BAR_BORDER, Vector2i(_hp_inner())), HP_BAR_BACK)
+	var inner := Vector2i(_hp_inner())
+	var fill := Image.create(inner.x, inner.y, false, Image.FORMAT_RGBA8)
+	for y in inner.y:
+		var shade := 1.0 if y == 0 else (0.9 if y < inner.y * 0.45 else 0.72)
+		fill.fill_rect(Rect2i(0, y, inner.x, 1), Color(shade, shade, shade))
+	_hp_bar_textures = [ImageTexture.create_from_image(back), ImageTexture.create_from_image(fill)]
+	return _hp_bar_textures
 
 
 func _build_body() -> void:

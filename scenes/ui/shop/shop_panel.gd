@@ -20,7 +20,9 @@ extends Control
 ## side, above / below it, or into the free band between the corner panels on the player's
 ## side – at a smaller scale when nothing else fits ([method layout_tooltips]).
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
-## redraws on Shop.changed and RunState.gold_changed.
+## redraws on Shop.changed and RunState.gold_changed (while hidden – the whole wave, the
+## Intermission stays in the tree – a wallet change is caught up at the end of the frame the
+## panel is shown in, unless refresh() rebuilt it first).
 
 ## A purchase went through (also used for bots and the smoke statistics).
 signal item_bought(slot_index: int, item: ItemInstance)
@@ -72,6 +74,9 @@ var _frame_delta := -1.0
 var _t := 0.0
 var _watched: Array[Equipment] = []
 var _cards_dirty := false
+## The wallet changed while the panel was hidden: price colours and the gold line are updated
+## when it is shown again (refresh() clears it: it rebuilds both).
+var _gold_stale := false
 
 var _art: ShopMerchant
 var _body: PanelContainer
@@ -136,8 +141,10 @@ func set_shop(p_shop: Shop) -> void:
 	_rebuild_cards()
 
 
-## Rebuilds the offer cards and cursors for the joined slots.
+## Rebuilds the offer cards and cursors for the joined slots (price colours and the gold line
+## included, so a pending wallet catch-up is dropped).
 func refresh(slots: Array[PlayerSlot]) -> void:
+	_gold_stale = false
 	_slots.clear()
 	for s in slots:
 		if s != null:
@@ -595,9 +602,26 @@ func _validate_holds() -> void:
 
 
 func _on_gold_changed(_gold: int, _delta: int) -> void:
+	if not is_visible_in_tree():
+		_gold_stale = true
+		return
+	_gold_stale = false
 	for c in cards:
 		c.update_state()
 	_update_info()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _gold_stale and is_visible_in_tree():
+		_catch_up_gold.call_deferred()
+
+
+## The stale panel was shown: updates the prices and the gold line at the end of the frame,
+## unless refresh() did already (the market start refreshes right after showing the panel) or
+## the panel was hidden again in the same frame (Intermission.open before the loot roll).
+func _catch_up_gold() -> void:
+	if _gold_stale and is_visible_in_tree():
+		_on_gold_changed(RunState.gold, 0)
 
 
 func _watch_equipment() -> void:

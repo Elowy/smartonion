@@ -272,6 +272,25 @@ func test_frost_nova_shatter_spec() -> void:
 	check_eq(late.fake_hits(), 1, "the burst hits a neighbour within 1.5 m")
 
 
+func test_frost_nova_shatter_hits_each_enemy_once_per_nova() -> void:
+	var p := _mage()
+	var slot := _learn(p, &"frost_nova", 5, 0)
+	var ring := _cluster(Vector3.ZERO, 8, 0.95)  # a tight clump: every ice touches every enemy
+	check(p.abilities.try_cast(slot), "cast")
+	var hit := ring[0].fake_damage_log[0]
+	_step(2.6)
+	for e in ring:
+		check(_ice(e, p) == null, "melted")
+		check_eq(e.fake_hits(), 2, "the nova + one shatter, however many frozen neighbours burst")
+		if e.fake_hits() == 2:
+			check_near(e.fake_damage_log[1], hit * 2.0, 0.001, "200% of the nova")
+	# The next nova shatters anew.
+	p.abilities.set_cooldown(_ability(&"frost_nova"), 0.0)
+	check(p.abilities.try_cast(slot), "second nova")
+	_step(2.6)
+	check_eq(ring[0].fake_hits(), 4, "one more nova + shatter")
+
+
 func test_frost_nova_frozen_ground_spec() -> void:
 	var p := _mage()
 	var slot := _learn(p, &"frost_nova", 5, 1)
@@ -447,6 +466,32 @@ func test_ice_barrier_is_recast_once_broken_and_off_cooldown() -> void:
 	check(p.procs.shield_hp > 0.0, "recast by itself")
 
 
+func test_ice_barrier_and_other_shields_keep_their_own_timers() -> void:
+	var p := _mage()
+	var slot := _learn(p, &"ice_barrier")
+	_enemy(Vector3(9, 0, 0))
+	var effect := _effect(p, &"ice_barrier") as MageIceBarrier
+	p.procs.add_shield(5.0, 8.0)  # a teammate's Holy Bulwark, an item's when-struck shield ...
+	check(effect.can_cast(_ctx(p, &"ice_barrier")), "another shield does not block the barrier")
+	check(p.abilities.try_cast(slot), "cast")
+	var amount := effect.strength
+	check_near(p.procs.shield_hp, 5.0 + amount, 0.001, "shield_hp is the total absorb")
+	check_near(p.procs.shield_of(MageIceBarrier.SHIELD_SOURCE), amount, 0.001, "the barrier's own entry")
+	check(not effect.can_cast(_ctx(p, &"ice_barrier")), "no recast while the barrier holds")
+	check_near(p.procs.absorb(3.0), 0.0, 0.001, "absorbed")
+	check_near(p.procs.shield_of(MageIceBarrier.SHIELD_SOURCE), amount, 0.001,
+			"the shield that runs out first soaks first")
+	p.procs._physics_process(9.0)
+	check_near(p.procs.shield_hp, amount, 0.001, "the 8 s shield expired on its own timer")
+	p.procs.add_shield(4.0, 2.0)
+	p.procs._physics_process(3.0)
+	check_near(p.procs.shield_hp, amount, 0.001, "a shield added on top of the barrier still expires")
+	_step(DT, [p])
+	check(effect.active, "the barrier still holds")
+	check_eq(effect.breaks, 0, "never broken")
+	check(MageBarrierBubble.of(p) != null, "and still shows")
+
+
 func test_ice_barrier_power() -> void:
 	var p := _mage()
 	var slot := _learn(p, &"ice_barrier", 2)
@@ -472,6 +517,30 @@ func test_ice_barrier_rank_three_chills_attackers() -> void:
 	check(biter.is_slowed(), "the attacker is chilled")
 	check_near(biter.slow_pct, 50.0, 0.001, "by 50%")
 	check(not bystander.is_slowed(), "enemies further away are not")
+
+
+func test_ice_barrier_rank_three_chills_while_another_shield_soaks_first() -> void:
+	var p := _mage()
+	var slot := _learn(p, &"ice_barrier", 3)
+	var biter := _enemy(Vector3(0.9, 0, 0))
+	check(p.abilities.try_cast(slot), "cast")
+	var effect := _effect(p, &"ice_barrier") as MageIceBarrier
+	var strength := effect.strength
+	p.procs.add_shield(5.0, 8.0)  # a teammate's Word of Glory, an item's proc shield ...
+	_step(0.1, [p])
+	check(not biter.is_slowed(), "nothing struck yet")
+	p.invulnerable_left = 0.0
+	p.take_damage(0.5, CombatMath.KIND_MELEE, biter)
+	check_near(p.procs.shield_of(MageIceBarrier.SHIELD_SOURCE), strength, 0.001,
+			"the shorter shield on top took the blow")
+	_step(DT, [p])
+	check(biter.is_slowed(), "the attacker still struck the barrier: chilled")
+	check(effect.active, "the barrier holds")
+	# A shield running out on its own timer is no strike.
+	var calm := _enemy(Vector3(-0.9, 0, 0))
+	p.procs._physics_process(8.5)
+	_step(DT, [p])
+	check(not calm.is_slowed(), "the 8 s shield expiring chills nobody")
 
 
 func test_ice_barrier_shattering_spec() -> void:

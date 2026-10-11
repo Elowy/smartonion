@@ -5,11 +5,19 @@ extends RefCounted
 ## (Db.ability_pool), free rank-ups of known abilities (core ones included), and stat cards
 ## (StatCards). About half are ability cards; every hand has at least one ability card (when
 ## any exists) and one stat card. When the slots of an ability's kind are full, new abilities
-## of that kind come less often and rank-ups more often. Reroll: all 5 cards for
-## [method reroll_price] gold from the shared wallet. Randomness: RunState.rng.
+## of that kind come less often and rank-ups more often: a card that would need a replacement
+## keeps only [constant FULL_SLOTS_MIN_SHARE] of its weight and the rest goes to stat cards,
+## while rank-ups keep their chance ([method ability_share], [method pick_weights]).
+## Reroll: all 5 cards for [method reroll_price] gold from the shared wallet.
+## Randomness: RunState.rng.
 
 const HAND_SIZE := 5
+## Chance of each card to be an ability card while every ability card is usable as it is.
 const ABILITY_SHARE := 0.5
+## Share of a replacement-only card's weight (a new ability whose kind has no free slot) that
+## still counts towards the ability cards; the rest goes to stat cards (all slots full, every
+## ability at Rank V: 0.5 × 0.2 = 10 % per card, plus the one-ability-card guarantee).
+const FULL_SLOTS_MIN_SHARE := 0.2
 ## New-ability weight when every slot of its kind is taken (picking it means replacing).
 const FULL_SLOTS_NEW_WEIGHT := 0.3
 ## Rank-up weight (per known ability) – higher once the learned slots are full.
@@ -28,12 +36,14 @@ static func reroll_price(wave: int, rerolls_done: int) -> int:
 static func draw(player: Player, rng: RandomNumberGenerator, count: int = HAND_SIZE) -> Array[LevelCard]:
 	var hand: Array[LevelCard] = []
 	var candidates := ability_candidates(player)
+	var share := ability_share(player, candidates)
+	var picks := pick_weights(player, candidates)
 	var used: Dictionary[StringName, bool] = {}
 	var abilities := 0
 	var stat_cards := 0
 	for i in count:
 		var left := count - i
-		var want_ability := rng.randf() < ABILITY_SHARE
+		var want_ability := rng.randf() < share
 		# Guarantees: one ability card (if any is possible) and one stat card per hand.
 		if abilities == 0 and left == 1 and stat_cards > 0:
 			want_ability = true
@@ -41,7 +51,7 @@ static func draw(player: Player, rng: RandomNumberGenerator, count: int = HAND_S
 			want_ability = false
 		var card: LevelCard = null
 		if want_ability:
-			card = _pick_ability(candidates, used, rng)
+			card = _pick_ability(picks, used, rng)
 		if card == null:
 			card = _stat_card(player, rng)
 			stat_cards += 1
@@ -75,6 +85,46 @@ static func ability_candidates(player: Player) -> Array:
 		if w > 0.0:
 			out.append([LevelCard.new_ability(a), w])
 	return out
+
+
+## Chance of each card in a hand to be an ability card (GDD 6.1): [constant ABILITY_SHARE] x
+## (usable + [constant FULL_SLOTS_MIN_SHARE] x replacement-only weight) / total weight of the
+## [param candidates]. Usable: rank-ups and new abilities whose kind has a free slot;
+## replacement-only: new abilities whose kind is full. Picked from [method pick_weights], each
+## usable card keeps its ABILITY_SHARE x weight / total chance per card (rank-ups do not lose
+## out to full slots); what the replacement-only cards lose goes to stat cards. A fresh hero:
+## 0.5; all slots full at Rank V: 0.1.
+static func ability_share(player: Player, candidates: Array) -> float:
+	var total := 0.0
+	var counted := 0.0
+	for c: Array in candidates:
+		var w := float(c[1])
+		total += w
+		counted += w * (FULL_SLOTS_MIN_SHARE if _needs_replacement(player, c[0] as LevelCard) else 1.0)
+	if total <= 0.0:
+		return ABILITY_SHARE
+	return ABILITY_SHARE * counted / total
+
+
+## The [param candidates] as [card, weight] pairs to pick the ability cards of a hand from:
+## replacement-only cards (a new ability whose kind has no free slot) weigh
+## [constant FULL_SLOTS_MIN_SHARE] of their candidate weight, the rest their full weight.
+## Same order; the card objects are shared with [param candidates].
+static func pick_weights(player: Player, candidates: Array) -> Array:
+	var out: Array = []
+	for c: Array in candidates:
+		var card := c[0] as LevelCard
+		out.append([card, float(c[1]) * (FULL_SLOTS_MIN_SHARE if _needs_replacement(player, card) else 1.0)])
+	return out
+
+
+## A new-ability card whose kind has no free slot for [param player] (picking it means
+## replacing a learned ability).
+static func _needs_replacement(player: Player, card: LevelCard) -> bool:
+	if card.kind != LevelCard.Kind.NEW_ABILITY:
+		return false
+	var runner := player.abilities if player != null else null
+	return runner != null and runner.free_slot(card.ability.kind) < 0
 
 
 ## Applies [param card] to [param player]. A new ability with its slots full needs

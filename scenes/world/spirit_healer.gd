@@ -1,16 +1,19 @@
 class_name SpiritHealer
 extends Node3D
 ## The Spirit Healer (GDD 1): a floating, winged, translucent spirit at a fixed point of the
-## arena ([constant Arena.SPIRIT_HEALER_POINT]) that brings ghosts back. A downed [Player]
-## standing within [constant HEAL_RADIUS] (flat XZ distance) channels for
-## [constant CHANNEL_TIME] seconds and comes back at full HP ([constant REVIVE_HP_RATIO]) with
-## the usual light column and "Resurrected!" text. Leaving the circle resets that ghost's
-## channel; several ghosts channel at once; living players are not affected.
+## arena ([constant Arena.SPIRIT_HEALER_POINT]) that brings ghosts back on a shared timer: a
+## [constant PULSE_INTERVAL] (10 s) countdown starts with every wave and runs on; whenever it
+## reaches 0 every ghost standing within [constant HEAL_RADIUS] (flat XZ distance) comes back
+## at full HP ([constant REVIVE_HP_RATIO]) with the light column and "Resurrected!" – except
+## ghosts with Resurrection Sickness ([member Player.res_sickness_left], given for
+## [constant Player.RES_SICKNESS_TIME] after every healer revive), who must wait it out.
+## Living players are not affected.
 ##
-## The channel shows on the ghost's "Resurrecting" cast bar in [constant CAST_COLOR] through
-## [member Player.healer_channel] / [member Player.healer_seconds_left]: the bar shows whichever
-## revive (teammates' or the healer's) is closer to completion, and whichever finishes first
-## revives. Part of the level: a child of the Arena (not of the per-wave entities) that
+## A ghost waiting in the circle sees the countdown on its "Resurrecting" cast bar in
+## [constant CAST_COLOR] ([member Player.healer_channel] / [member Player.healer_seconds_left]);
+## the bar shows whichever revive (teammates' or the healer's) is closer to completion, and
+## whichever finishes first revives. The time to the next pulse floats above the healer while
+## any ghost exists. Part of the level: a child of the Arena (not of the per-wave entities) that
 ## processes with it, so pausing the game pauses it. No collision: players, enemies and
 ## projectiles pass through it.
 ##
@@ -18,17 +21,19 @@ extends Node3D
 ## calls, no shadows): robed, hooded body with open arms and two flapping wings
 ## ([method Mats.ghost] look, one own material each so they can brighten), glowing face and
 ## hands, golden halo, sash and cuffs, a faint aura, a rune circle on the ground marking
-## HEAL_RADIUS, rising light motes and one OmniLight3D. While any ghost exists
-## ([method is_active]) the circle, the spirit and the light pulse brighter and a soft light
-## column marks the spot from afar.
+## HEAL_RADIUS, rising light motes and one OmniLight3D. It is only shown while a ghost exists
+## ([method is_active], the living never see it): it fades in and rises over
+## [constant APPEAR_TIME] when somebody falls and fades away once everyone stands again (the
+## pulse keeps running while hidden). While shown, the circle, the spirit and the light pulse
+## and a soft light column marks the spot from afar.
 
 ## Emitted right after the healer revived [param player].
 signal resurrected(player: Player)
 
-## Ghosts closer than this (metres, flat XZ distance) channel.
+## Ghosts closer than this (metres, flat XZ distance) are revived by a pulse.
 const HEAL_RADIUS := 1.6
-## Seconds a ghost has to stand in the circle.
-const CHANNEL_TIME := 1.0
+## Seconds between two resurrection pulses (the countdown restarts at every wave start).
+const PULSE_INTERVAL := 10.0
 ## HP fraction the healer revives at (100 %).
 const REVIVE_HP_RATIO := 1.0
 ## Pale spirit colour of the ghost's cast bar while the healer channels.
@@ -63,6 +68,9 @@ const COLUMN_HEIGHT := 11.0
 const COLUMN_RADIUS := 1.0
 ## Seconds to fade between calm and active.
 const FADE_TIME := 0.5
+## Seconds to appear when somebody falls / to fade away once everyone stands again: the
+## healer is only shown while a ghost exists (the living never see it; its pulse runs on).
+const APPEAR_TIME := 0.6
 
 const _RING_CODE := """
 shader_type spatial;
@@ -177,13 +185,17 @@ var _halo: MeshInstance3D
 var _glows: MeshInstance3D
 var _aura: MeshInstance3D
 ## Channel seconds per ghost inside the circle (instance id -> seconds).
-var _channels: Dictionary[int, float] = {}
+## Seconds until the next resurrection pulse.
+var pulse_left := PULSE_INTERVAL
+var _countdown: Label3D
 ## Smoothed 0 (calm) .. 1 (active) look, the strongest channel (0..1) and the flash after a
 ## resurrection.
 var _glow := 0.0
 var _channel_ratio := 0.0
 var _flare := 0.0
 var _time := 0.0
+## 0 (hidden) .. 1 (fully there): see [constant APPEAR_TIME].
+var _shown := 0.0
 ## Wing beat phase (accumulated: the beat speeds up while active without jumping).
 var _wing_phase := 0.0
 
@@ -201,6 +213,11 @@ func is_active() -> bool:
 	return ghost_count > 0
 
 
+## True while the healer is drawn at all (a ghost exists, or it is still fading away).
+func is_shown() -> bool:
+	return visible and _shown > 0.0
+
+
 ## True when [param point] is inside the heal circle (flat XZ distance).
 func contains(point: Vector3) -> bool:
 	return in_radius(global_position if is_inside_tree() else position, point)
@@ -211,22 +228,37 @@ static func in_radius(center: Vector3, point: Vector3) -> bool:
 	return Vector2(point.x - center.x, point.z - center.z).length() <= HEAL_RADIUS
 
 
-## Seconds [param player] has channelled so far (0 outside the circle / when alive).
-func channel_time(player: Player) -> float:
-	if player == null:
-		return 0.0
-	return _channels.get(player.get_instance_id(), 0.0)
+## True when [param player] would be revived by the next pulse (a ghost in the circle
+## without Resurrection Sickness).
+func will_revive(player: Player) -> bool:
+	return player != null and player.downed and player.is_inside_tree() \
+			and player.res_sickness_left <= 0.0 and contains(player.global_position)
+
+
+## A wave starts: the countdown starts over.
+func begin_wave() -> void:
+	pulse_left = PULSE_INTERVAL
 
 
 # --- Gameplay ------------------------------------------------------------------------
 
+func _ready() -> void:
+	RunState.wave_changed.connect(_on_wave_changed)
+
+
+func _on_wave_changed(_wave: int) -> void:
+	begin_wave()
+
+
 func _physics_process(delta: float) -> void:
 	if not is_inside_tree():
 		return
-	var center := global_position
+	pulse_left -= delta
+	var pulse := pulse_left <= 0.0001
+	if pulse:
+		pulse_left += PULSE_INTERVAL
 	var ghosts := 0
-	var best := 0.0
-	var channels: Dictionary[int, float] = {}
+	var waiting := false
 	var done: Array[Player] = []
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var p := node as Player
@@ -236,25 +268,22 @@ func _physics_process(delta: float) -> void:
 			_clear(p)
 			continue
 		ghosts += 1
-		if not in_radius(center, p.global_position):
+		if not will_revive(p):
 			_clear(p)
 			continue
-		var t: float = _channels.get(p.get_instance_id(), 0.0) + delta
-		if t >= CHANNEL_TIME - 0.0001:
+		waiting = true
+		if pulse:
 			done.append(p)
 			continue
-		channels[p.get_instance_id()] = t
-		p.healer_channel = t / CHANNEL_TIME
-		p.healer_seconds_left = CHANNEL_TIME - t
-		best = maxf(best, t / CHANNEL_TIME)
-	_channels = channels
-	_channel_ratio = best
+		p.healer_channel = 1.0 - pulse_left / PULSE_INTERVAL
+		p.healer_seconds_left = pulse_left
+	_channel_ratio = 1.0 - pulse_left / PULSE_INTERVAL if waiting else 0.0
 	ghost_count = ghosts
 	for p in done:
 		_resurrect(p)
 
 
-## The channel of [param p] ended (left the circle, alive again): nothing on its cast bar.
+## [param p] is not waiting in the circle (left it, alive again, sick): nothing on its bar.
 func _clear(p: Player) -> void:
 	p.healer_channel = 0.0
 	p.healer_seconds_left = -1.0
@@ -266,8 +295,11 @@ func _resurrect(p: Player) -> void:
 	_clear(p)
 	var feet := p.global_position
 	p.revive(REVIVE_HP_RATIO)
+	p.res_sickness_left = Player.RES_SICKNESS_TIME
 	Vfx.resurrect_column(feet)
 	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.6, "Resurrected!", Player.HEAL_TEXT_COLOR, 1.2)
+	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 1.1, "Resurrection Sickness",
+			Player.RES_SICKNESS_TEXT_COLOR, 0.9)
 	ghost_count = maxi(0, ghost_count - 1)
 	_flare = 1.0
 	resurrected.emit(p)
@@ -279,11 +311,26 @@ func _process(delta: float) -> void:
 	if _spirit == null:
 		return
 	_time += delta
+	var was_hidden := _shown <= 0.0
+	_shown = move_toward(_shown, 1.0 if is_active() else 0.0, delta / APPEAR_TIME)
+	visible = _shown > 0.0
+	_motes.emitting = is_active()
+	if not visible:
+		return
+	if was_hidden:
+		_flare = maxf(_flare, 0.6)  # it materialises with a soft flash
+	# Fade (alpha) and rise / grow (spirit, ring) while appearing or vanishing.
+	var a := _shown
+	var grow := ease(_shown, 0.5)
 	_glow = move_toward(_glow, 1.0 if is_active() else 0.0, delta / FADE_TIME)
 	_flare = maxf(0.0, _flare - delta * 1.4)
 	var pulse := 0.5 + 0.5 * sin(_time * 3.4)
 	var g := _glow
-	_spirit.position.y = FLOAT_HEIGHT + sin(_time * 1.7) * BOB_HEIGHT
+	_spirit.position.y = lerpf(-0.4, FLOAT_HEIGHT, grow) + sin(_time * 1.7) * BOB_HEIGHT
+	# The halo / glows use shared glow materials that cannot fade: they grow from a speck.
+	_spirit.scale = Vector3.ONE * SPIRIT_SCALE * lerpf(0.15, 1.0, grow)
+	var d := HEAL_RADIUS * 2.0 * RING_PAD * lerpf(0.6, 1.0, grow)
+	_ring.scale = Vector3(d, 1.0, d)
 	_spirit.rotation.z = sin(_time * 1.1) * 0.03
 	_wing_phase = fmod(_wing_phase + delta * (2.2 + 1.2 * g), TAU)
 	var flap := sin(_wing_phase) * (0.1 + 0.08 * g)
@@ -291,22 +338,31 @@ func _process(delta: float) -> void:
 		var side := 1.0 if i == 0 else -1.0
 		_wings[i].rotation = Vector3(0.0, side * (0.42 + flap), side * (-0.06 - flap * 0.6))
 	var ring_mat := _ring.material_override as ShaderMaterial
+	ring_mat.set_shader_parameter(&"rune_color", Color(RING_COLOR.r, RING_COLOR.g, RING_COLOR.b, a))
 	ring_mat.set_shader_parameter(&"intensity", g)
 	ring_mat.set_shader_parameter(&"channel", _channel_ratio)
 	ring_mat.set_shader_parameter(&"flare", _flare)
-	_set_ghost_color(_body, BODY_IDLE.lerp(BODY_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0)))
+	var body_color := BODY_IDLE.lerp(BODY_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0))
+	body_color.a *= a
+	_set_ghost_color(_body, body_color)
 	var wing_color := WING_IDLE.lerp(WING_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0))
+	wing_color.a *= a
 	for w in _wing_meshes:
 		_set_ghost_color(w, wing_color)
 	(_aura.material_override as ShaderMaterial).set_shader_parameter(&"strength",
-		lerpf(AURA_IDLE, AURA_ACTIVE, g) * (1.0 + 0.25 * g * pulse) + 0.4 * _flare)
+		(lerpf(AURA_IDLE, AURA_ACTIVE, g) * (1.0 + 0.25 * g * pulse) + 0.4 * _flare) * a)
 	var halo_scale := 1.0 + 0.08 * g * pulse + 0.25 * _flare
 	_halo.scale = Vector3(halo_scale, 1.0, halo_scale)
-	_light.light_energy = lerpf(LIGHT_ENERGY_IDLE, LIGHT_ENERGY_ACTIVE, g) * (1.0 + 0.2 * g * pulse) + 1.5 * _flare
+	_light.light_energy = (lerpf(LIGHT_ENERGY_IDLE, LIGHT_ENERGY_ACTIVE, g) * (1.0 + 0.2 * g * pulse) + 1.5 * _flare) * a
 	_column.visible = g > 0.01
 	if _column.visible:
-		(_column.material_override as ShaderMaterial).set_shader_parameter(&"strength", 0.5 * g * (0.85 + 0.15 * pulse))
+		(_column.material_override as ShaderMaterial).set_shader_parameter(&"strength", 0.5 * g * (0.85 + 0.15 * pulse) * a)
 	_motes.speed_scale = 1.0 + 0.8 * g
+	if _countdown != null:
+		_countdown.visible = g > 0.05
+		if _countdown.visible:
+			_countdown.text = str(ceili(maxf(0.0, pulse_left)))
+			_countdown.modulate.a = g * a
 
 
 static func _set_ghost_color(mi: MeshInstance3D, c: Color) -> void:
@@ -319,6 +375,20 @@ func _build() -> void:
 	_build_ring()
 	_build_column()
 	_build_motes()
+	# Seconds to the next resurrection pulse, floating above the spirit while ghosts exist.
+	_countdown = Label3D.new()
+	_countdown.name = "Countdown"
+	_countdown.position = Vector3(0, 3.3, 0)
+	_countdown.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_countdown.no_depth_test = true
+	_countdown.fixed_size = true
+	_countdown.pixel_size = 0.00085
+	_countdown.font_size = 64
+	_countdown.outline_size = 12
+	_countdown.modulate = GLOW_COLOR
+	_countdown.outline_modulate = Color(0.05, 0.1, 0.2, 0.9)
+	_countdown.visible = false
+	add_child(_countdown)
 	_light = OmniLight3D.new()
 	_light.name = "Light"
 	_light.position = Vector3(0, 1.5, 0)

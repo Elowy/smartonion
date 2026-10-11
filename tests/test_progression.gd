@@ -137,6 +137,44 @@ func test_rank_up_power_and_spec() -> void:
 	check(r.params_for(a)["explode"], "spec mods applied")
 
 
+## A spec's "_pct" applies on top of the Rank IV value (Hot Streak's "cooldown 30% shorter"),
+## not summed with the rank steps' percentages; item mods come last.
+func test_spec_pct_mods_compound_with_the_ranks() -> void:
+	var p := _hero()
+	var r := p.abilities
+	var a := _ability(&"t_hot", AbilityData.Kind.ACTIVE, &"", 10.0)
+	a.specs = [{"name": "Hot", "text": "30% shorter cooldown, 20% more damage",
+			"mods": {"cooldown_pct": -30.0, "power_pct": 20.0, "projectiles_add": 1}}]
+	r.learn(a)
+	for i in 4:
+		r.rank_up(&"t_hot")
+	r.set_spec(&"t_hot", 0)
+	var params := r.params_for(a)
+	check_near(float(params["cooldown"]), 10.0 * 0.8 * 0.7, 0.0001, "Rank IV cooldown, then 30% shorter")
+	check_near(float(params["power"]), 1.5 * 1.2, 0.0001, "Rank IV power, then +20%")
+	check_eq(float(params["projectiles"]), 2.0, "_add keys still add up (Rank III + spec)")
+	check_eq(AbilityRanks.spec_mods(a, 4, 0), {}, "no spec below Rank V")
+	check_eq(AbilityRanks.spec_mods(a, 5, 0)["cooldown_pct"], -30.0, "the spec's own mods")
+	check_near(r.cooldown_of(a), 5.6, 0.0001, "the runner's cooldown")
+
+
+## spec_mods hands out a copy: a caller merging into it must not change the spec of the shared
+## (Db-loaded) AbilityData for every hero.
+func test_spec_mods_are_a_copy() -> void:
+	var a := _ability(&"t_spec", AbilityData.Kind.AUTO)
+	a.specs[0]["mods"] = {"bounces": 2, "chain": [1, 2]}
+	var mods := AbilityRanks.spec_mods(a, 5, 0)
+	mods["bounces"] = 9
+	mods["power_pct"] = 50.0
+	(mods["chain"] as Array).append(3)
+	check_eq(a.specs[0]["mods"], {"bounces": 2, "chain": [1, 2]}, "the resource's spec is untouched")
+	check_eq(AbilityRanks.spec_mods(a, 5, 0), {"bounces": 2, "chain": [1, 2]}, "the next call sees the original")
+	var summary := AbilityRanks.mods_for(a, 5, 0)
+	summary["bounces"] = 7
+	(summary["chain"] as Array).append(4)
+	check_eq(a.specs[0]["mods"], {"bounces": 2, "chain": [1, 2]}, "nor through mods_for (nested values too)")
+
+
 func test_auto_slots_cast_by_themselves_for_humans() -> void:
 	var p := _hero()
 	var r := p.abilities
@@ -154,6 +192,36 @@ func test_auto_slots_cast_by_themselves_for_humans() -> void:
 	for i in 20:
 		r._physics_process(DT)
 	check_eq((r.effect_for(act) as CountingEffect).casts, 0, "an Active slot waits for its button")
+
+
+## From the wave start, every hero's auto-cast pass runs on its own tick (by slot), exactly
+## every 15 ticks at 60 Hz.
+func test_auto_cast_passes_are_staggered_by_slot() -> void:
+	var runners: Array[AbilityRunner] = []
+	var casts_at: Array[Array] = []
+	for i in PlayerManager.MAX_PLAYERS:
+		var p := Fakes.spawn_player(world, i, &"warrior", Vector3(6.0 * i, 0.0, 0.0))
+		# No cooldown: the effect casts on every pass.
+		p.abilities.learn(_ability(StringName("t_pass%d" % i), AbilityData.Kind.AUTO, &"", 0.0))
+		p.begin_wave()
+		runners.append(p.abilities)
+		casts_at.append([])
+	for tick in 300:
+		for i in runners.size():
+			var effect := runners[i].effect_for(runners[i].slots[4]) as CountingEffect
+			var before := effect.casts
+			runners[i]._physics_process(DT)
+			if effect.casts > before:
+				casts_at[i].append(tick + 1)
+	var firsts := {}
+	for i in runners.size():
+		var ticks: Array = casts_at[i]
+		check_eq(ticks.size(), 20, "P%d: 300 ticks / 15 = 20 passes" % (i + 1))
+		firsts[ticks[0]] = true
+		for k in range(1, ticks.size()):
+			check_eq(ticks[k] - ticks[k - 1], 15, "P%d pass %d: every 0.25 s exactly" % [i + 1, k])
+	check_eq(firsts.size(), PlayerManager.MAX_PLAYERS, "first passes on different ticks: %s" % [firsts.keys()])
+	check_eq(casts_at[0][0], 1, "P1 still checks on the first tick")
 
 
 # --- LevelUpDeck ----------------------------------------------------------------------------
@@ -246,6 +314,72 @@ func test_full_slots_favour_rank_ups() -> void:
 		weights[(pair[0] as LevelCard).ability.id] = pair[1]
 	check_near(weights[fresh.id], LevelUpDeck.FULL_SLOTS_NEW_WEIGHT, 0.0001, "new ability rarer when full")
 	check_near(weights[&"t_u0"], LevelUpDeck.RANK_UP_WEIGHT_FULL, 0.0001, "rank-ups more often")
+
+
+## GDD 6.1: with full slots, stat cards (not rank-ups) take the place of new abilities – a
+## maxed hero's hands are mostly stat cards, still with one ability card.
+func test_full_slots_shift_the_share_to_stat_cards() -> void:
+	var p := _hero()
+	var r := p.abilities
+	check_near(LevelUpDeck.ability_share(p, LevelUpDeck.ability_candidates(p)), LevelUpDeck.ABILITY_SHARE,
+			0.0001, "a fresh hero: half ability cards")
+	for i in 2:
+		r.learn(_ability(StringName("t_a%d" % i), AbilityData.Kind.ACTIVE))
+	for i in 4:
+		r.learn(_ability(StringName("t_u%d" % i), AbilityData.Kind.AUTO))
+	var candidates := LevelUpDeck.ability_candidates(p)
+	var total_weight := 0.0
+	var rank_weight := 0.0
+	for pair: Array in candidates:
+		total_weight += float(pair[1])
+		if (pair[0] as LevelCard).kind == LevelCard.Kind.RANK_UP:
+			rank_weight += float(pair[1])
+	check(rank_weight > 0.0 and rank_weight < total_weight, "rank-ups and replacement cards on offer")
+	var full_share := LevelUpDeck.ability_share(p, candidates)
+	check(full_share < LevelUpDeck.ABILITY_SHARE, "full slots at Rank I: fewer ability cards (%.2f)" % full_share)
+	check_near(full_share, LevelUpDeck.ABILITY_SHARE * (rank_weight + LevelUpDeck.FULL_SLOTS_MIN_SHARE
+			* (total_weight - rank_weight)) / total_weight, 0.0001, "only the replacement weight shrinks")
+	# Seeded hands: the rank-ups keep the chance they had before full slots shrank the share
+	# (ABILITY_SHARE x their weight share; the hand guarantees add a little, sampling noise
+	# 0.004); the replacement cards give up most of theirs.
+	var rank_ups := 0
+	var replacements := 0
+	var drawn := 0
+	var hand_rng := RandomNumberGenerator.new()
+	for seed_value in 4000:
+		hand_rng.seed = seed_value
+		for c in LevelUpDeck.draw(p, hand_rng):
+			drawn += 1
+			if c.kind == LevelCard.Kind.RANK_UP:
+				rank_ups += 1
+			elif c.kind == LevelCard.Kind.NEW_ABILITY:
+				replacements += 1
+	var rank_floor := LevelUpDeck.ABILITY_SHARE * rank_weight / total_weight
+	check(float(rank_ups) / drawn >= rank_floor - 0.01,
+			"rank-ups keep their chance: %.3f >= %.3f" % [float(rank_ups) / drawn, rank_floor])
+	var replace_before := LevelUpDeck.ABILITY_SHARE * (total_weight - rank_weight) / total_weight
+	check(float(replacements) / drawn < replace_before * 0.5,
+			"replacement cards come far less often: %.3f < %.3f" % [float(replacements) / drawn, replace_before * 0.5])
+	for a in r.slots:
+		while r.can_rank_up(a.id):
+			r.rank_up(a.id)
+	check_near(LevelUpDeck.ability_share(p, LevelUpDeck.ability_candidates(p)),
+			LevelUpDeck.ABILITY_SHARE * LevelUpDeck.FULL_SLOTS_MIN_SHARE, 0.0001, "everything at Rank V: the floor")
+	var rng := RandomNumberGenerator.new()
+	var stat_cards := 0
+	var cards := 0
+	for seed_value in 200:
+		rng.seed = seed_value
+		var abilities := 0
+		for c in LevelUpDeck.draw(p, rng):
+			cards += 1
+			if c.is_ability_card():
+				abilities += 1
+				check_eq(c.kind, LevelCard.Kind.NEW_ABILITY, "only replacements are left")
+			else:
+				stat_cards += 1
+		check(abilities >= 1, "seed %d: still one ability card" % seed_value)
+	check(float(stat_cards) / cards > 0.7, "mostly stat cards (%.2f)" % (float(stat_cards) / cards))
 
 
 func test_reroll_price() -> void:

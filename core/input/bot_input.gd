@@ -6,7 +6,8 @@ extends ScriptedInput
 ## - Walks to dropped loot, keeps away from the arena walls (no corner traps), stays near
 ##   its teammates and drifts back towards the centre.
 ## - Revives (GDD 1): a downed bot (ghost) walks straight to the arena's Spirit Healer and
-##   waits inside its circle (1 s there = full HP; without a healer it drifts towards the
+##   waits inside its circle for the next 10 s pulse (full HP; with Resurrection Sickness or
+##   without a healer it drifts towards the
 ##   nearest living teammate). A living bot only runs to a downed teammate within
 ##   RESCUE_RANGE and stands next to it until the revive is done – farther ghosts use the
 ##   healer while the bot keeps fighting.
@@ -99,7 +100,9 @@ func think(delta: float) -> void:
 			# Same push at the keep distance's edge whatever the keep distance is.
 			steer += d / dist * (keep - dist) * (KITE_DISTANCE / keep)
 	# A ghost walks straight to the Spirit Healer (enemies ignore ghosts) and waits there.
-	if not alive:
+	# With Resurrection Sickness the healer cannot help yet: drift to a living teammate.
+	var sick := body is Player and (body as Player).res_sickness_left > 0.0
+	if not alive and not sick:
 		var healer := _healer_point()
 		if healer.is_finite():
 			var to_healer := healer - pos

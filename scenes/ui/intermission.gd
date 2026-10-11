@@ -24,7 +24,8 @@ extends Control
 ## every bot buys every affordable offer that is an upgrade for it (cheapest first,
 ## round-robin over the bots – bot_offer_choice) and equips what ItemTooltip.upgrade_direction
 ## calls an upgrade; then they buy ability ranks from the Trainer with what is left above a reserve
-## (_bots_train: Trainer.bot_train, the wallet shared out evenly). Everyone ready ->
+## (_bots_train: Trainer.bot_train, the wallet shared out evenly), and gold that neither could
+## take rerolls the stall for another buying pass (_bots_reroll). Everyone ready ->
 ## continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of
 ## MARKET the next wave starts anyway (the countdown does not run during the loot roll and the
 ## level-up cards).
@@ -39,6 +40,8 @@ signal loot_rolled(roll: LootRoll)
 signal level_card_picked(slot_index: int, card: LevelCard)
 ## A bot bought [param count] ability ranks from the Trainer (statistics).
 signal ranks_trained(slot_index: int, count: int)
+## A bot paid [param cost] gold for a reroll of the stall (statistics).
+signal bot_rerolled(slot_index: int, cost: int)
 
 enum Phase { CLOSED, LOOT, LEVEL_UP, MARKET }
 
@@ -62,6 +65,11 @@ const CHIP_SIZE := Vector2(170, 56)
 ## Smoke / demo bots keep this many Uncommon items' worth of gold (next wave's price) per two
 ## bots when they train after shopping, so the shop still gets their gold next round.
 const BOT_TRAIN_RESERVE_RARITY := Items.Rarity.UNCOMMON
+## Smoke / demo bots reroll the stall at most this many times a round, each only while the
+## wallet keeps this many times [method bot_train_reserve] after paying for it (late-game gold
+## that neither the offers nor the Trainer could take).
+const BOT_MAX_REROLLS := 3
+const BOT_REROLL_RESERVE_MULT := 2
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -634,6 +642,7 @@ func _bots_settled() -> bool:
 ## included), then buys every affordable offer that is an upgrade for it – the cheapest first,
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
+## Then the bots train (_bots_train) and spend what is left over on rerolls (_bots_reroll).
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -644,6 +653,17 @@ func _bots_shop() -> void:
 		bot_equip_upgrades(s)
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
+	_bots_buy(shoppers)
+	_bots_train()
+	_bots_reroll(shoppers)
+	for s in PlayerManager.get_slots():
+		if s.is_bot() and panels.has(s.index):
+			panels[s.index].refresh()
+
+
+## The buying passes of [method _bots_shop] over [param p_shoppers] (the list is not changed).
+func _bots_buy(p_shoppers: Array[PlayerSlot]) -> void:
+	var shoppers: Array[PlayerSlot] = p_shoppers.duplicate()
 	var passes := 0
 	while not shoppers.is_empty() and passes < Items.BACKPACK_SIZE * 2:
 		passes += 1
@@ -663,21 +683,13 @@ func _bots_shop() -> void:
 			bot_equip_upgrades(s)
 			if eq == null or eq.backpack.has(item):
 				shoppers.erase(s)  # no room for what it would push out: done for this round
-	_bots_train()
-	for s in PlayerManager.get_slots():
-		if s.is_bot() and panels.has(s.index):
-			panels[s.index].refresh()
 
 
 ## After shopping, smoke / demo bots buy ability ranks from the Trainer (Trainer.bot_train,
 ## cheapest rank first) with the gold above [method bot_train_reserve]; the spendable gold is
 ## shared out evenly over the bots in slot order. Returns the ranks bought.
 func _bots_train() -> int:
-	var trainees: Array[PlayerSlot] = []
-	for s in PlayerManager.get_slots():
-		var hero := s.player as Player
-		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.abilities != null:
-			trainees.append(s)
+	var trainees := _bot_trainees()
 	var reserve := bot_train_reserve(cleared_wave, trainees.size())
 	var total := 0
 	for k in trainees.size():
@@ -696,6 +708,41 @@ func _bots_train() -> int:
 ## two bots (at least one).
 static func bot_train_reserve(p_cleared_wave: int, bots: int) -> int:
 	return ItemGenerator.price_for(BOT_TRAIN_RESERVE_RARITY, p_cleared_wave + 1) * maxi(1, ceili(bots / 2.0))
+
+
+## Bots with a hero that has an ability runner (who can train), in slot order.
+func _bot_trainees() -> Array[PlayerSlot]:
+	var out: Array[PlayerSlot] = []
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.abilities != null:
+			out.append(s)
+	return out
+
+
+## After buying and training, gold the bots could not spend (ranks maxed, few offers are
+## upgrades – the late game) buys rerolls of the stall: one of [param shoppers] (in turn) votes
+## and pays it alone, then they all go through the offers again (_bots_buy). At most
+## [constant BOT_MAX_REROLLS] a round, each only while the wallet keeps
+## [constant BOT_REROLL_RESERVE_MULT] x [method bot_train_reserve] after paying, and never
+## while a human votes on rerolls (Shop.reroll_cost, RunState.rng). Returns the rerolls bought.
+func _bots_reroll(shoppers: Array[PlayerSlot]) -> int:
+	var stall := shop_panel.shop if shop_panel != null else null
+	if stall == null or shoppers.is_empty() or not shop_panel.voter_indices().is_empty():
+		return 0
+	var keep := BOT_REROLL_RESERVE_MULT * bot_train_reserve(cleared_wave, _bot_trainees().size())
+	var n := 0
+	while n < BOT_MAX_REROLLS and not stall.rerollable_positions().is_empty():
+		var cost := stall.reroll_cost()
+		if RunState.gold - cost < keep:
+			break
+		var voter := shoppers[n % shoppers.size()]
+		if not stall.vote_reroll(voter.index, [voter.index] as Array[int], RunState.rng):
+			break
+		n += 1
+		bot_rerolled.emit(voter.index, cost)
+		_bots_buy(shoppers)
+	return n
 
 
 ## Index of the cheapest offer in [param p_shop] that the wallet can pay and that is an

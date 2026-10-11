@@ -115,6 +115,16 @@ func test_ghost_walks_straight_to_the_spirit_healer() -> void:
 	check(mate.is_alive(), "the living teammate is not what it seeks")
 
 
+func test_sick_ghost_seeks_a_teammate_instead_of_the_healer() -> void:
+	var ghost := _bot_player(&"paladin", Vector3(-4.0, 0.0, 0.0))
+	ghost.downed = true
+	ghost.res_sickness_left = 8.0
+	_bot_player(&"mage", Vector3(-10.0, 0.0, 0.0))
+	check(_move(ghost).x < -0.9, "Resurrection Sickness: away from the healer, to the teammate")
+	ghost.res_sickness_left = 0.0
+	check(_move(ghost).x > 0.9, "healthy again: back to the healer")
+
+
 func test_ghost_without_a_healer_seeks_a_living_teammate() -> void:
 	arena.remove_child(arena.spirit_healer)
 	arena.spirit_healer.free()

@@ -18,11 +18,17 @@ enum Behavior { CHASE, SWARM, LUNGE, RANGED }
 ## HP growth per wave after the first, as a fraction of [member max_hp] (GDD 9: +12% per
 ## wave, additive). A future DifficultyData may override it.
 @export var hp_growth: float = 0.12
+## Compounding HP factor per wave after the first, on top of [member hp_growth] (GDD 9): the
+## heroes' power compounds (items, ranks, level cards), so the enemies' HP has to as well.
+@export var hp_compound: float = 0.22
 ## Contact damage at wave 1.
 @export var contact_damage: float = 1.0
 ## Contact / projectile damage growth per wave after the first, as a fraction of the base
-## value (GDD 9: +8% per wave, additive). A future DifficultyData may override it.
-@export var damage_growth: float = 0.08
+## value (GDD 9: +15% per wave, additive). A future DifficultyData may override it.
+@export var damage_growth: float = 0.15
+## Compounding damage factor per wave after the first, on top of [member damage_growth]
+## (GDD 9).
+@export var damage_compound: float = 0.08
 ## Metres / second.
 @export var move_speed: float = 2.4
 ## Collision / visual radius in metres.
@@ -58,26 +64,37 @@ enum Behavior { CHASE, SWARM, LUNGE, RANGED }
 
 
 ## Max HP at [param wave] before co-op scaling (Enemy multiplies by RunState.coop_hp_mult()):
-## max_hp * (1 + hp_growth * (wave - 1)) (GDD 9).
+## max_hp * [method hp_mult_at_wave] (GDD 9).
 func hp_at_wave(wave: int) -> float:
 	return max_hp * hp_mult_at_wave(wave)
 
 
-## Contact damage at [param wave]: contact_damage * (1 + damage_growth * (wave - 1)) (GDD 9).
+## Contact damage at [param wave] before the party-size factor (Enemy multiplies by
+## RunState.coop_damage_mult()): contact_damage * [method damage_mult_at_wave] (GDD 9).
 func contact_damage_at_wave(wave: int) -> float:
 	return contact_damage * damage_mult_at_wave(wave)
 
 
-## Projectile damage at [param wave]: projectile_damage * (1 + damage_growth * (wave - 1)).
+## Projectile damage at [param wave] before the party-size factor (as
+## [method contact_damage_at_wave]): projectile_damage * [method damage_mult_at_wave].
 func projectile_damage_at_wave(wave: int) -> float:
 	return projectile_damage * damage_mult_at_wave(wave)
 
 
-## HP multiplier of [param wave] relative to wave 1.
+## HP multiplier of [param wave] relative to wave 1, n = wave - 1:
+## (1 + hp_growth * n) * (1 + hp_compound)^n.
 func hp_mult_at_wave(wave: int) -> float:
-	return maxf(0.0, 1.0 + hp_growth * maxi(0, wave - 1))
+	return growth_mult(wave, hp_growth, hp_compound)
 
 
-## Damage multiplier of [param wave] relative to wave 1.
+## Damage multiplier of [param wave] relative to wave 1, n = wave - 1:
+## (1 + damage_growth * n) * (1 + damage_compound)^n.
 func damage_mult_at_wave(wave: int) -> float:
-	return maxf(0.0, 1.0 + damage_growth * maxi(0, wave - 1))
+	return growth_mult(wave, damage_growth, damage_compound)
+
+
+## (1 + [param linear] * n) * (1 + [param compound])^n with n = wave - 1 (at least 0), never
+## negative: the additive per-wave growth of GDD 9 times a compounding factor.
+static func growth_mult(wave: int, linear: float, compound: float) -> float:
+	var n := maxi(0, wave - 1)
+	return maxf(0.0, (1.0 + linear * n) * pow(maxf(0.0, 1.0 + compound), n))

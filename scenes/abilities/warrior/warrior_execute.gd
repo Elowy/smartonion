@@ -2,15 +2,16 @@ class_name WarriorExecute
 extends AbilityEffect
 ## Execute (GDD 6.4, Warrior Active): a huge strike on an enemy in melee reach for
 ## [code]damage_pct[/code] % weapon damage (times "power"). An enemy below
-## [code]threshold[/code] % HP dies outright; elites and bosses are never killed outright –
-## below the threshold they take [code]elite_mult[/code] x damage instead.
+## [code]threshold[/code] % HP dies outright (elites too); bosses ([method Enemy.is_boss]) are
+## never killed outright – below the threshold they take [code]boss_mult[/code] x damage
+## instead.
 ##
 ## The strike picks its victim among the enemies within the ability's cast range: an
 ## executable one first (the one with the most HP left: the biggest saving), else an elite /
 ## boss (lowest HP share), else the nearest.
 ##
 ## Params (AbilityData.params; items and ranks change them):
-##   damage_pct, threshold (% HP; Rank III +10), elite_mult
+##   damage_pct, threshold (% HP; Rank III +10), boss_mult
 ##   arc         Rank V "Sweeping Strikes": every enemy in an arc of this many degrees in front
 ##               of the hero (towards the victim) is struck and checked for execution (0 = one)
 ##   kill_reset  Rank V "Massacre": a kill sets the remaining cooldown to this many seconds
@@ -20,7 +21,7 @@ extends AbilityEffect
 ## damage left (no wasting the big hit on scraps).
 
 const DEFAULT_THRESHOLD := 20.0
-const DEFAULT_ELITE_MULT := 2.0
+const DEFAULT_BOSS_MULT := 2.0
 const AUTO_WORTH := 0.4
 const SLASH_COLOR := Color(0.9, 0.15, 0.1)
 const TEXT_COLOR := Color(1.0, 0.25, 0.2)
@@ -36,9 +37,9 @@ var last_victim: Enemy
 var _reset_pending := -1.0
 
 
-## Below the threshold and not an elite / boss: dies to the strike.
+## Below the threshold and not a boss: dies to the strike.
 static func is_executable(e: Enemy, threshold_pct: float) -> bool:
-	if e == null or not is_instance_valid(e) or e.is_dead() or e.hp <= 0.0 or e.max_hp <= 0.0 or e.is_elite():
+	if e == null or not is_instance_valid(e) or e.is_dead() or e.hp <= 0.0 or e.max_hp <= 0.0 or e.is_boss():
 		return false
 	return e.hp / e.max_hp <= threshold_pct / 100.0 + 0.000001
 
@@ -105,14 +106,14 @@ func cast(ctx: AbilityContext) -> bool:
 			if e != victim:
 				victims.append(e)
 	var hit := hit_damage(p, ctx)
-	var elite_mult := ctx.num("elite_mult", DEFAULT_ELITE_MULT)
+	var boss_mult := ctx.num("boss_mult", DEFAULT_BOSS_MULT)
 	var kills := 0
 	var texts := 0
 	for e in victims:
 		if not is_instance_valid(e) or e.is_dead():
 			continue
 		var pos := e.global_position
-		var executed := strike(p, e, hit, threshold, elite_mult, ctx.ability.school)
+		var executed := strike(p, e, hit, threshold, boss_mult, ctx.ability.school)
 		last_struck += 1
 		var dead := not is_instance_valid(e) or e.is_dead() or e.hp <= 0.0
 		if dead:
@@ -133,20 +134,20 @@ func cast(ctx: AbilityContext) -> bool:
 	return true
 
 
-## One strike on [param e]: [param hit] damage, elite_mult x on an elite / boss below the
-## threshold, a kill on any other enemy below it. Returns true when it was an execution.
-static func strike(p: Player, e: Enemy, hit: float, threshold_pct: float, elite_mult: float,
+## One strike on [param e]: [param hit] damage, boss_mult x on a boss below the threshold, a
+## kill on any other enemy below it. Returns true when it was an execution.
+static func strike(p: Player, e: Enemy, hit: float, threshold_pct: float, boss_mult: float,
 		school: StringName) -> bool:
 	var ratio := e.hp / e.max_hp if e.max_hp > 0.0 else 1.0
 	var below := ratio <= threshold_pct / 100.0 + 0.000001
 	var amount := hit
-	if below and e.is_elite():
-		amount *= elite_mult
-	var execute := below and not e.is_elite()
+	if below and e.is_boss():
+		amount *= boss_mult
+	var execute := below and not e.is_boss()
 	if execute:
 		# Enough to finish it whatever the multipliers (outgoing and target bonuses).
 		var mult := p.outgoing_damage_mult(e, school, &"ability") \
-				* CombatMath.target_damage_mult(p.stats, ratio, false)
+				* CombatMath.target_damage_mult(p.stats, ratio, e.is_elite())
 		if mult > 0.0:
 			amount = maxf(amount, e.hp / mult * 1.001 + 0.01)
 	p.procs.deal_raw(e, amount, school, true, &"ability")

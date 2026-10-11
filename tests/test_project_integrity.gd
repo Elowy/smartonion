@@ -20,6 +20,8 @@ func _files(dir: String, ext: String) -> Array[String]:
 	if dir.trim_suffix("/") in SKIP_DIRS:
 		return out
 	for entry in ResourceLoader.list_directory(dir):
+		if entry.begins_with("."):
+			continue  # hidden (.godot, .git, .claude worktrees): Godot does not import them either
 		if entry.ends_with("/"):
 			out.append_array(_files(dir.path_join(entry.trim_suffix("/")) + "/", ext))
 		elif entry.trim_suffix(".remap").ends_with(ext):

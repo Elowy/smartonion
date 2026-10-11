@@ -64,19 +64,33 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 
 - 0 HP-nál a játékos **elesik** (szellem-alak, **normál sebességgel** mozoghat, nem támad;
   az ellenségek nem foglalkoznak vele).
-- **Spirit Healer:** a pálya közepén egy lebegő, áttetsző, szárnyas szellemalak áll (arany
-  glória, a földön világító rúnakör jelöli a hatósugarát, kb. 1,6 m). Az elesett játékos
-  odasétál, és ha **1 mp-ig a körében áll**, **100% HP-val** feléled (fényoszlop az égből,
-  „*Resurrected!*” felirat, 1 mp sebezhetetlenség).
-  - A szellem feje fölött ugyanaz a „Resurrecting” cast bar jelenik meg, halványkék
-    szellemszínben, a hátralévő idővel.
-  - Ha a szellem kilép a körből, a számlálás nullázódik. Több szellem egyszerre is éledhet.
+- **Spirit Healer:** a pálya közepén egy lebegő, áttetsző, szárnyas szellemalak (arany
+  glória, a földön világító rúnakör jelöli a hatósugarát, kb. 1,6 m). **Csak akkor látszik,
+  ha van elesett játékos:**
+  - Amíg mindenki él, nincs ott.
+  - Amint valaki elesik, felvillanva előtűnik és felemelkedik.
+  - Ha mindenki újra él, elhalványul.
+
+  **Folyamatosan futó
+  10 mp-es számlálója** van: a hullám elején indul, és minden lejáratkor (10 mp-enként) a
+  körében álló összes szellem **100% HP-val** feléled (fényoszlop az égből, „*Resurrected!*”
+  felirat, 1 mp sebezhetetlenség). Az elesett játékos odasétál, és a következő pulzusig vár.
+  - **Resurrection Sickness:** a Spirit Healer felélesztése után a játékos **15 mp-es**
+    debuffot kap; ez alatt a Spirit Healer nem tudja újra feléleszteni (a társak és a Word of
+    Glory igen). Hullámkezdéskor megszűnik.
+  - A körben várakozó szellem feje fölött a „Resurrecting” cast bar a következő pulzusig
+    hátralévő időt mutatja, halványkék szellemszínben; a Spirit Healer fölött is lebeg a
+    számláló, amíg van szellem.
+  - Ha a szellem kilép a körből, nem éled fel a pulzusnál. Egy pulzus az összes körben álló
+    szellemet feléleszti.
   - Élő játékosra nincs hatása. Csak hullám közben számít (hullámkezdéskor amúgy is
     mindenki feléled).
-  - Amíg van elesett játékos, a Spirit Healer erősebben izzik és lüktet, fényoszlop jelöli,
-    és a kamera mindig képen tartja, így a szellem biztosan látja és eléri.
-  - A játékos keretén (unit frame) a „DOWNED” felirat alatt a „*Go to the Spirit Healer*”
-    tipp jelenik meg.
+  - Amíg látszik (van elesett játékos), izzik és lüktet, fényoszlop jelöli, és a kamera
+    mindig képen tartja, így a szellem biztosan látja és eléri. A számláló láthatatlanul is
+    fut tovább.
+  - A játékos keretén (unit frame) a „DOWNED” felirat alatt a „*Go to the Spirit Healer (7 s)*”,
+    a körben a „*Spirit Healer: 7 s*”, betegség alatt a „*Resurrection Sickness: 12 s*” felirat
+    jelenik meg.
 - Egy élő társ **5 mp-ig mellette állva** is felélesztheti (30% HP-val) – ez megmaradt,
   WoW-szerű **„Resurrecting…” cast barral**:
   - **Cast bar:** a halott hagyma feje fölött jelenik meg, a felélesztő színében, a
@@ -222,7 +236,7 @@ Minden kaszt tartalmaz:
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
-| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a 8 m-en belüli legsebesültebb társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
+| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a 8 m-en belüli legsebesültebb társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban. Kivétel: ha a Spirit Healer 1 mp-en belül úgyis feléleszti, inkább gyógyít |
 | Mastery | **Aura of Devotion** – a közelben lévő társak HP-regenerációt és Armort kapnak (pontonként) |
 
 ### 3.4 Rogue
@@ -1041,13 +1055,44 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - **25 hullám**; a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
 
-- **Ellenség HP és sebzés:** hullámonként nő (kiinduló érték: +12% HP és +8% sebzés hullámonként, összeadódva).
+- **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
+  - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
+  - sebzés-szorzó: `(1 + 0,15 × n) × 1,08^n`.
+
+  Az összeadódó növekedést (+12% HP, +15% sebzés hullámonként) egy hullámonként kamatozó
+  szorzó egészíti ki (+22% HP, +8% sebzés), mert a hősök ereje (itemek, rangok, kártyák) is
+  kamatozva nő. Közelítő értékek (HP / sebzés):
+
+  | Hullám | HP | Sebzés |
+  |---|---|---|
+  | 5. | ×3,3 | ×2,2 |
+  | 10. | ×12 | ×4,7 |
+  | 15. | ×43 | ×9,1 |
+  | 20. | ×143 | ×17 |
+  | 25. | ×459 | ×29 |
+
+  A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez ideiglenes hangolás
+  M4 után, 4 ellenségtípussal; a végleges egyensúly M6-ban jön. A korábbi kiinduló érték +12%
+  HP és +8% sebzés volt, kamatozás nélkül.
 - **Spawn:** a spawnpontok a pálya szélén és véletlen belső pontokon vannak, 1 mp-es
   figyelmeztető jellel (piros rúna a földön), mint a Brotatóban.
 - **Co-op skálázás:** minden további játékos után
   - +60% ellenségszám,
   - +20% ellenség-HP,
   - a boss HP-ja ×(1 + 0,75 × (játékosok − 1)).
+- **Spawn-ráta:** `(0,9 + 0,08 × (h − 1))` ellenség / mp egy játékosra, co-opban szorozva az
+  ellenségszám-szorzóval. Egy 4 fős teljes menet kb. 15 000 ellenség. Mivel minden ellenség
+  goldot és XP-t ad, a szám lassan nő; a késői nehézséget a HP- és sebzés-skálázás adja.
+- **Ellenség-sebzés csapatlétszám szerint:** az ellenségek érintéses és lövedéksebzését a
+  csapatlétszám is szorozza: 1 / 2 / 3 / 4 játékosnál ×0,35 / ×0,45 / ×0,6 / ×0,8 (kb. ×1,3
+  minden további játékossal).
+  - **Miért:** kisebb csapatban kevesebben tudják felsegíteni az elesett hőst (egyedül az első
+    elesés már vereség), és egy hősre több ellenség jut (a +60% ellenségszám kevesebb, mint egy
+    újabb fejadag).
+  - A teljes csapat is ×0,8-at kap, mert a hullámgörbe teljes értékével 5 próbából 3-ban
+    elesett az egész csapat a 13–21. hullámon.
+  - Az ellenség HP-ja, száma és a gazdaság nem változik.
+  - Ideiglenes hangolás M4 után; a végleges egyensúly M6-ban jön.
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
@@ -1270,6 +1315,13 @@ indulnak.
   - erőforrás-sáv kaszt-színnel (Rage piros, Mana kék, Energy sárga, Holy Power arany pipek, Soul Shard lila pipek),
   - ability-sáv: 2 alap + 2 tanult aktív + 4 auto-cast ikon, cooldown-animációval és
     rang-jelzéssel (I–V).
+- **A hősök feje fölött:** névtábla („P1” + gyémánt a játékos színében) és alatta egy kis
+  életerő-csík. A csík fix képernyőméretű, és a tömegen át is látszik.
+  - Színe a HP szerint változik: zöld → sárga (50%) → piros.
+  - Az elnyelő pajzs halványkék szakaszként látszik a HP után. Ha túlnyúlik, a csík végére
+    rajzolódik.
+  - Szellemként a csík eltűnik; ilyenkor a cast bar és a Spirit Healer jelzései adnak
+    információt.
 - **Felül középen:** hullám száma, visszaszámláló, csapat-kassza.
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).
@@ -1562,7 +1614,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Cím | SmartOnion |
 | Nyelv | Angol |
 | Kamera | Közös képernyő; korlátos kizoomolás, a képernyő széle falként megállítja a játékosokat |
-| Felélesztés | Spirit Healer a pálya közepén: 1 mp a körében = 100% HP; egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog |
+| Felélesztés | Spirit Healer a pálya közepén: folyamatos 10 mp-es számláló, minden pulzus a körében álló szellemeket 100% HP-val feléleszti, utána 15 mp Resurrection Sickness (addig a Healer nem éleszt újra); egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog |
 | Gyógyulás | Minden hullám elején teljes HP |
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
@@ -1570,7 +1622,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Meta-progresszió | Egy fő profil (a kaszt szintjét bárki megkapja, aki azzal a kaszttal játszik), Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
 | Zene | Egyelőre nincs |
 | Célzás | Csak automatikus (fegyverek és képességek); nincs kézi célzás |
-| Paladin Word of Glory | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP) |
+| Paladin Word of Glory | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP), kivéve, ha a Spirit Healer 1 mp-en belül úgyis feléleszti |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
 | Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |

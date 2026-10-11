@@ -31,6 +31,8 @@ const PANEL_ALPHA := 0.8
 const SMALL_FONT := 18
 ## Shown while downed: what a ghost should do (GDD 1 – 1 s in the healer's circle = full HP).
 const GHOST_HINT := "Go to the Spirit Healer"
+const WAITING_HINT := "Spirit Healer: %d s"
+const SICKNESS_HINT := "Resurrection Sickness: %d s"
 ## Hint text and revive bar fill (pale spirit blue while the Spirit Healer channels).
 const GHOST_HINT_COLOR := Color(0.74, 0.9, 1.0)
 const REVIVE_BAR_COLOR := Color(0.55, 1.0, 0.45)
@@ -238,6 +240,24 @@ func _on_downed_changed(is_downed: bool) -> void:
 	revive_bar.set_values(0.0, 1.0)
 
 
+## The ghost hint: Resurrection Sickness time left, else the Spirit Healer's next pulse
+## ("Spirit Healer: 7 s" while waiting in its circle, "Go to the Spirit Healer (7 s)" else).
+func _update_hint() -> void:
+	var text := GHOST_HINT
+	var color := GHOST_HINT_COLOR
+	var healer: SpiritHealer = Arena.current.spirit_healer \
+			if Arena.current != null and is_instance_valid(Arena.current) else null
+	if player.res_sickness_left > 0.0:
+		text = SICKNESS_HINT % ceili(player.res_sickness_left)
+		color = Player.RES_SICKNESS_TEXT_COLOR
+	elif healer != null and is_instance_valid(healer):
+		var secs := ceili(maxf(0.0, healer.pulse_left))
+		text = (WAITING_HINT % secs) if player.healer_channel > 0.0 else (GHOST_HINT + " (%d s)" % secs)
+	if hint_label.text != text:
+		hint_label.text = text
+		hint_label.add_theme_color_override(&"font_color", color)
+
+
 func _on_damage_taken(_amount: float, _source: Node3D) -> void:
 	portrait.flash_hit()
 
@@ -258,3 +278,4 @@ func _process(_delta: float) -> void:
 		var healer := player.healer_channel > mates
 		revive_bar.fill_color = SpiritHealer.CAST_COLOR if healer else REVIVE_BAR_COLOR
 		revive_bar.set_values(player.healer_channel if healer else mates, 1.0)
+		_update_hint()

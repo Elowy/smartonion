@@ -65,8 +65,9 @@ func is_dashing() -> bool:
 	return _dashing
 
 
-func can_cast(_ctx: AbilityContext) -> bool:
-	return not _dashing
+## Not while dashing or leaping (WarriorKit.is_displaced): a press then is refunded.
+func can_cast(ctx: AbilityContext) -> bool:
+	return not _dashing and not WarriorKit.is_displaced(ctx.player)
 
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
