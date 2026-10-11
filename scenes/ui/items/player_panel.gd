@@ -5,8 +5,10 @@ extends Control
 ## Header in the player's colour (Pn, class, Avg. Item Level), tabs Character | Trainer |
 ## Talents. Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
 ## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
-## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/), wired the same
-## way. Character tab = WoW paper doll – Head, Neck,
+## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/: the three talent
+## trees, points, reset), wired the same way – its label shows the hero's free talent points
+## ("Talents (2)", TalentTab.tab_label, relabelled on TalentTab.points_changed). Character tab =
+## WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
@@ -135,6 +137,8 @@ var _player_label: Label
 var _class_label: Label
 var _ilvl_value: Label
 var _tabs_row: HBoxContainer
+## The tab strip's name labels (index = tab), relabelled in place (_refresh_tab_labels).
+var _tab_labels: Array[Label] = []
 var _stats_grid: GridContainer
 var _bag_count: Label
 var _spec_label: Label
@@ -193,6 +197,7 @@ func refresh() -> void:
 		close_menu()
 	trainer.refresh()
 	talents.refresh()
+	_refresh_tab_labels()
 	_update_selection()
 	_apply_debug_start_tab()
 
@@ -805,6 +810,7 @@ func _build() -> void:
 	talents.visible = false
 	talents.message.connect(_on_talents_message)
 	talents.prompts_changed.connect(_on_talents_prompts_changed)
+	talents.points_changed.connect(_refresh_tab_labels)
 	col.add_child(talents)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
@@ -859,6 +865,7 @@ func _refresh_tabs() -> void:
 	for c in _tabs_row.get_children():
 		_tabs_row.remove_child(c)
 		c.queue_free()
+	_tab_labels.clear()
 	for i in TAB_NAMES.size():
 		var tab := PanelContainer.new()
 		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -883,11 +890,12 @@ func _refresh_tabs() -> void:
 			var lock := UiIcon.create(UiIcon.Kind.LOCK, Vector2(16, 16), Color(0.55, 0.5, 0.44))
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(lock)
-		var l := UiTheme.label(TAB_NAMES[i], &"", 20 if active else UiTheme.FONT_SMALL,
+		var l := UiTheme.label(tab_text(i), &"", 20 if active else UiTheme.FONT_SMALL,
 			UiTheme.GOLD_BRIGHT if active else (Color(0.55, 0.52, 0.48) if locked else UiTheme.TEXT_DIM.lightened(0.1)))
 		if active:
 			l.add_theme_font_override(&"font", UiTheme.bold_font())
 		row.add_child(l)
+		_tab_labels.append(l)
 		_tabs_row.add_child(tab)
 	if not LOCKED_TABS.is_empty():
 		var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
@@ -904,6 +912,22 @@ func _refresh_tabs() -> void:
 	hint.add_child(TrainerRow.PromptTag.create("LMB" if keyboard else "RT", keyboard, 20.0, 14))
 	hint.modulate = Color(1, 1, 1, 0.8)
 	_tabs_row.add_child(hint)
+
+
+## The label of tab [param index]: its name; the Talents tab adds the free talent points
+## ("Talents (2)", TalentTab.tab_label).
+func tab_text(index: int) -> String:
+	if index == TALENTS_TAB and talents != null:
+		return talents.tab_label()
+	return TAB_NAMES[index] if index >= 0 and index < TAB_NAMES.size() else ""
+
+
+## Updates the tab names in place (the free talent points changed; no strip rebuild).
+func _refresh_tab_labels() -> void:
+	for i in _tab_labels.size():
+		var text := tab_text(i)
+		if _tab_labels[i].text != text:
+			_tab_labels[i].text = text
 
 
 func _build_doll() -> Control:
