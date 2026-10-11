@@ -7,7 +7,8 @@ extends Node3D
 ##   bomblets > 0  – Cluster Bomb: that many small bombs scatter 1.4-2.4 m around and explode
 ##                   for bomblet_pct % of the damage in bomblet_radius;
 ##   burn_duration > 0 – Incendiary Bomb: an AbilityArea of burning ground (burn_pct % of the
-##                   damage per burn_tick s).
+##                   damage per burn_tick s) as big as the blast ([member burn_radius] is the
+##                   radius before Area Size: AbilityArea.spawn applies it).
 ## In group &"ability_areas" (WaveDirector.stop frees bombs still in flight); the ability's
 ## end_wave frees them too. Logic in _physics_process, looks in _process.
 
@@ -36,6 +37,8 @@ var bomblets := 0
 var bomblet_pct := 40.0
 var bomblet_radius := 1.4
 var burn_duration := 0.0
+## Burning ground radius before Area Size (AbilityArea.spawn scales it).
+var burn_radius := 2.5
 var burn_pct := 15.0
 var burn_tick := 0.5
 var is_bomblet := false
@@ -54,7 +57,8 @@ var _age := 0.0
 
 ## Throws a bomb for [param thrower] from [param from] (world, its height is kept) to
 ## [param to] (ground). [param payload]: damage, radius (already final) and the spec numbers
-## (bomblets, bomblet_pct, bomblet_radius, burn_duration, burn_pct, burn_tick, flight_time).
+## (bomblets, bomblet_pct, bomblet_radius, burn_duration, burn_radius (unscaled; default:
+## radius without the thrower's Area Size), burn_pct, burn_tick, flight_time).
 ## Not in the tree when there is no arena / parent.
 static func throw(thrower: Player, from: Vector3, to: Vector3, payload: Dictionary, bomblet: bool = false) -> GeneralBombShell:
 	var b := GeneralBombShell.new()
@@ -70,6 +74,8 @@ static func throw(thrower: Player, from: Vector3, to: Vector3, payload: Dictiona
 	b.bomblet_pct = float(payload.get("bomblet_pct", 40.0))
 	b.bomblet_radius = float(payload.get("bomblet_radius", 1.4))
 	b.burn_duration = float(payload.get("burn_duration", 0.0))
+	var area := CombatMath.area_mult(thrower.stats) if thrower != null else 1.0
+	b.burn_radius = float(payload.get("burn_radius", b.radius / area))
 	b.burn_pct = float(payload.get("burn_pct", 15.0))
 	b.burn_tick = float(payload.get("burn_tick", 0.5))
 	var dist := GeneralKit.flat_distance(from, to)
@@ -141,7 +147,7 @@ func _spread(center: Vector3) -> void:
 				to = Arena.current.clamp_point(to, 0.5)
 			GeneralBombShell.throw(owner_player, center + Vector3.UP * 0.3, to, payload, true)
 	if burn_duration > 0.0 and not is_bomblet:
-		burn_area = AbilityArea.spawn(owner_player, center, radius, burn_duration, BURN_COLOR)
+		burn_area = AbilityArea.spawn(owner_player, center, burn_radius, burn_duration, BURN_COLOR)
 		if not burn_area.is_inside_tree():
 			burn_area.free()
 			burn_area = null

@@ -10,7 +10,8 @@ extends AbilityEffect
 ##   heal_pct        % of the bandaged hero's max HP (x power)
 ##   duration, tick  seconds of the heal and between two ticks
 ##   targets         heroes bandaged: the caster + the (targets - 1) most wounded living
-##                   teammates within ally_range m (Rank III: +1 = one ally)
+##                   teammates within ally_range m without a bandage of their own running
+##                   (it is never overwritten) (Rank III: +1 = one ally)
 ##   instant         Quick Wrap (spec): the whole heal lands at once
 ##   damage_reduction  Padded Wraps (spec): % less damage taken while bandaged (x power, max 75)
 ##   auto_hp         bots bandage below this % of max HP (themselves or a bandageable ally)
@@ -63,7 +64,8 @@ func end_wave(ctx: AbilityContext) -> void:
 	_clear(ctx)
 
 
-## Heroes a cast bandages: the caster, then the most wounded living teammates within range.
+## Heroes a cast bandages: the caster, then the most wounded living teammates within range
+## that are not bandaged already (a running bandage keeps its own heal and Padded Wraps).
 static func bandage_targets(ctx: AbilityContext) -> Array[Player]:
 	var out: Array[Player] = []
 	var player := ctx.player
@@ -75,7 +77,7 @@ static func bandage_targets(ctx: AbilityContext) -> Array[Player]:
 		return out
 	var hurt: Array[Player] = []
 	for p in GeneralKit.allies_near(player, ctx.num("ally_range", 6.0)):
-		if p.hp < p.max_hp() - 0.001:
+		if p.hp < p.max_hp() - 0.001 and GeneralBuff.find(p, KEY) == null:
 			hurt.append(p)
 	# Most wounded first; ties keep the group order (stable insertion).
 	var sorted: Array[Player] = []

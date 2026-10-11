@@ -166,12 +166,35 @@ class Buff extends RefCounted:
 	var left := 0.0
 
 
+## One absorb shield: [member hp] left for [member left] more seconds. Shields of one
+## [member source] share an entry (&"" = item procs and other anonymous shields).
+class Shield extends RefCounted:
+	var source: StringName = &""
+	var hp := 0.0
+	var left := 0.0
+
+
 var player: Player
 ## Every active proc (equipment order).
 var procs: Array[Proc] = []
-## Remaining absorb shield (HP) and its seconds left.
-var shield_hp := 0.0
-var shield_left := 0.0
+## Total absorb shield HP of every entry (overhead health bar, tests). Setting it clears every
+## shield; a positive value then adds one anonymous shield of DEFAULT_SHIELD_DURATION.
+var shield_hp: float:
+	get:
+		var total := 0.0
+		for s in _shields:
+			total += s.hp
+		return total
+	set(value):
+		_shields.clear()
+		add_shield(value, DEFAULT_SHIELD_DURATION)
+## Seconds left of the longest-lasting shield (0 = none).
+var shield_left: float:
+	get:
+		var longest := 0.0
+		for s in _shields:
+			longest = maxf(longest, s.left)
+		return longest
 
 var _on_hit: Array[Proc] = []
 var _on_kill: Array[Proc] = []
@@ -181,6 +204,8 @@ var _periodic: Array[Proc] = []
 var _cheat_death: Array[Proc] = []
 var _dots: Array[Dot] = []
 var _buffs: Array[Buff] = []
+## Absorb shields, one entry per source; each runs out on its own timer.
+var _shields: Array[Shield] = []
 ## Stat sources of "equip"-trigger buffs.
 var _equip_sources: Array[StringName] = []
 var _gold_carry := 0.0
@@ -261,31 +286,57 @@ func begin_wave() -> void:
 		p.timer = p.interval
 	_dots.clear()
 	_clear_buffs()
-	shield_hp = 0.0
-	shield_left = 0.0
+	_shields.clear()
 
 
-## Damage left after the absorb shield took its share ("Absorb" text when it took all).
-## Adds an absorb shield (Ice Barrier, shield procs): [param amount] HP for up to
-## [param duration] seconds (shields stack; the longer timer wins).
-func add_shield(amount: float, duration: float) -> void:
+## Adds an absorb shield (shield procs, Word of Glory, Ice Barrier ...): [param amount] HP for
+## up to [param duration] seconds. Shields of one [param source] stack in one entry (the
+## longer timer wins); shields of different sources keep their own timers.
+func add_shield(amount: float, duration: float, source: StringName = &"") -> void:
 	if amount <= 0.0:
 		return
-	shield_hp += amount
-	shield_left = maxf(shield_left, duration)
+	var entry := _shield_entry(source)
+	if entry == null:
+		entry = Shield.new()
+		entry.source = source
+		_shields.append(entry)
+	entry.hp += amount
+	entry.left = maxf(entry.left, duration)
 
 
+## Shield HP left from [param source] (0 = none).
+func shield_of(source: StringName) -> float:
+	var entry := _shield_entry(source)
+	return entry.hp if entry != null else 0.0
+
+
+func _shield_entry(source: StringName) -> Shield:
+	for s in _shields:
+		if s.source == source:
+			return s
+	return null
+
+
+## Damage left after the absorb shields took their share ("Absorb" text when they took all).
+## The shield that runs out first soaks first.
 func absorb(damage: float) -> float:
-	if shield_hp <= 0.0 or damage <= 0.0:
+	if _shields.is_empty() or damage <= 0.0:
 		return damage
-	var taken := minf(shield_hp, damage)
-	shield_hp -= taken
-	if shield_hp <= 0.0001:
-		shield_hp = 0.0
-		shield_left = 0.0
-	if taken >= damage and player != null:
+	var rest := damage
+	while rest > 0.0 and not _shields.is_empty():
+		var first := 0
+		for i in range(1, _shields.size()):
+			if _shields[i].left < _shields[first].left:
+				first = i
+		var s := _shields[first]
+		var taken := minf(s.hp, rest)
+		s.hp -= taken
+		rest -= taken
+		if s.hp <= 0.0001:
+			_shields.remove_at(first)
+	if rest <= 0.0 and player != null:
 		Vfx.floating_text(player.self_text_position(1.0), "Absorb", SHIELD_COLOR, Player.SELF_TEXT_SIZE, 1.0)
-	return damage - taken
+	return rest
 
 
 ## Lethal damage: a ready cheat_death effect saves the player (true) – the caller leaves it
@@ -547,8 +598,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 				RunState.add_gold(whole)
 				Vfx.floating_text(pos + Vector3.UP * 1.0, "+%d" % whole, GOLD_COLOR, 0.8)
 		&"shield":
-			shield_hp += maxf(0.0, p.num("amount"))
-			shield_left = maxf(shield_left, p.num("duration", DEFAULT_SHIELD_DURATION))
+			add_shield(p.num("amount"), p.num("duration", DEFAULT_SHIELD_DURATION))
 			_label(p, SHIELD_COLOR)
 		&"reflect":
 			var e := _target_enemy(target, pos)
@@ -757,15 +807,20 @@ func _physics_process(delta: float) -> void:
 			if p.timer <= 0.0:
 				p.timer = p.interval
 			_try_fire(p, p.chance / 100.0, null, _player_pos(), null)
-	if shield_left > 0.0:
-		shield_left -= delta
-		if shield_left <= 0.0:
-			shield_left = 0.0
-			shield_hp = 0.0
+	if not _shields.is_empty():
+		_tick_shields(delta)
 	if not _buffs.is_empty():
 		_tick_buffs(delta)
 	if not _dots.is_empty():
 		_tick_dots(delta)
+
+
+## Every shield runs out on its own timer.
+func _tick_shields(delta: float) -> void:
+	for i in range(_shields.size() - 1, -1, -1):
+		_shields[i].left -= delta
+		if _shields[i].left <= 0.0:
+			_shields.remove_at(i)
 
 
 func _tick_buffs(delta: float) -> void:

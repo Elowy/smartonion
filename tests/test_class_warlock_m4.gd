@@ -472,6 +472,32 @@ func test_seed_chain_reaction_and_blighted_ground() -> void:
 	check(pool.get_node_or_null("BlightVfx") != null, "bubbling look")
 
 
+func test_afflictions_wither_when_their_host_vanishes_without_dying() -> void:
+	var p := _warlock()
+	var host := _enemy(Vector3(5, 0, 0))
+	var next := _enemy(Vector3(6, 0, 0.5))
+	var slot := _learn(p, &"seed_of_corruption", 5, 1)  # Blighted Ground
+	check(p.abilities.try_cast(slot), "cast")
+	var aff := _aff(p)
+	var seeded: MortalEnemy = host if aff.has(WarlockAfflictions.SEED, host) else next
+	var other: MortalEnemy = next if seeded == host else host
+	check(aff.corrupt(seeded, 1.0, 8.0, 2, 6.0) != null, "corrupted too")
+	# Wave end: WaveDirector.stop() despawns every enemy (no died signal); freed by the next tick.
+	seeded.free()
+	aff._physics_process(DT)
+	check_eq(aff.bursts, 0, "no burst over a despawned host")
+	check_eq(aff.spreads, 0, "no spread either")
+	check_eq(aff.count(), 0, "its afflictions withered")
+	check(not aff.has(WarlockAfflictions.CORRUPTION, other), "nothing jumped to the neighbour")
+	check_eq(tree.get_nodes_in_group(&"ability_areas").size(), 0, "no Blighted Ground pool")
+	# A real death still counts, even when the corpse is already gone by the next tick.
+	check(aff.plant_seed(other, 1.0, 6.0, 5.0, 3.0) != null, "seeded the other one")
+	other.died.emit(other, 0)
+	other.free()
+	aff._physics_process(DT)
+	check_eq(aff.bursts, 1, "a killed host bursts")
+
+
 # --- Summon Voidwalker -----------------------------------------------------------------------
 
 func test_voidwalker_is_summoned_and_taunts() -> void:

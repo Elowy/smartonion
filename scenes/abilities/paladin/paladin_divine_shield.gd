@@ -5,7 +5,8 @@ extends AbilityEffect
 ##
 ## Params also: heal_max_hp (Rank III: heals that % of max HP x power at the cast),
 ## aura_damage / aura_spell_power_scale / aura_radius / aura_tick (spec "Radiant Bubble":
-## the bubble burns enemies around the Paladin for weapon-based Holy damage every tick),
+## the bubble burns enemies around the Paladin for weapon-based Holy damage every tick; power
+## only lengthens the bubble – more ticks – and never raises a tick, so it counts once),
 ## share_range (spec "Hand of Protection": the most wounded living ally within that range gets
 ## the same bubble and invulnerability).
 ##
@@ -85,8 +86,8 @@ func cast(ctx: AbilityContext) -> bool:
 		ProcVfx.beam(p.get_chest_position(), ally.get_chest_position(), PaladinKit.HOLY_COLOR)
 	_aura_damage = 0.0
 	if ctx.num("aura_damage") > 0.0:
-		_aura_damage = PaladinKit.strike_damage(p, ctx.num("aura_damage"), ctx.num("aura_spell_power_scale", 0.25),
-				ctx.num("power", 1.0))
+		# Power is already in the duration (more ticks): each tick stays at aura_damage %.
+		_aura_damage = PaladinKit.strike_damage(p, ctx.num("aura_damage"), ctx.num("aura_spell_power_scale", 0.25))
 		_aura_radius = ctx.num("aura_radius", DEFAULT_AURA_RADIUS) * CombatMath.area_mult(p.stats)
 		_aura_tick = maxf(0.1, ctx.num("aura_tick", 0.5))
 		_aura_timer = 0.0

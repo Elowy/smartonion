@@ -106,9 +106,10 @@ static func random_enemy(tree: SceneTree, center: Vector3, reach: float, rng: Ra
 
 ## Freezes [param e] for [param duration] seconds (a stun; stun resistance shortens it) and
 ## shows the ice ([MageFrozen], child of the enemy). Returns the ice, null when the enemy
-## shrugged the freeze off. [param shatter_damage] > 0: the ice bursts when it melts.
+## shrugged the freeze off. [param shatter_damage] > 0: the ice bursts when it melts; the ice
+## of one cast shares [param group] (each enemy takes that cast's shatter once).
 static func freeze(e: Enemy, caster: Player, duration: float, shatter_damage: float = 0.0,
-		shatter_radius: float = 1.5) -> MageFrozen:
+		shatter_radius: float = 1.5, group: MageFrozen.ShatterGroup = null) -> MageFrozen:
 	if not is_live(e) or duration <= 0.0:
 		return null
 	e.apply_stun(duration)
@@ -116,7 +117,7 @@ static func freeze(e: Enemy, caster: Player, duration: float, shatter_damage: fl
 	var life := e.stun_left if e.stun_left > 0.0 else (duration if e.data == null else 0.0)
 	if life <= 0.0:
 		return null
-	return MageFrozen.apply(e, caster, life, shatter_damage, shatter_radius)
+	return MageFrozen.apply(e, caster, life, shatter_damage, shatter_radius, group)
 
 
 ## Area multiplier of [param player] (Area Size %).

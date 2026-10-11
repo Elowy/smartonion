@@ -4,7 +4,9 @@ extends AbilityEffect
 ## INSTANTLY revives them at [code]revive_hp[/code] of their max HP instead of healing – the only
 ## instant revive in the game (AbilityRunner ALLY targeting with prefer_downed picks the
 ## downed teammate). Otherwise it heals the Paladin and the most hurt living teammate in range
-## ([method heal_targets]).
+## ([method heal_targets]). A ghost the Spirit Healer's pulse revives within
+## [constant HEALER_SOON] seconds (at full HP) is left to it – the cast heals instead; a ghost
+## with a longer wait is a fair revive.
 ##
 ## Params: prefer_downed, revive_hp (x power, at most full HP), heal (flat), heal_max_hp_pct (% of
 ## the healed hero's max HP), spell_power_scale – the heal x power (ranks II / IV); allies
@@ -16,12 +18,18 @@ extends AbilityEffect
 const HOLY_COLOR := Color(1.0, 0.88, 0.45)
 ## Bots heal when a hero in range is below this share of max HP.
 const AUTO_HEAL_RATIO := 0.5
+## A ghost the Spirit Healer revives within this many seconds (Player.healer_seconds_left) is
+## not worth a revive.
+const HEALER_SOON := 1.0
 
 
-## The downed teammate this cast would revive (ctx.target when downed and within range).
+## The downed teammate this cast would revive (ctx.target when downed and within range, unless
+## the Spirit Healer revives it within HEALER_SOON seconds anyway).
 static func revive_target(ctx: AbilityContext) -> Player:
 	var t := ctx.target as Player
 	if t == null or t == ctx.player or not t.downed or not t.is_inside_tree():
+		return null
+	if t.healer_seconds_left >= 0.0 and t.healer_seconds_left <= HEALER_SOON:
 		return null
 	if ctx.player == null or not ctx.player.is_inside_tree():
 		return null

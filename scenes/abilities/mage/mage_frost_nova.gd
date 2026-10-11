@@ -7,7 +7,8 @@ extends AbilityEffect
 ##
 ## Params (data/abilities/mage_frost_nova.tres): damage, int_scaling, radius, freeze (Rank
 ## III: +1 s), trigger, shatter_pct + shatter_radius (Rank V "Shatter": the ice bursts when
-## the freeze ends for shatter_pct % of the nova's damage around each frozen enemy),
+## the freeze ends for shatter_pct % of the nova's damage around each frozen enemy; each enemy
+## takes one nova's shatter at most once, [member MageFrozen.shatter_group]),
 ## ground_duration + ground_slow + ground_freeze (Rank V "Frozen Ground": an [AbilityArea]
 ## that slows and freezes each newcomer once).
 
@@ -45,13 +46,14 @@ func cast(ctx: AbilityContext) -> bool:
 	var freeze := ctx.num("freeze", 1.5)
 	var shatter := damage * ctx.num("shatter_pct", 0.0) / 100.0
 	var shatter_radius := ctx.num("shatter_radius", 1.5) * MageSpell.area_mult(p)
+	var group: MageFrozen.ShatterGroup = MageFrozen.ShatterGroup.new() if shatter > 0.0 else null
 	last_hits = 0
 	for e in victims:
 		if not MageSpell.is_live(e):
 			continue
 		p.procs.deal_raw(e, damage, MageSpell.FROST, true, &"ability")
 		last_hits += 1
-		MageSpell.freeze(e, p, freeze, shatter, shatter_radius)
+		MageSpell.freeze(e, p, freeze, shatter, shatter_radius, group)
 	if ctx.num("ground_duration", 0.0) > 0.0:
 		_frozen_ground(ctx, center)
 	MageFx.frost_nova(center, radius)

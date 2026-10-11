@@ -456,6 +456,34 @@ func test_when_struck_reflect_and_frozen_ward() -> void:
 	check_near(hp_e - e.hp, 12.0, 0.0001, "projectile hits count as struck too")
 
 
+func test_shields_keep_their_own_timers() -> void:
+	var p := _hero()
+	var ps := p.procs
+	ps.add_shield(10.0, 3600.0, &"barrier")
+	ps.add_shield(5.0, 4.0)
+	check_eq(ps.shield_hp, 15.0, "shield_hp is the total")
+	check_eq(ps.shield_of(&"barrier"), 10.0, "per source")
+	check_eq(ps.shield_of(&""), 5.0, "anonymous shields share one entry")
+	ps._physics_process(5.0)
+	check_eq(ps.shield_hp, 10.0, "the 4 s shield expired: a long shield does not stretch it")
+	ps.add_shield(6.0, 4.0)
+	ps.add_shield(1.0, 2.0)
+	check_eq(ps.shield_of(&""), 7.0, "same source: one entry (the longer timer wins)")
+	check_eq(ps.absorb(8.0), 0.0, "absorbed")
+	check_eq(ps.shield_of(&"barrier"), 9.0, "the shield that runs out first soaks first")
+	check_eq(ps.shield_of(&""), 0.0, "used up")
+	check_eq(ps.absorb(12.0), 3.0, "the rest goes through")
+	check_eq(ps.shield_hp, 0.0, "all used up")
+	ps.add_shield(4.0, 1.0, &"barrier")
+	ps.add_shield(2.0, 1.0)
+	ps.shield_hp = 0.0
+	check_eq(ps.shield_hp, 0.0, "setting 0 clears every shield")
+	check_eq(ps.shield_of(&"barrier"), 0.0, "including the named ones")
+	ps.add_shield(4.0, 1.0, &"barrier")
+	ps.begin_wave()
+	check_eq(ps.shield_hp, 0.0, "wave start clears them")
+
+
 func test_low_hp_shield_absorbs_and_rearms() -> void:
 	var p := _hero()
 	p.equipment.equip(unique(&"shield", {"trigger": "low_hp", "threshold": 50.0, "amount": 30.0,
