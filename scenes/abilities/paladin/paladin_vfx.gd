@@ -112,7 +112,7 @@ static func shield_look() -> Node3D:
 	body.mesh = MeshKit.cached("paladin:shield", func() -> Mesh:
 		var k := MeshKit.new()
 		var gold := Color(1.0, 0.8, 0.32)
-		k.add_cylinder(0.36, 0.36, 0.06, Transform3D.IDENTITY, Color(0.5, 0.58, 0.78), 20)
+		k.add_cylinder(0.36, 0.36, 0.06, Transform3D.IDENTITY, Color(0.36, 0.46, 0.78), 20)
 		k.add_torus(0.33, 0.42, Transform3D.IDENTITY, gold, 20, 6)
 		k.add_box(Vector3(0.5, 0.03, 0.08), MeshKit.xf(Vector3(0, 0.035, 0)), gold)
 		k.add_box(Vector3(0.08, 0.03, 0.5), MeshKit.xf(Vector3(0, 0.035, 0)), gold)
@@ -124,11 +124,11 @@ static func shield_look() -> Node3D:
 	var glow := MeshInstance3D.new()
 	glow.name = "Glow"
 	glow.mesh = _glow_sphere()
-	glow.material_override = Mats.glow(Color(GOLD.r, GOLD.g, GOLD.b, 0.28), 1.6)
+	glow.material_override = Mats.glow(Color(GOLD.r, GOLD.g, GOLD.b, 0.2), 1.4)
 	glow.scale = Vector3(1.9, 0.5, 1.9)
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	spinner.add_child(glow)
-	root.scale = Vector3.ONE * 1.2
+	root.scale = Vector3.ONE * 1.35
 	return root
 
 
