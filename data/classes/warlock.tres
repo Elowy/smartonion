@@ -1,7 +1,13 @@
-[gd_resource type="Resource" script_class="ClassData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ClassData" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
 [ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_mh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="3_res_script"]
+[ext_resource type="Resource" path="res://data/resources/soul_shards.tres" id="4_soul_shards"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="5_ability_script"]
+[ext_resource type="Resource" path="res://data/abilities/warlock_rain_of_fire.tres" id="6_rain_of_fire"]
+[ext_resource type="Resource" path="res://data/abilities/warlock_drain_life.tres" id="7_drain_life"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/warlock_mastery.gd" id="8_mastery"]
 
 [resource]
 script = ExtResource("1_script")
@@ -19,6 +25,10 @@ main_hand = ExtResource("2_mh")
 proficiencies = Array[StringName]([&"wand", &"staff", &"dagger", &"sword", &"tome"])
 resource_type = &"soul_shard"
 resource_color = Color(0.7, 0.3, 0.9, 1)
+resources = Array[ExtResource("3_res_script")]([ExtResource("4_soul_shards")])
+abilities = Array[ExtResource("5_ability_script")]([ExtResource("6_rain_of_fire"), ExtResource("7_drain_life")])
+mastery = ExtResource("8_mastery")
+mastery_text = "Demonic Pact: your damage-over-time effects and pets deal +2% damage per Mastery point. A permanent Imp fights at your side."
 onion_color = Color(0.3, 0.16, 0.32, 1)
 accent_color = Color(0.4, 0.9, 0.25, 1)
 headgear = &"horned_hood"

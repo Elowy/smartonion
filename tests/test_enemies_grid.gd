@@ -183,3 +183,18 @@ func test_weapon_retries_a_missing_target_every_retry_interval() -> void:
 	check(runner.tick(DT), "a spawned enemy is attacked without waiting")
 	check_eq(other.fake_hits(), 1, "hit the new one")
 	PFakes.free_world(pworld)
+
+
+func test_count_around_matches_a_full_scan() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for i in 50:
+		_fake_enemy(Vector3(rng.randf_range(-16, 16), 0, rng.randf_range(-10, 10)), 0.4)
+	for k in 40:
+		var center := Vector3(rng.randf_range(-18, 18), 0, rng.randf_range(-12, 12))
+		var radius := rng.randf_range(0.5, 8.0)
+		var expected := 0
+		for node in tree.get_nodes_in_group(&"enemies"):
+			if WeaponRunner.flat((node as Node3D).global_position - center).length() <= radius:
+				expected += 1
+		check_eq(EnemyGrid.count_around(tree, center, radius), expected, "centres within the radius (query %d)" % k)

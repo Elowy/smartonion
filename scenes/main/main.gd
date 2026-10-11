@@ -296,6 +296,10 @@ func open_intermission() -> void:
 		return
 	_set_state(State.INTERMISSION)
 	get_tree().paused = true
+	for slot in PlayerManager.get_slots():
+		var p := slot.player as Player
+		if p != null and is_instance_valid(p):
+			p.end_wave()  # auras / buffs must not show in the market
 	if hud != null:
 		hud.hide()  # the market has its own summary; start_wave shows the HUD again
 	intermission.open(wave, RunState.pending_level_ups)
@@ -697,10 +701,17 @@ func _apply_time_scale(scale: float) -> void:
 	Engine.max_physics_steps_per_frame = maxi(8, ceili(8.0 * scale))
 
 
-## Joins --players bots, classes cycling through Db.class_ids.
+## Joins --players bots, classes cycling through --classes (default: Db.class_ids).
 func _add_bots() -> void:
 	PlayerManager.clear()
-	var ids := Db.class_ids
+	var ids: Array[StringName] = []
+	for id in options.classes:
+		if Db.get_class_data(id) != null:
+			ids.append(id)
+		else:
+			push_warning("--classes: unknown class '%s'" % id)
+	if ids.is_empty():
+		ids = Db.class_ids
 	var base_seed := options.run_seed() if options.run_seed() >= 0 else randi() % 100000
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""

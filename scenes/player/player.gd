@@ -7,9 +7,10 @@ extends CharacterBody3D
 ## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
 ## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
 ## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level gained). Every equipped weapon that
-## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a slow ghost that
-## does not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME
-## seconds revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER).
+## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
+## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
+## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
+## the arena's [SpiritHealer] (1 s in its circle, full HP – see healer_channel).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 ## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
@@ -47,8 +48,8 @@ const DECELERATION := 60.0
 const MOVE_DEADZONE := 0.05
 ## Gap (m) kept between the body and the arena's outer walls (see _clamp_motion_to_arena).
 const WALL_GAP := 0.02
-## Downed ghosts move at half speed (GDD 1).
-const GHOST_SPEED_MULT := 0.5
+## Downed ghosts move at full speed (GDD 1), so the walk to the Spirit Healer is quick.
+const GHOST_SPEED_MULT := 1.0
 ## HP fraction after a teammate revive / after a wave starts while downed.
 const REVIVE_HP_RATIO := 0.3
 const WAVE_START_REVIVE_HP_RATIO := 0.5
@@ -102,12 +103,23 @@ var weapons: Array[WeaponRunner] = []
 var equipment: Equipment
 ## Enchantment / unique-item procs of the equipped items (child node "Procs", GDD 5.7).
 var procs: ProcSystem
+## Class abilities, resources and Mastery (child node "Abilities", GDD 3).
+var abilities: AbilityRunner
+## The next N weapon hits are guaranteed critical strikes (Vanish, talents ...).
+var forced_crits := 0
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
+## Set every tick by the [SpiritHealer] while this ghost channels in its circle: progress
+## (0..1, 0 = not channelling) and the seconds it still needs (-1 = none). The cast bar shows
+## whichever revive – teammates' or the healer's – is closer to completion.
+var healer_channel := 0.0
+var healer_seconds_left := -1.0
 ## Remaining invulnerability (i-frames) in seconds.
 var invulnerable_left := 0.0
+## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
+var stealth_left := 0.0
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -147,6 +159,8 @@ static func create(p_slot: PlayerSlot) -> Player:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
 	p.procs = ProcSystem.create(p)
+	p.abilities = AbilityRunner.create(p)
+	p.add_child(p.abilities)
 	p.add_child(p.procs)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons()
@@ -177,6 +191,32 @@ func is_alive() -> bool:
 	return not downed
 
 
+## Hidden from enemies (Vanish): still collects pickups and can be healed / revived.
+func is_stealthed() -> bool:
+	return stealth_left > 0.0
+
+
+## Alive and standing next to a downed teammate (reviving it) – bots must not dash away.
+func is_reviving() -> bool:
+	if downed or not is_inside_tree():
+		return false
+	var here := global_position
+	for node in get_tree().get_nodes_in_group(&"players"):
+		var other := node as Player
+		if other == null or other == self or not other.downed or not other.is_inside_tree():
+			continue
+		var d := other.global_position - here
+		if Vector2(d.x, d.z).length() <= REVIVE_RADIUS:
+			return true
+	return false
+
+
+## Wave cleared (before the intermission): abilities / Mastery drop auras and buffs.
+func end_wave() -> void:
+	if abilities != null:
+		abilities.end_wave()
+
+
 ## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1).
 func begin_wave() -> void:
 	velocity = Vector3.ZERO
@@ -189,10 +229,15 @@ func begin_wave() -> void:
 		hp = max_hp()
 		_hp_updated()
 	invulnerable_left = 0.0
+	stealth_left = 0.0
+	forced_crits = 0
+	damage_mults.clear()
 	for runner in weapons:
 		runner.reset()
 	if procs != null:
 		procs.begin_wave()
+	if abilities != null:
+		abilities.begin_wave()
 
 
 ## Called by enemies / enemy projectiles. Rolls dodge, parry (melee: negates the hit and
@@ -243,6 +288,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	_shake_camera(HIT_SHAKE)
 	_hp_updated()
 	damage_taken.emit(dmg, source)
+	if abilities != null:
+		abilities.on_damage_taken(dmg)
 	if hp <= 0.0:
 		_go_down()
 	_thorns(attacker, kind)
@@ -278,12 +325,16 @@ func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_c
 		heal(1.0)
 	if roll_procs and procs != null and target != null and is_instance_valid(target):
 		procs.on_hit(target, damage, weapon, is_crit, is_extra)
+	if abilities != null:
+		abilities.on_weapon_hit(target, damage, is_crit)
 
 
 ## Called by an Enemy this player killed (any damage of this player: weapon, proc, Thorns).
 ## Life on Kill (% chance to heal 1) and on-kill procs; a downed hero only gets the credit.
 func notify_kill(enemy: Node3D) -> void:
 	enemy_killed.emit(enemy)
+	if abilities != null and not downed:
+		abilities.on_kill(enemy)
 	if downed:
 		return
 	if stats.get_raw(Stats.LIFE_ON_KILL) > 0.0 and CombatMath.roll_life_on_kill(stats, RunState.rng):
@@ -317,6 +368,8 @@ func apply_equipment() -> void:
 		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
 	if procs != null:
 		procs.refresh()
+	if abilities != null:
+		abilities.invalidate_params()  # item ability mods
 
 
 ## The WeaponRunner of [param weapon] (the first runner when [param weapon] is null or not
@@ -377,6 +430,49 @@ func block_chance() -> float:
 	return total
 
 
+## Multiplier on all outgoing damage of this player (Mastery, ability buffs ...).
+## [param source]: &"weapon", &"proc", &"dot", &"ability", &"pet". [param target] may be null.
+func outgoing_damage_mult(target: Node3D, school: StringName, source: StringName) -> float:
+	var m := 1.0
+	if abilities != null and abilities.mastery != null:
+		m *= abilities.mastery.damage_mult(target, school, source)
+	for v in damage_mults.values():
+		m *= v
+	return maxf(0.0, m)
+
+
+## Temporary named outgoing-damage multipliers set by abilities / talents (key -> mult).
+var damage_mults: Dictionary[StringName, float] = {}
+
+
+## Consumes one guaranteed critical strike (Vanish ...). Weapon runners call this.
+func consume_forced_crit() -> bool:
+	if forced_crits <= 0:
+		return false
+	forced_crits -= 1
+	return true
+
+
+## Item modifiers for ability [param ability_id] from equipped items whose unique_effect is
+## &"ability_mod" and unique_params.ability == ability_id (merged "mods" dictionaries; see
+## AbilityRunner.apply_mods for the key conventions).
+func ability_mods(ability_id: StringName) -> Dictionary:
+	var out := {}
+	if equipment == null:
+		return out
+	for item in equipment.equipped_items():
+		if item.unique_effect != &"ability_mod" or StringName(item.unique_params.get("ability", "")) != ability_id:
+			continue
+		var mods: Dictionary = item.unique_params.get("mods", {})
+		for key: String in mods:
+			var v: Variant = mods[key]
+			if typeof(v) in [TYPE_INT, TYPE_FLOAT] and out.has(key) and typeof(out[key]) in [TYPE_INT, TYPE_FLOAT]:
+				out[key] = float(out[key]) + float(v)
+			else:
+				out[key] = v
+	return out
+
+
 ## Revives a downed player at [param hp_ratio] of max HP (min 1 HP).
 func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	if not downed:
@@ -384,6 +480,8 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	downed = false
 	revive_progress = 0.0
 	reviver_count = 0
+	healer_channel = 0.0
+	healer_seconds_left = -1.0
 	_regen_accum = 0.0
 	var nobody: Array[Player] = []
 	_update_channelers(nobody)
@@ -413,7 +511,7 @@ func revive_seconds_left() -> float:
 	return maxf(0.0, REVIVE_TIME - revive_progress) / speed
 
 
-## Current top speed in m/s (halved while downed).
+## Current top speed in m/s (GHOST_SPEED_MULT while downed).
 func current_max_speed() -> float:
 	return stats.move_speed() * (GHOST_SPEED_MULT if downed else 1.0)
 
@@ -459,6 +557,7 @@ func face_attack(direction: Vector3) -> void:
 
 func _physics_process(delta: float) -> void:
 	invulnerable_left = maxf(0.0, invulnerable_left - delta)
+	stealth_left = maxf(0.0, stealth_left - delta)
 	_attack_look_left = maxf(0.0, _attack_look_left - delta)
 	_update_movement(delta)
 	if downed:
@@ -642,7 +741,14 @@ func _update_revive(delta: float) -> void:
 		var color := OnionModel.REVIVE_COLOR
 		if not revivers.is_empty() and revivers[0].slot != null:
 			color = revivers[0].slot.color
-		model.set_revive_progress(revive_progress / REVIVE_TIME, color, revive_seconds_left())
+		var ratio := revive_progress / REVIVE_TIME
+		var seconds := revive_seconds_left()
+		if healer_channel > ratio:
+			# The Spirit Healer's channel is further along: show that one.
+			ratio = healer_channel
+			color = SpiritHealer.CAST_COLOR
+			seconds = healer_seconds_left
+		model.set_revive_progress(ratio, color, seconds)
 	if revive_progress >= REVIVE_TIME - 0.0001:
 		var feet := global_position
 		revive(REVIVE_HP_RATIO)
@@ -698,6 +804,7 @@ func _go_down() -> void:
 	reviver_count = 0
 	_regen_accum = 0.0
 	invulnerable_left = 0.0
+	stealth_left = 0.0
 	if model != null:
 		model.set_downed(true)
 		model.set_revive_progress(0.0)
@@ -780,6 +887,11 @@ static func _format_amount(value: float) -> String:
 	if is_zero_approx(fmod(tenths, 10.0)):
 		return str(int(tenths / 10.0))
 	return "%.1f" % (tenths / 10.0)
+
+
+func _exit_tree() -> void:
+	if abilities != null:
+		abilities.teardown()
 
 
 func _notification(what: int) -> void:

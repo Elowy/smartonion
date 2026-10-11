@@ -34,6 +34,12 @@ static func join_key_held() -> bool:
 	return false
 
 
+## LMB / RMB = core slots, Q = learned slot 1 (slot 2), E = learned slot 2 (slot 3), GDD 11 –
+## Q / E keep their menu meaning (LB / RB = tab left / right).
+func ability_button(index: int) -> Pad:
+	return [Pad.RT, Pad.LT, Pad.LB, Pad.RB][index]
+
+
 func get_device_name() -> String:
 	return "Keyboard & Mouse"
 

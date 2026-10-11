@@ -5,8 +5,11 @@ extends ScriptedInput
 ##   inside their weapon reach (they close in on the nearest enemy).
 ## - Walks to dropped loot, keeps away from the arena walls (no corner traps), stays near
 ##   its teammates and drifts back towards the centre.
-## - Rescues: a living bot runs to the nearest downed teammate and stands next to it until
-##   the revive is done; a downed bot (ghost) drifts towards the nearest living teammate.
+## - Revives (GDD 1): a downed bot (ghost) walks straight to the arena's Spirit Healer and
+##   waits inside its circle (1 s there = full HP; without a healer it drifts towards the
+##   nearest living teammate). A living bot only runs to a downed teammate within
+##   RESCUE_RANGE and stands next to it until the revive is done – farther ghosts use the
+##   healer while the bot keeps fighting.
 
 ## Ranged bots keep this far (m) from enemies.
 const KITE_DISTANCE := 6.0
@@ -30,8 +33,13 @@ const COHESION_DISTANCE := 4.0
 ## A bot stops this close (m) to the teammate it revives / is revived by
 ## (Player.REVIVE_RADIUS is 1.8 m).
 const RESCUE_DISTANCE := 1.1
-## Teammates farther away than this (m) are not worth a rescue run.
-const RESCUE_RANGE := 30.0
+## Downed teammates farther away than this (m) are not worth a rescue run: they walk to the
+## Spirit Healer instead.
+const RESCUE_RANGE := 5.0
+## A ghost bot stops this close (m) to the Spirit Healer – well inside its HEAL_RADIUS.
+const HEALER_STOP_DISTANCE := SpiritHealer.HEAL_RADIUS * 0.5
+## Without a Spirit Healer a ghost bot looks for living teammates within this range (m).
+const HELP_RANGE := 30.0
 ## While reviving, an enemy closer than this (m) makes the bot step away after all.
 const RESCUE_PANIC_DISTANCE := 1.6
 ## No rescue run into a crowd: more than RESCUE_MAX_THREATS enemies within
@@ -90,8 +98,16 @@ func think(delta: float) -> void:
 		if dist < keep:
 			# Same push at the keep distance's edge whatever the keep distance is.
 			steer += d / dist * (keep - dist) * (KITE_DISTANCE / keep)
-	# Living bots go to downed teammates, ghosts to living ones (revives, GDD 1).
-	var buddy := _nearest_teammate(pos, not alive)
+	# A ghost walks straight to the Spirit Healer (enemies ignore ghosts) and waits there.
+	if not alive:
+		var healer := _healer_point()
+		if healer.is_finite():
+			var to_healer := healer - pos
+			var gap := to_healer.length()
+			move = to_healer / gap if gap > HEALER_STOP_DISTANCE else Vector2.ZERO
+			return
+	# Living bots go to downed teammates close by, ghosts (no healer) to living ones (GDD 1).
+	var buddy := _nearest_teammate(pos, not alive, RESCUE_RANGE if alive else HELP_RANGE)
 	if buddy.is_finite() and alive and not _safe_rescue(pos, buddy, enemies):
 		buddy = Vector2.INF
 	if buddy.is_finite():
@@ -197,10 +213,10 @@ func _cohesion(pos: Vector2) -> Vector2:
 
 
 ## Position (XZ) of the nearest other player that is alive ([param want_alive]) or downed,
-## within RESCUE_RANGE; Vector2.INF when there is none.
-func _nearest_teammate(pos: Vector2, want_alive: bool) -> Vector2:
+## within [param max_range] m; Vector2.INF when there is none.
+func _nearest_teammate(pos: Vector2, want_alive: bool, max_range: float) -> Vector2:
 	var best := Vector2.INF
-	var best_dist := RESCUE_RANGE
+	var best_dist := max_range
 	for node in body.get_tree().get_nodes_in_group(&"players"):
 		var n := node as Node3D
 		if n == null or n == body or not n.is_inside_tree() or _is_alive(n) != want_alive:
@@ -211,3 +227,14 @@ func _nearest_teammate(pos: Vector2, want_alive: bool) -> Vector2:
 			best_dist = dist
 			best = p
 	return best
+
+
+## Ground position (XZ) of Arena.current's Spirit Healer; Vector2.INF when there is none.
+static func _healer_point() -> Vector2:
+	var arena := Arena.current
+	if arena == null or not is_instance_valid(arena):
+		return Vector2.INF
+	var healer := arena.spirit_healer
+	if healer == null or not is_instance_valid(healer) or not healer.is_inside_tree():
+		return Vector2.INF
+	return Vector2(healer.global_position.x, healer.global_position.z)

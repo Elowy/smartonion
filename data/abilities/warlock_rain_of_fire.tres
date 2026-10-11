@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/rain_of_fire.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"rain_of_fire"
+display_name = "Rain of Fire"
+description = "Calls down a rain of fire on the densest group of enemies: a {radius} m circle burns everything inside for {duration} sec. Scales with Intellect and Spell Power."
+class_id = &"warlock"
+school = &"fire"
+resource = &"soul_shard"
+cost = 1.0
+cooldown = 0.0
+targeting = 2
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_min": 4,
+"damage": 2.0,
+"duration": 4.0,
+"intellect_scale": 0.3,
+"radius": 3.0,
+"spell_power_scale": 1.0,
+"tick": 0.5
+}
+icon = &"rain_of_fire"
+color = Color(1, 0.45, 0.12, 1)

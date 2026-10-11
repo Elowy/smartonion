@@ -14,10 +14,10 @@ extends Control
 ## working device vote; bots never block it; process_votes re-evaluates standing votes).
 ## lock_input(seconds) makes A / X ignored for a moment after the market opens.
 ## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with the item it
-## would replace for that player (ItemTooltip.equipped_for_compare), beside the stall on the player's own
-## side (P1 / P3 left, P2 / P4 right; P1 / P2 from the top of the stall down, P3 / P4 from the
-## bottom of the screen up) so it never covers the stall; when two tooltips on one side
-## overlap, the one of the player who acted last is on top.
+## would replace for that player (ItemTooltip.equipped_for_compare), on the stall right beside
+## the hovered card (towards the stall's middle) – never over the player panels in the screen
+## corners; scaled down when taller than the stall body. When tooltips overlap, the one of the
+## player who acted last is on top.
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed.
 
@@ -35,10 +35,10 @@ const HOLD_SHARE := 0.5
 const FEEDBACK_LINES := 3
 const FEEDBACK_TIME := 6.0
 const TOOLTIP_GAP := 12.0
-## Shop tooltips are drawn a little smaller so two fit above each other beside the stall.
+## Shop tooltips are drawn a little smaller so they cover fewer neighbouring cards.
 const TOOLTIP_SCALE := 0.82
-## Distance of the P3 / P4 tooltips from the bottom screen edge.
-const TOOLTIP_BOTTOM_MARGIN := 14.0
+## Inset of the tooltips from the stall body's edges.
+const TOOLTIP_MARGIN := 8.0
 
 var shop: Shop
 ## Offer grid width (5 for 10 offers, 4 for 8 or 4, 3 for 6).
@@ -781,23 +781,38 @@ func _update_tooltips() -> void:
 		var key := "%d:%d:%d" % [o.item.uid, o.price, compare.uid if compare != null else 0]
 		if _tooltip_keys.get(s.index, "") != key:
 			_tooltip_keys[s.index] = key
+			tip.owner_tag = "P%d" % (s.index + 1)
+			tip.owner_color = s.color
 			tip.show_item(o.item, s.class_data, compare, o.price)
 			tip.reset_size()
 		tip.visible = true
 		_place_tooltip(tip, s.index)
 
 
-## Beside the stall on the player's own side: P1 / P3 left, P2 / P4 right; P1 / P2 from the
-## top of the stall down, P3 / P4 from the bottom of the screen up; kept inside the screen.
+## On the stall beside the hovered card: right of it for the left columns, left of it for the
+## right columns, the middle column away from the player's own corner (P1 / P3 right, P2 / P4
+## left); top-aligned with a top-row card, bottom-aligned with a bottom-row card; kept inside
+## the stall body and scaled down to fit it.
 func _place_tooltip(tip: ItemTooltip, slot_index: int) -> void:
-	var tsize := tip.get_combined_minimum_size().max(tip.size) * tip.scale
-	var left := slot_index % 2 == 0
-	var vp := get_viewport_rect().size if is_inside_tree() else STALL_SIZE
-	var g := Vector2(global_position.x - tsize.x - TOOLTIP_GAP if left else global_position.x + size.x + TOOLTIP_GAP,
-		global_position.y if slot_index < 2 else vp.y - TOOLTIP_BOTTOM_MARGIN - tsize.y)
-	g.x = clampf(g.x, 8.0, maxf(8.0, vp.x - tsize.x - 8.0))
-	g.y = clampf(g.y, 8.0, maxf(8.0, vp.y - tsize.y - 8.0))
-	tip.position = g - global_position
+	var index := cursor_of(slot_index)
+	if index < 0 or index >= cards.size():
+		return
+	var body := Rect2(global_position + Vector2(0.0, BODY_TOP), Vector2(size.x, size.y - BODY_TOP)) \
+			.grow(-TOOLTIP_MARGIN)
+	var raw := tip.get_combined_minimum_size().max(tip.size)
+	var fit := minf(1.0, body.size.y / maxf(1.0, raw.y * TOOLTIP_SCALE))
+	tip.scale = Vector2.ONE * TOOLTIP_SCALE * fit
+	var tsize := raw * tip.scale
+	var card := cards[index].get_global_rect()
+	# < 0: left half of the grid, 0: middle column, > 0: right half.
+	var side := (index % maxi(1, columns)) * 2 - (columns - 1)
+	var right := side < 0 or (side == 0 and slot_index % 2 == 0)
+	var x := card.end.x + TOOLTIP_GAP if right else card.position.x - TOOLTIP_GAP - tsize.x
+	var top_row := index < columns
+	var y := card.position.y if top_row else card.end.y - tsize.y
+	x = clampf(x, body.position.x, maxf(body.position.x, body.end.x - tsize.x))
+	y = clampf(y, body.position.y, maxf(body.position.y, body.end.y - tsize.y))
+	tip.position = Vector2(x, y) - global_position
 
 
 ## The tooltip of the player who acted last is drawn on top of the others.

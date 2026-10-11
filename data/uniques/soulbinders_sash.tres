@@ -15,16 +15,14 @@ stats = Dictionary[StringName, float]({
 &"stamina": 4.0
 })
 class_restriction = &"warlock"
-unique_effect = &"dot"
+unique_effect = &"ability_mod"
 unique_params = {
-"trigger": "on_hit",
-"ppm": 4.0,
-"damage": 18.0,
-"duration": 6.0,
-"stacks": 1,
-"school": "shadow"
+"ability": "warlock_shards",
+"mods": {
+"gain_per_kills": 8
 }
-unique_text = "Chance on hit: Corrupts the target, dealing 18 Shadow damage over 6 sec."
+}
+unique_text = "Equip: You gain a Soul Shard every 8 kills instead of every 12."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

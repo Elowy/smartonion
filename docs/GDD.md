@@ -62,9 +62,23 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 
 ### Elesés és halál (co-op)
 
-- 0 HP-nál a játékos **elesik** (szellem-alak, lassan mozoghat, nem támad).
-- Egy élő társ **5 mp-ig mellette állva** felélesztheti (30% HP-val), WoW-szerű
-  **„Resurrecting…” cast barral**:
+- 0 HP-nál a játékos **elesik** (szellem-alak, **normál sebességgel** mozoghat, nem támad;
+  az ellenségek nem foglalkoznak vele).
+- **Spirit Healer:** a pálya közepén egy lebegő, áttetsző, szárnyas szellemalak áll (arany
+  glória, a földön világító rúnakör jelöli a hatósugarát, kb. 1,6 m). Az elesett játékos
+  odasétál, és ha **1 mp-ig a körében áll**, **100% HP-val** feléled (fényoszlop az égből,
+  „*Resurrected!*” felirat, 1 mp sebezhetetlenség).
+  - A szellem feje fölött ugyanaz a „Resurrecting” cast bar jelenik meg, halványkék
+    szellemszínben, a hátralévő idővel.
+  - Ha a szellem kilép a körből, a számlálás nullázódik. Több szellem egyszerre is éledhet.
+  - Élő játékosra nincs hatása. Csak hullám közben számít (hullámkezdéskor amúgy is
+    mindenki feléled).
+  - Amíg van elesett játékos, a Spirit Healer erősebben izzik és lüktet, fényoszlop jelöli,
+    és a kamera mindig képen tartja, így a szellem biztosan látja és eléri.
+  - A játékos keretén (unit frame) a „DOWNED” felirat alatt a „*Go to the Spirit Healer*”
+    tipp jelenik meg.
+- Egy élő társ **5 mp-ig mellette állva** is felélesztheti (30% HP-val) – ez megmaradt,
+  WoW-szerű **„Resurrecting…” cast barral**:
   - **Cast bar:** a halott hagyma feje fölött jelenik meg, a felélesztő színében, a
     hátralévő idővel.
   - **Animáció:** a felélesztő hagyma két keze felemelkedik és aranyszínű fénnyel izzik, egy
@@ -73,6 +87,8 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
   - **Ha a felélesztő kilép a körből:** a cast bar lassan visszafogy, nem nullázódik azonnal.
   - **Több felélesztő:** minden további társ +50%-kal gyorsítja (co-op).
   - **Sebződés:** nem szakítja meg a felélesztést. A kockázat az, hogy közben állni kell.
+  - **Spirit Healerrel együtt:** ha a társ és a Spirit Healer egyszerre éleszt, a cast bar a
+    befejezéshez közelebbit mutatja, és amelyik előbb végez, az éleszt fel.
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
@@ -194,7 +210,7 @@ Minden kaszt tartalmaz:
 | Erőforrás | **Mana** (100 + 2 × Int), +10 / mp (Haste-tel nő) |
 | Képesség 1 | **Blizzard** – 50 Mana: jégeső a legsűrűbb ellenségcsoportra, 3 mp, lassít |
 | Képesség 2 | **Blink** – 6 mp CD: rövid teleport mozgásirányba |
-| Mastery | **Ignite** – a kritikus találat égést okoz (a krit sebzés pontonként +1%-a 3 mp alatt) |
+| Mastery | **Ignite** – a kritikus találat égést okoz (a krit sebzés pontonként +1%-a 3 mp alatt). Ha a krit megölte a célt, a legközelebbi élő ellenség kezd égni a tetemtől 2,5 m-en belül (ha nincs ilyen, elvész) |
 
 ### 3.3 Paladin
 | | |
@@ -206,7 +222,7 @@ Minden kaszt tartalmaz:
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
-| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a legközelebbi társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
+| Képesség 2 | **Word of Glory** – 3 Holy Power: gyógyítja magát és a 8 m-en belüli legsebesültebb társat. **Ha 8 m-en belül van elesett társ, azonnal feléleszti** (40% HP-val, a gyógyítás helyett) – az egyetlen azonnali felélesztés a játékban |
 | Mastery | **Aura of Devotion** – a közelben lévő társak HP-regenerációt és Armort kapnak (pontonként) |
 
 ### 3.4 Rogue
@@ -218,9 +234,9 @@ Minden kaszt tartalmaz:
 | Jártasság | Dagger, One-Hand Sword, Mace, Bow, Gun, **Dual Wield** |
 | Alap | +10% Crit, +10% Dodge, **−3 Max HP**, **−1 Armor** |
 | Erőforrás | **Energy** (0–100), +15 / mp; **Combo Points** (0–5): +1 minden kritikus találatnál |
-| Képesség 1 | **Fan of Knives** – 35 Energy: tőrök minden irányba; minden elhasznált Combo Point +20% sebzés |
-| Képesség 2 | **Vanish** – 15 mp CD: 2 mp láthatatlanság, az ellenség elveszti a célt, a következő találat garantált krit |
-| Mastery | **Deadly Poison** – a krit mérget tesz az ellenségre (pontonkénti DoT) |
+| Képesség 1 | **Fan of Knives** – 35 Energy: 10 tőr minden irányba (egyenként 110% fegyversebzés, mindegyik átüt egy ellenségen); minden elhasznált Combo Point +20% sebzés |
+| Képesség 2 | **Vanish** – 15 mp CD: 2 mp láthatatlanság, az ellenség elveszti a célt, a Rogue visszanyeri a max HP-ja 30%-át, a következő találat garantált krit |
+| Mastery | **Deadly Poison** – a krit mérget tesz az ellenségre (pontonkénti DoT). Ha a krit megölte a célt, a méreg a tetemtől 2,5 m-en belüli legközelebbi élő ellenségre kerül (ha nincs ilyen, elvész) |
 
 ### 3.5 Warlock
 | | |
@@ -1302,6 +1318,7 @@ indulnak.
   - Godot 4, **3D low-poly** modellek.
   - Kb. 55–60°-os felülnézeti kamera (keskeny FOV vagy ortografikus).
   - A kamera a csapat középpontját követi, és dinamikusan zoomol, hogy mindenki látszódjon.
+    Amíg van elesett játékos, a Spirit Healert is képen tartja (1. fejezet).
   - **Közös képernyő, osztás nélkül:** a kamera egy határig zoomol ki. Utána a képernyő széle
     láthatatlan falként megállítja azt a játékost, aki tovább szaladna. Így senki nem
     tűnhet el a képből.
@@ -1534,7 +1551,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Cím | SmartOnion |
 | Nyelv | Angol |
 | Kamera | Közös képernyő; korlátos kizoomolás, a képernyő széle falként megállítja a játékosokat |
-| Felélesztés | 5 mp a halott mellett állva, cast barral és animációval |
+| Felélesztés | Spirit Healer a pálya közepén: 1 mp a körében = 100% HP; egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog |
 | Gyógyulás | Minden hullám elején teljes HP |
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |

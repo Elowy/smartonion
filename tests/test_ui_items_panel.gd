@@ -372,3 +372,21 @@ func test_stat_rows_and_header() -> void:
 		"a full stat list still fits the design size: %s" % needed)
 	check_eq(panel._class_label.text, "Rogue", "class in the header")
 	check_eq(panel._ilvl_value.text, "13", "Avg. Item Level of two common wave-1 daggers")
+
+
+func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
+	var slot := _join(&"warrior")
+	_eq(slot).add_to_backpack(_helm("Iron Helm", ClassData.ArmorType.PLATE, 3))
+	var panel := _panel(slot)
+	panel.tooltip_inside = true
+	panel.scale = Vector2(0.5, 0.5)
+	panel.position = Vector2(20, 20)
+	panel._place_tooltip()
+	check(panel.tooltip.visible, "tooltip shown")
+	var tip_h := panel.tooltip.get_combined_minimum_size().y * 0.5
+	var room := panel.size.y * 0.5
+	var expected := clampf(room / tip_h, 0.4, 1.0)
+	check_near(panel.tooltip.scale.y, expected, 0.001, "scaled to the panel's height (%s / %s)" % [room, tip_h])
+	panel.tooltip_inside = false
+	panel._place_tooltip()
+	check(panel.tooltip.scale.y >= expected - 0.001, "outside the panel it may use the screen height")

@@ -117,6 +117,10 @@ func test_unique_data_is_valid() -> void:
 
 
 func _check_effect(id: StringName, effect: StringName, params: Dictionary) -> void:
+	if effect == &"ability_mod":
+		check(String(params.get("ability", "")) != "" and params.get("mods") is Dictionary,
+				"%s: ability_mod needs an ability and mods" % id)
+		return
 	check(effect in BLOCKS, "%s: building block %s" % [id, effect])
 	var trigger := String(params.get("trigger", ""))
 	check(trigger in TRIGGERS, "%s: trigger %s" % [id, trigger])

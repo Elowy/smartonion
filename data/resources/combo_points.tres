@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"combo_points"
+display_name = "Combo Points"
+color = Color(1, 0.45, 0.2, 1)
+display = 1
+max_value = 5.0
+start_value = 0.0
+gain_on_crit = 1.0

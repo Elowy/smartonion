@@ -427,7 +427,17 @@ func test_slow_stun_gold_and_resource_blocks() -> void:
 	p.procs.on_hit(e, 1.0, p.main_hand, false)
 	p.procs.on_hit(e, 1.0, p.main_hand, false)
 	check_eq(RunState.gold, 3, "1.5 gold per proc: fractions carried")
-	check_eq(p.procs.fire_count(&"test_resource"), 2, "resource fires (no-op until M3)")
+	check_eq(p.procs.fire_count(&"test_resource"), 2, "resource fires")
+	check_near(p.abilities.get_resource(&"rage").value, 2 * 0.1 * 100.0, 0.001,
+			"Rage (a bar): +10% of the bar per point")
+
+
+func test_resource_proc_gives_whole_pips() -> void:
+	var p := _hero(&"paladin")
+	var e := _fake(Vector3(1, 0, 0))
+	p.equipment.equip(unique(&"resource", {"trigger": "on_hit", "chance": 100.0, "amount": 1}), Items.EquipSlot.TRINKET_2)
+	p.procs.on_hit(e, 1.0, p.main_hand, false)
+	check_eq(p.abilities.get_resource(&"holy_power").value, 1.0, "+1 Holy Power")
 
 
 func test_when_struck_reflect_and_frozen_ward() -> void:

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"holy_power"
+display_name = "Holy Power"
+color = Color(1, 0.85, 0.3, 1)
+display = 1
+max_value = 3.0
+start_value = 0.0
+gain_per_hits = 5
+gain_per_hits_amount = 1.0

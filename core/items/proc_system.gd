@@ -37,7 +37,7 @@ extends Node
 ##   smite_heal {damage, heal, school} – damage + heal the most injured ally
 ##   cheat_death {invulnerable}       – lethal damage leaves 1 HP + invulnerable seconds
 ##                                      (passive, once per wave unless per_wave says more)
-##   resource {amount}                – class resource (no-op until M3)
+##   resource {amount}                – class resource (AbilityRunner.gain_from_proc)
 ## Riders on every damaging block: slow (%) + slow_duration (default 2 s), stun (s),
 ## dot (total) + dot_duration (default 3 s) + dot_stacks (default 1), spread (m: when an enemy
 ## burning with the dot dies, it spreads to up to SPREAD_TARGETS enemies in that radius).
@@ -306,12 +306,15 @@ func deal(target: Enemy, base: float, school: StringName) -> float:
 	return deal_raw(target, CombatMath.proc_damage(base, school, player.stats), school, true)
 
 
-## Applies [param amount] as this player's non-weapon damage (procs, DoT ticks, Thorns):
+## Applies [param amount] as this player's non-weapon damage (procs, DoT ticks, Thorns,
+## abilities – [param source] &"proc" / &"dot" / &"ability" / &"pet" for Mastery hooks):
 ## records it, credits a kill, shows a number in the school colour. [param target_bonus]:
 ## Executioner / Slayer apply. Returns the damage dealt.
-func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bool = true) -> float:
+func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bool = true,
+		source: StringName = &"proc") -> float:
 	if player == null or amount <= 0.0 or not _is_live(target):
 		return 0.0
+	amount *= player.outgoing_damage_mult(target, school, source)
 	if target_bonus:
 		var ratio := target.hp / target.max_hp if target.max_hp > 0.0 else 1.0
 		amount *= CombatMath.target_damage_mult(player.stats, ratio, target.is_elite())
@@ -555,7 +558,8 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 				ProcVfx.beam(_chest(e), ally.get_chest_position(), color)
 				ally.heal(p.num("heal"))
 		&"resource":
-			pass  # class resources arrive with M3 (abilities)
+			if player.abilities != null:
+				player.abilities.gain_from_proc(p.num("amount", 1.0))
 
 
 func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:
@@ -787,7 +791,7 @@ func _tick_dots(delta: float) -> void:
 		var amount := d.owed
 		d.owed = 0.0
 		if amount > 0.0:
-			deal_raw(e, amount, d.school, true)
+			deal_raw(e, amount, d.school, true, &"dot")
 		var died := not _is_live(e)
 		if d.left <= TIME_EPSILON or died:
 			if i < _dots.size() and _dots[i] == d:

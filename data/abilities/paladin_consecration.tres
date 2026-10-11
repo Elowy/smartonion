@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_consecration.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"consecration"
+display_name = "Consecration"
+description = "Consecrates the ground beneath you for {duration} sec: enemies standing in it take Holy damage every {tick} sec (scales with Strength and Spell Power)."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 0
+cast_range = 3.0
+effect = ExtResource("2_effect")
+params = {
+"damage": 2.5,
+"duration": 4.0,
+"follows": false,
+"radius": 3.0,
+"spell_power_scale": 1.0,
+"strength_scale": 0.25,
+"tick": 0.5
+}
+icon = &"consecration"
+color = Color(1, 0.84, 0.35, 1)

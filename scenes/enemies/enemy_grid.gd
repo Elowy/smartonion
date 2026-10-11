@@ -258,6 +258,39 @@ static func gather_touching(tree: SceneTree, min_x: float, min_z: float, max_x: 
 	return out
 
 
+## How many enemies' build-time centres lie within [param radius] of [param center] (XZ) –
+## an allocation-free count for scoring (bot targeting); dead enemies may be included.
+static func count_around(tree: SceneTree, center: Vector3, radius: float) -> int:
+	if tree == null or radius < 0.0:
+		return 0
+	ensure(tree)
+	if _size == 0:
+		return 0
+	var r_sq := radius * radius
+	var inv := _inv_cell
+	var c0 := clampi(int(floorf((center.x - radius - _min_x) * inv)), 0, _cols - 1)
+	var c1 := clampi(int(floorf((center.x + radius - _min_x) * inv)), 0, _cols - 1)
+	var r0 := clampi(int(floorf((center.z - radius - _min_z) * inv)), 0, _rows - 1)
+	var r1 := clampi(int(floorf((center.z + radius - _min_z) * inv)), 0, _rows - 1)
+	var keys := _keys
+	var sx := _sx
+	var sz := _sz
+	var n := 0
+	for r in range(r0, r1 + 1):
+		var row := r * _cols
+		var hi := (row + c1 + 1) * MAX_ENEMIES
+		var a := keys.bsearch((row + c0) * MAX_ENEMIES, true)
+		while a < _size:
+			if keys[a] >= hi:
+				break
+			var dx := sx[a] - center.x
+			var dz := sz[a] - center.z
+			if dx * dx + dz * dz <= r_sq:
+				n += 1
+			a += 1
+	return n
+
+
 ## Every enemy whose body may touch the circle at [param center] with [param radius] (XZ).
 static func gather_around(tree: SceneTree, center: Vector3, radius: float) -> Array[Node]:
 	return gather_touching(tree, center.x - radius, center.z - radius, center.x + radius,

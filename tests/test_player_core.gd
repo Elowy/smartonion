@@ -244,15 +244,17 @@ func test_revive_is_not_interrupted_by_damage_and_ends_with_a_light_column() -> 
 	check(resurrected, "\"Resurrected!\" floating text")
 
 
-func test_downed_ghost_does_not_attack_and_moves_slowly() -> void:
+func test_downed_ghost_does_not_attack_and_moves_at_full_speed() -> void:
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	Fakes.spawn_enemy(world, Vector3(1.5, 0, 0))
 	p.take_damage(999.0)
 	check(not p.weapons[0].tick(1.0), "ghost does not attack")
+	check_eq(Player.GHOST_SPEED_MULT, 1.0, "GDD 1: ghosts walk to the Spirit Healer at full speed")
 	(p.slot.input as ScriptedInput).move = Vector2(0, -1)
 	p.global_position = Vector3(0, 0, 5)
 	Fakes.step(p, 1.0)
-	check_near(p.velocity.length(), p.stats.move_speed() * Player.GHOST_SPEED_MULT, 0.01, "half speed")
+	check_near(p.velocity.length(), p.stats.move_speed() * Player.GHOST_SPEED_MULT, 0.01, "full speed")
+	check_near(p.current_max_speed(), p.stats.move_speed(), 0.0001, "not slowed while downed")
 
 
 func test_begin_wave_heals_and_revives() -> void:
@@ -496,3 +498,14 @@ func test_own_numbers_beside_the_head_and_tagged_marker() -> void:
 	var left := p.self_text_position(-1.0)
 	check(right.x > 2.3 and left.x < 1.7, "numbers start beside the hero, not on it")
 	check(right.y > Player.CHEST_HEIGHT + 0.5, "at head height")
+
+
+func test_is_reviving_next_to_a_ghost() -> void:
+	var p1 := Fakes.spawn_player(world, 0, &"warrior")
+	var p2 := Fakes.spawn_player(world, 1, &"warrior", Vector3(1.0, 0, 0))
+	check(not p2.is_reviving(), "nobody downed")
+	p1.take_damage(999.0)
+	check(p2.is_reviving(), "next to the ghost")
+	check(not p1.is_reviving(), "a ghost does not revive")
+	p2.global_position = Vector3(Player.REVIVE_RADIUS + 0.5, 0, 0)
+	check(not p2.is_reviving(), "out of the circle")

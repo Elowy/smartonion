@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mana"
+display_name = "Mana"
+color = Color(0.2, 0.45, 1, 1)
+display = 0
+max_value = 100.0
+start_value = 100.0
+regen_per_second = 10.0
+regen_uses_haste = true

@@ -243,7 +243,7 @@ func _is_valid_target(body: Node3D) -> bool:
 		var e := body as Enemy
 		return e != null and not e.is_dead()
 	var p := body as Player
-	return p != null and p.is_alive()
+	return p != null and p.is_alive() and not p.is_stealthed()
 
 
 func _target_radius(body: Node3D) -> float:

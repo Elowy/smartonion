@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warrior/warrior_charge.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"charge"
+display_name = "Charge"
+description = "Rush up to {distance} m in your movement direction. Enemies you hit and everything where you land are stunned for {stun} sec. You cannot be hurt while charging."
+class_id = &"warrior"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 3
+cast_range = 7.0
+effect = ExtResource("2_effect")
+params = {
+"buff_damage": 0.0,
+"buff_duration": 0.0,
+"distance": 7.0,
+"speed": 36.0,
+"stun": 1.0,
+"stun_radius": 2.0
+}
+icon = &"charge"
+color = Color(0.95, 0.65, 0.25, 1)

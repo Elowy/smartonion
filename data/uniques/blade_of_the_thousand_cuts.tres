@@ -17,16 +17,14 @@ stats = Dictionary[StringName, float]({
 &"crit": 5.0
 })
 class_restriction = &"rogue"
-unique_effect = &"chain"
+unique_effect = &"ability_mod"
 unique_params = {
-"trigger": "on_hit",
-"ppm": 4.0,
-"icd": 1.0,
-"damage": 8.0,
-"targets": 4,
-"school": "physical"
+"ability": "fan_of_knives",
+"mods": {
+"knives_add": 4.0
 }
-unique_text = "Chance on hit: Hurls knives that bounce between 4 enemies for 8 Physical damage."
+}
+unique_text = "Equip: Fan of Knives throws 4 additional knives."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

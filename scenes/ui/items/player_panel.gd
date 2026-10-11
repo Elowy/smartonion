@@ -1192,8 +1192,14 @@ func _place_tooltip() -> void:
 	var icon_rect := icon.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, icon.size)
 	var tip := tooltip.get_combined_minimum_size()
 	tooltip.size = tip
-	var tip_size := tip * to_canvas.get_scale()
 	var view := get_viewport_rect()
+	# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
+	# otherwise spill over the neighbouring player's panel).
+	var room := (minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)) \
+			if tooltip_inside else view.size.y - 8.0
+	var fit := clampf(room / maxf(1.0, tip.y * to_canvas.get_scale().y), 0.4, 1.0)
+	tooltip.scale = Vector2.ONE * fit
+	var tip_size := tip * to_canvas.get_scale() * fit
 	var gap := 10.0 * to_canvas.get_scale().x
 	var x := panel_rect.end.x + gap
 	if tooltip_inside:

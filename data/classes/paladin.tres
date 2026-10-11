@@ -1,8 +1,14 @@
-[gd_resource type="Resource" script_class="ClassData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="ClassData" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
 [ext_resource type="Resource" path="res://data/weapons/mace.tres" id="2_mh"]
 [ext_resource type="Resource" path="res://data/weapons/shield.tres" id="3_oh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="4_res_script"]
+[ext_resource type="Resource" path="res://data/resources/holy_power.tres" id="5_holy_power"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="6_ability_script"]
+[ext_resource type="Resource" path="res://data/abilities/paladin_consecration.tres" id="7_consecration"]
+[ext_resource type="Resource" path="res://data/abilities/paladin_word_of_glory.tres" id="8_word_of_glory"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_aura_of_devotion.gd" id="9_mastery"]
 
 [resource]
 script = ExtResource("1_script")
@@ -22,6 +28,10 @@ off_hand = ExtResource("3_oh")
 proficiencies = Array[StringName]([&"sword", &"mace", &"shield", &"tome"])
 resource_type = &"holy_power"
 resource_color = Color(1.0, 0.85, 0.3, 1)
+resources = Array[ExtResource("4_res_script")]([ExtResource("5_holy_power")])
+abilities = Array[ExtResource("6_ability_script")]([ExtResource("7_consecration"), ExtResource("8_word_of_glory")])
+mastery = ExtResource("9_mastery")
+mastery_text = "Aura of Devotion: living allies within 6 m of you (you included) gain +0.5 Armor and +1 Spirit (HP regeneration) per point of Mastery."
 onion_color = Color(0.93, 0.76, 0.32, 1)
 accent_color = Color(0.95, 0.95, 0.9, 1)
 headgear = &"paladin_helm"

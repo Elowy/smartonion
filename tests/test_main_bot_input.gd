@@ -1,6 +1,7 @@
 extends TestCase
 ## BotInput (the smoke / demo bots Main spawns): kiting by weapon reach, retreat when hurt,
-## rescue runs to downed teammates, ghosts seeking help, wall avoidance.
+## rescue runs to downed teammates close by, ghosts walking to the Spirit Healer (or to a
+## living teammate without one), wall avoidance.
 
 const DT := 1.0 / 60.0
 
@@ -68,19 +69,55 @@ func test_hurt_melee_bot_retreats() -> void:
 	check(_move(warrior).x < -0.5, "low HP: kite instead of fighting")
 
 
-func test_bot_runs_to_a_downed_teammate_and_stays() -> void:
-	var rescuer := _bot_player(&"rogue", Vector3.ZERO)
-	var ghost := _bot_player(&"mage", Vector3(0.0, 0.0, -8.0))
+func test_bot_runs_to_a_downed_teammate_close_by_and_stays() -> void:
+	var rescuer := _bot_player(&"rogue", Vector3(0.0, 0.0, -3.0))
+	var ghost := _bot_player(&"mage", Vector3(0.0, 0.0, -7.5))
 	ghost.downed = true
+	check(BotInput.RESCUE_RANGE <= 5.0, "rescue runs only for ghosts close by")
 	var m := _move(rescuer)
-	check(m.y < -0.9, "heads north to the ghost: %s" % m)
-	rescuer.global_position = Vector3(0.0, 0.0, -7.2)
+	check(m.y < -0.9, "heads north to the ghost 4.5 m away: %s" % m)
+	rescuer.global_position = Vector3(0.0, 0.0, -6.7)
 	check_eq(_move(rescuer), Vector2.ZERO, "stands still inside the revive circle")
-	_enemy(Vector3(1.0, 0.0, -7.2))
+	_enemy(Vector3(1.0, 0.0, -6.7))
 	check(_move(rescuer) != Vector2.ZERO, "an enemy on top of it makes it step away")
 
 
-func test_ghost_seeks_a_living_teammate() -> void:
+func test_living_bot_leaves_a_far_ghost_to_the_spirit_healer() -> void:
+	var fighter := _bot_player(&"mage", Vector3(-6.0, 0.0, 0.0))
+	var ghost := _bot_player(&"rogue", Vector3(4.0, 0.0, 0.0))
+	ghost.downed = true
+	_enemy(Vector3(-6.0, 0.0, -4.0))
+	var m := _move(fighter)
+	check(m.y > 0.5 and m.x < 0.7, "keeps kiting the enemy instead of running to a ghost 10 m away: %s" % m)
+	ghost.remove_from_group(&"players")
+	check(_move(fighter).is_equal_approx(m), "exactly as if there were no ghost")
+	ghost.add_to_group(&"players")
+	ghost.global_position = Vector3(-6.0 + BotInput.RESCUE_RANGE - 0.5, 0.0, 0.0)
+	check(_move(fighter).x > 0.9, "but still rescues a ghost within RESCUE_RANGE")
+
+
+func test_ghost_walks_straight_to_the_spirit_healer() -> void:
+	var healer := arena.spirit_healer
+	check(healer != null and healer.is_inside_tree(), "the arena has a Spirit Healer")
+	var ghost := _bot_player(&"paladin", Vector3(-8.0, 0.0, 6.0))
+	ghost.downed = true
+	var mate := _bot_player(&"mage", Vector3(-12.0, 0.0, 8.0))
+	_enemy(Vector3(-6.0, 0.0, 4.5))  # enemies ignore ghosts: no detour
+	var m := _move(ghost)
+	var want := Vector2(8.0, -6.0).normalized()
+	check(m.dot(want) > 0.99, "straight towards the healer at the centre: %s" % m)
+	check_near(m.length(), 1.0, 0.001, "full stick")
+	ghost.global_position = Vector3(BotInput.HEALER_STOP_DISTANCE * 0.5, 0.0, 0.0)
+	check_eq(_move(ghost), Vector2.ZERO, "waits inside the circle")
+	check(BotInput.HEALER_STOP_DISTANCE < SpiritHealer.HEAL_RADIUS, "stops well inside the heal radius")
+	ghost.global_position = Vector3(SpiritHealer.HEAL_RADIUS * 0.9, 0.0, 0.0)
+	check(_move(ghost).x < -0.9, "walks deeper into the circle from its edge")
+	check(mate.is_alive(), "the living teammate is not what it seeks")
+
+
+func test_ghost_without_a_healer_seeks_a_living_teammate() -> void:
+	arena.remove_child(arena.spirit_healer)
+	arena.spirit_healer.free()
 	var ghost := _bot_player(&"paladin", Vector3.ZERO)
 	ghost.downed = true
 	_bot_player(&"mage", Vector3(6.0, 0.0, 0.0))

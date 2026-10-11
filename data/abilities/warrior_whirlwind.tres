@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warrior/warrior_whirlwind.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"whirlwind"
+display_name = "Whirlwind"
+description = "Spin for {duration} sec, striking all enemies within {radius} m for {damage_pct}% weapon damage in total."
+class_id = &"warrior"
+school = &"physical"
+resource = &"rage"
+cost = 40.0
+cooldown = 0.0
+targeting = 0
+cast_range = 3.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 150.0,
+"duration": 1.0,
+"radius": 3.0,
+"slow": 0.0,
+"slow_duration": 1.5,
+"tick_interval": 0.25
+}
+icon = &"whirlwind"
+color = Color(0.9, 0.3, 0.2, 1)

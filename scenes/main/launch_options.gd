@@ -7,6 +7,7 @@ extends RefCounted
 ##                        "SMOKE_RESULT {json}" and quits (exit 1 on errors / defeat / stall)
 ##   --demo               bots at normal speed, endless (for screenshots / attract mode)
 ##   --players=N          bot count (1..4, default 4)
+##   --classes=a,b,...    bot classes in join order (cycled; default: Db.class_ids)
 ##   --waves=N            smoke: waves to play (default 3)
 ##   --start-wave=N       first wave of the run (1..25)
 ##   --seed=N             RunState / bot seed
@@ -31,6 +32,8 @@ const VIEWS: Array[String] = ["menu", "lobby", "game", "intermission", "game_ove
 var smoke := false
 var demo := false
 var players := DEFAULT_BOTS
+## Bot class ids from --classes (empty = cycle through Db.class_ids).
+var classes: Array[StringName] = []
 var waves := DEFAULT_SMOKE_WAVES
 var start_wave := 1
 ## -1 = random.
@@ -64,6 +67,9 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.demo = true
 			"--players":
 				o.players = clampi(value.to_int(), 1, PlayerManager.MAX_PLAYERS)
+			"--classes":
+				for part in value.split(",", false):
+					o.classes.append(StringName(part.strip_edges()))
 			"--waves":
 				o.waves = maxi(1, value.to_int())
 			"--start-wave":
