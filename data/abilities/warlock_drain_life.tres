@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"drain_life"
 display_name = "Drain Life"
-description = "Drains the nearest enemy for {duration} sec, dealing Shadow damage and healing you for {heal_pct}% of it. You keep moving; when the target dies the drain jumps to the next enemy."
+description = "Drains the nearest enemy for {duration} sec, healing you for {heal_pct}% of the Shadow damage. You keep moving; the drain jumps on when the target dies."
 class_id = &"warlock"
 school = &"shadow"
 resource = &""

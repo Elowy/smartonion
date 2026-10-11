@@ -77,7 +77,7 @@ func cast(ctx: AbilityContext) -> bool:
 
 
 func tick(_ctx: AbilityContext, delta: float) -> void:
-	if _strikes_left <= 0 and not is_active():
+	if not is_active():
 		return
 	var player := _player
 	if player == null or not is_instance_valid(player) or not player.is_inside_tree():

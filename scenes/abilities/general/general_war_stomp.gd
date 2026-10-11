@@ -16,7 +16,7 @@ extends AbilityEffect
 
 const DEFAULT_RADIUS := 2.5
 const TREMOR_TICK := 0.5
-const TREMOR_COLOR := Color(0.62, 0.48, 0.3, 0.35)
+const TREMOR_COLOR := Color(0.7, 0.55, 0.32, 0.28)
 const SPARK_COLOR := Color(0.95, 0.82, 0.55)
 const MAX_SPARKS := 5
 
@@ -129,6 +129,7 @@ func _tremor(ctx: AbilityContext, seconds: float) -> void:
 	area.stun = _stun
 	area.damage_per_tick = GeneralKit.weapon_damage(_player, _school) * ctx.num("tremor_pct", 10.0) / 100.0 \
 			* ctx.num("power", 1.0)
+	GeneralTremorVfx.attach(area)
 	tremor = area
 
 

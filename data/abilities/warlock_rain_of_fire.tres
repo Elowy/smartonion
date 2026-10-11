@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"rain_of_fire"
 display_name = "Rain of Fire"
-description = "Calls down a rain of fire on the densest group of enemies: a {radius} m circle burns everything inside for {duration} sec. Scales with Intellect and Spell Power."
+description = "Rains fire on the densest group of enemies: a {radius} m circle burns everything inside for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
 resource = &"soul_shard"

@@ -13,7 +13,7 @@ extends Node3D
 
 const FIRE := &"fire"
 const BLAST_COLOR := Color(1.0, 0.55, 0.15)
-const BURN_COLOR := Color(1.0, 0.4, 0.08, 0.45)
+const BURN_COLOR := Color(1.0, 0.4, 0.08, 0.32)
 const IRON := Color(0.16, 0.15, 0.17)
 const BRASS := Color(0.78, 0.6, 0.28)
 const FUSE := Color(0.55, 0.42, 0.28)

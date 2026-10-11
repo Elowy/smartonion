@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"summon_infernal"
 display_name = "Summon Infernal"
-description = "Calls an Infernal down on the densest group of enemies: its landing burns and stuns everything within {impact_radius} m, then it smashes enemies for {duration} sec."
+description = "An Infernal crashes onto the densest group, burning and stunning everything within {impact_radius} m, then smashes enemies for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
 resource = &"soul_shard"

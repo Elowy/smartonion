@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"summon_voidwalker"
 display_name = "Summon Voidwalker"
-description = "A Voidwalker guards you: it draws nearby enemies to itself and pummels them, and its Torment taunts every enemy within {torment_radius} m for {torment_duration} sec. It cannot be killed."
+description = "A Voidwalker guards you, drawing nearby enemies to itself and pummeling them. Its Torment taunts all enemies within {torment_radius} m. It cannot die."
 class_id = &"warlock"
 school = &"shadow"
 resource = &""

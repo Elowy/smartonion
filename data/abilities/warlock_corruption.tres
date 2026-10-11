@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"corruption"
 display_name = "Corruption"
-description = "Curses the nearest uncorrupted enemy (up to {targets} per cast) with Shadow damage over {duration} sec. When a corrupted enemy dies, the curse jumps with its remaining time to an enemy within {spread_radius} m. Scales with Intellect and Spell Power."
+description = "Shadow damage over {duration} sec on the nearest uncorrupted enemy ({targets} per cast). When it dies, the curse jumps to an enemy within {spread_radius} m."
 class_id = &"warlock"
 school = &"shadow"
 resource = &""

@@ -16,6 +16,7 @@ extends AbilityEffect
 const GROUND_COLOR := Color(1.0, 0.36, 0.06, 0.3)
 ## A second storm lands this many radii (at least) from the first one.
 const SECOND_STORM_GAP := 1.5
+const INFERNAL_ID := &"summon_infernal"
 
 ## The last circle this Warlock called down (bots do not stack a second one on it).
 var last_area: AbilityArea
@@ -110,10 +111,12 @@ func begin_wave(_ctx: AbilityContext) -> void:
 
 
 ## Bots: at least auto_cast_min enemies under the circle (around the Warlock with Walking
-## Inferno), and not on top of a running one.
+## Inferno), and not on top of a running one. The last shard waits for a ready Summon Infernal.
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player
 	if p == null or not p.is_inside_tree() or ctx.target == null:
+		return false
+	if leaves_shard_to_infernal(p):
 		return false
 	var radius := ctx.num("radius", 3.0) * CombatMath.area_mult(p.stats)
 	var center := p.global_position if ctx.flag("follows") else ctx.point
@@ -121,3 +124,16 @@ func wants_auto_cast(ctx: AbilityContext) -> bool:
 			and WeaponRunner.flat(last_area.global_position - center).length() < last_area.radius * 0.75:
 		return false
 	return enemies_in_circle(p.get_tree(), center, radius) >= int(ctx.num("auto_cast_min", 4.0))
+
+
+## Bots: true while a learned Summon Infernal is off cooldown and the Warlock has fewer than 2
+## Soul Shards – the shard is kept for the Infernal (a bigger use of it).
+static func leaves_shard_to_infernal(p: Player) -> bool:
+	var r := p.abilities
+	if r == null:
+		return false
+	var slot := r.slot_of(INFERNAL_ID)
+	if slot < 0 or r.remaining(slot) > 0.0:
+		return false
+	var shards := r.get_resource(&"soul_shard")
+	return shards != null and shards.value < 2.0

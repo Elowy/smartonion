@@ -789,3 +789,24 @@ func test_drain_life_power_soul_siphon_and_dark_bargain() -> void:
 	check_near(p2.procs.shield_hp, effect2.shield_total, 0.001, "on the warlock")
 	_step(p2.abilities, 3.0)
 	check(p2.procs.shield_hp <= p2.max_hp() * 0.5 + 0.001, "capped at 50% Max HP")
+
+
+func test_rain_of_fire_bots_keep_the_last_shard_for_the_infernal() -> void:
+	var p := _warlock()
+	for i in 4:
+		_enemy(Vector3(6.0 + 0.6 * i, 0, 0.5 * (i % 2)))
+	var shards := p.abilities.get_resource(&"soul_shard")
+	shards.set_value(1.0)
+	var rof := p.abilities.effect_for(p.abilities.slots[0])
+	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "no infernal: rain")
+	var slot := _learn(p, &"summon_infernal")
+	check(not rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "ready infernal: keep the shard")
+	check(not _effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "4 is too few for the infernal")
+	_enemy(Vector3(6.8, 0, -0.5))
+	check(_effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "5: infernal")
+	shards.set_value(2.0)
+	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "two shards: both")
+	shards.set_value(1.0)
+	p.abilities.set_cooldown(_ability(&"summon_infernal"), 30.0)
+	check(p.abilities.remaining(slot) > 0.0, "infernal on cooldown")
+	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "infernal on cooldown: rain")
