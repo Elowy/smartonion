@@ -186,8 +186,7 @@ func _check_rank_data(a: AbilityData) -> void:
 		all_mods.append(s.get("mods", {}))
 	for mods in all_mods:
 		for key: String in mods:
-			var param := key.trim_suffix("_add")
-			check(not key.ends_with("_pct"), "%s: mod key %s would scale a param" % [a.id, key])
+			var param := key.trim_suffix("_add").trim_suffix("_pct")
 			check(a.params.has(param), "%s: mod key %s has a param" % [a.id, key])
 	var text := AbilityIcon.format_description(a, a.params)
 	check(not text.contains("{"), "%s description resolves: %s" % [a.id, text])
@@ -195,6 +194,51 @@ func _check_rank_data(a: AbilityData) -> void:
 	for i in a.specs.size():
 		var mods := AbilityRanks.mods_for(a, AbilityRanks.MAX_RANK, i)
 		check_eq(float(mods.get("power_pct", 0.0)), 50.0, "%s Rank V power" % a.id)
+
+
+## Every Rank III / Rank V mod really changes the param it is meant for
+## (AbilityRunner.params_at_rank: "_add" adds, "_pct" scales an existing param, others set).
+func test_rank_mods_change_their_params() -> void:
+	var p := _paladin()
+	var r := p.abilities
+	var ids: Array[StringName] = LEARNED.duplicate()
+	ids.append_array([&"consecration", &"word_of_glory"] as Array[StringName])
+	for id in ids:
+		var a := Db.get_ability(id)
+		var r1 := r.params_at_rank(a, 1)
+		var r2 := r.params_at_rank(a, 2)
+		var r4 := r.params_at_rank(a, 4)
+		check_near(float(r1["power"]), 1.0, 0.0001, "%s Rank I power" % id)
+		check_near(float(r2["power"]), 1.25, 0.0001, "%s Rank II power" % id)
+		check_near(float(r4["power"]), 1.5, 0.0001, "%s Rank IV power" % id)
+		check_near(float(r2["cooldown"]), a.cooldown * 0.9, 0.0001, "%s Rank II cooldown" % id)
+		var r3 := r.params_at_rank(a, 3)
+		for key: String in a.rank3:
+			_check_mod_applied(id, "Rank III", key, a.rank3[key], r2, r3)
+		for i in a.specs.size():
+			var r5 := r.params_at_rank(a, 5, i)
+			var mods: Dictionary = a.specs[i]["mods"]
+			for key: String in mods:
+				_check_mod_applied(id, "spec %d" % i, key, mods[key], r4, r5)
+
+
+func _check_mod_applied(id: StringName, what: String, key: String, v: Variant, before: Dictionary,
+		after: Dictionary) -> void:
+	var label := "%s %s %s" % [id, what, key]
+	if key.ends_with("_add"):
+		var param := key.trim_suffix("_add")
+		check(before.has(param), "%s: base param" % label)
+		check_near(float(after.get(param, 0.0)) - float(before.get(param, 0.0)), float(v), 0.0001, label)
+	elif key.ends_with("_pct") and before.has(key.trim_suffix("_pct")):
+		var param := key.trim_suffix("_pct")
+		check_near(float(after[param]), float(before[param]) * (1.0 + float(v) / 100.0), 0.0001, label)
+	else:
+		check(before.has(key), "%s: base param" % label)
+		if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+			check_near(float(after.get(key, 0.0)), float(v), 0.0001, label)
+		else:
+			check_eq(after.get(key), v, label)
+		check(str(after.get(key)) != str(before.get(key)), "%s: changes the param" % label)
 
 
 func test_learn_slots() -> void:
