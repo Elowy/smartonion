@@ -132,8 +132,8 @@ var stealth_left := 0.0
 ## Named incoming-damage multipliers (Shield Wall 0.5 ...), applied after armour; cleared at
 ## wave start.
 var damage_taken_mults: Dictionary[StringName, float] = {}
-## Callables returning true to survive a lethal hit at 1 HP (Cheat Death ...); item
-## cheat-death procs are tried first.
+## Callables returning true to survive a lethal hit at 1 HP (Cheat Death, Last Stand ...);
+## tried before the item cheat-death procs, which are limited (usually once per wave).
 var death_guards: Array[Callable] = []
 
 var _regen_accum := 0.0
@@ -212,14 +212,14 @@ func is_stealthed() -> bool:
 	return stealth_left > 0.0
 
 
-## A lethal hit is about to land: item cheat-death procs first, then [member death_guards].
+## A lethal hit is about to land: [member death_guards] first (ability guards are free or
+## recharge), then the item cheat-death procs (limited, usually once per wave), so a guard
+## that would have saved the hero anyway never uses one up.
 func _prevent_death() -> bool:
-	if procs != null and procs.try_cheat_death():
-		return true
 	for guard in death_guards:
 		if guard.is_valid() and guard.call():
 			return true
-	return false
+	return procs != null and procs.try_cheat_death()
 
 
 ## Alive and standing next to a downed teammate (reviving it) – bots must not dash away.
