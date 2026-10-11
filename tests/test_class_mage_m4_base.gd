@@ -162,6 +162,6 @@ func _tough(p: Player) -> void:
 ## Knocks [param p] down (lethal hit).
 func _down(p: Player) -> void:
 	p.invulnerable_left = 0.0
-	p.procs.shield_hp = 0.0
+	p.procs.clear_shields()
 	p.take_damage(10000.0)
 	check(p.downed, "downed")

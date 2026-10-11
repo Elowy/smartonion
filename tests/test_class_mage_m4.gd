@@ -519,6 +519,30 @@ func test_ice_barrier_rank_three_chills_attackers() -> void:
 	check(not bystander.is_slowed(), "enemies further away are not")
 
 
+func test_ice_barrier_rank_three_chills_while_another_shield_soaks_first() -> void:
+	var p := _mage()
+	var slot := _learn(p, &"ice_barrier", 3)
+	var biter := _enemy(Vector3(0.9, 0, 0))
+	check(p.abilities.try_cast(slot), "cast")
+	var effect := _effect(p, &"ice_barrier") as MageIceBarrier
+	var strength := effect.strength
+	p.procs.add_shield(5.0, 8.0)  # a teammate's Word of Glory, an item's proc shield ...
+	_step(0.1, [p])
+	check(not biter.is_slowed(), "nothing struck yet")
+	p.invulnerable_left = 0.0
+	p.take_damage(0.5, CombatMath.KIND_MELEE, biter)
+	check_near(p.procs.shield_of(MageIceBarrier.SHIELD_SOURCE), strength, 0.001,
+			"the shorter shield on top took the blow")
+	_step(DT, [p])
+	check(biter.is_slowed(), "the attacker still struck the barrier: chilled")
+	check(effect.active, "the barrier holds")
+	# A shield running out on its own timer is no strike.
+	var calm := _enemy(Vector3(-0.9, 0, 0))
+	p.procs._physics_process(8.5)
+	_step(DT, [p])
+	check(not calm.is_slowed(), "the 8 s shield expiring chills nobody")
+
+
 func test_ice_barrier_shattering_spec() -> void:
 	var p := _mage()
 	var slot := _learn(p, &"ice_barrier", 5, 0)

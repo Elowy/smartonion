@@ -330,6 +330,7 @@ func test_bandage_rank3_leaves_an_allys_own_bandage_alone() -> void:
 	check_near(float(ally.damage_taken_mults.get(GeneralBandage.KEY, 1.0)), 1.0 - 0.25 * 1.5, 0.0001,
 			"Padded Wraps still holds")
 	check(GeneralBuff.find(other, GeneralBandage.KEY) != null, "the other ally is bandaged")
+	check("unbandaged" in Db.get_ability(&"bandage").rank3_text, "the Rank III text says so")
 
 
 func test_bandage_specs() -> void:
@@ -418,6 +419,41 @@ func test_sprint_specs_rally_and_trail() -> void:
 	q.end_wave()
 	check(not q.stats.has_source(GeneralSprint.KEY), "end_wave")
 	check(effect.trail_areas.is_empty() and not effect.is_trailing(), "trail gone")
+
+
+func test_sprint_never_weakens_a_running_sprint() -> void:
+	var p := _hero(&"paladin")
+	var ally := _hero(&"warlock", Vector3(3, 0, 0), 1)
+	var mate := _hero(&"rogue", Vector3(-3, 0, 0), 2)
+	var a := _learn(p, &"sprint", 5, 0)  # Rallying Sprint: +75% Speed, +30% Dodge for 3 s
+	# The ally's own Sprint, boosted by an item: +100% Speed for 5 s (no Dodge at Rank I).
+	var b := _learn(ally, &"sprint")
+	var boots := ItemInstance.new()
+	boots.slot_type = Items.SlotType.FEET
+	boots.armor_type = Items.NO_ARMOR
+	boots.unique_effect = &"ability_mod"
+	boots.unique_params = {"ability": "sprint", "mods": {"speed_add": 50.0, "duration_add": 2.0}}
+	check(ally.equipment.equip(boots), "equip")
+	check(_cast(ally, b), "the ally sprints")
+	_run([ally], 0.5)
+	var own := GeneralBuff.find(ally, GeneralSprint.KEY)
+	check_near(float(own.stat_mods[Stats.SPEED]), 100.0, 0.001, "its own +100% Speed")
+	var left := own.left
+	check(_cast(p, a), "Rallying Sprint")
+	var rallied := GeneralBuff.find(ally, GeneralSprint.KEY)
+	check_near(float(rallied.stat_mods[Stats.SPEED]), 100.0, 0.001, "keeps its stronger Speed")
+	check_near(float(rallied.stat_mods[Stats.DODGE]), 20.0 * 1.5, 0.001, "and gains the caster's Dodge")
+	check_near(rallied.left, left, 0.001, "and its longer time")
+	var mate_buff := GeneralBuff.find(mate, GeneralSprint.KEY)
+	check_near(float(mate_buff.stat_mods[Stats.SPEED]), 50.0 * 1.5, 0.001, "a teammate without one: the caster's")
+	# A weaker own Sprint cast under the rally does not slow the teammate down either.
+	var c := _learn(mate, &"sprint")
+	_run([p, ally, mate], 1.0)
+	check(_cast(mate, c), "the teammate's own Rank I Sprint")
+	mate_buff = GeneralBuff.find(mate, GeneralSprint.KEY)
+	check_near(float(mate_buff.stat_mods[Stats.SPEED]), 50.0 * 1.5, 0.001, "still the rally's Speed")
+	check_near(float(mate_buff.stat_mods[Stats.DODGE]), 20.0 * 1.5, 0.001, "and Dodge")
+	check_near(mate_buff.left, 3.0, 0.001, "for its own full 3 s")
 
 
 func test_sprint_cleanup_down_wave_forget() -> void:
