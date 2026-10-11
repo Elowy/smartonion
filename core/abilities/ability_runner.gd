@@ -682,8 +682,9 @@ func _densest_cluster(here: Vector3, reach: float, radius: float) -> Node3D:
 	return best
 
 
-## The nearest downed teammate in range (if [param prefer_downed]), else the most hurt
-## living teammate, else the player itself.
+## The nearest downed teammate in range (if [param prefer_downed]) that the Spirit Healer does
+## not revive within PaladinWordOfGlory.HEALER_SOON seconds anyway ([method _healer_raises_soon]),
+## else the most hurt living teammate, else the player itself.
 func _ally_target(here: Vector3, reach: float, prefer_downed: bool) -> Node3D:
 	if player == null or not player.is_inside_tree():
 		return player
@@ -699,7 +700,7 @@ func _ally_target(here: Vector3, reach: float, prefer_downed: bool) -> Node3D:
 		if dist > reach:
 			continue
 		if p.downed:
-			if prefer_downed and dist < downed_dist:
+			if prefer_downed and dist < downed_dist and not _healer_raises_soon(p):
 				downed_dist = dist
 				downed = p
 			continue
@@ -710,3 +711,10 @@ func _ally_target(here: Vector3, reach: float, prefer_downed: bool) -> Node3D:
 	if downed != null:
 		return downed
 	return best if best != null else player
+
+
+## A ghost the Spirit Healer's pulse revives (at full HP) within PaladinWordOfGlory.HEALER_SOON
+## seconds (0 <= Player.healer_seconds_left <= that; -1 = not waiting in the circle): a revive
+## goes to another ghost instead.
+static func _healer_raises_soon(p: Player) -> bool:
+	return p.healer_seconds_left >= 0.0 and p.healer_seconds_left <= PaladinWordOfGlory.HEALER_SOON

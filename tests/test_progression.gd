@@ -158,6 +158,22 @@ func test_spec_pct_mods_compound_with_the_ranks() -> void:
 	check_near(r.cooldown_of(a), 5.6, 0.0001, "the runner's cooldown")
 
 
+## spec_mods hands out a copy: a caller merging into it must not change the spec of the shared
+## (Db-loaded) AbilityData for every hero.
+func test_spec_mods_are_a_copy() -> void:
+	var a := _ability(&"t_spec", AbilityData.Kind.AUTO)
+	a.specs[0]["mods"] = {"bounces": 2, "chain": [1, 2]}
+	var mods := AbilityRanks.spec_mods(a, 5, 0)
+	mods["bounces"] = 9
+	mods["power_pct"] = 50.0
+	(mods["chain"] as Array).append(3)
+	check_eq(a.specs[0]["mods"], {"bounces": 2, "chain": [1, 2]}, "the resource's spec is untouched")
+	check_eq(AbilityRanks.spec_mods(a, 5, 0), {"bounces": 2, "chain": [1, 2]}, "the next call sees the original")
+	var summary := AbilityRanks.mods_for(a, 5, 0)
+	summary["bounces"] = 7
+	check_eq(a.specs[0]["mods"]["bounces"], 2, "nor through mods_for")
+
+
 func test_auto_slots_cast_by_themselves_for_humans() -> void:
 	var p := _hero()
 	var r := p.abilities
@@ -299,8 +315,8 @@ func test_full_slots_favour_rank_ups() -> void:
 	check_near(weights[&"t_u0"], LevelUpDeck.RANK_UP_WEIGHT_FULL, 0.0001, "rank-ups more often")
 
 
-## GDD 6.1: with full slots, stat cards (not only rank-ups) take the place of new abilities –
-## a maxed hero's hands are mostly stat cards, still with one ability card.
+## GDD 6.1: with full slots, stat cards (not rank-ups) take the place of new abilities – a
+## maxed hero's hands are mostly stat cards, still with one ability card.
 func test_full_slots_shift_the_share_to_stat_cards() -> void:
 	var p := _hero()
 	var r := p.abilities
@@ -310,8 +326,39 @@ func test_full_slots_shift_the_share_to_stat_cards() -> void:
 		r.learn(_ability(StringName("t_a%d" % i), AbilityData.Kind.ACTIVE))
 	for i in 4:
 		r.learn(_ability(StringName("t_u%d" % i), AbilityData.Kind.AUTO))
-	var full_share := LevelUpDeck.ability_share(p, LevelUpDeck.ability_candidates(p))
+	var candidates := LevelUpDeck.ability_candidates(p)
+	var total_weight := 0.0
+	var rank_weight := 0.0
+	for pair: Array in candidates:
+		total_weight += float(pair[1])
+		if (pair[0] as LevelCard).kind == LevelCard.Kind.RANK_UP:
+			rank_weight += float(pair[1])
+	check(rank_weight > 0.0 and rank_weight < total_weight, "rank-ups and replacement cards on offer")
+	var full_share := LevelUpDeck.ability_share(p, candidates)
 	check(full_share < LevelUpDeck.ABILITY_SHARE, "full slots at Rank I: fewer ability cards (%.2f)" % full_share)
+	check_near(full_share, LevelUpDeck.ABILITY_SHARE * (rank_weight + LevelUpDeck.FULL_SLOTS_MIN_SHARE
+			* (total_weight - rank_weight)) / total_weight, 0.0001, "only the replacement weight shrinks")
+	# Seeded hands: the rank-ups keep the chance they had before full slots shrank the share
+	# (ABILITY_SHARE x their weight share; the hand guarantees add a little, sampling noise
+	# 0.004); the replacement cards give up most of theirs.
+	var rank_ups := 0
+	var replacements := 0
+	var drawn := 0
+	var hand_rng := RandomNumberGenerator.new()
+	for seed_value in 4000:
+		hand_rng.seed = seed_value
+		for c in LevelUpDeck.draw(p, hand_rng):
+			drawn += 1
+			if c.kind == LevelCard.Kind.RANK_UP:
+				rank_ups += 1
+			elif c.kind == LevelCard.Kind.NEW_ABILITY:
+				replacements += 1
+	var rank_floor := LevelUpDeck.ABILITY_SHARE * rank_weight / total_weight
+	check(float(rank_ups) / drawn >= rank_floor - 0.01,
+			"rank-ups keep their chance: %.3f >= %.3f" % [float(rank_ups) / drawn, rank_floor])
+	var replace_before := LevelUpDeck.ABILITY_SHARE * (total_weight - rank_weight) / total_weight
+	check(float(replacements) / drawn < replace_before * 0.5,
+			"replacement cards come far less often: %.3f < %.3f" % [float(replacements) / drawn, replace_before * 0.5])
 	for a in r.slots:
 		while r.can_rank_up(a.id):
 			r.rank_up(a.id)

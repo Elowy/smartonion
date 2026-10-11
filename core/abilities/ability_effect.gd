@@ -21,6 +21,9 @@ func cast(_ctx: AbilityContext) -> bool:
 
 
 ## Called every physics frame while the player lives (channels, stateful effects).
+## [param ctx] is reused across ticks: one object per ability, refreshed by AbilityRunner
+## (player, rank, params, position and facing; no target) before every call. Read it during
+## the call only – do not keep it or write to it (copy what must outlive the tick).
 func tick(_ctx: AbilityContext, _delta: float) -> void:
 	pass
 

@@ -89,9 +89,15 @@ var wipes := 0
 var items_bought := 0
 var items_looted := 0
 var loot_rolls := 0
-## Level-up cards picked / ability ranks the bots bought from the Trainer this run.
+## Level-up cards picked / ability ranks the bots bought from the Trainer / stall rerolls the
+## bots paid for (Intermission.bot_rerolled) this run.
 var level_cards := 0
 var ranks_trained := 0
+var shop_rerolls := 0
+## The shared wallet when the last market closed (the gold carried into the wave after it;
+## the starting wallet before the first market). Unlike the final gold, it leaves out the
+## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
+var gold_at_last_shop := 0
 var victory := false
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
@@ -229,6 +235,8 @@ func start_run() -> void:
 	loot_rolls = 0
 	level_cards = 0
 	ranks_trained = 0
+	shop_rerolls = 0
+	gold_at_last_shop = RunState.gold
 	_loot_seen = RunState.team_loot.size()
 	victory = false
 	perf = RunPerf.new()
@@ -249,6 +257,7 @@ func start_run() -> void:
 	intermission.loot_rolled.connect(_on_loot_rolled)
 	intermission.level_card_picked.connect(_on_level_card_picked)
 	intermission.ranks_trained.connect(_on_ranks_trained)
+	intermission.bot_rerolled.connect(_on_bot_rerolled)
 	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
 	intermission.bot_shopping = options.smoke or options.demo
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
@@ -622,6 +631,9 @@ func _on_intermission_continue() -> void:
 	if options.view == "intermission" and _view_forced:
 		return  # held open for the screenshot
 	RunState.pending_level_ups = 0  # resolved by the intermission's level-up cards
+	gold_at_last_shop = RunState.gold
+	_log("market closed after wave %d: %d gold carried into wave %d (%d bot rerolls so far)" % [
+		wave, gold_at_last_shop, wave + 1, shop_rerolls])
 	start_wave(wave + 1)
 
 
@@ -639,6 +651,10 @@ func _on_level_card_picked(_slot_index: int, _card: LevelCard) -> void:
 
 func _on_ranks_trained(_slot_index: int, count: int) -> void:
 	ranks_trained += count
+
+
+func _on_bot_rerolled(_slot_index: int, _cost: int) -> void:
+	shop_rerolls += 1
 
 
 func _on_team_loot_changed() -> void:
@@ -792,6 +808,7 @@ func smoke_result(result: String) -> Dictionary:
 		"last_wave": wave,
 		"kills": RunState.kills,
 		"gold": RunState.gold,
+		"gold_at_last_shop": gold_at_last_shop,
 		"level": RunState.level,
 		"players": players.size(),
 		"players_downed": players_downed,
@@ -805,6 +822,7 @@ func smoke_result(result: String) -> Dictionary:
 		"level_cards": level_cards,
 		"abilities_learned": abilities_learned(),
 		"ranks_trained": ranks_trained,
+		"shop_rerolls": shop_rerolls,
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
