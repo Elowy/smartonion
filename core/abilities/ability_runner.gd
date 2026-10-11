@@ -2,10 +2,15 @@ class_name AbilityRunner
 extends Node
 ## A player's abilities, class resources and Mastery (GDD 3, 6). Child node "Abilities".
 ##
-## Slots: 0 = RT, 1 = LT (the class's two core abilities), 2 = RB, 3 = LB (learned actives, M4).
+## Slots (GDD 6.2): 0 = RT, 1 = LT (the class's two core abilities), 2 = RB, 3 = LB (learned
+## Active abilities), 4..7 = learned Auto-cast abilities (fire by themselves when ready).
 ## Input edges are read in _process (PlayerInput rule); cooldowns, resources and effects
-## tick in _physics_process. Bots (BotInput) auto-cast when AbilityEffect.wants_auto_cast.
-## All targeting is automatic.
+## tick in _physics_process. Auto-cast slots – and every slot of a bot (BotInput) – cast when
+## AbilityEffect.wants_auto_cast. All targeting is automatic.
+##
+## Ranks I–V (AbilityRanks): free rank-ups from level-up cards, paid ones from the Trainer;
+## a rank's changes are part of [method params_for]. Learning: [method learn] /
+## [method free_slot] / [method forget] (GDD 6.1–6.3).
 ##
 ## Charges: the "charges" param (default 1, item mods: "charges_add") lets an ability be cast
 ## that many times in a row; spent charges come back one per cooldown, in sequence. With one
@@ -13,9 +18,15 @@ extends Node
 
 signal ability_cast(slot_index: int, ability: AbilityData)
 signal slots_changed
+## An ability's rank or Rank V specialisation changed.
+signal ranks_changed(ability_id: StringName)
 
 const CORE_SLOTS := 2
-const MAX_SLOTS := 4
+## Slots cast by a button (RT, LT, RB, LB); the rest are auto-cast.
+const INPUT_SLOTS := 4
+const MAX_SLOTS := 8
+const ACTIVE_SLOTS: Array[int] = [2, 3]
+const AUTO_SLOTS: Array[int] = [4, 5, 6, 7]
 ## Bots re-check their abilities this often (s).
 const AUTO_CAST_INTERVAL := 0.25
 ## Default cluster radius for DENSEST_CLUSTER targeting (m).
@@ -23,8 +34,10 @@ const CLUSTER_RADIUS := 3.0
 
 var player: Player
 var slots: Array[AbilityData] = []
-## Ability id -> rank (0 = Rank I). M4 raises ranks.
+## Ability id -> rank (1 = Rank I .. 5); missing = Rank I.
 var ranks: Dictionary[StringName, int] = {}
+## Ability id -> chosen Rank V specialisation (index into AbilityData.specs).
+var specs: Dictionary[StringName, int] = {}
 ## Resource id -> state; [member resource_order] keeps the class's order (primary first).
 var resources: Dictionary[StringName, ClassResource] = {}
 var resource_order: Array[StringName] = []
@@ -90,6 +103,121 @@ func primary_resource() -> ClassResource:
 
 func effect_for(ability: AbilityData) -> AbilityEffect:
 	return _effects.get(ability.id) if ability != null else null
+
+
+# --- Learning and ranks (GDD 6.1–6.3) -------------------------------------------------------
+
+func rank_of(ability_id: StringName) -> int:
+	return ranks.get(ability_id, 1)
+
+
+func spec_of(ability_id: StringName) -> int:
+	return specs.get(ability_id, -1)
+
+
+## The slot holding [param ability_id] (-1 if not slotted).
+func slot_of(ability_id: StringName) -> int:
+	for i in MAX_SLOTS:
+		if slots[i] != null and slots[i].id == ability_id:
+			return i
+	return -1
+
+
+func knows(ability_id: StringName) -> bool:
+	return slot_of(ability_id) >= 0
+
+
+## Slot indices that take abilities of [param kind] (CORE: 0..1, ACTIVE: 2..3, AUTO: 4..7).
+static func slots_for_kind(kind: AbilityData.Kind) -> Array[int]:
+	match kind:
+		AbilityData.Kind.ACTIVE:
+			return ACTIVE_SLOTS
+		AbilityData.Kind.AUTO:
+			return AUTO_SLOTS
+	return [0, 1] as Array[int]
+
+
+## The first empty slot for [param kind] (-1 = all full).
+func free_slot(kind: AbilityData.Kind) -> int:
+	for i in slots_for_kind(kind):
+		if slots[i] == null:
+			return i
+	return -1
+
+
+## Learns [param ability] at Rank I into the first free slot of its kind, or into
+## [param replace_index] (a slot of the same kind; the old ability is forgotten and its
+## refund returned via [param refund_out]). Returns the slot index, -1 if impossible.
+func learn(ability: AbilityData, replace_index: int = -1) -> int:
+	if ability == null or not ability.is_learned_kind() or knows(ability.id):
+		return -1
+	var index := replace_index
+	if index < 0:
+		index = free_slot(ability.kind)
+	if index < 0 or index not in slots_for_kind(ability.kind):
+		return -1
+	if slots[index] != null:
+		forget(index)
+	ranks[ability.id] = 1
+	set_slot(index, ability)
+	return index
+
+
+## Removes the learned ability in [param index]; returns the gold refund (50 % of its ranks'
+## value at the current wave). Core slots cannot be emptied.
+func forget(index: int) -> int:
+	if index < CORE_SLOTS or index >= MAX_SLOTS or slots[index] == null:
+		return 0
+	var a := slots[index]
+	var refund := AbilityRanks.replace_refund(rank_of(a.id), RunState.wave)
+	var effect: AbilityEffect = _effects.get(a.id)
+	if effect != null:
+		effect.end_wave(_light_context(a))
+	_effects.erase(a.id)
+	_cooldown_left.erase(a.id)
+	_charges_spent.erase(a.id)
+	ranks.erase(a.id)
+	specs.erase(a.id)
+	slots[index] = null
+	invalidate_params()
+	slots_changed.emit()
+	return refund
+
+
+func can_rank_up(ability_id: StringName) -> bool:
+	return knows(ability_id) and rank_of(ability_id) < AbilityRanks.MAX_RANK
+
+
+## +1 rank (max V). Reaching Rank V needs a specialisation: [method needs_spec].
+func rank_up(ability_id: StringName) -> bool:
+	if not can_rank_up(ability_id):
+		return false
+	ranks[ability_id] = rank_of(ability_id) + 1
+	invalidate_params()
+	ranks_changed.emit(ability_id)
+	return true
+
+
+## True at Rank V without a chosen specialisation (the UI asks the player).
+func needs_spec(ability_id: StringName) -> bool:
+	var i := slot_of(ability_id)
+	return i >= 0 and rank_of(ability_id) >= AbilityRanks.MAX_RANK and spec_of(ability_id) < 0 \
+			and not slots[i].specs.is_empty()
+
+
+func set_spec(ability_id: StringName, index: int) -> bool:
+	var i := slot_of(ability_id)
+	if i < 0 or rank_of(ability_id) < AbilityRanks.MAX_RANK or index < 0 or index >= slots[i].specs.size():
+		return false
+	specs[ability_id] = index
+	invalidate_params()
+	ranks_changed.emit(ability_id)
+	return true
+
+
+## Gold for the next rank of [param ability_id] at the current wave (0 = max rank).
+func trainer_price(ability_id: StringName) -> int:
+	return AbilityRanks.trainer_price(rank_of(ability_id), RunState.wave) if knows(ability_id) else 0
 
 
 ## Full cooldown: the "cooldown" param (after item mods, from [param ctx] when given), then
@@ -244,7 +372,7 @@ func build_context(ability: AbilityData) -> AbilityContext:
 	var ctx := AbilityContext.new()
 	ctx.player = player
 	ctx.ability = ability
-	ctx.rank = ranks.get(ability.id, 0)
+	ctx.rank = rank_of(ability.id)
 	ctx.rng = RunState.rng
 	ctx.params = params_for(ability)
 	var here := player.global_position if player != null and player.is_inside_tree() else Vector3.ZERO
@@ -280,7 +408,7 @@ func _light_context(ability: AbilityData) -> AbilityContext:
 	var ctx := AbilityContext.new()
 	ctx.player = player
 	ctx.ability = ability
-	ctx.rank = ranks.get(ability.id, 0)
+	ctx.rank = rank_of(ability.id)
 	ctx.rng = RunState.rng
 	ctx.params = params_for(ability)
 	ctx.point = player.global_position if player != null and player.is_inside_tree() else Vector3.ZERO
@@ -288,20 +416,29 @@ func _light_context(ability: AbilityData) -> AbilityContext:
 	return ctx
 
 
-## The ability's params with "cooldown", "cost" and "charges" (1) filled in (unless the params
-## set them) and the player's item mods applied – so "cooldown_add": -5 works on any ability.
+## The ability's params with "cooldown", "cost", "charges" (1) and "power" (1.0) filled in
+## (unless the params set them), then its rank's changes (AbilityRanks) and the player's item
+## mods applied – so "cooldown_add": -5 works on any ability. Effects scale their damage /
+## heal / shield amounts by "power".
 ## Cached per ability and read-only: effects copy it before changing anything; equipment
 ## changes (Player.apply_equipment) and set_slot call [method invalidate_params].
 func params_for(ability: AbilityData) -> Dictionary:
 	var cached: Variant = _params_cache.get(ability.id)
 	if cached != null:
 		return cached
-	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1}
-	base.merge(ability.params, true)
-	var out := apply_mods(base, player.ability_mods(ability.id) if player != null else {})
+	var out := params_at_rank(ability, rank_of(ability.id), spec_of(ability.id))
 	out.make_read_only()
 	_params_cache[ability.id] = out
 	return out
+
+
+## [method params_for] as it would be at [param rank] with specialisation [param spec]
+## (previews: level-up rank-up cards, the Trainer). Not cached, a fresh dictionary.
+func params_at_rank(ability: AbilityData, rank: int, spec: int = -1) -> Dictionary:
+	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1, "power": 1.0}
+	base.merge(ability.params, true)
+	var ranked := apply_mods(base, AbilityRanks.mods_for(ability, clampi(rank, 1, AbilityRanks.MAX_RANK), spec))
+	return apply_mods(ranked, player.ability_mods(ability.id) if player != null else {})
 
 
 ## Drops the cached params (item mods or ranks changed).
@@ -322,18 +459,21 @@ func gain_from_proc(amount: float) -> void:
 		primary.add(amount * primary.max_value() * 0.1, false)
 
 
-## Applies item mods to [param base] params. Keys: "<param>_add" adds, "<param>_pct" scales
-## by (1 + v / 100), anything else replaces / sets (flags, new params).
+## Applies item / rank mods to [param base] params. Keys: "<param>_add" adds (missing = 0),
+## "<param>_pct" scales an existing <param> by (1 + v / 100); a "_pct" key whose <param> does
+## not exist sets that key itself (so {"slow_pct": 40} sets a "slow_pct" param); anything else
+## replaces / sets (flags, new params).
 static func apply_mods(base: Dictionary, mods: Dictionary) -> Dictionary:
 	var out := base.duplicate(true)
 	for key: String in mods:
 		var v: Variant = mods[key]
-		if key.ends_with("_add") and typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+		var numeric := typeof(v) in [TYPE_INT, TYPE_FLOAT]
+		if key.ends_with("_add") and numeric:
 			var p := key.trim_suffix("_add")
 			out[p] = float(out.get(p, 0.0)) + float(v)
-		elif key.ends_with("_pct") and typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+		elif key.ends_with("_pct") and numeric and out.has(key.trim_suffix("_pct")):
 			var p := key.trim_suffix("_pct")
-			out[p] = float(out.get(p, 0.0)) * (1.0 + float(v) / 100.0)
+			out[p] = float(out[p]) * (1.0 + float(v) / 100.0)
 		else:
 			out[key] = v
 	return out
@@ -384,7 +524,12 @@ func on_kill(enemy: Node3D) -> void:
 		mastery.on_kill(enemy)
 
 
+## The player is about to be freed: every slotted effect ends what it started (buffs on
+## allies, pets, areas) like at a wave end, then the Mastery tears down.
 func teardown() -> void:
+	for a in slots:
+		if a != null and _effects.has(a.id):
+			_effects[a.id].end_wave(_light_context(a))
 	if mastery != null:
 		mastery.teardown()
 
@@ -395,7 +540,7 @@ func _process(_delta: float) -> void:
 	if player == null or player.slot == null or not player.is_alive() or auto_cast:
 		return
 	var input := player.slot.input
-	for i in MAX_SLOTS:
+	for i in INPUT_SLOTS:
 		if input.ability_just_pressed(i):
 			try_cast(i)
 
@@ -418,18 +563,18 @@ func _physics_process(delta: float) -> void:
 	for a in slots:
 		if a != null and _effects.has(a.id):
 			_effects[a.id].tick(_light_context(a), delta)
-	if auto_cast:
-		_auto_timer -= delta
-		if _auto_timer <= 0.0:
-			_auto_timer = AUTO_CAST_INTERVAL
-			for i in MAX_SLOTS:
-				if not _cheap_ready(i):
-					continue
-				# One targeting pass per decision (DENSEST_CLUSTER scans the enemies).
-				var ctx := build_context(slots[i])
-				var effect := effect_for(slots[i])
-				if effect.can_cast(ctx) and effect.wants_auto_cast(ctx):
-					_cast_with(i, ctx)
+	_auto_timer -= delta
+	if _auto_timer <= 0.0:
+		_auto_timer = AUTO_CAST_INTERVAL
+		for i in MAX_SLOTS:
+			# Auto-cast slots fire for everybody; bots also "press" the button slots.
+			if (i < INPUT_SLOTS and not auto_cast) or not _cheap_ready(i):
+				continue
+			# One targeting pass per decision (DENSEST_CLUSTER scans the enemies).
+			var ctx := build_context(slots[i])
+			var effect := effect_for(slots[i])
+			if effect.can_cast(ctx) and effect.wants_auto_cast(ctx):
+				_cast_with(i, ctx)
 
 
 ## Recharges: the timer runs while charges are spent; each expiry returns one charge and

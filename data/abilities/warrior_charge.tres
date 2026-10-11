@@ -20,9 +20,31 @@ params = {
 "buff_damage": 0.0,
 "buff_duration": 0.0,
 "distance": 7.0,
+"impact_pct": 0.0,
+"rage_gain": 0.0,
 "speed": 36.0,
 "stun": 1.0,
 "stun_radius": 2.0
 }
 icon = &"charge"
 color = Color(0.95, 0.65, 0.25, 1)
+kind = 0
+card_weight = 0.0
+rank3 = {
+"charges_add": 1.0
+}
+rank3_text = "+1 charge: two Charges in a row"
+specs = Array[Dictionary]([{
+"mods": {
+"impact_pct_add": 150.0,
+"stun_radius_add": 1.0
+},
+"name": "Warbringer",
+"text": "Every enemy you stun takes 150% weapon damage; +1 m landing radius."
+}, {
+"mods": {
+"rage_gain_add": 20.0
+},
+"name": "Furious Charge",
+"text": "Gain 20 Rage when you land."
+}])

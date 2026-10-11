@@ -274,8 +274,8 @@ func test_begin_wave_heals_and_revives() -> void:
 	check_eq(p.invulnerable_left, 0.0, "no leftover i-frames")
 
 
-func test_team_level_placeholder_bonus() -> void:
-	# TEMPORARY M1 placeholder (until the M4 level-up cards): +1 Max HP, +4% damage per level.
+func test_team_level_gives_one_max_hp() -> void:
+	# +1 Max HP per team level (Brotato); damage comes from the level-up cards (M4).
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	check_eq(RunState.level, RunState.START_LEVEL, "run starts at the start level")
 	check(not p.stats.has_source(Player.LEVEL_SOURCE), "no level bonus at the starting level")
@@ -294,8 +294,8 @@ func test_team_level_placeholder_bonus() -> void:
 	check_eq(p.max_hp(), 16.0, "+1 max hp")
 	check_eq(p.hp, 11.0, "current hp rises by the max hp gained")
 	check(not hp_events.is_empty() and is_equal_approx(hp_events[-1], 11.0), "hp_changed with the new hp")
-	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct + 4.0, "+4% damage")
-	check_eq(p.stats.damage_mult(), mult + 0.04, "damage mult +0.04")
+	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct, "no damage from the level itself")
+	check_eq(p.stats.damage_mult(), mult, "damage mult unchanged")
 	check_eq(ghost.hp, 0.0, "a ghost stays at 0 hp")
 	check_eq(ghost.max_hp(), 16.0, "but its max hp grows too")
 	# Two levels at once (one leveled_up per level).
@@ -303,7 +303,7 @@ func test_team_level_placeholder_bonus() -> void:
 	check_eq(RunState.level, RunState.START_LEVEL + 3, "two more levels")
 	check_eq(p.max_hp(), 18.0, "+3 max hp in total")
 	check_eq(p.hp, 13.0, "+2 hp from the two levels")
-	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct + 12.0, "+12% damage in total")
+	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), dmg_pct, "still no damage from levels")
 	# A hero created mid-run starts with the team level's bonus at full hp.
 	var late := Fakes.spawn_player(world, 2, &"warrior", Vector3(-4, 0, 0))
 	check_eq(late.max_hp(), 18.0, "late hero has the level bonus")
@@ -509,3 +509,38 @@ func test_is_reviving_next_to_a_ghost() -> void:
 	check(not p1.is_reviving(), "a ghost does not revive")
 	p2.global_position = Vector3(Player.REVIVE_RADIUS + 0.5, 0, 0)
 	check(not p2.is_reviving(), "out of the circle")
+
+
+func test_damage_taken_mults_death_guards_and_shields() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	p.stats.set_source(&"test", {Stats.ARMOR: -2.0})  # no armour: raw damage lands
+	var hp := p.hp
+	p.damage_taken_mults[&"shield_wall"] = 0.5
+	p.take_damage(4.0)
+	check_near(hp - p.hp, 2.0, 0.001, "-50% damage taken")
+	p.begin_wave()
+	check(p.damage_taken_mults.is_empty(), "cleared at wave start")
+	p.invulnerable_left = 0.0
+	p.procs.add_shield(5.0, 10.0)
+	hp = p.hp
+	p.take_damage(3.0)
+	check_eq(p.hp, hp, "the shield took it")
+	p.invulnerable_left = 0.0
+	var used := [false]
+	p.death_guards.append(func() -> bool:
+		if used[0]:
+			return false
+		used[0] = true
+		return true)
+	p.take_damage(999.0)
+	check(not p.downed and p.hp >= 1.0, "a death guard keeps the hero up at 1 HP")
+	p.invulnerable_left = 0.0
+	p.take_damage(999.0)
+	check(p.downed, "but only while it allows")
+
+
+func test_every_hero_starts_with_base_mastery() -> void:
+	for class_id in Db.class_ids:
+		var p := Player.create(Fakes.make_slot(0, class_id))
+		check_eq(p.stats.get_stat(Stats.MASTERY), Stats.BASE_MASTERY, "%s: 5 Mastery" % class_id)
+		p.free()

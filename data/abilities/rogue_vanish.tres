@@ -22,7 +22,15 @@ params = {
 "forced_crits": 1,
 "heal_max_hp_pct": 30.0,
 "invulnerable": 0,
-"opacity": 0.4
+"opacity": 0.4,
+"smoke_radius": 0.0,
+"smoke_stun": 0.0,
+"speed_pct": 0.0
 }
 icon = &"vanish"
 color = Color(0.45, 0.4, 0.62, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"duration_add": 1.0}
+rank3_text = "+1 sec in the shadows"
+specs = Array[Dictionary]([{"name": "Smoke Bomb", "text": "Vanishing stuns every enemy within 4 m for 2 sec.", "mods": {"smoke_radius": 4.0, "smoke_stun": 2.0}}, {"name": "Shadow Veil", "text": "While vanished you cannot be hurt and move 30% faster.", "mods": {"invulnerable": 1, "speed_pct_add": 30.0}}])

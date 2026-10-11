@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/seed_of_corruption.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"seed_of_corruption"
+display_name = "Seed of Corruption"
+description = "Plants a seed in an enemy of the densest group. When the host dies, or after {duration} sec, it bursts for Shadow damage within {radius} m."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 7.0
+targeting = 2
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_min": 2,
+"chain": 0,
+"damage": 6.0,
+"dot_damage": 0.5,
+"dot_intellect_scale": 0.1,
+"dot_spell_power_scale": 0.25,
+"duration": 6.0,
+"intellect_scale": 1.0,
+"pool_damage_share": 15.0,
+"pool_duration": 0.0,
+"pool_slow": 40.0,
+"radius": 3.0,
+"spell_power_scale": 1.5
+}
+icon = &"seed_of_corruption"
+color = Color(0.5, 0.85, 0.3, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m burst radius"
+specs = Array[Dictionary]([{"name": "Chain Reaction", "text": "A burst plants a new seed in an enemy it hit (up to 2 more seeds per cast).", "mods": {"chain": 2}}, {"name": "Blighted Ground", "text": "The burst leaves blighted ground for 3 sec that slows enemies by 40% and burns them.", "mods": {"pool_duration": 3.0}}])

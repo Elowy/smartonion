@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warrior/warrior_bladestorm.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bladestorm"
+display_name = "Bladestorm"
+description = "Become a storm of steel for {duration} sec: enemies within {radius} m take {damage_pct}% weapon damage in total. Nothing can slow you meanwhile."
+class_id = &"warrior"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 20.0
+targeting = 2
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 300.0,
+"duration": 3.0,
+"leech": 0.0,
+"radius": 3.0,
+"ravager": false,
+"tick_interval": 0.25
+}
+icon = &"bladestorm"
+color = Color(0.75, 0.8, 0.95, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"duration_add": 1.0
+}
+rank3_text = "+1 sec storm"
+specs = Array[Dictionary]([{
+"mods": {
+"ravager": true
+},
+"name": "Ravager",
+"text": "Hurl the storm: a whirling axe strikes the biggest group up to 10 m away instead of you."
+}, {
+"mods": {
+"leech_add": 20.0
+},
+"name": "Bloodstorm",
+"text": "Heal for 20% of the damage the storm deals."
+}])

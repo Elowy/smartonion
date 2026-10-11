@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_fireball.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fireball"
+display_name = "Fireball"
+description = "Hurls a fireball at the nearest enemy: Fire damage (scales with Intellect and Spell Power) that sets it burning for {burn_pct}% more over {burn_duration} sec."
+class_id = &"mage"
+school = &"fire"
+resource = &""
+cost = 0.0
+cooldown = 4.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"bounce_pct": 75.0,
+"bounces": 0,
+"burn_duration": 3.0,
+"burn_pct": 50.0,
+"damage": 6.0,
+"fireballs": 1,
+"int_scaling": 1.0,
+"speed": 15.0,
+"splash_pct": 60.0,
+"splash_radius": 0.0
+}
+icon = &"fireball"
+color = Color(1.0, 0.48, 0.12, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"fireballs_add": 1
+}
+rank3_text = "+1 fireball at the next nearest enemy"
+specs = Array[Dictionary]([{
+"mods": {
+"bounces_add": 2
+},
+"name": "Bouncing Fireball",
+"text": "Fireball bounces to 2 more enemies (75% damage per bounce), setting each one burning."
+}, {
+"mods": {
+"splash_radius_add": 2.5
+},
+"name": "Explosive Fireball",
+"text": "Fireball explodes on impact: enemies within 2.5 m take 60% of its damage and start burning too."
+}])

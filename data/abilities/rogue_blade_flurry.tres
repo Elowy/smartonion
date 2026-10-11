@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_blade_flurry.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"blade_flurry"
+display_name = "Blade Flurry"
+description = "For {duration} sec, your weapon hits also strike other enemies nearby for {damage_pct}% of their damage (extra targets per hit: {targets})."
+class_id = &"rogue"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 12.0
+targeting = 0
+cast_range = 5.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 50.0,
+"duration": 5.0,
+"extend_on_kill": 0.0,
+"haste_pct": 0.0,
+"max_extend": 5.0,
+"range": 5.0,
+"targets": 1
+}
+icon = &"blade_flurry"
+color = Color(0.9, 0.92, 1, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"targets_add": 1}
+rank3_text = "Hits strike 1 more extra target"
+specs = Array[Dictionary]([{"name": "Relentless Flurry", "text": "Every kill during Blade Flurry makes it last 1 sec longer (up to 5 sec).", "mods": {"extend_on_kill": 1.0}}, {"name": "Adrenaline Surge", "text": "Blade Flurry also grants 30% Haste while it lasts.", "mods": {"haste_pct_add": 30.0}}])

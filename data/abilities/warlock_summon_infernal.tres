@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/summon_infernal.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"summon_infernal"
+display_name = "Summon Infernal"
+description = "An Infernal crashes onto the densest group, burning and stunning everything within {impact_radius} m, then smashes enemies for {duration} sec."
+class_id = &"warlock"
+school = &"fire"
+resource = &"soul_shard"
+cost = 1.0
+cooldown = 45.0
+targeting = 2
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_min": 5,
+"damage": 4.0,
+"duration": 8.0,
+"immolation_radius": 2.5,
+"immolation_share": 0.0,
+"impact_damage": 8.0,
+"impact_intellect_scale": 1.5,
+"impact_radius": 3.0,
+"impact_spell_power_scale": 2.0,
+"impact_stun": 1.0,
+"intellect_scale": 0.6,
+"radius": 3.0,
+"slam_interval": 1.0,
+"slam_radius": 2.0,
+"spell_power_scale": 1.0,
+"taunt_radius": 0.0
+}
+icon = &"summon_infernal"
+color = Color(0.45, 0.95, 0.25, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"duration_add": 3.0}
+rank3_text = "+3 sec Infernal"
+specs = Array[Dictionary]([{"name": "Immolation", "text": "The Infernal burns every enemy within 2.5 m for 30% of a slam every 0.5 sec.", "mods": {"immolation_share": 30.0}}, {"name": "Abyssal Guardian", "text": "The Infernal draws every enemy within 6 m onto itself and stays 2 sec longer.", "mods": {"taunt_radius": 6.0, "duration_add": 2.0}}])

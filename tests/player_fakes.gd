@@ -69,8 +69,11 @@ static func make_slot(index: int, class_id: StringName) -> PlayerSlot:
 	return slot
 
 
+## A real Player of [param class_id]. Without the universal base Mastery (Stats.BASE_MASTERY)
+## so exact-number tests see 0 Mastery unless they add some (Mastery tests set their own).
 static func spawn_player(world: Node3D, index: int, class_id: StringName, pos: Vector3 = Vector3.ZERO) -> Player:
 	var p := Player.create(make_slot(index, class_id))
+	p.stats.remove_source(&"base")
 	world.add_child(p)
 	p.global_position = pos
 	return p

@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/fear.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fear"
+display_name = "Fear"
+description = "Terrifies every enemy within {radius} m: they flee from you for {duration} sec and cannot attack."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 14.0
+targeting = 0
+cast_range = 5.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_hp": 45.0,
+"auto_cast_min": 4,
+"cower": false,
+"cower_bonus": 0.5,
+"dread_damage": 0.0,
+"dread_intellect_scale": 0.4,
+"dread_spell_power_scale": 1.0,
+"duration": 2.0,
+"radius": 4.0
+}
+icon = &"fear"
+color = Color(0.7, 0.45, 1.0, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"radius_add": 1.5}
+rank3_text = "+1.5 m radius"
+specs = Array[Dictionary]([{"name": "Dread", "text": "Terrified enemies also take Shadow damage every second while they flee.", "mods": {"dread_damage": 3.0}}, {"name": "Cower", "text": "Enemies freeze in place instead of fleeing (a stun), 0.5 sec longer.", "mods": {"cower": true}}])

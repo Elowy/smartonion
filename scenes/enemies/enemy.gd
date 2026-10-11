@@ -112,6 +112,11 @@ var state_left := 0.0
 var attack_cooldown_left := 0.0
 ## Seconds until the next contact hit may land.
 var contact_cooldown_left := 0.0
+## Fear (runs away from _fear_from, no attacks) and taunt (chases taunt_target) timers.
+var fear_left := 0.0
+var taunt_left := 0.0
+var taunt_target: Node3D
+var _fear_from := Vector3.ZERO
 var stun_left := 0.0
 ## Movement slow (procs such as Frostbite): percent and seconds left (the strongest wins).
 var slow_pct := 0.0
@@ -257,6 +262,40 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 		_die(attacker)
 
 
+## Runs away from [param from] for [param duration] seconds (Fear): no attacks, no contact
+## damage. Stun resistance shortens it.
+func apply_fear(duration: float, from: Vector3) -> void:
+	if is_dead() or duration <= 0.0:
+		return
+	var resist := clampf(data.stun_resist, 0.0, 1.0) if data != null else 0.0
+	var d := duration * (1.0 - resist)
+	if d <= 0.0:
+		return
+	fear_left = maxf(fear_left, d)
+	_fear_from = Vector3(from.x, 0.0, from.z)
+	if ai_state != AiState.MOVE:
+		ai_state = AiState.MOVE
+		state_left = 0.0
+
+
+func is_feared() -> bool:
+	return fear_left > 0.0
+
+
+## Chases [param target] (a pet, a decoy) instead of the players for [param duration]
+## seconds; touching a player still hurts it.
+func apply_taunt(target: Node3D, duration: float) -> void:
+	if is_dead() or target == null or duration <= 0.0:
+		return
+	taunt_target = target
+	taunt_left = maxf(taunt_left, duration)
+
+
+func is_taunted() -> bool:
+	return taunt_left > 0.0 and taunt_target != null and is_instance_valid(taunt_target) \
+			and taunt_target.is_inside_tree()
+
+
 func apply_stun(duration: float) -> void:
 	if is_dead() or duration <= 0.0:
 		return
@@ -363,14 +402,30 @@ func _physics_process(delta: float) -> void:
 			stun_left = 0.0
 			if model != null:
 				model.set_stunned(false)
+	var feared := fear_left > 0.0
+	if feared:
+		fear_left = maxf(0.0, fear_left - delta)
+	if taunt_left > 0.0:
+		taunt_left = maxf(0.0, taunt_left - delta)
+		if taunt_left <= 0.0:
+			taunt_target = null
 
 	var here := global_position
-	_scan_players(here, stunned)
+	_scan_players(here, stunned or feared)
 	if _dead or not is_inside_tree():
 		return  # a contact hit ended the run and the wave removed us
 
 	if stunned:
 		_move_velocity = Vector3.ZERO
+	elif feared:
+		var away := Vector3(here.x - _fear_from.x, 0.0, here.z - _fear_from.z)
+		var dir := away.normalized() if away.length_squared() > 0.0001 else _facing
+		_steer(dir * move_speed, delta)
+		_facing = dir
+	elif is_taunted():
+		_target_pos = Vector3(taunt_target.global_position.x, 0.0, taunt_target.global_position.z)
+		_target_dist_sq = WeaponRunner.flat(_target_pos - here).length_squared()
+		_update_chase(delta, here)
 	elif ai_state == AiState.LEAP:
 		_update_lunge(delta, here)
 	elif _target == null:

@@ -17,11 +17,32 @@ targeting = 4
 cast_range = 8.0
 effect = ExtResource("2_effect")
 params = {
+"allies": 1.0,
 "heal": 3.0,
+"heal_all": false,
 "heal_max_hp_pct": 25.0,
 "prefer_downed": true,
 "revive_hp": 0.4,
+"shield_duration": 8.0,
+"shield_share": 0.0,
 "spell_power_scale": 1.0
 }
 icon = &"word_of_glory"
 color = Color(1, 0.88, 0.45, 1)
+rank3 = {
+"allies_add": 1.0
+}
+rank3_text = "Heals 1 more wounded ally"
+specs = Array[Dictionary]([{
+"mods": {
+"heal_all": true
+},
+"name": "Light of Dawn",
+"text": "Heals every hero within 8 m, not just the most wounded ally."
+}, {
+"mods": {
+"shield_share": 50.0
+},
+"name": "Holy Bulwark",
+"text": "Every hero healed also gets an absorb shield worth 50% of the heal (8 sec)."
+}])

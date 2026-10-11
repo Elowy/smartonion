@@ -3,9 +3,13 @@ extends AbilityEffect
 ## Mage ability Blink (GDD 3.2): teleports the hero a few metres in the movement direction
 ## (facing when standing still), clamped to the arena and the shared screen, with a short
 ## invulnerability and arcane flashes at both ends. Params (data/abilities/mage_blink.tres):
-## distance (m), invulnerable (s), charges.
+## distance (m), invulnerable (s, x "power" from ranks II / IV), charges.
 ##
-## Charges (Band of the Blinking Star: charges_add +1) are kept by the AbilityRunner.
+## Charges (Band of the Blinking Star: charges_add +1; Rank III: +1) are kept by the
+## AbilityRunner. Rank V: "Frost Blink" (nova_freeze s: enemies within nova_radius m of the
+## spot you left are frozen – [method MageSpell.freeze]) or "Arcane Burst" (burst_damage +
+## burst_int_scaling x Intellect as an Arcane spell x power to enemies within burst_radius m
+## of where you arrive).
 
 const DEFAULT_DISTANCE := 6.0
 const DEFAULT_INVULNERABLE := 0.4
@@ -56,9 +60,35 @@ func cast(ctx: AbilityContext) -> bool:
 		player.global_position = dest
 	else:
 		player.position = dest
-	player.invulnerable_left = maxf(player.invulnerable_left, ctx.num("invulnerable", DEFAULT_INVULNERABLE))
+	player.invulnerable_left = maxf(player.invulnerable_left,
+			ctx.num("invulnerable", DEFAULT_INVULNERABLE) * ctx.num("power", 1.0))
 	MageVfx.blink(from, dest)
+	if player.is_inside_tree():
+		_frost_blink(ctx, from)
+		_arcane_burst(ctx, dest)
 	return true
+
+
+## Rank V "Frost Blink": freezes the enemies around the spot the hero left.
+func _frost_blink(ctx: AbilityContext, at: Vector3) -> void:
+	var freeze := ctx.num("nova_freeze", 0.0)
+	if freeze <= 0.0:
+		return
+	var radius := ctx.num("nova_radius", 3.0) * MageSpell.area_mult(ctx.player)
+	for e in MageSpell.enemies_in(ctx.player.get_tree(), at, radius):
+		MageSpell.freeze(e, ctx.player, freeze)
+	MageFx.frost_nova(WeaponRunner.flat(at), radius)
+
+
+## Rank V "Arcane Burst": Arcane damage around the spot the hero arrives at.
+func _arcane_burst(ctx: AbilityContext, at: Vector3) -> void:
+	if ctx.num("burst_damage", 0.0) <= 0.0 or ctx.player.procs == null:
+		return
+	var damage := MageSpell.damage_from(ctx, MageSpell.ARCANE, "burst_")
+	var radius := ctx.num("burst_radius", 3.0) * MageSpell.area_mult(ctx.player)
+	for e in MageSpell.enemies_in(ctx.player.get_tree(), at, radius):
+		ctx.player.procs.deal_raw(e, damage, MageSpell.ARCANE, true, &"ability")
+	Vfx.explosion(at + Vector3.UP * 0.3, radius, MageSpell.ARCANE_COLOR)
 
 
 func tick(ctx: AbilityContext, _delta: float) -> void:

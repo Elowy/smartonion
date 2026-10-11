@@ -1,8 +1,9 @@
 class_name WarriorSpinVfx
 extends Node3D
 ## The Whirlwind's spin: three translucent blade arcs and glinting blades circling the hero on
-## the ground, a faint outer ring. Child of the hero (follows it), frees itself after its
-## duration. Purely visual – the damage comes from [WarriorWhirlwind].
+## the ground, a faint outer ring. Child of the hero (follows it) – or of a Ravager axe –,
+## frees itself after its duration. Bladestorm spins more arcs, faster. Purely visual – the
+## damage comes from [WarriorSpin].
 
 const ARC_COUNT := 3
 const ARC_DEGREES := 100.0
@@ -19,6 +20,10 @@ const BLADE_ALPHA := 0.9
 var radius := 3.0
 var duration := 1.0
 var color := Color(0.9, 0.3, 0.2)
+var arcs := ARC_COUNT
+var turns_per_second := TURNS_PER_SECOND
+## Bladestorm: spectral greatswords (WarriorExecuteVfx.sword_mesh) instead of plain blades.
+var swords := false
 
 var _elapsed := 0.0
 var _spin: Node3D
@@ -27,14 +32,21 @@ var _alphas: Array[float] = []
 
 
 ## Starts a spin around [param hero] (parented to it). Null when the hero is not in the tree.
-static func spawn(hero: Node3D, p_radius: float, p_duration: float, p_color: Color) -> WarriorSpinVfx:
+## [param p_arcs] blade arcs turning [param p_turns] times a second; [param p_name] names the
+## node (tests find it by name).
+static func spawn(hero: Node3D, p_radius: float, p_duration: float, p_color: Color,
+		p_arcs: int = ARC_COUNT, p_turns: float = TURNS_PER_SECOND, p_name: String = "WhirlwindSpin",
+		p_swords: bool = false) -> WarriorSpinVfx:
 	if hero == null or not hero.is_inside_tree():
 		return null
 	var fx := WarriorSpinVfx.new()
-	fx.name = "WhirlwindSpin"
+	fx.name = p_name
 	fx.radius = maxf(0.5, p_radius)
 	fx.duration = maxf(0.1, p_duration)
 	fx.color = p_color
+	fx.arcs = maxi(1, p_arcs)
+	fx.turns_per_second = p_turns
+	fx.swords = p_swords
 	hero.add_child(fx)
 	return fx
 
@@ -51,12 +63,15 @@ func _ready() -> void:
 				Color.WHITE).build())
 	var ring_mesh := MeshKit.cached("warrior:spin_ring", func() -> Mesh:
 		return MeshKit.new().add_arc(0.94, 1.0, 360.0, Transform3D.IDENTITY, Color.WHITE, 48).build())
-	for i in ARC_COUNT:
-		var yaw := TAU * float(i) / float(ARC_COUNT)
+	for i in arcs:
+		var yaw := TAU * float(i) / float(arcs)
 		var arc := _part(arc_mesh, Color(color.r, color.g, color.b), ARC_ALPHA)
 		arc.rotation.y = yaw
 		arc.scale = Vector3(radius, 1.0, radius)
 		_spin.add_child(arc)
+		if swords:
+			_spin.add_child(_sword(yaw + deg_to_rad(ARC_DEGREES * 0.5)))
+			continue
 		# A glinting blade on the leading edge of every arc, at weapon height.
 		var blade := _part(blade_mesh, Color(0.92, 0.94, 1.0), BLADE_ALPHA)
 		blade.position.y = BLADE_HEIGHT - GROUND_Y
@@ -74,8 +89,25 @@ func _process(delta: float) -> void:
 	if _elapsed >= duration:
 		queue_free()
 		return
-	_spin.rotation.y -= delta * TAU * TURNS_PER_SECOND
+	_spin.rotation.y -= delta * TAU * turns_per_second
 	_apply_fade()
+
+
+## A greatsword lying flat at weapon height along [param yaw], hilt near the hero, tip on the
+## edge of the reach.
+func _sword(yaw: float) -> Node3D:
+	var holder := Node3D.new()
+	holder.rotation.y = yaw
+	holder.position.y = BLADE_HEIGHT - GROUND_Y
+	var s := clampf((radius - 0.5) / 2.6, 0.35, 1.6)
+	var sword := _part(WarriorExecuteVfx.sword_mesh(), Color.WHITE, BLADE_ALPHA)
+	(sword.material_override as StandardMaterial3D).vertex_color_use_as_albedo = true
+	# Rotated so the pommel points at the hero (+Z) and the tip outwards (-Z).
+	sword.rotation.x = deg_to_rad(90.0)
+	sword.scale = Vector3.ONE * s
+	sword.position.z = -(0.5 + 2.5 * s)
+	holder.add_child(sword)
+	return holder
 
 
 func _part(mesh: Mesh, tint: Color, alpha: float) -> MeshInstance3D:

@@ -9,6 +9,7 @@ const ITEM_BASE_DIR := "res://data/item_bases/"
 const AFFIX_DIR := "res://data/affixes/"
 const ENCHANT_DIR := "res://data/enchants/"
 const UNIQUE_DIR := "res://data/uniques/"
+const ABILITY_DIR := "res://data/abilities/"
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -19,6 +20,8 @@ var item_bases: Dictionary[StringName, ItemBase] = {}
 var affixes: Dictionary[StringName, AffixData] = {}
 var enchants: Dictionary[StringName, EnchantData] = {}
 var uniques: Dictionary[StringName, UniqueItemData] = {}
+## Every ability (core ones too), by id, in file order.
+var abilities: Dictionary[StringName, AbilityData] = {}
 var class_ids: Array[StringName] = []
 
 
@@ -55,6 +58,10 @@ func reload() -> void:
 	for res in _load_dir(UNIQUE_DIR):
 		if res is UniqueItemData:
 			uniques[res.id] = res
+	abilities.clear()
+	for res in _load_dir(ABILITY_DIR):
+		if res is AbilityData:
+			abilities[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -69,6 +76,23 @@ func reload() -> void:
 
 func get_class_data(id: StringName) -> ClassData:
 	return classes.get(id)
+
+
+func get_ability(id: StringName) -> AbilityData:
+	return abilities.get(id)
+
+
+## Learnable abilities (Active / Auto-cast) offered to [param class_id] on level-up cards:
+## the class's own plus the general ones (AbilityData.class_id empty), unlocked only.
+func ability_pool(class_id: StringName) -> Array[AbilityData]:
+	var out: Array[AbilityData] = []
+	for id in abilities:
+		var a := abilities[id]
+		if not a.is_learned_kind() or a.card_weight <= 0.0 or not is_unlocked(id):
+			continue
+		if a.class_id == &"" or a.class_id == class_id:
+			out.append(a)
+	return out
 
 
 func get_default_class() -> ClassData:

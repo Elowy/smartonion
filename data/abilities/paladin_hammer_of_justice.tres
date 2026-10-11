@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_hammer_of_justice.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hammer_of_justice"
+display_name = "Hammer of Justice"
+description = "Hurls a holy hammer at the nearest enemy that is not stunned yet ({hammers} at once): {damage_pct}% weapon damage as Holy damage (+Spell Power) and a {stun} sec stun."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 150.0,
+"execute_below": 0.0,
+"execute_bonus": 0.0,
+"hammers": 1.0,
+"impact_radius": 0.0,
+"kill_cdr": 0.0,
+"speed": 16.0,
+"spell_power_scale": 1.0,
+"stun": 1.5
+}
+icon = &"hammer_of_justice"
+color = Color(1, 0.85, 0.42, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"hammers_add": 1.0
+}
+rank3_text = "+1 hammer (a second target)"
+specs = Array[Dictionary]([{
+"mods": {
+"impact_radius": 2.5
+},
+"name": "Shattering Hammer",
+"text": "The hammer bursts on impact: every enemy within 2.5 m takes the damage and is stunned."
+}, {
+"mods": {
+"execute_below": 35.0,
+"execute_bonus": 100.0,
+"kill_cdr": 2.0
+},
+"name": "Wrathful Hammer",
+"text": "+100% damage against enemies below 35% health, and every killing blow takes 2 sec off the cooldown."
+}])

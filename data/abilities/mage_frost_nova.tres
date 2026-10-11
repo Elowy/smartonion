@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_frost_nova.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"frost_nova"
+display_name = "Frost Nova"
+description = "When an enemy gets close, frost bursts out around you: Frost damage to enemies within {radius} m and freezes them for {freeze} sec."
+class_id = &"mage"
+school = &"frost"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 0
+cast_range = 3.5
+effect = ExtResource("2_effect")
+params = {
+"damage": 2.0,
+"freeze": 1.5,
+"ground_duration": 0.0,
+"ground_freeze": 1.0,
+"ground_slow": 60.0,
+"int_scaling": 0.3,
+"radius": 3.5,
+"shatter_pct": 0.0,
+"shatter_radius": 1.5,
+"trigger": 0.5
+}
+icon = &"frost_nova"
+color = Color(0.6, 0.86, 1.0, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"freeze_add": 1.0
+}
+rank3_text = "+1 sec freeze"
+specs = Array[Dictionary]([{
+"mods": {
+"shatter_pct_add": 200.0
+},
+"name": "Shatter",
+"text": "When the freeze ends, frozen enemies shatter: 200% of the nova's damage to them and to enemies within 1.5 m."
+}, {
+"mods": {
+"ground_duration_add": 4.0
+},
+"name": "Frozen Ground",
+"text": "Leaves frozen ground for 4 sec: enemies in it are slowed by 60%, and each one stepping in is frozen for 1 sec."
+}])

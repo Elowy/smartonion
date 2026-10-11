@@ -75,7 +75,7 @@ func _tap(input: UiFakes.HumanInput, button: PlayerInput.Pad) -> void:
 func test_without_loot_the_market_opens_at_once() -> void:
 	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
 	MarketFakes.human_with_hero(world, "pad:b", &"mage")
-	screen.open(3, 1)
+	screen.open(3, 0)
 	check_eq(screen.phase, Intermission.Phase.MARKET, "market")
 	check(not screen.loot_screen.visible, "no loot roll")
 	check_eq(shop.open_calls.size(), 1, "Shop.open_round once")

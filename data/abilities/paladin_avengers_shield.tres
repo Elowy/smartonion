@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/paladin/paladin_avengers_shield.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"avengers_shield"
+display_name = "Avenger's Shield"
+description = "Hurls a holy shield that bounces between {targets} enemies, dealing {damage_pct}% weapon damage as Holy damage (+Spell Power) to each."
+class_id = &"paladin"
+school = &"holy"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"absorb_duration": 6.0,
+"absorb_max_hp": 0.0,
+"damage_pct": 100.0,
+"slow": 0.0,
+"slow_duration": 3.0,
+"speed": 18.0,
+"spell_power_scale": 0.8,
+"targets": 3.0
+}
+icon = &"avengers_shield"
+color = Color(0.95, 0.85, 0.5, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"targets_add": 1.0
+}
+rank3_text = "+1 bounce (4 targets)"
+specs = Array[Dictionary]([{
+"mods": {
+"absorb_max_hp": 4.0
+},
+"name": "Bulwark",
+"text": "Every enemy struck gives you an absorb shield worth 4% of your max HP (6 sec)."
+}, {
+"mods": {
+"slow": 50.0,
+"targets_add": 2.0
+},
+"name": "Dazing Shield",
+"text": "+2 bounces, and every enemy struck is dazed: 50% slower for 3 sec."
+}])

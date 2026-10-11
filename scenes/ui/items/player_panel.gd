@@ -3,14 +3,17 @@ extends Control
 ## One player's personal between-wave panel (GDD 12), shown in that player's screen corner /
 ## quadrant (DESIGN_SIZE 700x480 on the 1920x1080 canvas; scale it with [member scale]).
 ## Header in the player's colour (Pn, class, Avg. Item Level), tabs Character | Trainer |
-## Talents (the last two "Coming soon"). Character tab = WoW paper doll – Head, Neck,
+## Talents (Talents "Coming soon"). Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
+## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
+## the Character tab. Character tab = WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
 ## Controller (only the PlayerInput passed to handle_input): d-pad / stick moves the
 ## selection, A opens the action menu (backpack: Equip (→ slot for rings / trinkets /
 ## dual wield) / Sell / Trade → Pn / Cancel; equipped: Unequip / Cancel), X opens it on Sell,
-## B closes menus, Y toggles the comparison in the tooltip, LT / RT switch tabs.
+## B closes menus, Y toggles the comparison in the tooltip, LT / RT switch tabs (the Trainer tab
+## takes the rest of the input while it is shown; TrainerTab.handle_input).
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
 ## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
@@ -46,6 +49,10 @@ const BOTTOM_SLOTS: Array[Items.EquipSlot] = [
 	Items.EquipSlot.OFF_HAND, Items.EquipSlot.TRINKET_1, Items.EquipSlot.TRINKET_2,
 ]
 const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents"]
+const CHARACTER_TAB := 0
+const TRAINER_TAB := 1
+## Tabs that only say "coming soon" (Talents: M5).
+const LOCKED_TABS: Array[int] = [2]
 ## Stat list (two columns, at most MAX_STAT_ROWS rows so the panel never grows): the class's
 ## primary stat, then these, then the other primary stats and every other non-zero stat.
 ## Stamina is shown as Max HP (10 + Stamina).
@@ -102,8 +109,12 @@ var last_message := ""
 ## only used while a menu is open, so the owner may treat an unconsumed B as its own (unready).
 var last_input_consumed := false
 
+## The Trainer tab's body (shown instead of the paper doll while active_tab is TRAINER_TAB).
+var trainer: TrainerTab
+
 var _cells: Array[Cell] = []
 var _focused := false
+var _body: HBoxContainer
 var _equipment: Equipment
 var _frame: PanelContainer
 var _header: PanelContainer
@@ -165,6 +176,7 @@ func refresh() -> void:
 	_refresh_side(eq, cls)
 	if mode == Mode.MENU and not _menu_item_still_there():
 		close_menu()
+	trainer.refresh()
 	_update_selection()
 
 
@@ -174,6 +186,7 @@ func set_input_focus(focused: bool) -> void:
 	_focused = focused
 	if not focused and mode == Mode.MENU:
 		close_menu()
+	trainer.set_focused(focused and active_tab == TRAINER_TAB)
 	_frame.add_theme_stylebox_override(&"panel", _frame_style(focused))
 	_update_selection()
 
@@ -182,10 +195,14 @@ func has_input_focus() -> bool:
 	return _focused
 
 
-## Called every _process frame by the Intermission while this panel has focus.
-func handle_input(input: PlayerInput) -> void:
+## Called every _process frame by the Intermission while this panel has focus. [param delta]
+## runs the Trainer's hold-to-train timer (default: this frame's process delta).
+func handle_input(input: PlayerInput, delta: float = -1.0) -> void:
 	last_input_consumed = false
 	if input == null:
+		return
+	if active_tab == TRAINER_TAB:
+		_trainer_input(input, delta if delta >= 0.0 else get_process_delta_time())
 		return
 	if mode == Mode.MENU:
 		last_input_consumed = input.nav_just_pressed() != Vector2i.ZERO or input.just_pressed(PlayerInput.Pad.A) \
@@ -396,10 +413,45 @@ func toggle_comparison() -> void:
 	_update_prompts()
 
 
+## LT / RT: the neighbouring tab; a locked one (Talents) only says "coming soon".
 func switch_tab(step: int) -> void:
 	var target := posmod(active_tab + step, TAB_NAMES.size())
-	if target != 0:
+	if target in LOCKED_TABS:
 		_message("%s: coming soon" % TAB_NAMES[target])
+		return
+	set_tab(target)
+
+
+## Shows tab [param index] (CHARACTER_TAB or TRAINER_TAB; locked tabs are refused).
+func set_tab(index: int) -> void:
+	if index < 0 or index >= TAB_NAMES.size() or index in LOCKED_TABS or index == active_tab:
+		return
+	if mode == Mode.MENU:
+		close_menu()
+	active_tab = index
+	_body.visible = index == CHARACTER_TAB
+	trainer.visible = index == TRAINER_TAB
+	_refresh_tabs()
+	if index == TRAINER_TAB:
+		trainer.refresh()
+	trainer.set_focused(_focused and index == TRAINER_TAB)
+	_prompt_key = ""
+	_update_selection()
+
+
+## LT / RT switch tabs (not while the Rank V choice is open); everything else goes to the
+## Trainer. B counts as used only when it cancelled a hold or closed the choice.
+func _trainer_input(input: PlayerInput, delta: float) -> void:
+	if not trainer.is_choosing_spec():
+		if input.just_pressed(PlayerInput.Pad.LT):
+			switch_tab(-1)
+			last_input_consumed = true
+			return
+		if input.just_pressed(PlayerInput.Pad.RT):
+			switch_tab(1)
+			last_input_consumed = true
+			return
+	last_input_consumed = trainer.handle_input(input, delta)
 
 
 func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
@@ -649,11 +701,16 @@ func _build() -> void:
 	_frame.add_child(col)
 	col.add_child(_build_header())
 	col.add_child(_build_tabs())
-	var body := UiTheme.hbox(int(BODY_GAP))
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(body)
-	body.add_child(_build_doll())
-	body.add_child(_build_side())
+	_body = UiTheme.hbox(int(BODY_GAP))
+	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(_body)
+	_body.add_child(_build_doll())
+	_body.add_child(_build_side())
+	trainer = TrainerTab.create(slot)
+	trainer.visible = false
+	trainer.message.connect(_on_trainer_message)
+	trainer.prompts_changed.connect(_on_trainer_prompts_changed)
+	col.add_child(trainer)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
 	_build_menu()
@@ -697,6 +754,16 @@ func _build_header() -> PanelContainer:
 
 func _build_tabs() -> HBoxContainer:
 	_tabs_row = UiTheme.hbox(6)
+	_refresh_tabs()
+	return _tabs_row
+
+
+## Redraws the tab strip: the active tab raised in gold, locked tabs with a padlock and
+## "Coming soon".
+func _refresh_tabs() -> void:
+	for c in _tabs_row.get_children():
+		_tabs_row.remove_child(c)
+		c.queue_free()
 	for i in TAB_NAMES.size():
 		var tab := PanelContainer.new()
 		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -716,12 +783,13 @@ func _build_tabs() -> HBoxContainer:
 		tab.add_theme_stylebox_override(&"panel", ts)
 		var row := UiTheme.hbox(6)
 		tab.add_child(row)
-		if not active:
+		var locked := i in LOCKED_TABS
+		if locked:
 			var lock := UiIcon.create(UiIcon.Kind.LOCK, Vector2(16, 16), Color(0.55, 0.5, 0.44))
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(lock)
 		var l := UiTheme.label(TAB_NAMES[i], &"", 20 if active else UiTheme.FONT_SMALL,
-			UiTheme.GOLD_BRIGHT if active else Color(0.55, 0.52, 0.48))
+			UiTheme.GOLD_BRIGHT if active else (Color(0.55, 0.52, 0.48) if locked else UiTheme.TEXT_DIM.lightened(0.1)))
 		if active:
 			l.add_theme_font_override(&"font", UiTheme.bold_font())
 		row.add_child(l)
@@ -730,7 +798,16 @@ func _build_tabs() -> HBoxContainer:
 	soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_tabs_row.add_child(soon)
 	_tabs_row.add_child(UiTheme.spacer())
-	return _tabs_row
+	# LT / RT hint at the end of the strip.
+	var input := slot.input if slot != null else null
+	var hint := UiTheme.hbox(3)
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var keyboard := input is KeyboardInput
+	# Keyboard: the mouse buttons (KeyboardInput maps LT / RT to RMB / LMB).
+	hint.add_child(TrainerRow.PromptTag.create("RMB" if keyboard else "LT", keyboard, 20.0, 14))
+	hint.add_child(TrainerRow.PromptTag.create("LMB" if keyboard else "RT", keyboard, 20.0, 14))
+	hint.modulate = Color(1, 1, 1, 0.8)
+	_tabs_row.add_child(hint)
 
 
 func _build_doll() -> Control:
@@ -1070,7 +1147,7 @@ func _update_selection() -> void:
 
 func _update_tooltip() -> void:
 	var it := selected_item()
-	if not _focused or it == null:
+	if not _focused or it == null or active_tab != CHARACTER_TAB:
 		tooltip.visible = false
 		return
 	var compare: ItemInstance = null
@@ -1083,6 +1160,9 @@ func _update_tooltip() -> void:
 
 
 func _update_prompts() -> void:
+	if active_tab == TRAINER_TAB:
+		_update_trainer_prompts()
+		return
 	var cell := _cells[selected]
 	var it := selected_item()
 	var key := "%d:%s:%s:%s:%s" % [mode, it != null, cell.bag_index >= 0, comparison, _focused]
@@ -1107,6 +1187,42 @@ func _update_prompts() -> void:
 	var row := UiTheme.prompt_row(items, UiTheme.FONT_SMALL)
 	row.add_theme_constant_override(&"separation", 14)
 	_prompt_holder.add_child(row)
+
+
+func _update_trainer_prompts() -> void:
+	_context_label.text = trainer.context_text()
+	var input := slot.input if slot != null else null
+	var spec := trainer.prompt_spec()
+	var key := "trainer:%s:%s" % [str(spec), _focused]
+	if key == _prompt_key:
+		return
+	_prompt_key = key
+	for c in _prompt_holder.get_children():
+		_prompt_holder.remove_child(c)
+		c.queue_free()
+	var items: Array = []
+	for pair: Array in spec:
+		var button := int(pair[0])
+		var glyph: UiGlyph
+		if button == TrainerTab.NAV_PROMPT:
+			glyph = UiGlyph.nav(24.0, true)
+		elif button == TrainerTab.NAV_PROMPT_SIDEWAYS:
+			glyph = UiGlyph.nav(24.0)
+		else:
+			glyph = _glyph(input, button as PlayerInput.Pad)
+		items.append([glyph, pair[1]])
+	var row := UiTheme.prompt_row(items, UiTheme.FONT_SMALL)
+	row.add_theme_constant_override(&"separation", 14)
+	_prompt_holder.add_child(row)
+
+
+func _on_trainer_message(bbcode: String, plain: String, color: Color, coin: bool) -> void:
+	_message(bbcode, plain, color, coin)
+
+
+func _on_trainer_prompts_changed() -> void:
+	if active_tab == TRAINER_TAB and _prompt_holder != null:
+		_update_prompts()
 
 
 func _glyph(input: PlayerInput, button: PlayerInput.Pad) -> UiGlyph:

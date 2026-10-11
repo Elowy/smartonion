@@ -12,6 +12,10 @@ extends AbilityEffect
 ##
 ## Item mod (Shadowstalker Wraps): [code]cooldown_add[/code] = -5 s (AbilityRunner.cooldown_of
 ## reads the modded "cooldown" param).
+## Ranks (M4): the heal scales with "power"; Rank III +1 s in the shadows; Rank V "Smoke Bomb"
+## (enemies within [code]smoke_radius[/code] m are stunned for [code]smoke_stun[/code] s) or
+## "Shadow Veil" ([code]invulnerable[/code] while hidden and [code]speed_pct[/code] % x power
+## Speed, StatBlock source [constant SPEED_SOURCE], removed when the Vanish ends).
 ##
 ## The silhouette survives look changes during the effect: whatever the model puts back on a
 ## faded mesh (the HP peel of OnionModel.set_hp_ratio on a heal / stat change) becomes the
@@ -20,6 +24,9 @@ extends AbilityEffect
 ## the materials), and with the wave (begin_wave / end_wave).
 
 const SMOKE_COLOR := Color(0.36, 0.33, 0.46)
+const SPEED_SOURCE := &"vanish"
+## Silhouette opacity of a shroud (Vanish itself reads the "opacity" param).
+const DEFAULT_OPACITY := 0.4
 ## The silhouette is the class's onion colour pulled towards this shadow tone.
 const SHADOW_TONE := Color(0.12, 0.1, 0.26)
 const SHADOW_BLEND := 0.7
@@ -57,12 +64,17 @@ func cast(ctx: AbilityContext) -> bool:
 	_left = maxf(0.0, ctx.num("duration", 2.0))
 	player.forced_crits = maxi(player.forced_crits, int(ctx.num("forced_crits", 1.0)))
 	apply_stealth(player, _left, ctx.num("invulnerable", 0.0) > 0.0)
-	var heal_pct := ctx.num("heal_max_hp_pct", 0.0)
+	var power := ctx.num("power", 1.0)
+	var heal_pct := ctx.num("heal_max_hp_pct", 0.0) * power
 	if heal_pct > 0.0:
 		player.heal(player.max_hp() * heal_pct / 100.0)
+	var speed := ctx.num("speed_pct", 0.0) * power
+	if speed > 0.0 and _left > 0.0:
+		player.stats.set_source(SPEED_SOURCE, {Stats.SPEED: speed})
 	_fade(clampf(ctx.num("opacity", 0.35), 0.05, 1.0))
 	if player.is_inside_tree():
 		Vfx.death_puff(player.global_position + Vector3.UP * 0.6, SMOKE_COLOR, 1.3)
+		_smoke_bomb(player, ctx.num("smoke_radius", 0.0), ctx.num("smoke_stun", 0.0))
 		Vfx.floating_text(player.self_text_position(1.0), "Vanish", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
 	return true
 
@@ -113,8 +125,59 @@ func end(puff: bool = true) -> void:
 	_originals.clear()
 	_shadows.clear()
 	_ghost = null
+	if _player != null and is_instance_valid(_player):
+		_player.stats.remove_source(SPEED_SOURCE)
 	if puff and was_active and _player != null and is_instance_valid(_player) and _player.is_inside_tree():
 		Vfx.death_puff(_player.global_position + Vector3.UP * 0.5, SMOKE_COLOR, 0.8)
+
+
+## Smoke Bomb: every enemy within [param radius] m (Area Size scales it) is stunned for
+## [param seconds].
+static func _smoke_bomb(player: Player, radius: float, seconds: float) -> void:
+	if radius <= 0.0 or seconds <= 0.0:
+		return
+	var r := radius * CombatMath.area_mult(player.stats)
+	for e in RogueUtil.enemies_around(player.get_tree(), player.global_position, r):
+		e.apply_stun(seconds)
+	Vfx.explosion(player.global_position + Vector3.UP * 0.2, r, SMOKE_COLOR)
+	Vfx.death_puff(player.global_position + Vector3.UP * 0.4, SMOKE_COLOR, r * 0.8)
+
+
+## Hides [param player] like Vanish for [param seconds] – stealth plus the shadow silhouette
+## (through the Rogue's Vanish effect, when it has one) – without the heal or the guaranteed
+## crit: Cheat Death's Shadow Escape, Killing Spree's Untouchable.
+static func shroud(player: Player, seconds: float) -> void:
+	if player == null or seconds <= 0.0:
+		return
+	apply_stealth(player, seconds)
+	var vanish := of(player)
+	if vanish != null:
+		vanish.hide_for(player, seconds)
+
+
+## The Vanish effect of [param player] (null when it has none).
+static func of(player: Player) -> RogueVanish:
+	if player == null or player.abilities == null:
+		return null
+	for a in player.abilities.slots:
+		var e := player.abilities.effect_for(a) as RogueVanish
+		if e != null:
+			return e
+	return null
+
+
+## Shows the silhouette for [param seconds] (a running Vanish is only extended).
+func hide_for(player: Player, seconds: float) -> void:
+	if is_active():
+		_left = maxf(_left, seconds)
+		return
+	end(false)
+	_player = player
+	_connect(player)
+	_left = seconds
+	_fade(DEFAULT_OPACITY)
+	if player.is_inside_tree():
+		Vfx.death_puff(player.global_position + Vector3.UP * 0.6, SMOKE_COLOR, 1.0)
 
 
 ## Hides [param player] from the enemies for [param seconds] (and with [param invulnerable]

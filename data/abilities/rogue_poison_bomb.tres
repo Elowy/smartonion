@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_poison_bomb.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"poison_bomb"
+display_name = "Poison Bomb"
+description = "Lobs a vial at the densest group of enemies. The poison cloud ({radius} m, {duration} sec) deals {damage_pct}% weapon damage as Nature damage every {tick} sec to every enemy inside."
+class_id = &"rogue"
+school = &"nature"
+resource = &""
+cost = 0.0
+cooldown = 9.0
+targeting = 2
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 25.0,
+"duration": 4.0,
+"flight": 0.45,
+"impact_pct": 0.0,
+"radius": 2.5,
+"slow_pct": 0.0,
+"tick": 0.5
+}
+icon = &"poison_bomb"
+color = Color(0.45, 0.85, 0.3, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m cloud radius"
+specs = Array[Dictionary]([{"name": "Crippling Fumes", "text": "The cloud slows enemies inside by 40%.", "mods": {"slow_pct_add": 40.0}}, {"name": "Volatile Mixture", "text": "The vial bursts for 200% weapon damage on impact, and the cloud lasts 2 sec longer.", "mods": {"impact_pct_add": 200.0, "duration_add": 2.0}}])

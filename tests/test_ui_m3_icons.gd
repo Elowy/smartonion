@@ -48,17 +48,19 @@ func test_glyph_fallbacks_id_then_school() -> void:
 	check_eq(AbilityIcon.glyph_for(&"", &"holy"), AbilityIcon.Glyph.HOLY, "no icon at all: the school")
 	check_eq(AbilityIcon.glyph_for(&"", &""), AbilityIcon.Glyph.GENERIC, "nothing known: the rune")
 	check_eq(AbilityIcon.glyph_for(&"mystery", &"nonsense"), AbilityIcon.Glyph.GENERIC, "unknown school")
-	check_eq(AbilityIcon.glyph_for(&"", &"physical", &"heroic_leap"), AbilityIcon.Glyph.DASH, "the ability id is the second guess")
-	check_eq(AbilityIcon.glyph_for(&"mystery", &"nature", &"shield_wall"), AbilityIcon.Glyph.SHIELD, "id beats the school")
+	check_eq(AbilityIcon.glyph_for(&"", &"physical", &"savage_leap"), AbilityIcon.Glyph.DASH, "the ability id is the second guess")
+	check_eq(AbilityIcon.glyph_for(&"mystery", &"nature", &"stone_bulwark"), AbilityIcon.Glyph.SHIELD, "id beats the school")
+	check_eq(AbilityIcon.glyph_for(&"mystery", &"nature", &"heroic_leap"), AbilityIcon.Glyph.HEROIC_LEAP, "a shipped id: its own glyph")
 	check_eq(AbilityIcon.glyph_for(&"Fan Of Knives", &""), AbilityIcon.Glyph.KNIVES, "case / spaces do not matter")
 
 
 func test_token_rules_use_whole_words() -> void:
-	check_eq(AbilityIcon.glyph_for(&"ice_barrier"), AbilityIcon.Glyph.SHIELD, "barrier beats ice")
-	check_eq(AbilityIcon.glyph_for(&"frost_nova"), AbilityIcon.Glyph.FROST, "frost nova")
-	check_eq(AbilityIcon.glyph_for(&"shadow_bolt"), AbilityIcon.Glyph.BOLT, "bolt")
-	check_eq(AbilityIcon.glyph_for(&"hammer_of_justice"), AbilityIcon.Glyph.HAMMER, "hammer")
-	check_eq(AbilityIcon.glyph_for(&"divine_shield"), AbilityIcon.Glyph.SHIELD, "shield before divine")
+	# Made-up ids (the shipped ones have exact glyphs).
+	check_eq(AbilityIcon.glyph_for(&"ice_ward"), AbilityIcon.Glyph.SHIELD, "ward beats ice")
+	check_eq(AbilityIcon.glyph_for(&"glacial_spike"), AbilityIcon.Glyph.FROST, "glacial")
+	check_eq(AbilityIcon.glyph_for(&"chaos_bolt"), AbilityIcon.Glyph.BOLT, "bolt")
+	check_eq(AbilityIcon.glyph_for(&"hammer_of_wrath"), AbilityIcon.Glyph.HAMMER, "hammer")
+	check_eq(AbilityIcon.glyph_for(&"divine_bulwark"), AbilityIcon.Glyph.SHIELD, "shield before divine")
 	check(AbilityIcon.glyph_for(&"slice") != AbilityIcon.Glyph.FROST, "'slice' is not ice")
 	check(AbilityIcon.glyph_for(&"terrain") != AbilityIcon.Glyph.RAIN_OF_FIRE, "'terrain' is not rain")
 

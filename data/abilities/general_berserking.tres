@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_berserking.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"berserking"
+display_name = "Berserking"
+description = "Go berserk: +{haste}% Haste for {duration} sec."
+class_id = &""
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 18.0
+targeting = 0
+cast_range = 6.0
+effect = ExtResource("2_effect")
+params = {
+"auto_enemies": 3,
+"auto_radius": 6.0,
+"damage_taken": 0.0,
+"duration": 6.0,
+"haste": 20.0,
+"kill_extend": 0.0,
+"max_extend": 6.0
+}
+icon = &"berserking"
+color = Color(1, 0.35, 0.25, 1)
+kind = 1
+card_weight = 0.8
+rank3 = {
+"duration_add": 2.0
+}
+rank3_text = "+2 sec duration"
+specs = Array[Dictionary]([{
+"mods": {
+"kill_extend_add": 0.5
+},
+"name": "Feeding Frenzy",
+"text": "Every kill while berserking adds 0.5 sec (up to 6 sec)."
+}, {
+"mods": {
+"damage_taken_add": 15.0,
+"haste_add": 25.0
+},
+"name": "Reckless Fury",
+"text": "+25% more Haste, but you take 15% more damage while berserking."
+}])

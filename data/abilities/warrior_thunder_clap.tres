@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warrior/warrior_thunder_clap.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"thunder_clap"
+display_name = "Thunder Clap"
+description = "Slam the ground: enemies within {radius} m take {damage_pct}% weapon damage and are slowed by {slow}% for {slow_duration} sec."
+class_id = &"warrior"
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 6.0
+targeting = 0
+cast_range = 3.5
+effect = ExtResource("2_effect")
+params = {
+"damage_pct": 100.0,
+"echo_delay": 0.6,
+"echo_pct": 50.0,
+"echoes": 0.0,
+"radius": 3.5,
+"rage_max": 30.0,
+"rage_per_hit": 0.0,
+"slow": 50.0,
+"slow_duration": 2.0
+}
+icon = &"thunder_clap"
+color = Color(0.55, 0.75, 1, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"radius_add": 1.0,
+"slow_duration_add": 1.0
+}
+rank3_text = "+1 m radius, the slow lasts 1 sec longer"
+specs = Array[Dictionary]([{
+"mods": {
+"echoes_add": 2.0
+},
+"name": "Aftershock",
+"text": "The ground keeps shaking: the clap strikes 2 more times, 0.6 sec apart, for half damage."
+}, {
+"mods": {
+"rage_per_hit_add": 6.0
+},
+"name": "Booming Voice",
+"text": "Each enemy hit gives you 6 Rage (up to 30 per clap)."
+}])

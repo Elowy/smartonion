@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/rogue/rogue_cheat_death.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cheat_death"
+display_name = "Cheat Death"
+description = "Passive: a killing blow leaves you at 1 health instead. You become invulnerable for {invulnerable} sec and recover {heal_max_hp_pct}% of your max health. Once every {cooldown} sec."
+class_id = &"rogue"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 60.0
+targeting = 0
+cast_range = 0.0
+effect = ExtResource("2_effect")
+params = {
+"burst_pct": 0.0,
+"burst_radius": 4.0,
+"burst_stun": 0.0,
+"forced_crits": 0,
+"heal_max_hp_pct": 15.0,
+"invulnerable": 1.0,
+"stealth": 0.0
+}
+icon = &"cheat_death"
+color = Color(0.7, 0.62, 0.95, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"invulnerable_add": 1.0}
+rank3_text = "+1 sec invulnerability"
+specs = Array[Dictionary]([{"name": "Shadow Escape", "text": "Cheating death also hides you in the shadows for 3 sec, and your next hit is a guaranteed critical strike.", "mods": {"stealth": 3.0, "forced_crits": 1}}, {"name": "Death's Reprisal", "text": "Cheating death unleashes 300% weapon damage on enemies within 4 m and stuns them for 1.5 sec.", "mods": {"burst_pct_add": 300.0, "burst_stun": 1.5}}])

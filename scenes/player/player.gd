@@ -4,9 +4,10 @@ extends CharacterBody3D
 ## mask 1 ("world") – enemies do NOT physically block players; they deal contact damage.
 ## Moves on the XZ plane: input Vector2(x, y) -> world Vector3(x, 0, y).
 ##
-## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
-## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
-## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level gained). Every equipped weapon that
+## Stats come from a StatBlock with the sources &"base" (Stats.BASE_MASTERY), &"class"
+## (ClassData.base_stats), &"weapon:main", &"weapon:off" (WeaponData.bonus_stats), the
+## equipped items, &"level" (LEVEL_STAMINA per team level gained) and &"level_cards" (stat
+## level-up cards). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
 ## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
 ## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
@@ -78,12 +79,13 @@ const SELF_TEXT_SIZE := 0.85
 const SEPARATION_DISTANCE := 1.15
 const SEPARATION_SPEED := 3.0
 
-## TEMPORARY placeholder until the M4 level-up cards (GDD 6.1) exist: every team level gives
-## every player +1 Stamina (= +1 Max HP) and +4% damage through the StatBlock source
-## LEVEL_SOURCE. Remove this (and _apply_level_bonus) when the level-up cards land.
+## Every team level gives every hero +1 Stamina (= +1 Max HP, like Brotato) through the
+## StatBlock source LEVEL_SOURCE; the real level-up reward is the card picked after the wave
+## (GDD 6.1, CARD_SOURCE).
 const LEVEL_SOURCE := &"level"
 const LEVEL_STAMINA := 1.0
-const LEVEL_DAMAGE_PCT := 4.0
+## Stat level-up cards picked so far (summed).
+const CARD_SOURCE := &"level_cards"
 
 var slot: PlayerSlot
 var stats := StatBlock.new()
@@ -120,6 +122,12 @@ var healer_seconds_left := -1.0
 var invulnerable_left := 0.0
 ## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
 var stealth_left := 0.0
+## Named incoming-damage multipliers (Shield Wall 0.5 ...), applied after armour; cleared at
+## wave start.
+var damage_taken_mults: Dictionary[StringName, float] = {}
+## Callables returning true to survive a lethal hit at 1 HP (Cheat Death ...); item
+## cheat-death procs are tried first.
+var death_guards: Array[Callable] = []
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -158,6 +166,7 @@ static func create(p_slot: PlayerSlot) -> Player:
 	if p.class_data != null:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
+	p.stats.set_source(&"base", {Stats.MASTERY: Stats.BASE_MASTERY})
 	p.procs = ProcSystem.create(p)
 	p.abilities = AbilityRunner.create(p)
 	p.add_child(p.abilities)
@@ -196,6 +205,16 @@ func is_stealthed() -> bool:
 	return stealth_left > 0.0
 
 
+## A lethal hit is about to land: item cheat-death procs first, then [member death_guards].
+func _prevent_death() -> bool:
+	if procs != null and procs.try_cheat_death():
+		return true
+	for guard in death_guards:
+		if guard.is_valid() and guard.call():
+			return true
+	return false
+
+
 ## Alive and standing next to a downed teammate (reviving it) – bots must not dash away.
 func is_reviving() -> bool:
 	if downed or not is_inside_tree():
@@ -232,6 +251,7 @@ func begin_wave() -> void:
 	stealth_left = 0.0
 	forced_crits = 0
 	damage_mults.clear()
+	damage_taken_mults.clear()
 	for runner in weapons:
 		runner.reset()
 	if procs != null:
@@ -270,6 +290,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			_thorns(attacker, kind)
 			return
 	var dmg := CombatMath.incoming_damage(amount, stats, kind)
+	for m: float in damage_taken_mults.values():
+		dmg *= maxf(0.0, m)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
@@ -277,8 +299,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			_thorns(attacker, kind)
 			procs.on_struck(valid_source, 0.0)
 			return
-		if dmg >= hp and procs.try_cheat_death():
-			dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
+	if dmg >= hp and _prevent_death():
+		dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
 	hp = maxf(0.0, hp - dmg)
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:
@@ -832,15 +854,25 @@ func _apply_level_bonus(level: int) -> void:
 	if gained <= 0:
 		stats.remove_source(LEVEL_SOURCE)
 		return
-	stats.set_source(LEVEL_SOURCE, {
-		Stats.STAMINA: LEVEL_STAMINA * gained,
-		Stats.DAMAGE_PCT: LEVEL_DAMAGE_PCT * gained,
-	})
+	stats.set_source(LEVEL_SOURCE, {Stats.STAMINA: LEVEL_STAMINA * gained})
 
 
-## TEMPORARY placeholder for the M4 level-up cards: the team levelled up – grow the level
-## bonus; a living hero's current HP rises by the Max HP gained (a ghost keeps 0 HP and
-## comes back with its share of the new Max HP).
+## Adds a stat level-up card's stats (GDD 6.1) to CARD_SOURCE; a living hero's HP rises by
+## any Max HP gained.
+func add_card_stats(card_stats: Dictionary[StringName, float]) -> void:
+	var before := max_hp()
+	var total := stats.get_source(CARD_SOURCE) if stats.has_source(CARD_SOURCE) else {}
+	for s: StringName in card_stats:
+		total[s] = float(total.get(s, 0.0)) + card_stats[s]
+	stats.set_source(CARD_SOURCE, total)
+	var gained := max_hp() - before
+	if not downed and gained > 0.0:
+		hp = minf(max_hp(), hp + gained)
+		_hp_updated()
+
+
+## The team levelled up – grow the level bonus; a living hero's current HP rises by the Max
+## HP gained (a ghost keeps 0 HP and comes back with its share of the new Max HP).
 func _on_team_leveled_up(level: int) -> void:
 	var before := max_hp()
 	_apply_level_bonus(level)

@@ -11,8 +11,9 @@ extends Node
 ##   GameOverScreen and PauseMenu. Every wave: players back on the spawn points,
 ##   Player.begin_wave(), WaveDirector.start_wave(n), camera snap, "Wave n" banner.
 ##   wave_cleared -> WAVE_END ("Wave cleared!" for WAVE_END_DELAY) -> INTERMISSION (tree
-##   paused: loot roll of RunState.team_loot, then the shared shop + personal panels;
-##   RunState.pending_level_ups shown) -> next wave; after wave RunState.TOTAL_WAVES
+##   paused: loot roll of RunState.team_loot, the level-up cards for
+##   RunState.pending_level_ups, then the shared shop + personal panels; the pending level-ups
+##   are cleared when the next wave starts) -> next wave; after wave RunState.TOTAL_WAVES
 ##   -> GAME_OVER (victory). Everybody downed at the same time (solo: the player is downed)
 ##   -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with the same players.
 ## - Any player's START during a wave opens the PauseMenu (get_tree().paused). A controller
@@ -40,6 +41,8 @@ const DEMO_RESTART_DELAY := 6.0
 ## "thinking" time scale (see LootRollScreen.bot_think_time).
 const DEMO_MARKET_TIME := 4.0
 const DEMO_BOT_THINK_TIME := 1.0
+## Demo mode: seconds a bot "thinks" per level-up card (LevelUpScreen.bot_think_time).
+const DEMO_LEVEL_UP_THINK_TIME := 1.0
 const LAYER_HUD := 10
 const LAYER_MENU := 20
 const LAYER_INTERMISSION := 30
@@ -86,6 +89,9 @@ var wipes := 0
 var items_bought := 0
 var items_looted := 0
 var loot_rolls := 0
+## Level-up cards picked / ability ranks the bots bought from the Trainer this run.
+var level_cards := 0
+var ranks_trained := 0
 var victory := false
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
@@ -221,6 +227,8 @@ func start_run() -> void:
 	items_bought = 0
 	items_looted = 0
 	loot_rolls = 0
+	level_cards = 0
+	ranks_trained = 0
 	_loot_seen = RunState.team_loot.size()
 	victory = false
 	perf = RunPerf.new()
@@ -239,10 +247,13 @@ func start_run() -> void:
 	intermission.continue_requested.connect(_on_intermission_continue, CONNECT_DEFERRED)
 	intermission.item_bought.connect(_on_item_bought)
 	intermission.loot_rolled.connect(_on_loot_rolled)
+	intermission.level_card_picked.connect(_on_level_card_picked)
+	intermission.ranks_trained.connect(_on_ranks_trained)
 	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
 	intermission.bot_shopping = options.smoke or options.demo
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
 	intermission.loot_screen.bot_think_time = DEMO_BOT_THINK_TIME if options.demo and not options.smoke else 0.0
+	intermission.level_up_screen.bot_think_time = DEMO_LEVEL_UP_THINK_TIME if options.demo and not options.smoke else 0.0
 	_layers[LAYER_INTERMISSION].add_child(intermission)
 	game_over = GameOverScreen.create()
 	game_over.back_to_menu_requested.connect(_on_game_over_back, CONNECT_DEFERRED)
@@ -604,7 +615,7 @@ func _on_intermission_continue() -> void:
 		return
 	if options.view == "intermission" and _view_forced:
 		return  # held open for the screenshot
-	RunState.pending_level_ups = 0  # level-up choices arrive in M4
+	RunState.pending_level_ups = 0  # resolved by the intermission's level-up cards
 	start_wave(wave + 1)
 
 
@@ -614,6 +625,14 @@ func _on_item_bought(_slot_index: int, _item: ItemInstance) -> void:
 
 func _on_loot_rolled(_roll: LootRoll) -> void:
 	loot_rolls += 1
+
+
+func _on_level_card_picked(_slot_index: int, _card: LevelCard) -> void:
+	level_cards += 1
+
+
+func _on_ranks_trained(_slot_index: int, count: int) -> void:
+	ranks_trained += count
 
 
 func _on_team_loot_changed() -> void:
@@ -777,6 +796,9 @@ func smoke_result(result: String) -> Dictionary:
 		"loot_rolls": loot_rolls,
 		"need_wins": need_wins,
 		"greed_gold": RunState.greed_gold,
+		"level_cards": level_cards,
+		"abilities_learned": abilities_learned(),
+		"ranks_trained": ranks_trained,
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
@@ -787,6 +809,17 @@ func smoke_result(result: String) -> Dictionary:
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
 	return data
+
+
+## Learned abilities (RB / LB and auto-cast slots) over every hero (SMOKE_RESULT).
+func abilities_learned() -> int:
+	var n := 0
+	for p in players:
+		if is_instance_valid(p) and p.abilities != null:
+			for i in range(AbilityRunner.CORE_SLOTS, AbilityRunner.MAX_SLOTS):
+				if p.abilities.slots[i] != null:
+					n += 1
+	return n
 
 
 func _update_harness() -> void:

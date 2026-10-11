@@ -111,6 +111,9 @@ func test_item_mods_apply() -> void:
 	check_eq(out["duration"], 4.0, "add")
 	check(out["follows"], "flag")
 	check_eq(base["radius"], 2.0, "base untouched")
+	var set_pct := AbilityRunner.apply_mods({"damage": 5.0}, {"slow_pct": 40.0})
+	check_eq(set_pct["slow_pct"], 40.0, "a _pct key without its param sets the key itself")
+	check(not set_pct.has("slow"), "and does not create a zero param")
 
 
 func test_ability_mod_items_are_collected() -> void:

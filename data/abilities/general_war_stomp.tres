@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/general/general_war_stomp.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"war_stomp"
+display_name = "War Stomp"
+description = "When enemies crowd you, stomp the ground: enemies within {radius} m take {damage_pct}% weapon damage and are stunned for {stun} sec."
+class_id = &""
+school = &"physical"
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 0
+cast_range = 2.5
+effect = ExtResource("2_effect")
+params = {
+"aftershock_delay": 1.0,
+"aftershocks": 0,
+"auto_hp": 50.0,
+"damage_pct": 60.0,
+"min_enemies": 2,
+"radius": 2.5,
+"stun": 1.0,
+"tremor_duration": 0.0,
+"tremor_pct": 10.0,
+"tremor_slow": 50.0
+}
+icon = &"war_stomp"
+color = Color(0.82, 0.64, 0.4, 1)
+kind = 2
+card_weight = 0.8
+rank3 = {
+"radius_add": 1.0
+}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{
+"mods": {
+"aftershocks_add": 1
+},
+"name": "Aftershock",
+"text": "A second stomp follows 1 sec later."
+}, {
+"mods": {
+"tremor_duration_add": 4.0
+},
+"name": "Tremor Field",
+"text": "The ground keeps shaking for 4 sec: enemies in it are slowed by 50%, stunned when they enter and take damage."
+}])

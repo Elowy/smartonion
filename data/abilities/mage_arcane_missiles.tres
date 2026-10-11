@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/mage/mage_arcane_missiles.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"arcane_missiles"
+display_name = "Arcane Missiles"
+description = "Launches {missiles} arcane missiles at random enemies within range, each dealing Arcane damage (scales with Intellect and Spell Power)."
+class_id = &"mage"
+school = &"arcane"
+resource = &""
+cost = 0.0
+cooldown = 6.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"damage": 1.5,
+"focus": false,
+"focus_bonus_pct": 40.0,
+"int_scaling": 0.35,
+"interval": 0.12,
+"missiles": 5,
+"sp_scaling": 0.4,
+"speed": 14.0,
+"splash_pct": 50.0,
+"splash_radius": 0.0
+}
+icon = &"arcane_missiles"
+color = Color(0.88, 0.5, 1.0, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {
+"missiles_add": 2
+}
+rank3_text = "+2 missiles"
+specs = Array[Dictionary]([{
+"mods": {
+"splash_radius_add": 1.5
+},
+"name": "Arcane Barrage",
+"text": "Each missile bursts on impact: enemies within 1.5 m take 50% of its damage."
+}, {
+"mods": {
+"focus": true
+},
+"name": "Focused Missiles",
+"text": "Every missile seeks the toughest enemy in range and deals 40% more damage."
+}])

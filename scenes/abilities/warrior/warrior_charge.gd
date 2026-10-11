@@ -4,14 +4,19 @@ extends AbilityEffect
 ## enemies it runs into, stuns everything around the landing spot and is invulnerable while it
 ## runs. The dash stops at walls, the arena bounds and the screen edge.
 ##
-## Params (AbilityData.params, items change them through ability_mod):
+## Params (AbilityData.params; items and ranks change them):
 ##   distance       maximum dash length in metres
 ##   speed          dash speed in m/s
 ##   stun           seconds of stun for enemies hit on the way and around the landing spot
+##                  (times "power": Rank II / IV make it longer)
 ##   stun_radius    landing stun radius in metres (Area Size scales it)
 ##   buff_damage    % outgoing damage for buff_duration seconds after the dash (0 = none;
-##                  Warbringer's Greaves)
+##                  Warbringer's Greaves; times "power")
 ##   buff_duration  seconds the buff lasts
+##   impact_pct     % weapon damage dealt to every enemy stunned by the charge (Rank V
+##                  "Warbringer"; times "power")
+##   rage_gain      Rage gained on landing (Rank V "Furious Charge"; times "power")
+## Rank III: +1 charge (charges_add) – two Charges in a row.
 
 ## Key of the temporary damage multiplier in Player.damage_mults.
 const BUFF_KEY := &"charge"
@@ -49,6 +54,9 @@ var _stun_radius := DEFAULT_STUN_RADIUS
 var _buff_damage := 0.0
 var _buff_duration := 0.0
 var _buff_left := 0.0
+var _impact_pct := 0.0
+var _rage_gain := 0.0
+var _school: StringName = &"physical"
 var _start := Vector3.ZERO
 var _hit: Dictionary[int, Enemy] = {}
 
@@ -109,11 +117,15 @@ func cast(ctx: AbilityContext) -> bool:
 	_dir = dir
 	_left = distance
 	_start = player.global_position
+	var power := ctx.num("power", 1.0)
 	_speed = maxf(1.0, ctx.num("speed", DEFAULT_SPEED))
-	_stun = ctx.num("stun", DEFAULT_STUN)
+	_stun = ctx.num("stun", DEFAULT_STUN) * power
 	_stun_radius = ctx.num("stun_radius", DEFAULT_STUN_RADIUS) * CombatMath.area_mult(player.stats)
-	_buff_damage = ctx.num("buff_damage")
+	_buff_damage = ctx.num("buff_damage") * power
 	_buff_duration = ctx.num("buff_duration")
+	_impact_pct = ctx.num("impact_pct") * power
+	_rage_gain = ctx.num("rage_gain") * power
+	_school = ctx.ability.school
 	_hit.clear()
 	_dashing = true
 	if not player.downed_changed.is_connected(_on_downed_changed):
@@ -173,15 +185,40 @@ func _arrive(player: Player) -> void:
 	var victims: Dictionary[int, Enemy] = _hit.duplicate()
 	for e in WarriorKit.enemies_within(player, _stun_radius):
 		victims[e.get_instance_id()] = e
+	var impact := WarriorKit.weapon_damage(player) * _impact_pct / 100.0
 	for id in victims:
-		var e := victims[id]
-		if is_instance_valid(e) and not e.is_dead():
+		# (An enemy run over earlier may have died and been freed meanwhile.)
+		var v: Variant = victims[id]
+		if not is_instance_valid(v):
+			continue
+		var e := v as Enemy
+		if not e.is_dead():
 			e.apply_stun(_stun)
+			if impact > 0.0 and player.procs != null:
+				player.procs.deal_raw(e, impact, _school, true, &"ability")
 	_hit.clear()
 	WarriorChargeVfx.spawn(_start, player.global_position, _stun_radius)
 	if _buff_damage > 0.0 and _buff_duration > 0.0:
 		player.damage_mults[BUFF_KEY] = 1.0 + _buff_damage / 100.0
 		_buff_left = _buff_duration
+	if _rage_gain > 0.0:
+		WarriorKit.add_rage(player, _rage_gain)
+
+
+## A new wave starts without a dash or buff.
+func begin_wave(_ctx: AbilityContext) -> void:
+	_stop()
+
+
+## The market shows no dash or buff (also when the ability is forgotten).
+func end_wave(_ctx: AbilityContext) -> void:
+	_stop()
+
+
+func _stop() -> void:
+	_dashing = false
+	_hit.clear()
+	_clear_buff()
 
 
 func _clear_buff() -> void:
@@ -192,6 +229,4 @@ func _clear_buff() -> void:
 
 func _on_downed_changed(is_downed: bool) -> void:
 	if is_downed:
-		_dashing = false
-		_hit.clear()
-		_clear_buff()
+		_stop()

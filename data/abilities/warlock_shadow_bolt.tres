@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/warlock/shadow_bolt.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shadow_bolt"
+display_name = "Shadow Bolt"
+description = "Hurls a heavy bolt of shadow at the nearest enemy ({bolts} per cast). Scales with Intellect and Spell Power."
+class_id = &"warlock"
+school = &"shadow"
+resource = &""
+cost = 0.0
+cooldown = 3.5
+targeting = 1
+cast_range = 11.0
+effect = ExtResource("2_effect")
+params = {
+"blast_radius": 0.0,
+"bolts": 1,
+"damage": 10.0,
+"intellect_scale": 1.6,
+"pierce": 0,
+"speed": 15.0,
+"spell_power_scale": 2.5
+}
+icon = &"shadow_bolt"
+color = Color(0.55, 0.3, 0.9, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"bolts_add": 1}
+rank3_text = "+1 bolt, at the next-nearest enemy"
+specs = Array[Dictionary]([{"name": "Void Lance", "text": "Shadow Bolt pierces up to 3 more enemies.", "mods": {"pierce_add": 3}}, {"name": "Shadow Burst", "text": "Shadow Bolt explodes on impact, hitting every enemy within 2.5 m.", "mods": {"blast_radius": 2.5}}])
