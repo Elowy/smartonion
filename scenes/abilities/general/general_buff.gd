@@ -77,14 +77,14 @@ static func clear(tree: SceneTree, p_key: StringName) -> void:
 	for node in tree.get_nodes_in_group(&"players"):
 		var b := find(node as Player, p_key)
 		if b != null:
-			b.end()
+			b.end(false)
 
 
 ## Ends the buff [param p_key] on [param p_target] (if any).
-static func clear_on(p_target: Player, p_key: StringName) -> void:
+static func clear_on(p_target: Player, p_key: StringName, fade: bool = true) -> void:
 	var b := find(p_target, p_key)
 	if b != null:
-		b.end()
+		b.end(fade)
 
 
 func is_active() -> bool:
@@ -132,8 +132,9 @@ func extend(seconds: float, cap: float = -1.0) -> float:
 	return add
 
 
-## Removes everything the buff added and frees it.
-func end() -> void:
+## Removes everything the buff added and frees it. With [param fade] the look fades out on
+## its own (off for the wave hooks: the tree is about to pause).
+func end(fade: bool = true) -> void:
 	if _ended:
 		return
 	_ended = true
@@ -144,6 +145,9 @@ func end() -> void:
 		target.damage_taken_mults.erase(key)
 		if target.downed_changed.is_connected(_on_downed_changed):
 			target.downed_changed.disconnect(_on_downed_changed)
+	if fade and look != null and is_instance_valid(look) and is_inside_tree():
+		look.release()
+	look = null
 	queue_free()
 
 
