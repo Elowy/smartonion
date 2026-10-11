@@ -260,6 +260,30 @@ func test_word_of_glory_no_revive_beyond_8m() -> void:
 	check_eq(res.value, 0.0, "spent")
 
 
+func test_word_of_glory_leaves_a_ghost_the_spirit_healer_is_about_to_raise() -> void:
+	var healer := SpiritHealer.create()
+	world.add_child(healer)  # circle at the origin
+	var p := _paladin(Vector3(4.0, 0, 0))
+	p.hp = 5.0
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3.ZERO)
+	_down(ally)
+	_holy_power(p).set_value(3.0)
+	var wog := p.abilities.slots[LT]
+	healer._physics_process(1.0)
+	check_near(ally.healer_seconds_left, 9.0, 0.001, "waiting in the circle: 9 s to the pulse")
+	check(PaladinWordOfGlory.revive_target(p.abilities.build_context(wog)) == ally, "a long wait: a fair revive")
+	healer._physics_process(8.2)
+	check(PaladinWordOfGlory.revive_target(p.abilities.build_context(wog)) == null,
+			"the healer raises it within 1 s: no revive")
+	check(p.abilities.effect_for(wog).wants_auto_cast(p.abilities.build_context(wog)), "bots heal the hurt Paladin")
+	check(p.abilities.try_cast(LT), "heals instead")
+	check(ally.downed, "left to the healer")
+	check(p.hp > 5.0, "the Paladin healed")
+	healer._physics_process(0.9)
+	check(not ally.downed, "the healer raised it")
+	check_eq(ally.hp, ally.max_hp(), "at full HP")
+
+
 func test_word_of_glory_heals_self_and_most_hurt_ally() -> void:
 	var p := _paladin()
 	p.stats.set_source(&"test", {Stats.SPELL_POWER: 2.0})

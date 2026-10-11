@@ -67,12 +67,14 @@ static func bomb_damage(ctx: AbilityContext) -> float:
 			* ctx.num("power", 1.0)
 
 
-## What every bomb of a cast carries (final numbers).
+## What every bomb of a cast carries (final numbers; "burn_radius" is the unscaled radius,
+## since AbilityArea.spawn applies Area Size itself).
 static func payload_for(ctx: AbilityContext) -> Dictionary:
 	var area := CombatMath.area_mult(ctx.player.stats)
 	return {
 		"damage": bomb_damage(ctx),
 		"radius": ctx.num("radius", DEFAULT_RADIUS) * area,
+		"burn_radius": ctx.num("radius", DEFAULT_RADIUS),
 		"flight_time": ctx.num("flight_time", 0.55),
 		"bomblets": maxi(0, roundi(ctx.num("bomblets"))),
 		"bomblet_pct": ctx.num("bomblet_pct", 40.0),

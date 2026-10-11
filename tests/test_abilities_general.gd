@@ -306,6 +306,32 @@ func test_bandage_power_and_rank3_bandages_an_ally() -> void:
 	check_near(far.hp, hp0[2], 0.001, "out of range")
 
 
+func test_bandage_rank3_leaves_an_allys_own_bandage_alone() -> void:
+	var p := _hero(&"paladin")
+	var a := _learn(p, &"bandage", 3)
+	var ally := _hero(&"warrior", Vector3(2, 0, 0), 1)
+	var other := _hero(&"rogue", Vector3(-2, 0, 0), 2)
+	var b := _learn(ally, &"bandage", 5, 1)  # Padded Wraps
+	_hurt(ally, 0.3)
+	check(_cast(ally, b), "the ally bandages itself")
+	var own := GeneralBuff.find(ally, GeneralBandage.KEY)
+	_run([ally], 0.5)
+	var ticks := own.heal_ticks_left
+	var per_tick := own.heal_per_tick
+	_hurt(p, 0.4)
+	_hurt(other, 0.8)
+	var targets := GeneralBandage.bandage_targets(_ctx(p, a))
+	check(not targets.has(ally), "an ally already bandaged is skipped")
+	check(targets.has(other), "the next wounded ally gets the extra bandage")
+	check(_cast(p, a), "Rank III cast")
+	check(GeneralBuff.find(ally, GeneralBandage.KEY) == own, "the ally's own bandage runs on")
+	check_eq(own.heal_ticks_left, ticks, "its ticks are kept")
+	check_near(own.heal_per_tick, per_tick, 0.0001, "at its own heal")
+	check_near(float(ally.damage_taken_mults.get(GeneralBandage.KEY, 1.0)), 1.0 - 0.25 * 1.5, 0.0001,
+			"Padded Wraps still holds")
+	check(GeneralBuff.find(other, GeneralBandage.KEY) != null, "the other ally is bandaged")
+
+
 func test_bandage_specs() -> void:
 	var p := _hero(&"warrior")
 	var a := _learn(p, &"bandage", 5, 0)
@@ -594,6 +620,23 @@ func test_bomb_specs() -> void:
 	check_near(fire.duration, 4.0, 0.001, "4 sec")
 	check_near(fire.damage_per_tick, shell.damage * 0.15, 0.001, "15% per tick")
 	check_eq(fire.school, &"fire", "fire")
+
+
+func test_incendiary_ground_covers_the_blast_with_area_size() -> void:
+	var p := _hero(&"warlock")
+	p.stats.set_source(&"test_area", {Stats.AREA_SIZE: 50.0})
+	var a := _learn(p, &"engineers_bomb", 5, 1)
+	_enemy(Vector3(0, 0, -5))
+	_enemy(Vector3(0.5, 0, -5))
+	var effect := _effect(p, a) as GeneralEngineersBomb
+	check(_cast(p, a), "Incendiary Bomb")
+	var shell := effect.bombs[0]
+	check_near(shell.radius, _ctx(p, a).num("radius") * 1.5, 0.001, "+50% Area Size: a bigger blast")
+	_run([p], 0.6)
+	var fire := shell.burn_area
+	check(fire != null and is_instance_valid(fire), "burning ground")
+	if fire != null and is_instance_valid(fire):
+		check_near(fire.radius, shell.radius, 0.001, "the burn matches the blast (Area Size counted once)")
 
 
 # --- War Stomp --------------------------------------------------------------------------------
