@@ -218,12 +218,16 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--time-scale=X` | Overrides the time scale. |
 
 `SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `kills`, `gold`,
+`gold_at_last_shop` (the shared wallet when the last market closed, i.e. the gold carried into
+the last wave; `gold` also holds the last wave's haul, which no shop follows),
 `level`, `players_downed`, `revives`, `wipes`, `errors`, `warnings`, `error_samples`,
 `game_time`, `real_time`, and `perf` – physics tick times measured by `PhysicsClock` and
 grouped by living enemies (`RunPerf`): `physics_ms_avg`, `physics_ms_at_peak` (ticks with
 ≥ 80% of the peak enemy count), `script_ms_at_peak`, `physics_ms_max`, and
 `monitor_physics_ms_at_peak` (`Performance.TIME_PHYSICS_PROCESS`, which is the slowest tick of
-the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line.
+the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` line, and each
+closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1 (R bot
+rerolls so far)`.
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
 crowded), avoid walls, stay near the team and run to downed teammates within
 `BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
@@ -371,9 +375,26 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     `AbilityData.color` / school; clockwise cooldown pie (`sweep_polygon`) + seconds
     (`format_cooldown`: one decimal under 3 s), dimmed when off cooldown but unusable (red
     cost), cast flash, charge counter (top-left, while `charges_max` > 1), cost (top-right),
-    prompt pill hanging below. `set_state` only redraws when the text / state changed or the
-    pie moved `SWEEP_REDRAW_STEP` since the last drawn ratio (smooth for long cooldowns);
-    StyleBoxes are cached. Also used by the lobby cards (abilities + Mastery line;
+    prompt pill hanging below.
+    - Redraws: `set_state` only redraws when one of these changed:
+      - the shown seconds (`show_cooldown_text`);
+      - the dim / ready state;
+      - the pie crossed to or from empty;
+      - the pie moved `sweep_redraw_step()` since the last drawn ratio (`SWEEP_REDRAW_STEP`
+        0.004, or about 1 px of edge on smaller icons: 1 / (4 × side)).
+    - Layers: the background and glyph are drawn by an internal child `GlyphLayer`
+      (`show_behind_parent`), which only re-records on `set_ability` / glyph / tint changes.
+      A sweep redraw therefore re-records only the overlay (sweep, veil, flash, rim, texts,
+      rank, prompt). StyleBoxes are cached.
+    - Rank: gold diamond pips up the left edge. Icons below `SMALL_ICON` (the 26 px auto-cast
+      icons) show the roman numeral instead (`uses_rank_badge`):
+      - outlined, at `RANK_BADGE_FONT` = `SMALL_FONT` − 3;
+      - on a see-through plate (alpha 0.7) that backs exactly the outlined numeral, tucked
+        into the bottom-left corner on the rim (`rank_badge_origin` / `rank_badge_rect`;
+        about a fifth of the icon).
+
+      Both turn orange once specialised. Rank 0 draws no rank: the lobby preview and the
+      Trainer rows, whose rank column shows it. Also used by the lobby cards (abilities + Mastery line;
     `LobbyCard.mastery_parts` splits "Name: text" and capitalises the text, which must fit
     `MASTERY_MAX_LINES` 3 at the 1920x1080 canvas – every 16:9 window size, 720p included).
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
@@ -507,9 +528,11 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   cancels a hold-to-buy); panel tabs on LT / RT. The 60 s
   auto-continue runs only in MARKET. The HUD is hidden during the intermission. The
   Intermission itself stays in the tree, hidden, during waves, so `ShopPanel` and
-  `TrainerTab` skip `RunState.gold_changed` work while not visible in the tree and catch up
-  when shown (the market start also refreshes both). During waves the HUD shows a
-  "Team Loot: N" counter during waves.
+  `TrainerTab` skip `RunState.gold_changed` work while not visible in the tree. They catch
+  up once at the end of the frame they are shown in (deferred). `refresh()` clears their
+  stale mark, so the market start's own refresh is the only rebuild, and `Intermission.open`'s
+  momentary show before the loot roll does nothing. During waves the HUD shows a
+  "Team Loot: N" counter.
   - **Input guards** (co-op, one screen): the loot roll and the market swallow every human's
     held buttons / stick (`PlayerInput.swallow()`) when they open and when the market starts
     after the roll; A and X (buy / lock) are additionally ignored for
@@ -546,7 +569,10 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   `ability_just_pressed` in `_process`; cooldown = `cooldown x stats.cooldown_mult() x
   (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
   gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
-  NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`); bots
+  NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`, which picks the
+  nearest ghost in range but skips one the Spirit Healer revives within
+  `PaladinWordOfGlory.HEALER_SOON`, so Word of Glory revives another ghost instead of
+  healing); bots
   (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast`.
   - Timing: every `AUTO_CAST_INTERVAL` 0.25 s, which is exactly 15 ticks at 60 Hz.
     `begin_wave` staggers the players' passes by slot index, so P1–P4 first pass on ticks
@@ -667,8 +693,18 @@ core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; s
 - **Trainer bots** (smoke / demo, after their market shopping): `Intermission._bots_train`
   calls `Trainer.bot_train(player, reserve)` for every bot in slot order with an even share of
   the gold above `Intermission.bot_train_reserve` (one Uncommon item at the next wave's price
-  per two bots), so the shop still gets gold next round. `SMOKE_RESULT` adds `level_cards`
-  (cards picked), `abilities_learned` (learned slots filled at the end) and `ranks_trained`.
+  per two bots), so the shop still gets gold next round.
+  - Then `Intermission._bots_reroll` spends the gold neither the offers nor the Trainer could
+    take, while the wallet keeps `BOT_REROLL_RESERVE_MULT` (2) × `bot_train_reserve` after
+    paying `Shop.reroll_cost()`.
+  - Each time, one shopping bot (in turn) votes a reroll alone
+    (`Shop.vote_reroll(index, [index], RunState.rng)`) and the bots run their buying passes
+    again (`_bots_buy`).
+  - At most `BOT_MAX_REROLLS` (3) per round, and never while a human with a working device
+    can vote (`ShopPanel.voter_indices()` not empty).
+
+  `SMOKE_RESULT` adds `level_cards` (cards picked), `abilities_learned` (learned slots filled
+  at the end), `ranks_trained` and `shop_rerolls` (`Intermission.bot_rerolled`).
 
 
 ## M4: ranks, learned abilities, Trainer
@@ -689,7 +725,7 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   slotted effect gets `end_wave`, then the Mastery's teardown).
 - **Ranks** (`AbilityRanks`, GDD 6.3): Rank II and IV `"power_pct"` +25 and `"cooldown_pct"`
   −10 each; Rank III merges `AbilityData.rank3`. Rank V's chosen
-  `AbilityData.specs[i]["mods"]` (`AbilityRanks.spec_mods`) apply as a second `apply_mods`
+  `AbilityData.specs[i]["mods"]` (`AbilityRanks.spec_mods`, a deep copy) apply as a second `apply_mods`
   pass after the rank mods, then the item mods come last. So a spec's `_pct` scales the
   Rank IV value (Hot Streak: 10 s × 0.8 × 0.7 = 5.6 s). Every effect multiplies its damage / heal / shield / buff
   amounts by `ctx.num("power", 1.0)`. Trainer price `25 × rank × (1 + 0.08 × (wave − 1))`.
@@ -699,8 +735,18 @@ scenes/abilities/general/        the six general abilities (class_id empty)
 - **Level-up cards** (`LevelUpDeck`): 5 cards, about half ability cards (new learned
   abilities from `Db.ability_pool(class)` – class + general, unlocked, `card_weight` > 0 – or
   free rank-ups of slotted abilities incl. core ones), at least one ability and one stat
-  card; full slots of a kind make new abilities of that kind rarer (×0.3) and rank-ups more
-  likely; stat cards (`StatCards`): rarity Common 50 / Uncommon 30 / Rare 15 / Epic 5, 1–3
+  card.
+  - Full slots of a kind make new abilities of that kind rarer (×0.3) and rank-ups more
+    likely.
+  - A card that would need a replacement (a new ability whose kind is full) also counts only
+    `FULL_SLOTS_MIN_SHARE` (0.2) of its weight. The per-card ability chance is
+    `ABILITY_SHARE` 0.5 × (usable + 0.2 × replacement-only weight) / total weight
+    (`LevelUpDeck.ability_share`), and ability cards are picked from
+    `LevelUpDeck.pick_weights` (replacement-only ×0.2).
+  - So rank-ups keep their 0.5 × weight / total chance per card, and what full slots take
+    goes to stat cards. With every slot full at Rank V that is 10% per card, plus the
+    one-ability-card guarantee.
+  - Stat cards (`StatCards`): rarity Common 50 / Uncommon 30 / Rare 15 / Epic 5, 1–3
   stats from a weighted table with whole amounts (the class's own primary stat only). Stat
   cards go to the Player source `&"level_cards"`; team levels themselves give only +1 Stamina
   (`&"level"`). Every hero also has `Stats.BASE_MASTERY` 5 (`&"base"`; test heroes from
@@ -710,14 +756,30 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   `ShopPanel.HOLD_TIME` above half the wallet), Y previews the next rank, Rank V opens
   `SpecChooser` (B = later, the row shows "Choose"). Bots: `Trainer.bot_train` from the
   intermission.
+  - The Y preview shows the rank, the description and the `CD X s · Power Y%` stats in green.
+    The stats sit right-aligned on the rank row (`TrainerTab.stats_text` via
+    `AbilityRunner.cooldown_from_params`), so the description keeps that line.
+  - The detail description gets the whole lines left in its clip holder under the next-rank
+    and specialisation lines (`_fit_description`, at least `MIN_DESCRIPTION_LINES`), with an
+    ellipsis when cut.
+  - The row icons carry no rank of their own; the rank column shows it.
+  - While hidden, the tab skips gold and rank refreshes and only marks itself stale. It
+    catches up once at the end of the frame it is shown in (`call_deferred` from
+    NOTIFICATION_VISIBILITY_CHANGED). An explicit `refresh()` first (`PlayerPanel.set_tab`,
+    the market start) cancels the catch-up.
 - **HUD**: `AbilityBar` shows the four button slots (prompts per device) and a 2×2 cluster of
-  26 px auto-cast icons (sweep only) once an auto-cast ability is learned; every icon carries
-  rank pips (orange once specialised). Frames stay ≤ 112 px tall (wider with learned slots).
+  26 px auto-cast icons (sweep only) once an auto-cast ability is learned. Every icon carries
+  its rank: pips on the button icons, a small corner numeral on the 26 px auto-cast icons,
+  orange once specialised. Frames stay ≤ 112 px tall (wider with learned slots).
 - **Core hooks for the kits**:
   - `ProcSystem.add_shield(amount, duration, source := &"")`: one entry per source, each on
     its own timer. `absorb` drains the entry that runs out first. `shield_hp` is the total
     and `shield_of(source)` gives one entry's HP. Item procs and most kit shields share the
     anonymous `&""` entry.
+    - `shield_hp` is read-only: assigning it only reports an error.
+    - `clear_shields()` empties every entry (begin_wave, tests).
+    - `absorbed_total` is the running sum of damage any shield soaked. It is never reset, so
+      effects compare it between ticks.
   - `Player.damage_taken_mults`: named incoming multipliers, cleared at wave start.
   - `Player.death_guards`: Callables tried *before* the limited item cheat-death procs, so a
     free or recharging guard such as Last Stand or Cheat Death never uses one up.
@@ -737,6 +799,9 @@ scenes/abilities/general/        the six general abilities (class_id empty)
     - Ice Barrier = `add_shield(amount, 3600, &"ice_barrier")`, its own entry
       (`MageIceBarrier.SHIELD_SOURCE`), lasting until used up or wave end. Other shields
       neither block its recast nor inherit its timer.
+    - Its Rank III chill fires when `ProcSystem.absorbed_total` grew while the barrier is up,
+      so a hit soaked by a shorter-lived shield on top still chills. A shield expiring on its
+      timer does not.
     - Frost Nova's Shatter: the ice of one nova shares a `MageFrozen.ShatterGroup`, so each
       enemy takes one nova's shatter at most once.
   - Paladin: `PaladinKit` (holy strike damage, heals, per-Paladin buff keys),
@@ -754,10 +819,17 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   - Warlock: `WarlockSpell`, `WarlockAfflictions` (one DoT manager node per Warlock, ticks
     while downed; Demonic Pact on `"dot"` / `"pet"`). Afflictions listen to `Enemy.died`. A
     host that vanishes without dying (the wave-end despawn) only ends its afflictions: no
-    seed burst, no Corruption spread, no Blighted Ground.
+    seed burst, no Corruption spread, no Blighted Ground. Fear's Dread deals its damage per
+    second without the rank power (`WarlockFear.dread_rate`): power lengthens the fear, so
+    the Dread total scales with power once (the same rule as Radiant Bubble).
     Pets (Voidwalker taunts, Infernal for 8 s) free themselves when their owner is gone;
     `damage_taken_mults["voidwalker"]`.
   - General: `GeneralKit` (weapon damage normalised to a 1 s swing, spell damage with the
     best of Attack / Spell Power), `GeneralBuff` (timed hero buff: named stat source +
     damage-taken multiplier, refreshed not stacked), Spirit Wolf pet; Bandage is not
     interrupted by damage.
+    - A Sprint cast (own or Rallying) never weakens or shortens a running Sprint. Per stat
+      the higher value and the longer time are kept (`GeneralSprint.merged_stats`), so a
+      refresh may extend a rally's numbers. The Trailblazer trail lasts as long as the
+      caster's own merged Sprint.
+    - Bandage Rank III's extra bandage goes to the most wounded unbandaged ally.
