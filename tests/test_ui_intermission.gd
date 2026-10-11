@@ -2,7 +2,9 @@ extends TestCase
 ## Intermission: per-player ready with START (A buys in the shop since M2), B unreadies,
 ## bots and unplugged devices auto-ready, continue_requested once when everybody is ready, or
 ## when the auto-continue countdown (GDD 12, 60 s, can be switched off) runs out. The M2 phases
-## (loot roll, market routing) are covered by test_ui_market_intermission.gd.
+## (loot roll, market routing) are covered by test_ui_market_intermission.gd, the M5 purse
+## header (PurseBoard: gold, ready pips, spends, wants) and the chips' talent badge by
+## test_purse.gd.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
@@ -40,6 +42,8 @@ func test_hidden_until_opened_and_fills_summary() -> void:
 	check(screen.is_open(), "open")
 	check_eq(screen.title_label.text, "Wave 3 cleared!", "title")
 	check_eq(screen.gold_value.text, "42", "shared gold")
+	check(screen.gold_value == screen.purse_board.gold_value, "the gold sits on the purse board")
+	check_eq(screen.purse_board.pips.states.size(), 1, "one ready pip per player")
 	check_eq(screen.level_ups_value.text, "+2", "level-ups")
 	check("Wave 4" in screen.next_label.text, "next wave preview: %s" % screen.next_label.text)
 	check_eq(screen.chips_row.get_child_count(), 1, "one ready chip per player")
