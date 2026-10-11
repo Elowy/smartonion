@@ -109,7 +109,7 @@ func test_pyroblast_pyroclasm_spec_pierces() -> void:
 	_step(1.05, [p])
 	_fly()
 	var hit := _spell(p, 18.0, 2.5, &"fire", 1.5, 2.0)
-	for e in [first, second, third]:
+	for e: Fakes.FakeEnemy in [first, second, third]:
 		check_eq(_count(e, hit), 1, "every enemy in the path takes the full hit")
 
 

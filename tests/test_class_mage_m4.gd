@@ -233,7 +233,7 @@ func test_frost_nova_freezes_and_damages_everything_around() -> void:
 	var outside := _enemy(Vector3(0, 0, 5.0))
 	check(p.abilities.try_cast(slot), "cast")
 	var hit := _spell(p, 2.0, 0.3, &"frost")
-	for e in [touching, around]:
+	for e: Fakes.FakeEnemy in [touching, around]:
 		check_eq(e.fake_hits(), 1, "hit")
 		check_near(e.fake_damage_log[0], hit, 0.001, "frost damage")
 		check_eq(e.fake_stun_count, 1, "frozen")
@@ -489,7 +489,7 @@ func test_ice_barrier_shattering_spec() -> void:
 	check(not p.downed, "survived")
 	_step(DT, [p])
 	check_eq(effect.breaks, 1, "broken")
-	for e in [biter, near]:
+	for e: Fakes.FakeEnemy in [biter, near]:
 		check_eq(e.fake_hits(), 1, "the barrier explodes on enemies within 3.5 m")
 		check_near(e.fake_damage_log[0], strength, 0.001, "for its strength")
 		check(_ice(e, p) != null, "and freezes them")
