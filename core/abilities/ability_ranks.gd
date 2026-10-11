@@ -39,10 +39,12 @@ static func mods_for(ability: AbilityData, rank: int, spec: int = -1) -> Diction
 
 ## The mods of Rank V specialisation [param spec] (empty below Rank V or without a valid spec).
 ## Applied after [method mods_for] (rank only), so "_pct" keys compound with the rank steps.
+## A copy: changing it never touches the shared AbilityData resource.
 static func spec_mods(ability: AbilityData, rank: int, spec: int) -> Dictionary:
 	if ability == null or rank < MAX_RANK or spec < 0 or spec >= ability.specs.size():
 		return {}
-	return ability.specs[spec].get("mods", {})
+	var mods: Dictionary = ability.specs[spec].get("mods", {})
+	return mods.duplicate(true)
 
 
 ## Gold for the next rank (from [param rank] to rank + 1) at [param wave]; 0 at Rank V.
