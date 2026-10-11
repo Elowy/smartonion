@@ -13,6 +13,8 @@ extends Node
 ## Seed: when its host dies – or the seed ripens after its duration – it bursts: Shadow damage
 ## (&"ability") to every enemy in its radius; optionally a Blighted Ground pool and a new seed
 ## in a surviving victim (Chain Reaction).
+## A host that vanishes without dying (the wave-end despawn: no [signal Enemy.died]) only
+## takes its afflictions along – no burst, no spread.
 ## Order: the afflictions run in the order they were applied (deterministic). Markers
 ## ([WarlockAfflictionMarker]) show them on the enemies.
 
@@ -49,6 +51,8 @@ class Affliction extends RefCounted:
 	## The WarlockAfflictionMarker on the enemy (may be freed with the enemy).
 	var marker: Variant = null
 	var done := false
+	## The enemy died (its died signal) – a freed corpse still bursts / spreads.
+	var killed := false
 	## Damage dealt so far (tests, stats).
 	var dealt := 0.0
 	## Corruption: enemies it jumps to when its enemy dies, within spread_radius m; share of
@@ -158,6 +162,7 @@ func _start(kind: StringName, e: Enemy, rate: float, duration: float) -> Afflict
 		a.enemy_id = e.get_instance_id()
 		_list.append(a)
 		_index(kind)[a.enemy_id] = a
+		_watch(e)
 	a.rate = maxf(0.0, rate)
 	a.duration = duration
 	a.left = duration
@@ -221,7 +226,7 @@ func _step(a: Affliction, delta: float) -> void:
 	if not WarlockSpell.is_live(e):
 		if e != null and e.is_inside_tree():
 			a.last_pos = e.global_position
-		_host_died(a)
+		_host_gone(a, e)
 		return
 	a.last_pos = e.global_position
 	var look := _marker_of(a)
@@ -244,7 +249,7 @@ func _step(a: Affliction, delta: float) -> void:
 	if not WarlockSpell.is_live(e):
 		if is_instance_valid(e) and e.is_inside_tree():
 			a.last_pos = e.global_position
-		_host_died(a)
+		_host_gone(a, e if is_instance_valid(e) else null)
 		return
 	if a.left <= EPSILON:
 		if a.kind == SEED:
@@ -252,7 +257,16 @@ func _step(a: Affliction, delta: float) -> void:
 		_end(a)
 
 
-## The enemy of [param a] died (or vanished): Corruption spreads, a seed bursts.
+## The enemy of [param a] is gone: when it died (its died signal, or 0 HP while it is still
+## there) it counts as a death; one that vanished alive (despawned) only ends [param a].
+func _host_gone(a: Affliction, e: Enemy) -> void:
+	if a.killed or (e != null and e.hp <= 0.0):
+		_host_died(a)
+	else:
+		_end(a)
+
+
+## The enemy of [param a] died: Corruption spreads, a seed bursts.
 func _host_died(a: Affliction) -> void:
 	match a.kind:
 		CORRUPTION:
@@ -308,6 +322,7 @@ func _burst(a: Affliction, center: Vector3) -> void:
 			b.last_pos = next[0].global_position
 			_list.append(b)
 			_index(SEED)[b.enemy_id] = b
+			_watch(next[0])
 			_ensure_marker(b, next[0])
 			ProcVfx.beam(center + Vector3.UP * 0.6, WarlockSpell.chest(next[0]), WarlockSpell.FEL_COLOR)
 
@@ -321,6 +336,21 @@ func _end(a: Affliction) -> void:
 		index.erase(a.enemy_id)
 	WarlockAfflictionMarker.release(a.marker)
 	a.marker = null
+
+
+## Listens for [param e]'s death (once per enemy).
+func _watch(e: Enemy) -> void:
+	if not e.died.is_connected(_on_enemy_died):
+		e.died.connect(_on_enemy_died)
+
+
+## Marks the afflictions on [param e] as killed (their host may be freed before the next tick).
+func _on_enemy_died(e: Enemy, _killer_index: int) -> void:
+	var id := e.get_instance_id()
+	for index: Dictionary in _by_kind.values():
+		var a: Affliction = index.get(id)
+		if a != null:
+			a.killed = true
 
 
 func _compact() -> void:
