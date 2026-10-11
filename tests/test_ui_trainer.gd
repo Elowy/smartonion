@@ -399,6 +399,40 @@ func test_r3_pings_the_selected_rank_for_the_team() -> void:
 	check(panel.last_message.contains("Ping removed"), "feedback: %s" % panel.last_message)
 
 
+## The glyphs of [param panel]'s prompt row (rebuilt now), left to right.
+func _prompt_glyphs(panel: PlayerPanel) -> Array[UiGlyph]:
+	panel._update_prompts()
+	var out: Array[UiGlyph] = []
+	_collect_glyphs(panel._prompt_holder, out)
+	return out
+
+
+static func _collect_glyphs(node: Node, out: Array[UiGlyph]) -> void:
+	for c in node.get_children():
+		if c is UiGlyph:
+			out.append(c)
+		_collect_glyphs(c, out)
+
+
+func test_the_ping_prompt_reads_r3_on_a_pad_and_tab_on_the_keyboard() -> void:
+	var slot := _mage_with_learned()
+	var panel := _panel(slot)
+	panel.trainer.select_slot(2)
+	var glyphs := _prompt_glyphs(panel)
+	var r3 := glyphs.filter(func(g: UiGlyph) -> bool: return g.text == "R3")
+	check_eq(r3.size(), 1, "one R3 glyph in the controller's prompt row")
+	if r3.size() == 1:
+		check_eq((r3[0] as UiGlyph).style, UiGlyph.Style.PILL, "a stick click is a pill like LB / RB")
+	check(glyphs.all(func(g: UiGlyph) -> bool: return g.style != UiGlyph.Style.NAV),
+		"no left / right pair: the ping is no sideways move")
+	var l3 := UiGlyph.pad(PlayerInput.Pad.L3)
+	check(l3.style == UiGlyph.Style.PILL and l3.text == "L3", "L3 likewise")
+	var key := UiGlyph.for_input(KeyboardInput.new(), PlayerInput.Pad.R3)
+	check(key.style == UiGlyph.Style.KEY and key.text == "Tab", "the keyboard pings with Tab")
+	for g: UiGlyph in [l3, key]:
+		g.free()
+
+
 func test_buying_a_pinged_rank_clears_only_that_ping() -> void:
 	var slot := _mage_with_learned()
 	var r := _runner(slot)

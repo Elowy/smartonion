@@ -254,6 +254,51 @@ func test_wants_merge_shop_and_trainer_pings_in_slot_order() -> void:
 	check_eq(_board().wants_text(), "", "P1's wants are off the board")
 
 
+func test_a_player_who_leaves_takes_their_shop_pings_along() -> void:
+	_two_humans()
+	RunState.add_gold(500)
+	_open_market()
+	var shop := RunState.shop
+	var items: Array[ItemInstance] = [_ring("Runed Signet", Items.Rarity.EPIC), _ring("Silk Band")]
+	_stock(items, [62, 30] as Array[int])
+	shop.toggle_ping(0, 1)
+	_step()
+	check_eq(_board().wants_text(), "P2 [Runed Signet] 62 g", "P2 wants the signet")
+	check(RunState.wants.is_empty(), "a shop ping only, no Trainer ping")
+	check(0 not in shop.rerollable_positions(), "the pinged offer is kept out of a reroll")
+	PlayerManager.leave(1)
+	_step()
+	_step()
+	check_eq(_board().wants_text(), "", "P2's shop ping is off the board")
+	check(not _board().is_dirty(), "rebuilt")
+	check(shop.offers[0].pinged_by.is_empty(), "and off the offer (no 'P2 wants' left on the card)")
+	check(0 in shop.rerollable_positions(), "a reroll may take it again")
+
+
+func test_the_board_drops_the_wants_of_a_player_who_left() -> void:
+	# The board on its own, with a stall nobody prunes: the change in the players rebuilds the
+	# wants line although neither the wallet nor the stall signalled anything.
+	_two_humans()
+	holder = Control.new()
+	tree.root.add_child(holder)
+	var board := PurseBoard.create()
+	holder.add_child(board)
+	var stall := Shop.new()
+	var o := Shop.Offer.new()
+	o.item = _ring("Runed Signet", Items.Rarity.EPIC)
+	o.price = 62
+	o.pinged_by.append(1)
+	stall.offers.append(o)
+	board.set_shop(stall)
+	board.update(PlayerManager.get_slots())
+	check_eq(board.wants_text(), "P2 [Runed Signet] 62 g", "P2's ping")
+	PlayerManager.leave(1)
+	board.update(PlayerManager.get_slots())
+	check_eq(board.wants_text(), "", "P2 left: off the line")
+	check(not board.is_dirty(), "rebuilt by update()")
+	check_eq(o.pinged_by, [1] as Array[int], "with the ping still stored (no signal)")
+
+
 func test_many_wants_fit_one_line() -> void:
 	_two_humans()
 	_open_market()

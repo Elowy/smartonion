@@ -19,11 +19,11 @@ extends PanelContainer
 ## Shop items show as "[Name]" in their rarity colour while the stall still lists the offer
 ## (sold offers stay until the next round), else in plain text colour. Entries are packed into
 ## the lines by their measured width ([method pack]), so no line runs out of the board.
-## The texts are rebuilt only when something changed: RunState.spent / wants_changed and
-## Shop.changed mark them dirty, [method update] (every MARKET frame, from the Intermission)
-## or [method refresh] rebuilds them – nothing happens while the Intermission waits hidden
-## through a wave. [method refresh] is also how a new round shows (RunState.begin_spend_round
-## clears the log without a signal). No RNG.
+## The texts are rebuilt only when something changed: RunState.spent / wants_changed,
+## Shop.changed and a player leaving / joining mark them dirty, [method update] (every MARKET
+## frame, from the Intermission) or [method refresh] rebuilds them – nothing happens while the
+## Intermission waits hidden through a wave. [method refresh] is also how a new round shows
+## (RunState.begin_spend_round clears the log without a signal). No RNG.
 
 ## The board's design width (the stall's width; fits between the two top corner panels).
 const WIDTH := 712.0
@@ -64,6 +64,8 @@ var _ticker_plain: Array[String] = []
 var _wants_plain := ""
 var _dirty := true
 var _pip_key := ""
+## Who is in, in which colour ([method update]): a change rebuilds the texts.
+var _players_key := ""
 
 
 ## One diamond per player in their colour, filled while that player is ready.
@@ -276,11 +278,18 @@ func refresh_gold() -> void:
 
 
 ## Called every MARKET frame: the pips follow [param slots]' ready flags (redrawn only when one
-## changed) and dirty texts are rebuilt.
+## changed) and dirty texts are rebuilt. A change in the players themselves (one left or joined,
+## a colour changed) marks the texts dirty too: the wants line skips players who left
+## ([method merged_wants]) and the tags carry the players' colours.
 func update(slots: Array[PlayerSlot]) -> void:
+	var players := ""
 	var key := ""
 	for s in slots:
+		players += "%d:%s," % [s.index, s.color.to_html()]
 		key += "%d:%s:%s," % [s.index, s.ready, s.color.to_html()]
+	if players != _players_key:
+		_players_key = players
+		_dirty = true
 	if key != _pip_key:
 		_pip_key = key
 		var states: Array[Dictionary] = []

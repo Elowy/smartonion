@@ -933,14 +933,15 @@ func _on_gold_changed(_gold: int, _delta: int) -> void:
 
 
 ## A player left while the screen is open (PlayerManager.leave): their panel, shop cursor,
-## chip, reroll vote and Trainer pings go away, and the remaining voters may now complete a
-## reroll.
+## chip, reroll vote, Trainer pings and shop pings go away, and the remaining voters may now
+## complete a reroll (offers only that player pinged are no longer kept out of it).
 func _on_player_left(slot: PlayerSlot) -> void:
 	_was_auto.erase(slot.index)
 	panel_focus.erase(slot.index)
 	for w in RunState.wants.duplicate():
 		if int(w.get("slot", -1)) == slot.index:
 			RunState.clear_want(slot.index, String(w.get("key", "")))
+	drop_shop_pings(RunState.shop, slot.index)
 	if not is_open():
 		return
 	if phase == Phase.LEVEL_UP:
@@ -953,6 +954,17 @@ func _on_player_left(slot: PlayerSlot) -> void:
 			shop_panel.shop.prune_votes(shop_panel.voter_indices())
 		purse_board.update(PlayerManager.get_slots())
 	_refresh_chips(true)
+
+
+## Takes [param slot_index]'s "P2 wants" pings off every unsold offer of [param shop]
+## (Shop.toggle_ping, so Shop.changed redraws the stall cards and the purse board).
+static func drop_shop_pings(shop: Shop, slot_index: int) -> void:
+	if shop == null:
+		return
+	for i in shop.offers.size():
+		var o := shop.offers[i]
+		if o != null and not o.sold and o.pinged_by.has(slot_index):
+			shop.toggle_ping(i, slot_index)
 
 
 func _continue() -> void:
