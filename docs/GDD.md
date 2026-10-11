@@ -1951,6 +1951,23 @@ indulnak.
 | M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
+### 16.1 Jóváhagyott ötletek (backlog)
+
+A playtest után elfogadott bővítések, a tervezett mérföldkővel. A részletek a megvalósításkor
+kerülnek a megfelelő fejezetbe.
+
+| Ötlet | Mit jelent | Mérföldkő |
+|---|---|---|
+| **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | M5 (az integrációkor) |
+| **Sebzésmérő és díjak** | WoW-szerű damage meter (sebzés, gyógyítás, elnyelt sebzés, felélesztések) a menet végén; címek: „Most damage”, „Most revives”, „Most deaths” stb. | M6 |
+| **Menet végi összefoglaló kártya** | Megosztható kép: kasztok, elért hullám, idő, legjobb itemek, díjak | M6 |
+| **Véletlen környezet menetenként** | 5 féle aréna-környezet (pl. temető, mocsár, vulkán, jégbarlang, erdei rom) saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | M6 (tartalom), M7 (látvány) |
+| **Hullám közbeni események** | Őrzött kincsesláda, megvédendő totem, elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | M6 |
+| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | M6 |
+| **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, ranglistával | M6 |
+| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | M6 |
+| **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+
 ---
 
 ## 17. Meta-progresszió (utolsó mérföldkő, M9)
