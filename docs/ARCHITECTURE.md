@@ -256,6 +256,16 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     crowds). `Player.create` sets it; "" hides it (lobby previews). Over a ghost it bobs and
     is lifted above the "Resurrecting" cast bar. Downed: the player-colour ring stays and
     pulses, the revive circle is tinted with the ghost's own colour, ghost alpha 0.6.
+  - Overhead health bar (child `Marker/HpBar`): three fixed-size, no-depth-test Sprite3Ds –
+    framed back, HP fill (`region_rect` width = HP ratio, coloured by
+    `OnionModel.hp_bar_color`: green → yellow → red) and the absorb-shield segment.
+    - Its bottom edge sits on the marker origin (`MARKER_Y`); `_lift_plate` raises the
+      diamond and tag above it.
+    - `set_hp_ratio` drives the fill. `Player._physics_process` pushes
+      `procs.shield_hp / max_hp()` through `set_shield_ratio`, which is a no-op when the
+      value is unchanged.
+    - Hidden with the marker and while downed (the diamond drops back onto the origin).
+    - Test helpers: `is_hp_bar_visible()`, `hp_bar_fill()`, `hp_bar_shield()`.
   - `Mats.set_ring_stroke(node, amount)` – dark outline + white inner stroke on a ground
     ring (player rings use it, so the player colour reads on any ground / class colour).
   - Heroes never fully overlap: `Player.separation_offset` – a soft push (no physics

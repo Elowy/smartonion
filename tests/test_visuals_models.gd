@@ -454,6 +454,51 @@ func test_onion_player_marker() -> void:
 	check(OnionModel.marker_texture() == OnionModel.marker_texture(), "diamond texture built once")
 
 
+func test_onion_overhead_hp_bar() -> void:
+	var m := _onion(&"paladin")
+	check(not m.is_hp_bar_visible(), "no bar without a tag (lobby previews)")
+	m.set_tag("P1")
+	check(m.is_hp_bar_visible(), "bar above the hero's head")
+	var back := m.get_node("Marker/HpBar/Back") as Sprite3D
+	check(back.fixed_size and back.no_depth_test, "fixed screen size, drawn through crowds")
+	check_near(m.hp_bar_fill(), 1.0, 0.001, "full")
+	var diamond := m.get_node("Marker/Diamond") as Sprite3D
+	var lifted := diamond.offset.y
+	check(lifted * OnionModel.MARKER_DIAMOND_PIXEL > OnionModel.MARKER_TEX_SIZE.y * 0.5 * OnionModel.MARKER_DIAMOND_PIXEL
+		+ OnionModel.HP_BAR_SIZE.y * OnionModel.HP_BAR_PIXEL, "diamond sits above the bar")
+	m.set_hp_ratio(0.5)
+	check_near(m.hp_bar_fill(), 0.5, 0.02, "half")
+	var fill := m.get_node("Marker/HpBar/Fill") as Sprite3D
+	check(fill.modulate.g > fill.modulate.b and fill.modulate.r > 0.8, "yellow at half")
+	m.set_hp_ratio(0.1)
+	check(fill.modulate.r > 0.8 and fill.modulate.g < 0.5, "red when nearly dead")
+	m.set_hp_ratio(0.001)
+	check(m.hp_bar_fill() > 0.0, "a sliver stays visible while alive")
+	check(OnionModel.hp_bar_color(1.0).is_equal_approx(UiTheme.HP_GREEN), "green when healthy")
+	# Absorb shield: after the fill, laid over its end when it overflows.
+	m.set_hp_ratio(0.5)
+	m.set_shield_ratio(0.25)
+	var sh := m.hp_bar_shield()
+	check_near(sh.x, 0.5, 0.02, "shield starts at the HP end")
+	check_near(sh.y, 0.75, 0.02, "and covers its share")
+	m.set_hp_ratio(0.8)
+	m.set_shield_ratio(0.5)
+	sh = m.hp_bar_shield()
+	check_near(sh.y, 1.0, 0.001, "overflowing shield ends at the bar end")
+	check_near(sh.x, 0.5, 0.02, "laid over the HP fill")
+	m.set_shield_ratio(0.0)
+	check(m.hp_bar_shield() == Vector2.ZERO, "no shield, no segment")
+	# Ghost: no bar, the diamond drops back onto the marker origin.
+	m.set_downed(true)
+	check(not m.is_hp_bar_visible() and m.is_marker_visible(), "ghost keeps the marker, loses the bar")
+	check_near(diamond.offset.y, OnionModel.MARKER_TEX_SIZE.y * 0.5, 0.001, "diamond back on the origin")
+	m.set_hp_ratio(1.0)
+	m.set_downed(false)
+	check(m.is_hp_bar_visible(), "bar back after the revive")
+	check_near(diamond.offset.y, lifted, 0.001, "diamond above the bar again")
+	check(OnionModel.hp_bar_textures() == OnionModel.hp_bar_textures(), "bar textures built once")
+
+
 func test_onion_ghost_stays_findable() -> void:
 	var m := _onion(&"mage")
 	m.set_tag("P3")

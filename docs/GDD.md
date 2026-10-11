@@ -1277,6 +1277,13 @@ indulnak.
   - erőforrás-sáv kaszt-színnel (Rage piros, Mana kék, Energy sárga, Holy Power arany pipek, Soul Shard lila pipek),
   - ability-sáv: 2 alap + 2 tanult aktív + 4 auto-cast ikon, cooldown-animációval és
     rang-jelzéssel (I–V).
+- **A hősök feje fölött:** névtábla („P1” + gyémánt a játékos színében) és alatta egy kis
+  életerő-csík. A csík fix képernyőméretű, és a tömegen át is látszik.
+  - Színe a HP szerint változik: zöld → sárga (50%) → piros.
+  - Az elnyelő pajzs halványkék szakaszként látszik a HP után. Ha túlnyúlik, a csík végére
+    rajzolódik.
+  - Szellemként a csík eltűnik; ilyenkor a cast bar és a Spirit Healer jelzései adnak
+    információt.
 - **Felül középen:** hullám száma, visszaszámláló, csapat-kassza.
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).

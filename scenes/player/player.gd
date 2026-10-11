@@ -595,6 +595,8 @@ func _physics_process(delta: float) -> void:
 		_update_revive(delta)
 	else:
 		_update_regen(delta)
+	if model != null and procs != null:
+		model.set_shield_ratio(procs.shield_hp / max_hp())
 
 
 func _update_movement(delta: float) -> void:
