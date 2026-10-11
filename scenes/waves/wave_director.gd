@@ -24,7 +24,9 @@ signal enemy_spawned(enemy: Enemy)
 const MAX_ENEMIES := 150
 
 const BASE_SPAWN_RATE := 0.9
-const SPAWN_RATE_PER_WAVE := 0.22
+## Kept low: every kill pays gold and XP, so the enemy count drives the economy (and the
+## waves get longer anyway); the late-game threat comes from EnemyData's HP / damage growth.
+const SPAWN_RATE_PER_WAVE := 0.08
 const TELEGRAPH_TIME := 1.0
 const TELEGRAPH_RADIUS := 1.0
 ## Spawn points keep this far (m) from the arena walls.
