@@ -2,16 +2,29 @@ extends TestCase
 ## Trainer tab (GDD 6.3, PlayerPanel tab 2 / TrainerTab): the slot list (core, learned Active,
 ## learned Auto-cast, empty slots), buying ranks from the shared wallet (price escalation with
 ## the wave, max rank, the hold-to-buy rule), the Rank V specialisation prompt, the detail area
-## (stats line, description fitted to the room left) and the tab navigation – driven through
-## PlayerPanel.handle_input like a real pad – and no refreshes while hidden.
+## (stats beside the rank, description fitted to the room left) and the tab navigation – driven
+## through PlayerPanel.handle_input like a real pad – and no refreshes while hidden (one
+## deferred catch-up when shown).
 ## Test abilities are built in code; the fit test also walks the shipped Db.abilities.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const Fakes := preload("res://tests/test_ui_m3_fakes.gd")
+## Shipped descriptions still shortened (ellipsis) at Ranks I / II / IV / V in the design-size
+## panel: 44 while the stats had a line of their own, 11 since they share the rank's row.
+const MAX_CUT_DESCRIPTIONS := 11
 
 var players: Array[Player] = []
 var panels: Array[PlayerPanel] = []
 var _async := false
+
+
+## A TrainerTab that counts its rebuilds.
+class CountingTrainer extends TrainerTab:
+	var refreshes := 0
+
+	func refresh() -> void:
+		refreshes += 1
+		super()
 
 
 func is_async() -> bool:
@@ -130,7 +143,8 @@ func test_lists_core_learned_and_empty_slots() -> void:
 	check_eq(tab.row_for(2).name_label.text, "Fireball", "RB: the learned Active ability")
 	check_eq(tab.row_for(4).name_label.text, "Frost Nova", "auto-cast 1")
 	check_eq(tab.row_for(2).price_label.text, "25", "Rank II costs 25 g at wave 1")
-	check_eq(tab.row_for(2).icon.rank, 1, "rank pips on the icon")
+	check_eq(tab.row_for(2).rank_label.text, "I", "the rank column")
+	check_eq(tab.row_for(2).icon.rank, 0, "no rank mark on the row icon (the column shows it)")
 	for i: int in [3, 5, 6, 7]:
 		check(tab.row_for(i).is_empty(), "slot %d empty" % i)
 		check_eq(tab.row_for(i).name_label.text, "Learn abilities on level-up", "slot %d hint" % i)
@@ -169,7 +183,7 @@ func test_navigation_skips_empty_slots_and_shows_the_detail() -> void:
 	check_eq(tab.selected, 4, "and back up")
 	check_eq(tab.detail_name.text, "Frost Nova", "detail: name")
 	check_eq(tab.detail_kind.text, "Auto-cast · Fire", "detail: kind and school")
-	check_eq(tab.detail_rank.text, "Rank I of V", "detail: rank")
+	check_eq(tab.detail_rank.text, "Rank I", "detail: rank")
 	check_eq(tab.detail_description.text, "Hurls a bolt for 10 damage (1x) every 6 sec.", "description from params_for")
 	check_eq(tab.detail_next.text, "Next: Rank II – " + AbilityRanks.rank_text(tab.selected_ability(), 2), "what Rank II adds")
 	check_eq(tab.detail_price.text, "25", "price")
@@ -177,7 +191,8 @@ func test_navigation_skips_empty_slots_and_shows_the_detail() -> void:
 	# Y previews the next rank's numbers (AbilityRunner.params_at_rank).
 	_tap(panel, slot, PlayerInput.Pad.Y)
 	check(tab.preview_next, "Y: preview")
-	check_eq(tab.detail_rank.text, "Rank II of V (preview)", "the previewed rank")
+	check_eq(tab.detail_rank.text, "Rank II", "the previewed rank")
+	check(tab.detail_rank.get_theme_color(&"font_color").is_equal_approx(UiTheme.GREEN), "in green (the preview mark)")
 	check_eq(tab.detail_description.text, "Hurls a bolt for 10 damage (1.25x) every 5.4 sec.", "Rank II's numbers")
 	check_eq(_runner(slot).rank_of(&"frost_nova"), 1, "a preview buys nothing")
 	_tap(panel, slot, PlayerInput.Pad.Y)
@@ -196,7 +211,6 @@ func test_buying_ranks_spends_the_shared_wallet() -> void:
 	check(panel.last_message.contains("Fireball is now Rank II"), "feedback: %s" % panel.last_message)
 	check_eq(panel.trainer.row_for(2).rank_label.text, "II", "the row follows")
 	check_eq(panel.trainer.row_for(2).price_label.text, "50", "Rank III costs 25 x 2")
-	check_eq(panel.trainer.row_for(2).icon.rank, 2, "two pips")
 	check_eq(panel.trainer.detail_description.text, "Hurls a bolt for 10 damage (1.25x) every 5.4 sec.", "the description reads the ranked params")
 	_tap(panel, slot, PlayerInput.Pad.A)
 	check_eq(r.rank_of(&"fireball"), 3, "Rank III")
@@ -303,7 +317,7 @@ func test_max_rank_shows_max_and_refuses() -> void:
 	var row := panel.trainer.row_for(2)
 	check_eq(row.price_label.text, TrainerRow.MAX_TEXT, "MAX")
 	check_eq(row.rank_label.text, "V", "Rank V")
-	check(row.icon.rank_spec, "orange pips: specialised")
+	check(row.rank_label.get_theme_color(&"font_color").is_equal_approx(AbilityIcon.RANK_SPEC_COLOR), "orange: specialised")
 	panel.trainer.select_slot(2)
 	_tap(panel, slot, PlayerInput.Pad.A)
 	check_eq(RunState.gold, 500, "nothing paid")
@@ -355,7 +369,7 @@ func test_rank_v_asks_for_a_specialisation() -> void:
 	check_eq(r.params_for(r.slots[2]).get("explode_radius"), 3.0, "the spec's mods are live")
 	check(panel.last_message.contains("Exploding Fireball"), "feedback: %s" % panel.last_message)
 	check_eq(tab.row_for(2).price_label.text, TrainerRow.MAX_TEXT, "maxed")
-	check(tab.row_for(2).icon.rank_spec, "orange pips")
+	check(tab.row_for(2).rank_label.get_theme_color(&"font_color").is_equal_approx(AbilityIcon.RANK_SPEC_COLOR), "orange rank")
 
 
 func test_tabs_switch_with_lt_and_rt() -> void:
@@ -424,7 +438,9 @@ func test_detail_area_for_an_empty_selection_and_no_hero() -> void:
 
 func test_hidden_trainer_skips_gold_refreshes_until_shown() -> void:
 	# The Intermission and its panels stay in the tree, hidden, for the whole wave: a gold pickup
-	# must not rebuild the hidden Trainer; it catches up as soon as it is shown again.
+	# must not rebuild the hidden Trainer; it catches up as soon as it is shown again (at the
+	# end of that frame).
+	_async = true
 	var slot := _mage_with_learned()
 	RunState.wave = 11
 	RunState.add_gold(40)
@@ -439,6 +455,7 @@ func test_hidden_trainer_skips_gold_refreshes_until_shown() -> void:
 		RunState.add_gold(5)
 	check_eq(refreshes[0], 0, "no refresh while the panel is hidden")
 	panel.show()
+	await tree.process_frame
 	check(refreshes[0] > 0, "shown again: refreshed")
 	check(row.price_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.GOLD), "the price follows the wallet once shown")
 	refreshes[0] = 0
@@ -451,6 +468,48 @@ func test_hidden_trainer_skips_gold_refreshes_until_shown() -> void:
 	check_eq(refreshes[0], 0, "no refresh behind the Character tab")
 	panel.set_tab(PlayerPanel.TRAINER_TAB)
 	check(row.price_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.RED), "back on the Trainer: 10 g is red again")
+	finished.emit()
+
+
+func test_catch_up_on_show_is_deferred_and_skipped_after_a_refresh() -> void:
+	# Regression: the catch-up ran synchronously on NOTIFICATION_VISIBILITY_CHANGED, so showing a
+	# stale tab rebuilt it twice (the catch-up, then PlayerPanel.set_tab's / the market start's
+	# own refresh), and Intermission.open's momentary show of the market rebuilt it for nothing.
+	_async = true
+	var slot := _mage_with_learned()
+	var holder := Control.new()
+	tree.root.add_child(holder)
+	var tab := CountingTrainer.new()
+	tab.slot = slot
+	tab._build()
+	holder.add_child(tab)
+	tab.refresh()
+	holder.hide()
+	RunState.add_gold(5)
+	check(tab._stale, "hidden: a wallet change only marks the tab stale")
+	# Shown, then refreshed explicitly in the same frame (PlayerPanel.set_tab, _start_market).
+	tab.refreshes = 0
+	holder.show()
+	check_eq(tab.refreshes, 0, "not rebuilt inside the visibility notification")
+	tab.refresh()
+	await tree.process_frame
+	check_eq(tab.refreshes, 1, "one rebuild: the explicit refresh cancels the catch-up")
+	# Shown and hidden again within one frame (Intermission.open, then the loot roll).
+	holder.hide()
+	RunState.add_gold(5)
+	tab.refreshes = 0
+	holder.show()
+	holder.hide()
+	await tree.process_frame
+	check_eq(tab.refreshes, 0, "a momentary show does not rebuild the hidden tab")
+	check(tab._stale, "it stays stale")
+	# Shown and left alone: caught up once at the end of the frame.
+	holder.show()
+	await tree.process_frame
+	check_eq(tab.refreshes, 1, "caught up once")
+	check(not tab._stale, "and fresh")
+	UiFakes.free_node(holder)
+	finished.emit()
 
 
 func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
@@ -458,10 +517,10 @@ func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
 	var panel := _panel(slot)
 	var tab := panel.trainer
 	tab.select_slot(2)
-	check_eq(tab.detail_stats.text, "Cooldown 6 s · Power 100%", "Rank I")
+	check_eq(tab.detail_stats.text, "CD 6 s · Power 100%", "Rank I")
 	check(tab.detail_stats.get_theme_color(&"font_color").is_equal_approx(UiTheme.TEXT_DIM), "dim while not previewing")
 	_tap(panel, slot, PlayerInput.Pad.Y)
-	check_eq(tab.detail_stats.text, "Cooldown 5.4 s · Power 125%", "Y: Rank II's cooldown and power")
+	check_eq(tab.detail_stats.text, "CD 5.4 s · Power 125%", "Y: Rank II's cooldown and power")
 	check(tab.detail_stats.get_theme_color(&"font_color").is_equal_approx(UiTheme.GREEN), "green in the preview")
 	_tap(panel, slot, PlayerInput.Pad.Y)
 	# A shipped ability whose description has no {power} / {cooldown}: Y still shows the change.
@@ -478,7 +537,7 @@ func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
 	check(tab.detail_stats.text.ends_with("Power 125%"), "Rank II power: %s" % tab.detail_stats.text)
 	# Haste / Cooldown Reduction are in the shown cooldown (AbilityRunner.cooldown_from_params).
 	var params := r.params_at_rank(shipped, 2)
-	check_eq(TrainerTab.stats_text(r, shipped, params), "Cooldown %s s · Power 125%%" % AbilityIcon.format_number(snappedf(r.cooldown_from_params(shipped, params), 0.1)), "stats_text")
+	check_eq(TrainerTab.stats_text(r, shipped, params), "CD %s s · Power 125%%" % AbilityIcon.format_number(snappedf(r.cooldown_from_params(shipped, params), 0.1)), "stats_text")
 	# Passives (no cooldown) show the power only.
 	var passive := learned(&"passive", AbilityData.Kind.AUTO, 0.0)
 	check_eq(TrainerTab.stats_text(r, passive, r.params_at_rank(passive, 4)), "Power 150%", "no cooldown part")
@@ -487,7 +546,8 @@ func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
 func test_detail_texts_fit_for_every_shipped_ability() -> void:
 	# Every shipped ability at Ranks I–V in the design-size panel: the description gets the lines
 	# the clip holder has left under the next-rank / specialisation lines (nothing is clipped
-	# half-way) and a cut description ends in an ellipsis.
+	# half-way) and a cut description ends in an ellipsis. The cooldown / power stats sit beside
+	# the rank, in full, instead of taking a line from the description.
 	_async = true
 	var slot := _hero(&"mage")
 	var r := _runner(slot)
@@ -498,6 +558,9 @@ func test_detail_texts_fit_for_every_shipped_ability() -> void:
 	var texts := tab.detail_description.get_parent() as Control
 	for l: Label in [tab.detail_description, tab.detail_next, tab.detail_spec]:
 		check_eq(l.text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS, "%s: a cut text ends in an ellipsis" % l.name)
+	check(tab.detail_stats.get_parent() == tab.detail_rank.get_parent(), "the stats share the rank's row")
+	var stats := tab.detail_stats
+	var stats_font := stats.get_theme_font(&"font")
 	var cut := 0
 	for id: StringName in Db.abilities:
 		var a: AbilityData = Db.abilities[id]
@@ -519,11 +582,13 @@ func test_detail_texts_fit_for_every_shipped_ability() -> void:
 			for l: Label in [tab.detail_description, tab.detail_next, tab.detail_spec]:
 				if l.visible:
 					check(l.position.y + l.size.y <= room + 0.5, "%s: %s laid out inside the holder (%s)" % [what, l.text.left(20), l.get_rect()])
+			var stats_w := stats_font.get_string_size(stats.text, HORIZONTAL_ALIGNMENT_LEFT, -1, stats.get_theme_font_size(&"font_size")).x
+			check(stats_w <= stats.size.x + 0.5, "%s: '%s' (%s px) shown in full beside the rank (%s px)" % [what, stats.text, stats_w, stats.size.x])
 			var desc := tab.detail_description
 			check(desc.max_lines_visible >= TrainerTab.MIN_DESCRIPTION_LINES, "%s: at least %d description lines" % [what, TrainerTab.MIN_DESCRIPTION_LINES])
 			if desc.get_line_count() > desc.max_lines_visible:
 				cut += 1
 				var line_h := desc.get_line_height() + desc.get_theme_constant(&"line_spacing")
 				check(used + line_h > room, "%s: cut although another line fits (%s + %s <= %s)" % [what, used, line_h, room])
-	check(cut < Db.abilities.size(), "most descriptions are shown in full (%d cut)" % cut)
+	check(cut <= MAX_CUT_DESCRIPTIONS, "the descriptions keep their room: %d of %d cut (at most %d)" % [cut, Db.abilities.size() * 4, MAX_CUT_DESCRIPTIONS])
 	finished.emit()

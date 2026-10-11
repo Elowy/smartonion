@@ -1,7 +1,7 @@
 extends TestCase
 ## M4 HUD (GDD 6.2, 12): the unit frame's AbilityBar shows the learned Active slots (RB / LB with
 ## prompts) and the 2 x 2 auto-cast cluster (small icons, gear mark, sweep, no prompt), the rank
-## on every icon (pips, a numeral badge on the small ones), and every class's frame stays within
+## on every icon (pips, a corner numeral on the small ones), and every class's frame stays within
 ## UnitFrame.MAX_HEIGHT / MAX_WIDTH with all eight slots filled. Plus the glyph rule (every
 ## shipped ability id has its own glyph) and the icon redraw cost (sweep step, glyph layer).
 
@@ -374,34 +374,47 @@ func test_sweep_ending_without_a_state_flip_is_drawn_empty() -> void:
 
 func test_small_icons_show_the_rank_as_a_numeral() -> void:
 	# Five 2 px pips cannot be counted on a 26 px icon at 1280 x 720: small icons draw the roman
-	# numeral on a dark plate in the bottom-left corner instead (orange once specialised).
+	# numeral (orange once specialised) in the bottom-left corner instead – small, outlined, on a
+	# see-through plate sitting on the rim, so it hides as little of the glyph (the only thing
+	# that tells the auto-cast abilities apart) as it can.
 	_async = true
-	var small := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
-	var trainer_row := AbilityIcon.create(TrainerRow.ICON_SIZE, false)
+	var sq := AbilityBar.AUTO_ICON_SIZE
+	var small := AbilityIcon.create(sq, false)
 	var button := AbilityIcon.create(42.0)
-	check(small.uses_rank_badge() and trainer_row.uses_rank_badge(), "below SMALL_ICON: the numeral")
+	check(small.uses_rank_badge(), "below SMALL_ICON: the numeral")
 	check(not button.uses_rank_badge(), "button icons keep the pips")
-	for sq: float in [AbilityBar.AUTO_ICON_SIZE, TrainerRow.ICON_SIZE]:
-		for r in range(1, AbilityIcon.MAX_RANK + 1):
-			var plate := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, false), AbilityIcon.roman(r))
-			check(plate.position.x >= 2.0 and plate.end.y <= sq - 2.0, "%s px Rank %d: the plate %s sits inside the rim" % [sq, r, plate])
-			check(plate.end.x <= sq - 3.0, "%s px Rank %d: and clear of the right edge (%s)" % [sq, r, plate])
-			check(plate.position.y >= sq * 0.3, "%s px Rank %d: in the bottom part, clear of the top corner texts (%s)" % [sq, r, plate])
-		var above := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, true), "III")
-		check(above.end.y <= sq - AbilityIcon.PROMPT_OVERHANG, "%s px: above a prompt pill (%s)" % [sq, above])
+	check(AbilityIcon.RANK_BADGE_FONT < AbilityIcon.SMALL_FONT, "a smaller numeral than the other corner texts")
+	var half := sq * 0.5 * AbilityIcon.GLYPH_SCALE
+	var glyph_box := Rect2(Vector2.ONE * (sq * 0.5 - half), Vector2.ONE * half * 2.0)
+	for r in range(1, AbilityIcon.MAX_RANK + 1):
+		var plate := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, false), AbilityIcon.roman(r))
+		check(plate.position.x >= 0.0 and plate.end.y <= sq, "Rank %d: the plate %s stays on the icon" % [r, plate])
+		check(plate.position.x <= 2.0 and plate.end.y >= sq - 2.0, "Rank %d: and sits on the rim in the corner (%s)" % [r, plate])
+		check(plate.get_area() <= 0.2 * sq * sq, "Rank %d: the plate covers %s px², at most a fifth of the icon" % [r, plate.get_area()])
+		var hidden := plate.intersection(glyph_box).get_area() / glyph_box.get_area()
+		check(hidden <= 0.3, "Rank %d: it hides %d%% of the glyph's box" % [r, roundi(hidden * 100.0)])
+		check(plate.position.y >= sq * 0.5, "Rank %d: in the bottom half, clear of the top corner texts (%s)" % [r, plate])
+	var above := AbilityIcon.rank_badge_rect(AbilityIcon.rank_badge_origin(sq, true), "III")
+	check(above.end.y <= sq - AbilityIcon.PROMPT_OVERHANG, "above a prompt pill (%s)" % above)
+	# The Trainer rows show the rank in their own column: no corner numeral on their 32 px icons.
+	var row := TrainerRow.create(4)
+	row.show_ability(learned(&"row", AbilityData.Kind.AUTO), 3, 50, true, false, false)
+	check_eq(row.rank_label.text, "III", "the row's rank column")
+	check_eq(row.icon.rank, 0, "the row's icon draws no rank of its own")
+	row.free()
 	# Drawn for real at every rank, specialised or not.
 	var box := HBoxContainer.new()
 	tree.root.add_child(box)
 	nodes.append(box)
 	for r in range(1, AbilityIcon.MAX_RANK + 1):
 		for spec: bool in [false, true]:
-			var icon := AbilityIcon.create(AbilityBar.AUTO_ICON_SIZE, false)
+			var icon := AbilityIcon.create(sq, false)
 			icon.set_ability(learned(StringName("r%d" % r), AbilityData.Kind.AUTO))
 			icon.set_rank(r, spec)
 			icon.set_charges(1, 2)
 			icon.set_state(0.5, 2.0, false)
 			box.add_child(icon)
-	for icon: AbilityIcon in [small, trainer_row, button]:
+	for icon: AbilityIcon in [small, button]:
 		icon.free()
 	await tree.process_frame
 	await tree.process_frame
