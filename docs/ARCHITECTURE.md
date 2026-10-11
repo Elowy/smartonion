@@ -505,7 +505,10 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   (hold when > 50% of the wallet), X lock, R3 / Tab ping, Y reroll vote, START ready, B
   unready unless the panel consumed it (`last_input_consumed`; the shop consumes the B that
   cancels a hold-to-buy); panel tabs on LT / RT. The 60 s
-  auto-continue runs only in MARKET. The HUD is hidden during the intermission; the HUD shows a
+  auto-continue runs only in MARKET. The HUD is hidden during the intermission. The
+  Intermission itself stays in the tree, hidden, during waves, so `ShopPanel` and
+  `TrainerTab` skip `RunState.gold_changed` work while not visible in the tree and catch up
+  when shown (the market start also refreshes both). During waves the HUD shows a
   "Team Loot: N" counter during waves.
   - **Input guards** (co-op, one screen): the loot roll and the market swallow every human's
     held buttons / stick (`PlayerInput.swallow()`) when they open and when the market starts
@@ -544,8 +547,12 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
   gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
   NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`); bots
-  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast` (every 0.25 s; one targeting
-  pass per decision). Keyboard: LMB / RMB = slots 0 / 1, Q = slot 2, E = slot 3
+  (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast`.
+  - Timing: every `AUTO_CAST_INTERVAL` 0.25 s, which is exactly 15 ticks at 60 Hz.
+    `begin_wave` staggers the players' passes by slot index, so P1–P4 first pass on ticks
+    1 / 4 / 8 / 12.
+  - One targeting pass per decision. DENSEST_CLUSTER only considers enemies whose centre is
+    within `cast_range`. Keyboard: LMB / RMB = slots 0 / 1, Q = slot 2, E = slot 3
   (`KeyboardInput.ability_button`); controllers use `PlayerInput.ABILITY_BUTTONS`.
 - `params_for(ability)` (base cooldown / cost / charges + `AbilityData.params` + item mods) is
   **cached per ability and read-only** – copy it before changing anything.
@@ -553,15 +560,23 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   mods), any future rank change. `slot_state(i)` gives the HUD everything from one lookup;
   `is_ready(i)` = alive, off cooldown, affordable (no targeting); `can_cast` adds the effect's
   own check with full targeting.
+- Effects' `tick(ctx, delta)` gets one reused `AbilityContext` per ability id. It is
+  refreshed every tick and dropped on `set_slot` / `forget`. An effect must not keep a ctx
+  past the call.
 - Charges: `params.charges` (default 1, e.g. Blink + the Band of the Blinking Star); the
   recharge timer runs while charges are spent, each expiry returns one
   (`charges_max` / `charges_available`; `remaining()` is 0 while a charge is left).
   `set_cooldown(ability, s)` lets effects shorten / reset a running recharge (≤ 0 = ready).
+  `spend_charge(ability)` uses one charge as a cast would, for self-triggering passives such
+  as Cheat Death. `cooldown_from_params(ability, params)` gives the cooldown for a preview
+  params dict.
 - Wave hooks: `begin_wave` (resources / cooldowns reset, `AbilityEffect.begin_wave`,
   `MasteryEffect.begin_wave`; `Player.begin_wave` also clears `forced_crits` and
   `damage_mults`) and `end_wave` (`AbilityEffect.end_wave(ctx)`, `MasteryEffect.end_wave()`,
   via `Player.end_wave()` before the intermission: auras / buffs must not show in the
-  market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`.
+  market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`,
+  and again by `Main.open_intermission()` for areas that landed during the "Wave cleared!"
+  pause.
 - `MasteryEffect.tick` runs every physics tick, **also while downed** (Ignite / Deadly Poison
   DoTs keep burning like item DoTs); pets and auras check `player.is_alive()` themselves.
   Ability effects only tick while alive.
@@ -673,8 +688,10 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   `rank_up` / `set_spec` / `needs_spec` / `params_at_rank` (previews) / `teardown` (every
   slotted effect gets `end_wave`, then the Mastery's teardown).
 - **Ranks** (`AbilityRanks`, GDD 6.3): Rank II and IV `"power_pct"` +25 and `"cooldown_pct"`
-  −10 each; Rank III merges `AbilityData.rank3`; Rank V merges the chosen
-  `AbilityData.specs[i]["mods"]`. Every effect multiplies its damage / heal / shield / buff
+  −10 each; Rank III merges `AbilityData.rank3`. Rank V's chosen
+  `AbilityData.specs[i]["mods"]` (`AbilityRanks.spec_mods`) apply as a second `apply_mods`
+  pass after the rank mods, then the item mods come last. So a spec's `_pct` scales the
+  Rank IV value (Hot Streak: 10 s × 0.8 × 0.7 = 5.6 s). Every effect multiplies its damage / heal / shield / buff
   amounts by `ctx.num("power", 1.0)`. Trainer price `25 × rank × (1 + 0.08 × (wave − 1))`.
   Core abilities train too. `apply_mods`: `<param>_add` adds, `<param>_pct` scales an existing
   `<param>` (else it sets the key itself), anything else replaces – a data test per kit
@@ -696,29 +713,50 @@ scenes/abilities/general/        the six general abilities (class_id empty)
 - **HUD**: `AbilityBar` shows the four button slots (prompts per device) and a 2×2 cluster of
   26 px auto-cast icons (sweep only) once an auto-cast ability is learned; every icon carries
   rank pips (orange once specialised). Frames stay ≤ 112 px tall (wider with learned slots).
-- **Core hooks for the kits**: `ProcSystem.add_shield(amount, duration)` (one shared pool with
-  item shields), `Player.damage_taken_mults` (named incoming multipliers, cleared at wave
-  start), `Player.death_guards` (Callables tried after item cheat-death procs),
-  `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)`.
+- **Core hooks for the kits**:
+  - `ProcSystem.add_shield(amount, duration, source := &"")`: one entry per source, each on
+    its own timer. `absorb` drains the entry that runs out first. `shield_hp` is the total
+    and `shield_of(source)` gives one entry's HP. Item procs and most kit shields share the
+    anonymous `&""` entry.
+  - `Player.damage_taken_mults`: named incoming multipliers, cleared at wave start.
+  - `Player.death_guards`: Callables tried *before* the limited item cheat-death procs, so a
+    free or recharging guard such as Last Stand or Cheat Death never uses one up.
+  - Also `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)` and
+    `Enemy.is_boss()` (false until bosses exist).
 - **Kit helpers** (per class folder; all damage through `ProcSystem.deal_raw` with sources
   `&"ability"`, `&"dot"`, `&"pet"`):
   - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Bladestorm / Ravager), `WarriorFx`
     (VFX base); Bladestorm's "cannot be slowed" is the stat source `&"bladestorm"` cancelling
-    negative Speed.
+    negative Speed. `WarriorKit.is_displaced(player)` makes Charge and Heroic Leap exclusive:
+    neither starts while the other moves the hero. Execute instantly kills elites too; only
+    bosses (`Enemy.is_boss()`) take `boss_mult` × damage instead.
   - Mage: `MageSpell` (spell damage with a per-spell Spell Power factor, freeze), `MageBolt`
     (Projectile subclass dealing ability damage: burn / splash / bounce / pierce / homing),
     `MageBurn` / `MageFrozen` (nodes on the enemy), `MageMeteorStrike` (group
-    `ability_areas`). Ice Barrier = `add_shield(amount, 3600)` (until used up / wave end).
+    `ability_areas`).
+    - Ice Barrier = `add_shield(amount, 3600, &"ice_barrier")`, its own entry
+      (`MageIceBarrier.SHIELD_SOURCE`), lasting until used up or wave end. Other shields
+      neither block its recast nor inherit its timer.
+    - Frost Nova's Shatter: the ice of one nova shares a `MageFrozen.ShatterGroup`, so each
+      enemy takes one nova's shatter at most once.
   - Paladin: `PaladinKit` (holy strike damage, heals, per-Paladin buff keys),
     `PaladinHolyMissile` (homing / ricochet hammer and shield), `PaladinVfx`. Blessing of
     Kings = stat source `kings:paladin<slot>` per hero; Lay on Hands never revives (only Word
-    of Glory and the Spirit Healer / teammates do).
+    of Glory and the Spirit Healer / teammates do). Word of Glory does not revive a ghost the
+    Spirit Healer revives within `PaladinWordOfGlory.HEALER_SOON` (1 s,
+    `Player.healer_seconds_left`); it heals instead. Radiant Bubble ticks are not scaled by
+    power: power only lengthens the bubble.
   - Rogue: `RogueBlade` (Projectile subclass for knives / shuriken: weapon hits, optional
     poison and returning), `RogueVanish.shroud()` (stealth + silhouette for other effects);
-    Cheat Death is a `Player.death_guards` entry with the runner's cooldown.
+    Cheat Death is a `Player.death_guards` entry with the runner's cooldown; each save spends
+    one charge (`AbilityRunner.spend_charge`). Blade Flurry echoes carry each echo target's
+    own Executioner / Slayer bonus, not the struck enemy's.
   - Warlock: `WarlockSpell`, `WarlockAfflictions` (one DoT manager node per Warlock, ticks
-    while downed; Demonic Pact on `"dot"` / `"pet"`), pets (Voidwalker taunts, Infernal for
-    8 s) that free themselves when their owner is gone; `damage_taken_mults["voidwalker"]`.
+    while downed; Demonic Pact on `"dot"` / `"pet"`). Afflictions listen to `Enemy.died`. A
+    host that vanishes without dying (the wave-end despawn) only ends its afflictions: no
+    seed burst, no Corruption spread, no Blighted Ground.
+    Pets (Voidwalker taunts, Infernal for 8 s) free themselves when their owner is gone;
+    `damage_taken_mults["voidwalker"]`.
   - General: `GeneralKit` (weapon damage normalised to a 1 s swing, spell damage with the
     best of Attack / Spell Power), `GeneralBuff` (timed hero buff: named stat source +
     damage-taken multiplier, refreshed not stacked), Spirit Wolf pet; Bandage is not
