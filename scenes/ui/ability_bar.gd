@@ -10,7 +10,7 @@ extends HBoxContainer
 ## Everything is pushed from the runner (one AbilityRunner.slot_state per slot and rendered
 ## frame, nothing while the bar is hidden); the bar never touches gameplay state.
 
-const SLOT_COUNT := AbilityRunner.MAX_SLOTS
+const SLOT_COUNT := AbilityRunner.INPUT_SLOTS  # auto-cast slots 4..7: M4 HUD
 ## Room between two icons; wider when the prompt pills ("LMB" ~50 px) are wider than the
 ## icons, so neighbouring pills keep PILL_GAP between them.
 const SEPARATION := 10

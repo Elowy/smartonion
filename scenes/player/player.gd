@@ -78,12 +78,13 @@ const SELF_TEXT_SIZE := 0.85
 const SEPARATION_DISTANCE := 1.15
 const SEPARATION_SPEED := 3.0
 
-## TEMPORARY placeholder until the M4 level-up cards (GDD 6.1) exist: every team level gives
-## every player +1 Stamina (= +1 Max HP) and +4% damage through the StatBlock source
-## LEVEL_SOURCE. Remove this (and _apply_level_bonus) when the level-up cards land.
+## Every team level gives every hero +1 Stamina (= +1 Max HP, like Brotato) through the
+## StatBlock source LEVEL_SOURCE; the real level-up reward is the card picked after the wave
+## (GDD 6.1, CARD_SOURCE).
 const LEVEL_SOURCE := &"level"
 const LEVEL_STAMINA := 1.0
-const LEVEL_DAMAGE_PCT := 4.0
+## Stat level-up cards picked so far (summed).
+const CARD_SOURCE := &"level_cards"
 
 var slot: PlayerSlot
 var stats := StatBlock.new()
@@ -832,15 +833,25 @@ func _apply_level_bonus(level: int) -> void:
 	if gained <= 0:
 		stats.remove_source(LEVEL_SOURCE)
 		return
-	stats.set_source(LEVEL_SOURCE, {
-		Stats.STAMINA: LEVEL_STAMINA * gained,
-		Stats.DAMAGE_PCT: LEVEL_DAMAGE_PCT * gained,
-	})
+	stats.set_source(LEVEL_SOURCE, {Stats.STAMINA: LEVEL_STAMINA * gained})
 
 
-## TEMPORARY placeholder for the M4 level-up cards: the team levelled up – grow the level
-## bonus; a living hero's current HP rises by the Max HP gained (a ghost keeps 0 HP and
-## comes back with its share of the new Max HP).
+## Adds a stat level-up card's stats (GDD 6.1) to CARD_SOURCE; a living hero's HP rises by
+## any Max HP gained.
+func add_card_stats(card_stats: Dictionary[StringName, float]) -> void:
+	var before := max_hp()
+	var total := stats.get_source(CARD_SOURCE) if stats.has_source(CARD_SOURCE) else {}
+	for s: StringName in card_stats:
+		total[s] = float(total.get(s, 0.0)) + card_stats[s]
+	stats.set_source(CARD_SOURCE, total)
+	var gained := max_hp() - before
+	if not downed and gained > 0.0:
+		hp = minf(max_hp(), hp + gained)
+		_hp_updated()
+
+
+## The team levelled up – grow the level bonus; a living hero's current HP rises by the Max
+## HP gained (a ghost keeps 0 HP and comes back with its share of the new Max HP).
 func _on_team_leveled_up(level: int) -> void:
 	var before := max_hp()
 	_apply_level_bonus(level)

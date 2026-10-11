@@ -6,6 +6,9 @@ extends Resource
 
 ## Where the ability goes. All targeting is automatic (GDD decision: no manual aim).
 enum Targeting { SELF, NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY }
+## CORE = the class's fixed RT / LT abilities; ACTIVE = learned, cast with RB / LB;
+## AUTO = learned, fires by itself whenever it is ready (GDD 6.2).
+enum Kind { CORE, ACTIVE, AUTO }
 
 @export var id: StringName
 @export var display_name: String
@@ -29,3 +32,19 @@ enum Targeting { SELF, NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY }
 ## Icon style id for the HUD (drawn procedurally).
 @export var icon: StringName
 @export var color: Color = Color.WHITE
+
+@export_group("Learning and ranks (M4)")
+@export var kind: Kind = Kind.CORE
+## Relative chance to be offered on a level-up card (0 = never offered).
+@export var card_weight: float = 1.0
+## Rank III ("+1 extra effect", GDD 6.3): item-mod style params changes ({"projectiles_add": 1}).
+@export var rank3: Dictionary = {}
+## One line for the Trainer / cards: what Rank III adds ("+1 knife").
+@export var rank3_text: String
+## Rank V specialisations: two entries {"name": String, "text": String, "mods": Dictionary};
+## the player picks one when the ability reaches Rank V.
+@export var specs: Array[Dictionary] = []
+
+
+func is_learned_kind() -> bool:
+	return kind != Kind.CORE
