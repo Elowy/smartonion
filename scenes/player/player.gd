@@ -11,7 +11,8 @@ extends CharacterBody3D
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
 ## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
 ## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
-## the arena's [SpiritHealer] (1 s in its circle, full HP – see healer_channel).
+## the arena's [SpiritHealer] (its 10 s pulse revives ghosts in its circle at full HP – see
+## healer_channel – and gives RES_SICKNESS_TIME of Resurrection Sickness).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 ## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
@@ -51,6 +52,9 @@ const MOVE_DEADZONE := 0.05
 const WALL_GAP := 0.02
 ## Downed ghosts move at full speed (GDD 1), so the walk to the Spirit Healer is quick.
 const GHOST_SPEED_MULT := 1.0
+## Resurrection Sickness after a Spirit Healer revive (seconds; GDD 1).
+const RES_SICKNESS_TIME := 15.0
+const RES_SICKNESS_TEXT_COLOR := Color(0.72, 0.68, 0.95)
 ## HP fraction after a teammate revive / after a wave starts while downed.
 const REVIVE_HP_RATIO := 0.3
 const WAVE_START_REVIVE_HP_RATIO := 0.5
@@ -113,11 +117,14 @@ var forced_crits := 0
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
-## Set every tick by the [SpiritHealer] while this ghost channels in its circle: progress
-## (0..1, 0 = not channelling) and the seconds it still needs (-1 = none). The cast bar shows
-## whichever revive – teammates' or the healer's – is closer to completion.
+## Set every tick by the [SpiritHealer] while this ghost waits in its circle: progress
+## towards the next pulse (0..1, 0 = not waiting) and the seconds until it (-1 = none). The
+## cast bar shows whichever revive – teammates' or the healer's – is closer to completion.
 var healer_channel := 0.0
 var healer_seconds_left := -1.0
+## Resurrection Sickness: seconds the Spirit Healer cannot revive this player again (set
+## after each healer revive; teammates and Word of Glory still can). Cleared at wave start.
+var res_sickness_left := 0.0
 ## Remaining invulnerability (i-frames) in seconds.
 var invulnerable_left := 0.0
 ## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
@@ -249,6 +256,7 @@ func begin_wave() -> void:
 		_hp_updated()
 	invulnerable_left = 0.0
 	stealth_left = 0.0
+	res_sickness_left = 0.0
 	forced_crits = 0
 	damage_mults.clear()
 	damage_taken_mults.clear()
@@ -580,6 +588,7 @@ func face_attack(direction: Vector3) -> void:
 func _physics_process(delta: float) -> void:
 	invulnerable_left = maxf(0.0, invulnerable_left - delta)
 	stealth_left = maxf(0.0, stealth_left - delta)
+	res_sickness_left = maxf(0.0, res_sickness_left - delta)
 	_attack_look_left = maxf(0.0, _attack_look_left - delta)
 	_update_movement(delta)
 	if downed:

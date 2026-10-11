@@ -75,11 +75,14 @@ the new screen never sees the button press that closed the old one.
    - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
      one at `Arena.SPIRIT_HEALER_POINT` (the centre; no decor there) as its own child (not an
      entity), `Arena.current.spirit_healer`; no collision. Every physics tick (before the
-     entities, paused with the arena) every ghost within `HEAL_RADIUS` (1.6 m, flat XZ)
-     channels; after `CHANNEL_TIME` (1 s) `revive(REVIVE_HP_RATIO = 1.0)` +
-     `Vfx.resurrect_column` + "Resurrected!" and the `resurrected(player)` signal. Leaving the
-     circle resets that ghost's channel; several ghosts channel at once; the living are not
-     affected. It writes `Player.healer_channel` / `healer_seconds_left`, and the ghost's cast
+     entities, paused with the arena) its countdown `pulse_left` runs down from
+     `PULSE_INTERVAL` (10 s; restarted by `begin_wave` on `RunState.wave_changed`); at 0
+     every ghost within `HEAL_RADIUS` (1.6 m, flat XZ) without Resurrection Sickness
+     (`will_revive`) gets `revive(REVIVE_HP_RATIO = 1.0)` + `Vfx.resurrect_column` +
+     "Resurrected!", `Player.res_sickness_left = Player.RES_SICKNESS_TIME` (15 s; ticks in
+     `Player._physics_process`, cleared at wave start; blocks only the healer) and the
+     `resurrected(player)` signal. A Label3D shows the seconds above the spirit while ghosts
+     exist; the living are not affected. It writes `Player.healer_channel` / `healer_seconds_left`, and the ghost's cast
      bar shows whichever revive (teammates' or the healer's) is further along, in
      `SpiritHealer.CAST_COLOR` for the healer; whichever finishes first revives. Look:
      procedural winged spirit (own copies of `Mats.ghost`), halo, rune circle on
@@ -219,7 +222,8 @@ the last second). Each cleared wave also prints a `SMOKE wave n cleared ...` lin
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
 crowded), avoid walls, stay near the team and run to downed teammates within
 `BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
-and waits inside its circle (`HEALER_STOP_DISTANCE`).
+and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
+a living teammate instead.
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
 `PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
 -1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
@@ -324,7 +328,9 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
   plaque. Unit frames hide when their player is freed; while downed they show the revive
   progress (teammates' or the Spirit Healer's, whichever is further along; spirit blue for the
-  healer) and the hint "Go to the Spirit Healer" (`UnitFrame.GHOST_HINT`).
+  healer) and a hint: "Go to the Spirit Healer (7 s)" (`GHOST_HINT` + the next pulse),
+  "Spirit Healer: 7 s" in its circle (`WAITING_HINT`), "Resurrection Sickness: 12 s"
+  (`SICKNESS_HINT`).
   Frame layout: `[portrait | name row over (HP + resource bars | ability icons)]`, mirrored
   for P2 / P4 (portrait outside, icons on the inner side). The bars cell is as tall as the
   DOWNED overlay, so going down never changes the frame height.

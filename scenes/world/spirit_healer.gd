@@ -1,16 +1,19 @@
 class_name SpiritHealer
 extends Node3D
 ## The Spirit Healer (GDD 1): a floating, winged, translucent spirit at a fixed point of the
-## arena ([constant Arena.SPIRIT_HEALER_POINT]) that brings ghosts back. A downed [Player]
-## standing within [constant HEAL_RADIUS] (flat XZ distance) channels for
-## [constant CHANNEL_TIME] seconds and comes back at full HP ([constant REVIVE_HP_RATIO]) with
-## the usual light column and "Resurrected!" text. Leaving the circle resets that ghost's
-## channel; several ghosts channel at once; living players are not affected.
+## arena ([constant Arena.SPIRIT_HEALER_POINT]) that brings ghosts back on a shared timer: a
+## [constant PULSE_INTERVAL] (10 s) countdown starts with every wave and runs on; whenever it
+## reaches 0 every ghost standing within [constant HEAL_RADIUS] (flat XZ distance) comes back
+## at full HP ([constant REVIVE_HP_RATIO]) with the light column and "Resurrected!" – except
+## ghosts with Resurrection Sickness ([member Player.res_sickness_left], given for
+## [constant Player.RES_SICKNESS_TIME] after every healer revive), who must wait it out.
+## Living players are not affected.
 ##
-## The channel shows on the ghost's "Resurrecting" cast bar in [constant CAST_COLOR] through
-## [member Player.healer_channel] / [member Player.healer_seconds_left]: the bar shows whichever
-## revive (teammates' or the healer's) is closer to completion, and whichever finishes first
-## revives. Part of the level: a child of the Arena (not of the per-wave entities) that
+## A ghost waiting in the circle sees the countdown on its "Resurrecting" cast bar in
+## [constant CAST_COLOR] ([member Player.healer_channel] / [member Player.healer_seconds_left]);
+## the bar shows whichever revive (teammates' or the healer's) is closer to completion, and
+## whichever finishes first revives. The time to the next pulse floats above the healer while
+## any ghost exists. Part of the level: a child of the Arena (not of the per-wave entities) that
 ## processes with it, so pausing the game pauses it. No collision: players, enemies and
 ## projectiles pass through it.
 ##
@@ -25,10 +28,10 @@ extends Node3D
 ## Emitted right after the healer revived [param player].
 signal resurrected(player: Player)
 
-## Ghosts closer than this (metres, flat XZ distance) channel.
+## Ghosts closer than this (metres, flat XZ distance) are revived by a pulse.
 const HEAL_RADIUS := 1.6
-## Seconds a ghost has to stand in the circle.
-const CHANNEL_TIME := 1.0
+## Seconds between two resurrection pulses (the countdown restarts at every wave start).
+const PULSE_INTERVAL := 10.0
 ## HP fraction the healer revives at (100 %).
 const REVIVE_HP_RATIO := 1.0
 ## Pale spirit colour of the ghost's cast bar while the healer channels.
@@ -177,7 +180,9 @@ var _halo: MeshInstance3D
 var _glows: MeshInstance3D
 var _aura: MeshInstance3D
 ## Channel seconds per ghost inside the circle (instance id -> seconds).
-var _channels: Dictionary[int, float] = {}
+## Seconds until the next resurrection pulse.
+var pulse_left := PULSE_INTERVAL
+var _countdown: Label3D
 ## Smoothed 0 (calm) .. 1 (active) look, the strongest channel (0..1) and the flash after a
 ## resurrection.
 var _glow := 0.0
@@ -211,22 +216,37 @@ static func in_radius(center: Vector3, point: Vector3) -> bool:
 	return Vector2(point.x - center.x, point.z - center.z).length() <= HEAL_RADIUS
 
 
-## Seconds [param player] has channelled so far (0 outside the circle / when alive).
-func channel_time(player: Player) -> float:
-	if player == null:
-		return 0.0
-	return _channels.get(player.get_instance_id(), 0.0)
+## True when [param player] would be revived by the next pulse (a ghost in the circle
+## without Resurrection Sickness).
+func will_revive(player: Player) -> bool:
+	return player != null and player.downed and player.is_inside_tree() \
+			and player.res_sickness_left <= 0.0 and contains(player.global_position)
+
+
+## A wave starts: the countdown starts over.
+func begin_wave() -> void:
+	pulse_left = PULSE_INTERVAL
 
 
 # --- Gameplay ------------------------------------------------------------------------
 
+func _ready() -> void:
+	RunState.wave_changed.connect(_on_wave_changed)
+
+
+func _on_wave_changed(_wave: int) -> void:
+	begin_wave()
+
+
 func _physics_process(delta: float) -> void:
 	if not is_inside_tree():
 		return
-	var center := global_position
+	pulse_left -= delta
+	var pulse := pulse_left <= 0.0001
+	if pulse:
+		pulse_left += PULSE_INTERVAL
 	var ghosts := 0
-	var best := 0.0
-	var channels: Dictionary[int, float] = {}
+	var waiting := false
 	var done: Array[Player] = []
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var p := node as Player
@@ -236,25 +256,22 @@ func _physics_process(delta: float) -> void:
 			_clear(p)
 			continue
 		ghosts += 1
-		if not in_radius(center, p.global_position):
+		if not will_revive(p):
 			_clear(p)
 			continue
-		var t: float = _channels.get(p.get_instance_id(), 0.0) + delta
-		if t >= CHANNEL_TIME - 0.0001:
+		waiting = true
+		if pulse:
 			done.append(p)
 			continue
-		channels[p.get_instance_id()] = t
-		p.healer_channel = t / CHANNEL_TIME
-		p.healer_seconds_left = CHANNEL_TIME - t
-		best = maxf(best, t / CHANNEL_TIME)
-	_channels = channels
-	_channel_ratio = best
+		p.healer_channel = 1.0 - pulse_left / PULSE_INTERVAL
+		p.healer_seconds_left = pulse_left
+	_channel_ratio = 1.0 - pulse_left / PULSE_INTERVAL if waiting else 0.0
 	ghost_count = ghosts
 	for p in done:
 		_resurrect(p)
 
 
-## The channel of [param p] ended (left the circle, alive again): nothing on its cast bar.
+## [param p] is not waiting in the circle (left it, alive again, sick): nothing on its bar.
 func _clear(p: Player) -> void:
 	p.healer_channel = 0.0
 	p.healer_seconds_left = -1.0
@@ -266,8 +283,11 @@ func _resurrect(p: Player) -> void:
 	_clear(p)
 	var feet := p.global_position
 	p.revive(REVIVE_HP_RATIO)
+	p.res_sickness_left = Player.RES_SICKNESS_TIME
 	Vfx.resurrect_column(feet)
 	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.6, "Resurrected!", Player.HEAL_TEXT_COLOR, 1.2)
+	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 1.1, "Resurrection Sickness",
+			Player.RES_SICKNESS_TEXT_COLOR, 0.9)
 	ghost_count = maxi(0, ghost_count - 1)
 	_flare = 1.0
 	resurrected.emit(p)
@@ -307,6 +327,11 @@ func _process(delta: float) -> void:
 	if _column.visible:
 		(_column.material_override as ShaderMaterial).set_shader_parameter(&"strength", 0.5 * g * (0.85 + 0.15 * pulse))
 	_motes.speed_scale = 1.0 + 0.8 * g
+	if _countdown != null:
+		_countdown.visible = g > 0.05
+		if _countdown.visible:
+			_countdown.text = str(ceili(maxf(0.0, pulse_left)))
+			_countdown.modulate.a = g
 
 
 static func _set_ghost_color(mi: MeshInstance3D, c: Color) -> void:
@@ -319,6 +344,20 @@ func _build() -> void:
 	_build_ring()
 	_build_column()
 	_build_motes()
+	# Seconds to the next resurrection pulse, floating above the spirit while ghosts exist.
+	_countdown = Label3D.new()
+	_countdown.name = "Countdown"
+	_countdown.position = Vector3(0, 3.3, 0)
+	_countdown.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_countdown.no_depth_test = true
+	_countdown.fixed_size = true
+	_countdown.pixel_size = 0.00085
+	_countdown.font_size = 64
+	_countdown.outline_size = 12
+	_countdown.modulate = GLOW_COLOR
+	_countdown.outline_modulate = Color(0.05, 0.1, 0.2, 0.9)
+	_countdown.visible = false
+	add_child(_countdown)
 	_light = OmniLight3D.new()
 	_light.name = "Light"
 	_light.position = Vector3(0, 1.5, 0)
