@@ -2,14 +2,20 @@ extends TestCase
 ## Trainer tab (GDD 6.3, PlayerPanel tab 2 / TrainerTab): the slot list (core, learned Active,
 ## learned Auto-cast, empty slots), buying ranks from the shared wallet (price escalation with
 ## the wave, max rank, the hold-to-buy rule), the Rank V specialisation prompt, the detail area
-## and the tab navigation – driven through PlayerPanel.handle_input like a real pad.
-## Test abilities are built in code (no dependency on the ability .tres content).
+## (stats line, description fitted to the room left) and the tab navigation – driven through
+## PlayerPanel.handle_input like a real pad – and no refreshes while hidden.
+## Test abilities are built in code; the fit test also walks the shipped Db.abilities.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const Fakes := preload("res://tests/test_ui_m3_fakes.gd")
 
 var players: Array[Player] = []
 var panels: Array[PlayerPanel] = []
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
@@ -414,3 +420,110 @@ func test_detail_area_for_an_empty_selection_and_no_hero() -> void:
 	check(p2.trainer.row_for(0).is_empty(), "no hero: empty rows")
 	p2.trainer.press_train()
 	check_eq(p2.last_message, "Learn abilities on level-up", "nothing to train")
+
+
+func test_hidden_trainer_skips_gold_refreshes_until_shown() -> void:
+	# The Intermission and its panels stay in the tree, hidden, for the whole wave: a gold pickup
+	# must not rebuild the hidden Trainer; it catches up as soon as it is shown again.
+	var slot := _mage_with_learned()
+	RunState.wave = 11
+	RunState.add_gold(40)
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	var row := tab.row_for(2)
+	check(row.price_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.RED), "40 g cannot pay 45")
+	var refreshes: Array[int] = [0]
+	tab.prompts_changed.connect(func() -> void: refreshes[0] += 1)
+	panel.hide()
+	for i in 20:
+		RunState.add_gold(5)
+	check_eq(refreshes[0], 0, "no refresh while the panel is hidden")
+	panel.show()
+	check(refreshes[0] > 0, "shown again: refreshed")
+	check(row.price_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.GOLD), "the price follows the wallet once shown")
+	refreshes[0] = 0
+	RunState.add_gold(1)
+	check(refreshes[0] > 0, "visible: every gold change refreshes")
+	# The Character tab hides the Trainer too; switching to it refreshes.
+	panel.set_tab(PlayerPanel.CHARACTER_TAB)
+	refreshes[0] = 0
+	RunState.try_spend(RunState.gold - 10)
+	check_eq(refreshes[0], 0, "no refresh behind the Character tab")
+	panel.set_tab(PlayerPanel.TRAINER_TAB)
+	check(row.price_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.RED), "back on the Trainer: 10 g is red again")
+
+
+func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
+	var slot := _mage_with_learned()
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	tab.select_slot(2)
+	check_eq(tab.detail_stats.text, "Cooldown 6 s · Power 100%", "Rank I")
+	check(tab.detail_stats.get_theme_color(&"font_color").is_equal_approx(UiTheme.TEXT_DIM), "dim while not previewing")
+	_tap(panel, slot, PlayerInput.Pad.Y)
+	check_eq(tab.detail_stats.text, "Cooldown 5.4 s · Power 125%", "Y: Rank II's cooldown and power")
+	check(tab.detail_stats.get_theme_color(&"font_color").is_equal_approx(UiTheme.GREEN), "green in the preview")
+	_tap(panel, slot, PlayerInput.Pad.Y)
+	# A shipped ability whose description has no {power} / {cooldown}: Y still shows the change.
+	var r := _runner(slot)
+	var shipped: AbilityData = Db.abilities[&"pyroblast"]
+	r.forget(2)
+	check_eq(r.learn(shipped), 2, "Pyroblast (Active) on RB")
+	tab.select_slot(2)
+	var now_text := tab.detail_description.text
+	var now_stats := tab.detail_stats.text
+	_tap(panel, slot, PlayerInput.Pad.Y)
+	check_eq(tab.detail_description.text, now_text, "the description has no rank II numbers")
+	check(tab.detail_stats.text != now_stats, "but the stats line changes: %s -> %s" % [now_stats, tab.detail_stats.text])
+	check(tab.detail_stats.text.ends_with("Power 125%"), "Rank II power: %s" % tab.detail_stats.text)
+	# Haste / Cooldown Reduction are in the shown cooldown (AbilityRunner.cooldown_from_params).
+	var params := r.params_at_rank(shipped, 2)
+	check_eq(TrainerTab.stats_text(r, shipped, params), "Cooldown %s s · Power 125%%" % AbilityIcon.format_number(snappedf(r.cooldown_from_params(shipped, params), 0.1)), "stats_text")
+	# Passives (no cooldown) show the power only.
+	var passive := learned(&"passive", AbilityData.Kind.AUTO, 0.0)
+	check_eq(TrainerTab.stats_text(r, passive, r.params_at_rank(passive, 4)), "Power 150%", "no cooldown part")
+
+
+func test_detail_texts_fit_for_every_shipped_ability() -> void:
+	# Every shipped ability at Ranks I–V in the design-size panel: the description gets the lines
+	# the clip holder has left under the next-rank / specialisation lines (nothing is clipped
+	# half-way) and a cut description ends in an ellipsis.
+	_async = true
+	var slot := _hero(&"mage")
+	var r := _runner(slot)
+	var panel := _panel(slot)
+	panel.size = PlayerPanel.DESIGN_SIZE
+	var tab := panel.trainer
+	var holder := tab.detail_description.get_parent().get_parent() as Control
+	var texts := tab.detail_description.get_parent() as Control
+	for l: Label in [tab.detail_description, tab.detail_next, tab.detail_spec]:
+		check_eq(l.text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS, "%s: a cut text ends in an ellipsis" % l.name)
+	var cut := 0
+	for id: StringName in Db.abilities:
+		var a: AbilityData = Db.abilities[id]
+		r.set_slot(2, a)
+		for rank: int in [1, 2, 4, 5]:
+			r.ranks[a.id] = rank
+			r.specs.erase(a.id)
+			if rank == AbilityRanks.MAX_RANK and not a.specs.is_empty():
+				r.specs[a.id] = 0
+			r.invalidate_params()
+			tab.selected = 2
+			tab.refresh()
+			await tree.process_frame
+			await tree.process_frame
+			var what := "%s Rank %s" % [id, AbilityIcon.roman(rank)]
+			var room := holder.size.y
+			var used := texts.get_combined_minimum_size().y
+			check(used <= room + 0.5, "%s: the texts (%s px) fit the holder (%s px)" % [what, used, room])
+			for l: Label in [tab.detail_description, tab.detail_next, tab.detail_spec]:
+				if l.visible:
+					check(l.position.y + l.size.y <= room + 0.5, "%s: %s laid out inside the holder (%s)" % [what, l.text.left(20), l.get_rect()])
+			var desc := tab.detail_description
+			check(desc.max_lines_visible >= TrainerTab.MIN_DESCRIPTION_LINES, "%s: at least %d description lines" % [what, TrainerTab.MIN_DESCRIPTION_LINES])
+			if desc.get_line_count() > desc.max_lines_visible:
+				cut += 1
+				var line_h := desc.get_line_height() + desc.get_theme_constant(&"line_spacing")
+				check(used + line_h > room, "%s: cut although another line fits (%s + %s <= %s)" % [what, used, line_h, room])
+	check(cut < Db.abilities.size(), "most descriptions are shown in full (%d cut)" % cut)
+	finished.emit()
