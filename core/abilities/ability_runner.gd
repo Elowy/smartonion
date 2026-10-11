@@ -228,6 +228,11 @@ func cooldown_of(ability: AbilityData, ctx: AbilityContext = null) -> float:
 	return _cooldown_from(ability, ctx.params if ctx != null else params_for(ability))
 
 
+## [method cooldown_of] for an explicit params dict (e.g. [method params_at_rank] previews).
+func cooldown_from_params(ability: AbilityData, params: Dictionary) -> float:
+	return _cooldown_from(ability, params) if ability != null else 0.0
+
+
 func _cooldown_from(ability: AbilityData, params: Dictionary) -> float:
 	var base := float(params.get("cooldown", ability.cooldown))
 	if base <= 0.0:
@@ -268,6 +273,19 @@ func set_cooldown(ability: AbilityData, seconds: float) -> void:
 	else:
 		_cooldown_left[ability.id] = seconds
 		_charges_spent[ability.id] = maxi(1, int(_charges_spent.get(ability.id, 0)))
+
+
+## Uses up one charge of [param ability] as a cast would (the recharge starts if it is not
+## already running) – for passives that trigger themselves (Cheat Death).
+func spend_charge(ability: AbilityData, ctx: AbilityContext = null) -> void:
+	if ability == null:
+		return
+	var full := cooldown_of(ability, ctx)
+	if full <= 0.0:
+		return
+	_charges_spent[ability.id] = int(_charges_spent.get(ability.id, 0)) + 1
+	if _cooldown_left.get(ability.id, 0.0) <= 0.0:
+		_cooldown_left[ability.id] = full
 
 
 ## 0..1 share of the cooldown still running (HUD sweep).
@@ -358,11 +376,7 @@ func _cast_with(index: int, ctx: AbilityContext) -> bool:
 		return false
 	if a.resource != &"":
 		get_resource(a.resource).spend(cost_of(a, ctx))
-	var full := cooldown_of(a, ctx)
-	if full > 0.0:
-		_charges_spent[a.id] = int(_charges_spent.get(a.id, 0)) + 1
-		if _cooldown_left.get(a.id, 0.0) <= 0.0:
-			_cooldown_left[a.id] = full
+	spend_charge(a, ctx)
 	ability_cast.emit(index, a)
 	return true
 

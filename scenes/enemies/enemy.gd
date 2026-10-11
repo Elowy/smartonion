@@ -228,6 +228,12 @@ func is_elite() -> bool:
 	return false
 
 
+## Bosses only (a boss is also [method is_elite]): immune to instant kills such as Execute.
+## No bosses until M5 / M6.
+func is_boss() -> bool:
+	return false
+
+
 func is_slowed() -> bool:
 	return slow_left > 0.0 and slow_pct > 0.0
 
