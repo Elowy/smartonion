@@ -1966,7 +1966,27 @@ kerülnek a megfelelő fejezetbe.
 | **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | M6 |
 | **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, ranglistával | M6 |
 | **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | M6 |
+| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | M6 |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+
+**Dungeon-portál (M6)**
+
+- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után**: a hullámok közti szünetben
+  portál nyílik az arénában.
+- **Opcionális:** a csapat közösen dönt, belép-e (mint a bolti rerollnál, mindenki szavaz).
+  Ha nem lépnek be, a menet a szokásos módon folytatódik.
+- **Belül:** 3–4 kisebb, zárt terem egymás után, mindegyikben egy feladattal (takarítás,
+  túlélés, valami megvédése), a végén egy **mini-boss**. A harcrendszer és az aréna-technika
+  ugyanaz, mint a menetben.
+- **Szabályok:** nincs Spirit Healer, csak a társak tudnak feléleszteni.
+- **Siker:** nagyobb esély tier set-darabra, garantált Epic item (Need / Greed / Pass), később
+  Artifact-esély is.
+- **Bukás** (mindenki elesett): a dungeon véget ér, a csapat elveszíti a közös kassza
+  **50%-át**, és a menet a következő hullámmal folytatódik (a hullám elején mindenki feléled).
+- **Szerepek:** a kasztok úgy működnek, mint a menetben; külön tank / healer / DPS
+  hangsúly nincs.
+- **Később (M10, ha az M6-os változat bevált):** külön Dungeon mód a főmenüből, egymásba
+  nyíló termekkel és több bosszal.
 
 ---
 
