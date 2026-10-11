@@ -311,6 +311,12 @@ func open_intermission() -> void:
 		var p := slot.player as Player
 		if p != null and is_instance_valid(p):
 			p.end_wave()  # auras / buffs must not show in the market
+	# WaveDirector.stop() swept the ground effects at the clear; this catches the ones that
+	# landed during the "Wave cleared!" pause (bursts, bombs, craters), which would otherwise
+	# wait out the market and come back in the next wave.
+	for node in get_tree().get_nodes_in_group(&"ability_areas"):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			node.queue_free()
 	if hud != null:
 		hud.hide()  # the market has its own summary; start_wave shows the HUD again
 	intermission.open(wave, RunState.pending_level_ups)

@@ -3,7 +3,9 @@ extends RefCounted
 ## Ability ranks I–V (GDD 6.3): what each rank changes and what the Trainer charges.
 ##   Rank II and IV: +25 % damage / effect ("power" param) and −10 % cooldown each.
 ##   Rank III: the ability's own [member AbilityData.rank3] mods (+1 extra effect).
-##   Rank V: the chosen specialisation's mods ([member AbilityData.specs]).
+##   Rank V: the chosen specialisation's mods ([member AbilityData.specs]), applied as a pass
+##   of their own on top of Ranks II–IV ([method spec_mods]), so a spec's "_pct" key scales
+##   the Rank IV value ("cooldown 30% shorter" = ×0.7 of the Rank IV cooldown).
 ## Effects read the result through AbilityRunner.params_for: multiply damage / heal / shield
 ## amounts by ctx.num("power", 1.0).
 
@@ -17,8 +19,10 @@ const TRAINER_WAVE_GROWTH := 0.08
 const REPLACE_REFUND := 0.5
 
 
-## Item-mod style changes for [param ability] at [param rank] (1..5) with Rank V
-## specialisation [param spec] (-1 = none chosen yet).
+## Item-mod style changes for [param ability] at [param rank] (1..5): the Rank II / IV steps
+## and Rank III's mods. With Rank V specialisation [param spec] (-1 = none chosen yet) its mods
+## are merged in too (numbers summed) – a one-dict summary; AbilityRunner.params_at_rank
+## applies [method spec_mods] as a separate pass instead.
 static func mods_for(ability: AbilityData, rank: int, spec: int = -1) -> Dictionary:
 	var out: Dictionary = {}
 	if ability == null:
@@ -29,9 +33,16 @@ static func mods_for(ability: AbilityData, rank: int, spec: int = -1) -> Diction
 		out["cooldown_pct"] = COOLDOWN_PCT_PER_STEP * steps
 	if rank >= 3:
 		_merge(out, ability.rank3)
-	if rank >= MAX_RANK and spec >= 0 and spec < ability.specs.size():
-		_merge(out, ability.specs[spec].get("mods", {}))
+	_merge(out, spec_mods(ability, rank, spec))
 	return out
+
+
+## The mods of Rank V specialisation [param spec] (empty below Rank V or without a valid spec).
+## Applied after [method mods_for] (rank only), so "_pct" keys compound with the rank steps.
+static func spec_mods(ability: AbilityData, rank: int, spec: int) -> Dictionary:
+	if ability == null or rank < MAX_RANK or spec < 0 or spec >= ability.specs.size():
+		return {}
+	return ability.specs[spec].get("mods", {})
 
 
 ## Gold for the next rank (from [param rank] to rank + 1) at [param wave]; 0 at Rank V.
