@@ -154,10 +154,17 @@ the new screen never sees the button press that closed the old one.
   `CombatMath.incoming_damage` (not rounded – small Armor / Versatility / Avoidance values
   count; at least 1); i-frames `INVULNERABLE_AFTER_HIT`. HP may be fractional: only the
   displayed numbers are rounded (floating text to one decimal, unit frames round up).
-- Enemy stats at wave w (GDD 9, additive): HP `data.hp_at_wave(w) * RunState.coop_hp_mult()`
-  = `max_hp * (1 + hp_growth * (w - 1)) * coop`, contact / projectile damage
-  `base * (1 + damage_growth * (w - 1))`; `EnemyData.hp_growth` = 0.12 and `damage_growth`
-  = 0.08 by default (a future DifficultyData may override them).
+- Enemy stats at wave w (GDD 9), n = w - 1:
+  - HP: `data.hp_at_wave(w) * RunState.coop_hp_mult()` =
+    `max_hp * (1 + hp_growth * n) * (1 + hp_compound)^n * coop`.
+  - Contact / projectile damage: `data.contact_damage_at_wave(w) * RunState.coop_damage_mult()`
+    = `base * (1 + damage_growth * n) * (1 + damage_compound)^n * party`. Uses
+    `EnemyData.growth_mult` and is applied once in `Enemy.create`.
+  - Defaults: `hp_growth` 0.12, `hp_compound` 0.22, `damage_growth` 0.15, `damage_compound`
+    0.08. A future DifficultyData may override them.
+  - `party` = `RunState.COOP_DAMAGE_MULTS[players - 1]` = 0.35 / 0.45 / 0.6 / 0.8 for 1–4
+    players: small parties have fewer rescuers (solo: the first down is defeat) and more
+    enemies per head.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -191,7 +198,7 @@ the new screen never sees the button press that closed the old one.
 - Duration `RunState.wave_duration(w)` (GDD 1): waves 1–10 `min(60, 20 + 5 * (w - 1))` s,
   above 10 `60 + 10 * (w - 10)` s (11 → 70 s, 15 → 110 s, 20 → 160 s, 25 → 210 s; a full
   run is 42 minutes of fighting). Spawn budget per second
-  `(0.9 + 0.22 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
+  `(0.9 + 0.08 * (w - 1)) * RunState.coop_count_mult()`; weighted pick among enemies with
   `first_wave <= w`; group size in `[group_min, group_max]`; position = random arena point
   ≥ 6 m from every living player, preferably on screen outside the HUD
   (`CameraRig.get_safe_ground_rect()`; 16 tries there, then 8 anywhere in the arena);
