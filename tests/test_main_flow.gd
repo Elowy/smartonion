@@ -173,6 +173,21 @@ func test_wave_end_intermission_and_next_wave() -> void:
 	check(main.players[0].global_position.distance_to(spawn) < 0.001, "players back on the spawn points")
 
 
+## A ground effect that lands during the "Wave cleared!" pause (after WaveDirector.stop swept
+## the areas, e.g. a Seed of Corruption pool) must not wait out the market.
+func test_intermission_sweeps_areas_from_the_wave_end() -> void:
+	_run_with_bots(2)
+	_clear_wave()
+	check_eq(main.state, Main.State.WAVE_END, "banner")
+	var area := AbilityArea.new()
+	area.duration = 3.0
+	main.arena.entities.add_child(area)
+	check(area.is_in_group(&"ability_areas"), "an area that landed after the sweep")
+	main._physics_process(Main.WAVE_END_DELAY + 0.01)
+	check_eq(main.state, Main.State.INTERMISSION, "intermission")
+	check(area.is_queued_for_deletion(), "swept when the intermission opens")
+
+
 func test_downed_player_returns_next_wave() -> void:
 	_run_with_bots(2)
 	_down(main.players[0])

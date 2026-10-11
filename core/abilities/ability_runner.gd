@@ -27,7 +27,8 @@ const INPUT_SLOTS := 4
 const MAX_SLOTS := 8
 const ACTIVE_SLOTS: Array[int] = [2, 3]
 const AUTO_SLOTS: Array[int] = [4, 5, 6, 7]
-## Bots re-check their abilities this often (s).
+## Auto-cast slots (and bots) re-check their abilities this often (s); the players' passes
+## are staggered across the interval.
 const AUTO_CAST_INTERVAL := 0.25
 ## Default cluster radius for DENSEST_CLUSTER targeting (m).
 const CLUSTER_RADIUS := 3.0
@@ -51,6 +52,10 @@ var _cooldown_left: Dictionary[StringName, float] = {}
 var _charges_spent: Dictionary[StringName, int] = {}
 ## Ability id -> params_for result (read-only); cleared by invalidate_params.
 var _params_cache: Dictionary[StringName, Dictionary] = {}
+## Ability id -> the context handed to that effect's tick(), refreshed every tick instead of
+## allocated (effects never keep a ctx); cleared when the slots change.
+var _tick_contexts: Dictionary[StringName, AbilityContext] = {}
+## Seconds until the next auto-cast pass; staggered by player slot at every wave start.
 var _auto_timer := 0.0
 
 
@@ -89,6 +94,7 @@ func set_slot(index: int, ability: AbilityData) -> void:
 	slots[index] = ability
 	if ability != null and not _effects.has(ability.id) and ability.effect != null:
 		_effects[ability.id] = ability.effect.new() as AbilityEffect
+	_tick_contexts.clear()
 	invalidate_params()
 	slots_changed.emit()
 
@@ -174,6 +180,7 @@ func forget(index: int) -> int:
 	if effect != null:
 		effect.end_wave(_light_context(a))
 	_effects.erase(a.id)
+	_tick_contexts.erase(a.id)
 	_cooldown_left.erase(a.id)
 	_charges_spent.erase(a.id)
 	ranks.erase(a.id)
@@ -417,14 +424,28 @@ func build_context(ability: AbilityData) -> AbilityContext:
 	return ctx
 
 
-## Context without target resolution (per-frame ticks, cost checks).
+## Context without target resolution (cost checks, wave hooks).
 func _light_context(ability: AbilityData) -> AbilityContext:
-	var ctx := AbilityContext.new()
+	return _fill_light_context(AbilityContext.new(), ability)
+
+
+## The per-tick context of [param ability]: one object per ability id, refreshed (rank,
+## params, position) on every call – an effect must not keep it past its tick().
+func _tick_context(ability: AbilityData) -> AbilityContext:
+	var ctx: AbilityContext = _tick_contexts.get(ability.id)
+	if ctx == null:
+		ctx = AbilityContext.new()
+		_tick_contexts[ability.id] = ctx
+	return _fill_light_context(ctx, ability)
+
+
+func _fill_light_context(ctx: AbilityContext, ability: AbilityData) -> AbilityContext:
 	ctx.player = player
 	ctx.ability = ability
 	ctx.rank = rank_of(ability.id)
 	ctx.rng = RunState.rng
 	ctx.params = params_for(ability)
+	ctx.target = null
 	ctx.point = player.global_position if player != null and player.is_inside_tree() else Vector3.ZERO
 	ctx.direction = player.facing if player != null else Vector3.FORWARD
 	return ctx
@@ -448,10 +469,14 @@ func params_for(ability: AbilityData) -> Dictionary:
 
 ## [method params_for] as it would be at [param rank] with specialisation [param spec]
 ## (previews: level-up rank-up cards, the Trainer). Not cached, a fresh dictionary.
+## Three passes: the rank (II–IV), the Rank V specialisation, the item mods – each pass's
+## "_pct" keys scale the result of the one before.
 func params_at_rank(ability: AbilityData, rank: int, spec: int = -1) -> Dictionary:
 	var base := {"cooldown": ability.cooldown, "cost": ability.cost, "charges": 1, "power": 1.0}
 	base.merge(ability.params, true)
-	var ranked := apply_mods(base, AbilityRanks.mods_for(ability, clampi(rank, 1, AbilityRanks.MAX_RANK), spec))
+	var r := clampi(rank, 1, AbilityRanks.MAX_RANK)
+	var ranked := apply_mods(base, AbilityRanks.mods_for(ability, r))
+	ranked = apply_mods(ranked, AbilityRanks.spec_mods(ability, r, spec))
 	return apply_mods(ranked, player.ability_mods(ability.id) if player != null else {})
 
 
@@ -498,6 +523,7 @@ static func apply_mods(base: Dictionary, mods: Dictionary) -> Dictionary:
 func begin_wave() -> void:
 	_cooldown_left.clear()
 	_charges_spent.clear()
+	_stagger_auto_timer()
 	for id in resource_order:
 		resources[id].reset()
 	for a in slots:
@@ -505,6 +531,14 @@ func begin_wave() -> void:
 			_effects[a.id].begin_wave(_light_context(a))
 	if mastery != null:
 		mastery.begin_wave()
+
+
+## Each player's auto-cast pass on its own tick (P1–P4: first passes on ticks 1 / 4 / 8 / 12
+## of the wave at 60 Hz, then every 15) instead of all heroes' targeting and casts landing on
+## the same one. Deterministic: by slot index only.
+func _stagger_auto_timer() -> void:
+	var index := player.slot.index if player != null and player.slot != null else 0
+	_auto_timer = AUTO_CAST_INTERVAL * float(index % PlayerManager.MAX_PLAYERS) / float(PlayerManager.MAX_PLAYERS)
 
 
 ## Wave cleared (before the intermission): effects and the Mastery drop what must not show
@@ -576,10 +610,14 @@ func _physics_process(delta: float) -> void:
 		return
 	for a in slots:
 		if a != null and _effects.has(a.id):
-			_effects[a.id].tick(_light_context(a), delta)
+			_effects[a.id].tick(_tick_context(a), delta)
 	_auto_timer -= delta
 	if _auto_timer <= 0.0:
-		_auto_timer = AUTO_CAST_INTERVAL
+		# += keeps the period exact (15 ticks at 60 Hz, not 16); a delta longer than the
+		# interval (a hitch, a test's big step) resyncs instead of running passes back to back.
+		_auto_timer += AUTO_CAST_INTERVAL
+		if _auto_timer <= 0.0:
+			_auto_timer = AUTO_CAST_INTERVAL
 		for i in MAX_SLOTS:
 			# Auto-cast slots fire for everybody; bots also "press" the button slots.
 			if (i < INPUT_SLOTS and not auto_cast) or not _cheap_ready(i):
@@ -630,9 +668,12 @@ func _densest_cluster(here: Vector3, reach: float, radius: float) -> Node3D:
 	var tree := player.get_tree()
 	var best: Node3D = null
 	var best_count := 0
+	var reach_sq := reach * reach
+	# gather_around returns whole grid cells (a square grown by the enemy radius): keep only
+	# centres within the cast range, as NEAREST_ENEMY does.
 	for node in EnemyGrid.gather_around(tree, here, reach):
 		var e := node as Enemy
-		if e == null or e.is_dead():
+		if e == null or e.is_dead() or WeaponRunner.flat(e.global_position - here).length_squared() > reach_sq:
 			continue
 		var count := EnemyGrid.count_around(tree, e.global_position, radius)
 		if count > best_count:

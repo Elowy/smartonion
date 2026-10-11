@@ -124,7 +124,8 @@ func test_pyroblast_hot_streak_spec_is_instant() -> void:
 	check(p.get_node_or_null(^"PyroCharge") == null, "no charge look")
 	_fly()
 	check(e.fake_hits() >= 1, "hit")
-	check_near(p.abilities.cooldown_of(_ability(&"pyroblast")), 10.0 * 0.5, 0.001, "-20% (ranks) -30% (spec)")
+	check_near(p.abilities.cooldown_of(_ability(&"pyroblast")), 10.0 * 0.8 * 0.7, 0.001,
+			"-20% (ranks), then 30% shorter (spec)")
 
 
 func test_pyroblast_waits_for_its_button_unless_a_bot() -> void:
