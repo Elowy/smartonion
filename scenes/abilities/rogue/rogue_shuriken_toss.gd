@@ -8,7 +8,7 @@ extends AbilityEffect
 ## the on-hit procs once.
 ## Rank III: +2 shuriken. Rank V: "Razor Stars" ([code]pierce[/code] +2, [code]range[/code]
 ## +4) or "Twin Volley" ([code]volleys[/code] 2: a second fan [code]volley_delay[/code] s later,
-## re-aimed at the nearest enemy).
+## re-aimed at the nearest enemy; dropped when the Rogue goes down and with the wave).
 
 const COLOR := Color(0.78, 0.86, 1.0)
 const KNOCKBACK := 0.4
@@ -44,6 +44,8 @@ func cast(ctx: AbilityContext) -> bool:
 	_volleys_left = maxi(1, roundi(ctx.num("volleys", 1.0))) - 1
 	_volley_delay = maxf(0.05, ctx.num("volley_delay", 0.25))
 	_volley_left = _volley_delay
+	if _volleys_left > 0 and not player.downed_changed.is_connected(_on_downed_changed):
+		player.downed_changed.connect(_on_downed_changed)
 	return true
 
 
@@ -74,6 +76,13 @@ func begin_wave(_ctx: AbilityContext) -> void:
 
 func end_wave(_ctx: AbilityContext) -> void:
 	_volleys_left = 0
+
+
+## A Rogue that goes down throws no late volley (the runner does not tick it while downed, so
+## it would fly right after a revive).
+func _on_downed_changed(is_downed: bool) -> void:
+	if is_downed:
+		_volleys_left = 0
 
 
 ## One fan of shuriken from [param player] centred on [param dir]. False when nothing could be

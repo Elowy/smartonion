@@ -182,6 +182,20 @@ static func is_big(e: Enemy) -> bool:
 	return e != null and is_instance_valid(e) and e.is_elite()
 
 
+## True while one of [param player]'s movement abilities carries it (a Charge dash or a
+## Heroic Leap in the air). They exclude each other: each one moves the body every tick, so a
+## second one would throw the first one's movement away.
+static func is_displaced(player: Player) -> bool:
+	if player == null or player.abilities == null:
+		return false
+	for a in player.abilities.slots:
+		var fx := player.abilities.effect_for(a)
+		if (fx is WarriorCharge and (fx as WarriorCharge).is_dashing()) \
+				or (fx is WarriorHeroicLeap and (fx as WarriorHeroicLeap).is_flying()):
+			return true
+	return false
+
+
 ## A short "skill name" text over the hero's head.
 static func shout_text(player: Player, text: String, color: Color) -> void:
 	if player == null or not player.is_inside_tree():

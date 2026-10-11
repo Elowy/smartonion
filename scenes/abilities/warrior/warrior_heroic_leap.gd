@@ -66,8 +66,9 @@ func landing_point() -> Vector3:
 	return _to
 
 
-func can_cast(_ctx: AbilityContext) -> bool:
-	return not _flying
+## Not while flying or charging (WarriorKit.is_displaced): a press then is refunded.
+func can_cast(ctx: AbilityContext) -> bool:
+	return not _flying and not WarriorKit.is_displaced(ctx.player)
 
 
 ## Impact radius in metres, with Area Size.

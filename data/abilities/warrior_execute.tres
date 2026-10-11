@@ -7,7 +7,7 @@
 script = ExtResource("1_script")
 id = &"execute"
 display_name = "Execute"
-description = "A huge strike for {damage_pct}% weapon damage on an enemy in reach. Enemies below {threshold}% HP die outright; elites and bosses take {elite_mult}x damage instead."
+description = "A huge strike for {damage_pct}% weapon damage on an enemy in reach. Enemies below {threshold}% HP die outright; bosses take {boss_mult}x damage instead."
 class_id = &"warrior"
 school = &"physical"
 resource = &""
@@ -18,8 +18,8 @@ cast_range = 3.5
 effect = ExtResource("2_effect")
 params = {
 "arc": 0.0,
+"boss_mult": 2.0,
 "damage_pct": 300.0,
-"elite_mult": 2.0,
 "kill_reset": 0.0,
 "threshold": 20.0
 }
