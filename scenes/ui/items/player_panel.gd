@@ -7,8 +7,9 @@ extends Control
 ## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
 ## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/: the three talent
 ## trees, points, reset), wired the same way – its label shows the hero's free talent points
-## ("Talents (2)", TalentTab.tab_label, relabelled on TalentTab.points_changed). Character tab =
-## WoW paper doll – Head, Neck,
+## ("Talents (2)", TalentTab.tab_label, relabelled on TalentTab.points_changed; talent stats come
+## through stats.set_source, so that signal and showing the Character tab rebuild the stat list).
+## Character tab = WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
@@ -459,7 +460,10 @@ func set_tab(index: int) -> void:
 	trainer.visible = index == TRAINER_TAB
 	talents.visible = index == TALENTS_TAB
 	_refresh_tabs()
-	if index == TRAINER_TAB:
+	if index == CHARACTER_TAB:
+		# Talent points (and other set_source changes) do not fire Equipment.changed.
+		_refresh_stats(class_data())
+	elif index == TRAINER_TAB:
 		trainer.refresh()
 	elif index == TALENTS_TAB:
 		talents.refresh()
@@ -810,7 +814,7 @@ func _build() -> void:
 	talents.visible = false
 	talents.message.connect(_on_talents_message)
 	talents.prompts_changed.connect(_on_talents_prompts_changed)
-	talents.points_changed.connect(_refresh_tab_labels)
+	talents.points_changed.connect(_on_talent_points_changed)
 	col.add_child(talents)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
@@ -928,6 +932,16 @@ func _refresh_tab_labels() -> void:
 		var text := tab_text(i)
 		if _tab_labels[i].text != text:
 			_tab_labels[i].text = text
+
+
+## TalentTab.points_changed (every talent add / take back / reset, and level-ups): relabels the
+## tab and, while the Character tab is shown, rebuilds its stat list – talent stats arrive
+## through stats.set_source, which fires no Equipment.changed (GDD 7.2: the Character tab shows
+## the new numbers). Another tab rebuilds the list when it switches back (set_tab).
+func _on_talent_points_changed() -> void:
+	_refresh_tab_labels()
+	if active_tab == CHARACTER_TAB:
+		_refresh_stats(class_data())
 
 
 func _build_doll() -> Control:

@@ -208,6 +208,7 @@ func test_three_trees_side_by_side_with_capstones_centred() -> void:
 
 
 func test_the_tab_fits_the_panel() -> void:
+	_async = true
 	var slot := _hero()
 	var s := _talents(slot)
 	# A long name and a capstone-sized text must not grow the panel.
@@ -225,13 +226,28 @@ func test_the_tab_fits_the_panel() -> void:
 	var frame_min := panel.get_child(0).get_combined_minimum_size() as Vector2
 	check(frame_min.x <= PlayerPanel.DESIGN_SIZE.x + 0.5 and frame_min.y <= PlayerPanel.DESIGN_SIZE.y + 0.5,
 		"the frame's content fits the design size: %s" % frame_min)
-	check(panel.talents.get_combined_minimum_size().y <= 336.0, "the tab fits the body height (%s)" % panel.talents.get_combined_minimum_size())
-	var arms := panel.talents.tree_views[0]
+	# TalentTab is a plain Control with an anchored Body (its own minimum size is zero, so the
+	# frame check above does not see it): after a layout pass the Body's minimum must fit the
+	# area the panel's column gives the tab, and the Body must stay above the prompt row.
+	await tree.process_frame
+	await tree.process_frame
+	var tab := panel.talents
+	var body := tab.get_node("Body") as Control
+	var body_min := body.get_combined_minimum_size()
+	check(tab.size.x > 0.0 and tab.size.y > 0.0, "laid out: %s" % tab.size)
+	check(body_min.x <= tab.size.x + 0.5 and body_min.y <= tab.size.y + 0.5,
+		"the tab's content fits its area: needs %s, gets %s" % [body_min, tab.size])
+	var prompt_row := panel._prompt_holder.get_parent() as Control
+	check(body.get_global_rect().end.y <= prompt_row.get_global_rect().position.y + 0.5,
+		"the Body ends above the prompt row (%s / %s)" % [body.get_global_rect(), prompt_row.get_global_rect()])
+	check(body.get_global_rect().end.x <= tab.get_global_rect().end.x + 0.5, "and inside the tab's width")
+	var arms := tab.tree_views[0]
 	check(TalentTreeView.fitted_name_size("Assassination", arms.name_label.size.x) >= TalentTreeView.MIN_NAME_FONT,
 		"the longest tree name fits")
 	check(UiTheme.bold_font().get_string_size("Assassination", HORIZONTAL_ALIGNMENT_LEFT, -1,
 		TalentTreeView.fitted_name_size("Assassination", arms.name_label.size.x)).x <= arms.name_label.size.x,
 		"at the fitted size")
+	finished.emit()
 
 
 func test_long_descriptions_shrink_before_they_are_cut() -> void:
@@ -313,6 +329,60 @@ func test_tab_label_follows_spending_even_from_another_tab() -> void:
 	check_eq(panel._tab_labels[PlayerPanel.TALENTS_TAB].text, "Talents", "no free points: plain")
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
 	check_eq(panel._tab_labels[PlayerPanel.TALENTS_TAB].text, "Talents", "the active tab keeps its label")
+
+
+## The value the Character tab's stat list shows for [param stat] ("" when the row is missing).
+static func _stat_shown(panel: PlayerPanel, stat: StringName) -> String:
+	for cell in panel._stats_grid.get_children():
+		if cell.get_child_count() < 2:
+			continue
+		if (cell.get_child(0) as Label).text == PlayerPanel._stat_name(stat):
+			return (cell.get_child(1) as Label).text
+	return ""
+
+
+func test_character_tab_shows_the_talent_stats() -> void:
+	# GDD 7.2 / spec 2.2 Flow: after spending, the Character tab shows the new numbers. Talent
+	# stats reach the hero through stats.set_source (T-CORE-A's bonus engine; the stand-in here
+	# sets the source on TalentState.changed right after the Player's own handler, as the
+	# engine does), which fires no Equipment.changed.
+	var slot := _hero()
+	var hero := slot.player as Player
+	var s := _talents(slot)
+	var t1a := _id("arms", "t1a")
+	# (The lambda reads the state through the hero: capturing s itself would be a reference cycle.)
+	s.changed.connect(func() -> void: hero.stats.set_source(&"talents", {Stats.DODGE: 2.0 * hero.talents.rank_of(t1a)}))
+	RunState.add_gold(100)
+	var panel := _panel(slot, false)
+	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 0.0), "no dodge before")
+	panel.set_tab(PlayerPanel.TALENTS_TAB)
+	panel.talents.select_talent(t1a)
+	for i in 3:
+		_tap(panel, slot, PlayerInput.Pad.A)
+	check_eq(s.rank_of(t1a), 3, "three points in Deflection")
+	check_near(hero.stats.get_stat(Stats.DODGE), 6.0, 0.001, "the hero has 6% dodge")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "RT: the Character tab")
+	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 6.0), "the stat list shows the talent dodge")
+	# X takes a point back: the Character tab follows.
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "LT: back to Talents")
+	_tap(panel, slot, PlayerInput.Pad.X)
+	check_eq(s.rank_of(t1a), 2, "one point taken back")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 4.0), "after the take-back")
+	# A change while the Character tab is shown (a bot's spending) updates it at once.
+	s.add(t1a)
+	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 6.0), "rebuilt on the change")
+	# The reset: the Character tab follows.
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	panel.talents.select_reset()
+	_tap(panel, slot, PlayerInput.Pad.A)
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check_eq(s.points_spent(), 0, "reset")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "the Character tab again")
+	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 0.0), "after the reset")
 
 
 # --- Navigation ----------------------------------------------------------------------------------
