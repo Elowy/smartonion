@@ -10,6 +10,7 @@ const FLY_TIME := 0.18
 const HOVER := 0.75
 const TURNS_PER_SECOND := 3.5
 const AXE_COLOR := Color(1.0, 1.0, 1.0, 0.95)
+const AXE_SCALE := 1.6
 
 var _axe: Node3D
 var _from_offset := Vector3.ZERO
@@ -50,6 +51,7 @@ static func axe_mesh() -> Mesh:
 func _ready() -> void:
 	_axe = Node3D.new()
 	_axe.name = "Axe"
+	_axe.scale = Vector3.ONE * AXE_SCALE
 	add_child(_axe)
 	add_part(axe_mesh(), AXE_COLOR, _axe, true)
 	_animate(0.0)

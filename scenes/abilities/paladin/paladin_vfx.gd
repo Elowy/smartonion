@@ -7,8 +7,8 @@ extends Node3D
 ##   * [method storm]: Divine Storm – golden blade arcs whirling around the Paladin, an
 ##     expanding holy ring and rising motes (fire and forget).
 ##   * [method crown]: Blessing of Kings cast – a golden crown pops over a hero's head.
-##   * [method kings_mark]: a slowly turning golden rune ring under a blessed hero while the
-##     blessing lasts ([method finish] fades it early).
+##   * [method kings_mark]: three small golden crown gems circling a blessed hero at waist
+##     height while the blessing lasts ([method finish] fades it early).
 ##   * [method bubble]: Divine Shield – a glowing golden sphere around a hero.
 ## Persistent looks are children of the hero (they follow it and die with it); their owner
 ## ends them with [method finish].
@@ -23,8 +23,10 @@ const STORM_TIME := 0.5
 const STORM_ARCS := 3
 const STORM_TURNS := 1.4
 const CROWN_TIME := 1.4
-const CROWN_HEIGHT := 1.75
-const MARK_DIAMETER := 1.9
+const CROWN_HEIGHT := 2.6
+const MARK_DIAMETER := 1.5
+const MARK_GEMS := 3
+const MARK_HEIGHT := 0.75
 const BUBBLE_RADIUS := 0.85
 const BUBBLE_CENTER := 0.62
 ## The bubble flickers during its last seconds (it is about to drop).
@@ -223,18 +225,20 @@ func _animate(delta: float) -> void:
 			Mats.set_ring(_ring, Color(GOLD.r, GOLD.g, GOLD.b, 0.8 * (1.0 - t)), 0.9, 0.98, 0.08 * (1.0 - t))
 			_set_alpha(fade)
 		Kind.CROWN:
+			# Opaque toon crown: pops in, floats up, shrinks away at the end.
 			var pop := minf(1.0, age / 0.18)
-			_body.position.y = CROWN_HEIGHT + 0.35 * t
-			_body.scale = Vector3.ONE * lerpf(0.4, 1.0, pop)
+			var gone := clampf((life - age) / FADE_OUT, 0.0, 1.0)
+			_body.position.y = CROWN_HEIGHT + 0.3 * t
+			_body.scale = Vector3.ONE * maxf(0.01, lerpf(0.5, 1.4, pop) * gone)
 			_body.rotation.y += delta * 2.0
 			var grow := lerpf(0.4, 1.6, sqrt(minf(1.0, age / 0.5)))
 			_ring.scale = Vector3(grow, 1.0, grow)
 			Mats.set_ring(_ring, Color(GOLD.r, GOLD.g, GOLD.b, 0.7 * maxf(0.0, 1.0 - age / 0.5)), 0.78, 0.96)
 			_set_alpha(fade)
 		Kind.KINGS_MARK:
-			_ring.rotation.y += delta * 0.8
-			var pulse := 0.85 + 0.15 * sin(age * 3.0)
-			Mats.set_ring(_ring, Color(GOLD.r, GOLD.g, GOLD.b, 0.6 * fade * pulse), 0.84, 0.94, 0.05 * fade)
+			_spin.rotation.y += delta * 1.6
+			_spin.position.y = MARK_HEIGHT + 0.06 * sin(age * 2.5)
+			_set_alpha(fade)
 			if _motes != null and life - age < FADE_OUT and _motes.emitting:
 				_motes.emitting = false
 		Kind.BUBBLE:
@@ -325,7 +329,8 @@ func _build_storm() -> void:
 
 
 func _build_crown() -> void:
-	_body = _part(MeshKit.cached("paladin:crown", func() -> Mesh:
+	_body = MeshInstance3D.new()
+	_body.mesh = MeshKit.cached("paladin:crown", func() -> Mesh:
 		var k := MeshKit.new()
 		var gold := Color(1.0, 0.82, 0.3)
 		k.add_cylinder(0.2, 0.2, 0.1, Transform3D.IDENTITY, gold, 16, false)
@@ -334,26 +339,48 @@ func _build_crown() -> void:
 			var p := Vector3(sin(a) * 0.2, 0.1, cos(a) * 0.2)
 			k.add_segment(p - Vector3(0, 0.05, 0), p + Vector3(0, 0.13, 0), 0.05, 0.0, gold, 6)
 			k.add_sphere(0.03, MeshKit.xf(p + Vector3(0, 0.15, 0)), Color(1.0, 0.95, 0.75), 6, 3)
-		return k.build()), Color.WHITE, 0.95, false)
+		k.add_sphere(0.045, MeshKit.xf(Vector3(0, 0.0, 0.2)), Color(0.85, 0.2, 0.25), 6, 3)
+		return k.build())
+	_body.material_override = Mats.toon_vc()
+	_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.name = "Crown"
 	add_child(_body)
-	var glow := _part(_glow_sphere(), GOLD, 0.35)
-	glow.scale = Vector3(1.4, 0.9, 1.4)
+	var glow := _part(_glow_sphere(), GOLD, 0.18)
+	glow.scale = Vector3(1.0, 0.7, 1.0)
+	glow.position.y = 0.08
 	_body.add_child(glow)
 	_ring = _ground_ring(1.0, 0.06)
 
 
 func _build_mark() -> void:
-	_ring = _ground_ring(radius * 2.0, 0.05)
+	_spin = Node3D.new()
+	_spin.name = "Gems"
+	_spin.position.y = MARK_HEIGHT
+	add_child(_spin)
+	var gem_mesh := MeshKit.cached("paladin:kings_gem", func() -> Mesh:
+		var k := MeshKit.new()
+		var gold := Color(1.0, 0.84, 0.32)
+		k.add_cylinder(0.0, 0.1, 0.13, MeshKit.xf(Vector3(0, 0.065, 0)), gold, 4)
+		k.add_cylinder(0.1, 0.0, 0.13, MeshKit.xf(Vector3(0, -0.065, 0)), gold, 4)
+		return k.build())
+	for i in MARK_GEMS:
+		var a := TAU * float(i) / float(MARK_GEMS)
+		var gem := _part(gem_mesh, Color.WHITE, 0.95, false)
+		gem.name = "Gem%d" % i
+		gem.position = Vector3(sin(a) * radius, 0.0, cos(a) * radius)
+		_spin.add_child(gem)
+		var halo := _part(_glow_sphere(), GOLD, 0.3)
+		halo.scale = Vector3.ONE * 0.6
+		gem.add_child(halo)
 	_motes = _mote_particles(5, 1.3)
 	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	_motes.emission_ring_axis = Vector3.UP
-	_motes.emission_ring_radius = radius * 0.85
-	_motes.emission_ring_inner_radius = radius * 0.75
+	_motes.emission_ring_radius = radius
+	_motes.emission_ring_inner_radius = radius * 0.8
 	_motes.emission_ring_height = 0.05
-	_motes.initial_velocity_min = 0.4
-	_motes.initial_velocity_max = 0.9
-	_motes.position.y = 0.1
+	_motes.initial_velocity_min = 0.3
+	_motes.initial_velocity_max = 0.7
+	_motes.position.y = MARK_HEIGHT - 0.2
 
 
 func _build_bubble() -> void:

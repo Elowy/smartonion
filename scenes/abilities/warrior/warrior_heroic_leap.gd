@@ -182,6 +182,7 @@ func _land(p: Player) -> void:
 			area.damage_per_tick = WarriorKit.weapon_damage(p) * _crater_pct / 100.0 * CRATER_TICK
 			area.slow_pct = _crater_slow
 			last_crater = area
+			WarriorLeapVfx.spawn_crater(area, area.radius, _crater_duration)
 		else:
 			area.free()
 
