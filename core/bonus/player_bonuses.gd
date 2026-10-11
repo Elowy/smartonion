@@ -50,7 +50,10 @@ func effects_of(source: StringName) -> Array[Dictionary]:
 
 
 ## Talent / set ability mods for [param ability_id] (merged like item mods, applied after them
-## by Player.ability_mods).
+## by Player.ability_mods). [param ability_id] may be a BonusVocabulary.PSEUDO_IDS id (kits read
+## warlock_imp, paladin_aura … here): match entries with
+## [code]BonusVocabulary.matches_id(entry["match"], ability_id, <class>)[/code], not
+## [code]matches(..., Db.get_ability(ability_id), ...)[/code] – a pseudo id has no AbilityData.
 func ability_mods_for(_ability_id: StringName) -> Dictionary:
 	return {}
 

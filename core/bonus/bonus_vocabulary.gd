@@ -17,8 +17,8 @@ extends RefCounted
 ##                "scale": [proc keys multiplied by the rank]}
 ##   script       {"script": "res://scenes/talents/<class>/<tree>_<name>.gd", "params": {...}}
 ## Everything here is pure (no Player): [method validate] is the content check of the data
-## tests, [method resolve] the rank scaling, [method matches] the ability filter of "ability"
-## entries and on_cast / cooldown procs.
+## tests, [method resolve] the rank scaling, [method matches] / [method matches_id] the ability
+## filter of "ability" entries and on_cast / cooldown procs.
 
 const KINDS: Array[StringName] = [&"stats", &"ability", &"damage", &"damage_taken", &"resource", &"proc", &"script"]
 ## "source" filter of damage entries (Player.outgoing_damage_mult sources).
@@ -90,9 +90,12 @@ const HIT_TRIGGERS: Array[StringName] = [&"on_hit", &"on_crit"]
 ## The contract check of one entry: "" = valid, else the first problem found. [param class_id]
 ## is the owner's class (a tree's / set's class_id): a "match" / "knows" id must be a Db ability
 ## of that class (or a general one) or a PSEUDO_IDS id registered for that class – mod keys of
-## a pseudo id are not checked (their params live in kit code). Resource ids must be resources
-## of that class. Without a class every class's abilities and resources are accepted and no
-## pseudo id is. Script entries are checked for their shape only (the data test loads them).
+## a pseudo id are not checked (their params live in kit code). Mods of a named ability must
+## change one of its params ([method param_names]); a "<x>_pct" key whose <x> param does not
+## exist is refused when it would replace an existing "<x>_pct" param (use "<x>_pct_add"),
+## the replace trap of talent_vocabulary §3.2. Resource ids must be resources of that class.
+## Without a class every class's abilities and resources are accepted and no pseudo id is.
+## Script entries are checked for their shape only (the data test loads them).
 static func validate(entry: Dictionary, class_id: StringName = &"") -> String:
 	var kind := _name(entry.get("kind"))
 	if kind not in KINDS:
@@ -185,8 +188,16 @@ static func _validate_ability(entry: Dictionary, class_id: StringName) -> String
 		if k.ends_with("_add"):
 			if not names.has(k.trim_suffix("_add")):
 				return "'%s': %s has no param '%s'" % [k, id, k.trim_suffix("_add")]
-		elif k.ends_with("_pct") and names.has(k.trim_suffix("_pct")):
-			continue
+		elif k.ends_with("_pct"):
+			# AbilityRunner.apply_mods scales <param> when it exists; otherwise it REPLACES the
+			# "<param>_pct" param itself (and resolve would scale the replacement by the rank):
+			# Whirlwind {"damage_pct": 10} sets 10 instead of 150 (talent_vocabulary §3.2).
+			var base := k.trim_suffix("_pct")
+			if names.has(base):
+				continue
+			if names.has(k):
+				return "'%s' would replace %s's %s (no '%s' param); use %s_add" % [k, id, k, base, k]
+			return "'%s' changes no param of %s" % [k, id]
 		elif not names.has(k):
 			return "'%s' changes no param of %s" % [k, id]
 	return ""
@@ -439,7 +450,8 @@ static func param_names(ability: AbilityData) -> Dictionary:
 ## §2): stats – every number; ability – the numbers of "_add" / "_pct" mods (replace keys never);
 ## damage / damage_taken – "pct"; resource – every "_add"; proc – only the keys listed in
 ## "scale" (a listed "stats" dict scales all its numbers); script – nothing. Rank 1 (and below)
-## returns an unscaled copy.
+## returns an unscaled copy. Every "_pct" mod of a validated entry scales an existing param
+## ([method validate] refuses the "_pct" keys that would replace one), so scaling it is right.
 static func resolve(entry: Dictionary, rank: int) -> Dictionary:
 	var out: Dictionary = entry.duplicate(true)
 	if rank <= 1:
@@ -488,7 +500,8 @@ static func _scale_all(d: Dictionary, rank: int) -> void:
 ## True when [param ability] passes [param filter] (an entry's "match" dict; every key present
 ## must hold): "id", "ids", "school", "tag", "kind" (core / active / auto), "resource" (the
 ## resource it spends), "class": true (every ability of [param owner_class], core included –
-## general abilities are not). Null / empty filter: false.
+## general abilities are not). Null ability / empty filter: false – a pseudo id has no
+## AbilityData, so lookups by id go through [method matches_id].
 static func matches(filter: Dictionary, ability: AbilityData, owner_class: StringName) -> bool:
 	if ability == null or filter.is_empty():
 		return false
@@ -526,6 +539,17 @@ static func matches(filter: Dictionary, ability: AbilityData, owner_class: Strin
 			_:
 				return false
 	return true
+
+
+## [method matches] by ability id, pseudo ids included – the lookup PlayerBonuses.ability_mods_for
+## uses (Player.ability_mods asks by id, and a PSEUDO_IDS id has no AbilityData, so [method
+## matches] alone can never match one). A pseudo id matches only {"id": <that id>} (validate
+## allows nothing else for it; generic filters never reach pseudo numbers); any other id goes
+## through [method matches] with its Db ability (false when unknown).
+static func matches_id(filter: Dictionary, ability_id: StringName, owner_class: StringName) -> bool:
+	if PSEUDO_IDS.has(ability_id):
+		return filter.size() == 1 and filter.has("id") and _name(filter["id"]) == ability_id
+	return matches(filter, Db.get_ability(ability_id), owner_class)
 
 
 # --- Helpers -----------------------------------------------------------------------------------

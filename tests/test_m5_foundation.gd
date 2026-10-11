@@ -1,9 +1,15 @@
 extends TestCase
 ## M5 foundation (P0): the TalentState rules on fixture trees, the BonusVocabulary contract
-## (validate / resolve / matches / PSEUDO_IDS), the ability tags, Db's talent / set loading, the
-## block caps, the Player / WeaponRunner / Enemy / LootDrops hooks, RunState's spend log, wants,
-## counters and start level, the launch options, Main's wiring and the P0 stubs (PlayerBonuses
-## through test doubles, the Forge entry, the Talents tab).
+## (validate / resolve / matches / matches_id / PSEUDO_IDS), the ability tags, Db's talent / set
+## loading, the block caps, the Player / WeaponRunner / Enemy / LootDrops hooks (PlayerBonuses /
+## ProcSystem through test doubles), RunState's spend log, wants, counters and start level, the
+## launch options, Main's wiring and the panel's Forge entry / Talents tab.
+##
+## Frozen (integrator only). Every check here is a contract that holds with or without the Wave-1
+## implementations and content: no "nothing yet" / "stub returns 0" asserts, no lookups of
+## shipping ids, fixtures live in Db only under the "zz_test" class and Db is restored after
+## each test. The P0 stub values are pinned in tests/test_p0_stub_<package>.gd, one file per
+## owning package, which that package deletes or replaces when it implements the stub.
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -12,8 +18,66 @@ const DT := 1.0 / 60.0
 const TMP_DIR := "user://m5_p0_talent_tree_test/"
 
 
+## PlayerBonuses with every method overridden neutrally (set_effects only stores): the doubles
+## below never run the real engine (T-CORE-A replaces the stub bodies), only the P0 API.
+class NeutralBonuses extends PlayerBonuses:
+	var stored: Dictionary = {}
+
+	func set_effects(source: StringName, entries: Array[Dictionary]) -> void:
+		stored[source] = entries.duplicate(true)
+		changed.emit()
+
+	func effects_of(source: StringName) -> Array[Dictionary]:
+		var out: Array[Dictionary] = []
+		out.assign(stored.get(source, []))
+		return out
+
+	func ability_mods_for(_ability_id: StringName) -> Dictionary:
+		return {}
+
+	func damage_mult(_target: Node3D, _school: StringName, _source: StringName) -> float:
+		return 1.0
+
+	func damage_taken_mult(_kind: StringName, _attacker: Node3D) -> float:
+		return 1.0
+
+	func crit_forced(_target: Node3D) -> bool:
+		return false
+
+	func scripts() -> Array[TalentEffect]:
+		var out: Array[TalentEffect] = []
+		return out
+
+	func on_hit(_target: Node3D, _damage: float, _is_crit: bool, _first: bool) -> void:
+		pass
+
+	func on_kill(_enemy: Node3D) -> void:
+		pass
+
+	func on_damage_taken(_amount: float, _attacker: Node3D) -> void:
+		pass
+
+	func on_cast(_slot_index: int, _ability: AbilityData) -> void:
+		pass
+
+	func on_avoided(_kind: StringName, _attacker: Node3D) -> void:
+		pass
+
+	func begin_wave() -> void:
+		pass
+
+	func end_wave() -> void:
+		pass
+
+	func tick(_delta: float) -> void:
+		pass
+
+	func teardown() -> void:
+		pass
+
+
 ## PlayerBonuses test double: records hooks, returns scripted mods / forced crits.
-class RecordingBonuses extends PlayerBonuses:
+class RecordingBonuses extends NeutralBonuses:
 	## [target, damage, is_crit, first] per on_hit call.
 	var hits: Array[Array] = []
 	var order: Array[String] = []
@@ -47,7 +111,7 @@ class RecordingProcs extends ProcSystem:
 
 
 ## Records on_avoided / on_damage_taken.
-class AvoidBonuses extends PlayerBonuses:
+class AvoidBonuses extends NeutralBonuses:
 	var kinds: Array[StringName] = []
 	var taken := 0
 
@@ -74,6 +138,8 @@ var main: Main
 var nodes: Array[Node] = []
 var spent_entries: Array[Dictionary] = []
 var specials: Array[Array] = []
+## Db's talent / set dictionaries before a test injected fixtures (restored in after_each).
+var _saved_db: Dictionary = {}
 
 
 func before_each() -> void:
@@ -100,12 +166,29 @@ func after_each() -> void:
 		RunState.spent.disconnect(_on_spent)
 	if RunState.special_killed.is_connected(_on_special_killed):
 		RunState.special_killed.disconnect(_on_special_killed)
+	_restore_db()
 	EliteAffixes.rate_mult = 1.0
 	GoblinSpawner.chance_override = -1.0
 	PlayerPanel.debug_start_tab = ""
 	UiFakes.reset_players()
 	Enemy.invalidate_player_cache()
 	EnemyGrid.mark_dirty()
+
+
+## Snapshot of Db's talent / set dictionaries; [method _restore_db] puts them back (after_each).
+func _save_db() -> void:
+	if _saved_db.is_empty():
+		_saved_db = {"talent_trees": Db.talent_trees.duplicate(), "talents": Db.talents.duplicate(),
+			"sets": Db.sets.duplicate()}
+
+
+func _restore_db() -> void:
+	if _saved_db.is_empty():
+		return
+	Db.talent_trees.assign(_saved_db["talent_trees"])
+	Db.talents.assign(_saved_db["talents"])
+	Db.sets.assign(_saved_db["sets"])
+	_saved_db = {}
 
 
 func _on_spent(entry: Dictionary) -> void:
@@ -218,34 +301,72 @@ func test_ability_tags() -> void:
 	check_eq(pets, 3, "spirit wolf, infernal, voidwalker")
 
 
-func test_db_talents_and_sets() -> void:
-	check(Db.talent_trees.is_empty() and Db.talents.is_empty() and Db.sets.is_empty(), "no M5 content yet")
-	check(Db.talent_trees_for(&"warrior").is_empty(), "no trees")
-	check(Db.get_talent(&"warrior_arms_deflection") == null and Db.get_talent_tree(&"warrior_arms") == null, "lookups")
-	check(Db.get_set(&"battlegear_of_fury") == null and Db.set_for_class(&"warrior") == null, "no sets")
-	# Ordering by index, then id (injected, then removed again).
-	var trees := _fixture_trees()
-	for t in trees:
+## Two "zz_test" trees (index 1 given first) + one of another class, registered in Db like
+## Db._add_talent_tree does (trees and their talents). Ids no shipping content uses.
+func _inject_test_trees() -> Array[TalentTreeData]:
+	_save_db()
+	var a1 := _talent("a1", 1, 0, 3)
+	a1.id = &"zz_test_arms_a1"
+	a1.effects = [{"kind": "stats", "stats": {"crit": 1.0}}]
+	var f1 := _talent("f1", 1, 0, 3)
+	f1.id = &"zz_test_fury_f1"
+	var fury := _tree(&"zz_test_fury", "Fury", 1, [f1] as Array[TalentData])
+	var arms := _tree(&"zz_test_arms", "Arms", 0, [a1] as Array[TalentData])
+	var other := _tree(&"zz_other_fire", "Fire", 0, [] as Array[TalentData])
+	fury.class_id = &"zz_test"
+	arms.class_id = &"zz_test"
+	other.class_id = &"zz_other"
+	var out: Array[TalentTreeData] = [fury, arms, other]
+	for t in out:
 		Db.talent_trees[t.id] = t
-	var mage := _tree(&"mage_fire", "Fire", 1, [] as Array[TalentData])
-	mage.class_id = &"mage"
-	Db.talent_trees[mage.id] = mage
-	var got := Db.talent_trees_for(&"warrior")
-	check_eq(got.size(), 2, "the warrior's two trees")
-	check(got[0].id == &"warrior_arms" and got[1].id == &"warrior_fury", "by index")
-	for id: StringName in [&"warrior_arms", &"warrior_fury", &"mage_fire"]:
-		Db.talent_trees.erase(id)
+		for talent in t.talents:
+			Db.talents[talent.id] = talent
+	return out
+
+
+func test_db_talents_and_sets() -> void:
+	# Holds with or without shipped content: only "zz_test" ids are injected, Db is restored.
+	var before := Db.talent_trees.size()
+	_inject_test_trees()
+	var got := Db.talent_trees_for(&"zz_test")
+	check_eq(got.size(), 2, "the class's two trees, not the other class's")
+	check(got.size() == 2 and got[0].id == &"zz_test_arms" and got[1].id == &"zz_test_fury", "by index")
+	check_eq(Db.get_talent_tree(&"zz_test_fury"), got[1] if got.size() == 2 else null, "get_talent_tree")
+	check(Db.get_talent(&"zz_test_arms_a1") != null and Db.get_talent(&"zz_test_arms_a1").display_name == "A1", "get_talent")
+	check(Db.get_talent(&"zz_test_arms_nope") == null and Db.get_talent_tree(&"zz_test_nope") == null, "unknown ids")
+	check(Db.talent_trees_for(&"zz_nobody").is_empty(), "a class without trees")
+	# Sets: the first of the class by id.
 	var s := SetData.new()
-	s.id = &"z_set"
-	s.class_id = &"warrior"
+	s.id = &"zz_test_z_set"
+	s.class_id = &"zz_test"
 	var s2 := SetData.new()
-	s2.id = &"a_set"
-	s2.class_id = &"warrior"
+	s2.id = &"zz_test_a_set"
+	s2.class_id = &"zz_test"
 	Db.sets[s.id] = s
 	Db.sets[s2.id] = s2
-	check_eq(Db.set_for_class(&"warrior"), s2, "first set by id")
-	Db.sets.erase(s.id)
-	Db.sets.erase(s2.id)
+	check_eq(Db.set_for_class(&"zz_test"), s2, "first set by id")
+	check_eq(Db.get_set(&"zz_test_z_set"), s, "get_set")
+	check(Db.get_set(&"zz_test_nope") == null and Db.set_for_class(&"zz_nobody") == null, "unknown set / class")
+	_restore_db()
+	check_eq(Db.talent_trees.size(), before, "restored")
+	check(not Db.talent_trees.has(&"zz_test_arms") and not Db.talents.has(&"zz_test_arms_a1")
+		and not Db.sets.has(&"zz_test_a_set"), "fixtures gone again")
+
+
+func test_talent_state_reads_its_trees_from_db() -> void:
+	_inject_test_trees()
+	var s := TalentState.create(&"zz_test")
+	check_eq(s.trees().size(), 2, "Db.talent_trees_for without explicit trees")
+	check(not s.trees().is_empty() and s.trees()[0].id == &"zz_test_arms", "in tab order")
+	var fury := s.tree_of(&"zz_test_fury_f1")
+	check(s.talent(&"zz_test_arms_a1") != null and fury != null and fury.id == &"zz_test_fury", "lookups")
+	check_eq(s.add_block_reason(&"zz_other_x"), "Unknown talent", "another class's id")
+	RunState.set_start_level(10)
+	check(s.add(&"zz_test_arms_a1"), "spend a point")
+	check_eq(s.effects().size(), 1, "its entry")
+	var empty := TalentState.create(&"zz_nobody")
+	check(empty.trees().is_empty() and empty.effects().is_empty(), "a class without trees")
+	check_eq(empty.add_block_reason(&"zz_test_arms_a1"), "Unknown talent", "nothing to add")
 
 
 func test_db_load_tree_descends_into_subfolders() -> void:
@@ -449,13 +570,6 @@ func test_effects_and_saving() -> void:
 	check_eq(other.reset_price(), 80, "price follows the resets")
 
 
-func test_talent_state_from_db_is_empty_until_content_lands() -> void:
-	var s := TalentState.create(&"warrior")
-	check(s.trees().is_empty(), "no trees in Db yet")
-	check(s.effects().is_empty(), "no effects")
-	check_eq(s.add_block_reason(&"warrior_arms_deflection"), "Unknown talent", "nothing to add")
-
-
 # --- BonusVocabulary ---------------------------------------------------------------------------
 
 ## Every example of talent_vocabulary.md (and the set / capstone entries) with its class.
@@ -476,6 +590,8 @@ static func _valid_examples() -> Array[Array]:
 		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true}}, &"paladin"],
 		[{"kind": "ability", "match": {"id": "rain_of_fire"}, "mods": {"free_chance_add": 20}}, &"warlock"],
 		[{"kind": "ability", "match": {"id": "bandage"}, "mods": {"targets_add": 1}}, &"warrior"],
+		# Whirlwind's damage is the "damage_pct" param itself: raise it with "damage_pct_add".
+		[{"kind": "ability", "match": {"id": "whirlwind"}, "mods": {"damage_pct_add": 10}}, &"warrior"],
 		[{"kind": "damage", "pct": 2.0}, &"warrior"],
 		[{"kind": "damage", "pct": 5.0, "source": ["dot", "pet"]}, &"warlock"],
 		[{"kind": "damage", "pct": 4.0, "school": "fire"}, &"mage"],
@@ -572,10 +688,19 @@ func test_validate_rejects_typos() -> void:
 		[{"kind": "stats", "stats": {"crit": 1}, "requires": {"knows": "fireballl"}}, &"mage", "unknown known ability"],
 		[{"kind": "stats", "stats": {"crit": 1}, "requires": {"level": 5}}, &"mage", "unknown requirement"],
 		[{"kind": "stats", "stats": {"crit": 1}, "rank": 0}, &"mage", "rank 0"],
+		[{"kind": "ability", "match": {"id": "whirlwind"}, "mods": {"damage_pct": 10}}, &"warrior",
+			"a _pct that would replace (no 'damage' param, talent_vocabulary §3.2)"],
 	]
 	for case in bad:
 		var err := BonusVocabulary.validate(case[0], case[1])
 		check(err != "", "rejects %s: %s" % [case[2], str(case[0])])
+	# The replace trap names the fix; apply_mods really would replace 150 with 10.
+	var trap := {"kind": "ability", "match": {"id": "whirlwind"}, "mods": {"damage_pct": 10}}
+	check_eq(BonusVocabulary.validate(trap, &"warrior"),
+		"'damage_pct' would replace whirlwind's damage_pct (no 'damage' param); use damage_pct_add", "the message")
+	var ww_params := Db.get_ability(&"whirlwind").params
+	check_eq(AbilityRunner.apply_mods(ww_params, {"damage_pct": 10})["damage_pct"], 10, "why: apply_mods replaces")
+	check_eq(AbilityRunner.apply_mods(ww_params, {"damage_pct_add": 10})["damage_pct"], 160.0, "the _add form adds")
 
 
 func test_pseudo_ids_only_for_their_class() -> void:
@@ -640,6 +765,24 @@ func test_matches_filters_abilities() -> void:
 	check(not BonusVocabulary.matches({"id": "fireball"}, null, &"mage"), "null ability")
 
 
+func test_matches_id_reaches_pseudo_ids() -> void:
+	# By id: real abilities go through matches with their Db data.
+	check(BonusVocabulary.matches_id({"id": "fireball"}, &"fireball", &"mage"), "id")
+	check(BonusVocabulary.matches_id({"school": "fire"}, &"fireball", &"mage"), "a generic filter")
+	check(not BonusVocabulary.matches_id({"class": true}, &"fireball", &"warrior"), "owner class still counts")
+	check(not BonusVocabulary.matches_id({"id": "fireball"}, &"firebal", &"mage"), "unknown id")
+	# Pseudo ids have no AbilityData: matches alone never matches them, matches_id does by id.
+	for id: StringName in BonusVocabulary.PSEUDO_IDS:
+		var owner: StringName = BonusVocabulary.PSEUDO_IDS[id]
+		check(not BonusVocabulary.matches({"id": String(id)}, Db.get_ability(id), owner), "%s: matches cannot" % id)
+		check(BonusVocabulary.matches_id({"id": String(id)}, id, owner), "%s: matches_id can" % id)
+		check(BonusVocabulary.matches_id({"id": id}, id, owner), "%s: StringName ids too" % id)
+		check(not BonusVocabulary.matches_id({"id": "fireball"}, id, owner), "%s: another id" % id)
+		check(not BonusVocabulary.matches_id({"class": true}, id, owner), "%s: generic filters never" % id)
+		check(not BonusVocabulary.matches_id({"ids": [String(id)]}, id, owner), "%s: ids never" % id)
+	check(not BonusVocabulary.matches_id({"id": "warlock_imp"}, &"paladin_aura", &"paladin"), "another pseudo id")
+
+
 func test_vocabulary_constants_match_the_engine() -> void:
 	var blocks: Array[StringName] = ProcSystem.BLOCKS.duplicate()
 	blocks.append_array([&"cooldown", &"forced_crit"] as Array[StringName])
@@ -681,11 +824,12 @@ func test_player_has_bonuses_talents_and_merges_mods() -> void:
 	check(p.bonuses != null and p.bonuses.player == p, "bonuses")
 	check(p.talents != null and p.talents.class_id == &"warrior", "talents of the class")
 	check(p.bonuses.effects_of(PlayerBonuses.SOURCE_SETS).is_empty(), "apply_equipment set the (empty) set bonuses")
-	check_eq(p.bonuses.ability_mods_for(&"whirlwind"), {}, "stub: no mods")
-	check_eq(p.bonuses.damage_mult(null, &"fire", &"weapon"), 1.0, "stub: neutral damage")
-	check_eq(p.bonuses.damage_taken_mult(&"melee", null), 1.0, "stub: neutral damage taken")
-	check(not p.bonuses.crit_forced(null), "stub: no forced crits")
-	check(p.bonuses.scripts().is_empty(), "stub: no scripts")
+	# A fresh hero has no talents and no set pieces: neutral with the stub and with the engine.
+	check_eq(p.bonuses.ability_mods_for(&"whirlwind"), {}, "no entries: no mods")
+	check_eq(p.bonuses.damage_mult(null, &"fire", &"weapon"), 1.0, "no entries: neutral damage")
+	check_eq(p.bonuses.damage_taken_mult(&"melee", null), 1.0, "no entries: neutral damage taken")
+	check(not p.bonuses.crit_forced(null), "no entries: no forced crits")
+	check(p.bonuses.scripts().is_empty(), "no entries: no scripts")
 	var double := RecordingBonuses.new()
 	double.player = p
 	double.mods = {&"whirlwind": {"radius_add": 1.0, "power_pct": 10.0}}
@@ -845,24 +989,21 @@ func test_avoided_hits_and_damage_taken_hooks() -> void:
 	check_eq(prec.taken + prec.kinds.count(&"dodge") + prec.kinds.count(&"parry"), 40, "blocked hits still land")
 
 
-func test_cooldown_left_and_class_resource_bonus_stubs() -> void:
+## The hand-off APIs T-CORE-B fills (their P0 stub values: test_p0_stub_tcore_b.gd).
+func test_cooldown_left_and_class_resource_bonus() -> void:
 	_player_world()
 	var p := Fakes.spawn_player(world, 0, &"mage")
 	var blink := Db.get_ability(&"blink")
 	check_eq(p.abilities.cooldown_left(blink), 0.0, "nothing running")
 	p.abilities.set_cooldown(blink, 4.0)
 	check_eq(p.abilities.cooldown_left(blink), 4.0, "the running recharge")
-	p.abilities.reduce_cooldown(blink, 1.0)
-	check_eq(p.abilities.cooldown_left(blink), 4.0, "P0: reduce_cooldown is a no-op")
+	p.abilities.set_cooldown(blink, 0.0)
+	check_eq(p.abilities.cooldown_left(blink), 0.0, "reset")
 	var mana := p.abilities.primary_resource()
 	var bonus := {"max_value_add": 20.0}
 	mana.set_bonus(bonus)
 	bonus["max_value_add"] = 5.0
 	check_eq(mana.bonus, {"max_value_add": 20.0}, "a copy is stored")
-	var n := p.procs.procs.size()
-	p.procs.set_extra_procs(&"talents", [{"trigger": "on_hit", "effect": "bolt", "damage": 3}] as Array[Dictionary])
-	check_eq(p.procs._extra_defs[&"talents"].size(), 1, "stored")
-	check_eq(p.procs.procs.size(), n, "P0: not built into procs")
 
 
 # --- Enemy -------------------------------------------------------------------------------------
@@ -1109,7 +1250,12 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	check(panel.tooltip.viewer_equipment == hero.equipment, "the tooltip knows the viewer's equipment")
 	panel.open_menu()
 	check_eq(Array(panel.menu_labels()), ["Unequip", "Forge", "Cancel"], "Forge after Unequip")
-	check(not panel.menu_entry_enabled("Forge"), "disabled (stub)")
+	# The entry follows Forge.blocked_reason (the stub's or FORGE's): a lone starting sword has
+	# no partner either way.
+	var sword := hero.equipment.get_item(Items.EquipSlot.MAIN_HAND)
+	var reason := Forge.blocked_reason(hero.equipment, sword)
+	check(reason != "", "a lone starting sword cannot be forged")
+	check_eq(panel.menu_entry_enabled("Forge"), reason == "", "enabled exactly when Forge allows it")
 	panel.select_menu_entry("Forge")
 	var input := slot.input as ScriptedInput
 	input.press(PlayerInput.Pad.A)
@@ -1117,7 +1263,7 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	panel.handle_input(input)
 	input.release(PlayerInput.Pad.A)
 	input.poll(0.0)
-	check_eq(panel.last_message, Forge.NOT_AVAILABLE, "the reason is shown")
+	check_eq(panel.last_message, reason, "the reason is shown")
 	panel.close_menu()
 	var dagger := ItemGenerator.generate_weapon(Db.get_weapon(&"dagger"), Items.Rarity.COMMON, 1, false, RunState.rng)
 	hero.equipment.add_to_backpack(dagger)
@@ -1137,8 +1283,7 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	check(not Array(panel.menu_labels()).has("Forge"), "only weapons")
 	panel.close_menu()
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
-	check(panel.active_tab == PlayerPanel.TALENTS_TAB and panel.talents.visible and not panel._body.visible,
-		"the Talents tab opens")
+	check(panel.active_tab == PlayerPanel.TALENTS_TAB and panel.talents.visible, "the Talents tab opens")
 	check(PlayerPanel.LOCKED_TABS.is_empty(), "no locked tabs")
 
 
@@ -1161,29 +1306,13 @@ func test_debug_start_tab_opens_p1_on_talents_once() -> void:
 	check_eq(p1.active_tab, PlayerPanel.CHARACTER_TAB, "once")
 
 
-func test_stubs_are_neutral() -> void:
-	var eq := Equipment.new(Db.get_class_data(&"warrior"))
-	eq.equip_starting_weapons()
-	var sword := eq.get_item(Items.EquipSlot.MAIN_HAND)
-	check(not Forge.is_forgeable(sword) and Forge.partner_for(eq, sword) == null, "nothing forgeable")
-	check_eq(Forge.blocked_reason(eq, sword), "Forging is not available yet", "reason")
-	check(Forge.forge(eq, sword) == null and Forge.bot_forge_all(null) == 0, "no forging")
-	check(SetBonuses.counts(eq).is_empty() and SetBonuses.effects_for(eq).is_empty() and SetBonuses.active_count(eq) == 0,
-		"no sets")
-	var state := RunState.rng.state
-	check(EliteAffixes.schedule(10, 60.0, 4, RunState.rng).is_empty(), "no elites")
-	check(EliteAffixes.roll_count(10, 4, RunState.rng) == 0 and EliteAffixes.expected_count(10, 4) == 0.0, "count 0")
-	check_eq(RunState.rng.state, state, "and no draws")
-	check_eq(EliteAffixes.ALL.size(), 4, "four affixes")
-	var spawner := GoblinSpawner.create(null)
-	nodes.append(spawner)
-	check_eq(spawner.pending_time(), -1.0, "no goblin")
-	check_eq(GoblinSpawner.chance_for(5, 100.0), 0.0, "no chance yet")
-	check_eq(TalentBot.spend_all(null, 0), 0, "bots spend nothing yet")
-	var tab := TalentTab.create(null)
-	nodes.append(tab)
-	check(not tab.handle_input(null, DT) and not tab.is_modal() and tab.prompt_spec().is_empty(), "tab stub")
+## Frozen pieces of the stubbed classes (their stub values: tests/test_p0_stub_*.gd).
+func test_talent_effect_base_and_constants() -> void:
 	var effect := TalentEffect.new()
 	effect.setup(null, 2, {"every": 5, "name": "x"})
 	check(effect.rank == 2 and effect.num("every") == 5.0 and effect.num("name", 1.0) == 1.0, "TalentEffect basics")
 	check(effect.damage_mult(null, &"fire", &"weapon") == 1.0 and not effect.crit_forced(null), "neutral hooks")
+	check_eq(EliteAffixes.ALL.size(), 4, "four affixes")
+	check(EliteAffixes.expected_count(EliteAffixes.FIRST_WAVE - 1, 4) == 0.0, "no elites before FIRST_WAVE")
+	check_eq(PlayerBonuses.SOURCE_TALENTS, &"talents", "talent source")
+	check_eq(PlayerBonuses.SOURCE_SETS, &"set_bonus", "set source")
