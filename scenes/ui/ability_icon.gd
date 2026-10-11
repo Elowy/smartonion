@@ -1,22 +1,34 @@
 class_name AbilityIcon
 extends Control
-## One ability slot on the HUD / lobby card, drawn in code (no image assets yet): a gold-rimmed
-## square with a procedural glyph picked by AbilityData.icon (falling back to the ability id and
-## then to the school), tinted by AbilityData.color (or the school colour when the data leaves
-## the default white).
+## One ability slot on the HUD / lobby card / Trainer, drawn in code (no image assets yet): a
+## gold-rimmed square with a procedural glyph picked by AbilityData.icon (falling back to the
+## ability id and then to the school), tinted by AbilityData.color (or the school colour when the
+## data leaves the default white). Every shipped ability id has its own glyph (EXACT_GLYPHS);
+## the token rules and the school are the fallbacks for new content.
 ##
 ## State drawn on top of the glyph (all pushed in by the owner, nothing is read from gameplay):
-##  - cooldown sweep: a dark pie that shrinks clockwise (WoW style) + the seconds left,
+##  - cooldown sweep: a dark pie that shrinks clockwise (WoW style) + the seconds left (the
+##    seconds can be switched off: [member show_cooldown_text], the small auto-cast icons),
 ##  - dimmed: off cooldown but not usable (resource missing / player down) - darker, the cost in red,
 ##  - flash: a short white pop when the ability was cast ([method flash_cast]),
 ##  - the button prompt ("RT", "LMB" ...) as a small pill straddling the bottom edge, the
-##    resource cost in the top-right corner.
+##    resource cost in the top-right corner,
+##  - the rank (GDD 6.3, [method set_rank]): one small gold diamond per rank (I–V) up the left
+##    edge, orange once the Rank V specialisation is chosen.
 ## Empty slots draw a faint socket. The control is SIZE wide and SIZE + PROMPT_OVERHANG tall
-## (the prompt pill hangs below the square).
+## (the prompt pill hangs below the square) unless it is created without the prompt row
+## (create(size, false): a plain square for the auto-cast slots and the Trainer list).
 
 enum Glyph {
 	GENERIC, PHYSICAL, WHIRLWIND, DASH, BLIZZARD, BLINK, CONSECRATION, HEAL, KNIVES, VANISH,
 	RAIN_OF_FIRE, DRAIN, FIRE, FROST, ARCANE, HOLY, SKULL, NATURE, SHIELD, HAMMER, BOLT, BOMB,
+	# M4 learned abilities (GDD 6.4), one each.
+	THUNDER_CLAP, HEROIC_LEAP, EXECUTE, BATTLE_SHOUT, SHIELD_WALL, BLADESTORM,
+	FIREBALL, FROST_NOVA, ARCANE_MISSILES, ICE_BARRIER, PYROBLAST, METEOR,
+	AVENGERS_SHIELD, DIVINE_STORM, KINGS, DIVINE_SHIELD, LAY_ON_HANDS,
+	SHURIKEN, BLADE_FLURRY, POISON_BOMB, CHEAT_DEATH, SHADOWSTEP, KILLING_SPREE,
+	CORRUPTION, SHADOW_BOLT, SEED, VOIDWALKER, FEAR, INFERNAL,
+	BANDAGE, SPRINT, WAR_STOMP, SPIRIT_WOLF, BERSERKING,
 }
 
 const SIZE := 50.0
@@ -31,6 +43,14 @@ const SWEEP_REDRAW_STEP := 0.004
 ## Glyph half-extent as a share of the half icon size.
 const GLYPH_SCALE := 0.74
 const OUT := Color(0.05, 0.03, 0.02, 0.95)
+## Icons narrower than this use the small text sizes (SMALL_FONT).
+const SMALL_ICON := 36.0
+const SMALL_FONT := 14
+const MAX_RANK := 5
+## Rank pips: gold, orange once the Rank V specialisation is chosen.
+const RANK_COLOR := Color(1.0, 0.86, 0.38)
+const RANK_SPEC_COLOR := Color(1.0, 0.52, 0.12)
+const ROMAN: Array[String] = ["", "I", "II", "III", "IV", "V"]
 
 const SCHOOL_COLORS: Dictionary[StringName, Color] = {
 	&"physical": Color(0.86, 0.78, 0.62),
@@ -48,11 +68,33 @@ const SCHOOL_GLYPHS: Dictionary[StringName, Glyph] = {
 	&"arcane": Glyph.ARCANE, &"holy": Glyph.HOLY, &"shadow": Glyph.SKULL, &"nature": Glyph.NATURE,
 }
 
-## Whole ids first (they win over the token rules).
+## Whole ids first (they win over the token rules): every shipped ability (M3 core kits and the
+## M4 pool of GDD 6.4) has its own glyph.
 const EXACT_GLYPHS: Dictionary[StringName, Glyph] = {
-	&"thunder_clap": Glyph.WHIRLWIND, &"war_stomp": Glyph.HAMMER, &"cheat_death": Glyph.SKULL,
-	&"divine_storm": Glyph.HOLY, &"rain_of_fire": Glyph.RAIN_OF_FIRE, &"drain_life": Glyph.DRAIN,
-	&"word_of_glory": Glyph.HEAL, &"fan_of_knives": Glyph.KNIVES, &"lay_on_hands": Glyph.HEAL,
+	# M3 core abilities.
+	&"whirlwind": Glyph.WHIRLWIND, &"charge": Glyph.DASH, &"blizzard": Glyph.BLIZZARD,
+	&"blink": Glyph.BLINK, &"consecration": Glyph.CONSECRATION, &"word_of_glory": Glyph.HEAL,
+	&"fan_of_knives": Glyph.KNIVES, &"vanish": Glyph.VANISH, &"rain_of_fire": Glyph.RAIN_OF_FIRE,
+	&"drain_life": Glyph.DRAIN,
+	# Warrior.
+	&"thunder_clap": Glyph.THUNDER_CLAP, &"heroic_leap": Glyph.HEROIC_LEAP, &"execute": Glyph.EXECUTE,
+	&"battle_shout": Glyph.BATTLE_SHOUT, &"shield_wall": Glyph.SHIELD_WALL, &"bladestorm": Glyph.BLADESTORM,
+	# Mage.
+	&"fireball": Glyph.FIREBALL, &"frost_nova": Glyph.FROST_NOVA, &"arcane_missiles": Glyph.ARCANE_MISSILES,
+	&"ice_barrier": Glyph.ICE_BARRIER, &"pyroblast": Glyph.PYROBLAST, &"meteor": Glyph.METEOR,
+	# Paladin.
+	&"hammer_of_justice": Glyph.HAMMER, &"avengers_shield": Glyph.AVENGERS_SHIELD,
+	&"divine_storm": Glyph.DIVINE_STORM, &"blessing_of_kings": Glyph.KINGS,
+	&"divine_shield": Glyph.DIVINE_SHIELD, &"lay_on_hands": Glyph.LAY_ON_HANDS,
+	# Rogue.
+	&"shuriken_toss": Glyph.SHURIKEN, &"blade_flurry": Glyph.BLADE_FLURRY, &"poison_bomb": Glyph.POISON_BOMB,
+	&"cheat_death": Glyph.CHEAT_DEATH, &"shadowstep": Glyph.SHADOWSTEP, &"killing_spree": Glyph.KILLING_SPREE,
+	# Warlock.
+	&"corruption": Glyph.CORRUPTION, &"shadow_bolt": Glyph.SHADOW_BOLT, &"seed_of_corruption": Glyph.SEED,
+	&"summon_voidwalker": Glyph.VOIDWALKER, &"fear": Glyph.FEAR, &"summon_infernal": Glyph.INFERNAL,
+	# General pool.
+	&"bandage": Glyph.BANDAGE, &"sprint": Glyph.SPRINT, &"engineers_bomb": Glyph.BOMB,
+	&"war_stomp": Glyph.WAR_STOMP, &"spirit_wolf": Glyph.SPIRIT_WOLF, &"berserking": Glyph.BERSERKING,
 }
 
 ## Ordered token rules: the first rule with a key that starts one of the id's `_`-separated
@@ -105,6 +147,14 @@ var flash := 0.0
 ## Charge counter (Blink with a second charge): shown top-left while charges_max > 1.
 var charges := 0
 var charges_max := 0
+## Rank I–V (0 = not shown, e.g. the lobby preview) and whether the Rank V specialisation is
+## chosen (orange pips).
+var rank := 0
+var rank_spec := false
+## The seconds on the cooldown sweep (off on the small auto-cast icons: the sweep says enough).
+var show_cooldown_text := true
+## Created with the prompt row below the square (see [method create]).
+var has_prompt_row := true
 
 ## StyleBoxes reused by every draw (a running cooldown redraws every few frames): the fixed
 ## looks are shared by all icons, the tinted ones belong to the icon and are recoloured.
@@ -118,10 +168,12 @@ var _drawn_ratio := -1.0
 var _side := SIZE
 
 
-static func create(p_size: float = SIZE) -> AbilityIcon:
+## [param with_prompt_row] false: a plain square (no room for the button prompt pill below it).
+static func create(p_size: float = SIZE, with_prompt_row: bool = true) -> AbilityIcon:
 	var i := AbilityIcon.new()
 	i._side = p_size
-	i.custom_minimum_size = Vector2(p_size, p_size + PROMPT_OVERHANG)
+	i.has_prompt_row = with_prompt_row
+	i.custom_minimum_size = Vector2(p_size, p_size + (PROMPT_OVERHANG if with_prompt_row else 0.0))
 	i.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	i.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	i.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -216,7 +268,21 @@ static func format_cooldown(seconds: float) -> String:
 	return str(int(ceilf(seconds - 0.001)))
 
 
+## "I" .. "V" for ranks 1..5 ("" outside).
+static func roman(p_rank: int) -> String:
+	return ROMAN[p_rank] if p_rank >= 1 and p_rank < ROMAN.size() else ""
+
+
 # --- State ------------------------------------------------------------------------------
+
+## Rank pips: [param p_rank] 1..5 (0 hides them); [param spec_chosen] turns them orange.
+func set_rank(p_rank: int, spec_chosen: bool = false) -> void:
+	var r := clampi(p_rank, 0, MAX_RANK)
+	if r != rank or spec_chosen != rank_spec:
+		rank = r
+		rank_spec = spec_chosen
+		queue_redraw()
+
 
 ## Shows [param a] (null = empty socket). [param p_cost] < 0 uses AbilityData.cost.
 func set_ability(a: AbilityData, p_cost: float = -1.0, p_cost_color: Color = Color(0, 0, 0, 0)) -> void:
@@ -369,19 +435,70 @@ func _draw() -> void:
 	rim.set_border_width_all(2)
 	draw_style_box(rim, rect)
 
-	if _text_cache != "":
-		_text(_text_cache, rect.get_center(), COOLDOWN_FONT, UiTheme.TEXT)
+	var small := sq < SMALL_ICON
+	var corner_font := SMALL_FONT if small else COST_FONT
+	var corner_y := corner_font * 0.6 + 0.5
+	if _text_cache != "" and show_cooldown_text:
+		_text(_text_cache, rect.get_center(), SMALL_FONT + 2 if small else COOLDOWN_FONT, UiTheme.TEXT)
 	if cost > 0.0:
 		var label := UiTheme.format_amount(cost)
 		var color := UiTheme.RED.lightened(0.15) if dimmed else cost_color.lightened(0.5)
-		var w := _text_width(label, COST_FONT)
-		_text(label, Vector2(sq - w * 0.5 - 3.0, 11.0), COST_FONT, color, 5)
+		var w := _text_width(label, corner_font)
+		_text(label, Vector2(sq - w * 0.5 - 3.0, corner_y), corner_font, color, 5)
 	if charges_max > 1:
 		var count := str(charges)
-		var cw := _text_width(count, COST_FONT)
-		_text(count, Vector2(cw * 0.5 + 4.0, 11.0), COST_FONT, UiTheme.GOLD_BRIGHT if charges > 0 else UiTheme.RED.lightened(0.15), 5)
+		var cw := _text_width(count, corner_font)
+		# Right of the rank pips' column.
+		var left := 4.0 + (rank_pip_size(sq) * 2.0 + 1.0 if rank > 0 else 0.0)
+		_text(count, Vector2(cw * 0.5 + left, corner_y), corner_font, UiTheme.GOLD_BRIGHT if charges > 0 else UiTheme.RED.lightened(0.15), 5)
+	if rank > 0:
+		_draw_rank(sq)
 	if show_prompt and prompt != "":
 		_draw_prompt(sq)
+
+
+## Half-size of one rank diamond on an icon of side [param sq].
+static func rank_pip_size(sq: float) -> float:
+	return maxf(1.7, sq * 0.05)
+
+
+## Centres of the rank pips (bottom one first) on an icon of side [param sq]; [param above_prompt]
+## keeps them clear of the prompt pill hanging over the bottom edge.
+static func rank_pip_centers(sq: float, count: int, above_prompt: bool) -> PackedVector2Array:
+	var r := rank_pip_size(sq)
+	var step := r * 2.0 + maxf(0.8, sq * 0.026)
+	var bottom := (sq - PROMPT_OVERHANG - 2.0 if above_prompt else sq - 2.5) - r
+	var out := PackedVector2Array()
+	for i in clampi(count, 0, MAX_RANK):
+		out.append(Vector2(2.5 + r, bottom - i * step))
+	return out
+
+
+## One small diamond per rank up the left edge (GDD 12: rank shown on every icon).
+func _draw_rank(sq: float) -> void:
+	var r := rank_pip_size(sq)
+	var fill := RANK_SPEC_COLOR if rank_spec else RANK_COLOR
+	for c in rank_pip_centers(sq, rank, show_prompt and prompt != ""):
+		var o := r + 1.2
+		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -o), c + Vector2(o, 0), c + Vector2(0, o), c + Vector2(-o, 0)]), OUT)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)]), fill)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r * 0.7), c + Vector2(r * 0.45, -r * 0.1), c + Vector2(-r * 0.45, -r * 0.1)]), Color(1, 1, 1, 0.55))
+
+
+## A small gear (auto-cast mark) centred on [param center] with outer radius [param r].
+static func draw_gear(ci: CanvasItem, center: Vector2, r: float, fill: Color, outline: Color = OUT) -> void:
+	var teeth := 8
+	var pts := PackedVector2Array()
+	for i in teeth * 4:
+		var a := TAU * (i / float(teeth * 4)) - PI * 0.5
+		var tooth := (i % 4) < 2
+		pts.append(center + Vector2(cos(a), sin(a)) * (r if tooth else r * 0.74))
+	var ring := pts.duplicate()
+	ring.append(pts[0])
+	ci.draw_polyline(ring, outline, maxf(1.5, r * 0.22), true)
+	ci.draw_colored_polygon(pts, fill)
+	ci.draw_circle(center, r * 0.36, outline, true, -1.0, true)
+	ci.draw_circle(center, r * 0.2, fill.darkened(0.5), true, -1.0, true)
 
 
 ## A StyleBoxFlat shared by every icon (socket, dim, veil, outer): built once, never changed.

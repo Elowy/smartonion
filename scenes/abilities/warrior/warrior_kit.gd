@@ -1,10 +1,14 @@
 class_name WarriorKit
 extends RefCounted
-## Shared helpers of the Warrior kit (Whirlwind, Charge, Battle Fury): weapon damage, enemy
-## queries around the hero and the free run-up in front of it.
+## Shared helpers of the Warrior kit (Whirlwind, Charge, Battle Fury and the M4 abilities):
+## weapon damage, enemy queries around the hero, the free run-up in front of it, landing
+## spots, knockback and Rage gains.
 
 ## Damage of a main-hand hit when the hero has no weapon (bare fists).
 const FALLBACK_DAMAGE := 3.0
+const RAGE := &"rage"
+## Landing spots inside a prop are moved back towards the take-off in steps of this (m).
+const LANDING_STEP := 0.4
 
 
 ## Damage of one main-hand weapon hit (100%), before crits and target bonuses. Abilities
@@ -94,3 +98,114 @@ static func _walk_rect(arena: Arena, player: Player) -> Rect2:
 	if not is_instance_valid(arena.camera) or not arena.camera.is_inside_tree():
 		return Rect2(0.0, 0.0, -1.0, -1.0)
 	return arena.camera.get_walk_rect(player)
+
+
+## Living enemies around [param player] (within [param radius], bodies counted) inside the
+## [param arc_degrees] wedge centred on [param direction] (XZ). 360 or more = the full circle.
+static func enemies_in_arc(player: Player, radius: float, direction: Vector3, arc_degrees: float) -> Array[Enemy]:
+	var all := enemies_within(player, radius)
+	if arc_degrees >= 360.0:
+		return all
+	var dir := Vector3(direction.x, 0.0, direction.z)
+	if dir.length_squared() < 0.0001:
+		return all
+	dir = dir.normalized()
+	var min_dot := cos(deg_to_rad(clampf(arc_degrees, 0.0, 360.0) * 0.5))
+	var here := player.global_position
+	var out: Array[Enemy] = []
+	for e in all:
+		var to := Vector3(e.global_position.x - here.x, 0.0, e.global_position.z - here.z)
+		var dist := to.length()
+		# A body overlapping the hero always counts; else the centre must lie in the wedge.
+		if dist <= Player.RADIUS + e.radius or to.dot(dir) >= min_dot * dist:
+			out.append(e)
+	return out
+
+
+## +[param amount] Rage for [param player] (Resource Regen applies like any gain).
+static func add_rage(player: Player, amount: float) -> void:
+	if player == null or player.abilities == null or amount <= 0.0:
+		return
+	var rage := player.abilities.get_resource(RAGE)
+	if rage != null:
+		rage.add(amount)
+
+
+## Pushes [param e] away from [param from] like a weapon knockback of [param strength]
+## (the enemy's knockback resistance applies).
+static func knock_back(e: Enemy, from: Vector3, strength: float) -> void:
+	if e == null or not is_instance_valid(e) or e.is_dead() or strength <= 0.0:
+		return
+	var away := Vector3(e.global_position.x - from.x, 0.0, e.global_position.z - from.z)
+	if away.length_squared() < 0.0001:
+		away = Vector3.RIGHT
+	var resist := clampf(e.data.knockback_resist, 0.0, 1.0) if e.data != null else 0.0
+	var push := away.normalized() * strength * Enemy.KNOCKBACK_VELOCITY_PER_UNIT * (1.0 - resist)
+	e.knockback_velocity = (e.knockback_velocity + push).limit_length(Enemy.MAX_KNOCKBACK_SPEED)
+
+
+## Where [param player] coming from [param from] can land near [param to]: inside the arena
+## and the shared screen, and – when [param to] is inside a prop – moved back towards
+## [param from] until the body fits (at worst [param from]).
+static func landing_spot(player: Player, from: Vector3, to: Vector3) -> Vector3:
+	var dest := keep_in_play_area(player, from, Vector3(to.x, from.y, to.z))
+	dest.y = from.y
+	if player == null or not player.is_inside_tree():
+		return dest
+	var back := Vector3(from.x - dest.x, 0.0, from.z - dest.z)
+	var length := back.length()
+	var steps := ceili(length / LANDING_STEP)
+	for i in steps + 1:
+		var spot := dest + (back * (float(i) / float(steps)) if steps > 0 else Vector3.ZERO)
+		if body_fits(player, spot):
+			return spot
+	return from
+
+
+## True when the hero's body at [param pos] touches no world geometry (props, walls).
+static func body_fits(player: Player, pos: Vector3) -> bool:
+	if player == null or not player.is_inside_tree():
+		return true
+	var shape := CapsuleShape3D.new()
+	shape.radius = Player.RADIUS
+	shape.height = Player.BODY_HEIGHT
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.transform = Transform3D(Basis.IDENTITY, Vector3(pos.x, pos.y + Player.BODY_HEIGHT * 0.5, pos.z))
+	query.collision_mask = Player.COLLISION_MASK_WORLD
+	query.exclude = [player.get_rid()]
+	return player.get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
+
+
+## The living enemy within [param reach] of [param player] with the most other enemies within
+## [param radius] of it (ties: the first found), null when none. [param min_count] = fewest
+## enemies (itself included) the group must have.
+static func densest_enemy(player: Player, reach: float, radius: float, min_count: int = 1) -> Enemy:
+	if player == null or not player.is_inside_tree():
+		return null
+	var tree := player.get_tree()
+	var best: Enemy = null
+	var best_count := maxi(0, min_count - 1)
+	for node in EnemyGrid.gather_around(tree, player.global_position, reach):
+		var e := node as Enemy
+		if e == null or e.is_dead():
+			continue
+		if WeaponRunner.flat(e.global_position - player.global_position).length() > reach:
+			continue
+		var count := EnemyGrid.count_around(tree, e.global_position, radius)
+		if count > best_count:
+			best_count = count
+			best = e
+	return best
+
+
+## True when [param e] is an elite or a boss.
+static func is_big(e: Enemy) -> bool:
+	return e != null and is_instance_valid(e) and e.is_elite()
+
+
+## A short "skill name" text over the hero's head.
+static func shout_text(player: Player, text: String, color: Color) -> void:
+	if player == null or not player.is_inside_tree():
+		return
+	Vfx.floating_text(player.self_text_position(1.0), text, color, Player.SELF_TEXT_SIZE, 1.0)
