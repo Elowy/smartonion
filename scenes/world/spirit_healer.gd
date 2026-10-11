@@ -21,9 +21,11 @@ extends Node3D
 ## calls, no shadows): robed, hooded body with open arms and two flapping wings
 ## ([method Mats.ghost] look, one own material each so they can brighten), glowing face and
 ## hands, golden halo, sash and cuffs, a faint aura, a rune circle on the ground marking
-## HEAL_RADIUS, rising light motes and one OmniLight3D. While any ghost exists
-## ([method is_active]) the circle, the spirit and the light pulse brighter and a soft light
-## column marks the spot from afar.
+## HEAL_RADIUS, rising light motes and one OmniLight3D. It is only shown while a ghost exists
+## ([method is_active], the living never see it): it fades in and rises over
+## [constant APPEAR_TIME] when somebody falls and fades away once everyone stands again (the
+## pulse keeps running while hidden). While shown, the circle, the spirit and the light pulse
+## and a soft light column marks the spot from afar.
 
 ## Emitted right after the healer revived [param player].
 signal resurrected(player: Player)
@@ -66,6 +68,9 @@ const COLUMN_HEIGHT := 11.0
 const COLUMN_RADIUS := 1.0
 ## Seconds to fade between calm and active.
 const FADE_TIME := 0.5
+## Seconds to appear when somebody falls / to fade away once everyone stands again: the
+## healer is only shown while a ghost exists (the living never see it; its pulse runs on).
+const APPEAR_TIME := 0.6
 
 const _RING_CODE := """
 shader_type spatial;
@@ -189,6 +194,8 @@ var _glow := 0.0
 var _channel_ratio := 0.0
 var _flare := 0.0
 var _time := 0.0
+## 0 (hidden) .. 1 (fully there): see [constant APPEAR_TIME].
+var _shown := 0.0
 ## Wing beat phase (accumulated: the beat speeds up while active without jumping).
 var _wing_phase := 0.0
 
@@ -204,6 +211,11 @@ static func create() -> SpiritHealer:
 ## True while at least one ghost exists: the healer glows, pulses and shows its light column.
 func is_active() -> bool:
 	return ghost_count > 0
+
+
+## True while the healer is drawn at all (a ghost exists, or it is still fading away).
+func is_shown() -> bool:
+	return visible and _shown > 0.0
 
 
 ## True when [param point] is inside the heal circle (flat XZ distance).
@@ -299,11 +311,26 @@ func _process(delta: float) -> void:
 	if _spirit == null:
 		return
 	_time += delta
+	var was_hidden := _shown <= 0.0
+	_shown = move_toward(_shown, 1.0 if is_active() else 0.0, delta / APPEAR_TIME)
+	visible = _shown > 0.0
+	_motes.emitting = is_active()
+	if not visible:
+		return
+	if was_hidden:
+		_flare = maxf(_flare, 0.6)  # it materialises with a soft flash
+	# Fade (alpha) and rise / grow (spirit, ring) while appearing or vanishing.
+	var a := _shown
+	var grow := ease(_shown, 0.5)
 	_glow = move_toward(_glow, 1.0 if is_active() else 0.0, delta / FADE_TIME)
 	_flare = maxf(0.0, _flare - delta * 1.4)
 	var pulse := 0.5 + 0.5 * sin(_time * 3.4)
 	var g := _glow
-	_spirit.position.y = FLOAT_HEIGHT + sin(_time * 1.7) * BOB_HEIGHT
+	_spirit.position.y = lerpf(-0.4, FLOAT_HEIGHT, grow) + sin(_time * 1.7) * BOB_HEIGHT
+	# The halo / glows use shared glow materials that cannot fade: they grow from a speck.
+	_spirit.scale = Vector3.ONE * SPIRIT_SCALE * lerpf(0.15, 1.0, grow)
+	var d := HEAL_RADIUS * 2.0 * RING_PAD * lerpf(0.6, 1.0, grow)
+	_ring.scale = Vector3(d, 1.0, d)
 	_spirit.rotation.z = sin(_time * 1.1) * 0.03
 	_wing_phase = fmod(_wing_phase + delta * (2.2 + 1.2 * g), TAU)
 	var flap := sin(_wing_phase) * (0.1 + 0.08 * g)
@@ -311,27 +338,31 @@ func _process(delta: float) -> void:
 		var side := 1.0 if i == 0 else -1.0
 		_wings[i].rotation = Vector3(0.0, side * (0.42 + flap), side * (-0.06 - flap * 0.6))
 	var ring_mat := _ring.material_override as ShaderMaterial
+	ring_mat.set_shader_parameter(&"rune_color", Color(RING_COLOR.r, RING_COLOR.g, RING_COLOR.b, a))
 	ring_mat.set_shader_parameter(&"intensity", g)
 	ring_mat.set_shader_parameter(&"channel", _channel_ratio)
 	ring_mat.set_shader_parameter(&"flare", _flare)
-	_set_ghost_color(_body, BODY_IDLE.lerp(BODY_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0)))
+	var body_color := BODY_IDLE.lerp(BODY_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0))
+	body_color.a *= a
+	_set_ghost_color(_body, body_color)
 	var wing_color := WING_IDLE.lerp(WING_ACTIVE, clampf(g * (0.8 + 0.2 * pulse) + _flare * 0.4, 0.0, 1.0))
+	wing_color.a *= a
 	for w in _wing_meshes:
 		_set_ghost_color(w, wing_color)
 	(_aura.material_override as ShaderMaterial).set_shader_parameter(&"strength",
-		lerpf(AURA_IDLE, AURA_ACTIVE, g) * (1.0 + 0.25 * g * pulse) + 0.4 * _flare)
+		(lerpf(AURA_IDLE, AURA_ACTIVE, g) * (1.0 + 0.25 * g * pulse) + 0.4 * _flare) * a)
 	var halo_scale := 1.0 + 0.08 * g * pulse + 0.25 * _flare
 	_halo.scale = Vector3(halo_scale, 1.0, halo_scale)
-	_light.light_energy = lerpf(LIGHT_ENERGY_IDLE, LIGHT_ENERGY_ACTIVE, g) * (1.0 + 0.2 * g * pulse) + 1.5 * _flare
+	_light.light_energy = (lerpf(LIGHT_ENERGY_IDLE, LIGHT_ENERGY_ACTIVE, g) * (1.0 + 0.2 * g * pulse) + 1.5 * _flare) * a
 	_column.visible = g > 0.01
 	if _column.visible:
-		(_column.material_override as ShaderMaterial).set_shader_parameter(&"strength", 0.5 * g * (0.85 + 0.15 * pulse))
+		(_column.material_override as ShaderMaterial).set_shader_parameter(&"strength", 0.5 * g * (0.85 + 0.15 * pulse) * a)
 	_motes.speed_scale = 1.0 + 0.8 * g
 	if _countdown != null:
 		_countdown.visible = g > 0.05
 		if _countdown.visible:
 			_countdown.text = str(ceili(maxf(0.0, pulse_left)))
-			_countdown.modulate.a = g
+			_countdown.modulate.a = g * a
 
 
 static func _set_ghost_color(mi: MeshInstance3D, c: Color) -> void:

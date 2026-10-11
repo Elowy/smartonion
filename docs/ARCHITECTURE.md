@@ -74,7 +74,12 @@ the new screen never sees the button press that closed the old one.
      (`Player.GHOST_SPEED_MULT` = 1) and that enemies ignore.
    - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
      one at `Arena.SPIRIT_HEALER_POINT` (the centre; no decor there) as its own child (not an
-     entity), `Arena.current.spirit_healer`; no collision. Every physics tick (before the
+     entity), `Arena.current.spirit_healer`; no collision.
+     - It is only drawn while a ghost exists (`is_active()`, `is_shown()`). `_shown` fades
+       it in over `APPEAR_TIME` (0.6 s): alpha, a rising and growing spirit, a growing ring
+       and a soft flash. It fades out the same way and the node's `visible` is false when
+       nobody is down.
+     - The pulse runs regardless. Every physics tick (before the
      entities, paused with the arena) its countdown `pulse_left` runs down from
      `PULSE_INTERVAL` (10 s; restarted by `begin_wave` on `RunState.wave_changed`); at 0
      every ghost within `HEAL_RADIUS` (1.6 m, flat XZ) without Resurrection Sickness

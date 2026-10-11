@@ -64,8 +64,14 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 
 - 0 HP-nál a játékos **elesik** (szellem-alak, **normál sebességgel** mozoghat, nem támad;
   az ellenségek nem foglalkoznak vele).
-- **Spirit Healer:** a pálya közepén egy lebegő, áttetsző, szárnyas szellemalak áll (arany
-  glória, a földön világító rúnakör jelöli a hatósugarát, kb. 1,6 m). **Folyamatosan futó
+- **Spirit Healer:** a pálya közepén egy lebegő, áttetsző, szárnyas szellemalak (arany
+  glória, a földön világító rúnakör jelöli a hatósugarát, kb. 1,6 m). **Csak akkor látszik,
+  ha van elesett játékos:**
+  - Amíg mindenki él, nincs ott.
+  - Amint valaki elesik, felvillanva előtűnik és felemelkedik.
+  - Ha mindenki újra él, elhalványul.
+
+  **Folyamatosan futó
   10 mp-es számlálója** van: a hullám elején indul, és minden lejáratkor (10 mp-enként) a
   körében álló összes szellem **100% HP-val** feléled (fényoszlop az égből, „*Resurrected!*”
   felirat, 1 mp sebezhetetlenség). Az elesett játékos odasétál, és a következő pulzusig vár.
@@ -79,8 +85,9 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
     szellemet feléleszti.
   - Élő játékosra nincs hatása. Csak hullám közben számít (hullámkezdéskor amúgy is
     mindenki feléled).
-  - Amíg van elesett játékos, a Spirit Healer erősebben izzik és lüktet, fényoszlop jelöli,
-    és a kamera mindig képen tartja, így a szellem biztosan látja és eléri.
+  - Amíg látszik (van elesett játékos), izzik és lüktet, fényoszlop jelöli, és a kamera
+    mindig képen tartja, így a szellem biztosan látja és eléri. A számláló láthatatlanul is
+    fut tovább.
   - A játékos keretén (unit frame) a „DOWNED” felirat alatt a „*Go to the Spirit Healer (7 s)*”,
     a körben a „*Spirit Healer: 7 s*”, betegség alatt a „*Resurrection Sickness: 12 s*” felirat
     jelenik meg.

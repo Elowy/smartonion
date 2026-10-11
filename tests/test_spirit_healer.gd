@@ -219,6 +219,30 @@ func test_living_players_are_not_affected() -> void:
 	check(not healer.is_active(), "no ghost: calm")
 
 
+func test_only_shown_while_somebody_is_a_ghost() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior", Vector3(4, 0, 0))
+	healer._physics_process(DT)
+	healer._process(1.0)
+	check(not healer.is_shown() and not healer.visible, "everyone alive: the healer is not there")
+	p.take_damage(9999.0)
+	healer._physics_process(DT)
+	healer._process(SpiritHealer.APPEAR_TIME * 0.5)
+	check(healer.visible, "appears as soon as somebody falls")
+	var spirit := healer.get_node("Spirit") as Node3D
+	check(spirit.scale.x < SpiritHealer.SPIRIT_SCALE - 0.01, "still materialising")
+	healer._process(SpiritHealer.APPEAR_TIME)
+	check(healer.is_shown(), "fully there for the ghost")
+	check_near(spirit.scale.x, SpiritHealer.SPIRIT_SCALE, 0.001, "full size")
+	var left := healer.pulse_left
+	p.revive(1.0)
+	healer._physics_process(DT)
+	healer._process(SpiritHealer.APPEAR_TIME * 0.5)
+	check(healer.visible, "fades away, not popping out")
+	healer._process(SpiritHealer.APPEAR_TIME)
+	check(not healer.is_shown() and not healer.visible, "gone once everyone stands")
+	check_near(healer.pulse_left, left - DT, 0.001, "the pulse keeps running while hidden")
+
+
 func test_one_pulse_revives_every_ghost_in_the_circle() -> void:
 	healer.begin_wave()
 	var a := _ghost(0, Vector3(0.6, 0, 0))
