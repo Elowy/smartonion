@@ -195,7 +195,7 @@ func test_prompts_follow_the_players_device() -> void:
 	check_eq(AbilityBar.prompt_text(null, 2), "RB", "no device: the controller default")
 	# The prompt is the device's real binding (PlayerInput.ability_button), not a fixed table.
 	var kb := KeyboardInput.new()
-	for i in AbilityRunner.MAX_SLOTS:
+	for i in AbilityRunner.INPUT_SLOTS:
 		var key := UiGlyph.keyboard_name(kb.ability_button(i))
 		if i >= AbilityRunner.CORE_SLOTS:
 			check_eq(AbilityBar.prompt_text(kb, i), key, "keyboard slot %d shows its bound key" % i)
