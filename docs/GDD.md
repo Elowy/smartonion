@@ -115,7 +115,7 @@ a százalékos statok közvetlenül %-ban értendők).
 |---|---|---|---|
 | **Critical Strike** | Kritikus esély (%), a krit ×2 sebzés (fegyverenként módosulhat) | 0% | 100% |
 | **Haste** | +% támadási sebesség, −% képesség-cooldown (fele hatással), +% erőforrás-regeneráció | 0% | – |
-| **Mastery** | Kasztonként más hatás (lásd 3. fejezet) | 0 | – |
+| **Mastery** | Kasztonként más hatás (lásd 3. fejezet) | 5 (minden kaszt, hogy a Mastery-passzív az első hullámtól működjön) | – |
 | **Versatility** | +% minden sebzés **és** −(fele)% elszenvedett sebzés | 0% | csökkentés max 30% |
 
 ### 2.3 Védekező és harmadlagos statok

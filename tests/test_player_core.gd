@@ -537,3 +537,10 @@ func test_damage_taken_mults_death_guards_and_shields() -> void:
 	p.invulnerable_left = 0.0
 	p.take_damage(999.0)
 	check(p.downed, "but only while it allows")
+
+
+func test_every_hero_starts_with_base_mastery() -> void:
+	for class_id in Db.class_ids:
+		var p := Player.create(Fakes.make_slot(0, class_id))
+		check_eq(p.stats.get_stat(Stats.MASTERY), Stats.BASE_MASTERY, "%s: 5 Mastery" % class_id)
+		p.free()

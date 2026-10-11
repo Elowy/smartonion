@@ -14,10 +14,11 @@ extends Control
 ## working device vote; bots never block it; process_votes re-evaluates standing votes).
 ## lock_input(seconds) makes A / X ignored for a moment after the market opens.
 ## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with the item it
-## would replace for that player (ItemTooltip.equipped_for_compare), on the stall right beside
-## the hovered card (towards the stall's middle) – never over the player panels in the screen
-## corners; scaled down when taller than the stall body. When tooltips overlap, the one of the
-## player who acted last is on top.
+## would replace for that player (ItemTooltip.equipped_for_compare). Tooltips never overlap
+## each other or the player panels in the screen corners and never hide their own card: each
+## goes beside its hovered card on the stall if that spot is free, else on the card's other
+## side, above / below it, or into the free band between the corner panels on the player's
+## side – at a smaller scale when nothing else fits ([method layout_tooltips]).
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed.
 
@@ -35,8 +36,10 @@ const HOLD_SHARE := 0.5
 const FEEDBACK_LINES := 3
 const FEEDBACK_TIME := 6.0
 const TOOLTIP_GAP := 12.0
-## Shop tooltips are drawn a little smaller so they cover fewer neighbouring cards.
+## Shop tooltips are drawn a little smaller so they cover fewer neighbouring cards; when no
+## free spot is found the next smaller scale is tried.
 const TOOLTIP_SCALE := 0.82
+const TOOLTIP_SCALES: Array[float] = [0.82, 0.72, 0.62, 0.54]
 ## Inset of the tooltips from the stall body's edges.
 const TOOLTIP_MARGIN := 8.0
 
@@ -60,6 +63,8 @@ var last_input_consumed := false
 var _input_lockout := 0.0
 var _tooltips: Dictionary[int, ItemTooltip] = {}
 var _tooltip_keys: Dictionary[int, String] = {}
+## Slot indices, the player who acted last at the end (tooltip priority and draw order).
+var _act_order: Array[int] = []
 ## Newest last: {"bb": String, "plain": String, "age": float}.
 var _feedback: Array[Dictionary] = []
 var _feedback_dirty := false
@@ -786,37 +791,135 @@ func _update_tooltips() -> void:
 			tip.show_item(o.item, s.class_data, compare, o.price)
 			tip.reset_size()
 		tip.visible = true
-		_place_tooltip(tip, s.index)
+	layout_tooltips()
 
 
-## On the stall beside the hovered card: right of it for the left columns, left of it for the
-## right columns, the middle column away from the player's own corner (P1 / P3 right, P2 / P4
-## left); top-aligned with a top-row card, bottom-aligned with a bottom-row card; kept inside
-## the stall body and scaled down to fit it.
-func _place_tooltip(tip: ItemTooltip, slot_index: int) -> void:
-	var index := cursor_of(slot_index)
-	if index < 0 or index >= cards.size():
-		return
-	var body := Rect2(global_position + Vector2(0.0, BODY_TOP), Vector2(size.x, size.y - BODY_TOP)) \
-			.grow(-TOOLTIP_MARGIN)
-	var raw := tip.get_combined_minimum_size().max(tip.size)
-	var fit := minf(1.0, body.size.y / maxf(1.0, raw.y * TOOLTIP_SCALE))
-	tip.scale = Vector2.ONE * TOOLTIP_SCALE * fit
-	var tsize := raw * tip.scale
-	var card := cards[index].get_global_rect()
+## Places every visible tooltip at the first free candidate spot, largest scale first. The
+## player who acted last is placed first (the one browsing gets the best, full-size spot);
+## the others take what is left.
+func layout_tooltips() -> void:
+	var placed: Array[Rect2] = []
+	var areas := tooltip_areas()
+	var order: Array[PlayerSlot] = []
+	for i in range(_act_order.size() - 1, -1, -1):
+		for s in _slots:
+			if s.index == _act_order[i]:
+				order.append(s)
+	for s in _slots:
+		if s not in order:
+			order.append(s)
+	for s in order:
+		var tip: ItemTooltip = _tooltips.get(s.index)
+		var index := cursor_of(s.index)
+		if tip == null or not tip.visible or index < 0 or index >= cards.size():
+			continue
+		var raw := tip.get_combined_minimum_size().max(tip.size)
+		var card := cards[index].get_global_rect()
+		var best := Rect2()
+		var best_scale := TOOLTIP_SCALES[-1]
+		var best_overlap := INF
+		for scale_value in TOOLTIP_SCALES:
+			var tsize := raw * scale_value
+			for r in _candidates(tsize, card, index, s.index, areas):
+				var overlap := _overlap(r, placed) + (r.intersection(card).get_area() * 4.0 if r.intersects(card) else 0.0)
+				if overlap < best_overlap - 0.5:
+					best_overlap = overlap
+					best = r
+					best_scale = scale_value
+				if overlap <= 0.0:
+					break
+			if best_overlap <= 0.0:
+				break
+		tip.scale = Vector2.ONE * best_scale
+		tip.position = best.position - global_position
+		placed.append(best)
+
+
+## Screen rects tooltips may use: the stall body and the free bands between the top and the
+## bottom corner panels on both sides (from the Intermission's panel geometry).
+func tooltip_areas() -> Array[Rect2]:
+	var out: Array[Rect2] = [Rect2(global_position + Vector2(0.0, BODY_TOP), Vector2(size.x, size.y - BODY_TOP))
+			.grow(-TOOLTIP_MARGIN)]
+	if not is_inside_tree():
+		return out
+	var vp := get_viewport_rect().size
+	var panel := PlayerPanel.DESIGN_SIZE * Intermission.panel_scale(PlayerPanel.DESIGN_SIZE)
+	var top := Intermission.MARGIN + panel.y + TOOLTIP_GAP
+	var height := vp.y - 2.0 * (Intermission.MARGIN + panel.y + TOOLTIP_GAP)
+	var left_w := global_position.x - Intermission.MARGIN - TOOLTIP_GAP
+	if height > 40.0 and left_w > 40.0:
+		out.append(Rect2(Intermission.MARGIN, top, left_w, height))
+		var right_x := global_position.x + size.x + TOOLTIP_GAP
+		out.append(Rect2(right_x, top, vp.x - Intermission.MARGIN - right_x, height))
+	return out
+
+
+## Candidate rects (global) for a tooltip of [param tsize] next to [param card], in order of
+## preference, each clamped into one of [param areas] (dropped when it does not fit).
+func _candidates(tsize: Vector2, card: Rect2, index: int, slot_index: int, areas: Array[Rect2]) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var stall := areas[0]
 	# < 0: left half of the grid, 0: middle column, > 0: right half.
 	var side := (index % maxi(1, columns)) * 2 - (columns - 1)
-	var right := side < 0 or (side == 0 and slot_index % 2 == 0)
-	var x := card.end.x + TOOLTIP_GAP if right else card.position.x - TOOLTIP_GAP - tsize.x
+	var right_first := side < 0 or (side == 0 and slot_index % 2 == 0)
 	var top_row := index < columns
-	var y := card.position.y if top_row else card.end.y - tsize.y
-	x = clampf(x, body.position.x, maxf(body.position.x, body.end.x - tsize.x))
-	y = clampf(y, body.position.y, maxf(body.position.y, body.end.y - tsize.y))
-	tip.position = Vector2(x, y) - global_position
+	var y_row := card.position.y if top_row else card.end.y - tsize.y
+	var right_x := card.end.x + TOOLTIP_GAP
+	var left_x := card.position.x - TOOLTIP_GAP - tsize.x
+	for x in ([right_x, left_x] if right_first else [left_x, right_x]):
+		out.append(Rect2(Vector2(x, y_row), tsize))
+	# Below a top-row card / above a bottom-row card.
+	var y_off := card.end.y + TOOLTIP_GAP if top_row else card.position.y - TOOLTIP_GAP - tsize.y
+	out.append(Rect2(Vector2(card.get_center().x - tsize.x * 0.5, y_off), tsize))
+	# The free bands between the corner panels: the player's own side first (P1 / P3 left,
+	# P2 / P4 right), its outer edge for P1 / P2 and inner edge for P3 / P4 (so the two
+	# players of a side sit next to each other), top for P1 / P2, bottom for P3 / P4.
+	var own_band := 1 if slot_index % 2 == 0 else 2
+	var outer_first := slot_index < 2
+	for b in [own_band, 3 - own_band]:
+		if b >= areas.size():
+			continue
+		var band := areas[b]
+		var outer_x := band.position.x if b == 1 else band.end.x - tsize.x
+		var inner_x := band.end.x - tsize.x if b == 1 else band.position.x
+		var top_first := slot_index < 2
+		for x in ([outer_x, inner_x] if outer_first else [inner_x, outer_x]):
+			for y in ([band.position.y, band.end.y - tsize.y] if top_first else [band.end.y - tsize.y, band.position.y]):
+				out.append(Rect2(Vector2(x, y), tsize))
+	var fitted: Array[Rect2] = []
+	for r in out:
+		var area := _area_for(r, areas, stall)
+		if area.size.x + 0.5 >= tsize.x and area.size.y + 0.5 >= tsize.y:
+			var p := Vector2(clampf(r.position.x, area.position.x, area.end.x - tsize.x),
+					clampf(r.position.y, area.position.y, area.end.y - tsize.y))
+			fitted.append(Rect2(p, tsize))
+	return fitted
+
+
+## The area [param r] mostly lies in (the stall when none).
+static func _area_for(r: Rect2, areas: Array[Rect2], stall: Rect2) -> Rect2:
+	var best := stall
+	var best_a := -1.0
+	for a in areas:
+		var share := a.intersection(r).get_area() if a.intersects(r) else 0.0
+		if share > best_a:
+			best_a = share
+			best = a
+	return best
+
+
+static func _overlap(r: Rect2, placed: Array[Rect2]) -> float:
+	var total := 0.0
+	for o in placed:
+		if o.intersects(r):
+			total += o.intersection(r).get_area()
+	return total
 
 
 ## The tooltip of the player who acted last is drawn on top of the others.
 func _raise_tooltip(slot_index: int) -> void:
+	_act_order.erase(slot_index)
+	_act_order.append(slot_index)
 	var tip: ItemTooltip = _tooltips.get(slot_index)
 	if tip != null and tip.get_parent() == _tooltip_layer:
 		_tooltip_layer.move_child(tip, -1)

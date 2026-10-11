@@ -4,9 +4,10 @@ extends CharacterBody3D
 ## mask 1 ("world") – enemies do NOT physically block players; they deal contact damage.
 ## Moves on the XZ plane: input Vector2(x, y) -> world Vector3(x, 0, y).
 ##
-## Stats come from a StatBlock with the sources &"class" (ClassData.base_stats),
-## &"weapon:main", &"weapon:off" (WeaponData.bonus_stats) and – TEMPORARY M1 placeholder –
-## &"level" (LEVEL_STAMINA / LEVEL_DAMAGE_PCT per team level gained). Every equipped weapon that
+## Stats come from a StatBlock with the sources &"base" (Stats.BASE_MASTERY), &"class"
+## (ClassData.base_stats), &"weapon:main", &"weapon:off" (WeaponData.bonus_stats), the
+## equipped items, &"level" (LEVEL_STAMINA per team level gained) and &"level_cards" (stat
+## level-up cards). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
 ## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
 ## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
@@ -165,6 +166,7 @@ static func create(p_slot: PlayerSlot) -> Player:
 	if p.class_data != null:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
 		p.stats.set_source(&"class", p.class_data.base_stats)
+	p.stats.set_source(&"base", {Stats.MASTERY: Stats.BASE_MASTERY})
 	p.procs = ProcSystem.create(p)
 	p.abilities = AbilityRunner.create(p)
 	p.add_child(p.abilities)

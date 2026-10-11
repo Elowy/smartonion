@@ -255,16 +255,18 @@ func test_tooltips_on_the_stall_beside_the_hovered_card() -> void:
 	var t2 := panel.tooltip_of(1)
 	check(t1 != null and t2 != null, "one tooltip per player")
 	check(t1.visible and t2.visible, "shown for the hovered offers")
-	var stall := panel.get_global_rect()
 	for tip in [t1, t2]:
 		var r := _tip_rect(tip)
-		check(stall.grow(0.5).encloses(r), "inside the stall, never over the corner panels: %s in %s" % [r, stall])
+		var inside := false
+		for a in panel.tooltip_areas():
+			inside = inside or a.grow(1.0).encloses(r)
+		check(inside, "on the stall or in a free band, never over the corner panels: %s" % r)
 	var c1 := panel.cards[panel.cursor_of(0)].get_global_rect()
 	var c2 := panel.cards[panel.cursor_of(1)].get_global_rect()
 	check(not _tip_rect(t1).intersects(c1), "P1's tooltip leaves its card visible")
 	check(not _tip_rect(t2).intersects(c2), "P2's tooltip leaves its card visible")
-	check(_tip_rect(t1).position.x >= c1.end.x, "left-column card: tooltip to its right")
-	check(_tip_rect(t2).end.x <= c2.position.x, "right-column card: tooltip to its left")
+	check(_tip_rect(t1).position.x >= c1.end.x, "left-column card: the first choice is to its right")
+	check(not _tip_rect(t1).intersects(_tip_rect(t2)), "the two tooltips do not overlap")
 	check(t1.find_line("P1", true) != null and t2.find_line("P2", true) != null, "owner tag on top")
 	check_eq(t2.owner_color, PlayerManager.get_slot(1).color, "P2's colour")
 	panel.set_cursor_active(0, false)
@@ -289,3 +291,34 @@ func test_cheapest_usable_affordable_offer() -> void:
 	check_eq(panel.cheapest_offer_for(warrior), 1, "sold offers skipped (the warrior can wear cloth)")
 	check(panel.try_buy(mage, 2), "buy helper")
 	check_eq(RunState.gold, 5, "paid")
+
+
+func test_four_tooltips_never_overlap_or_cover_the_panels() -> void:
+	var p3 := MarketFakes.human_with_hero(world, "pad:c", &"paladin")
+	var p4 := MarketFakes.human_with_hero(world, "pad:d", &"rogue")
+	_stock(10)
+	panel.position = Vector2((1920.0 - ShopPanel.STALL_SIZE.x) * 0.5, 140.0 - 8.0)
+	panel.refresh(PlayerManager.get_slots())
+	_layout(panel)
+	# Everybody crowds the middle of the grid (the worst case for overlaps).
+	for i in 4:
+		panel.set_cursor(i, [1, 3, 6, 8][i])
+	panel._process(DT)
+	var rects: Array[Rect2] = []
+	for i in 4:
+		var tip := panel.tooltip_of(i)
+		check(tip != null and tip.visible, "P%d tooltip" % (i + 1))
+		var r := _tip_rect(tip)
+		check(not r.intersects(panel.cards[panel.cursor_of(i)].get_global_rect()), "P%d sees its card" % (i + 1))
+		var inside := false
+		for a in panel.tooltip_areas():
+			inside = inside or a.grow(1.0).encloses(r)
+		check(inside, "P%d inside the stall or a free band: %s" % [i + 1, r])
+		for o in rects:
+			check(not r.intersects(o), "P%d does not overlap another tooltip" % (i + 1))
+		rects.append(r)
+	check(p3 != null and p4 != null, "four players")
+	# The player who acted last gets the best (full-size) spot.
+	panel._raise_tooltip(3)
+	panel._process(DT)
+	check_near(panel.tooltip_of(3).scale.x, ShopPanel.TOOLTIP_SCALES[0], 0.001, "P4 browses: full size")
