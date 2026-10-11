@@ -208,6 +208,43 @@ func _check_mod_keys(a: AbilityData, mods: Dictionary, what: String) -> void:
 		check(a.params.has(param), "%s %s: '%s' is a param" % [a.id, what, param])
 
 
+## Applies Rank III and both Rank V specs through the runner (AbilityRunner.params_at_rank)
+## and checks every mod really changes the param it is meant for (apply_mods: "_add" adds,
+## "_pct" scales an existing param, anything else is set).
+func test_rank3_and_spec_mods_change_their_params() -> void:
+	var p := _hero(&"warrior")
+	var r := p.abilities
+	for id in IDS:
+		var a := _ability(id)
+		_check_mods_applied(a, r.params_at_rank(a, 2), r.params_at_rank(a, 3), a.rank3, "Rank III")
+		var plain := r.params_at_rank(a, 5)
+		for i in a.specs.size():
+			var spec := a.specs[i]
+			_check_mods_applied(a, plain, r.params_at_rank(a, 5, i), spec.get("mods", {}), String(spec.get("name", "")))
+
+
+func _check_mods_applied(a: AbilityData, before: Dictionary, after: Dictionary, mods: Dictionary, what: String) -> void:
+	for key: String in mods:
+		var v: Variant = mods[key]
+		var numeric := typeof(v) in [TYPE_INT, TYPE_FLOAT]
+		var label := "%s %s '%s'" % [a.id, what, key]
+		if key.ends_with("_add") and numeric:
+			var param := key.trim_suffix("_add")
+			check(a.params.has(param), label + ": adds to an existing param")
+			check_near(float(after.get(param, 0.0)), float(before.get(param, 0.0)) + float(v), 0.0001, label)
+		elif key.ends_with("_pct") and numeric and before.has(key.trim_suffix("_pct")):
+			var param := key.trim_suffix("_pct")
+			check_near(float(after[param]), float(before[param]) * (1.0 + float(v) / 100.0), 0.0001, label)
+		else:
+			check(a.params.has(key), label + ": sets a param the effect reads")
+			check_eq(after.get(key), v, label)
+	# Nothing else may change.
+	for other: String in after:
+		if mods.has(other) or mods.has(other + "_add") or mods.has(other + "_pct"):
+			continue
+		check_eq(after[other], before.get(other), "%s %s: '%s' unchanged" % [a.id, what, other])
+
+
 func test_every_class_is_offered_the_general_pool() -> void:
 	for class_id in Db.class_ids:
 		var pool := Db.ability_pool(class_id)
