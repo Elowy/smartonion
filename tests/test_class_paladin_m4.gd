@@ -582,7 +582,8 @@ func test_kings_blesses_every_living_hero() -> void:
 	check(not p.stats.has_source(key), "from the Paladin too")
 	check_near(ally.max_hp(), max_before, 0.0001, "Max HP back")
 	check(ally.hp <= ally.max_hp(), "HP clamped")
-	check(_ending(_vfx(ally, "PaladinKingsMark")[0]) if not _vfx(ally, "PaladinKingsMark").is_empty() else true, "mark fades")
+	var marks := _vfx(ally, "PaladinKingsMark")
+	check(marks.is_empty() or _ending(marks[0]), "mark fades")
 
 
 func test_kings_does_not_compound_and_two_paladins_stack() -> void:
