@@ -459,18 +459,21 @@ func gain_from_proc(amount: float) -> void:
 		primary.add(amount * primary.max_value() * 0.1, false)
 
 
-## Applies item mods to [param base] params. Keys: "<param>_add" adds, "<param>_pct" scales
-## by (1 + v / 100), anything else replaces / sets (flags, new params).
+## Applies item / rank mods to [param base] params. Keys: "<param>_add" adds (missing = 0),
+## "<param>_pct" scales an existing <param> by (1 + v / 100); a "_pct" key whose <param> does
+## not exist sets that key itself (so {"slow_pct": 40} sets a "slow_pct" param); anything else
+## replaces / sets (flags, new params).
 static func apply_mods(base: Dictionary, mods: Dictionary) -> Dictionary:
 	var out := base.duplicate(true)
 	for key: String in mods:
 		var v: Variant = mods[key]
-		if key.ends_with("_add") and typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+		var numeric := typeof(v) in [TYPE_INT, TYPE_FLOAT]
+		if key.ends_with("_add") and numeric:
 			var p := key.trim_suffix("_add")
 			out[p] = float(out.get(p, 0.0)) + float(v)
-		elif key.ends_with("_pct") and typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+		elif key.ends_with("_pct") and numeric and out.has(key.trim_suffix("_pct")):
 			var p := key.trim_suffix("_pct")
-			out[p] = float(out.get(p, 0.0)) * (1.0 + float(v) / 100.0)
+			out[p] = float(out[p]) * (1.0 + float(v) / 100.0)
 		else:
 			out[key] = v
 	return out
