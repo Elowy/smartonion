@@ -792,6 +792,14 @@ Ez a játék fő újítása a Brotatóhoz képest: a szintlépés nem csak stato
   régit. A régi rangjainak goldra váltott értékének 50%-a visszajár.
 - Ha a slotok tele vannak és a játékos nem akar cserélni, a felajánlott kártyák között
   a megtanult abilityk rangemelései súlyozottan gyakrabban jönnek.
+- **M4 döntések:**
+  - A tanult abilityk cooldown-alapúak és ingyenesek (nem költenek kaszt-erőforrást);
+    kivétel: Summon Infernal (1 Soul Shard).
+  - A szintlépés-kártyák választására 40 mp jut (+20 mp minden további szintért); aki addig
+    nem választ, annak a játék választ (ugyanúgy, mint a botoknak). A lecsatlakozott
+    kontroller is automatikusan választ.
+  - Minden játékos saját véletlen-sorozatból húz (a menet seedjéből), így az egyik játékos
+    rerollja nem változtatja meg a másik kártyáit.
 
 ### 6.3 Rangok és fejlesztés goldért (Trainer)
 
@@ -810,6 +818,9 @@ WoW-hangulatban az abilityknek **rangjaik** vannak: **Rank I–V**.
   | V | **Specializáció:** választás 2 módosítás közül, ami megváltoztatja az ability működését (pl. a Fireball pattog vagy robban) |
 
 - A rangok és a gold-ár együtt adják a gazdasági döntést: **új item vagy erősebb ability?**
+- A Trainer a kaszt két alap képességét (RT / LT) is fejleszti. Rank V elérésekor (kártyáról
+  vagy a Trainernél) a játékos kiválasztja a specializációt; ha elhalasztja, a Trainer fülön
+  később választhat.
 
 ### 6.4 Ability-készlet (MVP)
 
@@ -834,7 +845,7 @@ Kasztonként 6 saját ability + 6 általános, amit minden kaszt megkaphat.
 | Paladin | Divine Storm | Auto | Körkörös szent csapás, a közeli társakat gyógyítja |
 | Paladin | Blessing of Kings | Auto | Minden társ +5% minden statot kap 10 mp-re |
 | Paladin | Divine Shield | Active | 3 mp sebezhetetlenség |
-| Paladin | Lay on Hands | Active | Teljesen gyógyítja a legkevesebb HP-jú társat (hosszú CD) |
+| Paladin | Lay on Hands | Active | Teljesen gyógyítja a legkevesebb HP-jú társat (hosszú CD); elesett társat nem éleszt fel (azonnal csak a Word of Glory éleszt) |
 | Rogue | Shuriken Toss | Auto | 3 shuriken legyezőben |
 | Rogue | Blade Flurry | Auto | 5 mp-ig a találatok egy második célpontot is érnek |
 | Rogue | Poison Bomb | Auto | Méregfelhő a földön |

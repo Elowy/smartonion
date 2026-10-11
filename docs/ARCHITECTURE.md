@@ -127,11 +127,10 @@ the new screen never sees the button press that closed the old one.
 - Team level: a run starts at level 1 (`RunState.START_LEVEL`, WoW style); the n-th
   level-up needs `(n + 3)^2` XP × the co-op multiplier (`RunState.xp_needed_for_level`, so
   1 → 2 needs 16 solo); talent points from level 10 (`talent_points_earned`).
-- **TEMPORARY placeholder until the M4 level-up cards:** every team level gained above the
-  starting level gives every player +1 Stamina (+1 Max HP) and +4% damage via the source
-  `&"level"` (`Player.LEVEL_*`; nothing at level 1; applied in `Player.create` for the current
-  level and on `RunState.leveled_up`, current HP rises by the Max HP gained). Remove it when
-  the level-up cards replace it.
+- Every team level gained above the starting level gives every player +1 Stamina (+1 Max
+  HP) via the source `&"level"` (`Player.LEVEL_STAMINA`; applied in `Player.create` for the
+  current level and on `RunState.leveled_up`, current HP rises by the Max HP gained); the
+  real reward is the level-up card picked after the wave (M4 sections below).
 - `WeaponRunner` (one per weapon that `attacks()`): cooldown =
   `CombatMath.weapon_cooldown`; target = nearest living enemy within `attack_range`.
   - `MELEE_ARC`: every enemy within `attack_range + enemy.radius` and inside `arc_degrees`
@@ -598,8 +597,8 @@ core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; s
   or "Rank II → III" (gold), `AbilityIcon`, name, school · cost · cooldown (a rank-up that
   shortens it shows "3.6 → 3.2 s"), `AbilityRanks.rank_text` in green (Rank V names both
   specs), the description via `AbilityIcon.format_description(ability, params)` – `runner.params_for`
-  for new abilities, the next rank's params for rank-ups (`LevelCardView.next_rank_params`
-  mirrors `AbilityRunner.params_for` at rank + 1) – and a red "Slots full – replaces one"
+  for new abilities, the next rank's params for rank-ups (`LevelCardView.next_rank_params` →
+  `AbilityRunner.params_at_rank`) – and a red "Slots full – replaces one"
   strip when the kind's slots are all taken. Stat cards: ribbon, gem and title in the Items
   rarity colour, `LevelCard.lines()`. The player's cursor lifts the card with a border / glow
   in the player's colour.
@@ -634,3 +633,72 @@ core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; s
   the gold above `Intermission.bot_train_reserve` (one Uncommon item at the next wave's price
   per two bots), so the shop still gets gold next round. `SMOKE_RESULT` adds `level_cards`
   (cards picked), `abilities_learned` (learned slots filled at the end) and `ranks_trained`.
+
+
+## M4: ranks, learned abilities, Trainer
+
+```
+core/abilities/ability_ranks.gd  AbilityRanks: rank mods, Trainer prices, replacement refund
+core/progression/                LevelUpDeck, LevelCard, StatCards, Trainer
+scenes/ui/trainer/               TrainerTab / TrainerRow / SpecChooser (PlayerPanel's Trainer tab)
+scenes/abilities/general/        the six general abilities (class_id empty)
+```
+
+- **Kinds and slots** (`AbilityData.kind`): CORE (RT / LT, fixed per class), ACTIVE (learned,
+  RB / LB = slots 2 / 3; keyboard Q / E via `PlayerInput.ability_button`), AUTO (learned,
+  slots 4–7, cast by themselves for everybody when `_cheap_ready` and the effect's
+  `can_cast` + `wants_auto_cast` agree, every `AUTO_CAST_INTERVAL`). Bots also auto-cast the
+  button slots. `AbilityRunner.learn` / `forget` (50 % refund of the ranks' gold value) /
+  `rank_up` / `set_spec` / `needs_spec` / `params_at_rank` (previews) / `teardown` (every
+  slotted effect gets `end_wave`, then the Mastery's teardown).
+- **Ranks** (`AbilityRanks`, GDD 6.3): Rank II and IV `"power_pct"` +25 and `"cooldown_pct"`
+  −10 each; Rank III merges `AbilityData.rank3`; Rank V merges the chosen
+  `AbilityData.specs[i]["mods"]`. Every effect multiplies its damage / heal / shield / buff
+  amounts by `ctx.num("power", 1.0)`. Trainer price `25 × rank × (1 + 0.08 × (wave − 1))`.
+  Core abilities train too. `apply_mods`: `<param>_add` adds, `<param>_pct` scales an existing
+  `<param>` (else it sets the key itself), anything else replaces – a data test per kit
+  applies every rank3 / spec mod through `params_at_rank` and checks the intended param moves.
+- **Level-up cards** (`LevelUpDeck`): 5 cards, about half ability cards (new learned
+  abilities from `Db.ability_pool(class)` – class + general, unlocked, `card_weight` > 0 – or
+  free rank-ups of slotted abilities incl. core ones), at least one ability and one stat
+  card; full slots of a kind make new abilities of that kind rarer (×0.3) and rank-ups more
+  likely; stat cards (`StatCards`): rarity Common 50 / Uncommon 30 / Rare 15 / Epic 5, 1–3
+  stats from a weighted table with whole amounts (the class's own primary stat only). Stat
+  cards go to the Player source `&"level_cards"`; team levels themselves give only +1 Stamina
+  (`&"level"`). Every hero also has `Stats.BASE_MASTERY` 5 (`&"base"`; test heroes from
+  `tests/player_fakes.gd` drop it).
+- **Trainer tab** (`TrainerTab` in `PlayerPanel`, `set_tab` / `TRAINER_TAB`): eight rows (core,
+  Active, Auto), rank, next-rank text, price; A trains (`Trainer.try_buy_rank`; hold A for
+  `ShopPanel.HOLD_TIME` above half the wallet), Y previews the next rank, Rank V opens
+  `SpecChooser` (B = later, the row shows "Choose"). Bots: `Trainer.bot_train` from the
+  intermission.
+- **HUD**: `AbilityBar` shows the four button slots (prompts per device) and a 2×2 cluster of
+  26 px auto-cast icons (sweep only) once an auto-cast ability is learned; every icon carries
+  rank pips (orange once specialised). Frames stay ≤ 112 px tall (wider with learned slots).
+- **Core hooks for the kits**: `ProcSystem.add_shield(amount, duration)` (one shared pool with
+  item shields), `Player.damage_taken_mults` (named incoming multipliers, cleared at wave
+  start), `Player.death_guards` (Callables tried after item cheat-death procs),
+  `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)`.
+- **Kit helpers** (per class folder; all damage through `ProcSystem.deal_raw` with sources
+  `&"ability"`, `&"dot"`, `&"pet"`):
+  - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Bladestorm / Ravager), `WarriorFx`
+    (VFX base); Bladestorm's "cannot be slowed" is the stat source `&"bladestorm"` cancelling
+    negative Speed.
+  - Mage: `MageSpell` (spell damage with a per-spell Spell Power factor, freeze), `MageBolt`
+    (Projectile subclass dealing ability damage: burn / splash / bounce / pierce / homing),
+    `MageBurn` / `MageFrozen` (nodes on the enemy), `MageMeteorStrike` (group
+    `ability_areas`). Ice Barrier = `add_shield(amount, 3600)` (until used up / wave end).
+  - Paladin: `PaladinKit` (holy strike damage, heals, per-Paladin buff keys),
+    `PaladinHolyMissile` (homing / ricochet hammer and shield), `PaladinVfx`. Blessing of
+    Kings = stat source `kings:paladin<slot>` per hero; Lay on Hands never revives (only Word
+    of Glory and the Spirit Healer / teammates do).
+  - Rogue: `RogueBlade` (Projectile subclass for knives / shuriken: weapon hits, optional
+    poison and returning), `RogueVanish.shroud()` (stealth + silhouette for other effects);
+    Cheat Death is a `Player.death_guards` entry with the runner's cooldown.
+  - Warlock: `WarlockSpell`, `WarlockAfflictions` (one DoT manager node per Warlock, ticks
+    while downed; Demonic Pact on `"dot"` / `"pet"`), pets (Voidwalker taunts, Infernal for
+    8 s) that free themselves when their owner is gone; `damage_taken_mults["voidwalker"]`.
+  - General: `GeneralKit` (weapon damage normalised to a 1 s swing, spell damage with the
+    best of Attack / Spell Power), `GeneralBuff` (timed hero buff: named stat source +
+    damage-taken multiplier, refreshed not stacked), Spirit Wolf pet; Bandage is not
+    interrupted by damage.
