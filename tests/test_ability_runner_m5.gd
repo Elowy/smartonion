@@ -1,13 +1,28 @@
 extends TestCase
 ## AbilityRunner M5 (T-CORE-B): reduce_cooldown (one charge back at most, the leftover kept –
 ## like time passing), cooldown_left while charges are left, the "free_chance" param (clamped
-## to 75%, no draw at 0 or without a cost, "Free!", last_paid).
+## to 75%, no draw at 0 or without a cost, "Free!", last_paid – settled before cast() runs).
 
 const Fakes := preload("res://tests/player_fakes.gd")
 
 ## An effect that always casts and never draws.
 class AlwaysCast extends AbilityEffect:
 	func cast(_ctx: AbilityContext) -> bool:
+		return true
+
+
+## Reads last_paid inside cast() (like Whirlwind's first strike) and draws once; [member fail]
+## makes the cast fail before drawing.
+class Recorder extends AbilityEffect:
+	var fail := false
+	var seen_paid := -1.0
+	var drawn := -1.0
+
+	func cast(ctx: AbilityContext) -> bool:
+		seen_paid = ctx.player.abilities.last_paid(ctx.ability)
+		if fail:
+			return false
+		drawn = ctx.rng.randf()
 		return true
 
 
@@ -224,3 +239,81 @@ func test_free_chance_add_mods_reach_the_roll() -> void:
 		if rage.value > 99.0:
 			free += 1
 	check(free > 120 and free < 180, "90 clamped to 75%% (%d of 200)" % free)
+
+
+func test_last_paid_is_settled_before_the_effect_casts() -> void:
+	var a := _spender(40.0, {"free_chance": 50.0})
+	a.effect = Recorder
+	var p := _warrior_with(a)
+	var rec := p.abilities.effect_for(a) as Recorder
+	var rage := p.abilities.get_resource(&"rage")
+	p.abilities.begin_wave()
+	check_eq(p.abilities.last_paid(a), 0.0, "nothing cast this wave yet")
+	var probe := RandomNumberGenerator.new()
+	var saw_free_after_paid := false
+	var saw_paid_first := false
+	var was_paid := false
+	for i in 16:
+		rage.set_value(100.0)
+		probe.state = RunState.rng.state
+		var will_be_free := probe.randf() * 100.0 < 50.0
+		var effect_draw := probe.randf()
+		check(p.abilities.try_cast(2), "cast %d" % i)
+		var free := is_equal_approx(rage.value, 100.0)
+		check_eq(free, will_be_free, "the free roll is the first draw (before the effect's)")
+		check_eq(rec.drawn, effect_draw, "the effect draws after the free roll")
+		check_eq(rec.seen_paid, 0.0 if free else 40.0, "inside cast(): this cast's payment")
+		check_eq(p.abilities.last_paid(a), rec.seen_paid, "unchanged after the cast")
+		if i == 0 and not free:
+			saw_paid_first = true
+		if free and was_paid:
+			saw_free_after_paid = true
+		was_paid = not free
+	check(saw_free_after_paid, "a free cast right after a paid one reads 0 (refunds nothing)")
+	# The first cast of a wave already reads its cost (not the cleared 0).
+	var first_paid_seen := saw_paid_first
+	for i in 16:
+		if first_paid_seen:
+			break
+		p.abilities.begin_wave()
+		rage.set_value(100.0)
+		p.abilities.try_cast(2)
+		first_paid_seen = not is_equal_approx(rage.value, 100.0) and rec.seen_paid == 40.0
+	check(first_paid_seen, "the first paid cast of a wave reads 40 inside cast()")
+
+
+func test_a_failed_cast_spends_nothing_and_restores_last_paid() -> void:
+	var a := _spender(40.0, {"free_chance": 50.0})
+	a.effect = Recorder
+	var p := _warrior_with(a)
+	var rec := p.abilities.effect_for(a) as Recorder
+	var rage := p.abilities.get_resource(&"rage")
+	rec.fail = true
+	rage.set_value(100.0)
+	var probe := RandomNumberGenerator.new()
+	probe.state = RunState.rng.state
+	probe.randf()
+	var texts := _texts(AbilityRunner.FREE_TEXT)
+	check(not p.abilities.try_cast(2), "the effect refused")
+	check_eq(RunState.rng.state, probe.state, "the free roll was drawn (chance > 0, a cost)")
+	check_near(rage.value, 100.0, 0.0001, "nothing spent")
+	check_eq(p.abilities.last_paid(a), 0.0, "no previous cast: back to 0")
+	check(not p.abilities._last_paid.has(a.id), "nothing recorded")
+	check_eq(_texts(AbilityRunner.FREE_TEXT), texts, "no \"Free!\"")
+	check_eq(p.abilities.charges_available(a), p.abilities.charges_max(a), "no charge spent")
+	# After a cast, a failed one leaves its payment in place.
+	rec.fail = false
+	var before := -1.0
+	for i in 8:
+		rage.set_value(100.0)
+		p.abilities.try_cast(2)
+		before = p.abilities.last_paid(a)
+		if before == 40.0:
+			break
+	check_eq(before, 40.0, "a paid cast")
+	rec.fail = true
+	for i in 8:
+		rage.set_value(100.0)
+		check(not p.abilities.try_cast(2), "refused %d" % i)
+		check_eq(p.abilities.last_paid(a), 40.0, "the last real cast's payment stays")
+		check_near(rage.value, 100.0, 0.0001, "nothing spent")

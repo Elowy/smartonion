@@ -54,10 +54,10 @@ extends Node
 ## generator's job).
 ##
 ## M5 (talents and set bonuses, also open to unique items):
-## - Extra procs: [method set_extra_procs] hands over the rank-resolved "proc" entries of a
-##   source (PlayerBonuses: &"talents", &"set_bonus"); [method refresh] builds them after the
-##   items ([method proc_from_params]: numbers used as written, the label defaults to the
-##   entry's label – the talent / set name).
+## - Extra procs: [method set_extra_procs] stores the rank-resolved "proc" entries of a
+##   source (PlayerBonuses: &"talents", &"set_bonus"; it calls [method refresh] afterwards),
+##   [method refresh] builds them after the items ([method proc_from_params]: numbers used as
+##   written, the label defaults to the entry's label – the talent / set name).
 ## - Triggers: "on_crit" (the attack's first hit crit – inside [method on_hit], same once-per-
 ##   attack gate; chance default 100), "on_cast" ([method on_ability_cast]; filter "ability"
 ##   id or "match" dict as BonusVocabulary.matches – none = every cast), "wave_start"
@@ -367,9 +367,10 @@ func on_struck(attacker: Node3D, _damage: float) -> void:
 ## M5, see PlayerBonuses: the proc entries of [param source] (&"talents", &"set_bonus"),
 ## rank-resolved. Each def is either a whole entry ({"kind": "proc", "proc": {...}, "label",
 ## "id", ...}: the "proc" dict is used, the entry's label is the default label, its id the
-## proc id) or a bare ProcSystem params dict (its own "label" / "id" keys, if any). Replaces
-## the source's defs and rebuilds the list ([method refresh]) when they changed; an empty
-## array removes the source.
+## proc id) or a bare ProcSystem params dict (its own "label" / "id" keys, if any). Stores
+## only: replaces the source's defs (an empty array removes the source; identical defs are a
+## no-op), and the next [method refresh] builds them – the caller (PlayerBonuses) refreshes
+## once after handing over every changed source.
 func set_extra_procs(source: StringName, defs: Array[Dictionary]) -> void:
 	if _same_defs(_extra_defs.get(source, []), defs):
 		return
@@ -377,7 +378,6 @@ func set_extra_procs(source: StringName, defs: Array[Dictionary]) -> void:
 		_extra_defs.erase(source)
 	else:
 		_extra_defs[source] = defs.duplicate(true)
-	refresh()
 
 
 ## The extra defs of [param source] as stored (tests, UI; empty when none).

@@ -19,8 +19,9 @@ extends Node
 ##
 ## Free casts (M5): the "free_chance" param (percent, talent / set mods "free_chance_add") is
 ## the chance a cast of an ability with a resource cost spends nothing ("Free!"), at most
-## FREE_CHANCE_CAP. One RunState.rng draw per successful cast, and only when the chance is
-## above 0 and the cast costs something. [method last_paid] = what the last cast really paid.
+## FREE_CHANCE_CAP. One RunState.rng draw per cast attempt that reaches the effect (before
+## the effect's own draws), and only when the chance is above 0 and the cast costs something.
+## [method last_paid] = what the current / last cast really pays (set before cast() runs).
 
 signal ability_cast(slot_index: int, ability: AbilityData)
 signal slots_changed
@@ -305,9 +306,11 @@ func reduce_cooldown(ability: AbilityData, seconds: float) -> void:
 	_advance_recharge(ability.id, _cooldown_left[ability.id] - seconds)
 
 
-## What the last cast of [param ability] really spent of its resource: its cost, 0 when the
-## cast was free ("free_chance") or costs nothing, 0 before the first cast (kits that refund
-## part of a cast – Meat Cleaver – cap the refund with it).
+## What the current / last cast of [param ability] really pays of its resource: its cost, 0
+## when the cast is free ("free_chance") or costs nothing, 0 before the first cast of the wave.
+## Set before the effect's cast() runs (a failed cast restores the old value), so it is valid
+## for strikes inside cast() as well as later ticks (kits that refund part of a cast – Meat
+## Cleaver – cap the refund with it).
 func last_paid(ability: AbilityData) -> float:
 	return _last_paid.get(ability.id, 0.0) if ability != null else 0.0
 
@@ -414,23 +417,30 @@ func _cheap_ready(index: int) -> bool:
 
 
 ## Casts slot [param index] with an already resolved [param ctx] (cost, cooldown / charge).
-## After a successful cast the resource is spent – unless the "free_chance" roll (one
-## RunState.rng draw, only when the clamped chance is above 0 and the cast costs something)
-## makes it free.
+## The payment is settled before the effect runs: the "free_chance" roll (one RunState.rng
+## draw, only when the clamped chance is above 0 and the cast costs something – before the
+## effect's own draws, also when the cast then fails) and [method last_paid], so strikes that
+## land inside cast() (Whirlwind's first pulse) already read this cast's payment. The
+## resource itself is spent after a successful cast (unless free); a failed cast spends
+## nothing and restores the previous last_paid.
 func _cast_with(index: int, ctx: AbilityContext) -> bool:
 	var a := slots[index]
 	var effect := effect_for(a)
+	var cost := cost_of(a, ctx) if a.resource != &"" else 0.0
+	var free := cost > 0.0 and _rolls_free(ctx)
+	var had_paid := _last_paid.has(a.id)
+	var old_paid: float = _last_paid.get(a.id, 0.0)
+	_last_paid[a.id] = 0.0 if free else cost
 	if not effect.cast(ctx):
-		return false
-	var paid := 0.0
-	if a.resource != &"":
-		var cost := cost_of(a, ctx)
-		if cost > 0.0 and _rolls_free(ctx):
-			_show_free(a)
+		if had_paid:
+			_last_paid[a.id] = old_paid
 		else:
-			get_resource(a.resource).spend(cost)
-			paid = cost
-	_last_paid[a.id] = paid
+			_last_paid.erase(a.id)
+		return false
+	if free:
+		_show_free(a)
+	elif a.resource != &"":
+		get_resource(a.resource).spend(cost)
 	spend_charge(a, ctx)
 	ability_cast.emit(index, a)
 	return true

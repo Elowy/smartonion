@@ -64,8 +64,10 @@ static func _talent(entry: Dictionary, rank: int, id: String, label: String) -> 
 	return out
 
 
+## Hands [param entries] over the way PlayerBonuses does: store, then one refresh.
 func _give(p: Player, entries: Array[Dictionary], source: StringName = &"talents") -> void:
 	p.procs.set_extra_procs(source, entries)
+	p.procs.refresh()
 
 
 func _texts(text: String) -> int:
@@ -110,10 +112,17 @@ func test_extra_procs_are_built_after_the_items_and_follow_their_source() -> voi
 	check_eq(b.id, &"set_x:2", "bare shape: its own id")
 	check_eq(b.label, "Bare", "and label")
 	check_eq(b.chance, 50.0, "chance")
-	# Unchanged defs: no rebuild (running state is kept).
+	# set_extra_procs only stores (the contract: PlayerBonuses refreshes once afterwards).
 	var uid := a.uid
-	_give(p, [_entry({"trigger": "on_kill", "effect": "bolt", "damage": 3.0}, "talent_a", "Talent A")] as Array[Dictionary])
-	check_eq(p.procs.procs[1].uid, uid, "same defs: the list is not rebuilt")
+	p.procs.set_extra_procs(&"talents", [_entry({"trigger": "on_kill", "effect": "bolt", "damage": 3.0}, "talent_a", "Talent A")] as Array[Dictionary])
+	check_eq(p.procs.procs[1].uid, uid, "same defs: no rebuild")
+	p.procs.set_extra_procs(&"talents", [_entry({"trigger": "on_kill", "effect": "bolt", "damage": 9.0}, "talent_a", "Talent A")] as Array[Dictionary])
+	check_eq(p.procs.procs[1].uid, uid, "changed defs: stored, the list waits for refresh()")
+	check_eq(p.procs.procs[1].num("damage"), 3.0, "still the old proc")
+	check_eq(p.procs.extra_defs(&"talents")[0]["proc"]["damage"], 9.0, "the new defs are stored")
+	p.procs.refresh()
+	check_eq(p.procs.procs[1].num("damage"), 9.0, "refresh() builds them")
+	check(p.procs.procs[1].uid != uid, "a new proc")
 	# An equipment change rebuilds the items and keeps the extras.
 	p.equipment.unequip(Items.EquipSlot.TRINKET_1)
 	check_eq(p.procs.procs.size(), 2, "item gone, both extras stay")
@@ -121,7 +130,9 @@ func test_extra_procs_are_built_after_the_items_and_follow_their_source() -> voi
 	# New defs replace the source's; an empty list removes it.
 	_give(p, [_entry({"trigger": "on_kill", "effect": "bolt", "damage": 6.0}, "talent_a", "Talent A")] as Array[Dictionary])
 	check_eq(p.procs.procs[0].num("damage"), 6.0, "replaced")
-	_give(p, [] as Array[Dictionary])
+	p.procs.set_extra_procs(&"talents", [] as Array[Dictionary])
+	check_eq(p.procs.procs.size(), 2, "an empty list is stored, the list waits for refresh()")
+	p.procs.refresh()
 	check_eq(p.procs.procs.size(), 1, "talents removed")
 	check(p.procs.extra_defs(&"talents").is_empty(), "nothing stored")
 	check_eq(p.procs.extra_defs(&"set_bonus").size(), 1, "the set source stays")
