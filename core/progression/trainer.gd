@@ -1,10 +1,13 @@
 class_name Trainer
 extends RefCounted
 ## The class Trainer (GDD 6.3), a tab of the between-waves panel: buy the next rank of a
-## slotted ability (core ones included) from the shared wallet.
+## slotted ability (core ones included) from the shared wallet. A player can ping a rank they
+## want (GDD 10, TrainerTab R3 / Tab): a RunState want under [method want_key], shown on the
+## purse board, cleared when the rank is bought (or by the next round).
 
 ## Buys the next rank of [param ability_id] for [param player] (logged in the wallet's spend
-## log as "<Ability> Rank III"). Rank V then needs a specialisation (AbilityRunner.needs_spec).
+## log as "<Ability> Rank III") and clears the player's ping on it. Rank V then needs a
+## specialisation (AbilityRunner.needs_spec).
 static func try_buy_rank(player: Player, ability_id: StringName) -> bool:
 	var runner := player.abilities if player != null else null
 	if runner == null or not runner.can_rank_up(ability_id):
@@ -14,7 +17,13 @@ static func try_buy_rank(player: Player, ability_id: StringName) -> bool:
 	if not RunState.try_spend_for(price, slot_index, &"trainer", spend_label(runner, ability_id)):
 		return false
 	runner.rank_up(ability_id)
+	RunState.clear_want(slot_index, want_key(ability_id))
 	return true
+
+
+## The RunState.wants key of a Trainer ping on [param ability_id]: "trainer:fireball".
+static func want_key(ability_id: StringName) -> String:
+	return "trainer:%s" % ability_id
 
 
 ## "Fireball Rank III": the ability and the rank [param runner] would buy next.
