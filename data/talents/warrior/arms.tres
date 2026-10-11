@@ -1,0 +1,235 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_deflection"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_deflection"
+display_name = "Deflection"
+description = "Increases your chance to dodge attacks by {dodge}%."
+values = {
+"dodge": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"dodge"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"dodge": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_tactical_mastery"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_tactical_mastery"
+display_name = "Tactical Mastery"
+description = "You start every wave with {rage} Rage and generate {regen}% more Rage."
+values = {
+"rage": 5.0,
+"regen": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "resource",
+"resource": "rage",
+"start_value_add": 5.0
+}, {
+"kind": "stats",
+"stats": {
+"resource_regen": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_charge"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_improved_charge"
+display_name = "Improved Charge"
+description = "Charge stuns {stun} sec longer and recharges {cd} sec faster."
+values = {
+"cd": 0.5,
+"stun": 0.3
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"charge"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "charge"
+},
+"mods": {
+"cooldown_add": -0.5,
+"stun_add": 0.3
+}
+}])
+
+[sub_resource type="Resource" id="Resource_deep_wounds"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_deep_wounds"
+display_name = "Deep Wounds"
+description = "Your critical hits make the target bleed for {pct}% of the damage over {duration_fixed} sec."
+values = {
+"duration_fixed": 3.0,
+"pct": 10.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"duration": 3.0,
+"effect": "dot",
+"hit_pct": 10.0,
+"school": "physical",
+"trigger": "on_crit"
+},
+"scale": ["hit_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_two_handed_specialization"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_two_handed_specialization"
+display_name = "Two-Handed Specialization"
+description = "While wielding a two-handed weapon you deal {pct}% more damage."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"requires": {
+"weapon": "two_handed"
+}
+}])
+
+[sub_resource type="Resource" id="Resource_sweeping_blows"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_sweeping_blows"
+display_name = "Sweeping Blows"
+description = "After Whirlwind, your weapon attacks have a {chance}% chance to strike again for {duration} sec."
+values = {
+"chance": 25.0,
+"duration": 5.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"whirlwind"
+icon = &"whirlwind"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "whirlwind",
+"duration": 5.0,
+"effect": "buff",
+"label": "",
+"stats": {
+"extra_attack": 25.0
+},
+"trigger": "on_cast"
+}
+}])
+
+[sub_resource type="Resource" id="Resource_impale"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_impale"
+display_name = "Impale"
+description = "Your critical strikes deal {crit}% more damage."
+values = {
+"crit": 10.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warrior_arms_deep_wounds"
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit_damage": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_sudden_death"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_sudden_death"
+display_name = "Sudden Death"
+description = "Your weapon hits have a {chance}% chance to finish Execute's cooldown."
+values = {
+"chance": 3.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"execute"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "execute",
+"chance": 3.0,
+"effect": "cooldown",
+"reset": true,
+"trigger": "on_hit"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_mortal_strike"]
+script = ExtResource("2_talent")
+id = &"warrior_arms_mortal_strike"
+display_name = "Mortal Strike"
+description = "Every 5th weapon attack also strikes for {strike}% weapon damage and leaves a Mortal Wound for {duration} sec: the target heals {heal}% less and takes {taken}% more damage from you."
+values = {
+"duration": 8.0,
+"heal": 50.0,
+"strike": 150.0,
+"taken": 10.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage_taken_pct": 10.0,
+"every": 5,
+"heal_reduction": 50.0,
+"strike_pct": 150.0,
+"wound_duration": 8.0
+},
+"script": "res://scenes/talents/warrior/arms_mortal_strike.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warrior_arms"
+class_id = &"warrior"
+display_name = "Arms"
+index = 0
+description = "Two-handed strikes, bleeding wounds and executions."
+icon = &"execute"
+color = Color(0.75, 0.55, 0.35, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_deflection"), SubResource("Resource_tactical_mastery"), SubResource("Resource_improved_charge"), SubResource("Resource_deep_wounds"), SubResource("Resource_two_handed_specialization"), SubResource("Resource_sweeping_blows"), SubResource("Resource_impale"), SubResource("Resource_sudden_death"), SubResource("Resource_mortal_strike")])
