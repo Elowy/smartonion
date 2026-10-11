@@ -446,13 +446,42 @@ func test_empty_label_silences_every_block() -> void:
 		var q := b.duplicate(true)
 		q["label"] = ""
 		quiet.append(_entry(q, "quiet%d" % i, "Quiet"))
+	var charge := Db.get_ability(&"charge")
+	p.abilities.set_cooldown(charge, 5.0)  # the cooldown block only speaks when it shortens something
 	_give(p, loud)
 	p.procs.after_wave_start()
 	check_eq(_texts("Loud"), blocks.size(), "every block shows the talent's name by default")
+	p.abilities.set_cooldown(charge, 5.0)
 	_give(p, quiet)
 	p.procs.after_wave_start()
 	check_eq(p.procs.fire_count(&"quiet0") + p.procs.fire_count(&"quiet5"), 2, "they fired")
 	check_eq(_texts("Quiet"), 0, "\"label\": \"\" – no text from any block")
+
+
+func test_cooldown_block_is_silent_when_nothing_recharges() -> void:
+	var p := _hero()
+	var charge := Db.get_ability(&"charge")
+	p.abilities.set_cooldown(charge, 0.0)
+	var b := {"effect": "cooldown", "ability": "charge", "reset": true, "trigger": "wave_start"}
+	_give(p, [_entry(b, "sd", "Sudden")] as Array[Dictionary])
+	p.procs.after_wave_start()
+	check_eq(_texts("Sudden"), 0, "Charge is ready: no reset text")
+	p.abilities.set_cooldown(charge, 6.0)
+	p.procs.after_wave_start()
+	check_eq(_texts("Sudden"), 1, "a running recharge was reset: the name shows")
+	check_eq(p.abilities.cooldown_left(charge), 0.0, "and Charge is ready")
+
+
+func test_wave_start_every_counts_waves() -> void:
+	var p := _hero()
+	var b := {"effect": "forced_crit", "count": 1, "trigger": "wave_start", "every": 2}
+	_give(p, [_entry(b, "ws", "Second")] as Array[Dictionary])
+	var fired: Array[int] = []
+	for wave in 4:
+		p.procs.begin_wave()
+		p.procs.after_wave_start()
+		fired.append(p.procs.fire_count(&"ws"))
+	check_eq(fired, [0, 1, 1, 2] as Array[int], "every 2nd wave start, across the wave reset")
 
 
 # --- Arms proc talents (inline fixtures = arms.tres) -----------------------------------------

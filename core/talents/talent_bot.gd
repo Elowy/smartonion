@@ -80,8 +80,9 @@ static func is_deferred(player: Player, talent: TalentData) -> bool:
 static func _pick_in_tree(player: Player, state: TalentState, tree: TalentTreeData, allow_deferred: bool) -> TalentData:
 	var ok := func(t: TalentData) -> bool:
 		return t != null and state.can_add(t.id) and (allow_deferred or not is_deferred(player, t))
+	# The capstone is never deferred (architecture 2.2: point 13 in every tree).
 	for t in tree.talents:
-		if t != null and t.kind == TalentData.Kind.CAPSTONE and ok.call(t):
+		if t != null and t.kind == TalentData.Kind.CAPSTONE and state.can_add(t.id):
 			return t
 	for t in tree.talents:
 		if t != null and t.kind == TalentData.Kind.MODIFIER and ok.call(t):

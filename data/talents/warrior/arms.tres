@@ -199,7 +199,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warrior_arms_mortal_strike"
 display_name = "Mortal Strike"
-description = "Every 5th weapon attack also strikes for {strike}% weapon damage and leaves a Mortal Wound for {duration} sec: the target heals {heal}% less and takes {taken}% more damage from you."
+description = "Every 5th weapon attack (the next one if its target already fell) also strikes for {strike}% weapon damage and leaves a Mortal Wound for {duration} sec: the target heals {heal}% less and takes {taken}% more damage from you."
 values = {
 "duration": 8.0,
 "heal": 50.0,

@@ -453,7 +453,8 @@ func begin_wave() -> void:
 		p.cd_left = 0.0
 		p.fired_wave = 0
 		p.armed = true
-		p.counter = 0
+		if p.trigger != TRIGGER_WAVE_START:
+			p.counter = 0  # a wave_start "every N" counts waves, so it keeps counting
 		p.timer = p.interval
 	_dots.clear()
 	_clear_buffs()
@@ -819,7 +820,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			var who := _receiver(p)
 			who.heal(_amount_for(p, who))
 			if p.extra:
-				_label(p, Player.HEAL_TEXT_COLOR)
+				_label(p, Player.HEAL_TEXT_COLOR, who)
 		&"drain":
 			var e := _target_enemy(target, pos)
 			if e != null:
@@ -850,7 +851,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			var into: ProcSystem = self if who == player else who.procs
 			if into != null:
 				into.add_shield(_amount_for(p, who), p.num("duration", DEFAULT_SHIELD_DURATION))
-			_label(p, SHIELD_COLOR)
+			_label(p, SHIELD_COLOR, who)
 		&"reflect":
 			var e := _target_enemy(target, pos)
 			if e != null:
@@ -931,6 +932,7 @@ func _cooldown(p: Proc) -> void:
 	var reset: bool = typeof(p.params.get("reset")) == TYPE_BOOL and p.params["reset"]
 	var seconds := p.num("reduce")
 	var class_id := player.class_data.id if player.class_data != null else &""
+	var hit := false
 	for a in runner.slots:
 		if a == null:
 			continue
@@ -938,11 +940,15 @@ func _cooldown(p: Proc) -> void:
 			continue
 		if id == &"" and not BonusVocabulary.matches(filter, a, class_id):
 			continue
+		if runner.cooldown_left(a) <= 0.0:
+			continue  # nothing to reset / shorten: no text either (Sudden Death on a ready Execute)
+		hit = true
 		if reset:
 			runner.set_cooldown(a, 0.0)
 		elif seconds > 0.0:
 			runner.reduce_cooldown(a, seconds)
-	_label(p, ProcVfx.school_color(&"arcane"))
+	if hit:
+		_label(p, ProcVfx.school_color(&"arcane"))
 
 
 func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:
@@ -1295,8 +1301,10 @@ static func _chest(e: Node3D) -> Vector3:
 	return e.global_position + Vector3.UP * Player.CHEST_HEIGHT
 
 
-## The proc's name above the player ("Bloodlust", "Shield") in [param color].
-func _label(p: Proc, color: Color) -> void:
+## The proc's name above the player ("Bloodlust", "Shield") in [param color] – above
+## [param over] instead when the effect went to another hero (a lowest_ally heal / shield).
+func _label(p: Proc, color: Color, over: Player = null) -> void:
 	if player == null or p.label == "":
 		return
-	Vfx.floating_text(player.get_chest_position() + Vector3.UP * 1.1, p.label, color, LABEL_TEXT_SIZE)
+	var who := over if over != null and is_instance_valid(over) else player
+	Vfx.floating_text(who.get_chest_position() + Vector3.UP * 1.1, p.label, color, LABEL_TEXT_SIZE)
