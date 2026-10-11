@@ -4,6 +4,9 @@ extends Node
 ## - One shared wallet (gold) – anyone can spend it.
 ## - One shared XP bar – the whole team levels up together.
 ## - Wave counter and the wave / co-op scaling formulas.
+## - M5: the spend log of the shared wallet (try_spend_for: who spent what this round), the
+##   players' "wants" (Trainer pings), elite / goblin / forge / talent-reset counters, the
+##   special-kill record and the run serial that per-run statics compare against.
 
 signal run_started
 signal run_ended(victory: bool)
@@ -13,6 +16,13 @@ signal xp_changed(xp: int, needed: int)
 signal leveled_up(level: int)
 ## Team loot changed (an item bag was picked up / banked, or the loot roll consumed items).
 signal team_loot_changed
+## The wallet paid [param entry] ({"slot", "kind", "label", "amount", "wave"}, see try_spend_for).
+signal spent(entry: Dictionary)
+## [member wants] changed (toggle_want / clear_want / begin_spend_round).
+signal wants_changed
+## An elite or the Loot Goblin died ([param kind] &"elite" / &"goblin"; M6 adds &"boss");
+## [param killer_index] = the killer's slot index (-1 = none).
+signal special_killed(kind: StringName, killer_index: int)
 
 const TOTAL_WAVES := 25
 const BOSS_WAVES: Array[int] = [10, 25]
@@ -60,6 +70,28 @@ var greed_gold := 0
 ## received (see add_gold_for). Keyed by slot index (-1 = no slot).
 var _gold_remainder: Dictionary[int, float] = {}
 
+# M5: the shared purse (GDD 10) and the new run statistics.
+## Every wallet spend of this round (shop, auto-forge, stall reroll, Trainer, level-up reroll,
+## talent reset), oldest first: {"slot": int (-1 = the team), "kind": StringName,
+## "label": String, "amount": int, "wave": int}. Cleared by [method begin_spend_round].
+var spend_log: Array[Dictionary] = []
+## Gold spent through [method try_spend_for] this run.
+var gold_spent := 0
+## What players asked the team to buy for them this round (Trainer pings):
+## {"slot": int, "key": String ("trainer:<ability_id>"), "label": String, "price": int}.
+var wants: Array[Dictionary] = []
+var elites_spawned := 0
+var elites_killed := 0
+var goblins_spawned := 0
+var goblins_killed := 0
+var goblins_escaped := 0
+var weapons_forged := 0
+## Talent resets bought by every hero this run.
+var talent_resets := 0
+## Counts the runs started; per-run statics of kits (e.g. MageFrozen) store it and clear
+## themselves when it changed.
+var run_serial := 0
+
 
 func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	active = true
@@ -84,6 +116,21 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	shop = Shop.new()
 	need_wins_by_player.clear()
 	greed_gold = 0
+	spend_log.clear()
+	gold_spent = 0
+	wants.clear()
+	elites_spawned = 0
+	elites_killed = 0
+	goblins_spawned = 0
+	goblins_killed = 0
+	goblins_escaped = 0
+	weapons_forged = 0
+	talent_resets = 0
+	run_serial += 1
+	# Launch-option statics back to their defaults (Main applies --elite-mult / --goblin-chance
+	# after this; tests that change them restore them).
+	EliteAffixes.rate_mult = 1.0
+	GoblinSpawner.chance_override = -1.0
 	run_started.emit()
 	gold_changed.emit(gold, 0)
 	xp_changed.emit(xp, xp_to_next_level())
@@ -160,12 +207,68 @@ func can_afford(amount: int) -> bool:
 
 
 ## Spends from the shared wallet. Returns false (and changes nothing) if too poor.
+## Game code goes through [method try_spend_for] (the spend log); this one stays for tests.
 func try_spend(amount: int) -> bool:
 	if amount < 0 or gold < amount:
 		return false
 	gold -= amount
 	gold_changed.emit(gold, -amount)
 	return true
+
+
+## [method try_spend] that also logs who spent what (GDD 10, the purse board): player slot
+## [param slot_index] (-1 = the team, e.g. a stall reroll), [param kind] (&"shop",
+## &"shop_forge", &"shop_reroll", &"trainer", &"level_reroll", &"talent_reset") and a display
+## [param label] ("Rare Dagger", "Fireball Rank III"). On success the entry goes to
+## [member spend_log], the amount to [member gold_spent], and [signal spent] fires.
+func try_spend_for(amount: int, slot_index: int, kind: StringName, label: String) -> bool:
+	if not try_spend(amount):
+		return false
+	var entry := {"slot": slot_index, "kind": kind, "label": label, "amount": amount, "wave": wave}
+	spend_log.append(entry)
+	gold_spent += amount
+	spent.emit(entry)
+	return true
+
+
+## A new market round (Intermission.open): clears this round's spend log and the wants.
+func begin_spend_round() -> void:
+	spend_log.clear()
+	if not wants.is_empty():
+		wants.clear()
+		wants_changed.emit()
+
+
+## Adds (returns true) or removes (false) [param slot_index]'s want [param key]
+## ("trainer:<ability_id>") with its [param label] and [param price].
+func toggle_want(slot_index: int, key: String, label: String, price: int) -> bool:
+	var at := _want_index(slot_index, key)
+	if at >= 0:
+		wants.remove_at(at)
+		wants_changed.emit()
+		return false
+	wants.append({"slot": slot_index, "key": key, "label": label, "price": price})
+	wants_changed.emit()
+	return true
+
+
+## Removes [param slot_index]'s want [param key] (bought, or the reason went away).
+func clear_want(slot_index: int, key: String) -> void:
+	var at := _want_index(slot_index, key)
+	if at >= 0:
+		wants.remove_at(at)
+		wants_changed.emit()
+
+
+func has_want(slot_index: int, key: String) -> bool:
+	return _want_index(slot_index, key) >= 0
+
+
+func _want_index(slot_index: int, key: String) -> int:
+	for i in wants.size():
+		if int(wants[i].get("slot", -2)) == slot_index and String(wants[i].get("key", "")) == key:
+			return i
+	return -1
 
 
 # --- Shared XP ---------------------------------------------------------------
@@ -199,9 +302,18 @@ func add_xp(amount: int) -> void:
 
 
 ## Talent points become available from level 10 (GDD 7.1): one at 10, one per level after.
-## Used from M5.
+## Every hero has this many (TalentState).
 func talent_points_earned() -> int:
 	return maxi(0, level - TALENT_START_LEVEL + 1)
+
+
+## Test hook (--start-level): the team starts at [param p_level] (at least START_LEVEL) with no
+## XP and no pending level-ups. Call it after start_run and before the heroes are created.
+func set_start_level(p_level: int) -> void:
+	level = maxi(START_LEVEL, p_level)
+	xp = 0
+	pending_level_ups = 0
+	xp_changed.emit(xp, xp_to_next_level())
 
 
 # --- Statistics --------------------------------------------------------------
@@ -215,6 +327,17 @@ func record_kill(player_index: int) -> void:
 func record_damage(player_index: int, amount: float) -> void:
 	if player_index >= 0:
 		damage_by_player[player_index] = damage_by_player.get(player_index, 0.0) + amount
+
+
+## An elite (&"elite") or the Loot Goblin (&"goblin") died, killed by slot [param killer_index]
+## (-1 = none): counts it and emits [signal special_killed] (meta statistics, M6 bosses).
+func record_special_kill(kind: StringName, killer_index: int) -> void:
+	match kind:
+		&"elite":
+			elites_killed += 1
+		&"goblin":
+			goblins_killed += 1
+	special_killed.emit(kind, killer_index)
 
 
 # --- Wave / co-op scaling (GDD 9) -------------------------------------------

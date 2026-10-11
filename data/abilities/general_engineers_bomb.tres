@@ -10,6 +10,7 @@ display_name = "Engineer's Bomb"
 description = "Throws a bomb at the densest group of enemies. It explodes for Fire damage in a {radius} m circle (scales with your primary stat and Attack or Spell Power)."
 class_id = &""
 school = &"fire"
+tags = Array[StringName]([&"aoe", &"ground"])
 resource = &""
 cost = 0.0
 cooldown = 8.0

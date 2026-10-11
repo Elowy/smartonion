@@ -812,6 +812,7 @@ func _update_tooltips() -> void:
 			_tooltip_keys[s.index] = key
 			tip.owner_tag = "P%d" % (s.index + 1)
 			tip.owner_color = s.color
+			tip.viewer_equipment = equipment_of(s)
 			tip.show_item(o.item, s.class_data, compare, o.price)
 			tip.reset_size()
 		tip.visible = true

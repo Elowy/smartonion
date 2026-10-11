@@ -10,6 +10,7 @@ display_name = "Sprint"
 description = "Break into a sprint: +{speed}% movement Speed for {duration} sec."
 class_id = &""
 school = &"physical"
+tags = Array[StringName]([&"movement", &"buff"])
 resource = &""
 cost = 0.0
 cooldown = 12.0

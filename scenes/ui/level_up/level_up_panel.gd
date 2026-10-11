@@ -233,7 +233,7 @@ func try_reroll() -> bool:
 	if mode != Mode.CARDS:
 		return false
 	var price := reroll_price()
-	if not RunState.try_spend(price):
+	if not RunState.try_spend_for(price, slot.index if slot != null else -1, &"level_reroll", "Level-up reroll"):
 		show_message("Not enough gold (%d g)" % price, true)
 		return false
 	rerolls += 1

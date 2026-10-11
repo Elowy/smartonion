@@ -24,8 +24,9 @@ extends Control
 ## every bot buys every affordable offer that is an upgrade for it (cheapest first,
 ## round-robin over the bots – bot_offer_choice) and equips what ItemTooltip.upgrade_direction
 ## calls an upgrade; then they buy ability ranks from the Trainer with what is left above a reserve
-## (_bots_train: Trainer.bot_train, the wallet shared out evenly), and gold that neither could
-## take rerolls the stall for another buying pass (_bots_reroll). Everyone ready ->
+## (_bots_train: Trainer.bot_train, the wallet shared out evenly) and spend their talent points
+## (_bots_talents: TalentBot), and gold that neither could take rerolls the stall for another
+## buying pass (_bots_reroll). Bots forge before buying (Forge.bot_forge_all). Everyone ready ->
 ## continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of
 ## MARKET the next wave starts anyway (the countdown does not run during the loot roll and the
 ## level-up cards).
@@ -132,8 +133,10 @@ static func create() -> Intermission:
 
 
 ## Shows the screen for the wave that was just cleared: the loot roll first (if any loot),
-## then the market. Players ready up with START.
+## then the market. Players ready up with START. A new spend round starts (RunState's spend log
+## and wants are cleared).
 func open(p_cleared_wave: int, p_level_ups: int) -> void:
+	RunState.begin_spend_round()
 	cleared_wave = p_cleared_wave
 	level_ups = p_level_ups
 	_done = false
@@ -642,7 +645,9 @@ func _bots_settled() -> bool:
 ## included), then buys every affordable offer that is an upgrade for it – the cheapest first,
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
-## Then the bots train (_bots_train) and spend what is left over on rerolls (_bots_reroll).
+## Before buying, every bot forges what it can (Forge.bot_forge_all) and wears the results.
+## Then the bots train (_bots_train), spend their talent points (_bots_talents) and spend what
+## is left over on rerolls (_bots_reroll).
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -651,10 +656,13 @@ func _bots_shop() -> void:
 		if not s.is_bot() or ShopPanel.equipment_of(s) == null:
 			continue
 		bot_equip_upgrades(s)
+		if Forge.bot_forge_all(s) > 0:
+			bot_equip_upgrades(s)
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
 	_bots_buy(shoppers)
 	_bots_train()
+	_bots_talents()
 	_bots_reroll(shoppers)
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
@@ -701,6 +709,17 @@ func _bots_train() -> int:
 		if n > 0:
 			total += n
 			ranks_trained.emit(s.index, n)
+	return total
+
+
+## After training, every bot hero spends its free talent points (TalentBot.spend_all – no
+## RNG). Returns the points spent.
+func _bots_talents() -> int:
+	var total := 0
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.talents != null:
+			total += TalentBot.spend_all(hero, s.index)
 	return total
 
 

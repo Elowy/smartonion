@@ -282,6 +282,22 @@ func set_cooldown(ability: AbilityData, seconds: float) -> void:
 		_charges_spent[ability.id] = maxi(1, int(_charges_spent.get(ability.id, 0)))
 
 
+## M5 (talent / set cooldown procs, Restless Blades): shortens the running recharge of
+## [param ability] by [param seconds]; reaching 0 returns one charge and restarts the timer with
+## the leftover, like a tick would (never every spent charge, unlike set_cooldown(a, 0)).
+## P0 stub: does nothing yet (T-CORE-B).
+func reduce_cooldown(_ability: AbilityData, _seconds: float) -> void:
+	pass
+
+
+## M5: seconds left of the running recharge of [param ability] – also while charges are left
+## (unlike [method remaining]); 0 when nothing recharges.
+func cooldown_left(ability: AbilityData) -> float:
+	if ability == null:
+		return 0.0
+	return _cooldown_left.get(ability.id, 0.0)
+
+
 ## Uses up one charge of [param ability] as a cast would (the recharge starts if it is not
 ## already running) – for passives that trigger themselves (Cheat Death).
 func spend_charge(ability: AbilityData, ctx: AbilityContext = null) -> void:

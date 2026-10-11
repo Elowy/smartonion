@@ -10,6 +10,7 @@ display_name = "Rain of Fire"
 description = "Rains fire on the densest group of enemies: a {radius} m circle burns everything inside for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
+tags = Array[StringName]([&"aoe", &"ground", &"spell"])
 resource = &"soul_shard"
 cost = 1.0
 cooldown = 0.0

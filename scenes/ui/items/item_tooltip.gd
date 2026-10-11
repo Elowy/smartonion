@@ -51,6 +51,9 @@ var comparison_visible := true
 ## and the frame border in that colour. Empty = none.
 var owner_tag := ""
 var owner_color := Color.WHITE
+## The viewer's equipment (M5): set bonuses use it to show the worn pieces "(n/5)" and which
+## bonuses are active. Null = no counts (the loot roll). Set it before show_item.
+var viewer_equipment: Equipment
 
 var _box: VBoxContainer
 static var _italic: FontVariation

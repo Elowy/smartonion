@@ -345,15 +345,18 @@ func test_y_toggles_comparison_and_tabs_switch() -> void:
 	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "RT opens the Trainer")
 	check(panel.trainer.visible and not panel.tooltip.visible, "the Trainer replaces the paper doll and its tooltip")
 	_tap(panel, slot, PlayerInput.Pad.RT)
-	check_eq(panel.last_message, "Talents: coming soon", "locked tab")
-	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "stays on the Trainer")
+	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "RT opens the Talents tab (M5)")
+	check(panel.talents.visible and not panel.trainer.visible and not panel.tooltip.visible,
+		"the Talents tab replaces the Trainer")
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "LT goes back to the Trainer")
 	_tap(panel, slot, PlayerInput.Pad.LT)
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "LT goes back to Character")
 	check(panel.tooltip.visible, "the item tooltip is back")
-	panel.last_message = ""
 	_tap(panel, slot, PlayerInput.Pad.LT)
-	check_eq(panel.last_message, "Talents: coming soon", "wraps to Talents")
-	check_eq(panel.active_tab, 0, "stays on Character")
+	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "wraps to Talents")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "RT wraps back to Character")
 
 
 func test_stat_rows_and_header() -> void:

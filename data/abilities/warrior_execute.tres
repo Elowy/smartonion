@@ -10,6 +10,7 @@ display_name = "Execute"
 description = "A huge strike for {damage_pct}% weapon damage on an enemy in reach. Enemies below {threshold}% HP die outright; bosses take {boss_mult}x damage instead."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 8.0

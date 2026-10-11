@@ -1,8 +1,12 @@
 class_name LootDrops
 extends RefCounted
 ## Decides item drops when enemies die (GDD 10.1): normal enemies 1.5% (+Fortune), at most
-## 1 + players item drops per wave from normal enemies; elites / goblin / boss sources come
-## with M5 / M6. Spawns a LootBag.
+## 1 + players item drops per wave from normal enemies. Spawns a LootBag.
+## Guaranteed drops of elites, the Loot Goblin (M5) and bosses (M6) go through
+## [method drop_special]: their own generator source, not counted against the cap. M6 adds the
+## Artifact roll there (and the normal enemies' one in on_enemy_killed).
+## Every generated drop passes the party's classes (&"team_classes", [method team_classes]) so
+## class-bound content (tier set pieces) is rolled for a class that is playing.
 ##
 ## Fortune formula (GDD: "Fortune increases the drop chance"): every 10 points of Fortune of
 ## the killer add 1 percentage point, i.e. chance = 1.5% + Fortune / 1000 (a Lucky Rabbit
@@ -45,11 +49,37 @@ static func on_enemy_killed(enemy: Node3D, killer: Node3D) -> LootBag:
 	return drop_item(generate_item(killer), Vector3(at.x, 0.0, at.z), enemy)
 
 
+## The joined players' classes, each once, in slot order (slots without a class are skipped).
+static func team_classes() -> Array[ClassData]:
+	var out: Array[ClassData] = []
+	for s in PlayerManager.get_slots():
+		if s.class_data != null and s.class_data not in out:
+			out.append(s.class_data)
+	return out
+
+
 ## A new looted item at the current wave (Source.LOOT, killer's Fortune).
 static func generate_item(killer: Node3D) -> ItemInstance:
+	return _generate(ItemGenerator.Source.LOOT, killer)
+
+
+## A guaranteed drop of an elite / the Loot Goblin / a boss ([param source] ELITE / GOBLIN /
+## BOSS – the generator's rarity rules for it), with [param killer]'s Fortune, at
+## [param enemy]'s position. Unlike normal drops it is not counted in
+## RunState.loot_drops_this_wave (the cap stays for normal enemies). Returns the bag (null when
+## there is nowhere to put it).
+static func drop_special(source: ItemGenerator.Source, enemy: Node3D, killer: Node3D) -> LootBag:
+	if enemy == null or not is_instance_valid(enemy):
+		return null
+	var at := enemy.global_position if enemy.is_inside_tree() else enemy.position
+	return _place_bag(_generate(source, killer), Vector3(at.x, 0.0, at.z), enemy)
+
+
+## A looted item of [param source] at the current wave (killer's Fortune, the team's classes).
+static func _generate(source: ItemGenerator.Source, killer: Node3D) -> ItemInstance:
 	var wave := maxi(1, RunState.wave)
-	var item := ItemGenerator.generate(ItemGenerator.Source.LOOT, wave, RunState.rng,
-		{&"fortune": killer_fortune(killer)})
+	var item := ItemGenerator.generate(source, wave, RunState.rng,
+		{&"fortune": killer_fortune(killer), &"team_classes": team_classes()})
 	item.looted = true
 	if item.buy_price <= 0:
 		item.buy_price = ItemGenerator.price_for(item.rarity, wave)
@@ -60,10 +90,17 @@ static func generate_item(killer: Node3D) -> ItemInstance:
 ## the wave cap). The bag goes under Arena.current.entities, else under [param fallback]'s
 ## parent. Returns null when there is nowhere to put it.
 static func drop_item(item: ItemInstance, world_pos: Vector3, fallback: Node = null) -> LootBag:
+	var bag := _place_bag(item, world_pos, fallback)
+	if bag != null:
+		RunState.loot_drops_this_wave += 1
+	return bag
+
+
+## A LootBag with [param item] at [param world_pos] (see [method drop_item]; not counted).
+static func _place_bag(item: ItemInstance, world_pos: Vector3, fallback: Node) -> LootBag:
 	var parent := _world_parent(fallback)
 	if item == null or parent == null:
 		return null
-	RunState.loot_drops_this_wave += 1
 	var bag := LootBag.create(item)
 	var parent_3d := parent as Node3D
 	if parent_3d != null and parent_3d.is_inside_tree():

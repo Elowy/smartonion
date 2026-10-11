@@ -10,6 +10,7 @@ display_name = "Whirlwind"
 description = "Spin for {duration} sec, striking all enemies within {radius} m for {damage_pct}% weapon damage in total."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"aoe", &"weapon"])
 resource = &"rage"
 cost = 40.0
 cooldown = 0.0

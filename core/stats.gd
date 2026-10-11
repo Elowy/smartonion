@@ -53,6 +53,12 @@ const EXECUTIONER := &"executioner"        ## +% damage vs targets below 30% HP
 const SLAYER := &"slayer"                  ## +% damage vs elites and bosses
 const LIFE_ON_KILL := &"life_on_kill"      ## % chance to heal 1 HP on kill
 const XP_GAIN := &"xp_gain"                ## +% XP
+# M5 (talents / set bonuses)
+## % block chance, added to the equipped weapons' block chance (shields); the total is capped
+## at BLOCK_CAP (Player.block_chance).
+const BLOCK_CHANCE := &"block_chance"
+## +% healing done – kits opt in (e.g. PaladinKit.heal_amount); nothing reads it by default.
+const HEALING_DONE := &"healing_done"
 
 ## Whole-number stats (counts): item / enchant values are rounded down for them.
 const INTEGER_STATS: Array[StringName] = [EXTRA_PROJECTILE, PIERCE]
@@ -72,7 +78,7 @@ const ALL: Array[StringName] = [
 	ATTACK_POWER, SPELL_POWER, EXTRA_ATTACK, CRIT_DAMAGE, THORNS, PARRY, BLOCK_VALUE,
 	COOLDOWN_REDUCTION, RESOURCE_REGEN, EXTRA_PROJECTILE, PIERCE, AREA_SIZE,
 	FIRE_DAMAGE, FROST_DAMAGE, ARCANE_DAMAGE, HOLY_DAMAGE, SHADOW_DAMAGE, NATURE_DAMAGE,
-	PHYSICAL_DAMAGE, EXECUTIONER, SLAYER, LIFE_ON_KILL, XP_GAIN,
+	PHYSICAL_DAMAGE, EXECUTIONER, SLAYER, LIFE_ON_KILL, XP_GAIN, BLOCK_CHANCE, HEALING_DONE,
 ]
 
 const BASE_MAX_HP := 10.0
@@ -83,6 +89,8 @@ const BASE_PICKUP_RANGE := 3.0  ## metres at Pickup Range 0
 const BASE_MASTERY := 5.0
 
 const DODGE_CAP := 60.0
+## Total block chance ceiling (percent; weapons + BLOCK_CHANCE), like the Dodge / Parry caps.
+const BLOCK_CAP := 50.0
 const AVOIDANCE_CAP := 50.0
 const VERSATILITY_REDUCTION_CAP := 30.0
 const CRIT_CAP := 100.0
@@ -132,6 +140,8 @@ const DISPLAY_NAMES := {
 	SLAYER: "Slayer",
 	LIFE_ON_KILL: "Life on Kill",
 	XP_GAIN: "XP Gain",
+	BLOCK_CHANCE: "Block",
+	HEALING_DONE: "Healing Done",
 }
 
 ## Stats displayed with a % suffix.
@@ -139,7 +149,7 @@ const PERCENT_STATS: Array[StringName] = [
 	CRIT, HASTE, VERSATILITY, DODGE, AVOIDANCE, LEECH, SPEED, GOLD_FIND, PICKUP_RANGE, DAMAGE_PCT,
 	EXTRA_ATTACK, CRIT_DAMAGE, PARRY, BLOCK_VALUE, COOLDOWN_REDUCTION, RESOURCE_REGEN, AREA_SIZE,
 	FIRE_DAMAGE, FROST_DAMAGE, ARCANE_DAMAGE, HOLY_DAMAGE, SHADOW_DAMAGE, NATURE_DAMAGE,
-	PHYSICAL_DAMAGE, EXECUTIONER, SLAYER, LIFE_ON_KILL, XP_GAIN,
+	PHYSICAL_DAMAGE, EXECUTIONER, SLAYER, LIFE_ON_KILL, XP_GAIN, BLOCK_CHANCE, HEALING_DONE,
 ]
 
 

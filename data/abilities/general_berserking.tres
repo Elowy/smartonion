@@ -10,6 +10,7 @@ display_name = "Berserking"
 description = "Go berserk: +{haste}% Haste for {duration} sec."
 class_id = &""
 school = &"physical"
+tags = Array[StringName]([&"buff"])
 resource = &""
 cost = 0.0
 cooldown = 18.0

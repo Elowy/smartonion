@@ -10,6 +10,7 @@ display_name = "Cheat Death"
 description = "Passive: a killing blow leaves you at 1 health instead. You become invulnerable for {invulnerable} sec and recover {heal_max_hp_pct}% of your max health. Once every {cooldown} sec."
 class_id = &"rogue"
 school = &"shadow"
+tags = Array[StringName]([&"shield"])
 resource = &""
 cost = 0.0
 cooldown = 60.0

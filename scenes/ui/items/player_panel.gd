@@ -3,17 +3,21 @@ extends Control
 ## One player's personal between-wave panel (GDD 12), shown in that player's screen corner /
 ## quadrant (DESIGN_SIZE 700x480 on the 1920x1080 canvas; scale it with [member scale]).
 ## Header in the player's colour (Pn, class, Avg. Item Level), tabs Character | Trainer |
-## Talents (Talents "Coming soon"). Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
+## Talents. Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
 ## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
-## the Character tab. Character tab = WoW paper doll – Head, Neck,
+## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/), wired the same
+## way. Character tab = WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
 ## Controller (only the PlayerInput passed to handle_input): d-pad / stick moves the
 ## selection, A opens the action menu (backpack: Equip (→ slot for rings / trinkets /
-## dual wield) / Sell / Trade → Pn / Cancel; equipped: Unequip / Cancel), X opens it on Sell,
-## B closes menus, Y toggles the comparison in the tooltip, LT / RT switch tabs (the Trainer tab
-## takes the rest of the input while it is shown; TrainerTab.handle_input).
+## dual wield) / Forge (weapons) / Sell / Trade → Pn / Cancel; equipped: Unequip / Forge
+## (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles the comparison in the
+## tooltip, LT / RT switch tabs (the Trainer and Talents tabs take the rest of the input while
+## they are shown; TrainerTab / TalentTab.handle_input – LT / RT stay with the panel unless the
+## tab is modal). Forge (M5): Forge.blocked_reason greys the entry out, Forge.result_text is its
+## detail, Forge.forge does it and the result gets selected.
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
 ## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
@@ -51,8 +55,11 @@ const BOTTOM_SLOTS: Array[Items.EquipSlot] = [
 const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents"]
 const CHARACTER_TAB := 0
 const TRAINER_TAB := 1
-## Tabs that only say "coming soon" (Talents: M5).
-const LOCKED_TABS: Array[int] = [2]
+const TALENTS_TAB := 2
+## Tabs that only say "coming soon" (none since M5 opened Talents).
+const LOCKED_TABS: Array[int] = []
+## --panel-tab values -> tab index (debug_start_tab).
+const TAB_IDS: Dictionary[String, int] = {"character": CHARACTER_TAB, "trainer": TRAINER_TAB, "talents": TALENTS_TAB}
 ## Stat list (two columns, at most MAX_STAT_ROWS rows so the panel never grows): the class's
 ## primary stat, then these, then the other primary stats and every other non-zero stat.
 ## Stamina is shown as Max HP (10 + Stamina).
@@ -111,6 +118,12 @@ var last_input_consumed := false
 
 ## The Trainer tab's body (shown instead of the paper doll while active_tab is TRAINER_TAB).
 var trainer: TrainerTab
+## The Talents tab's body (shown while active_tab is TALENTS_TAB).
+var talents: TalentTab
+
+## Dev only (--panel-tab=talents / trainer / character, screenshots): when the market opens,
+## P1's panel switches to that tab once ("" = off).
+static var debug_start_tab := ""
 
 var _cells: Array[Cell] = []
 var _focused := false
@@ -139,6 +152,8 @@ var _toast_label: RichTextLabel
 var _toast_coin: UiIcon
 var _toast_time := 0.0
 var _initial_selection := true
+## debug_start_tab was applied to this panel.
+var _debug_tab_done := false
 
 ## Panels in the tree, so a trade can notify the receiver's panel.
 static var _open_panels: Array[PlayerPanel] = []
@@ -177,7 +192,9 @@ func refresh() -> void:
 	if mode == Mode.MENU and not _menu_item_still_there():
 		close_menu()
 	trainer.refresh()
+	talents.refresh()
 	_update_selection()
+	_apply_debug_start_tab()
 
 
 ## Whether this panel currently receives the player's input (the Intermission routes input
@@ -187,6 +204,7 @@ func set_input_focus(focused: bool) -> void:
 	if not focused and mode == Mode.MENU:
 		close_menu()
 	trainer.set_focused(focused and active_tab == TRAINER_TAB)
+	talents.set_focused(focused and active_tab == TALENTS_TAB)
 	_frame.add_theme_stylebox_override(&"panel", _frame_style(focused))
 	_update_selection()
 
@@ -203,6 +221,9 @@ func handle_input(input: PlayerInput, delta: float = -1.0) -> void:
 		return
 	if active_tab == TRAINER_TAB:
 		_trainer_input(input, delta if delta >= 0.0 else get_process_delta_time())
+		return
+	if active_tab == TALENTS_TAB:
+		_talents_input(input, delta if delta >= 0.0 else get_process_delta_time())
 		return
 	if mode == Mode.MENU:
 		last_input_consumed = input.nav_just_pressed() != Vector2i.ZERO or input.just_pressed(PlayerInput.Pad.A) \
@@ -413,7 +434,7 @@ func toggle_comparison() -> void:
 	_update_prompts()
 
 
-## LT / RT: the neighbouring tab; a locked one (Talents) only says "coming soon".
+## LT / RT: the neighbouring tab; a locked one (none since M5) only says "coming soon".
 func switch_tab(step: int) -> void:
 	var target := posmod(active_tab + step, TAB_NAMES.size())
 	if target in LOCKED_TABS:
@@ -422,7 +443,7 @@ func switch_tab(step: int) -> void:
 	set_tab(target)
 
 
-## Shows tab [param index] (CHARACTER_TAB or TRAINER_TAB; locked tabs are refused).
+## Shows tab [param index] (CHARACTER_TAB, TRAINER_TAB or TALENTS_TAB; locked tabs are refused).
 func set_tab(index: int) -> void:
 	if index < 0 or index >= TAB_NAMES.size() or index in LOCKED_TABS or index == active_tab:
 		return
@@ -431,12 +452,40 @@ func set_tab(index: int) -> void:
 	active_tab = index
 	_body.visible = index == CHARACTER_TAB
 	trainer.visible = index == TRAINER_TAB
+	talents.visible = index == TALENTS_TAB
 	_refresh_tabs()
 	if index == TRAINER_TAB:
 		trainer.refresh()
+	elif index == TALENTS_TAB:
+		talents.refresh()
 	trainer.set_focused(_focused and index == TRAINER_TAB)
+	talents.set_focused(_focused and index == TALENTS_TAB)
 	_prompt_key = ""
 	_update_selection()
+
+
+## --panel-tab (dev): P1's panel opens on [member debug_start_tab] once, when the market first
+## shows it.
+func _apply_debug_start_tab() -> void:
+	if _debug_tab_done or debug_start_tab == "" or slot == null or slot.index != 0:
+		return
+	_debug_tab_done = true
+	set_tab(int(TAB_IDS.get(debug_start_tab, active_tab)))
+
+
+## LT / RT switch tabs unless the Talents tab is modal (a confirm / hold is open); everything
+## else goes to the Talents tab.
+func _talents_input(input: PlayerInput, delta: float) -> void:
+	if not talents.is_modal():
+		if input.just_pressed(PlayerInput.Pad.LT):
+			switch_tab(-1)
+			last_input_consumed = true
+			return
+		if input.just_pressed(PlayerInput.Pad.RT):
+			switch_tab(1)
+			last_input_consumed = true
+			return
+	last_input_consumed = talents.handle_input(input, delta)
 
 
 ## LT / RT switch tabs (not while the Rank V choice is open); everything else goes to the
@@ -473,6 +522,8 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	else:
 		_fill_equip_entry(equip, it, targets[0], Items.EQUIP_SLOT_NAMES.get(targets[0], ""))
 	out.append(equip)
+	if it.is_weapon():
+		out.append(_forge_entry(it))
 	var last_weapon := eq.is_last_weapon(it)
 	var sell := _entry("Sell")
 	sell.detail = "+%d gold" % it.sell_value()
@@ -507,10 +558,27 @@ func _equipped_entries(equip_slot: int) -> Array[MenuEntry]:
 	else:
 		unequip.action = _do_unequip.bind(equip_slot)
 	out.append(unequip)
+	var it := equipment().get_item(equip_slot as Items.EquipSlot)
+	if it != null and it.is_weapon():
+		out.append(_forge_entry(it))
 	var cancel := _entry("Cancel")
 	cancel.action = close_menu
 	out.append(cancel)
 	return out
+
+
+## "Forge" for weapon [param it] (M5): greyed out with Forge.blocked_reason, the result's rarity
+## (Forge.result_text) as the detail.
+func _forge_entry(it: ItemInstance) -> MenuEntry:
+	var e := _entry("Forge")
+	e.detail = Forge.result_text(it)
+	var reason := Forge.blocked_reason(equipment(), it)
+	if reason != "":
+		e.enabled = false
+		e.reason = reason
+	else:
+		e.action = _do_forge.bind(it)
+	return e
 
 
 func _open_equip_choice(it: ItemInstance) -> void:
@@ -592,6 +660,28 @@ func _do_unequip(equip_slot: int) -> void:
 		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
 	else:
 		_message("Your backpack is full", "", UiTheme.RED)
+
+
+## Forges [param it] with its partner (Forge.forge): "Forged [Rare Dagger]!" and the result is
+## selected (where it went: an equipped position or the backpack).
+func _do_forge(it: ItemInstance) -> void:
+	var eq := equipment()
+	var reason := Forge.blocked_reason(eq, it)
+	var result := Forge.forge(eq, it) if reason == "" else null
+	if result == null:
+		_message(reason if reason != "" else "Can't forge that", "", UiTheme.RED)
+		return
+	close_menu()
+	_message("Forged %s!" % _bb_item(result), "Forged %s!" % result.display_name, _rarity_color(result))
+	var at := eq.backpack.find(result)
+	if at >= 0:
+		select_backpack(at)
+	else:
+		for s in Items.EquipSlot.values():
+			if eq.get_item(s) == result:
+				select_equip_slot(s)
+				break
+	refresh()
 
 
 func _do_sell(it: ItemInstance) -> void:
@@ -711,6 +801,11 @@ func _build() -> void:
 	trainer.message.connect(_on_trainer_message)
 	trainer.prompts_changed.connect(_on_trainer_prompts_changed)
 	col.add_child(trainer)
+	talents = TalentTab.create(slot)
+	talents.visible = false
+	talents.message.connect(_on_talents_message)
+	talents.prompts_changed.connect(_on_talents_prompts_changed)
+	col.add_child(talents)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
 	_build_menu()
@@ -794,9 +889,10 @@ func _refresh_tabs() -> void:
 			l.add_theme_font_override(&"font", UiTheme.bold_font())
 		row.add_child(l)
 		_tabs_row.add_child(tab)
-	var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
-	soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_tabs_row.add_child(soon)
+	if not LOCKED_TABS.is_empty():
+		var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
+		soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_tabs_row.add_child(soon)
 	_tabs_row.add_child(UiTheme.spacer())
 	# LT / RT hint at the end of the strip.
 	var input := slot.input if slot != null else null
@@ -1154,6 +1250,7 @@ func _update_tooltip() -> void:
 	if _cells[selected].bag_index >= 0:
 		compare = ItemTooltip.equipped_for_compare(it, equipment())
 	tooltip.comparison_visible = comparison
+	tooltip.viewer_equipment = equipment()
 	tooltip.show_item(it, class_data(), compare)
 	if is_inside_tree():
 		_place_tooltip.call_deferred()
@@ -1162,6 +1259,9 @@ func _update_tooltip() -> void:
 func _update_prompts() -> void:
 	if active_tab == TRAINER_TAB:
 		_update_trainer_prompts()
+		return
+	if active_tab == TALENTS_TAB:
+		_update_tab_prompts("talents", talents.prompt_spec(), talents.context_text())
 		return
 	var cell := _cells[selected]
 	var it := selected_item()
@@ -1190,10 +1290,16 @@ func _update_prompts() -> void:
 
 
 func _update_trainer_prompts() -> void:
-	_context_label.text = trainer.context_text()
+	_update_tab_prompts("trainer", trainer.prompt_spec(), trainer.context_text())
+
+
+## The prompt row of the Trainer / Talents tab ([param tab_key]): [param spec] = [button, text]
+## pairs (PlayerInput.Pad or TrainerTab.NAV_PROMPT / NAV_PROMPT_SIDEWAYS), [param context] the
+## text on the left. Rebuilt only when something changed.
+func _update_tab_prompts(tab_key: String, spec: Array, context: String) -> void:
+	_context_label.text = context
 	var input := slot.input if slot != null else null
-	var spec := trainer.prompt_spec()
-	var key := "trainer:%s:%s" % [str(spec), _focused]
+	var key := "%s:%s:%s" % [tab_key, str(spec), _focused]
 	if key == _prompt_key:
 		return
 	_prompt_key = key
@@ -1222,6 +1328,15 @@ func _on_trainer_message(bbcode: String, plain: String, color: Color, coin: bool
 
 func _on_trainer_prompts_changed() -> void:
 	if active_tab == TRAINER_TAB and _prompt_holder != null:
+		_update_prompts()
+
+
+func _on_talents_message(bbcode: String, plain: String, color: Color, coin: bool) -> void:
+	_message(bbcode, plain, color, coin)
+
+
+func _on_talents_prompts_changed() -> void:
+	if active_tab == TALENTS_TAB and _prompt_holder != null:
 		_update_prompts()
 
 

@@ -10,6 +10,10 @@ const AFFIX_DIR := "res://data/affixes/"
 const ENCHANT_DIR := "res://data/enchants/"
 const UNIQUE_DIR := "res://data/uniques/"
 const ABILITY_DIR := "res://data/abilities/"
+## One subfolder per class: data/talents/<class>/<tree>.tres (TalentTreeData, M5).
+const TALENT_DIR := "res://data/talents/"
+## data/sets/<set_id>.tres (SetData, M5).
+const SET_DIR := "res://data/sets/"
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -22,6 +26,12 @@ var enchants: Dictionary[StringName, EnchantData] = {}
 var uniques: Dictionary[StringName, UniqueItemData] = {}
 ## Every ability (core ones too), by id, in file order.
 var abilities: Dictionary[StringName, AbilityData] = {}
+## Every talent tree, by id (M5).
+var talent_trees: Dictionary[StringName, TalentTreeData] = {}
+## Every talent of every tree, by id (ids are global; a duplicate is an error).
+var talents: Dictionary[StringName, TalentData] = {}
+## Every tier set, by id (M5).
+var sets: Dictionary[StringName, SetData] = {}
 var class_ids: Array[StringName] = []
 
 
@@ -62,6 +72,15 @@ func reload() -> void:
 	for res in _load_dir(ABILITY_DIR):
 		if res is AbilityData:
 			abilities[res.id] = res
+	talent_trees.clear()
+	talents.clear()
+	for res in _load_tree(TALENT_DIR):
+		if res is TalentTreeData:
+			_add_talent_tree(res)
+	sets.clear()
+	for res in _load_dir(SET_DIR):
+		if res is SetData:
+			sets[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -93,6 +112,39 @@ func ability_pool(class_id: StringName) -> Array[AbilityData]:
 		if a.class_id == &"" or a.class_id == class_id:
 			out.append(a)
 	return out
+
+
+## The talent trees of [param class_id] in tab order (TalentTreeData.index, then id).
+func talent_trees_for(class_id: StringName) -> Array[TalentTreeData]:
+	var out: Array[TalentTreeData] = []
+	for id in talent_trees:
+		if talent_trees[id].class_id == class_id:
+			out.append(talent_trees[id])
+	out.sort_custom(func(a: TalentTreeData, b: TalentTreeData) -> bool:
+		return a.index < b.index if a.index != b.index else String(a.id) < String(b.id))
+	return out
+
+
+func get_talent(id: StringName) -> TalentData:
+	return talents.get(id)
+
+
+func get_talent_tree(id: StringName) -> TalentTreeData:
+	return talent_trees.get(id)
+
+
+func get_set(id: StringName) -> SetData:
+	return sets.get(id)
+
+
+## The tier set of [param class_id] (the first by id when there are several; null = none).
+func set_for_class(class_id: StringName) -> SetData:
+	var best: SetData = null
+	for id in sets:
+		var s := sets[id]
+		if s.class_id == class_id and (best == null or String(s.id) < String(best.id)):
+			best = s
+	return best
 
 
 func get_default_class() -> ClassData:
@@ -128,6 +180,33 @@ func cycle_class(current: StringName, step: int) -> StringName:
 		return current
 	var i := class_ids.find(current)
 	return class_ids[wrapi(i + step, 0, class_ids.size())]
+
+
+## Registers [param tree] and its talents (a duplicate tree / talent id is an error; the first
+## one loaded stays).
+func _add_talent_tree(tree: TalentTreeData) -> void:
+	if talent_trees.has(tree.id):
+		push_error("Db: duplicate talent tree id %s" % tree.id)
+		return
+	talent_trees[tree.id] = tree
+	for t in tree.talents:
+		if t == null:
+			continue
+		if talents.has(t.id):
+			push_error("Db: duplicate talent id %s (tree %s)" % [t.id, tree.id])
+			continue
+		talents[t.id] = t
+
+
+## [method _load_dir] of [param path] and, depth first in name order, of its subfolders.
+func _load_tree(path: String) -> Array[Resource]:
+	var out := _load_dir(path)
+	var entries := ResourceLoader.list_directory(path)
+	entries.sort()
+	for entry in entries:
+		if entry.ends_with("/"):
+			out.append_array(_load_tree(path + entry))
+	return out
 
 
 func _load_dir(path: String) -> Array[Resource]:

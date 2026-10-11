@@ -10,6 +10,7 @@ display_name = "Divine Shield"
 description = "A golden bubble makes you immune to all damage for {duration} sec."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"shield"])
 resource = &""
 cost = 0.0
 cooldown = 40.0

@@ -10,6 +10,7 @@ display_name = "Heroic Leap"
 description = "Leap onto the biggest group of enemies up to 10 m away. The impact deals {damage_pct}% weapon damage to enemies within {radius} m. You cannot be hurt in the air."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"movement", &"aoe", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 12.0

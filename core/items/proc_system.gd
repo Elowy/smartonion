@@ -216,6 +216,9 @@ var _equip_sources: Array[StringName] = []
 var _gold_carry := 0.0
 var _depth := 0
 var _next_uid := 1
+## M5, see PlayerBonuses: proc params dicts of talents / set bonuses per source
+## (set_extra_procs; not built into procs yet – T-CORE-B).
+var _extra_defs: Dictionary[StringName, Array] = {}
 
 
 static func create(owner_player: Player) -> ProcSystem:
@@ -279,6 +282,33 @@ func on_struck(attacker: Node3D, _damage: float) -> void:
 		for p in _when_struck:
 			_try_fire(p, p.chance / 100.0, attacker, pos, null)
 	_check_low_hp()
+
+
+## M5, see PlayerBonuses: the proc entries of [param source] (&"talents", &"set_bonus"),
+## rank-resolved ProcSystem params dicts (BonusVocabulary). P0 stub: stored only (T-CORE-B
+## builds them into procs in refresh()).
+func set_extra_procs(source: StringName, defs: Array[Dictionary]) -> void:
+	_extra_defs[source] = defs.duplicate(true)
+
+
+## M5, see PlayerBonuses: one of the player's abilities was cast (on_cast trigger).
+## P0 stub: nothing fires yet.
+func on_ability_cast(_ability: AbilityData) -> void:
+	pass
+
+
+## M5, see PlayerBonuses: the player dodged / parried / blocked ([param _kind] &"dodge" /
+## &"parry" / &"block") a hit of [param _attacker] (may be null) – on_dodge / on_parry /
+## on_block triggers. P0 stub: nothing fires yet.
+func on_avoided(_kind: StringName, _attacker: Node3D) -> void:
+	pass
+
+
+## M5, see PlayerBonuses: called by Player.begin_wave after the class resources were reset
+## (AbilityRunner.begin_wave), so a wave_start proc's resource / cooldown effect is not wiped.
+## P0 stub: nothing fires yet.
+func after_wave_start() -> void:
+	pass
 
 
 ## Wave start: cooldowns, per-wave limits and low-HP triggers re-arm; DoTs, timed buffs and

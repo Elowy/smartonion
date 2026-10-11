@@ -21,6 +21,10 @@ extends CharacterBody3D
 ## item drops via [method LootDrops.on_enemy_killed], [method Player.notify_kill] for the
 ## killing Player, [signal died]).
 ## Players are looked up through the shared per-tick [LivingPlayers] snapshot.
+## Subclasses (M5: the Loot Goblin) are built with [method setup] on their own instance and
+## override [method _think] (the AI step), [method deals_contact_damage] and
+## [method _death_loot] (gold / XP pickup and the item drop roll). Healing (Vampiric elites)
+## goes through [method heal], which healing reduction (Mortal Wound) lowers.
 
 signal died(enemy: Enemy, killer_index: int)
 
@@ -89,6 +93,8 @@ const OPEN_FIELD_MARGIN := 0.05
 const OPEN_FIELD_HEIGHT := Vector2(0.05, 2.0)
 ## Loot lands up to this far (m) from the death position.
 const LOOT_SCATTER := 0.4
+## Size of the green heal number ([method heal]).
+const HEAL_TEXT_SIZE := 0.7
 ## State timers end this close to zero (keeps frame counts exact despite float error).
 const TIMER_EPSILON := 0.0001
 
@@ -121,6 +127,9 @@ var stun_left := 0.0
 ## Movement slow (procs such as Frostbite): percent and seconds left (the strongest wins).
 var slow_pct := 0.0
 var slow_left := 0.0
+## Healing reduction (Mortal Wound, M5): percent and seconds left (the strongest wins).
+var heal_reduction_pct := 0.0
+var heal_reduction_left := 0.0
 var knockback_velocity := Vector3.ZERO
 
 var _dead := false
@@ -163,7 +172,12 @@ static var _no_players: Array[Player] = []
 
 
 static func create(p_data: EnemyData, p_wave: int) -> Enemy:
-	var e := Enemy.new()
+	return setup(Enemy.new(), p_data, p_wave)
+
+
+## Configures [param e] (a new Enemy or subclass instance, not in the tree) for [param p_data]
+## at wave [param p_wave]: HP / damage growth, speed jitter, collision shape and model.
+static func setup(e: Enemy, p_data: EnemyData, p_wave: int) -> Enemy:
 	e.data = p_data
 	e.wave = maxi(1, p_wave)
 	e.collision_layer = COLLISION_LAYER_ENEMIES
@@ -302,6 +316,56 @@ func is_taunted() -> bool:
 			and taunt_target.is_inside_tree()
 
 
+## Ends a taunt towards [param target] (a hero that went down – Challenging Charge, Righteous
+## Fury); a taunt towards anything else keeps running.
+func release_taunt(target: Node3D) -> void:
+	if target == null or taunt_target != target:
+		return
+	taunt_left = 0.0
+	taunt_target = null
+
+
+## Whether touching a player hurts it (the Loot Goblin overrides it with false).
+func deals_contact_damage() -> bool:
+	return true
+
+
+## Healing reduction (Mortal Wound): heals on this enemy restore [param pct] percent less for
+## [param duration] seconds. A stronger reduction replaces the running one, an equal one
+## extends it, a weaker one is ignored while the stronger one lasts.
+func apply_healing_reduction(pct: float, duration: float) -> void:
+	if is_dead() or pct <= 0.0 or duration <= 0.0:
+		return
+	var p := clampf(pct, 0.0, 100.0)
+	if heal_reduction_left <= 0.0 or p > heal_reduction_pct:
+		heal_reduction_pct = p
+		heal_reduction_left = duration
+	elif is_equal_approx(p, heal_reduction_pct):
+		heal_reduction_left = maxf(heal_reduction_left, duration)
+
+
+## Multiplier on heals this enemy receives (1 = full, 0.5 under a 50% reduction).
+func healing_taken_mult() -> float:
+	if heal_reduction_left <= 0.0:
+		return 1.0
+	return clampf(1.0 - heal_reduction_pct / 100.0, 0.0, 1.0)
+
+
+## Heals [param amount] x [method healing_taken_mult], at most up to max_hp, with a green
+## number. Returns the HP restored (0 when dead or full).
+func heal(amount: float) -> float:
+	if is_dead() or amount <= 0.0:
+		return 0.0
+	var gained := minf(max_hp - hp, amount * healing_taken_mult())
+	if gained <= 0.0:
+		return 0.0
+	hp += gained
+	var pos := global_position if is_inside_tree() else position
+	Vfx.floating_text(pos + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT,
+			"+" + Player._format_amount(gained), Player.HEAL_TEXT_COLOR, HEAL_TEXT_SIZE)
+	return gained
+
+
 func apply_stun(duration: float) -> void:
 	if is_dead() or duration <= 0.0:
 		return
@@ -402,6 +466,11 @@ func _physics_process(delta: float) -> void:
 		if slow_left <= 0.0:
 			slow_left = 0.0
 			slow_pct = 0.0
+	if heal_reduction_left > 0.0:
+		heal_reduction_left -= delta
+		if heal_reduction_left <= 0.0:
+			heal_reduction_left = 0.0
+			heal_reduction_pct = 0.0
 	if stunned:
 		stun_left -= delta
 		if stun_left <= 0.0:
@@ -417,13 +486,32 @@ func _physics_process(delta: float) -> void:
 			taunt_target = null
 
 	var here := global_position
-	_scan_players(here, stunned or feared)
+	_scan_players(here, stunned or feared or not deals_contact_damage())
 	if _dead or not is_inside_tree():
 		return  # a contact hit ended the run and the wave removed us
 
 	if stunned:
 		_move_velocity = Vector3.ZERO
-	elif feared:
+	else:
+		_think(delta, here, feared)
+	_apply_movement(delta, here, stunned)
+	if model != null:
+		# Only forward noticeable changes (the model smooths them anyway).
+		if _facing.dot(_sent_facing) < 0.9995:
+			_sent_facing = _facing
+			model.set_facing(_facing)
+		var moving := clampf(_move_velocity.length() / maxf(0.1, move_speed), 0.0, 1.0)
+		if absf(moving - _sent_moving) > 0.03:
+			_sent_moving = moving
+			model.set_moving(moving)
+
+
+## One AI step while not stunned (after the player scan: [member _target] is the nearest
+## visible living player or null): fear (run away), taunt (chase the taunter), then the
+## behaviour (lunge / ranged / chase, or wander without a target). Sets the desired walking
+## velocity; subclasses (the Loot Goblin's flight) replace it.
+func _think(delta: float, here: Vector3, feared: bool) -> void:
+	if feared:
 		var away := Vector3(here.x - _fear_from.x, 0.0, here.z - _fear_from.z)
 		var dir := away.normalized() if away.length_squared() > 0.0001 else _facing
 		_steer(dir * move_speed, delta)
@@ -447,16 +535,6 @@ func _physics_process(delta: float) -> void:
 				_update_ranged(delta, here)
 			_:
 				_update_chase(delta, here)
-	_apply_movement(delta, here, stunned)
-	if model != null:
-		# Only forward noticeable changes (the model smooths them anyway).
-		if _facing.dot(_sent_facing) < 0.9995:
-			_sent_facing = _facing
-			model.set_facing(_facing)
-		var moving := clampf(_move_velocity.length() / maxf(0.1, move_speed), 0.0, 1.0)
-		if absf(moving - _sent_moving) > 0.03:
-			_sent_moving = moving
-			model.set_moving(moving)
 
 
 ## Finds the nearest living player and deals contact damage to the first one touched.
@@ -727,9 +805,7 @@ func _die(attacker: Node3D) -> void:
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
-		_drop_loot(pos)
-	# Item drops (GDD 10.1) – the killer's Fortune counts (null killer: base chance).
-	LootDrops.on_enemy_killed(self, attacker if attacker != null and is_instance_valid(attacker) else null)
+	_death_loot(pos, attacker)
 	_leave_world()
 	died.emit(self, killer_index)
 	# On-kill effects of the killing hero (Life on Kill, on-kill procs) – after the enemy left
@@ -737,6 +813,15 @@ func _die(attacker: Node3D) -> void:
 	if killer != null and is_instance_valid(killer):
 		killer.notify_kill(self)
 	queue_free()
+
+
+## What a death leaves at [param pos]: the gold / XP pickup and the item drop roll (GDD 10.1 –
+## the killer's Fortune counts; a null / freed [param attacker] uses the base chance).
+## Subclasses with their own rewards (the Loot Goblin) replace it.
+func _death_loot(pos: Vector3, attacker: Node3D) -> void:
+	if data != null:
+		_drop_loot(pos)
+	LootDrops.on_enemy_killed(self, attacker if attacker != null and is_instance_valid(attacker) else null)
 
 
 func _drop_loot(pos: Vector3) -> void:

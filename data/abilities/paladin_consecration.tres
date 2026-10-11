@@ -10,6 +10,7 @@ display_name = "Consecration"
 description = "Consecrates the ground beneath you for {duration} sec: enemies standing in it take Holy damage every {tick} sec (scales with Strength and Spell Power)."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"aoe", &"ground"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

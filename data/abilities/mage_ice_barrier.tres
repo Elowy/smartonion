@@ -10,6 +10,7 @@ display_name = "Ice Barrier"
 description = "Wraps you in ice that absorbs {shield} damage (more with Intellect and Spell Power) until it breaks. Cast again once it is gone."
 class_id = &"mage"
 school = &"frost"
+tags = Array[StringName]([&"shield"])
 resource = &""
 cost = 0.0
 cooldown = 12.0

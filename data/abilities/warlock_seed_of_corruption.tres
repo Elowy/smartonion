@@ -10,6 +10,7 @@ display_name = "Seed of Corruption"
 description = "Plants a seed in an enemy of the densest group. When the host dies, or after {duration} sec, it bursts for Shadow damage within {radius} m."
 class_id = &"warlock"
 school = &"shadow"
+tags = Array[StringName]([&"aoe", &"dot", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 7.0

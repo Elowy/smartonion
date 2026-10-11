@@ -10,6 +10,7 @@ display_name = "Blade Flurry"
 description = "For {duration} sec, your weapon hits also strike other enemies nearby for {damage_pct}% of their damage (extra targets per hit: {targets})."
 class_id = &"rogue"
 school = &"physical"
+tags = Array[StringName]([&"buff", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 12.0

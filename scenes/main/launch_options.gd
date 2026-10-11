@@ -18,6 +18,13 @@ extends RefCounted
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
 ##   --time-scale=X       overrides the time scale (smoke default 4)
+##   --goblin-chance=X    M5 test hook: Loot Goblin chance per eligible wave (0..1,
+##                        GoblinSpawner.chance_override; default: the normal chance)
+##   --elite-mult=X       M5 test hook: multiplies the elites per wave (EliteAffixes.rate_mult)
+##   --start-level=N      M5 test hook: team level at run start (talent points from 10;
+##                        RunState.set_start_level, before the heroes spawn)
+##   --panel-tab=NAME     dev: P1's panel opens on that tab when the market opens – talents,
+##                        trainer, character (PlayerPanel.debug_start_tab, screenshots)
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -28,6 +35,10 @@ const DEFAULT_SHOT_TIME := 8.0
 ## Views that need a running game (bots are added and a run starts right away).
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
 const VIEWS: Array[String] = ["menu", "lobby", "game", "intermission", "game_over", "victory", "pause"]
+## --panel-tab values (PlayerPanel.TAB_IDS).
+const PANEL_TABS: Array[String] = ["character", "trainer", "talents"]
+## --start-level ceiling (far beyond a full run).
+const MAX_START_LEVEL := 99
 
 var smoke := false
 var demo := false
@@ -46,6 +57,12 @@ var view_time := -1.0
 var allow_defeat := false
 ## <= 0 = mode default (smoke 4, otherwise 1).
 var time_scale := 0.0
+## < 0 = the normal Loot Goblin chance.
+var goblin_chance := -1.0
+var elite_mult := 1.0
+var start_level := 1
+## "" = the panels open on the Character tab.
+var panel_tab := ""
 ## Arguments that were not understood (reported once by Main).
 var unknown: Array[String] = []
 
@@ -91,6 +108,17 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.allow_defeat = true
 			"--time-scale":
 				o.time_scale = clampf(value.to_float(), 0.05, 16.0)
+			"--goblin-chance":
+				o.goblin_chance = clampf(value.to_float(), 0.0, 1.0)
+			"--elite-mult":
+				o.elite_mult = maxf(0.0, value.to_float())
+			"--start-level":
+				o.start_level = clampi(value.to_int(), RunState.START_LEVEL, MAX_START_LEVEL)
+			"--panel-tab":
+				if value in PANEL_TABS:
+					o.panel_tab = value
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):

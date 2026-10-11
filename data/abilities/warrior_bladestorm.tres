@@ -10,6 +10,7 @@ display_name = "Bladestorm"
 description = "Become a storm of steel for {duration} sec: enemies within {radius} m take {damage_pct}% weapon damage in total. Nothing can slow you meanwhile."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"aoe", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 20.0
