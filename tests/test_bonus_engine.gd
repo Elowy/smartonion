@@ -7,6 +7,7 @@ extends TestCase
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const Probe := preload("res://tests/talent_effect_probe.gd")
+const ProcTests := preload("res://tests/test_procs.gd")
 
 
 ## ProcSystem that counts the hand-off calls (the real set_extra_procs / refresh still run).
@@ -115,6 +116,43 @@ func test_armor_specialization_counts_talent_primary() -> void:
 	var rest := p.stats.get_raw(Stats.STRENGTH) - bonus
 	check_near(bonus, rest * Equipment.ARMOR_SPEC_BONUS, 0.0001, "10% of the Strength incl. the talents' 10")
 	check(rest >= 26.0, "the talents' Strength is in (%s)" % rest)
+
+
+static func _spec_strength(p: Player) -> float:
+	return float(p.stats.get_source(&"armor_spec").get(Stats.STRENGTH, 0.0))
+
+
+## Review fix: a proc buff that ends with the wave leaves no share in Armor Specialization –
+## neither from a market recompute while it still ran (Player.begin_wave recomputes after the
+## buffs ended) nor in the market itself (Player.end_wave ends the buffs and recomputes).
+func test_armor_specialization_keeps_no_share_of_an_ended_proc_buff() -> void:
+	var p := _warrior()
+	for st in Items.ARMOR_SLOTS:
+		var piece := ItemInstance.new()
+		piece.display_name = "Plate %d" % st
+		piece.slot_type = st
+		piece.armor_type = p.class_data.armor_type
+		piece.stats[Stats.STRENGTH] = 2.0
+		_wear(p, piece)
+	_wear(p, ProcTests.unique(&"buff", {"trigger": "on_hit", "chance": 100.0, "stats": {"primary": 50.0}, "duration": 0.0}))
+	check(p.equipment.armor_spec_active(), "Armor Specialization active")
+	var e := Fakes.spawn_enemy(world, Vector3(1.2, 0, 0))
+	var rest := p.stats.get_raw(Stats.STRENGTH) - _spec_strength(p)
+	# The buff runs while a talent change in the market recomputes Armor Specialization.
+	p.procs.on_hit(e, 1.0, p.main_hand, false)
+	check_near(p.stats.get_raw(Stats.STRENGTH) - _spec_strength(p), rest + 50.0, 0.0001, "+50 Strength buff running")
+	_put(p, [{"kind": "stats", "stats": {"crit": 1.0}, "rank": 1}])
+	check_near(_spec_strength(p), (rest + 50.0) * Equipment.ARMOR_SPEC_BONUS, 0.0001, "recomputed with the buff in it")
+	p.begin_wave()
+	check_near(p.stats.get_raw(Stats.STRENGTH) - _spec_strength(p), rest, 0.0001, "the buff ended at the wave start")
+	check_near(_spec_strength(p), rest * Equipment.ARMOR_SPEC_BONUS, 0.0001, "no share of it for the new wave")
+	# The wave ends with the buff running: the market sees neither the buff nor its share.
+	p.procs.on_hit(e, 1.0, p.main_hand, false)
+	_put(p, [{"kind": "stats", "stats": {"crit": 2.0}, "rank": 1}])
+	check_near(_spec_strength(p), (rest + 50.0) * Equipment.ARMOR_SPEC_BONUS, 0.0001, "buffed again")
+	p.end_wave()
+	check_near(p.stats.get_raw(Stats.STRENGTH) - _spec_strength(p), rest, 0.0001, "the buff ended with the wave")
+	check_near(_spec_strength(p), rest * Equipment.ARMOR_SPEC_BONUS, 0.0001, "the market's Armor Specialization has no share of it")
 
 
 # --- ability -----------------------------------------------------------------------------------
