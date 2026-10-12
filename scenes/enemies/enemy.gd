@@ -20,6 +20,10 @@ extends CharacterBody3D
 ## enemy only handles knockback, hit flash, slows and death (kill credit, death puff, loot,
 ## item drops via [method LootDrops.on_enemy_killed], [method Player.notify_kill] for the
 ## killing Player, [signal died]).
+## Slows: [method apply_slow] (procs, abilities – the strongest wins) and the ghost slow
+## ([method apply_ghost_slow], GDD 16.1: a downed hero's revive circle slows the enemies inside
+## it by Player.GHOST_SLOW_PCT) in a slot of its own; the stronger of the two applies
+## ([method current_slow_pct]) to walking and lunges.
 ## Players are looked up through the shared per-tick [LivingPlayers] snapshot.
 ## Subclasses (M5: the Loot Goblin) are built with [method setup] on their own instance and
 ## override [method _think] (the AI step), [method deals_contact_damage] and
@@ -33,11 +37,11 @@ extends CharacterBody3D
 ## numbers are: [member shield_hp] (Shielding – [method take_damage] drains it first),
 ## [member speed_mult] (walking: [method walk_speed]), [member attack_cooldown_mult] (contact,
 ## lunge and throw cooldowns: [method attack_cooldown]) and [member damage_mult] (contact and
-## thrown damage); Enraged ignores slows once it raged ([method is_enraged]); Vampiric heals
-## through the heroes' [signal Player.damage_taken]. Elite rewards (10 gold, XP ×5, a
-## guaranteed Rare+ [method LootDrops.drop_special], [method RunState.record_special_kill])
-## key on [member elite_affix], never on [method is_elite] (the Loot Goblin returns true there
-## for Slayer / targeting only).
+## thrown damage); Enraged ignores slows (the ghost slow too) once it raged
+## ([method is_enraged]); Vampiric heals through the heroes' [signal Player.damage_taken].
+## Elite rewards (10 gold, XP ×5, a guaranteed Rare+ [method LootDrops.drop_special],
+## [method RunState.record_special_kill]) key on [member elite_affix], never on
+## [method is_elite] (the Loot Goblin returns true there for Slayer / targeting only).
 
 signal died(enemy: Enemy, killer_index: int)
 
@@ -146,6 +150,9 @@ var stun_left := 0.0
 ## Movement slow (procs such as Frostbite): percent and seconds left (the strongest wins).
 var slow_pct := 0.0
 var slow_left := 0.0
+## Ghost slow (GDD 16.1): seconds left of the Player.GHOST_SLOW_PCT slow a downed hero's revive
+## circle puts on the enemies inside it ([method apply_ghost_slow], refreshed every tick).
+var ghost_slow_left := 0.0
 ## Healing reduction (Mortal Wound, M5): percent and seconds left (the strongest wins).
 var heal_reduction_pct := 0.0
 var heal_reduction_left := 0.0
@@ -296,8 +303,18 @@ func is_boss() -> bool:
 	return false
 
 
+## Walking slower than normal: [method apply_slow]'s slow or the ghost slow.
 func is_slowed() -> bool:
-	return slow_left > 0.0 and slow_pct > 0.0
+	return (slow_left > 0.0 and slow_pct > 0.0) or ghost_slow_left > 0.0
+
+
+## The walking slow in effect (percent, 0 = none): the strongest of [method apply_slow]'s slow
+## and the ghost slow (they never add up).
+func current_slow_pct() -> float:
+	var p := slow_pct if slow_left > 0.0 else 0.0
+	if ghost_slow_left > 0.0 and Player.GHOST_SLOW_PCT > p:
+		p = Player.GHOST_SLOW_PCT
+	return p
 
 
 ## Slows walking (and lunges) by [param pct] percent (at most 90) for [param duration]
@@ -312,6 +329,20 @@ func apply_slow(pct: float, duration: float) -> void:
 		slow_left = duration
 	elif is_equal_approx(p, slow_pct):
 		slow_left = maxf(slow_left, duration)
+
+
+## Ghost slow (GDD 16.1, Player.GHOST_SLOW_PCT): every downed hero calls this each physics tick
+## for the enemies inside its revive circle with Player.GHOST_SLOW_LINGER. A separate slot from
+## [method apply_slow] – it never replaces or shortens another slow, several ghosts give one
+## slow (it does not stack with itself), and it runs out a moment after the last refresh (the
+## enemy left the circle, the ghost revived or left). The strongest slow wins
+## ([method current_slow_pct]); an enraged elite ignores it like every slow. Returns whether it
+## landed.
+func apply_ghost_slow(duration: float) -> bool:
+	if is_dead() or duration <= 0.0 or _enraged:
+		return false
+	ghost_slow_left = maxf(ghost_slow_left, duration)
+	return true
 
 
 ## [param attacker] is the Player (or null). [param knockback] is a world-space impulse.
@@ -537,6 +568,7 @@ func _enrage() -> void:
 	speed_mult *= EliteAffixes.ENRAGE_SPEED_MULT
 	slow_pct = 0.0
 	slow_left = 0.0
+	ghost_slow_left = 0.0
 	var pos := global_position if is_inside_tree() else position
 	var top := model.head_height * EliteAffixes.MODEL_SCALE if model != null else 1.2
 	Vfx.floating_text(pos + Vector3.UP * top, "Enrage!", ENRAGE_TEXT_COLOR, 1.0)
@@ -643,6 +675,8 @@ func _physics_process(delta: float) -> void:
 		if slow_left <= 0.0:
 			slow_left = 0.0
 			slow_pct = 0.0
+	if ghost_slow_left > 0.0:
+		ghost_slow_left = maxf(0.0, ghost_slow_left - delta)
 	if heal_reduction_left > 0.0:
 		heal_reduction_left -= delta
 		if heal_reduction_left <= 0.0:
@@ -897,8 +931,12 @@ func _apply_movement(delta: float, here: Vector3, stunned: bool) -> void:
 		if knockback_velocity.length_squared() < 0.0025:
 			knockback_velocity = Vector3.ZERO
 	var walk := _move_velocity
-	if slow_left > 0.0:
-		walk *= 1.0 - slow_pct / 100.0
+	# The strongest slow wins (current_slow_pct, inlined for the hot path).
+	var slow := slow_pct if slow_left > 0.0 else 0.0
+	if ghost_slow_left > 0.0 and Player.GHOST_SLOW_PCT > slow:
+		slow = Player.GHOST_SLOW_PCT
+	if slow > 0.0:
+		walk *= 1.0 - slow / 100.0
 	velocity = EnemyGrid.crowd_velocity(self, walk + knockback_velocity, delta, not stunned)
 	if velocity.length_squared() < 0.000001:
 		velocity = Vector3.ZERO
