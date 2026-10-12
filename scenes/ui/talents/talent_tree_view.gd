@@ -23,7 +23,8 @@ const NAME_FONT := 16
 ## The tree name shrinks down to this size to fit the column.
 const MIN_NAME_FONT := 12
 const POINTS_FONT := 20
-const CAPTION_FONT := 13
+## The "pts" caption under the points (15 px: still legible on a 4-player panel at 720p).
+const CAPTION_FONT := 15
 const ARROW_WIDTH := 3.0
 const ARROW_MET := Color(1.0, 0.82, 0.3)
 const ARROW_UNMET := Color(0.42, 0.39, 0.34)
@@ -48,7 +49,8 @@ var _frame: StyleBoxFlat
 ## while the selected talent's tree has reached that gate, grey with a padlock before.
 class TierRail extends Control:
 	const WIDTH := 20.0
-	const FONT := 14
+	## Gate numbers: the widest, "12", still fits WIDTH at 16 px.
+	const FONT := 16
 	## Tier 1..5 reached in the selected tree (index tier - 1).
 	var open: Array[bool] = [true, true, true, true, true]
 

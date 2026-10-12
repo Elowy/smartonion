@@ -247,6 +247,17 @@ func test_the_tab_fits_the_panel() -> void:
 	check(UiTheme.bold_font().get_string_size("Assassination", HORIZONTAL_ALIGNMENT_LEFT, -1,
 		TalentTreeView.fitted_name_size("Assassination", arms.name_label.size.x)).x <= arms.name_label.size.x,
 		"at the fitted size")
+	# The small texts (sized to stay legible at 720p) stay inside their spots: the widest gate
+	# number in the rail, the capstone's rank pill and the points caption in the tree view.
+	var gate_w := UiTheme.bold_font().get_string_size(TalentTreeView.TierRail.gate_text(5), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		TalentTreeView.TierRail.FONT).x
+	check(gate_w <= TalentTreeView.TierRail.WIDTH, "gate number %.1f px in a %.1f px rail" % [gate_w, TalentTreeView.TierRail.WIDTH])
+	var cap_node := arms.node_for(cap.id)
+	check(cap_node.position.y + cap_node.side() + TalentNode.PILL_HEIGHT * 0.5 <= TalentTreeView.HEIGHT,
+		"the capstone's rank pill ends inside the tree")
+	var caption := arms.get_node("PointsCaption") as Label
+	check(caption.position.y + caption.size.y <= TalentTreeView.HEIGHT + 0.5 and caption.size.x >= caption.get_minimum_size().x,
+		"the points caption fits (%s at %s)" % [caption.size, caption.position])
 	finished.emit()
 
 
