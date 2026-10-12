@@ -316,6 +316,10 @@ func test_the_column_mate_follows_a_player_leaving() -> void:
 	await _open_market([&"warrior", &"mage", &"paladin"] as Array[StringName])
 	check(screen.panels[0].tooltip_column_mate and screen.panels[2].tooltip_column_mate, "P1 / P3 share the left column")
 	check(not screen.panels[1].tooltip_column_mate, "P2 has the right column to itself")
+	# Only a bottom panel with a teammate above it makes way (PlayerPanel.tooltip_obstacle).
+	check(screen.panels[2].tooltip_obstacle.is_valid(), "P3 keeps clear of P1's tooltip")
+	check(not screen.panels[0].tooltip_obstacle.is_valid() and not screen.panels[1].tooltip_obstacle.is_valid(),
+		"the top panels keep their places")
 	var slot := PlayerManager.get_slot(2)
 	inputs[2].connected = false
 	var hero := slot.player as Node
