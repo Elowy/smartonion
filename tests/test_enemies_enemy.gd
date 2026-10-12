@@ -4,7 +4,7 @@ extends TestCase
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const DT := 1.0 / 60.0
 ## RunState.coop_damage_mult() for 1..4 players (GDD 9).
-const COOP_DAMAGE: Array[float] = [0.35, 0.45, 0.6, 0.8]
+const COOP_DAMAGE: Array[float] = [0.45, 0.6, 0.75, 0.95]
 
 var world: Node3D
 
@@ -40,8 +40,8 @@ func test_create_builds_body_and_scales_hp_with_wave() -> void:
 	var e5 := Enemy.create(data, 5)
 	check_near(e5.max_hp, 4.0 * (1.0 + 0.12 * 4.0) * pow(1.22, 4.0), 0.0001,
 			"wave 5 hp = 4 * (1 + 12% * 4) * 1.22^4")
-	check_near(e5.contact_damage, 1.0 * (1.0 + 0.15 * 4.0) * pow(1.08, 4.0) * COOP_DAMAGE[0], 0.0001,
-			"wave 5 contact damage = 1 * (1 + 15% * 4) * 1.08^4 * the solo damage factor")
+	check_near(e5.contact_damage, 1.0 * (1.0 + 0.15 * 4.0) * pow(1.1, 4.0) * COOP_DAMAGE[0], 0.0001,
+			"wave 5 contact damage = 1 * (1 + 15% * 4) * 1.1^4 * the solo damage factor")
 	e5.free()
 
 
@@ -56,7 +56,7 @@ func test_wave_scaling_follows_gdd() -> void:
 	check_eq(defaults.hp_growth, 0.12, "default hp growth")
 	check_eq(defaults.damage_growth, 0.15, "default damage growth")
 	check_eq(defaults.hp_compound, 0.22, "default hp compounding")
-	check_eq(defaults.damage_compound, 0.08, "default damage compounding")
+	check_eq(defaults.damage_compound, 0.1, "default damage compounding")
 	check_eq(data.hp_at_wave(1), 10.0, "wave 1 = base hp")
 	check_eq(data.hp_at_wave(0), 10.0, "wave 0 / negative waves clamp to the base")
 	check_eq(data.hp_at_wave(11), 10.0 * 2.2, "wave 11: +120%")
@@ -95,9 +95,9 @@ func test_enemy_stats_at_wave_include_coop_scaling() -> void:
 	var e := Enemy.create(data, 6)
 	check_near(e.max_hp, data.max_hp * 1.6 * pow(1.22, 5.0) * 1.6, 0.0001,
 			"hp: base * (1 + 12% * 5) * 1.22^5 * coop 1.6")
-	check_near(e.contact_damage, data.contact_damage * 1.75 * pow(1.08, 5.0) * COOP_DAMAGE[3], 0.0001,
-			"contact damage: (1 + 15% * 5) * 1.08^5 * the 4-player damage factor")
-	check_near(e.projectile_damage, data.projectile_damage * 1.75 * pow(1.08, 5.0) * COOP_DAMAGE[3], 0.0001,
+	check_near(e.contact_damage, data.contact_damage * 1.75 * pow(1.1, 5.0) * COOP_DAMAGE[3], 0.0001,
+			"contact damage: (1 + 15% * 5) * 1.1^5 * the 4-player damage factor")
+	check_near(e.projectile_damage, data.projectile_damage * 1.75 * pow(1.1, 5.0) * COOP_DAMAGE[3], 0.0001,
 			"projectile damage: the same co-op factor")
 	e.free()
 

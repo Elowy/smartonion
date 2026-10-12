@@ -28,7 +28,7 @@ enum Behavior { CHASE, SWARM, LUNGE, RANGED }
 @export var damage_growth: float = 0.15
 ## Compounding damage factor per wave after the first, on top of [member damage_growth]
 ## (GDD 9).
-@export var damage_compound: float = 0.08
+@export var damage_compound: float = 0.1
 ## Metres / second.
 @export var move_speed: float = 2.4
 ## Collision / visual radius in metres.
