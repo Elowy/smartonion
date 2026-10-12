@@ -506,6 +506,7 @@ func select_talent(talent_id: StringName) -> void:
 		return
 	selected_id = talent_id
 	reset_selected = false
+	preview_next = false  # Y previews the talent it was pressed on, not the next one selected
 	cancel_reset()
 	_update_selection()
 

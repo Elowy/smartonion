@@ -129,6 +129,16 @@ func test_blocked_reasons_and_result_text() -> void:
 	check_eq(Forge.blocked_reason(null, dagger), Forge.REASON_NO_HERO, "no equipment")
 
 
+func test_forge_refuses_a_weapon_the_hero_does_not_own() -> void:
+	var eq := _eq(&"rogue", false)
+	var mine := _gen(&"dagger", Items.Rarity.RARE)
+	eq.add_to_backpack(mine)
+	var stray := _gen(&"dagger", Items.Rarity.RARE)
+	check(Forge.forge(eq, stray, rng) == null, "not in this hero's equipment: no forge")
+	check(eq.backpack.has(mine), "the partner was not consumed")
+	check_eq(eq.backpack.size(), 1, "nothing created")
+
+
 func test_partner_order_backpack_then_main_then_off_hand() -> void:
 	var eq := _eq(&"rogue")
 	var main := eq.get_item(Items.EquipSlot.MAIN_HAND)

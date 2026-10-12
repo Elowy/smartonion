@@ -142,6 +142,8 @@ static func can_place(eq: Equipment, a: ItemInstance, b: ItemInstance) -> bool:
 static func forge(eq: Equipment, item: ItemInstance, rng: RandomNumberGenerator = null) -> ItemInstance:
 	if blocked_reason(eq, item) != "":
 		return null
+	if not eq.backpack.has(item) and _equipped_slot(eq, item) < 0:
+		return null  # not this hero's weapon (the shop path is forge_with_offer): no free rarity-up
 	var partner := partner_for(eq, item)
 	var result := make_result(item, partner, rng)
 	if result == null:

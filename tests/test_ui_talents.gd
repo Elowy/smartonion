@@ -543,6 +543,11 @@ func test_y_previews_the_next_rank() -> void:
 	check(_prompt_texts(tab.prompt_spec()).has("Now"), "Y goes back")
 	_tap(panel, slot, PlayerInput.Pad.Y)
 	check_eq(tab.detail_text.text, "Raises dodge by 2%.", "back to the current rank")
+	_tap(panel, slot, PlayerInput.Pad.Y)
+	check(tab.preview_next, "preview on again")
+	_select(panel, "arms", "t3m")
+	check(not tab.preview_next, "another talent selected: the preview ends")
+	check_eq(tab.detail_rank.get_theme_color(&"font_color"), UiTheme.GOLD, "its own rank, not a green preview")
 
 
 func test_modifier_of_an_unlearned_ability_says_so() -> void:

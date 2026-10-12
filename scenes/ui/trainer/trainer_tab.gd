@@ -705,6 +705,7 @@ func _fit_description() -> void:
 	var lines := maxi(MIN_DESCRIPTION_LINES, floori((room + spacing) / line_h))
 	if detail_description.max_lines_visible != lines:
 		detail_description.max_lines_visible = lines
+		detail_description.update_minimum_size()  # Godot keeps the old min height otherwise
 
 
 ## "CD 5.4 s · Power 125%" for [param a] with [param params] (AbilityRunner.params_for or

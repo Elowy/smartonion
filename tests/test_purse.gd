@@ -363,6 +363,8 @@ func test_ready_chips_show_unspent_talent_points() -> void:
 func test_shop_and_trainer_share_the_hold_rule_and_rerolls_never_hold() -> void:
 	check_eq(TrainerTab.HOLD_TIME, ShopPanel.HOLD_TIME, "same hold time")
 	check_eq(TrainerTab.HOLD_SHARE, ShopPanel.HOLD_SHARE, "same share")
+	check_eq(TalentTab.HOLD_TIME, ShopPanel.HOLD_TIME, "talent reset: same hold time")
+	check_eq(TalentTab.HOLD_SHARE, ShopPanel.HOLD_SHARE, "talent reset: same share")
 	check_eq(ShopPanel.HOLD_SHARE, 0.5, "GDD 10: more than half the wallet")
 	for gold: int in [0, 10, 99, 100, 1001]:
 		RunState.gold = gold
@@ -370,6 +372,7 @@ func test_shop_and_trainer_share_the_hold_rule_and_rerolls_never_hold() -> void:
 			var expect := price > gold * 0.5
 			check_eq(screen.shop_panel.needs_hold(price), expect, "shop: %d of %d" % [price, gold])
 			check_eq(TrainerTab.needs_hold(price), expect, "Trainer: %d of %d" % [price, gold])
+			check_eq(TalentTab.needs_hold(price), expect, "talent reset: %d of %d" % [price, gold])
 	# The stall reroll: the last vote pays at once, even all of the wallet.
 	var inputs := _two_humans()
 	RunState.gold = 0
