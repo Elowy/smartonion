@@ -45,8 +45,13 @@ const BODY_GAP := 12.0
 const MESSAGE_TIME := 2.8
 ## With [member tooltip_inside] a tooltip taller than the panel shrinks to fit it, but not below
 ## this scale: a still taller one (a set piece with the comparison block) reaches past the
-## panel's edge towards the middle of the screen instead of becoming unreadable at 720p.
+## panel's edge towards the middle of the screen instead of becoming unreadable at 720p – as
+## far as the other corner panel of the screen column allows ([member tooltip_column_mate]; it
+## shrinks below this only when this scale would cross into that panel).
 const MIN_INSIDE_TOOLTIP_FIT := 0.9
+## A tooltip that reaches out of the panel ends this far (canvas px) before the column's other
+## corner panel.
+const TOOLTIP_NEIGHBOUR_GAP := 8.0
 ## Without [member tooltip_inside]: the tooltip shrinks to the screen height, down to this.
 const MIN_TOOLTIP_FIT := 0.4
 
@@ -128,6 +133,12 @@ var tooltip: ItemTooltip
 ## selection) instead of floating towards the screen centre – used between waves, where the
 ## middle of the screen holds the shared shop.
 var tooltip_inside := false
+## With [member tooltip_inside]: the other corner of this panel's screen column holds a
+## teammate's panel (the Intermission's corner layout – P1 / P3 left, P2 / P4 right – where it is
+## the mirror image of this panel about the view's horizontal centre line). A tooltip that
+## reaches out of this panel then ends TOOLTIP_NEIGHBOUR_GAP before it; false: before the screen
+## edge. The Intermission keeps it up to date ([method Intermission._sync_panels]).
+var tooltip_column_mate := true
 ## Index into the cells (see select_equip_slot / select_backpack).
 var selected := 0
 ## Whether the tooltip shows the "If you replace this item:" block (Y toggles).
@@ -1492,7 +1503,8 @@ func _place_menu() -> void:
 ## selected icon and kept inside the visible area. With [member tooltip_inside] it stays over the
 ## panel (scaled down to its height, at least MIN_INSIDE_TOOLTIP_FIT); one taller than that hangs
 ## from the panel's top edge downwards (top-corner panels) or rises from its bottom edge (bottom
-## corners), over the middle of the screen.
+## corners), over the middle of the screen – and shrinks further if it would otherwise reach the
+## column's other corner panel ([method _inside_tooltip_reach]).
 func _place_tooltip() -> void:
 	if not tooltip.visible or not is_inside_tree():
 		return
@@ -1503,12 +1515,15 @@ func _place_tooltip() -> void:
 	var tip := tooltip.get_combined_minimum_size()
 	tooltip.size = tip
 	var view := get_viewport_rect()
-	# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
-	# otherwise spill over the neighbouring player's panel) – but only so far.
-	var room := (minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)) \
-			if tooltip_inside else view.size.y - 8.0
-	var min_fit := MIN_INSIDE_TOOLTIP_FIT if tooltip_inside else MIN_TOOLTIP_FIT
-	var fit := clampf(room / maxf(1.0, tip.y * to_canvas.get_scale().y), min_fit, 1.0)
+	var tip_h := maxf(1.0, tip.y * to_canvas.get_scale().y)
+	var fit := clampf((view.size.y - 8.0) / tip_h, MIN_TOOLTIP_FIT, 1.0)
+	if tooltip_inside:
+		# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
+		# otherwise spill over the neighbouring player's panel) – but only so far, and never so
+		# little that it reaches the panel at the column's other end.
+		var room := minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)
+		var reach := maxf(room, _inside_tooltip_reach(panel_rect, view))
+		fit = minf(clampf(room / tip_h, MIN_INSIDE_TOOLTIP_FIT, 1.0), reach / tip_h)
 	tooltip.scale = Vector2.ONE * fit
 	var tip_size := tip * to_canvas.get_scale() * fit
 	var gap := 10.0 * to_canvas.get_scale().x
@@ -1531,6 +1546,34 @@ func _place_tooltip() -> void:
 		y = top if panel_rect.get_center().y <= view.get_center().y else bottom - tip_size.y
 		y = clampf(y, view.position.y + 4.0, maxf(view.position.y + 4.0, view.end.y - 4.0 - tip_size.y))
 	tooltip.position = to_canvas.affine_inverse() * Vector2(x, y)
+
+
+## The item tooltip's global rect while it is shown and reaches out of the panel (a tall one
+## with [member tooltip_inside], over the free band between two corner panels); an empty Rect2
+## while it is hidden or stays over the panel. The shop keeps its tooltips clear of it
+## (ShopPanel.tooltip_obstacles).
+func outside_tooltip_rect() -> Rect2:
+	if tooltip == null or not tooltip.visible or not is_visible_in_tree():
+		return Rect2()
+	var r := tooltip.get_global_transform() * Rect2(Vector2.ZERO, tooltip.size)
+	return Rect2() if (get_global_transform() * Rect2(Vector2.ZERO, size)).grow(0.5).encloses(r) else r
+
+
+## How tall (canvas px) a [member tooltip_inside] tooltip may get when it reaches out of the
+## panel: from the panel's outer edge (top for the top corners, bottom for the bottom ones) to
+## TOOLTIP_NEIGHBOUR_GAP before the column's other corner panel (the mirror image of this one,
+## [member tooltip_column_mate]), or to the screen edge.
+func _inside_tooltip_reach(panel_rect: Rect2, view: Rect2) -> float:
+	var mirror_y := view.position.y + view.end.y
+	if panel_rect.get_center().y <= view.get_center().y:
+		var end := view.end.y - 4.0
+		if tooltip_column_mate:
+			end = minf(end, mirror_y - panel_rect.end.y - TOOLTIP_NEIGHBOUR_GAP)
+		return end - maxf(panel_rect.position.y, view.position.y + 4.0)
+	var start := view.position.y + 4.0
+	if tooltip_column_mate:
+		start = maxf(start, mirror_y - panel_rect.position.y + TOOLTIP_NEIGHBOUR_GAP)
+	return minf(panel_rect.end.y, view.end.y - 4.0) - start
 
 
 # --- Messages -----------------------------------------------------------------------------------
