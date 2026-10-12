@@ -16,7 +16,10 @@ extends RefCounted
 ##   only on equipment changes.
 ## - Bots value a piece that completes a 2- / 4-piece bonus (ItemTooltip.upgrade_direction via
 ##   [method bonus_change]); the same rule keeps them from trading an active bonus away for a
-##   slightly better item.
+##   slightly better item. It looks ahead to the backpack (ItemTooltip.set_lookahead): of the
+##   pieces of the same set waiting there for other slots, as many as the next threshold still
+##   needs count as worn, so a 3rd piece that makes the 4-piece reachable is worth as much as
+##   the 2nd one, and so is the 4th piece however many others wait with it.
 
 ## Tooltip row kinds of [method describe].
 const ROW_HEADER := &"header"
@@ -115,15 +118,77 @@ static func worn_pieces(eq: Equipment) -> Array[StringName]:
 ## (< 0) when [param displaced] (what it pushes out – ItemTooltip.equipped_for_compare, an
 ## EquippedPair's parts) leaves. 0 when no threshold is crossed (e.g. neither item is a piece,
 ## or a duplicate replaces the same piece).
-static func bonus_change(item: ItemInstance, displaced: Array[ItemInstance], eq: Equipment) -> int:
+## [param lookahead]: backpack pieces the hero could put on as well, best first
+## (ItemTooltip.set_lookahead – pieces of the item's or a displaced piece's set, for other slots
+## that hold no set piece). Per set, only as many as [method pieces_to_next_bonus] still needs
+## count – from the worn pieces with [param item] on for the item's set, from the worn pieces
+## before the swap for a displaced piece's set – taken in list order, skipping [param item]
+## itself and pieces already counted. They count as worn on both sides, so the change is the
+## item's own share of the next bonus within reach: a 3rd piece whose 4th waits in the backpack
+## is +1, and so is that 4th one whatever else waits; a plain item that would push out such a
+## 3rd piece is -1, one that pushes out a piece of a full 5-piece set 0. A piece no threshold
+## needs counts for nothing, so spare pieces in the backpack never cancel the item out.
+static func bonus_change(item: ItemInstance, displaced: Array[ItemInstance], eq: Equipment,
+		lookahead: Array[ItemInstance] = []) -> int:
 	if item == null or eq == null:
 		return 0
+	var before: Array[ItemInstance] = []
 	var after: Array[ItemInstance] = []
 	for it in eq.equipped_items():
+		before.append(it)
 		if it != item and it not in displaced:
 			after.append(it)
 	after.append(item)
-	return _active_total(Equipment.count_sets(after)) - _active_total(counts(eq))
+	var extras := _needed_lookahead(item, before, after, lookahead)
+	# A lookahead piece only goes into a slot without a set piece: what it pushes out never
+	# counted for a set, so leaving it in changes no count.
+	before.append_array(extras)
+	after.append_array(extras)
+	return _active_total(Equipment.count_sets(after)) - _active_total(Equipment.count_sets(before))
+
+
+## Pieces of [param data] still missing for its next bonus once [param pieces] are worn: the
+## smallest bonus threshold at or above [param pieces] minus [param pieces] (0 when
+## [param pieces] is a threshold itself, when no threshold is left above it, or for null).
+static func pieces_to_next_bonus(data: SetData, pieces: int) -> int:
+	if data == null:
+		return 0
+	var next := -1
+	for bonus in data.bonuses:
+		var needed := int(bonus.get("pieces", 0))
+		if needed > 0 and needed >= pieces and (next < 0 or needed < next):
+			next = needed
+	return next - pieces if next >= 0 else 0
+
+
+## The pieces of [param lookahead] [method bonus_change] counts as worn (see there):
+## [param before] / [param after] are the worn items without / with [param item].
+static func _needed_lookahead(item: ItemInstance, before: Array[ItemInstance],
+		after: Array[ItemInstance], lookahead: Array[ItemInstance]) -> Array[ItemInstance]:
+	var out: Array[ItemInstance] = []
+	if lookahead.is_empty():
+		return out
+	var count_before := Equipment.count_sets(before)
+	var count_after := Equipment.count_sets(after)
+	var counted: Array[StringName] = []
+	for side: Array[ItemInstance] in [before, after]:
+		for it in side:
+			if it.set_id != &"" and it.source_id not in counted:
+				counted.append(it.source_id)
+	var missing: Dictionary[StringName, int] = {}
+	for extra in lookahead:
+		if extra == null or extra == item or extra.set_id == &"" or extra.source_id in counted:
+			continue
+		var set_id := extra.set_id
+		if not missing.has(set_id):
+			var worn: int = count_after.get(set_id, 0) if set_id == item.set_id else count_before.get(set_id, 0)
+			missing[set_id] = pieces_to_next_bonus(Db.get_set(set_id), worn)
+		if missing[set_id] <= 0:
+			continue
+		missing[set_id] -= 1
+		counted.append(extra.source_id)
+		out.append(extra)
+	return out
 
 
 ## Σ active bonuses over [param c] (set id -> pieces; unknown sets count 0).

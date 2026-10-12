@@ -129,6 +129,29 @@ func test_bots_do_not_flip_flop_between_a_bow_and_daggers() -> void:
 	check(oeq.backpack == [common_bow], "the bow waits in the backpack")
 
 
+## Intermission.bot_equip_upgrades repeats its pass until nothing more goes on: a shield
+## that would disarm the two-hander is no upgrade when the pass reaches it, but once a sword
+## replaced the two-hander later in that pass, it fills the free off hand in the same call.
+func test_bots_wear_what_a_later_swap_made_an_upgrade() -> void:
+	var slot := Support.make_slot(slots.size(), &"warrior")
+	slots.append(slot)
+	var cls := slot.class_data
+	var eq := Support.equipment_of(slot)
+	var axe := _weapon(&"two_hand_axe")
+	eq.add_to_backpack(axe)
+	check(eq.equip(axe) and eq.backpack.is_empty(), "a Common two-hander on")
+	var shield := _weapon(&"shield")
+	var sword := _weapon(&"sword", Items.Rarity.EPIC)
+	check(eq.add_to_backpack(shield) and eq.add_to_backpack(sword), "shield first, then the sword")
+	check_eq(ItemTooltip.upgrade_direction(shield, axe, cls, eq), -1, "fixture: the shield would disarm the two-hander")
+	check_eq(ItemTooltip.upgrade_direction(sword, axe, cls, eq), 1, "fixture: the Epic sword beats it")
+	check_eq(Intermission.bot_equip_upgrades(slot), 2, "sword, then the shield in the next pass")
+	check(eq.get_item(Items.EquipSlot.MAIN_HAND) == sword and eq.get_item(Items.EquipSlot.OFF_HAND) == shield,
+		"sword and shield in hand")
+	check(eq.backpack == [axe], "the two-hander waits in the backpack")
+	check_eq(Intermission.bot_equip_upgrades(slot), 0, "and stays")
+
+
 func test_mage_bot_keeps_its_staff_next_to_a_tome() -> void:
 	RunState.start_run(1, 3)
 	var slot := PlayerSlot.new(0, ScriptedInput.new("x"), Color.WHITE)

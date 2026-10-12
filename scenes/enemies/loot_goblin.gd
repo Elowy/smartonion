@@ -5,7 +5,9 @@ extends Enemy
 ## (spawn_weight 0, so the WaveDirector never picks it; gold / XP 0 – its rewards are custom).
 ##
 ## - Built with [method Enemy.setup] on its own instance ([method create]); a gold "Loot Goblin"
-##   Label3D floats above it (own node, no depth test).
+##   Label3D floats above it (own node, no depth test). The CameraRig frames a living goblin
+##   ([method CameraRig.goblin_points]); the tag never leaves the screen: at (or beyond) the
+##   screen edge it slides along the edge, pointing the way ([method keep_tag_on_screen]).
 ## - Never attacks: [method deals_contact_damage] is false. It flees ([method _think]): away
 ##   from the living, visible players weighted by inverse distance (closer ones push harder),
 ##   steering around the arena walls (it probes FLEE_DIRECTIONS headings FLEE_LOOKAHEAD m ahead
@@ -81,6 +83,8 @@ const LABEL_OUTLINE := Color(0.2, 0.12, 0.02)
 const LABEL_LIFT := 0.3
 const LABEL_PIXEL_SIZE := 0.00042
 const LABEL_FONT_SIZE := 40
+## Screen px kept free between the name tag and the viewport edge ([method keep_tag_on_screen]).
+const TAG_SCREEN_PAD := 8.0
 ## Coin burst / sparkle colour.
 const COIN_COLOR := Color(1.0, 0.82, 0.3)
 
@@ -110,6 +114,8 @@ var _heading := Vector3.ZERO
 static func create(p_data: EnemyData, p_wave: int) -> LootGoblin:
 	var g := setup(LootGoblin.new(), p_data, p_wave) as LootGoblin
 	g.add_to_group(&"loot_goblins")
+	# The tag follows this frame's camera (rendered frames only; physics order is unchanged).
+	g.process_priority = CameraRig.PROCESS_PRIORITY + 1
 	g._build_label()
 	return g
 
@@ -197,6 +203,10 @@ func _physics_process(delta: float) -> void:
 	if is_dead() or data == null or not is_inside_tree():
 		return
 	_update_escape(delta)
+
+
+func _process(_delta: float) -> void:
+	keep_tag_on_screen()
 
 
 ## Flight (see the class notes); stands still while the portal opens. Fleeing, the current
@@ -396,6 +406,60 @@ func _build_label() -> void:
 	label.render_priority = 24
 	label.outline_render_priority = 23
 	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var top := model.head_height if model != null else 1.0
-	label.position = Vector3(0.0, top + LABEL_LIFT, 0.0)
+	label.position = tag_home()
 	add_child(label)
+
+
+## The name tag's own place (local): LABEL_LIFT m above the head.
+func tag_home() -> Vector3:
+	var top := model.head_height if model != null else 1.0
+	return Vector3(0.0, top + LABEL_LIFT, 0.0)
+
+
+## Visual only (every rendered frame, no gameplay state, no RunState.rng): keeps the name tag
+## inside the viewport of the current camera, TAG_SCREEN_PAD px from the edges. On screen it
+## sits at [method tag_home]; near an edge – or with the goblin beyond it, on a screen too
+## narrow for the camera to frame it with the heroes – it slides along the edge at the same
+## depth ([method clamp_tag]), so it is never cut off and points towards the goblin.
+func keep_tag_on_screen() -> void:
+	if label == null or not is_inside_tree():
+		return
+	var home := tag_home()
+	var cam := get_viewport().get_camera_3d()
+	var anchor := global_position + home
+	if cam == null or cam.projection != Camera3D.PROJECTION_PERSPECTIVE or cam.is_position_behind(anchor):
+		label.position = home
+		return
+	var view := cam.get_viewport().get_visible_rect().size
+	var screen := cam.unproject_position(anchor)
+	var clamped := clamp_tag(screen, tag_screen_size(view.y, cam.fov), view, TAG_SCREEN_PAD)
+	if clamped.is_equal_approx(screen):
+		label.position = home
+		return
+	var depth := -(cam.global_transform.affine_inverse() * anchor).z
+	label.global_position = cam.project_position(clamped, depth)
+
+
+## The tag's size on screen (px) under a perspective camera of vertical [param fov] (degrees)
+## on a viewport [param view_height] px tall: fixed-size text, so it does not depend on the
+## depth.
+func tag_screen_size(view_height: float, fov: float) -> Vector2:
+	if label == null:
+		return Vector2.ZERO
+	var font := label.font if label.font != null else ThemeDB.fallback_font
+	var text := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.font_size)
+	text += Vector2.ONE * float(label.outline_size)
+	return text * label.pixel_size * view_height / (2.0 * tan(deg_to_rad(fov) * 0.5))
+
+
+## Where a tag of [param size] (px) anchored at its bottom centre [param screen] goes so that
+## it stays [param pad] px inside a [param view] px viewport (screen y grows down).
+static func clamp_tag(screen: Vector2, size: Vector2, view: Vector2, pad: float) -> Vector2:
+	var half_w := size.x * 0.5
+	var x0 := pad + half_w
+	var x1 := view.x - pad - half_w
+	var y0 := pad + size.y
+	var y1 := view.y - pad
+	return Vector2(
+		clampf(screen.x, x0, x1) if x0 <= x1 else view.x * 0.5,
+		clampf(screen.y, y0, y1) if y0 <= y1 else view.y * 0.5)
