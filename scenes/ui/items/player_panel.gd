@@ -116,6 +116,12 @@ class Cell:
 	var icon: ItemIcon
 
 
+## Where the item tooltip goes: its scale and canvas rect (PlayerPanel._tooltip_plan).
+class TooltipPlan:
+	var fit := 1.0
+	var rect := Rect2()
+
+
 class MenuEntry:
 	var label := ""
 	## Right-hand text (gold value, current item, "Backpack full" ...).
@@ -139,6 +145,11 @@ var tooltip_inside := false
 ## reaches out of this panel then ends TOOLTIP_NEIGHBOUR_GAP before it; false: before the screen
 ## edge. The Intermission keeps it up to date ([method Intermission._sync_panels]).
 var tooltip_column_mate := true
+## With [member tooltip_inside]: returns a canvas Rect2 (empty: nothing) that this panel's
+## tooltip keeps clear of when it reaches out of the panel – it moves to the panel's other half
+## ([method _keep_tooltip_clear]). The Intermission hands a bottom-corner panel its column
+## mate's [method planned_outside_tooltip_rect] (P3 makes way for P1, P4 for P2); unset: none.
+var tooltip_obstacle: Callable
 ## Index into the cells (see select_equip_slot / select_backpack).
 var selected := 0
 ## Whether the tooltip shows the "If you replace this item:" block (Y toggles).
@@ -1506,28 +1517,40 @@ func _place_menu() -> void:
 ## panel (scaled down to its height, at least MIN_INSIDE_TOOLTIP_FIT); one taller than that hangs
 ## from the panel's top edge downwards (top-corner panels) or rises from its bottom edge (bottom
 ## corners), over the middle of the screen – and shrinks further if it would otherwise reach the
-## column's other corner panel ([method _inside_tooltip_reach]).
+## column's other corner panel ([method _inside_tooltip_span]). If it would then cover
+## [member tooltip_obstacle] (the column mate's tooltip in the same band), it moves aside
+## ([method _keep_tooltip_clear]).
 func _place_tooltip() -> void:
 	if not tooltip.visible or not is_inside_tree():
 		return
+	var plan := _tooltip_plan(true)
+	tooltip.size = tooltip.get_combined_minimum_size()
+	tooltip.scale = Vector2.ONE * plan.fit
+	tooltip.position = get_global_transform_with_canvas().affine_inverse() * plan.rect.position
+
+
+## Where the tooltip goes ([method _place_tooltip]): its scale and canvas rect, worked out from
+## the current selection without moving anything – so the column mate may ask for it too
+## ([method planned_outside_tooltip_rect]). [param keep_clear]: and clear of
+## [member tooltip_obstacle].
+func _tooltip_plan(keep_clear: bool) -> TooltipPlan:
 	var to_canvas := get_global_transform_with_canvas()
 	var panel_rect := to_canvas * Rect2(Vector2.ZERO, size)
 	var icon := _cells[selected].icon
 	var icon_rect := icon.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, icon.size)
-	var tip := tooltip.get_combined_minimum_size()
-	tooltip.size = tip
+	var tip := tooltip.get_combined_minimum_size() * to_canvas.get_scale()
 	var view := get_viewport_rect()
-	var tip_h := maxf(1.0, tip.y * to_canvas.get_scale().y)
+	var tip_h := maxf(1.0, tip.y)
 	var fit := clampf((view.size.y - 8.0) / tip_h, MIN_TOOLTIP_FIT, 1.0)
+	var span := _inside_tooltip_span(panel_rect, view)
 	if tooltip_inside:
 		# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
 		# otherwise spill over the neighbouring player's panel) – but only so far, and never so
 		# little that it reaches the panel at the column's other end.
 		var room := minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)
-		var reach := maxf(room, _inside_tooltip_reach(panel_rect, view))
+		var reach := maxf(room, span.y - span.x)
 		fit = minf(clampf(room / tip_h, MIN_INSIDE_TOOLTIP_FIT, 1.0), reach / tip_h)
-	tooltip.scale = Vector2.ONE * fit
-	var tip_size := tip * to_canvas.get_scale() * fit
+	var tip_size := tip * fit
 	var gap := 10.0 * to_canvas.get_scale().x
 	var x := panel_rect.end.x + gap
 	if tooltip_inside:
@@ -1537,7 +1560,6 @@ func _place_tooltip() -> void:
 			x = panel_rect.end.x - gap - tip_size.x
 	elif panel_rect.get_center().x > view.get_center().x:
 		x = panel_rect.position.x - gap - tip_size.x
-	x = clampf(x, view.position.x + 4.0, maxf(view.position.x + 4.0, view.end.x - tip_size.x - 4.0))
 	var top := panel_rect.position.y if tooltip_inside else view.position.y
 	var bottom := panel_rect.end.y if tooltip_inside else view.end.y
 	top = maxf(top, view.position.y + 4.0)
@@ -1547,7 +1569,47 @@ func _place_tooltip() -> void:
 		# Taller than the panel even at the minimum fit: out over the panel's inner edge.
 		y = top if panel_rect.get_center().y <= view.get_center().y else bottom - tip_size.y
 		y = clampf(y, view.position.y + 4.0, maxf(view.position.y + 4.0, view.end.y - 4.0 - tip_size.y))
-	tooltip.position = to_canvas.affine_inverse() * Vector2(x, y)
+	var plan := TooltipPlan.new()
+	plan.fit = fit
+	plan.rect = Rect2(Vector2(_clamp_tooltip_x(x, tip_size.x, view), y), tip_size)
+	if keep_clear and tooltip_inside and tooltip_obstacle.is_valid() and not panel_rect.grow(0.5).encloses(plan.rect):
+		var obstacle: Rect2 = tooltip_obstacle.call()
+		if obstacle.has_area() and plan.rect.intersects(obstacle.grow(TOOLTIP_NEIGHBOUR_GAP)):
+			_keep_tooltip_clear(plan, obstacle, panel_rect, icon_rect, span, gap, view)
+	return plan
+
+
+## [param plan] reaches out of the panel over [param obstacle] (the column mate's tooltip in the
+## same band): it moves to the panel's other half – the selected icon's – at the same scale
+## (both are at most MIN_INSIDE_TOOLTIP_FIT there, so two fit side by side). In the room the
+## column allows ([param span]) it sits just above the selected icon, else just below it, so
+## the icon stays in sight; when neither fits, from the panel's outer edge as before (over the
+## icon). Only if the other half were no clearer (a tooltip wider than half the panel) does it
+## stay and shrink into the room beside the obstacle.
+func _keep_tooltip_clear(plan: TooltipPlan, obstacle: Rect2, panel_rect: Rect2, icon_rect: Rect2, span: Vector2, gap: float, view: Rect2) -> void:
+	var r := plan.rect
+	var moved := r
+	var x := panel_rect.position.x + gap
+	if r.get_center().x < panel_rect.get_center().x:
+		x = panel_rect.end.x - gap - r.size.x
+	moved.position.x = _clamp_tooltip_x(x, r.size.x, view)
+	if icon_rect.position.y - 6.0 - r.size.y >= span.x:
+		moved.position.y = icon_rect.position.y - 6.0 - r.size.y
+	elif icon_rect.end.y + 6.0 + r.size.y <= span.y:
+		moved.position.y = icon_rect.end.y + 6.0
+	if not moved.intersects(obstacle.grow(TOOLTIP_NEIGHBOUR_GAP)):
+		plan.rect = moved
+		return
+	var below := obstacle.get_center().y < r.get_center().y
+	var room := span.y - obstacle.end.y - TOOLTIP_NEIGHBOUR_GAP if below else obstacle.position.y - TOOLTIP_NEIGHBOUR_GAP - span.x
+	var shrink := clampf(room / r.size.y, 0.05, 1.0)
+	plan.fit *= shrink
+	plan.rect.size = r.size * shrink
+	plan.rect.position.y = span.y - plan.rect.size.y if below else span.x
+
+
+static func _clamp_tooltip_x(x: float, width: float, view: Rect2) -> float:
+	return clampf(x, view.position.x + 4.0, maxf(view.position.x + 4.0, view.end.x - width - 4.0))
 
 
 ## The item tooltip's global rect while it is shown and reaches out of the panel (a tall one
@@ -1561,21 +1623,32 @@ func outside_tooltip_rect() -> Rect2:
 	return Rect2() if (get_global_transform() * Rect2(Vector2.ZERO, size)).grow(0.5).encloses(r) else r
 
 
-## How tall (canvas px) a [member tooltip_inside] tooltip may get when it reaches out of the
-## panel: from the panel's outer edge (top for the top corners, bottom for the bottom ones) to
-## TOOLTIP_NEIGHBOUR_GAP before the column's other corner panel (the mirror image of this one,
-## [member tooltip_column_mate]), or to the screen edge.
-func _inside_tooltip_reach(panel_rect: Rect2, view: Rect2) -> float:
+## Like [method outside_tooltip_rect], but where the tooltip goes for the current selection
+## (canvas px; [method _tooltip_plan] without [member tooltip_obstacle]) rather than where it
+## was drawn – so the column mate that keeps clear of it (its [member tooltip_obstacle]) gets the
+## same answer whichever panel lays out first in a frame.
+func planned_outside_tooltip_rect() -> Rect2:
+	if tooltip == null or not tooltip.visible or not is_visible_in_tree() or _cells.is_empty():
+		return Rect2()
+	var r := _tooltip_plan(false).rect
+	return Rect2() if (get_global_transform_with_canvas() * Rect2(Vector2.ZERO, size)).grow(0.5).encloses(r) else r
+
+
+## The canvas y range (x = top, y = bottom) a [member tooltip_inside] tooltip may use when it
+## reaches out of the panel: from the panel's outer edge (top for the top corners, bottom for the
+## bottom ones) to TOOLTIP_NEIGHBOUR_GAP before the column's other corner panel (the mirror image
+## of this one, [member tooltip_column_mate]), or to the screen edge.
+func _inside_tooltip_span(panel_rect: Rect2, view: Rect2) -> Vector2:
 	var mirror_y := view.position.y + view.end.y
 	if panel_rect.get_center().y <= view.get_center().y:
 		var end := view.end.y - 4.0
 		if tooltip_column_mate:
 			end = minf(end, mirror_y - panel_rect.end.y - TOOLTIP_NEIGHBOUR_GAP)
-		return end - maxf(panel_rect.position.y, view.position.y + 4.0)
+		return Vector2(maxf(panel_rect.position.y, view.position.y + 4.0), end)
 	var start := view.position.y + 4.0
 	if tooltip_column_mate:
 		start = maxf(start, mirror_y - panel_rect.position.y + TOOLTIP_NEIGHBOUR_GAP)
-	return minf(panel_rect.end.y, view.end.y - 4.0) - start
+	return Vector2(start, minf(panel_rect.end.y, view.end.y - 4.0))
 
 
 # --- Messages -----------------------------------------------------------------------------------

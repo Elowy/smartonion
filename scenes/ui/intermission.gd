@@ -355,9 +355,13 @@ func _sync_panels(slots: Array[PlayerSlot]) -> void:
 		if not keep.has(i):
 			_free_panel(i)
 	# A tall item tooltip may reach down / up the screen column as far as the teammate's panel
-	# at its other end (P1 / P3, P2 / P4) – all the way when that corner is empty.
+	# at its other end (P1 / P3, P2 / P4) – all the way when that corner is empty. When both of
+	# a column's tooltips reach into the band between the panels, the bottom one makes way.
 	for i: int in panels.keys():
-		panels[i].tooltip_column_mate = panels.has(i ^ 2)
+		var panel: PlayerPanel = panels[i]
+		panel.tooltip_column_mate = panels.has(i ^ 2)
+		var above: PlayerPanel = panels.get(i - 2) if i >= 2 else null
+		panel.tooltip_obstacle = above.planned_outside_tooltip_rect if above != null else Callable()
 
 
 ## The corner panels' item tooltips that reach out of their panel into the free bands between
