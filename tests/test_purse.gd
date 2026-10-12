@@ -299,18 +299,99 @@ func test_the_board_drops_the_wants_of_a_player_who_left() -> void:
 	check_eq(o.pinged_by, [1] as Array[int], "with the ping still stored (no signal)")
 
 
-func test_many_wants_fit_one_line() -> void:
+## Shown entries of [param lines] (plain board lines) and the "+N more" count at the end.
+static func _shown_and_more(lines: Array[String]) -> Array[int]:
+	var shown := 0
+	for l in lines:
+		shown += l.split(PurseBoard.SEPARATOR).size()
+	var more := 0
+	var last := lines[-1].split(PurseBoard.SEPARATOR)
+	if last[-1].begins_with("+") and last[-1].ends_with(" more"):
+		more = last[-1].trim_prefix("+").trim_suffix(" more").to_int()
+		shown -= 1
+	return [shown, more]
+
+
+func test_many_wants_fit_their_lines() -> void:
 	_two_humans()
 	_open_market()
+	var board := _board()
 	for i in 9:
 		RunState.toggle_want(i % 2, "trainer:x%d" % i, "Arcane Missiles Rank IV", 120)
 	_step()
-	var text := _board().wants_text()
-	check(text.ends_with(PurseBoard.more_text(9 - (text.split(PurseBoard.SEPARATOR).size() - 1))), "+N more: %s" % text)
-	check(_board().text_width(text) <= PurseBoard.line_width() + 0.5, "fits the line")
+	# Nothing spent: the ticker needs one line, so the wants take the second one too.
+	check_eq(board.ticker_lines(), [PurseBoard.EMPTY_TICKER] as Array[String], "an empty round")
+	var lines := board.wants_lines()
+	check_eq(lines.size(), 2, "the wants use the ticker's free line: %s" % [lines])
+	for l in lines:
+		check(board.text_width(l) <= PurseBoard.line_width() + 0.5, "fits the line: %s" % l)
+	var counts := _shown_and_more(lines)
+	check_eq(counts[0] + counts[1], 9, "every want shown or in +N more: %s" % [lines])
+	check(counts[0] >= 3, "more than one line's worth shown: %d" % counts[0])
+	check_eq(board.wants_text(), PurseBoard.SEPARATOR.join(lines), "wants_text joins the lines")
+	check(board.row_labels[1].text.contains("Arcane Missiles Rank IV"), "the second row holds wants")
+	check(board.wants_label.text.contains(PurseBoard.more_text(counts[1])), "the bottom row ends in +N more")
+	check_eq([board.caption_labels[0].text, board.caption_labels[1].text, board.caption_labels[2].text],
+		["Spent", "Wants", ""], "the Wants caption moved up a row")
+	# A two-line ticker: the wants are back to one line on the bottom row.
+	for i in 13:
+		RunState.spend_log.append(_entry(i % 2, &"trainer", "Fireball Rank III", 45))
+	board.refresh()
+	check_eq(board.ticker_lines().size(), PurseBoard.TICKER_LINES, "the ticker takes two lines")
+	lines = board.wants_lines()
+	check_eq(lines.size(), 1, "one wants line")
+	check(board.text_width(lines[0]) <= PurseBoard.line_width() + 0.5, "it fits")
+	counts = _shown_and_more(lines)
+	check_eq(counts[0] + counts[1], 9, "the rest summed up: %s" % lines[0])
+	check(board.row_labels[1].text.contains("Fireball Rank III"), "row 2 is the ticker's again")
+	check_eq([board.caption_labels[0].text, board.caption_labels[1].text, board.caption_labels[2].text],
+		["Spent", "", "Wants"], "the Wants caption on the bottom row")
+	# Few wants and an empty round: they stay on the bottom row, the second row stays empty.
+	RunState.spend_log.clear()
+	RunState.wants.clear()
+	RunState.toggle_want(0, "trainer:y", "Charge Rank II", 25)
+	board.refresh()
+	check_eq(board.wants_lines(), ["P1 Charge Rank II 25 g"] as Array[String], "one short want")
+	check(board.row_labels[1].text == "" and board.wants_label.text.contains("Charge Rank II"), "on the bottom row")
+	check_eq(board.caption_labels[2].text, "Wants", "with its caption")
 
 
 # --- Ready pips ------------------------------------------------------------------------------
+
+func test_update_tells_ready_changes_from_player_changes() -> void:
+	_two_humans()
+	holder = Control.new()
+	tree.root.add_child(holder)
+	var board := PurseBoard.create()
+	holder.add_child(board)
+	var slots := PlayerManager.get_slots()
+	board.update(slots)
+	check(not board.is_dirty(), "the first update builds the texts")
+	check_eq(board.ready_label.text, "0/2 ready", "two players")
+	board.update(slots)
+	check(not board.is_dirty(), "nothing changed: nothing to rebuild")
+	slots[1].ready = true
+	board.update(slots)
+	check(board.pips.states[1]["ready"] and board.ready_label.text == "1/2 ready", "a ready toggle redraws the pips")
+	board._dirty = false
+	slots[1].ready = false
+	board.update(slots)
+	check(not board.pips.states[1]["ready"], "and back")
+	check(not board.is_dirty(), "the texts do not depend on ready flags")
+	RunState.toggle_want(0, "trainer:z", "Charge Rank II", 25)
+	board.update(slots)
+	var old_color := slots[0].color
+	check(board.wants_label.text.contains(old_color.lightened(0.25).to_html(false)), "P1's tag in their colour")
+	var green := Color(0.1, 0.9, 0.2)
+	slots[0].color = green
+	board.update(slots)
+	check_eq(board.pips.states[0]["color"], green, "a colour change reaches the pips")
+	check(board.wants_label.text.contains(green.lightened(0.25).to_html(false)), "and rebuilt the texts (the tags carry the colours)")
+	slots[0].color = old_color
+	var fewer: Array[PlayerSlot] = [slots[0]]
+	board.update(fewer)
+	check_eq(board.pips.states.size(), 1, "a player left: one pip")
+	check_eq(board.ready_label.text, "0/1 ready", "count follows")
 
 func test_ready_pips_follow_the_players() -> void:
 	var inputs := _two_humans()
