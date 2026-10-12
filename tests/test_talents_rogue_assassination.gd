@@ -253,6 +253,51 @@ func test_envenom_burst_kill_counts_for_venomous_wounds() -> void:
 	check_near(_energy(p).value, 68.0, 0.0001, "Venomous Wounds: +3 Energy for the envenomed kill")
 
 
+## A fan over a poisoned 1 HP grunt (hit first, 1.5 m ahead) and a second enemy (3 m behind
+## the hero), Combat Potency 3/3 forced to 100%; returns the Rogue (Energy after the cast: 65).
+func _fan_over_a_dying_grunt(envenom: bool) -> Player:
+	var p := _rogue()
+	_add(p, T, "malice", 3)
+	_add(p, T, "improved_poisons", 3)
+	if envenom:
+		_add(p, T, "envenom")
+	_add(p, "combat", "combat_potency", 3)
+	_force_procs(p, &"rogue_combat_combat_potency")
+	var grunt := Enemy.create(Db.get_enemy(&"skeleton_grunt"), 1)
+	world.add_child(grunt)
+	grunt.global_position = Vector3(0, 0, -1.5)
+	var other := Fakes.spawn_enemy(world, Vector3(0, 0, 3.0))
+	EnemyGrid.mark_dirty()
+	_mastery(p).poison(grunt, 400.0)
+	grunt.hp = 1.0
+	_throw_fan(p)
+	check_near(_energy(p).value, 65.0, 0.0001, "35 Energy spent")
+	_fly(p)
+	check(grunt.is_dead(), "the grunt died")
+	check_eq(other.fake_hits(), 1, "another knife hit the second enemy")
+	var detonations := 0
+	var hits := 0
+	for k in _all_knives(p):
+		detonations += k.detonations
+		hits += k.hit_count
+	check_eq(detonations, 1 if envenom else 0, "Envenom's burst killed the grunt" if envenom else "no burst")
+	check_eq(hits, 2, "two knives landed (the grunt's one counts even on a corpse)")
+	return p
+
+
+func test_without_envenom_the_fan_rolls_its_on_hit_proc_once() -> void:
+	var p := _fan_over_a_dying_grunt(false)
+	check_near(_energy(p).value, 67.0, 0.0001, "Combat Potency fired once for the fan: +2 Energy")
+
+
+## The burst's kill leaves its knife on a corpse: no weapon hit, so that knife must not close
+## the fan's shared proc gate (the Envenom + Combat Potency hybrid, talents_rogue.md "Twin
+## modifiers") – the knife on the second enemy still rolls.
+func test_envenom_burst_kill_keeps_the_fans_on_hit_proc() -> void:
+	var p := _fan_over_a_dying_grunt(true)
+	check_near(_energy(p).value, 67.0, 0.0001, "Combat Potency still fired once for the fan: +2 Energy")
+
+
 # --- Cold Blood (capstone) ---------------------------------------------------------------------
 
 func test_cold_blood_every_third_fan_crits_harder_and_cripples() -> void:

@@ -16,6 +16,8 @@ extends Projectile
 ##                          (deal_raw(..., target_bonus = false, &"dot"), like the ticks). Each
 ##                          enemy once per cast: the knives of one fan share [member envenomed],
 ##                          so a fan never detonates the fresh stacks its own crits put on.
+##                          A burst that kills leaves the knife on a corpse: no weapon hit, and
+##                          the fan's shared proc gate stays open for its other knives.
 ##   [member slow_pct] / [member slow_duration] – Cold Blood: a living enemy is slowed after
 ##                          the hit.
 
@@ -83,6 +85,13 @@ func _build_visual() -> void:
 func _apply_hit(body: Node3D, kb_dir: Vector3, from_explosion: bool) -> void:
 	if envenom_pct > 0.0:
 		_envenom(body)
+		# The burst killed it: the knife lands on a corpse – no weapon hit, so it must not take
+		# the fan's shared proc gate (Projectile._apply_hit evaluates proc_gate.take() before
+		# WeaponRunner.apply_hit skips the dead enemy), nor slow / poison it.
+		var dead := body as Enemy
+		if dead != null and is_instance_valid(dead) and dead.is_dead():
+			hit_count += 1
+			return
 	super._apply_hit(body, kb_dir, from_explosion)
 	if poison_hits and not is_crit:
 		_poison(body)
