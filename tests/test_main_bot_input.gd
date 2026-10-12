@@ -1,7 +1,7 @@
 extends TestCase
 ## BotInput (the smoke / demo bots Main spawns): kiting by weapon reach, retreat when hurt,
 ## rescue runs to downed teammates close by, ghosts walking to the Spirit Healer (or to a
-## living teammate without one), wall avoidance.
+## living teammate without one), wall avoidance, Loot Goblin chases (M5).
 
 const DT := 1.0 / 60.0
 
@@ -40,6 +40,23 @@ func _enemy(pos: Vector3) -> Node3D:
 	arena.entities.add_child(e)
 	e.global_position = pos
 	return e
+
+
+func _goblin(pos: Vector3) -> LootGoblin:
+	var g := LootGoblin.create(LootGoblin.goblin_data(), 3)
+	arena.entities.add_child(g)
+	g.global_position = pos
+	return g
+
+
+## The bot's move with [param node] in the enemies group and without it (same wander: the
+## first call draws it, the second reuses it).
+func _move_with_and_without(p: Player, node: Node3D) -> Array[Vector2]:
+	var with_it := _move(p)
+	node.remove_from_group(&"enemies")
+	var without := _move(p)
+	node.add_to_group(&"enemies")
+	return [with_it, without]
 
 
 func _move(p: Player) -> Vector2:
@@ -140,3 +157,52 @@ func test_bot_keeps_away_from_the_walls() -> void:
 	check(_move(bot).x < 0.0, "pushed back from the east wall")
 	bot.global_position = Vector3(0.0, 0.0, b.end.y - 0.5)
 	check(_move(bot).y < 0.0, "pushed back from the south wall")
+
+
+func test_a_loot_goblin_is_never_kited() -> void:
+	var mage := _bot_player(&"mage", Vector3.ZERO)
+	var g := _goblin(Vector3(3.0, 0.0, 0.0))
+	_move(mage)  # draws the wander
+	var m := _move_with_and_without(mage, g)
+	check(m[0].is_equal_approx(m[1]), "a goblin 3 m away is no threat: %s vs %s" % [m[0], m[1]])
+	var warrior := _bot_player(&"warrior", Vector3(-8.0, 0.0, 6.0))
+	g.global_position = Vector3(-7.4, 0.0, 6.0)
+	_move(warrior)
+	check(_move(warrior).x > -0.3, "a melee bot does not step back from a goblin at its feet")
+
+
+func test_bots_chase_a_loot_goblin_nearby() -> void:
+	var mage := _bot_player(&"mage", Vector3.ZERO)
+	var g := _goblin(Vector3(9.0, 0.0, 0.0))
+	_move(mage)
+	var m := _move_with_and_without(mage, g)
+	check(m[0].x > 0.8, "a ranged bot runs after a goblin 9 m away: %s" % m[0])
+	check(not m[0].is_equal_approx(m[1]), "because of the goblin")
+	g.global_position = Vector3(5.0, 0.0, 0.0)
+	m = _move_with_and_without(mage, g)
+	check(m[0].is_equal_approx(m[1]), "close enough to shoot it: no more chasing")
+	var warrior := _bot_player(&"warrior", Vector3(-8.0, 0.0, -6.0))
+	g.global_position = Vector3(-8.0, 0.0, -6.0 + 4.0)
+	_move(warrior)
+	m = _move_with_and_without(warrior, g)
+	check(m[0].y > 0.8 and not m[0].is_equal_approx(m[1]), "a melee bot closes in on it: %s" % m[0])
+
+
+func test_bots_leave_the_goblin_when_crowded_hurt_or_far() -> void:
+	var mage := _bot_player(&"mage", Vector3.ZERO)
+	var g := _goblin(Vector3(9.0, 0.0, 0.0))
+	_move(mage)
+	var e := _enemy(Vector3(0.0, 0.0, -2.0))
+	var m := _move_with_and_without(mage, g)
+	check(m[0].is_equal_approx(m[1]), "another enemy within CROWD_RADIUS: fight / kite first")
+	e.global_position = Vector3(0.0, 0.0, -BotInput.CROWD_RADIUS - 0.5)
+	m = _move_with_and_without(mage, g)
+	check(not m[0].is_equal_approx(m[1]), "just outside the crowd radius it chases again")
+	e.remove_from_group(&"enemies")
+	mage.hp = mage.max_hp() * (BotInput.RETREAT_HP_RATIO - 0.1)
+	m = _move_with_and_without(mage, g)
+	check(m[0].is_equal_approx(m[1]), "too hurt to chase")
+	mage.hp = mage.max_hp()
+	g.global_position = Vector3(BotInput.ENGAGE_DISTANCE + 1.0, 0.0, 0.0)
+	m = _move_with_and_without(mage, g)
+	check(m[0].is_equal_approx(m[1]), "beyond ENGAGE_DISTANCE it is left alone")

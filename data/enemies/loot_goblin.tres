@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"loot_goblin"
+display_name = "Loot Goblin"
+behavior = 0
+max_hp = 30.0
+contact_damage = 0.0
+move_speed = 4.4
+radius = 0.45
+knockback_resist = 0.3
+first_wave = 3
+spawn_weight = 0.0
+group_min = 1
+group_max = 1
+gold = 0
+xp = 0
+model_style = &"goblin"
+color = Color(0.45, 0.7, 0.27, 1)
+model_scale = 1.0

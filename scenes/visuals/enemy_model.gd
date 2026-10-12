@@ -1,14 +1,17 @@
 class_name EnemyModel
 extends Node3D
-## Procedural enemy look per EnemyData.model_style (skeleton, candlekin, gurgler, troll),
-## owned by the "visuals" module. Origin at the feet, faces -Z, scaled by data.model_scale.
+## Procedural enemy look per EnemyData.model_style (skeleton, candlekin, gurgler, troll and –
+## M5 – goblin, the Loot Goblin), owned by the "visuals" module. Origin at the feet, faces -Z,
+## scaled by data.model_scale.
 ##
 ## Built for crowds (up to ~150 on screen): per enemy only 4-5 nodes –
 ##   EnemyModel → Pivot (yaw + lean + bob + scale) → Body, Arm (weapon arm, pivots at the
 ##   shoulder), optional Glow (candle flame) – and every Mesh is shared per style + colour.
 ## Stun stars are created lazily on the first stun.
+## The goblin: a short green goblin with a big gold sack on its back; its Glow part is a
+## bright gold glint on the sack (twinkles like the candle flame).
 
-const STYLES: Array[StringName] = [&"skeleton", &"candlekin", &"gurgler", &"troll"]
+const STYLES: Array[StringName] = [&"skeleton", &"candlekin", &"gurgler", &"troll", &"goblin"]
 const TURN_SPEED := 12.0
 const FLASH_TIME := 0.12
 const ATTACK_TIME := 0.32
@@ -23,6 +26,10 @@ const IRON := Color(0.36, 0.36, 0.4)
 const WOOD := Color(0.48, 0.3, 0.16)
 const DARK := Color(0.08, 0.05, 0.06)
 const WHITE := Color(0.97, 0.96, 0.92)
+## Loot Goblin: coins, sack cloth, leather.
+const GOLD := Color(1.0, 0.8, 0.22)
+const SACK := Color(0.7, 0.54, 0.32)
+const LEATHER := Color(0.4, 0.24, 0.12)
 
 var data: EnemyData
 var style: StringName = &""
@@ -233,6 +240,12 @@ static func parts_for(p_style: StringName, color: Color) -> Dictionary:
 		&"troll":
 			out["arm_pivot"] = Vector3(0.27, 1.12, 0.02)
 			out["head_y"] = 1.55
+		&"goblin":
+			out["arm_pivot"] = Vector3(0.17, 0.5, -0.01)
+			out["head_y"] = 1.05
+			out["glow"] = MeshKit.cached("enemy:glint", func() -> Mesh: return _glint_mesh())
+			out["glow_pos"] = Vector3(0.1, 0.98, 0.3)
+			out["glow_color"] = Color(1.0, 0.86, 0.35)
 		_:
 			out["arm_pivot"] = Vector3(0.21, 0.8, 0.0)
 			out["head_y"] = 1.24
@@ -257,6 +270,11 @@ static func _build(p_style: StringName, color: Color, arm: bool) -> Mesh:
 				_troll_arm(k, color)
 			else:
 				_troll(k, color)
+		&"goblin":
+			if arm:
+				_goblin_arm(k, color)
+			else:
+				_goblin(k, color)
 		_:
 			if arm:
 				_skeleton_arm(k, color)
@@ -472,6 +490,93 @@ static func _troll_arm(k: MeshKit, skin: Color) -> void:
 	k.add_box(Vector3(0.07, 0.24, 0.06), t * _xf(Vector3(0.0, 0.42, 0)), Color(0.35, 0.33, 0.35))
 	for i in 2:
 		k.add_torus(0.028, 0.045, t * _xf(Vector3(0, -0.02 + i * 0.09, 0)), Color(0.85, 0.25, 0.2), 8, 4)
+
+
+# Loot Goblin: short and green, huge ears, long nose, a gold-tooth grin, a leather vest and a
+# big tied sack of gold on its back (a coin sigil on it, coins peeking out of the top); the
+# left hand holds the sack's neck over the shoulder.
+static func _goblin(k: MeshKit, skin: Color) -> void:
+	var dark_skin := skin.darkened(0.2)
+	var boot := LEATHER.darkened(0.3)
+	# Legs and pointy curled boots.
+	for side: float in [-1.0, 1.0]:
+		var hip := Vector3(0.075 * side, 0.3, 0.0)
+		var knee := Vector3(0.09 * side, 0.17, -0.03)
+		var ankle := Vector3(0.09 * side, 0.07, -0.01)
+		k.add_segment(hip, knee, 0.042, 0.036, skin, 6)
+		k.add_segment(knee, ankle, 0.036, 0.032, skin, 6)
+		k.add_sphere(0.08, _xf(Vector3(0.09 * side, 0.045, -0.05), Vector3.ZERO, Vector3(0.8, 0.5, 1.6)), boot, 8, 4)
+		k.add_sphere(0.025, _xf(Vector3(0.09 * side, 0.085, -0.17)), boot, 6, 3)
+	# Shorts, torso in an open leather vest, belt with a gold buckle, bandolier strap.
+	k.add_sphere(0.13, _xf(Vector3(0, 0.3, 0.0), Vector3.ZERO, Vector3(1.1, 0.6, 0.95)), LEATHER.darkened(0.15), 10, 5)
+	k.add_sphere(0.165, _xf(Vector3(0, 0.45, 0.015), Vector3.ZERO, Vector3(1.02, 1.0, 0.85)), LEATHER, 12, 6)
+	k.add_sphere(0.12, _xf(Vector3(0, 0.43, -0.075), Vector3.ZERO, Vector3(0.85, 1.1, 0.6)), skin.lightened(0.08), 10, 5)
+	k.add_torus(0.13, 0.168, _xf(Vector3(0, 0.35, 0.0)), LEATHER.darkened(0.35), 14, 4)
+	k.add_box(Vector3(0.075, 0.055, 0.025), _xf(Vector3(0, 0.35, -0.158)), GOLD)
+	k.add_tube(PackedVector3Array([Vector3(-0.15, 0.58, -0.07), Vector3(-0.02, 0.47, -0.15), Vector3(0.14, 0.34, -0.09)]),
+			0.022, 0.022, LEATHER.darkened(0.45), 5)
+	# Head: big round skull, cheeks, huge pointed ears.
+	var head := Vector3(0, 0.71, -0.03)
+	k.add_segment(Vector3(0, 0.56, -0.01), head, 0.06, 0.06, skin, 6)
+	k.add_sphere(0.19, _xf(head, Vector3.ZERO, Vector3(1.05, 0.95, 1.0)), skin, 14, 7)
+	k.add_sphere(0.13, _xf(head + Vector3(0, -0.08, -0.07), Vector3.ZERO, Vector3(1.2, 0.7, 0.9)), skin.lightened(0.05), 10, 5)
+	for side: float in [-1.0, 1.0]:
+		var ear := head + Vector3(0.16 * side, 0.02, 0.03)
+		k.add_segment(ear, ear + Vector3(0.29 * side, 0.1, 0.07), 0.075, 0.0, skin, 7)
+		k.add_segment(ear + Vector3(0.01 * side, 0.0, -0.025), ear + Vector3(0.23 * side, 0.08, 0.03), 0.04, 0.0,
+				Color(0.86, 0.5, 0.45), 6)
+		# Yellow eyes, dark pupils, grumpy brows.
+		k.add_sphere(0.05, _xf(head + Vector3(0.075 * side, 0.04, -0.15)), Color(1.0, 0.86, 0.22), 8, 4)
+		k.add_sphere(0.022, _xf(head + Vector3(0.075 * side, 0.04, -0.196)), DARK, 6, 3)
+		k.add_box(Vector3(0.08, 0.022, 0.03), _xf(head + Vector3(0.08 * side, 0.1, -0.16), Vector3(0, 0, -18.0 * side)), dark_skin)
+	# Long hooked nose and a wide grin with one gold tooth.
+	k.add_segment(head + Vector3(0, 0.0, -0.17), head + Vector3(0, -0.07, -0.31), 0.05, 0.012, skin.darkened(0.05), 7)
+	k.add_sphere(0.08, _xf(head + Vector3(0, -0.11, -0.14), Vector3.ZERO, Vector3(1.25, 0.35, 0.55)), Color(0.32, 0.05, 0.07), 10, 4)
+	for i in 4:
+		var tooth := GOLD if i == 2 else WHITE
+		k.add_box(Vector3(0.024, 0.03, 0.012), _xf(head + Vector3(-0.045 + i * 0.03, -0.1, -0.183)), tooth)
+	# The sack: a big tied bag of gold on the back.
+	var sack := Vector3(0, 0.6, 0.3)
+	k.add_sphere(0.3, _xf(sack, Vector3.ZERO, Vector3(1.0, 1.05, 0.85)), SACK, 16, 8)
+	k.add_sphere(0.24, _xf(sack + Vector3(0, -0.17, 0.03), Vector3.ZERO, Vector3(1.1, 0.8, 0.95)), SACK.darkened(0.08), 12, 6)
+	k.add_box(Vector3(0.12, 0.1, 0.02), _xf(sack + Vector3(-0.13, -0.12, 0.235), Vector3(0, -25, 12)), SACK.darkened(0.3))
+	k.add_cylinder(0.085, 0.085, 0.02, _xf(sack + Vector3(0.02, 0.02, 0.258), Vector3(90, 0, 0)), GOLD, 14)
+	k.add_cylinder(0.05, 0.05, 0.024, _xf(sack + Vector3(0.02, 0.02, 0.262), Vector3(90, 0, 0)), GOLD.darkened(0.25), 10)
+	k.add_cylinder(0.075, 0.1, 0.1, _xf(sack + Vector3(0, 0.33, 0.0)), SACK, 10)
+	k.add_torus(0.075, 0.1, _xf(sack + Vector3(0, 0.31, 0.0)), Color(0.82, 0.68, 0.42), 12, 4)
+	k.add_cylinder(0.13, 0.08, 0.06, _xf(sack + Vector3(0, 0.4, 0.0)), SACK.lightened(0.05), 12)
+	for c: Vector3 in [Vector3(-0.045, 0.43, -0.02), Vector3(0.05, 0.425, 0.02), Vector3(0.0, 0.45, 0.03), Vector3(0.02, 0.44, -0.04)]:
+		k.add_cylinder(0.045, 0.045, 0.016, _xf(sack + c, Vector3(25.0 * signf(c.x + 0.01), 0, 30.0 * signf(c.z + 0.01))), GOLD, 10)
+	# Left arm up over the shoulder, holding the sack's neck.
+	var sh := Vector3(-0.17, 0.52, -0.01)
+	var el := Vector3(-0.27, 0.66, 0.1)
+	var ha := Vector3(-0.1, 0.9, 0.27)
+	k.add_sphere(0.055, _xf(sh), skin, 8, 4)
+	k.add_segment(sh, el, 0.042, 0.036, skin, 6)
+	k.add_segment(el, ha, 0.036, 0.032, skin, 6)
+	k.add_sphere(0.05, _xf(ha), skin.lightened(0.05), 8, 4)
+
+
+static func _goblin_arm(k: MeshKit, skin: Color) -> void:
+	var el := Vector3(0.06, -0.12, -0.03)
+	var ha := Vector3(0.05, -0.22, -0.1)
+	k.add_sphere(0.055, _xf(Vector3.ZERO), skin, 8, 4)
+	k.add_segment(Vector3.ZERO, el, 0.042, 0.036, skin, 6)
+	k.add_segment(el, ha, 0.036, 0.032, skin, 6)
+	k.add_sphere(0.05, _xf(ha), skin.lightened(0.05), 8, 4)
+	# A gold coin clutched in the fist.
+	k.add_cylinder(0.05, 0.05, 0.016, _xf(ha + Vector3(0.0, -0.01, -0.05), Vector3(70, 0, 0)), GOLD, 12)
+
+
+## Gold glint on the goblin's sack: a small 3D twinkle (spikes along every axis).
+static func _glint_mesh() -> Mesh:
+	var k := MeshKit.new()
+	k.add_sphere(0.032, Transform3D(), Color.WHITE, 8, 4)
+	for axis: Vector3 in [Vector3.UP, Vector3.DOWN]:
+		k.add_segment(Vector3.ZERO, axis * 0.12, 0.022, 0.0, Color.WHITE, 5)
+	for axis: Vector3 in [Vector3.LEFT, Vector3.RIGHT, Vector3.FORWARD, Vector3.BACK]:
+		k.add_segment(Vector3.ZERO, axis * 0.075, 0.018, 0.0, Color.WHITE, 5)
+	return k.build()
 
 
 static func _flame_mesh() -> Mesh:

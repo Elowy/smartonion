@@ -430,6 +430,32 @@ func test_enemy_animation_states() -> void:
 	check_near(absf(angle_difference(pivot.rotation.y, PI)), 0.0, 0.05, "faces +Z")
 
 
+func test_loot_goblin_model() -> void:
+	check(&"goblin" in EnemyModel.STYLES, "goblin style")
+	var data := Db.get_enemy(&"loot_goblin")
+	check(data != null, "Loot Goblin data")
+	if data == null:
+		return
+	var g := _keep(EnemyModel.new()) as EnemyModel
+	g.setup(data)
+	check_eq(g.style, &"goblin", "goblin, not the skeleton fallback")
+	var s := _keep(EnemyModel.new()) as EnemyModel
+	s.setup(Db.get_enemy(&"skeleton_grunt"))
+	check((g.get_node("Pivot/Body") as MeshInstance3D).mesh != (s.get_node("Pivot/Body") as MeshInstance3D).mesh,
+			"its own body")
+	var glint := g.get_node_or_null("Pivot/Glow") as MeshInstance3D
+	check(glint != null, "a gold glint on the sack")
+	if glint != null:
+		var mat := glint.material_override as StandardMaterial3D
+		check(mat != null and mat.emission_enabled and mat.emission.r > 0.9 and mat.emission.b < 0.5, "bright gold")
+		check(glint.position.z > 0.15 and glint.position.y > 0.8, "up on the sack at its back")
+	check(g.head_height > 0.9 and g.head_height < 1.2, "short (head %.2f m)" % g.head_height)
+	var arm := g.get_node("Pivot/Arm") as MeshInstance3D
+	check(arm.position.x > 0.0 and arm.position.y < 0.6, "right shoulder")
+	g.set_stunned(true)
+	check(g.get_node_or_null("Stars") != null, "stun stars work")
+
+
 func test_unknown_enemy_style_falls_back() -> void:
 	var data := EnemyData.new()
 	data.model_style = &"no_such_style"
