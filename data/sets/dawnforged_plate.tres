@@ -24,9 +24,10 @@ bonuses = Array[Dictionary]([{
 "id": "word_of_glory"
 },
 "mods": {
-"heal_all": true
+"heal_all": true,
+"heal_max_hp_pct_add": 10.0
 }
 }],
 "pieces": 4,
-"text": "Word of Glory heals every hero within 8 m, not just the most wounded."
+"text": "Word of Glory heals every hero within 8 m and restores 10% more of their Max HP."
 }])

@@ -183,7 +183,8 @@ func test_bonus_numbers_follow_the_design_table() -> void:
 	check_eq(bonus_effects(&"regalia_of_the_arcane", 2), [{"kind": "stats", "stats": {"haste": 10.0}}], "Regalia 2: +10% Haste")
 	check_eq(bonus_effects(&"dawnforged_plate", 2), [{"kind": "stats", "stats": {"armor": 3.0}}], "Dawnforged 2: +3 Armor")
 	check_eq(bonus_effects(&"dawnforged_plate", 4),
-		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true}}], "Dawnforged 4: Word of Glory heals all")
+		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true, "heal_max_hp_pct_add": 10.0}}],
+		"Dawnforged 4: Word of Glory heals all, +10% of Max HP")
 	check_eq(bonus_effects(&"shadowstitch_garb", 2), [{"kind": "stats", "stats": {"crit": 5.0}}], "Shadowstitch 2: +5% crit")
 	check_eq(bonus_effects(&"shadowstitch_garb", 4), [{"kind": "proc", "proc": {"trigger": "on_cast", "ability": "vanish",
 		"effect": "buff", "stats": {"crit_damage": 50.0}, "duration": 4.0}}], "Shadowstitch 4: Vanish +50% crit damage 4 s")
@@ -384,6 +385,8 @@ func test_each_class_set_reaches_the_engine() -> void:
 		_wear(paladin, piece(&"paladin", s))
 	check_eq(paladin.stats.get_source(&"set_bonus").get(Stats.ARMOR, 0.0), 3.0, "Dawnforged 2: Armor")
 	check_eq(paladin.abilities.params_for(Db.get_ability(&"word_of_glory")).get("heal_all"), true, "Dawnforged 4: heal_all")
+	check_eq(paladin.abilities.params_for(Db.get_ability(&"word_of_glory")).get("heal_max_hp_pct"), 35.0,
+		"Dawnforged 4: 25 + 10% of Max HP")
 	var rogue := Fakes.spawn_player(world, 2, &"rogue", Vector3(12, 0, 0))
 	for s in ["head", "shoulders", "hands", "legs"]:
 		_wear(rogue, piece(&"rogue", s))
@@ -396,6 +399,38 @@ func test_each_class_set_reaches_the_engine() -> void:
 	check_near(warlock.bonuses.damage_mult(null, &"fire", &"pet"), 1.1, 0.0001, "Felfire 2: +10% pet damage")
 	check_near(warlock.bonuses.damage_mult(null, &"fire", &"ability"), 1.0, 0.0001, "only pets")
 	check_eq(float(warlock.abilities.params_for(Db.get_ability(&"rain_of_fire")).get("free_chance", 0.0)), 20.0, "Felfire 4: free Rain of Fire")
+
+
+## Word of Glory Rank V "Light of Dawn" already heals every hero within 8 m; the Dawnforged
+## 4-piece still pays off for that Paladin: every heal restores 10% more of Max HP.
+func test_dawnforged_4_piece_still_helps_with_light_of_dawn() -> void:
+	var paladin := _player(&"paladin")
+	var wog := Db.get_ability(&"word_of_glory")
+	var slot := paladin.abilities.slot_of(wog.id)
+	check(slot >= 0, "Word of Glory is known")
+	while paladin.abilities.rank_of(wog.id) < 5:
+		check(paladin.abilities.rank_up(wog.id), "rank up")
+	check(paladin.abilities.set_spec(wog.id, 0), "Light of Dawn chosen")
+	var spec_only := paladin.abilities.params_for(wog)
+	check(spec_only.get("heal_all") == true and float(spec_only.get("heal_max_hp_pct")) == 25.0, "the spec heals every hero, 25%")
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3, 0, 0))
+	var holy := paladin.abilities.get_resource(&"holy_power")
+	ally.hp = 2.0
+	holy.set_value(3.0)
+	check(paladin.abilities.try_cast(slot), "cast without the set")
+	var power := float(spec_only.get("power", 1.0))
+	var heal_spec := ally.hp - 2.0
+	check_near(heal_spec, (3.0 + ally.max_hp() * 0.25) * power, 0.001, "spec heal: flat + 25% of Max HP, x power")
+	for s in ["head", "shoulders", "chest", "legs"]:
+		_wear(paladin, piece(&"paladin", s))
+	var with_set := paladin.abilities.params_for(wog)
+	check(with_set.get("heal_all") == true, "still every hero")
+	check_eq(float(with_set.get("heal_max_hp_pct")), 35.0, "the 4-piece adds 10% of Max HP")
+	ally.hp = 2.0
+	holy.set_value(3.0)
+	check(paladin.abilities.try_cast(slot), "cast with the 4-piece")
+	check_near(ally.hp - 2.0, (3.0 + ally.max_hp() * 0.35) * power, 0.001, "the heal grew by 10% of Max HP x power")
+	check(ally.hp - 2.0 > heal_spec, "the set is worth something next to Light of Dawn")
 
 
 # --- Generator: the set roll -------------------------------------------------------------------
