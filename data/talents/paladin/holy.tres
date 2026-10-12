@@ -1,0 +1,244 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_healing_light"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_healing_light"
+display_name = "Healing Light"
+description = "Increases the healing of your Paladin abilities by {pct}%."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"healing_done"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"healing_done": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_aura_mastery"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_aura_mastery"
+display_name = "Aura Mastery"
+description = "Increases your Mastery by {mastery}, and your Aura of Devotion reaches {radius} m further."
+values = {
+"mastery": 1.0,
+"radius": 1.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 1.0
+}
+}, {
+"kind": "ability",
+"match": {
+"id": "paladin_aura"
+},
+"mods": {
+"radius_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_eternal_glory"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_eternal_glory"
+display_name = "Eternal Glory"
+description = "Word of Glory has a {chance}% chance to cost no Holy Power."
+values = {
+"chance": 8.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"word_of_glory"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"free_chance_add": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_unyielding_faith"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_unyielding_faith"
+display_name = "Unyielding Faith"
+description = "Every {interval_fixed} sec you have a {chance}% chance to gain 1 Holy Power."
+values = {
+"chance": 8.0,
+"interval_fixed": 4.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 8.0,
+"effect": "resource",
+"interval": 4.0,
+"label": "",
+"resource": "holy_power",
+"trigger": "periodic",
+"value": 1
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_lights_grace"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_lights_grace"
+display_name = "Light's Grace"
+description = "Word of Glory heals {pct}% more, and the number of wounded allies it heals is increased by {allies}."
+values = {
+"allies": 1.0,
+"pct": 8.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"word_of_glory"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"allies_add": 1.0,
+"power_pct": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_lights_hammer"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_lights_hammer"
+display_name = "Light's Hammer"
+description = "Consecration is hurled at the feet of the most wounded hero within {range} m who is below {below}% health (otherwise at your feet), and heroes standing in it heal {heal}% of their maximum health every {tick} sec."
+values = {
+"below": 80.0,
+"heal": 1.0,
+"range": 10.0,
+"tick": 0.5
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"consecration"
+icon = &"consecration"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "consecration"
+},
+"mods": {
+"ally_range_add": 10.0,
+"heal_max_hp_pct_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_divine_guardian"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_divine_guardian"
+display_name = "Divine Guardian"
+description = "Heroes inside your Aura of Devotion (you included) take {pct}% less damage."
+values = {
+"pct": 2.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"paladin_holy_aura_mastery"
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "paladin_aura"
+},
+"mods": {
+"guard_add": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_purifying_power"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_purifying_power"
+display_name = "Purifying Power"
+description = "Increases your Holy damage by {pct}%."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"holy_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"school": "holy"
+}])
+
+[sub_resource type="Resource" id="Resource_holy_shock"]
+script = ExtResource("2_talent")
+id = &"paladin_holy_holy_shock"
+display_name = "Holy Shock"
+description = "Every {interval} sec, Holy Shock heals the most wounded hero within {range} m below {below}% health (you included) for {heal}% of their maximum health – or, when nobody needs it, strikes the nearest enemy within {range} m for {pct}% weapon damage as Holy damage. Haste shortens the interval."
+values = {
+"below": 90.0,
+"heal": 6.0,
+"interval": 4.0,
+"pct": 100.0,
+"range": 8.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"heal_below": 90.0,
+"heal_flat": 1.0,
+"heal_max_hp_pct": 6.0,
+"heal_sp_scale": 0.5,
+"interval": 4.0,
+"range": 8.0,
+"retry": 0.25,
+"sp_scale": 0.8,
+"weapon_pct": 100.0
+},
+"script": "res://scenes/talents/paladin/holy_holy_shock.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"paladin_holy"
+class_id = &"paladin"
+display_name = "Holy"
+index = 0
+description = "Healing light, Holy Power and the allies at your side."
+icon = &"word_of_glory"
+color = Color(1, 0.88, 0.45, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_healing_light"), SubResource("Resource_aura_mastery"), SubResource("Resource_eternal_glory"), SubResource("Resource_unyielding_faith"), SubResource("Resource_lights_grace"), SubResource("Resource_lights_hammer"), SubResource("Resource_divine_guardian"), SubResource("Resource_purifying_power"), SubResource("Resource_holy_shock")])
