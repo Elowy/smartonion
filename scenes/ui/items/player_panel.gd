@@ -27,7 +27,8 @@ extends Control
 ## two-hander, "Replaces Dagger + Dagger" for a two-hander). Nothing may leave the hero without
 ## an attacking weapon (Equipment.is_last_weapon / equip_disarms): those Equip / Unequip /
 ## Sell / Trade entries are greyed out with "You need a weapon".
-## The selected item's ItemTooltip floats beside the panel, towards the screen centre.
+## The selected item's ItemTooltip floats beside the panel, towards the screen centre (with
+## [member tooltip_inside] over the panel's other half); it hides while the action menu is open.
 
 signal trade_done(item: ItemInstance, to_slot_index: int)
 ## Emitted after an item was sold from the backpack ([param gold] went to RunState).
@@ -435,6 +436,7 @@ func open_menu(sell_first: bool = false) -> void:
 	_menu_stack = [{"title": it.display_name, "color": _rarity_color(it), "entries": entries, "index": index, "item": it}]
 	mode = Mode.MENU
 	_render_menu()
+	_update_tooltip()
 	_update_prompts()
 
 
@@ -442,6 +444,7 @@ func close_menu() -> void:
 	_menu_stack.clear()
 	mode = Mode.BROWSE
 	_menu_panel.visible = false
+	_update_tooltip()
 	_update_prompts()
 
 
@@ -1302,9 +1305,12 @@ func _update_selection() -> void:
 	_update_prompts()
 
 
+## The selected item's tooltip – hidden while the action menu is open: both use the panel's
+## half away from the selection (_place_tooltip / _place_menu), and the menu's title names the
+## item anyway.
 func _update_tooltip() -> void:
 	var it := selected_item()
-	if not _focused or it == null or active_tab != CHARACTER_TAB:
+	if not _focused or it == null or active_tab != CHARACTER_TAB or mode == Mode.MENU:
 		tooltip.visible = false
 		return
 	var compare: ItemInstance = null

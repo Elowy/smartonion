@@ -149,6 +149,39 @@ func test_backpack_starts_selected_and_focus_shows_tooltip() -> void:
 	check(not panel.icon_for_equip_slot(Items.EquipSlot.HEAD).selected, "focus lost hides the cursor")
 
 
+## Between waves the tooltip stays over the panel on the half away from the selection – where
+## the action menu opens too: the menu (Forge, Unequip …) must not sit under the tooltip.
+func test_action_menu_hides_the_tooltip() -> void:
+	var slot := _join(&"warrior")
+	var helm := _helm("Iron Helm", ClassData.ArmorType.PLATE, 3)
+	_eq(slot).add_to_backpack(helm)
+	var panel := _panel(slot)
+	panel.tooltip_inside = true
+	panel.select_backpack(0)
+	check(panel.tooltip.visible, "browsing: the tooltip shows")
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(panel.is_menu_open(), "A opens the action menu")
+	check(not panel.tooltip.visible, "the tooltip hides while the menu is open")
+	_nav(panel, slot, Vector2i.DOWN)
+	check(not panel.tooltip.visible, "and stays hidden while the menu cursor moves")
+	_tap(panel, slot, PlayerInput.Pad.B)
+	check(not panel.is_menu_open(), "B closes the menu")
+	check(panel.tooltip.visible and panel.tooltip.item == helm, "the tooltip is back")
+	# An equipped weapon's menu (Unequip / Forge) likewise; X (Sell) on a backpack item too.
+	panel.select_equip_slot(Items.EquipSlot.MAIN_HAND)
+	check(panel.tooltip.visible, "the main hand's tooltip")
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(panel.is_menu_open() and "Forge" in panel.menu_labels(), "Unequip / Forge menu: %s" % panel.menu_labels())
+	check(not panel.tooltip.visible, "hidden")
+	_tap(panel, slot, PlayerInput.Pad.B)
+	panel.select_backpack(0)
+	_tap(panel, slot, PlayerInput.Pad.X)
+	check(panel.is_menu_open() and not panel.tooltip.visible, "X opens the menu on Sell, without the tooltip")
+	panel.set_tab(PlayerPanel.TRAINER_TAB)
+	panel.set_tab(PlayerPanel.CHARACTER_TAB)
+	check(not panel.is_menu_open() and panel.tooltip.visible, "a tab switch closes the menu; the tooltip returns")
+
+
 # --- Equip / unequip --------------------------------------------------------------------------
 
 func test_equip_from_backpack() -> void:
