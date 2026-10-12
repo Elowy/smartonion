@@ -341,6 +341,34 @@ func test_proc_entries_reach_the_proc_system_rank_resolved() -> void:
 	check(procs.refreshes > r0, "and rebuilt")
 
 
+## Review nit: one equipment change rebuilds the proc list once – also when it changes the set
+## procs (the bonus rebuild refreshes then and Player.apply_equipment does not again), so the
+## running buffs and the equip-trigger sources are rebuilt once.
+func test_an_equipment_change_refreshes_the_procs_once() -> void:
+	var p := Fakes.spawn_player(world, 0, &"mage")
+	var procs := CountingProcs.new()
+	procs.player = p
+	nodes.append(procs)
+	p.procs = procs
+	var rng := RandomNumberGenerator.new()
+	for s in ["head", "shoulders", "chest"]:
+		check(p.equipment.equip(ItemGenerator.from_unique(Db.get_unique(StringName("set_mage_%s" % s)), 8, false, rng)), s)
+	check(procs.extra_defs(PlayerBonuses.SOURCE_SETS).is_empty(), "3 pieces: no set proc yet")
+	var r0 := procs.refreshes
+	check(p.equipment.equip(ItemGenerator.from_unique(Db.get_unique(&"set_mage_hands"), 8, false, rng)), "4th piece")
+	check_eq(procs.extra_defs(PlayerBonuses.SOURCE_SETS).size(), 1, "the Regalia's Blink proc arrived")
+	check_eq(procs.refreshes - r0, 1, "one refresh for the change that brought it")
+	r0 = procs.refreshes
+	check(p.equipment.equip(ProcTests.unique(&"buff", {"trigger": "equip", "stats": {"crit": 3.0}}, Items.SlotType.NECK)),
+		"an amulet with an equip buff")
+	check_eq(procs.refreshes - r0, 1, "an item proc alone: one refresh as well")
+	check_eq(p.stats.get_stat(Stats.CRIT) >= 3.0, true, "its equip buff is on")
+	r0 = procs.refreshes
+	check(p.equipment.unequip(Items.EquipSlot.HANDS), "a piece off again")
+	check(procs.extra_defs(PlayerBonuses.SOURCE_SETS).is_empty(), "the set proc is gone")
+	check_eq(procs.refreshes - r0, 1, "one refresh for taking it away")
+
+
 # --- scripts -----------------------------------------------------------------------------------
 
 func test_script_lifecycle_and_diffing() -> void:

@@ -444,8 +444,10 @@ func notify_kill(enemy: Node3D) -> void:
 
 ## Re-applies [member equipment]: one stat source per equipped position (Items.source_for),
 ## the equipped weapons (their bonus stats), the set bonuses (PlayerBonuses source &"set_bonus" –
-## the engine rebuilds every source, so talent conditions follow the equipment) and then Armor
-## Specialization ([method refresh_armor_spec]), the procs and the ability params.
+## the engine rebuilds every source, so talent conditions follow the equipment), the procs –
+## refreshed once: by the bonus rebuild when the set procs changed, else here – then Armor
+## Specialization ([method refresh_armor_spec], with the procs' equip buffs in and no running
+## proc buff) and the ability params.
 func apply_equipment() -> void:
 	if equipment == null:
 		return
@@ -460,11 +462,12 @@ func apply_equipment() -> void:
 	var off := equipment.off_weapon()
 	if main != main_hand or off != off_hand:
 		equip_weapons(main, off)
+	var procs_refreshed := false
 	if bonuses != null:
-		bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
-	refresh_armor_spec()
-	if procs != null:
+		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
+	if procs != null and not procs_refreshed:
 		procs.refresh()
+	refresh_armor_spec()
 	if abilities != null:
 		abilities.invalidate_params()  # item ability mods
 

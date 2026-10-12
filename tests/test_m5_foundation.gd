@@ -23,9 +23,10 @@ const TMP_DIR := "user://m5_p0_talent_tree_test/"
 class NeutralBonuses extends PlayerBonuses:
 	var stored: Dictionary = {}
 
-	func set_effects(source: StringName, entries: Array[Dictionary]) -> void:
+	func set_effects(source: StringName, entries: Array[Dictionary]) -> bool:
 		stored[source] = entries.duplicate(true)
 		changed.emit()
+		return false
 
 	func effects_of(source: StringName) -> Array[Dictionary]:
 		var out: Array[Dictionary] = []
