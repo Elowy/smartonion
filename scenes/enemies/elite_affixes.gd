@@ -24,9 +24,11 @@ const ENRAGED := &"enraged"
 const FRENZIED := &"frenzied"
 const VAMPIRIC := &"vampiric"
 const ALL: Array[StringName] = [SHIELDING, ENRAGED, FRENZIED, VAMPIRIC]
-const NAMES := {SHIELDING: "Shielding", ENRAGED: "Enraged", FRENZIED: "Frenzied", VAMPIRIC: "Vampiric"}
+const NAMES: Dictionary[StringName, String] = {
+	SHIELDING: "Shielding", ENRAGED: "Enraged", FRENZIED: "Frenzied", VAMPIRIC: "Vampiric",
+}
 ## Accent colour per affix (the nameplate's gem; the name itself is silver).
-const COLORS := {
+const COLORS: Dictionary[StringName, Color] = {
 	SHIELDING: Color(0.45, 0.75, 1.0),
 	ENRAGED: Color(1.0, 0.3, 0.2),
 	FRENZIED: Color(1.0, 0.78, 0.2),
