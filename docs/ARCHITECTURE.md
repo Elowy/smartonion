@@ -1396,7 +1396,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   scheduled time has passed (one time per enemy, `make_elite` before `add_child`). Counters
   `RunState.elites_spawned`, `elites_this_wave`; elites count towards `MAX_ENEMIES`; unused
   times are dropped at the wave end.
-- **Enemy API** (P0 + ELITES):
+- **Enemy API** (M5):
   - `Enemy.setup(instance, data, wave)` (subclasses: `create` = `setup(Sub.new(), …)`),
     `_think(delta, here, feared)` (the AI step), `deals_contact_damage()`,
     `_death_loot(pos, attacker)`, `heal(amount) -> float`, `apply_healing_reduction(pct,
@@ -1480,7 +1480,7 @@ Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identic
 
 ### M5 tests
 
-- Engine and core: `test_m5_foundation.gd` (the P0 contracts: TalentState on fixture trees,
+- Engine and core: `test_m5_foundation.gd` (the foundation contracts: TalentState on fixture trees,
   BonusVocabulary, Db loading, block caps, hooks through test doubles, RunState purse /
   counters / start level, launch options; fixtures live only under the `zz_test` class and
   `Db.talent_trees` / `talents` / `sets` are restored after each test), `test_bonus_engine.gd`,
