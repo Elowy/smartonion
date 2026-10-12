@@ -103,6 +103,20 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
   - **Sebződés:** nem szakítja meg a felélesztést. A kockázat az, hogy közben állni kell.
   - **Spirit Healerrel együtt:** ha a társ és a Spirit Healer egyszerre éleszt, a cast bar a
     befejezéshez közelebbit mutatja, és amelyik előbb végez, az éleszt fel.
+- **Szellem-lassítás:** amíg egy játékos elesett (szellem), a felélesztési körében (1,8 m a
+  szellem körül – ahol a társ a felélesztést csatornázza) álló ellenségek **33%-kal
+  lassabban** mozognak, így a felélesztő nem marad védtelen. A kör a szellemmel együtt mozog
+  (a Spirit Healerhez sétálva is lassít).
+  - Minden ellenségre hat, a **Loot Goblinra is** (rá is hat a crowd control); a feldühödött
+    (Enraged) elitre nem – az minden lassításra immunis.
+  - **Nem adódik össze:** több szellem átfedő köre is 33%, és más lassításokkal sem
+    halmozódik – mindig az erősebb érvényes, és egyik sem írja felül a másikat.
+  - A kör elhagyása, a szellem felélesztése vagy elsétálása után egy pillanaton belül
+    (0,1 mp) megszűnik.
+  - A lassított ellenség „lassítottnak” számít a talentek feltételeinél (pl. Frost: több
+    sebzés lassított célpontra).
+  - **Jelzés:** amíg a kör lassít valakit, a felélesztési kör halvány kékes szellemszínbe
+    vált, és a belseje lassan lüktet.
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
@@ -1958,7 +1972,7 @@ kerülnek a megfelelő fejezetbe.
 
 | Ötlet | Mit jelent | Mérföldkő |
 |---|---|---|
-| **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | M5 (az integrációkor) |
+| **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
 | **Sebzésmérő és díjak** | WoW-szerű damage meter (sebzés, gyógyítás, elnyelt sebzés, felélesztések) a menet végén; címek: „Most damage”, „Most revives”, „Most deaths” stb. | M6 |
 | **Menet végi összefoglaló kártya** | Megosztható kép: kasztok, elért hullám, idő, legjobb itemek, díjak | M6 |
 | **Véletlen környezet menetenként** | 5 féle aréna-környezet (pl. temető, mocsár, vulkán, jégbarlang, erdei rom) saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | M6 (tartalom), M7 (látvány) |
@@ -2096,7 +2110,7 @@ Jelenleg nincs nyitott kérdés.
 | Cím | SmartOnion |
 | Nyelv | Angol |
 | Kamera | Közös képernyő; korlátos kizoomolás, a képernyő széle falként megállítja a játékosokat |
-| Felélesztés | Spirit Healer a pálya közepén: folyamatos 10 mp-es számláló, minden pulzus a körében álló szellemeket 100% HP-val feléleszti, utána 15 mp Resurrection Sickness (addig a Healer nem éleszt újra); egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog |
+| Felélesztés | Spirit Healer a pálya közepén: folyamatos 10 mp-es számláló, minden pulzus a körében álló szellemeket 100% HP-val feléleszti, utána 15 mp Resurrection Sickness (addig a Healer nem éleszt újra); egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog; a szellem 1,8 m-es körében az ellenségek 33%-kal lassabbak (nem halmozódik) |
 | Gyógyulás | Minden hullám elején teljes HP |
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
