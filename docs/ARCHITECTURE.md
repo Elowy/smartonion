@@ -172,9 +172,9 @@ the new screen never sees the button press that closed the old one.
     = `base * (1 + damage_growth * n) * (1 + damage_compound)^n * party`. Uses
     `EnemyData.growth_mult` and is applied once in `Enemy.create`.
   - Defaults: `hp_growth` 0.12, `hp_compound` 0.22, `damage_growth` 0.15, `damage_compound`
-    0.08. A future DifficultyData may override them.
-  - `party` = `RunState.COOP_DAMAGE_MULTS[players - 1]` = 0.35 / 0.45 / 0.6 / 0.8 for 1–4
-    players: small parties have fewer rescuers (solo: the first down is defeat) and more
+    0.10 (0.08 before the M5 balance pass). A future DifficultyData may override them.
+  - `party` = `RunState.COOP_DAMAGE_MULTS[players - 1]` = 0.45 / 0.6 / 0.75 / 0.95 for 1–4
+    players (M4: 0.35 / 0.45 / 0.6 / 0.8): small parties have fewer rescuers (solo: the first down is defeat) and more
     enemies per head.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
