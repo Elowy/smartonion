@@ -9,6 +9,9 @@ extends Node3D
 
 const WAVE_TIME := 0.45
 const WISPS := 8
+## Unstable Affliction's burst: ring life and fel crackles.
+const UNSTABLE_TIME := 0.3
+const UNSTABLE_CRACKLES := 3
 
 static var _wisp_mesh: Mesh
 
@@ -31,6 +34,16 @@ static func fear_wave(center: Vector3, p_radius: float) -> void:
 static func seed_burst(center: Vector3, p_radius: float) -> void:
 	Vfx.explosion(center + Vector3.UP * 0.5, p_radius, WarlockSpell.SHADOW_COLOR)
 	_spawn(center, p_radius, Color(0.5, 1.0, 0.3, 0.85), 0.35, 0.16, true)
+
+
+## Unstable Affliction (M5 Affliction capstone) bursting at [param center]: a fast
+## purple-black ring with a few green fel crackles. One per burst, no per-victim effects.
+static func unstable_burst(center: Vector3, p_radius: float) -> void:
+	_spawn(center, p_radius, Color(0.6, 0.3, 0.95, 0.9), UNSTABLE_TIME, 0.22, false)
+	for i in UNSTABLE_CRACKLES:
+		var a := TAU * float(i) / float(UNSTABLE_CRACKLES)
+		var at := Vector3(center.x + cos(a) * p_radius * 0.45, Vfx.GROUND_Y + 0.6, center.z + sin(a) * p_radius * 0.45)
+		Vfx.hit_spark(at, WarlockSpell.FEL_COLOR)
 
 
 ## The Voidwalker's Torment: a deep blue pulse.

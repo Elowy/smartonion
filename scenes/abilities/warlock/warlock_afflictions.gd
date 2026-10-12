@@ -1,13 +1,24 @@
 class_name WarlockAfflictions
 extends Node
 ## The damage-over-time effects one Warlock keeps on enemies (M4, GDD 6.4): Corruption, Seed
-## of Corruption and the Dread of Fear. A child node of the Warlock ([method of]) – freed with
-## it, ticking every physics frame on its own (also while the Warlock is downed: DoTs keep
-## burning like item DoTs and Ignite; ability effects only tick while their hero lives).
+## of Corruption, the Dread of Fear and (M5 talents) Agony. A child node of the Warlock
+## ([method of]) – freed with it, ticking every physics frame on its own (also while the
+## Warlock is downed: DoTs keep burning like item DoTs and Ignite; ability effects only tick
+## while their hero lives).
 ##
 ## Ticks are DoT damage – ProcSystem.deal_raw(..., &"dot"), so Demonic Pact boosts them, the
 ## Warlock gets the kill credit and the damage meter counts them. Every enemy carries at most
 ## one affliction of each kind from this Warlock; re-applying one refreshes it.
+## Agony (Curse of Agony, [method agonize]): every weapon hit of the Warlock curses its target
+## with a share of the hit's base amount as Shadow damage over a few seconds; a new hit rolls
+## the remaining damage into the refreshed curse (nothing is lost). Its ticks are damage
+## derived from a hit: deal_raw(..., target_bonus = false, &"dot") (talent_vocabulary §3.6).
+## When its host dies, Writhe in Agony splits the remaining curse between the nearest enemies
+## without one ([member Affliction.spread_targets]) – the total never grows.
+## Curse of Exhaustion ([method slow_pct], WarlockMastery's "warlock_afflictions" params):
+## every affliction slows its enemy when it starts and after each tick.
+## [signal afflicted_died] tells talents (Unstable Affliction) that an enemy died while it
+## carried at least one of this Warlock's afflictions (any killer).
 ## Corruption: when its enemy dies it jumps, with the time it had left, to the nearest
 ## uncorrupted enemies within its spread radius (spread_targets of them).
 ## Seed: when its host dies – or the seed ripens after its duration – it bursts: Shadow damage
@@ -22,19 +33,35 @@ extends Node
 signal seed_burst(center: Vector3, victims: int)
 ## A Corruption jumped from a corpse at [param from] to [param to].
 signal corruption_spread(from: Vector3, to: Enemy)
+## An Agony split from a corpse at [param from] onto [param to] (Writhe in Agony).
+signal agony_spread(from: Vector3, to: Enemy)
+## An enemy died (its [signal Enemy.died] – any killer) while it carried at least one
+## affliction of this Warlock; [param at] is where (y = 0). Once per death. A despawned enemy
+## (wave end, no died signal) emits nothing.
+signal afflicted_died(at: Vector3)
 
 const NODE_NAME := "WarlockAfflictions"
 const CORRUPTION := &"corruption"
 const SEED := &"seed"
 const DREAD := &"dread"
+## Curse of Agony (M5 talent): a share of every weapon hit over a few seconds.
+const AGONY := &"agony"
+## Every kind, in the order [method afflicted] checks them.
+const KINDS: Array[StringName] = [CORRUPTION, SEED, DREAD, AGONY]
 ## Seconds between damage ticks.
 const TICK := 0.5
 const EPSILON := 0.0001
-## A Corruption with less time left than this does not spread.
+## A Corruption / Agony with less time left than this does not spread.
 const MIN_SPREAD_LEFT := 0.5
-## Safety cap of afflictions per Warlock (new ones are refused beyond it).
-const MAX_AFFLICTIONS := 60
+## Safety cap of afflictions per Warlock (new ones are refused beyond it). 120: Agony lands
+## on every enemy the Warlock's weapon hits.
+const MAX_AFFLICTIONS := 120
+## Curse of Exhaustion: the slow lasts this much longer than a tick, so it never lapses
+## between two ticks.
+const SLOW_LINGER := 0.25
 const POOL_COLOR := Color(0.35, 0.8, 0.2, 0.32)
+## Writhe in Agony's beam (the dark crimson of the Agony marker).
+const AGONY_BEAM_COLOR := Color(0.85, 0.15, 0.3)
 
 
 class Affliction extends RefCounted:
@@ -55,8 +82,12 @@ class Affliction extends RefCounted:
 	var killed := false
 	## Damage dealt so far (tests, stats).
 	var dealt := 0.0
-	## Corruption: enemies it jumps to when its enemy dies, within spread_radius m; share of
-	## the damage that heals the Warlock (Siphon Life).
+	## ProcSystem.deal_raw's target_bonus of the ticks: true for spells built from the
+	## Warlock's stats, false for Agony (derived from a weapon hit – vocabulary §3.6).
+	var target_bonus := true
+	## Corruption / Agony: enemies it jumps to when its enemy dies, within spread_radius m
+	## (Agony splits its remaining damage between them); share of the damage that heals the
+	## Warlock (Siphon Life).
 	var spread_targets := 0
 	var spread_radius := 0.0
 	var heal_ratio := 0.0
@@ -82,6 +113,7 @@ class Affliction extends RefCounted:
 		a.rate = rate
 		a.duration = duration
 		a.left = duration
+		a.target_bonus = target_bonus
 		a.spread_targets = spread_targets
 		a.spread_radius = spread_radius
 		a.heal_ratio = heal_ratio
@@ -150,6 +182,28 @@ func dread(e: Enemy, rate: float, duration: float) -> Affliction:
 	return _start(DREAD, e, rate, duration)
 
 
+## Curse of Agony: [param total] Shadow damage (a share of a weapon hit's base amount) over
+## [param duration] seconds on [param e]. A running Agony takes the new total on top of the
+## damage it still owes and restarts its [param duration] (rate = (rate x left + total) /
+## duration – a refresh never loses damage). [param spread_targets] / [param spread_radius]
+## (m, Area Size included): Writhe in Agony. Ticks with target_bonus = false. Null when the
+## enemy is not alive, nothing is owed or the cap is reached.
+func agonize(e: Enemy, total: float, duration: float, spread_targets: int = 0,
+		spread_radius: float = 0.0) -> Affliction:
+	if total <= 0.0 or duration <= 0.0:
+		return null
+	var rate := total / duration
+	var running := get_affliction(AGONY, e)
+	if running != null and not running.done:
+		rate = (running.rate * maxf(0.0, running.left) + total) / duration
+	var a := _start(AGONY, e, rate, duration)
+	if a != null:
+		a.target_bonus = false
+		a.spread_targets = maxi(0, spread_targets)
+		a.spread_radius = maxf(0.0, spread_radius)
+	return a
+
+
 func _start(kind: StringName, e: Enemy, rate: float, duration: float) -> Affliction:
 	if not WarlockSpell.is_live(e) or duration <= 0.0:
 		return null
@@ -168,6 +222,7 @@ func _start(kind: StringName, e: Enemy, rate: float, duration: float) -> Afflict
 	a.left = duration
 	a.last_pos = e.global_position
 	_ensure_marker(a, e)
+	_slow(e)
 	return a
 
 
@@ -193,6 +248,28 @@ func count(kind: StringName = &"") -> int:
 ## Callable for WarlockSpell queries: enemies without an affliction of [param kind].
 func lacks(kind: StringName) -> Callable:
 	return func(e: Enemy) -> bool: return not has(kind, e)
+
+
+## True when [param e] carries any affliction of this Warlock (Corruption, Seed, Dread,
+## Agony) – one dictionary lookup per kind, no allocation (Dark Harvest).
+func afflicted(e: Node3D) -> bool:
+	if e == null or not is_instance_valid(e):
+		return false
+	var id := e.get_instance_id()
+	for kind in KINDS:
+		var index: Variant = _by_kind.get(kind)
+		if index != null and (index as Dictionary).has(id):
+			return true
+	return false
+
+
+## Curse of Exhaustion: % slow every affliction of this Warlock puts on its enemy (the
+## "slow" of WarlockMastery.affliction_params – pseudo id "warlock_afflictions"; 0 = none).
+func slow_pct() -> float:
+	if player == null or not is_instance_valid(player) or player.abilities == null:
+		return 0.0
+	var m := player.abilities.mastery as WarlockMastery
+	return m.affliction_slow() if m != null else 0.0
 
 
 ## Drops every affliction of [param kind] (&"" = all) without bursts or spreads (wave start /
@@ -242,7 +319,7 @@ func _step(a: Affliction, delta: float) -> void:
 	a.owed = 0.0
 	if amount > 0.0 and player.procs != null:
 		var hp_before := maxf(0.0, e.hp)
-		var dealt := player.procs.deal_raw(e, amount, a.school, true, &"dot")
+		var dealt := player.procs.deal_raw(e, amount, a.school, a.target_bonus, &"dot")
 		a.dealt += dealt
 		if a.heal_ratio > 0.0 and dealt > 0.0:
 			player.heal(minf(dealt, hp_before) * a.heal_ratio)
@@ -251,6 +328,7 @@ func _step(a: Affliction, delta: float) -> void:
 			a.last_pos = e.global_position
 		_host_gone(a, e if is_instance_valid(e) else null)
 		return
+	_slow(e)
 	if a.left <= EPSILON:
 		if a.kind == SEED:
 			_burst(a, e.global_position)
@@ -266,11 +344,14 @@ func _host_gone(a: Affliction, e: Enemy) -> void:
 		_end(a)
 
 
-## The enemy of [param a] died: Corruption spreads, a seed bursts.
+## The enemy of [param a] died: Corruption spreads, Agony splits (Writhe in Agony), a seed
+## bursts.
 func _host_died(a: Affliction) -> void:
 	match a.kind:
 		CORRUPTION:
 			_spread(a)
+		AGONY:
+			_split_agony(a)
 		SEED:
 			_burst(a, a.last_pos)
 	_end(a)
@@ -290,6 +371,31 @@ func _spread(a: Affliction) -> void:
 		spreads += 1
 		ProcVfx.beam(from, WarlockSpell.chest(t), WarlockSpell.SHADOW_COLOR)
 		corruption_spread.emit(a.last_pos, t)
+
+
+## Writhe in Agony: the curse of a dead host is split between the (up to) spread_targets
+## nearest enemies without Agony within spread_radius m of the corpse – each gets rate / n
+## for the time the host had left, so the remaining damage is shared, never copied (judge
+## B9: a copy multiplied an elite's rolled-up Agony with every death).
+func _split_agony(a: Affliction) -> void:
+	if a.spread_targets <= 0 or a.left <= MIN_SPREAD_LEFT or a.rate <= 0.0 or not is_inside_tree():
+		return
+	var targets := WarlockSpell.nearest_enemies(get_tree(), a.last_pos, a.spread_radius, a.spread_targets,
+			lacks(AGONY))
+	if targets.is_empty():
+		return
+	var share := a.rate / float(targets.size())
+	var from := a.last_pos + Vector3.UP * Enemy.BODY_CENTER_HEIGHT
+	for t in targets:
+		var b := _start(AGONY, t, share, a.left)
+		if b == null:
+			continue
+		b.target_bonus = false
+		b.spread_targets = a.spread_targets
+		b.spread_radius = a.spread_radius
+		spreads += 1
+		ProcVfx.beam(from, WarlockSpell.chest(t), AGONY_BEAM_COLOR)
+		agony_spread.emit(a.last_pos, t)
 
 
 func _burst(a: Affliction, center: Vector3) -> void:
@@ -344,13 +450,26 @@ func _watch(e: Enemy) -> void:
 		e.died.connect(_on_enemy_died)
 
 
-## Marks the afflictions on [param e] as killed (their host may be freed before the next tick).
+## Marks the afflictions on [param e] as killed (their host may be freed before the next tick)
+## and, when it carried any, emits [signal afflicted_died].
 func _on_enemy_died(e: Enemy, _killer_index: int) -> void:
 	var id := e.get_instance_id()
+	var any := false
 	for index: Dictionary in _by_kind.values():
 		var a: Affliction = index.get(id)
 		if a != null:
 			a.killed = true
+			any = true
+	if any:
+		var pos := e.global_position if e.is_inside_tree() else e.position
+		afflicted_died.emit(Vector3(pos.x, 0.0, pos.z))
+
+
+## Curse of Exhaustion on [param e] (nothing without the talent).
+func _slow(e: Enemy) -> void:
+	var pct := slow_pct()
+	if pct > 0.0:
+		e.apply_slow(pct, TICK + SLOW_LINGER)
 
 
 func _compact() -> void:
