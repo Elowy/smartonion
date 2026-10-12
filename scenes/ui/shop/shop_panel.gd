@@ -827,14 +827,15 @@ func _update_tooltips() -> void:
 			_tooltip_keys.erase(s.index)
 			continue
 		var compare := ItemTooltip.equipped_for_compare(o.item, equipment_of(s))
-		var key := "%d:%d:%d" % [o.item.uid, o.price, compare.uid if compare != null else 0]
+		var key := "%d:%d:%s" % [o.item.uid, o.price, ItemTooltip.compare_key(compare)]
 		if _tooltip_keys.get(s.index, "") != key:
 			_tooltip_keys[s.index] = key
 			tip.owner_tag = "P%d" % (s.index + 1)
 			tip.owner_color = s.color
 			tip.viewer_equipment = equipment_of(s)
 			tip.show_item(o.item, s.class_data, compare, o.price)
-			tip.reset_size()
+			# Measured now: layout_tooltips places it in this very frame.
+			tip.layout_now()
 		tip.visible = true
 	layout_tooltips()
 
@@ -880,6 +881,10 @@ func layout_tooltips() -> void:
 					break
 			if best_overlap <= 0.0:
 				break
+		if not best.has_area():
+			# Taller than the stall even at the smallest scale: at the stall's top, not the
+			# screen's corner.
+			best = Rect2(areas[0].position, raw * best_scale)
 		tip.scale = Vector2.ONE * best_scale
 		tip.position = best.position - global_position
 		placed.append(best)

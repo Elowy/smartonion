@@ -123,6 +123,38 @@ func show_item(p_item: ItemInstance, p_viewer: ClassData = null, p_compare: Item
 	visible = item != null
 
 
+## Lays the tooltip out now and shrinks it to its content, so a caller that places it in the
+## frame its content changed (ShopPanel.layout_tooltips) gets its real size. Without this the
+## wrapped lines still have the 40 px width they were created with until the containers sort at
+## the end of the frame – the tooltip measures several times its height. Containers top-down,
+## then each label's minimum size is refreshed (a label does not report a new width by itself).
+func layout_now() -> void:
+	reset_size()
+	_layout_tree(self)
+	reset_size()
+
+
+static func _layout_tree(node: Node) -> void:
+	if node is Container:
+		node.notification(Container.NOTIFICATION_SORT_CHILDREN)
+	for c in node.get_children():
+		if not c.is_queued_for_deletion():
+			_layout_tree(c)
+	if node is Label:
+		(node as Label).update_minimum_size()
+
+
+## Identifies the comparison item across calls: an EquippedPair is a new object every time
+## (equipped_for_compare), so it is known by its two parts.
+static func compare_key(p_compare: ItemInstance) -> String:
+	if p_compare == null:
+		return "0"
+	if p_compare is EquippedPair:
+		var parts := (p_compare as EquippedPair).parts
+		return "%d+%d" % [parts[0].uid, parts[1].uid]
+	return str(p_compare.uid)
+
+
 func set_owner_tag(tag: String, color: Color) -> void:
 	if tag == owner_tag and color == owner_color:
 		return

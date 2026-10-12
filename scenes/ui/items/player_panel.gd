@@ -1340,6 +1340,8 @@ func _update_tooltip() -> void:
 	tooltip.viewer_equipment = equipment()
 	tooltip.show_item(it, class_data(), compare)
 	if is_inside_tree():
+		# Measured now: placed with its real size in this frame (the shop reads its rect).
+		tooltip.layout_now()
 		_place_tooltip.call_deferred()
 
 
