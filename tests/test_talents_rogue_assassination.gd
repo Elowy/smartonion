@@ -348,3 +348,25 @@ func test_fan_without_talents_draws_one_crit_roll_per_knife() -> void:
 		check(k.envenom_pct == 0.0 and k.slow_pct == 0.0 and k.envenomed.is_empty(), "no talent riders")
 	check_eq(crits, expected, "the same crits")
 	check(not RogueFanOfKnives.of(p).has_cold_ring(), "no ring")
+
+
+# --- Bot ---------------------------------------------------------------------------------------
+
+func test_assassination_bot_path_reaches_the_capstone_at_13() -> void:
+	var p := _rogue()
+	var path: Array[StringName] = []
+	for i in 30:
+		var t := TalentBot.next_talent(p, 0)
+		if t == null or not p.talents.add(t.id):
+			break
+		path.append(t.id)
+	check_eq(path.size(), 22, "the whole tree")
+	check_eq(path[6], &"rogue_assassination_envenom", "the modifier is point 7")
+	check_eq(path[12], &"rogue_assassination_cold_blood", "the capstone is point 13")
+	check_eq(path.slice(7, 12), [&"rogue_assassination_seal_fate", &"rogue_assassination_seal_fate",
+			&"rogue_assassination_seal_fate", &"rogue_assassination_coup_de_grace",
+			&"rogue_assassination_coup_de_grace"] as Array[StringName], "Seal Fate 3, Coup de Grace 2")
+	check_eq(path[21], &"rogue_assassination_master_poisoner", "Master Poisoner last")
+	var q := _rogue(1, Vector3(4, 0, 0))
+	check_eq(TalentBot.spend_all(q, 0), 22, "spend_all: the same 22 points")
+	check_eq(q.talents.ranks, p.talents.ranks, "same ranks")
