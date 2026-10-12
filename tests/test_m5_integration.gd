@@ -5,7 +5,9 @@ extends TestCase
 ## procs fire on real weapon hits, elite and Loot Goblin drops travelling from the kill through
 ## the wave end into the Intermission's loot roll, the wallet's spend log covering every spender,
 ## talents + set bonuses + item ability_mods merging in AbilityRunner.params_for, and a talent
-## reset refunding everything and logging the payment.
+## reset refunding everything and logging the payment. Also the integrator's follow-ups: the
+## shop's and the loot roll's upgrade badges count set bonuses (the viewer's equipment), and the
+## Loot Goblin flees at walk_speed() (per-enemy speed multipliers apply).
 
 const PFakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -234,6 +236,38 @@ func test_mage_set_bonus_proc_fires_on_blink_and_leaves_with_the_pieces() -> voi
 	check(m.bonuses.effects_of(PlayerBonuses.SOURCE_SETS).is_empty(), "nothing left in the engine")
 
 
+func test_upgrade_badges_in_the_shop_and_the_loot_roll_count_set_bonuses() -> void:
+	var slot := MarketFakes.bot_with_hero(world, "test:a", &"warrior")
+	var hero := slot.player as Player
+	_wear(hero, _piece(&"warrior", "head"))
+	# Worn: the same shoulders without the set and 15% stronger; offered: the set's shoulders.
+	var worn := _piece(&"warrior", "shoulders")
+	worn.set_id = &""
+	worn.display_name = "Gilded Pauldrons"
+	for k in worn.stats:
+		worn.stats[k] *= 1.15
+	_wear(hero, worn)
+	var offered := _piece(&"warrior", "shoulders")
+	var current := ItemTooltip.equipped_for_compare(offered, hero.equipment)
+	check(current == worn, "compared with the worn shoulders")
+	check_eq(ItemTooltip.upgrade_direction(offered, current, slot.class_data), -1, "on its stats alone: worse")
+	check_eq(ItemTooltip.upgrade_direction(offered, current, slot.class_data, hero.equipment), 1,
+		"completing the 2-piece bonus: an upgrade (what bots Need and buy)")
+	var slots := PlayerManager.get_slots()
+	var card := ShopOfferCard.create(0)
+	_nodes.append(card)
+	var o := Shop.Offer.new()
+	o.item = offered
+	o.price = 50
+	card.set_offer(o, slots)
+	check_eq(card._usable.get(slot.index, 0), 2, "the stall's pip shows the upgrade arrow")
+	var loot := LootRollScreen.create()
+	_nodes.append(loot)
+	tree.root.add_child(loot)
+	loot.open([offered] as Array[ItemInstance], slots)
+	check_eq(loot._upgrade_direction(slot), 1, "the loot roll's chip shows it too")
+
+
 # --- Forged Legendaries ------------------------------------------------------------------------
 
 func test_a_forged_knell_of_stone_rings_every_5th_hit_for_80_percent_of_it() -> void:
@@ -245,10 +279,13 @@ func test_a_forged_knell_of_stone_rings_every_5th_hit_for_80_percent_of_it() -> 
 	var near := PFakes.spawn_enemy(world, Vector3(2.7, 0.0, 0.0))  # 1.5 m from the target
 	var far := PFakes.spawn_enemy(world, Vector3(1.2, 0.0, 6.0))
 	EnemyGrid.mark_dirty()
+	w.damage_mults[&"m5_integration"] = 1.5  # an outgoing multiplier: it must apply only once
 	var base := 30.0
 	for i in 4:
 		_hit(w, target, base)
 	check_eq(target.fake_hits(), 4, "hits 1-4: the weapon only")
+	check_near(target.fake_damage_log[0], base * w.outgoing_damage_mult(target, &"physical", &"weapon"), 0.001,
+		"the weapon hit carries the multiplier")
 	check_eq(near.fake_hits() + target.fake_stun_count, 0, "nothing rang yet")
 	_hit(w, target, base)
 	check_eq(target.fake_hits(), 6, "hit 5: the weapon + the toll")
@@ -356,6 +393,17 @@ func test_elite_and_goblin_drops_reach_the_loot_roll() -> void:
 		_step_intermission(LootRollScreen.RESULT_TIME + 0.01)
 	check_eq(RunState.gold - gold, greed, "both sold into the shared wallet")
 	check_eq(screen.phase, Intermission.Phase.MARKET, "then the market")
+
+
+func test_the_loot_goblin_runs_at_its_walk_speed() -> void:
+	EFakes.spawn_player(world, Vector3(-6.0, 0.0, 0.0))
+	var g := LootGoblin.create(LootGoblin.goblin_data(), 8)
+	EFakes.arena_of(world).entities.add_child(g)
+	g.global_position = Vector3.ZERO
+	g.speed_mult = 0.5  # a per-enemy speed multiplier (like the elite affixes use)
+	EFakes.step(g, 0.6)
+	check_near(g.walk_speed(), g.move_speed * 0.5, 0.0001, "walk_speed includes the multiplier")
+	check_near(g._move_velocity.length(), g.walk_speed(), 0.05, "the flight steers at walk_speed()")
 
 
 # --- The spend log covers every spender ---------------------------------------------------------
