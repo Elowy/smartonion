@@ -378,3 +378,59 @@ func test_shop_tooltips_keep_clear_of_a_panel_tooltip_in_the_band() -> void:
 	check(not p3.outside_tooltip_rect().has_area(), "P3's panel tooltip is gone")
 	check(band.grow(1.0).encloses(_rect(p1_tip)), "P1's shop tooltip is back in the band")
 	finished.emit()
+
+
+## The make-way geometry on its own (PlayerPanel._keep_tooltip_clear, a bottom-left panel at
+## 1920 x 1080 under a top tooltip on the same half): above the selected icon at its size, or
+## shrunk for that down to MIN_MOVED_TOOLTIP_FIT; below the icon when only that fits; over the
+## icon at its size when neither does; and – should the other half be no clearer (an obstacle
+## wider than half the panel) – on its own half, shrunk into the room below the obstacle.
+func test_a_tooltip_makes_way_above_below_or_over_the_icon() -> void:
+	await tree.process_frame
+	var gap := PlayerPanel.TOOLTIP_NEIGHBOUR_GAP
+	var view := Rect2(0, 0, 1920, 1080)
+	var panel_rect := Rect2(14, 666, 580, 400)
+	var span := Vector2(422, 1062)
+	var top_tip := Rect2(22, 14, 268, 600)
+	var right_half := panel_rect.get_center().x
+	var cases: Array[Dictionary] = [
+		# tooltip height at the plan's fit, icon y, what happens.
+		{"h": 450.0, "icon_y": 937.0, "where": "above", "fit": 0.9},
+		{"h": 560.0, "icon_y": 937.0, "where": "above", "fit": 0.9 * (937.0 - 6.0 - 422.0) / 560.0},
+		{"h": 450.0, "icon_y": 560.0, "where": "below", "fit": 0.9},
+		{"h": 640.0, "icon_y": 937.0, "where": "over", "fit": 0.9},
+	]
+	for c in cases:
+		var h: float = c["h"]
+		var icon := Rect2(328, float(c["icon_y"]), 43, 43)
+		var plan := PlayerPanel.TooltipPlan.new()
+		plan.fit = 0.9
+		plan.rect = Rect2(22, 1062 - h, 268, h)
+		PlayerPanel._keep_tooltip_clear(plan, top_tip, panel_rect, icon, span, 8.3, view)
+		var r := plan.rect
+		var what := "%.0f px tall, icon at %.0f" % [h, icon.position.y]
+		check(r.position.x > right_half, "%s: on the right half %s" % [what, r])
+		check(not r.intersects(top_tip.grow(gap)), "%s: clear of the top tooltip" % what)
+		check(r.position.y >= span.x - 0.01 and r.end.y <= span.y + 0.01, "%s: within the column's room %s" % [what, r])
+		check_near(plan.fit, float(c["fit"]), 0.0001, "%s: fit" % what)
+		check(plan.fit >= PlayerPanel.MIN_MOVED_TOOLTIP_FIT, "%s: not below the floor" % what)
+		check_near(r.size.x / plan.fit, 268.0 / 0.9, 0.01, "%s: scaled as a whole" % what)
+		match String(c["where"]):
+			"above":
+				check_near(r.end.y, icon.position.y - 6.0, 0.01, "%s: just above the icon" % what)
+			"below":
+				check_near(r.position.y, icon.end.y + 6.0, 0.01, "%s: just below the icon" % what)
+			"over":
+				check_near(r.end.y, span.y, 0.01, "%s: from the panel's bottom edge, over the icon" % what)
+				check(r.intersects(icon), "%s: covers the icon" % what)
+	# An obstacle as wide as the panel: the other half is no clearer.
+	var wide := Rect2(22, 14, 560, 600)
+	var plan := PlayerPanel.TooltipPlan.new()
+	plan.fit = 0.9
+	plan.rect = Rect2(22, 1062 - 560, 268, 560)
+	PlayerPanel._keep_tooltip_clear(plan, wide, panel_rect, Rect2(328, 937, 43, 43), span, 8.3, view)
+	check_near(plan.rect.position.x, 22.0, 0.01, "stays on its half")
+	check_near(plan.rect.position.y, wide.end.y + gap, 0.01, "starts the gap below the obstacle")
+	check_near(plan.rect.end.y, span.y, 0.01, "ends at the panel's bottom edge")
+	check_near(plan.fit, 0.9 * (span.y - wide.end.y - gap) / 560.0, 0.0001, "shrunk into the room")
+	finished.emit()

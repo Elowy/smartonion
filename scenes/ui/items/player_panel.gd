@@ -1589,7 +1589,7 @@ func _tooltip_plan(keep_clear: bool) -> TooltipPlan:
 ## to MIN_MOVED_TOOLTIP_FIT, so the icon stays in sight; when neither fits, at its size from the
 ## panel's outer edge as before (over the icon). Only if the other half were no clearer (a
 ## tooltip wider than half the panel) does it stay and shrink into the room beside the obstacle.
-func _keep_tooltip_clear(plan: TooltipPlan, obstacle: Rect2, panel_rect: Rect2, icon_rect: Rect2, span: Vector2, gap: float, view: Rect2) -> void:
+static func _keep_tooltip_clear(plan: TooltipPlan, obstacle: Rect2, panel_rect: Rect2, icon_rect: Rect2, span: Vector2, gap: float, view: Rect2) -> void:
 	var r := plan.rect
 	var tip_h := r.size.y / plan.fit
 	var above := minf(plan.fit, (icon_rect.position.y - 6.0 - span.x) / tip_h)
