@@ -250,6 +250,37 @@ func test_the_tab_fits_the_panel() -> void:
 	finished.emit()
 
 
+## The detail's one-line kind ("Talent · Tier 2", "Modifier · Rain of Fire", "Capstone") fits
+## the column whole for every shipped talent – the tree's name is on the prompt row instead.
+func test_every_kind_line_fits_the_detail_column() -> void:
+	_async = true
+	var slot := _hero()
+	var panel := _panel(slot)
+	panel.size = PlayerPanel.DESIGN_SIZE
+	var tab := panel.talents
+	_select(panel, "arms", "t3m")
+	await tree.process_frame
+	await tree.process_frame
+	var label := tab.detail_kind
+	var width := label.size.x
+	check(width > 100.0, "laid out: %.1f" % width)
+	var font := label.get_theme_font(&"font")
+	var fs := label.get_theme_font_size(&"font_size")
+	var count := 0
+	for class_id: StringName in Db.classes:
+		for tree_data in Db.talent_trees_for(class_id):
+			for t in tree_data.talents:
+				var text := TalentTab.kind_text(t)
+				var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+				check(w <= width, "%s: '%s' is %.1f of %.1f px" % [t.id, text, w, width])
+				check(not text.begins_with(tree_data.display_name), "%s: no tree name in '%s'" % [t.id, text])
+				count += 1
+	check_eq(count, 135, "15 trees x 9 talents")
+	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t5"))), "Capstone", "capstone")
+	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t2a"))), "Talent · Tier 2", "talent")
+	finished.emit()
+
+
 func test_long_descriptions_shrink_before_they_are_cut() -> void:
 	_async = true
 	var slot := _hero()
@@ -555,7 +586,7 @@ func test_modifier_of_an_unlearned_ability_says_so() -> void:
 	var panel := _panel(slot)
 	var tab := panel.talents
 	_select(panel, "arms", "t3m")
-	check_eq(tab.detail_kind.text, "Arms modifier · Whirlwind", "kind line names the ability")
+	check_eq(tab.detail_kind.text, "Modifier · Whirlwind", "kind line names the ability")
 	check_eq(tab.detail_hint.text, "", "Whirlwind is a core ability: learned")
 	_select(panel, "fury", "t3m")
 	check_eq(tab.detail_hint.text, "You haven't learned Execute", "the hint (GDD 7.2)")
