@@ -168,6 +168,7 @@ func spawn_goblin() -> LootGoblin:
 	parent.add_child(g)
 	goblin = g
 	g.escaped.connect(_on_goblin_escaped)
+	g.tree_exiting.connect(_on_goblin_left.bind(g))
 	RunState.goblins_spawned += 1
 	Vfx.explosion(pos + Vector3.UP * 0.3, 1.0, LootGoblin.COIN_COLOR)
 	Vfx.pickup_sparkle(pos + Vector3.UP * 0.9)
@@ -189,6 +190,13 @@ func _on_goblin_escaped(g: LootGoblin) -> void:
 	if g == goblin:
 		goblin = null
 	announced.emit(ESCAPED_TEXT, ESCAPED_COLOR)
+
+
+## The goblin left the tree (killed, escaped, despawned by the director's stop() – also a stop
+## without wave_cleared, such as a wipe): forget it, so [member goblin] never holds a freed node.
+func _on_goblin_left(g: LootGoblin) -> void:
+	if g == goblin:
+		goblin = null
 
 
 ## The arena's entity root (the director's arena, else Arena.current), else null.

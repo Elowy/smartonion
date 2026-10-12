@@ -281,6 +281,27 @@ func test_wave_end_cancels_the_spawn_and_despawns_the_goblin() -> void:
 	check_eq(_gold_on_ground(), 0, "no gold")
 
 
+func test_spawner_forgets_a_goblin_that_left() -> void:
+	_make_director()
+	director.start_wave(3)
+	var g := spawner.spawn_goblin()
+	check(g != null and spawner.goblin == g, "tracked")
+	if g == null:
+		return
+	g.take_damage(g.hp + 1.0)
+	check(g.is_dead(), "killed")
+	_arena().entities.remove_child(g)  # what its queued deletion does at the frame end
+	check(spawner.goblin == null, "a killed goblin is forgotten")
+	g.free()
+	var h := spawner.spawn_goblin()
+	check(spawner.goblin == h, "the next one is tracked")
+	director.stop()  # a wipe stops the director without wave_cleared
+	check(h.is_dead(), "despawned")
+	_arena().entities.remove_child(h)
+	check(spawner.goblin == null, "so is one the director removed")
+	h.free()
+
+
 # --- LootGoblin: behaviour -------------------------------------------------------------
 
 func test_goblin_flees_a_player_standing_still() -> void:
