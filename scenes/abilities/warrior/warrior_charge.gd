@@ -16,7 +16,18 @@ extends AbilityEffect
 ##   impact_pct     % weapon damage dealt to every enemy stunned by the charge (Rank V
 ##                  "Warbringer"; times "power")
 ##   rage_gain      Rage gained on landing (Rank V "Furious Charge"; times "power")
+##   taunt          seconds the stunned enemies stay taunted to the hero after their stun
+##                  (0 = no taunt; Protection talent "Challenging Charge" adds 4). Not
+##                  "power"-scaled; ignores stun resistance (bosses can be taunted).
+##   shield_per_enemy  absorb shield, % of the hero's Max HP per enemy stunned (0 = none;
+##                  Challenging Charge adds 3; not "power"-scaled) ...
+##   shield_max     ... at most this % of Max HP in the shield (a second Charge tops it up to
+##                  the cap, not past it) ...
+##   shield_duration  ... for this many seconds (ProcSystem shield source &"challenging_charge")
 ## Rank III: +1 charge (charges_add) – two Charges in a row.
+##
+## Challenging Charge taunts are released (Enemy.release_taunt – only taunts still aimed at
+## this hero) when the hero goes down, at wave start / end and when Charge is forgotten.
 
 ## Key of the temporary damage multiplier in Player.damage_mults.
 const BUFF_KEY := &"charge"
@@ -43,6 +54,12 @@ const AUTO_FLEE_ENEMIES := 2
 ## How well the move direction must point at / away from the enemy (cosine).
 const AUTO_ALIGNMENT := 0.7
 const SPARK_COLOR := Color(1.0, 0.8, 0.45)
+## ProcSystem shield source of Challenging Charge.
+const SHIELD_SOURCE := &"challenging_charge"
+const CHALLENGE_TEXT := "Challenge!"
+const CHALLENGE_COLOR := Color(1.0, 0.55, 0.15)
+## Taunt sparks shown per Charge at most.
+const MAX_TAUNT_SPARKS := 6
 
 var _player: Player
 var _dashing := false
@@ -56,9 +73,25 @@ var _buff_duration := 0.0
 var _buff_left := 0.0
 var _impact_pct := 0.0
 var _rage_gain := 0.0
+var _taunt := 0.0
+var _shield_pct := 0.0
+var _shield_max := 0.0
+var _shield_duration := 0.0
 var _school: StringName = &"physical"
 var _start := Vector3.ZERO
 var _hit: Dictionary[int, Enemy] = {}
+## Challenging Charge: instance id -> enemy taunted by this hero (values may be freed: untyped).
+var _taunted: Dictionary = {}
+
+
+## Enemies Challenging Charge taunted that are still taunted to this hero (tests, UI).
+func taunted() -> Array[Enemy]:
+	var out: Array[Enemy] = []
+	for id: int in _taunted:
+		var v: Variant = _taunted[id]
+		if is_instance_valid(v) and (v as Enemy).taunt_target == _player and (v as Enemy).is_taunted():
+			out.append(v as Enemy)
+	return out
 
 
 func is_dashing() -> bool:
@@ -126,8 +159,13 @@ func cast(ctx: AbilityContext) -> bool:
 	_buff_duration = ctx.num("buff_duration")
 	_impact_pct = ctx.num("impact_pct") * power
 	_rage_gain = ctx.num("rage_gain") * power
+	_taunt = maxf(0.0, ctx.num("taunt"))
+	_shield_pct = maxf(0.0, ctx.num("shield_per_enemy"))
+	_shield_max = maxf(0.0, ctx.num("shield_max", 15.0))
+	_shield_duration = maxf(0.0, ctx.num("shield_duration", 5.0))
 	_school = ctx.ability.school
 	_hit.clear()
+	_prune_taunted()
 	_dashing = true
 	if not player.downed_changed.is_connected(_on_downed_changed):
 		player.downed_changed.connect(_on_downed_changed)
@@ -187,6 +225,7 @@ func _arrive(player: Player) -> void:
 	for e in WarriorKit.enemies_within(player, _stun_radius):
 		victims[e.get_instance_id()] = e
 	var impact := WarriorKit.weapon_damage(player) * _impact_pct / 100.0
+	var stunned := 0
 	for id in victims:
 		# (An enemy run over earlier may have died and been freed meanwhile.)
 		var v: Variant = victims[id]
@@ -195,8 +234,10 @@ func _arrive(player: Player) -> void:
 		var e := v as Enemy
 		if not e.is_dead():
 			e.apply_stun(_stun)
+			stunned += 1
 			if impact > 0.0 and player.procs != null:
 				player.procs.deal_raw(e, impact, _school, true, &"ability")
+	_challenge(player, victims, stunned)
 	_hit.clear()
 	WarriorChargeVfx.spawn(_start, player.global_position, _stun_radius)
 	if _buff_damage > 0.0 and _buff_duration > 0.0:
@@ -220,6 +261,58 @@ func _stop() -> void:
 	_dashing = false
 	_hit.clear()
 	_clear_buff()
+	_release_taunts()
+
+
+## Challenging Charge on landing: the living victims ([param count] were stunned) are taunted
+## to the hero for the stun + taunt seconds, and the hero gains the absorb shield.
+func _challenge(player: Player, victims: Dictionary[int, Enemy], count: int) -> void:
+	if count <= 0 or (_taunt <= 0.0 and _shield_pct <= 0.0):
+		return
+	var shown := player.is_inside_tree()
+	if _taunt > 0.0:
+		var sparks := 0
+		for id in victims:
+			var v: Variant = victims[id]
+			if not is_instance_valid(v) or (v as Enemy).is_dead():
+				continue
+			var e := v as Enemy
+			e.apply_taunt(player, _stun + _taunt)
+			_taunted[id] = e
+			if shown and sparks < MAX_TAUNT_SPARKS and e.is_inside_tree():
+				sparks += 1
+				Vfx.hit_spark(e.global_position + Vector3.UP * (WarriorSpin.SPARK_HEIGHT + 0.6), CHALLENGE_COLOR)
+	if _shield_pct > 0.0 and player.procs != null:
+		var max_hp := player.max_hp()
+		var room := max_hp * _shield_max / 100.0 - player.procs.shield_of(SHIELD_SOURCE)
+		var amount := minf(max_hp * float(count) * _shield_pct / 100.0, room)
+		if amount > 0.0:
+			player.procs.add_shield(amount, _shield_duration, SHIELD_SOURCE)
+			if shown:
+				Vfx.explosion(player.global_position + Vector3.UP * 0.1, 1.2, ProcSystem.SHIELD_COLOR)
+	WarriorKit.shout_text(player, CHALLENGE_TEXT, CHALLENGE_COLOR)
+
+
+## Ends every Challenging Charge taunt still aimed at this hero (another hero's taunt stays).
+func _release_taunts() -> void:
+	if _taunted.is_empty():
+		return
+	for id: int in _taunted:
+		var v: Variant = _taunted[id]
+		if is_instance_valid(v) and is_instance_valid(_player):
+			(v as Enemy).release_taunt(_player)
+	_taunted.clear()
+
+
+## Forgets taunted enemies that are gone or no longer taunted to this hero.
+func _prune_taunted() -> void:
+	if _taunted.is_empty():
+		return
+	for id: int in _taunted.keys():
+		var v: Variant = _taunted[id]
+		if not is_instance_valid(v) or (v as Enemy).is_dead() or (v as Enemy).taunt_target != _player \
+				or (v as Enemy).taunt_left <= 0.0:
+			_taunted.erase(id)
 
 
 func _clear_buff() -> void:

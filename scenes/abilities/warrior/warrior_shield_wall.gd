@@ -45,6 +45,12 @@ func time_left() -> float:
 	return maxf(0.0, _left)
 
 
+## True while a wall with the Rank V "Last Stand" spec stands: its death guard would save a
+## lethal hit (Protection's Unbreakable capstone defers to it and stays unused).
+func guards_lethal() -> bool:
+	return _left > 0.0 and _last_stand
+
+
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player
 	if p == null or not p.is_inside_tree() or is_active():

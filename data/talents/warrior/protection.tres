@@ -1,0 +1,257 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_toughness"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_toughness"
+display_name = "Toughness"
+description = "Increases your Armor by {armor}."
+values = {
+"armor": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"armor": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shield_specialization"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_shield_specialization"
+display_name = "Shield Specialization"
+description = "While you wield a shield, your chance to block is increased by {block}% and your blocks absorb {value}% more damage."
+values = {
+"block": 3.0,
+"value": 10.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"block_value"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"requires": {
+"weapon": "shield"
+},
+"stats": {
+"block_chance": 3.0,
+"block_value": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_revenge"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_revenge"
+display_name = "Revenge"
+description = "Increases your chance to parry melee attacks by {parry}%. When you block or dodge an attack, you have a {chance}% chance to strike back at once."
+values = {
+"chance": 15.0,
+"parry": 2.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"parry"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"parry": 2.0
+}
+}, {
+"kind": "proc",
+"proc": {
+"chance": 15.0,
+"count": 1,
+"effect": "extra_attack",
+"icd": 0.5,
+"label": "",
+"trigger": "on_block"
+},
+"scale": ["chance"]
+}, {
+"kind": "proc",
+"proc": {
+"chance": 15.0,
+"count": 1,
+"effect": "extra_attack",
+"icd": 0.5,
+"label": "",
+"trigger": "on_dodge"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_defiance"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_defiance"
+display_name = "Defiance"
+description = "Taking damage generates {rage} more Rage, and your Rage decays {decay} less per second out of combat."
+values = {
+"decay": 1.0,
+"rage": 2.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"decay_per_second_add": -1.0,
+"gain_on_damage_taken_add": 2.0,
+"kind": "resource",
+"resource": "rage"
+}])
+
+[sub_resource type="Resource" id="Resource_vitality"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_vitality"
+display_name = "Vitality"
+description = "Increases your Stamina by {stamina} and your Strength by {strength}."
+values = {
+"stamina": 4.0,
+"strength": 1.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"stamina"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"stamina": 4.0,
+"strength": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_challenging_charge"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_challenging_charge"
+display_name = "Challenging Charge"
+description = "Enemies stunned by Charge are taunted to you for {taunt} sec after the stun, and you gain an absorb shield of {shield}% of your maximum health per enemy stunned (up to {max}%) for {duration} sec."
+values = {
+"duration": 5.0,
+"max": 15.0,
+"shield": 3.0,
+"taunt": 4.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"charge"
+icon = &"charge"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "charge"
+},
+"mods": {
+"shield_per_enemy_add": 3.0,
+"taunt_add": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shield_mastery"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_shield_mastery"
+display_name = "Shield Mastery"
+description = "While you wield a shield, you take {pct}% less damage."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warrior_protection_shield_specialization"
+icon = &"shield_wall"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -4.0,
+"requires": {
+"weapon": "shield"
+}
+}])
+
+[sub_resource type="Resource" id="Resource_blood_and_thunder"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_blood_and_thunder"
+display_name = "Blood and Thunder"
+description = "Whirlwind and Thunder Clap are {pct}% stronger, and Whirlwind slows the enemies it hits by {slow}% for {slow_duration_fixed} sec."
+values = {
+"pct": 5.0,
+"slow": 10.0,
+"slow_duration_fixed": 1.5
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"thunder_clap"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"ids": ["whirlwind", "thunder_clap"]
+},
+"mods": {
+"power_pct": 5.0
+}
+}, {
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"slow_add": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_unbreakable"]
+script = ExtResource("2_talent")
+id = &"warrior_protection_unbreakable"
+display_name = "Unbreakable"
+description = "Once per wave, a hit that would bring you down leaves you standing: +{self_pct}% maximum health for {duration} sec, and you are healed by as much. Allies within {radius} m gain +{ally_pct}% the same way."
+values = {
+"ally_pct": 15.0,
+"duration": 10.0,
+"radius": 8.0,
+"self_pct": 30.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"ally_max_hp_pct": 15.0,
+"ally_radius": 8.0,
+"duration": 10.0,
+"invulnerable": 1.0,
+"max_hp_pct": 30.0
+},
+"script": "res://scenes/talents/warrior/protection_unbreakable.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warrior_protection"
+class_id = &"warrior"
+display_name = "Protection"
+index = 2
+description = "Shield, armour and taunts: the wall your allies stand behind."
+icon = &"shield_wall"
+color = Color(0.45, 0.6, 0.85, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_toughness"), SubResource("Resource_shield_specialization"), SubResource("Resource_revenge"), SubResource("Resource_defiance"), SubResource("Resource_vitality"), SubResource("Resource_challenging_charge"), SubResource("Resource_shield_mastery"), SubResource("Resource_blood_and_thunder"), SubResource("Resource_unbreakable")])
