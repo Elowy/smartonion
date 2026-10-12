@@ -221,7 +221,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warrior_protection_unbreakable"
 display_name = "Unbreakable"
-description = "Once per wave, a hit that would bring you down leaves you standing instead: for {duration} sec your maximum health is increased by {self_pct}% and you are healed by that much, and allies within {radius} m gain {ally_pct}% maximum health the same way."
+description = "Once per wave, a hit that would bring you down leaves you standing: +{self_pct}% maximum health for {duration} sec, and you are healed by as much. Allies within {radius} m gain +{ally_pct}% the same way."
 values = {
 "ally_pct": 15.0,
 "duration": 10.0,
