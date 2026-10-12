@@ -268,7 +268,8 @@ static func item_score(p_item: ItemInstance, p_viewer: ClassData) -> float:
 ## tier sets count (SetBonuses.bonus_change): an item that would complete a set bonus is an
 ## upgrade unless its score is more than SET_UPGRADE_TOLERANCE below the replaced item's, one
 ## that would break an active bonus is worse unless the replaced piece's score is more than
-## SET_UPGRADE_TOLERANCE below its own.
+## SET_UPGRADE_TOLERANCE below its own. The backpack pieces of the same sets count as worn
+## ([method set_lookahead]), so a piece that makes the next threshold reachable counts too.
 static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_viewer: ClassData,
 		equipment: Equipment = null) -> int:
 	if p_item == null:
@@ -285,7 +286,8 @@ static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_vi
 		var displaced: Array[ItemInstance] = [equipped]
 		if equipped is EquippedPair:
 			displaced.assign((equipped as EquippedPair).parts)
-		var change := SetBonuses.bonus_change(p_item, displaced, equipment)
+		var lookahead := set_lookahead(p_item, displaced, equipment, p_viewer)
+		var change := SetBonuses.bonus_change(p_item, displaced, equipment, lookahead)
 		if change > 0 and mine >= theirs * (1.0 - SET_UPGRADE_TOLERANCE):
 			return 1
 		if change < 0 and theirs >= mine * (1.0 - SET_UPGRADE_TOLERANCE):
@@ -296,6 +298,46 @@ static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_vi
 	if diff < -UPGRADE_THRESHOLD:
 		return -1
 	return 0
+
+
+## The backpack set pieces [method upgrade_direction] counts as worn when it weighs
+## [param p_item] against [param displaced] (SetBonuses.bonus_change's lookahead): pieces of
+## [param p_item]'s set or of a displaced piece's set that [param equipment] can equip into
+## other slots (one piece per slot, backpack order), each going where no set piece is worn and
+## scoring at most SET_UPGRADE_TOLERANCE below what it would replace (equipped_for_compare;
+## an empty slot always qualifies). Empty when no set is involved.
+static func set_lookahead(p_item: ItemInstance, displaced: Array[ItemInstance], equipment: Equipment,
+		p_viewer: ClassData) -> Array[ItemInstance]:
+	var out: Array[ItemInstance] = []
+	if p_item == null or equipment == null:
+		return out
+	var sets: Array[StringName] = []
+	if p_item.set_id != &"":
+		sets.append(p_item.set_id)
+	for d in displaced:
+		if d != null and d.set_id != &"" and d.set_id not in sets:
+			sets.append(d.set_id)
+	if sets.is_empty():
+		return out
+	var taken: Array[Items.EquipSlot] = []
+	taken.append_array(equipment.target_slots(p_item))
+	for piece in equipment.backpack:
+		if piece == null or piece == p_item or piece.set_id not in sets or not equipment.can_equip(piece):
+			continue
+		var targets := equipment.target_slots(piece)
+		var clash := false
+		for t in targets:
+			if t in taken:
+				clash = true
+		if clash:
+			continue
+		var there := equipped_for_compare(piece, equipment)
+		if there != null and (there.set_id != &"" \
+				or item_score(piece, p_viewer) < item_score(there, p_viewer) * (1.0 - SET_UPGRADE_TOLERANCE)):
+			continue
+		taken.append_array(targets)
+		out.append(piece)
+	return out
 
 
 ## Whether equipping [param p_item] in place of [param equipped] would leave the hero without

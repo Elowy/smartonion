@@ -321,6 +321,29 @@ func test_bonus_change_counts_thresholds() -> void:
 	check_eq(SetBonuses.bonus_change(piece(&"paladin", "hands"), [] as Array[ItemInstance], null), 0, "no equipment")
 
 
+## The lookahead (ItemTooltip.set_lookahead): reachable backpack pieces count as worn on both
+## sides, so the item gets its own share of the bonuses within reach.
+func test_bonus_change_looks_ahead_to_reachable_pieces() -> void:
+	var eq := wearing(&"paladin", ["head", "chest"])
+	var legs := piece(&"paladin", "legs")
+	var hands := piece(&"paladin", "hands")
+	var none: Array[ItemInstance] = []
+	check_eq(SetBonuses.bonus_change(legs, none, eq), 0, "3rd piece alone: no threshold")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "with the 4th piece reachable: +1")
+	check_eq(SetBonuses.bonus_change(hands, none, eq, [legs] as Array[ItemInstance]), 1, "and the other way round")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [legs, hands] as Array[ItemInstance]), 1, "the item itself in the lookahead is skipped")
+	var head := eq.get_item(Items.EquipSlot.HEAD)
+	check_eq(SetBonuses.bonus_change(piece(&"paladin", "head"), [head] as Array[ItemInstance], eq, [hands] as Array[ItemInstance]), 0,
+		"a duplicate gains nothing from the backpack")
+	var plain_legs := ItemInstance.new()
+	plain_legs.slot_type = Items.SlotType.LEGS
+	plain_legs.armor_type = ClassData.ArmorType.PLATE
+	eq.slots[Items.EquipSlot.LEGS] = legs
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq), 0, "3 -> 2 pieces: still active")
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq, [hands] as Array[ItemInstance]), -1,
+		"but it pushes the reachable 4-piece away: -1")
+
+
 # --- Player: entries reach the bonus engine ----------------------------------------------------
 
 func test_apply_equipment_hands_the_entries_to_player_bonuses() -> void:

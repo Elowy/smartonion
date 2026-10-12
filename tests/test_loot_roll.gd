@@ -325,6 +325,45 @@ func test_bot_needs_a_set_piece_that_completes_a_bonus() -> void:
 	check_eq(LootRoll.bot_choice(slots[1], hands), LootRoll.Choice.GREED, "another class's piece -> Greed")
 
 
+## A plain piece for [param set_item]'s slot with its stats raised by [param factor].
+static func _plain_like(set_item: ItemInstance, factor: float) -> ItemInstance:
+	var stats: Dictionary = {}
+	for stat: StringName in set_item.stats:
+		stats[stat] = set_item.stats[stat] * factor
+	return _gear(set_item.item_level, set_item.armor_type, stats, set_item.slot_type)
+
+
+## The review case (GDD 5.5 "Botok"): a warrior wears the Battlegear head + chest (2-piece)
+## and plain legs / hands ~10% better than the set legs / hands. A 3rd piece crosses no
+## threshold on its own, so the bots look ahead to the backpack: with the 4th piece waiting
+## there, the 3rd one counts (Need, equip) and the bot reaches the 4-piece.
+func test_bots_look_ahead_to_the_backpack_for_the_4_piece() -> void:
+	var warrior := slots[0]
+	var cls := warrior.class_data
+	var eq := Support.equipment_of(warrior)
+	check(eq.equip(_set_piece(&"set_warrior_head")) and eq.equip(_set_piece(&"set_warrior_chest")), "2-piece worn")
+	var legs := _set_piece(&"set_warrior_legs")
+	var hands := _set_piece(&"set_warrior_hands")
+	var plain_legs := _plain_like(legs, 1.1)
+	var plain_hands := _plain_like(hands, 1.1)
+	for pair: Array in [[legs, plain_legs], [hands, plain_hands]]:
+		var s := ItemTooltip.item_score(pair[0], cls)
+		var p := ItemTooltip.item_score(pair[1], cls)
+		check(p - s > ItemTooltip.UPGRADE_THRESHOLD and s >= p * (1.0 - ItemTooltip.SET_UPGRADE_TOLERANCE),
+			"fixture: the plain piece is ~10%% better (%.1f vs %.1f)" % [p, s])
+	check(eq.equip(plain_legs) and eq.equip(plain_hands), "plain legs and hands on")
+	check_eq(LootRoll.bot_choice(warrior, legs), LootRoll.Choice.GREED, "nothing in the backpack: a 3rd piece goes by its stats")
+	check(eq.add_to_backpack(hands), "the set hands wait in the backpack")
+	check_eq(LootRoll.bot_choice(warrior, legs), LootRoll.Choice.NEED, "with the 4th piece in the backpack: Need the 3rd")
+	check(eq.add_to_backpack(legs), "won")
+	check_eq(ItemTooltip.upgrade_direction(legs, plain_legs, cls, eq), 1, "legs: an upgrade")
+	check_eq(ItemTooltip.upgrade_direction(hands, plain_hands, cls, eq), 1, "hands: an upgrade")
+	check_eq(Intermission.bot_equip_upgrades(warrior), 2, "the bot puts both on")
+	check_eq(SetBonuses.counts(eq).get(&"battlegear_of_fury", 0), 4, "4 pieces worn")
+	check_eq(SetBonuses.active_count(eq), 2, "the 4-piece bonus is reached")
+	check_eq(Intermission.bot_equip_upgrades(warrior), 0, "and kept: the plain pieces would break it")
+
+
 ## Guaranteed drops of elites / the goblin / bosses (LootDrops.drop_special) roll their
 ## Epics into set pieces at the loot rate, always for a class of the party.
 func test_special_drops_roll_set_pieces_for_the_party() -> void:

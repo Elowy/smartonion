@@ -16,7 +16,9 @@ extends RefCounted
 ##   only on equipment changes.
 ## - Bots value a piece that completes a 2- / 4-piece bonus (ItemTooltip.upgrade_direction via
 ##   [method bonus_change]); the same rule keeps them from trading an active bonus away for a
-##   slightly better item.
+##   slightly better item. It looks ahead to the backpack (ItemTooltip.set_lookahead): pieces
+##   of the same set waiting there for other slots count as worn, so a 3rd piece that makes the
+##   4-piece reachable is worth as much as the 2nd one.
 
 ## Tooltip row kinds of [method describe].
 const ROW_HEADER := &"header"
@@ -115,15 +117,29 @@ static func worn_pieces(eq: Equipment) -> Array[StringName]:
 ## (< 0) when [param displaced] (what it pushes out – ItemTooltip.equipped_for_compare, an
 ## EquippedPair's parts) leaves. 0 when no threshold is crossed (e.g. neither item is a piece,
 ## or a duplicate replaces the same piece).
-static func bonus_change(item: ItemInstance, displaced: Array[ItemInstance], eq: Equipment) -> int:
+## [param lookahead]: backpack pieces the hero could put on as well (ItemTooltip.set_lookahead
+## – pieces of the item's or a displaced piece's set, for other slots that hold no set piece).
+## They count as worn on both sides, so the change is the item's own share of the bonuses the
+## hero can reach: a 3rd piece whose 4th waits in the backpack is +1 (and so is that 4th one),
+## a plain item that would push out such a 3rd piece -1. [param item] itself is skipped there.
+static func bonus_change(item: ItemInstance, displaced: Array[ItemInstance], eq: Equipment,
+		lookahead: Array[ItemInstance] = []) -> int:
 	if item == null or eq == null:
 		return 0
+	var before: Array[ItemInstance] = []
 	var after: Array[ItemInstance] = []
 	for it in eq.equipped_items():
+		before.append(it)
 		if it != item and it not in displaced:
 			after.append(it)
 	after.append(item)
-	return _active_total(Equipment.count_sets(after)) - _active_total(counts(eq))
+	# A lookahead piece only goes into a slot without a set piece: what it pushes out never
+	# counted for a set, so leaving it in changes no count.
+	for extra in lookahead:
+		if extra != null and extra != item:
+			before.append(extra)
+			after.append(extra)
+	return _active_total(Equipment.count_sets(after)) - _active_total(Equipment.count_sets(before))
 
 
 ## Σ active bonuses over [param c] (set id -> pieces; unknown sets count 0).
