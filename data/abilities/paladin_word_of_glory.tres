@@ -26,7 +26,10 @@ params = {
 "revive_hp": 0.4,
 "shield_duration": 8.0,
 "shield_share": 0.0,
-"spell_power_scale": 1.0
+"spell_power_scale": 1.0,
+"verdict_pct": 0.0,
+"verdict_range": 4.0,
+"verdict_sp_scale": 1.5
 }
 icon = &"word_of_glory"
 color = Color(1, 0.88, 0.45, 1)

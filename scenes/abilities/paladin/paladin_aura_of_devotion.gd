@@ -7,8 +7,27 @@ extends MasteryEffect
 ## hero inside, refreshed every [constant REFRESH_INTERVAL] seconds; heroes that leave the
 ## circle or go down lose it, and everybody loses it when the Paladin goes down or leaves.
 ## Several Paladins stack (one source each).
+##
+## M5 talents – pseudo ability id [constant PSEUDO_ID] (&"paladin_aura", registered in
+## BonusVocabulary.PSEUDO_IDS for the Paladin): its params are [constant BASE] with the
+## Paladin's talent / item mods applied ([method aura_params]: AbilityRunner.apply_mods(BASE,
+## player.ability_mods(&"paladin_aura")), read on every refresh – not cached):
+##   radius (m; Holy Aura Mastery "radius_add"), guard (% less damage taken for every hero
+##   inside; Holy Divine Guardian "guard_add": Player.damage_taken_mults[source_key()] =
+##   1 - guard / 100), might (% more damage for every hero inside; Retribution Sanctified
+##   Retribution "might_add": Player.damage_mults[source_key()] = 1 + might / 100).
+## Guard and might also work at 0 Mastery (the stat source then stays off). Both keys are set
+## again on every refresh (Player.begin_wave clears the dictionaries) and erased whenever the
+## stat source goes (a hero leaves, the Paladin goes down, wave end, teardown). Two Paladins
+## stack multiplicatively (one key each).
 
 const RADIUS := 6.0
+## The pseudo ability id talents change the aura through (BonusVocabulary.PSEUDO_IDS).
+const PSEUDO_ID := &"paladin_aura"
+## The aura's params before talent / item mods (the contract of the "paladin_aura" mods).
+const BASE := {"radius": RADIUS, "guard": 0.0, "might": 0.0}
+## Guard is capped so the aura never makes anybody (nearly) immune.
+const MAX_GUARD := 75.0
 const REFRESH_INTERVAL := 0.5
 const ARMOR_PER_POINT := 0.5
 ## Spirit regenerates HP (StatBlock.hp_regen_per_second: 15 Spirit = 1 HP per second).
@@ -40,6 +59,19 @@ func aura_mods() -> Dictionary:
 	return {Stats.ARMOR: m * ARMOR_PER_POINT, Stats.SPIRIT: m * SPIRIT_PER_POINT}
 
 
+## The aura's params with the Paladin's talent / item mods ([constant BASE] keys: radius,
+## guard, might).
+func aura_params() -> Dictionary:
+	if player == null:
+		return BASE.duplicate()
+	return AbilityRunner.apply_mods(BASE, player.ability_mods(PSEUDO_ID))
+
+
+## Reach of the aura in metres (BASE radius + talents such as Aura Mastery).
+func radius() -> float:
+	return maxf(0.0, float(aura_params().get("radius", RADIUS)))
+
+
 ## Heroes currently inside the aura (tests, UI).
 func affected() -> Array[Player]:
 	var out: Array[Player] = []
@@ -50,30 +82,46 @@ func affected() -> Array[Player]:
 	return out
 
 
-## Re-evaluates who is inside and updates their stat sources.
+## Re-evaluates who is inside and updates their stat sources (and the talents' guard / might
+## multipliers).
 func refresh() -> void:
 	var key := source_key()
 	var mods := aura_mods()
+	var params := aura_params()
+	var reach := maxf(0.0, float(params.get("radius", RADIUS)))
+	var guard := clampf(float(params.get("guard", 0.0)), 0.0, MAX_GUARD)
+	var might := maxf(0.0, float(params.get("might", 0.0)))
 	var inside: Dictionary = {}
 	if player != null and is_instance_valid(player) and player.is_alive() and player.is_inside_tree() \
-			and not mods.is_empty():
+			and (not mods.is_empty() or guard > 0.0 or might > 0.0):
 		var here := player.global_position
 		for node in player.get_tree().get_nodes_in_group(&"players"):
 			var p := node as Player
 			if p == null or not p.is_alive() or not p.is_inside_tree():
 				continue
 			var d := p.global_position - here
-			if Vector2(d.x, d.z).length() > RADIUS:
+			if Vector2(d.x, d.z).length() > reach:
 				continue
 			inside[p.get_instance_id()] = p
-			if not _same_mods(p.stats.get_source(key), mods):
+			if mods.is_empty():
+				if p.stats.has_source(key):
+					p.stats.remove_source(key)
+			elif not _same_mods(p.stats.get_source(key), mods):
 				p.stats.set_source(key, mods)
+			if guard > 0.0:
+				p.damage_taken_mults[key] = 1.0 - guard / 100.0
+			else:
+				p.damage_taken_mults.erase(key)
+			if might > 0.0:
+				p.damage_mults[key] = 1.0 + might / 100.0
+			else:
+				p.damage_mults.erase(key)
 	for id: int in _affected:
 		if inside.has(id):
 			continue
 		var v: Variant = _affected[id]
 		if is_instance_valid(v):
-			(v as Player).stats.remove_source(key)
+			_strip(v as Player, key)
 	_affected = inside
 
 
@@ -83,8 +131,15 @@ func clear() -> void:
 	for id: int in _affected:
 		var v: Variant = _affected[id]
 		if is_instance_valid(v):
-			(v as Player).stats.remove_source(key)
+			_strip(v as Player, key)
 	_affected.clear()
+
+
+## Takes this aura's stat source and talent multipliers off [param p].
+static func _strip(p: Player, key: StringName) -> void:
+	p.stats.remove_source(key)
+	p.damage_taken_mults.erase(key)
+	p.damage_mults.erase(key)
 
 
 ## Also runs while the Paladin is downed (MasteryEffect.tick): a downed Paladin grants
@@ -118,9 +173,17 @@ func teardown() -> void:
 
 func describe() -> String:
 	var mods := aura_mods()
-	return "Aura of Devotion: allies within %d m (you included) gain +%s Armor and +%s HP per 5 sec." % [
-		int(RADIUS), _fmt(float(mods.get(Stats.ARMOR, 0.0))),
+	var params := aura_params()
+	var text := "Aura of Devotion: allies within %s m (you included) gain +%s Armor and +%s HP per 5 sec" % [
+		_fmt(maxf(0.0, float(params.get("radius", RADIUS)))), _fmt(float(mods.get(Stats.ARMOR, 0.0))),
 		_fmt(float(mods.get(Stats.SPIRIT, 0.0)) / 15.0 * 5.0)]
+	var guard := clampf(float(params.get("guard", 0.0)), 0.0, MAX_GUARD)
+	if guard > 0.0:
+		text += "; -%s%% damage taken" % _fmt(guard)
+	var might := maxf(0.0, float(params.get("might", 0.0)))
+	if might > 0.0:
+		text += "; +%s%% damage" % _fmt(might)
+	return text + "."
 
 
 func _on_downed_changed(is_downed: bool) -> void:
