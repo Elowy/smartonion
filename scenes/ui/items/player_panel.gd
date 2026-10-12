@@ -80,16 +80,19 @@ const PRIMARY_STATS: Array[StringName] = [Stats.STRENGTH, Stats.AGILITY, Stats.I
 const UNLISTED_STATS: Array[StringName] = [Stats.STAMINA]
 const MAX_STAT_ROWS := 6
 ## Compact names of the stat list: the two columns share the inset's width (STAT_COLUMN_GAP
-## apart), so a name gets about 100 design px next to a "12%" value. Longer names are cut with
-## an ellipsis ([method _refresh_stats]) – the list never widens the panel.
+## apart), so a name gets 90 design px next to a "12.5%" value (105 next to "30%"). Longer names
+## are cut with an ellipsis ([method _refresh_stats]) – the list never widens the panel; every
+## stat's name here or in Stats.DISPLAY_NAMES fits next to "12.5%". The spell schools drop the
+## "Damage" ("Shadow 30%" – plain Damage is its own row).
 const SHORT_STAT_NAMES := {
 	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Dmg",
-	Stats.COOLDOWN_REDUCTION: "Cooldowns", Stats.EXTRA_PROJECTILE: "Projectiles",
+	Stats.COOLDOWN_REDUCTION: "CDR", Stats.EXTRA_PROJECTILE: "Projectiles",
 	Stats.RESOURCE_REGEN: "Regen", Stats.PICKUP_RANGE: "Pickup", Stats.HEALING_DONE: "Healing",
-	Stats.ATTACK_POWER: "Atk Power", Stats.EXTRA_ATTACK: "Extra Atk",
-	Stats.FIRE_DAMAGE: "Fire Dmg", Stats.FROST_DAMAGE: "Frost Dmg", Stats.ARCANE_DAMAGE: "Arcane Dmg",
-	Stats.HOLY_DAMAGE: "Holy Dmg", Stats.SHADOW_DAMAGE: "Shadow Dmg", Stats.NATURE_DAMAGE: "Nature Dmg",
-	Stats.PHYSICAL_DAMAGE: "Phys. Dmg",
+	Stats.ATTACK_POWER: "Atk Power", Stats.EXTRA_ATTACK: "Extra Atk", Stats.BLOCK_VALUE: "Block Val.",
+	Stats.EXECUTIONER: "Execute",
+	Stats.FIRE_DAMAGE: "Fire", Stats.FROST_DAMAGE: "Frost", Stats.ARCANE_DAMAGE: "Arcane",
+	Stats.HOLY_DAMAGE: "Holy", Stats.SHADOW_DAMAGE: "Shadow", Stats.NATURE_DAMAGE: "Nature",
+	Stats.PHYSICAL_DAMAGE: "Physical",
 }
 ## Stat list inset: side padding, the gap between the two columns and between a name and its value.
 const STAT_INSET_PAD := 8

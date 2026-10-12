@@ -427,7 +427,8 @@ func test_stat_rows_and_header() -> void:
 ## The long rows M5 talents and set bonuses put into the compact stat list (Resource Regen,
 ## Cooldown Reduction, Crit Damage – a warrior also lists its base Speed) with wide values: the
 ## names give way, so the grid fits the inset and the frame stays inside the 700 x 480 design box
-## (the 4-player corner layout scales that box, never past it).
+## (the 4-player corner layout scales that box, never past it). Every stat's compact name shows
+## whole next to a "30%" and a "12.5%" value (PlayerPanel.SHORT_STAT_NAMES).
 func test_stat_list_fits_its_inset_with_long_rows() -> void:
 	_async = true
 	var slot := _join(&"warrior")
@@ -463,6 +464,33 @@ func test_stat_list_fits_its_inset_with_long_rows() -> void:
 		if value_label.text.length() <= 3:
 			check(needed <= name_label.size.x + 0.5, "'%s' (%s) shows whole: %.1f / %.1f" % [name_label.text, value_label.text, needed, name_label.size.x])
 		check(value_label.get_global_rect().end.x <= inset.get_global_rect().end.x + 0.5, "'%s' value inside the inset" % name_label.text)
+	# Every stat's compact name shows whole next to "30%" and "12.5%" (a few stats at a time,
+	# each batch fits the twelve cells next to the always-listed rows).
+	var shown := {}
+	var all_stats: Array[StringName] = Stats.ALL.duplicate()
+	all_stats.erase(Stats.STAMINA)  # listed as Max HP
+	for value in [30.0, 12.5]:
+		for start in range(0, all_stats.size(), 3):
+			var batch := all_stats.slice(start, start + 3)
+			var values := {}
+			for stat in batch:
+				values[stat] = value
+			player.stats.set_source(&"test", values)
+			panel.refresh()
+			await tree.process_frame
+			await tree.process_frame
+			for cell in panel._stats_grid.get_children():
+				var name_label := cell.get_child(0) as Label
+				var value_label := cell.get_child(1) as Label
+				for stat in batch:
+					if name_label.text != PlayerPanel._stat_name(stat):
+						continue
+					shown["%s %s" % [stat, value]] = true
+					var needed := name_label.get_theme_font(&"font").get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+						name_label.get_theme_font_size(&"font_size")).x
+					check(needed <= name_label.size.x + 0.5, "'%s' next to '%s' shows whole: %.1f / %.1f" % [name_label.text,
+						value_label.text, needed, name_label.size.x])
+	check_eq(shown.size(), all_stats.size() * 2, "every stat was listed with both values")
 	finished.emit()
 
 
