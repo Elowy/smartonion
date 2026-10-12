@@ -270,6 +270,24 @@ func test_wild_imps_join_every_rain_of_fire() -> void:
 	var now := _rain(p).wild_imps()
 	check_eq(now.size(), 4, "at most 4 at once")
 	check(imps[0].is_queued_for_deletion() and imps[1].is_queued_for_deletion(), "the oldest left first")
+	# Taken back in the market (after the wave end dismissed them): wild_imps is neutral again
+	# and the next wave's Rain of Fire summons nobody.
+	p.end_wave()
+	check(_rain(p).wild_imps().is_empty(), "wave end: dismissed")
+	_remove(p, "wild_imps")
+	check_eq(p.abilities.params_for(rain)["wild_imps"], 0.0, "undone: wild_imps 0")
+	p.begin_wave()
+	for a in tree.get_nodes_in_group(&"ability_areas"):
+		a.free()
+	p.abilities.set_cooldown(rain, 0.0)
+	WFakes.shards(p).set_value(5.0)
+	check(p.abilities.try_cast(RT), "cast without Wild Imps")
+	check(_rain(p).wild_imps().is_empty(), "no Wild Imps")
+	var wild := 0
+	for n in tree.root.find_children("*", "Node3D", true, false):
+		if n is WarlockImp and (n as WarlockImp).is_wild() and not n.is_queued_for_deletion():
+			wild += 1
+	check_eq(wild, 0, "none in the world either")
 
 
 func test_wild_imps_expire_and_leave_with_the_wave() -> void:

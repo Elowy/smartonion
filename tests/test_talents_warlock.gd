@@ -321,6 +321,11 @@ func test_malediction_and_deaths_embrace_damage() -> void:
 	check_near(p.bonuses.damage_mult(low, &"fire", &"dot"), 1.27, 0.0001, "adds up with Malediction")
 	_remove(p, "deaths_embrace", 3)
 	check_near(p.bonuses.damage_mult(low, &"fire", &"weapon"), 1.0, 0.0001, "undone")
+	check_near(p.bonuses.damage_mult(low, &"fire", &"dot"), 1.12, 0.0001, "Malediction still counts")
+	_remove(p, "shadow_mastery", 1)
+	_remove(p, "malediction", 2)
+	check_near(p.bonuses.damage_mult(null, &"shadow", &"dot"), 1.0, 0.0001, "Malediction undone: Shadow DoTs")
+	check_near(p.bonuses.damage_mult(low, &"fire", &"dot"), 1.0, 0.0001, "and every other DoT")
 
 
 # --- Dark Harvest ------------------------------------------------------------------------------
@@ -394,6 +399,24 @@ func test_dark_harvest_cap_and_bot_rule() -> void:
 	WFakes.step_abilities(p, 0.41)
 	check_eq(effect.harvest_hits, 6, "eight afflicted enemies in range, six harvested per tick")
 	check(target.hits.size() == 1, "the drained target is not harvested on top")
+	WFakes.step_abilities(p, 2.0)
+	check(not effect.is_channeling(), "completed")
+	# Taken back: harvest_pct is neutral again; a channel drains its target only.
+	_remove(p, "dark_harvest")
+	var drain := Db.get_ability(&"drain_life")
+	check_eq(p.abilities.params_for(drain)["harvest_pct"], 0.0, "undone: harvest_pct 0")
+	check(not effect.wants_auto_cast(p.abilities.build_context(slot)), "the bot rule is gone too")
+	var cursed_hits: Array[int] = []
+	for e in cursed:
+		cursed_hits.append(e.hits.size())
+	p.abilities.set_cooldown(drain, 0.0)
+	check(p.abilities.try_cast(LT), "cast without Dark Harvest")
+	WFakes.step_abilities(p, 2.1)
+	check(not effect.is_channeling(), "completed")
+	check_eq(effect.harvest_hits, 0, "nothing harvested")
+	check_near(effect.harvest_total, 0.0, 0.0001, "no harvest damage")
+	for i in cursed.size():
+		check_eq(cursed[i].hits.size(), cursed_hits[i], "afflicted enemy %d spared" % i)
 
 
 # --- Writhe in Agony ---------------------------------------------------------------------------
@@ -452,6 +475,18 @@ func test_writhe_in_agony_rank_one_and_despawn() -> void:
 	gone.despawn()
 	WFakes.step(_aff(p), DT)
 	check(not _aff(p).has(AGONY, near), "a despawned host (wave end) spreads nothing")
+	# Taken back: agony_spread is neutral again; a dying host's Agony dies with it.
+	_remove(p, "writhe_in_agony")
+	check_eq(_params(p)["agony_spread"], 0.0, "undone: agony_spread 0")
+	var host2 := _enemy(Vector3(0, 0, 8))
+	var n1 := _enemy(Vector3(1, 0, 8))
+	var n2 := _enemy(Vector3(0, 0, 9.5))
+	_hit(p, host2, 50.0, 40.0)
+	check(_aff(p).has(AGONY, host2), "Curse of Agony still curses")
+	host2.die_now(p)
+	WFakes.step(_aff(p), DT)
+	check(not _aff(p).has(AGONY, n1) and not _aff(p).has(AGONY, n2), "the neighbours stay clean")
+	check(n1.hits.is_empty() and n2.hits.is_empty(), "and take nothing")
 
 
 # --- Unstable Affliction -----------------------------------------------------------------------

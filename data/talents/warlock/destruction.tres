@@ -119,7 +119,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_destruction_shadowburn"
 display_name = "Shadowburn"
-description = "When Drain Life's channel completes, Shadowburn scorches the drained enemy for {pct}% of the channel's damage. If it dies within {window} sec, you gain a Soul Shard (at most once every {icd} sec)."
+description = "When Drain Life's channel completes, Shadowburn scorches the drained enemy for {pct}% of the channel's damage. If it dies within {window} sec, you gain a Soul Shard (once every {icd} sec)."
 values = {
 "icd": 10.0,
 "pct": 75.0,

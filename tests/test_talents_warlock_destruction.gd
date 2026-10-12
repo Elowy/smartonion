@@ -114,6 +114,9 @@ func test_devastation_and_ruin_crit() -> void:
 	check_eq(p.stats.get_raw(Stats.CRIT_DAMAGE), crit_damage + 30.0, "+10% crit damage per rank")
 	_remove(p, "ruin", 3)
 	check_eq(p.stats.get_raw(Stats.CRIT_DAMAGE), crit_damage, "undone")
+	check_eq(p.stats.get_raw(Stats.CRIT), crit + 6.0, "Devastation still counts")
+	_remove(p, "devastation", 3)
+	check_eq(p.stats.get_raw(Stats.CRIT), crit, "Devastation undone: crit back to its base")
 
 
 func test_emberstorm_fire_damage() -> void:
@@ -159,6 +162,24 @@ func test_aftermath_slows_inside_rain_of_fire() -> void:
 	area._physics_process(DT)
 	for e in inside:
 		check(e.is_slowed() and e.slow_pct == 30.0, "an enemy inside is slowed")
+	# Taken back: Rain of Fire's slow param is neutral again and a new circle does not slow.
+	_remove(p, "aftermath", 3)
+	check_eq(p.abilities.params_for(rain)["slow"], 0.0, "undone: no slow")
+	area.free()
+	for e in inside:
+		e.slow_left = 0.0
+		e.slow_pct = 0.0
+	p.abilities.set_cooldown(rain, 0.0)
+	WFakes.shards(p).set_value(1.0)
+	check(p.abilities.try_cast(RT), "cast again")
+	var fresh := _areas()
+	check_eq(fresh.size(), 1, "one new circle")
+	if fresh.size() != 1:
+		return
+	check_eq(fresh[0].slow_pct, 0.0, "the new circle has no slow")
+	fresh[0]._physics_process(DT)
+	for e in inside:
+		check(not e.is_slowed(), "an enemy inside is not slowed")
 
 
 func test_soul_leech_drains_a_share_of_every_crit() -> void:
@@ -236,6 +257,19 @@ func test_shadowburn_scorches_a_completed_channel_and_pays_a_shard() -> void:
 	b.take_damage(5000.0, false, null)
 	check_eq(res.value, 2.0, "within the shard cooldown: no shard")
 	check_eq(RunState.rng.state, state, "no RNG")
+	# Taken back: Drain Life's shadowburn_pct is neutral again and a completed channel only drains.
+	_remove(p, "shadowburn")
+	check_eq(p.abilities.params_for(drain)["shadowburn_pct"], 0.0, "undone: shadowburn_pct 0")
+	p.begin_wave()
+	check_eq(effect.scorches, 0, "the wave start reset the stats")
+	p.abilities.set_cooldown(drain, 0.0)
+	var c := _enemy(Vector3(2, 0, -1))
+	check(p.abilities.try_cast(LT), "cast without Shadowburn")
+	WFakes.step_abilities(p, 2.1)
+	check(not effect.is_channeling(), "completed")
+	check_eq(c.hits.size(), 5, "5 ticks, no scorch")
+	check_eq(effect.scorches, 0, "nothing scorched")
+	check(not effect.is_watched(c), "nothing watched")
 
 
 func test_shadowburn_window_interrupts_scorch_kills_and_going_down() -> void:
@@ -294,6 +328,30 @@ func test_shadowburn_window_interrupts_scorch_kills_and_going_down() -> void:
 	check(effect.is_watched(h), "watched before the wave end")
 	p.end_wave()
 	check(not effect.is_watched(h), "the wave end clears it too")
+
+
+func test_shadowburn_going_down_mid_channel_scorches_nothing() -> void:
+	var p := _warlock()
+	_add(p, "devastation", 3)
+	_add(p, "emberstorm", 3)
+	_add(p, "shadowburn")
+	var effect := _drain(p)
+	var res := WFakes.shards(p)
+	res.set_value(1.0)
+	var e := _enemy(Vector3(2, 0, 0))
+	check(p.abilities.try_cast(LT), "cast")
+	WFakes.step_abilities(p, 0.5)
+	check(effect.is_channeling(), "channeling")
+	check_eq(e.hits.size(), 1, "one tick so far")
+	p._go_down()
+	check(p.downed, "down mid-channel")
+	check(not effect.is_channeling(), "going down interrupts the channel")
+	WFakes.step_abilities(p, 2.0)
+	check_eq(e.hits.size(), 1, "no further tick and no scorch")
+	check_eq(effect.scorches, 0, "an interrupted channel scorches nothing")
+	check(not effect.is_watched(e), "nothing watched")
+	e.take_damage(5000.0, false, null)
+	check_eq(res.value, 1.0, "its death pays no shard")
 
 
 # --- Conflagrate -------------------------------------------------------------------------------
@@ -377,3 +435,24 @@ func test_conflagrate_walking_inferno_and_crit_shards() -> void:
 	p.on_hit_dealt(12.0, e, p.main_hand, false, false, true, 10.0)
 	check_eq(RunState.rng.state, no_crit, "no roll without a crit")
 	check_eq(res.value, 0.0, "no shard")
+	# Taken back: no burning ground on a new cast and crits roll no Soul Shard any more.
+	_remove(p, "conflagrate")
+	var rain := Db.get_ability(&"rain_of_fire")
+	check_eq(p.abilities.params_for(rain)["ember_duration"], 0.0, "undone: ember_duration 0")
+	area.free()
+	p.abilities.set_cooldown(rain, 0.0)
+	res.set_value(2.0)
+	check(p.abilities.try_cast(RT), "cast without Conflagrate")
+	var fresh := _areas()
+	check_eq(fresh.size(), 1, "one new circle")
+	if fresh.size() == 1:
+		check_near(fresh[0].duration, 5.0, 0.0001, "the rain only (Walking Inferno 5 sec)")
+		check(fresh[0].get_node_or_null("Embers") == null, "no embers ride along")
+	var fired := p.procs.fire_count(&"warlock_destruction_conflagrate")
+	var before := RunState.rng.state
+	for i in 60:
+		res.set_value(0.0)
+		p.on_hit_dealt(12.0, e, p.main_hand, true, false, true, 10.0)
+		check_eq(res.value, 0.0, "a crit grants no shard")
+	check_eq(p.procs.fire_count(&"warlock_destruction_conflagrate"), fired, "the proc never fires")
+	check_eq(RunState.rng.state, before, "and nothing is rolled")
