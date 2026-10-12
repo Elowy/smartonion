@@ -36,7 +36,7 @@ const TALENT_START_LEVEL := 10
 ## one (alone, the first down ends the run) and the more enemies each faces (the +60% count
 ## per extra player is less than one more share). About x1.3 per extra player; even a full
 ## party stays below the plain EnemyData curve.
-const COOP_DAMAGE_MULTS: Array[float] = [0.35, 0.45, 0.6, 0.8]
+const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.75, 0.9]
 
 var active := false
 var victory := false
