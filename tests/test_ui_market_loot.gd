@@ -249,3 +249,18 @@ func test_empty_loot_finishes_on_the_next_frame() -> void:
 	await tree.process_frame
 	check_eq(finishes, 1, "finished")
 	finished.emit()
+
+
+## Tier sets (M5): the loot roll is everyone's window, so its tooltip has no viewer equipment –
+## the set block shows "(5 pieces)", every piece and every bonus grey.
+func test_set_piece_tooltip_in_the_loot_roll() -> void:
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	MarketFakes.human_with_hero(world, "pad:b", &"rogue")
+	var piece := ItemGenerator.from_unique(Db.get_unique(&"set_rogue_hands"), 9, true, RandomNumberGenerator.new())
+	screen.open([piece] as Array[ItemInstance], PlayerManager.get_slots())
+	_settle()
+	check(screen.tooltip.viewer_equipment == null, "nobody's equipment")
+	check(screen.tooltip.find_line("Shadowstitch Garb (5 pieces)", true) != null, "(5 pieces): %s" % screen.tooltip.line_texts())
+	var bonus := screen.tooltip.find_line("(2) Set: Increases your critical strike chance by 5%.", true)
+	check(bonus != null and bonus.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.DIM), "bonuses grey")
+	check(screen.tooltip.find_line("Shadowstitch Leggings", true) != null, "piece list")

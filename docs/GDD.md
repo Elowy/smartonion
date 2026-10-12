@@ -103,6 +103,20 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
   - **Sebződés:** nem szakítja meg a felélesztést. A kockázat az, hogy közben állni kell.
   - **Spirit Healerrel együtt:** ha a társ és a Spirit Healer egyszerre éleszt, a cast bar a
     befejezéshez közelebbit mutatja, és amelyik előbb végez, az éleszt fel.
+- **Szellem-lassítás:** amíg egy játékos elesett (szellem), a felélesztési körében (1,8 m a
+  szellem körül – ahol a társ a felélesztést csatornázza) álló ellenségek **33%-kal
+  lassabban** mozognak, így a felélesztő nem marad védtelen. A kör a szellemmel együtt mozog
+  (a Spirit Healerhez sétálva is lassít).
+  - Minden ellenségre hat, a **Loot Goblinra is** (rá is hat a crowd control); a feldühödött
+    (Enraged) elitre nem – az minden lassításra immunis.
+  - **Nem adódik össze:** több szellem átfedő köre is 33%, és más lassításokkal sem
+    halmozódik – mindig az erősebb érvényes, és egyik sem írja felül a másikat.
+  - A kör elhagyása, a szellem felélesztése vagy elsétálása után egy pillanaton belül
+    (0,1 mp) megszűnik.
+  - A lassított ellenség „lassítottnak” számít a talentek feltételeinél (pl. Frost: több
+    sebzés lassított célpontra).
+  - **Jelzés:** amíg a kör lassít valakit, a felélesztési kör halvány kékes szellemszínbe
+    vált, és a belseje lassan lüktet.
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
@@ -361,18 +375,46 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 
 ### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
 
-**Szabály:** **2 azonos típusú fegyver, azonos ritkaságban → 1 fegyver eggyel magasabb ritkaságban.**
+**Szabály:** **2 azonos alapfegyver, azonos ritkaságban → 1 fegyver eggyel magasabb
+ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Hand Axe).
 
 > Példa: 2 × Uncommon Dagger → 1 × Rare Dagger.
 
-**Hol lehet kovácsolni:**
-- **Karakterpanel / backpack:** a fegyvert kiválasztva (A) megjelenő menüben „Forge”
-  opció, ha van hozzá párja a backpackben vagy a felszerelt slotok között.
-- **Boltban, automatikusan:** ha a backpack tele van, és olyan fegyvert veszel, amiből van
-  azonos ritkaságú példányod, a vásárlás egyből kovácsol (mint a Brotatóban).
-- **Bolti jelzés:** az ilyen ajánlatot üllő-ikon jelöli.
+**Mi kovácsolható:**
+- A **generált** fegyverek Commontól Epicig, a kezdőfegyverek is (Common, nem kézzel tervezett).
+- **Nem kovácsolható:** kézzel tervezett (unique) fegyver, mert a kézzel tervezett hatása
+  elveszne vagy megduplázódna; Legendary, mert az a csúcs; Artifact, mert az hullámonként
+  magától fejlődik (5.5).
 
-**Költség:** **ingyenes**.
+**Hol lehet kovácsolni:**
+- **Karakterpanel / backpack:** a fegyvert kiválasztva (A) megjelenő műveletmenüben
+  (Equip / **Forge** / Sell / Trade / Cancel) minden fegyvernél ott a „Forge”.
+  - Mellette látszik az eredmény ritkasága („→ Rare”).
+  - Ha nincs párja, szürke, és kiírja az okát: „No other Common Dagger”, „Hand-made weapons
+    cannot be forged”, „Legendary is the highest rarity”.
+  - Sikeres kovácsolás után üzenet jelenik meg a ritkaság színében: „Forged [Rare Dagger]!”.
+- **Boltban, automatikusan:** ha a vásárló backpackje tele van, és az ajánlatnak van párja
+  nála, a vásárlás egyből kovácsol (mint a Brotatóban).
+  - A megvett fegyver be sem kerül a backpackbe.
+  - A bolti napló: „P1 bought and forged [Rare Dagger] – 62 g”.
+  - Szabad hellyel a fegyver a backpackbe kerül, mint eddig. Tele backpacknél a „Backpack
+    full” helyett a vásárlás kovácsol.
+- **Bolti jelzés:** az ajánlati kártyán kis üllő-pip jelenik meg minden olyan játékos
+  színében, akinek van hozzá párja – akkor is, ha a backpackje még nincs tele.
+
+**A pár és az eredmény helye** (determinisztikus):
+- A pár sorrendje: először a backpack (a legelső megfelelő), utána a Main Hand, végül az Off
+  Hand; a fegyver soha nem önmaga párja.
+- Ha bármelyik fél fel volt szerelve, az eredmény a helyére kerül (ha mindkettő, akkor a Main
+  Handbe), különben a backpack végére. Ugyanaz a típus ugyanakkora kéz, így a hős soha nem
+  marad fegyver nélkül.
+
+**Az eredmény:** egy friss, eggyel magasabb ritkaságú fegyver ugyanabból az alapfegyverből.
+- Szintje a két fél és az aktuális hullám közül a legmagasabb.
+- **Új véletlen bónusz statokat és enchantokat kap** a ritkaságának megfelelően.
+- **„Looted”** marad, ha bármelyik fele lootból jött (10.1).
+
+**Költség:** **ingyenes** (a boltban csak a vételárat kell kifizetni).
 
 **Ritkaság-szorzók (alapsebzés):**
 
@@ -381,13 +423,21 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 | Common | ×1,0 | – |
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
-| Epic | ×2,2 | +2 stat, +10% támadási sebesség |
-| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** (pl. Dagger: minden 4. találat mérgező pengét lő) |
+| Epic | ×2,2 | +2 stat (a „+10% támadási sebesség” az M6 item-tartalom passzában jön, M5-ben nincs) |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – 10 kézzel tervezett hatás, fegyvertípusonként egy (pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
 
 **Korlátok:**
-- Legendary fölé nem lehet kovácsolni.
+- Legendary fölé nem lehet kovácsolni; a kovácsolt Legendary-t sem lehet tovább kovácsolni.
 - **Artifact** fegyver nem kovácsolható (az hullámonként magától fejlődik, lásd 5.5).
-- A kovácsolt fegyver új véletlen bónusz statokat kap a ritkaságának megfelelően.
+- A kovácsolt Legendary neve a fegyvertípus Legendary-neve; nem lehet WoW-tárgy neve
+  (14. fejezet).
+
+**Botok:** a hullámok közt kovácsolják a párjaikat.
+- Két backpackbeli fegyvert, vagy egy felszerelt és egy backpackbeli fegyvert; az utóbbinál
+  az eredmény a felszerelt helyére kerül.
+- Két felszerelt fegyvert (Dual Wield) soha, mert nem tudható előre, hogy jobb lesz-e.
+- A bolti automatikus kovácsolást nem használják: vásárlás előtt eladnak, így a backpackjük
+  sosem telik meg.
 
 **Dual Wield szinergia:** két azonos fegyver felszerelve (pl. 2 tőr) erős a Rogue-nak,
 de kovácsolva egy erősebb fegyver lesz belőlük. Ez Brotato-szerű döntés:
@@ -562,12 +612,56 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Kaszt | Set | 2 darab | 4 darab |
 |---|---|---|---|
 | Warrior | Battlegear of Fury | +10% Rage-termelés | A Whirlwind 30%-ban ingyenes |
-| Mage | Regalia of the Arcane | +10% Haste | A Blink után 3 mp-ig +30% sebzés |
-| Paladin | Lightforged Plate | +3 Armor | A Word of Glory az összes társat gyógyítja |
-| Rogue | Shadowcraft Garb | +5% Crit | A Vanish után 4 mp-ig +50% krit sebzés |
-| Warlock | Felheart Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
+| Mage | Regalia of the Arcane | +10% Haste | A Blink után 3 mp-ig +30% sebzés (legfeljebb 6 mp-enként) |
+| Paladin | Dawnforged Plate | +3 Armor | A Word of Glory minden hőst gyógyít 8 m-en belül, és a gyógyítás a Max HP további 10%-át adja vissza |
+| Rogue | Shadowstitch Garb | +5% Crit | A Vanish után 4 mp-ig +50% krit sebzés |
+| Warlock | Felfire Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
 | Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
 | Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Chain Lightning +2 célpontot ér |
+
+- **Nevek:** a Paladin, a Rogue és a Warlock setje új nevet kapott (korábban Lightforged
+  Plate, Shadowcraft Garb, Felheart Raiment), mert azok WoW-setek, illetve -kifejezések
+  nevei (14. fejezet).
+- **Dawnforged Plate 4 darab:** a „minden hőst gyógyít” rész ugyanaz, mint a Word of Glory
+  V. rangú „Light of Dawn” specializációja, ezért a bónusz +10 százalékpontot is ad a
+  gyógyítás Max HP-arányos részéhez (25% → 35%, × a rang ereje). Így a Light of Dawnt
+  választó Paladinnak is ér valamit a 4 darab.
+- **A darabok:**
+  - Epic ritkaságúak, kaszthoz kötöttek („Classes: X”), a kaszt páncéltípusában.
+  - Kézzel tervezett statjuk van: elsődleges stat + Stamina + egy másodlagos, az Epic
+    keretében.
+  - A 6. hullámtól jelennek meg.
+- **Honnan jönnek:**
+  - Egy Epic dobás a boltban **5%**, lootból (normál drop, elit, Loot Goblin, boss) **15%**
+    eséllyel set-darab lesz – lootban 3× gyakoribb (5.2).
+  - Boltban az első Epic-hullámtól (9.) kaphatók.
+  - A darab mindig a csapat egyik kasztjának szól.
+  - Az adott set darabjai közül egyenlő eséllyel jön egy; duplikátum lehetséges (azt
+    Greedelni lehet).
+- **Bónuszok:** halmozódnak (4 darab = a 2- és a 4-darabos bónusz együtt); 5-darabos bónusz
+  nincs.
+- **Tooltip:**
+  - A set neve és az állás: „(n/5)”, a dobóablakban „(5 pieces)”.
+  - Az öt darab: a saját panelen és a boltban röviden, a slotjuk nevével egy sorban
+    („Head  Shoulders  Chest  Hands  Legs”, a felvettek világosan), flavor szöveg nélkül –
+    így a sarokpanelben is olvasható; a dobóablakban a darabok teljes nevével.
+  - A „(2) Set: …” / „(4) Set: …” sor zöld, ha aktív, egyébként szürke.
+- **Botok:**
+  - A 2-es vagy 4-es küszöböt elérő darab fejlesztésnek számít, hacsak a statjai 30%-nál
+    többel nem rosszabbak.
+  - A botok a hátizsákba is előre néznek: ha ugyanannak a setnek más darabjai (más slotra,
+    ahol nincs setdarab, és legfeljebb 30%-kal gyengébbek annál, amit leváltanának) a
+    hátizsákban várnak, ezekből annyit számítanak viseltnek, amennyi a következő küszöbhöz
+    (2 vagy 4 darab) még hiányzik – a legjobbakat. Így a 3. darab is fejlesztés, ha a 4. már
+    megvan, a 4. darab akkor is, ha egy 5. is vár mellette, és a botok egy piacon elérik a
+    4 darabos bónuszt.
+  - Egy sima tárgy, amely egy így elérhető 4 darabos bónuszból venné ki a 3. darabot,
+    rosszabbnak számít (hacsak nem több mint 30%-kal jobb); egy viselt 4 darabos bónuszt sem
+    bontanak meg azért, mert a leváltott darab a hátizsákban vár. Teljes (5 darabos) setből
+    egy darabot odaadhatnak egy jobb sima tárgyért, egy másodikat már nem.
+  - Addig ismétlik a felszerelést a hátizsákból, amíg már semmit sem vesznek fel (legfeljebb
+    a hátizsák méretének megfelelő körben), így ami egy későbbi csere után lett fejlesztés, az
+    ugyanazon a piacon felkerül.
 
 #### Artifact fegyverek (kasztonként 1)
 
@@ -900,9 +994,13 @@ talentfák mintájára.
 
 ### 7.1 Pontok
 
-- **A 10. szinttől minden szintlépés +1 talentpontot ad**, a kártyaválasztás mellé.
-- A pontok **a hullámok között**, a **Talents** fülön költhetők el. Nem kötelező
-  azonnal elkölteni.
+- **A 10. szinttől minden szintlépés +1 talentpontot ad**, a kártyaválasztás mellé
+  (`team level − 9`).
+- **Minden hős a teljes pontszámot kapja** – a pontok hősönként járnak, nem közösek.
+- A pontok **a hullámok között**, a bolti fázisban, a **Talents** fülön költhetők el. Nem
+  kötelező azonnal elkölteni. A hullám közben szerzett pont a következő boltnál költhető.
+- A szintlépési kártyáknak nincs közük a talentpontokhoz.
+- A 10. szint előtt a fül csak ennyit mutat: „Talent points from level 10 (level 7)”.
 - **Várható pontszám egy menet alatt:** kb. 15–20 (a menet végére a 25.–30. szint körül).
 - **XP-skálázás co-opban:** az XP-igény a játékosszámmal nő (`× (1 + 0,6 × (játékosok − 1))`),
   hogy a szintlépés üteme 1–4 játékossal hasonló legyen.
@@ -923,7 +1021,7 @@ Minden kasztnak **3 fája** van (a WoW-os specializációk szerint):
 
 Egy fa **5 szintből (tier)** áll:
 
-| Tier | Feltétel (pont ebben a fában) | Tartalom |
+| Tier | Feltétel (pont a fa alacsonyabb tierjeiben) | Tartalom |
 |---|---|---|
 | 1 | 0 | 2 talent, egyenként max 3 pont |
 | 2 | 3 | 2 talent, egyenként max 3 pont |
@@ -931,50 +1029,352 @@ Egy fa **5 szintből (tier)** áll:
 | 4 | 9 | 2 talent, egyenként max 3 pont |
 | 5 | 12 | **Capstone** (1 pont) – nagy, buildet meghatározó hatás |
 
+- A tier feltétele a **fa alacsonyabb tierjeibe** tett pontok száma (WoW-szabály). Ezért a
+  capstone már **13 ponttal** elérhető: 12 pont az 1–4. tierben, és a 13. maga a capstone.
 - Egy fa teljes kitöltése **22 pont**, tehát egy menetben **egy fát lehet majdnem
   végigvinni**, vagy két fa között el lehet osztani a pontokat (hibrid build), ahogy a
-  klasszikus WoW-ban.
-- Egyes talentek **előfeltételhez** kötöttek (nyíl a fában, mint a WoW-ban).
+  klasszikus WoW-ban. Két capstone-hoz 26 pont kellene, ez egy menetben nem jön össze.
+- **Előfeltétel** (nyíl a fában): ugyanannak a fának egy alacsonyabb tierbeli talentje, amit
+  **maxra** kell vinni. Fánként 1–2 nyíl van.
+- **Képesség-módosító:** egyetlen abilityt változtat meg.
+  - A legtöbb a kaszt mindig meglévő (Core) abilityjére hat.
+  - Ha a módosított ability még nincs megtanulva, a pont akkor is elkölthető, és a
+    megtanuláskor hat. A tooltip kiírja: „You haven't learned X”.
+- Egyik fa sem épül egyetlen tanult (véletlenszerűen kapott) abilityre: minden fa a kaszt Core
+  abilityjeivel, erőforrásával, Masteryjével és fegyvereivel is működik.
+- A talentek **azonnal** hatnak, már a boltban: a Character fül, a Trainer és a tooltipek az
+  új számokat mutatják.
+- A talent- és set-sebzésbónuszok összeadódnak, utána szorzódnak a Masteryvel és az ideiglenes
+  buffokkal.
 
-### 7.3 Respec
+### 7.3 Visszavétel, reset és botok
 
-- A Talents fülön „Reset Talents”: minden pont visszajár.
-- **Ár:** az első reset 20 gold, utána minden reset az előző ár duplája
-  (a WoW-os respec-díj mintájára).
+- **Visszavétel (X):** az utolsó hullám kezdete óta elköltött pontok egyenként visszavehetők –
+  a fül bezárása és újranyitása után is, a teljes hullámközi szünetben. A hullám indulásakor a
+  pontok véglegesek.
+  - Nem vehető vissza a pont, ha egy előfeltétel függ tőle: „X depends on it”.
+  - Akkor sem, ha egy magasabb tier pontjai a feltétel alá esnének: „X needs those points”.
+- **Reset Talents** (a fül alján, árral: „Reset Talents – 40 g”): minden pont visszajár, a
+  függőben lévők is.
+  - **Ár:** hősönként számolva az első reset 20 gold, utána minden reset az előző ár duplája
+    (20, 40, 80 …; a WoW-os respec-díj mintájára). Az ár nem csökken vissza.
+  - A közös kasszából fizetünk, és a kassza melletti költésnaplóban is látszik (10. fejezet).
+  - **Megerősítés:** az A egy figyelmeztetést nyit („Press A again to reset (40 g)”), és 2 mp-en
+    belül újra meg kell nyomni.
+  - Ha az ár a kassza több mint 50%-a, az A-t 1 mp-ig nyomva kell tartani (mint a boltban és a
+    Trainernél).
+- **Kezelés:**
+  - **A** = pont elköltése, **X** = visszavétel, **Y** = a következő rang előnézete,
+    **LT / RT** = fülváltás.
+  - A **B** csak a nyitott megerősítést / nyomva tartást szakítja meg, így a B továbbra is
+    visszavonja a ready-t.
+  - A fül címkéje mutatja a szabad pontokat: „Talents (2)”.
+- **Botok:** a hős slot-sorszáma választ fát (1. játékos az 1. fa, 2. a 2. … 4. megint az 1.).
+  - Sorrend: a capstone, ha felvehető; különben a módosító; különben az első felvehető talent
+    tier és oszlop szerint.
+  - Elhalasztják, ami náluk nem hatna, és csak akkor veszik fel, ha már semmi más nem
+    vehető: a talentet, amelynek minden hatásához más fegyver kellene (pl. pajzs), és a
+    módosítót, amelynek az abilityjét nem tanulták meg.
+  - A fa betelte után a következő fába költenek; soha nem resetelnek, és véletlen nélkül
+    döntenek.
 
-### 7.4 Példa: Warrior – Arms fa
+### 7.4 A talentfák (5 kaszt × 3 fa)
+
+**Jelölések:**
+- A számok **pontonként** értendők (3 pont = háromszoros hatás); a módosító és a capstone
+  1 pontos, ezek a végleges számok.
+- *Dőlt* név = képesség-módosító; **félkövér** = capstone; „előfeltétel: X 3/3” = nyíl a fában.
+- Egy tieren belül az első sor a bal, a második a jobb oszlop.
+- A talentnevek angolok (a UI-ban is), a klasszikus WoW talentneveket követik; Blizzard-márka
+  nincs köztük.
+
+#### Warrior – Arms fa
+
+Kétkezes csapások, vérző sebek és kivégzések. A Mortal Strike minden 5. támadást
+megerősít, és a Vampiric elitek gyógyulását is letöri.
 
 | Tier | Talent | Pont | Hatás / pont |
 |---|---|---|---|
 | 1 | Deflection | 3 | +2% Dodge |
-| 1 | Tactical Mastery | 3 | +5 Rage induláskor és +3% Rage-termelés |
-| 2 | Improved Charge | 3 | A Charge +0,3 mp kábítás és −1 mp CD |
-| 2 | Deep Wounds | 3 | A krit 3 mp-es vérzést okoz (a sebzés 10%-a) |
+| 1 | Tactical Mastery | 3 | +5 Rage minden hullám elején és +3% Rage-termelés |
+| 2 | Improved Charge | 3 | A Charge kábítása +0,3 mp, a cooldownja −0,5 mp |
+| 2 | Deep Wounds | 3 | A kritikus fegyvertalálat 3 mp-es vérzést okoz (a találat sebzésének 10%-a) |
 | 3 | Two-Handed Specialization | 2 | +5% sebzés kétkezes fegyverrel |
-| 3 | *Sweeping Strikes* (módosító) | 1 | A Whirlwind után 5 mp-ig a csapások +1 célpontot érnek |
-| 4 | Impale | 3 | +10% krit sebzés |
-| 4 | Sudden Death | 3 | 3% esély találatkor, hogy az Execute CD-je lenulláz |
-| 5 | **Mortal Strike** (capstone) | 1 | Minden 5. fegyvertalálat 250%-os csapás, ami a célpontot −50% gyógyulásra ítéli; Execute-tal szinergiában |
+| 3 | *Sweeping Blows* (módosító – Whirlwind) | 1 | A Whirlwind után 5 mp-ig a fegyvertámadások 25% eséllyel azonnal még egyszer lecsapnak |
+| 4 | Impale (előfeltétel: Deep Wounds 3/3) | 3 | +10% kritikus sebzés |
+| 4 | Sudden Death | 3 | Fegyvertalálatkor 3% esély, hogy az Execute cooldownja azonnal lejár |
+| 5 | **Mortal Strike** (capstone) | 1 | Minden 5. fegyvertámadás egy extra, 150%-os fegyversebzésű csapást is mér, és 8 mp-re Mortal Wound-ot hagy: a célpont 50%-kal kevesebbet gyógyul, és 10%-kal több sebzést kap tőled (az Execute-ot is beleértve) |
+
+#### Warrior – Fury fa
+
+Két fegyver, kritikus találatok, Rage és öldöklés: a kritek Rage-et adnak, a Rage
+Whirlwindet, az ölések Rampage-et. A kevés HP keményebb ütést jelent (Battle Fury).
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Cruelty | 3 | +2% Crit |
+| 1 | Unbridled Wrath | 3 | A kritikus fegyvertalálat +3 Rage-et termel |
+| 2 | Improved Whirlwind | 3 | A Whirlwind költsége −2 Rage, az ereje +5% |
+| 2 | Blood Craze | 3 | Öléskor a Max HP 1%-át visszagyógyítod (legfeljebb 1,5 mp-enként egyszer) |
+| 3 | Dual Wield Specialization | 2 | +5% sebzés két fegyverrel (Dual Wield) |
+| 3 | *Meat Cleaver* (módosító – Whirlwind) | 1 | A Whirlwind minden eltalált ellenségért 3 Rage-et visszaad (pörgésenként legfeljebb 12-t, és legfeljebb annyit, amennyibe a pörgés került): nagy csapatban szinte ingyen pörögsz |
+| 4 | Flurry (előfeltétel: Cruelty 3/3) | 3 | Kritikus találat után 3 mp-ig +6% Haste |
+| 4 | Death Wish | 3 | +4 Mastery (Battle Fury: minél kevesebb a HP-d, annál nagyobb a sebzésed) |
+| 5 | **Rampage** (capstone) | 1 | Ölésenként +2% sebzés 5 mp-ig (legfeljebb 10 halmozás = +20%, minden ölés frissíti); a 8 m-en belüli társak a bónusz felét kapják |
+
+#### Warrior – Protection fa
+
+Pajzs, páncél és taunt: a fal, ami mögött a társak állnak. A pajzsos talenteknek van
+pajzs nélküli szomszédja, így karddal vagy kétkezessel is elérhető a capstone.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Toughness | 3 | +2 Armor |
+| 1 | Shield Specialization | 3 | Pajzzsal: +3% Block esély és +10% Block Value |
+| 2 | Revenge | 3 | +2% Parry; blokk vagy kitérés (Dodge) után 15% esély azonnali visszavágásra a fegyvereddel |
+| 2 | Defiance | 3 | Elszenvedett találatonként +2 Rage, és harcon kívül a Rage 1-gyel lassabban fogy másodpercenként |
+| 3 | Vitality | 2 | +4 Stamina és +1 Strength |
+| 3 | *Challenging Charge* (módosító – Charge) | 1 | A Charge által elkábított ellenségek a kábítás után még 4 mp-ig rád fókuszálnak (taunt); ellenségenként a Max HP 3%-ának megfelelő elnyelő pajzsot kapsz 5 mp-re (legfeljebb 15%) |
+| 4 | Shield Mastery (előfeltétel: Shield Specialization 3/3) | 3 | Pajzzsal −4% elszenvedett sebzés |
+| 4 | Blood and Thunder | 3 | A Whirlwind és a Thunder Clap ereje +5%; a Whirlwind 1,5 mp-re 10%-kal lassítja az eltalált ellenségeket |
+| 5 | **Unbreakable** (capstone; korábban Last Stand) | 1 | Hullámonként 1×: a halálos találat helyett talpon maradsz – 10 mp-re +30% Max HP (ennyit azonnal gyógyulsz is) és 1 mp sebezhetetlenség; a 8 m-en belüli társak ugyanígy +15% Max HP-t kapnak |
+
+#### Mage – Arcane fa
+
+A wand Arcane lövedékei, a Blink, a Haste / cooldownok és a mély Mana-készlet. A capstone a
+nyers erő: minden sebzés +25%, cserébe drágább Blizzard – amit a fa Mana-talentjei fizetnek
+meg.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Arcane Focus | 3 | +3% Arcane sebzés (a wand lövedékei, Arcane Missiles, a Blink robbanásai) |
+| 1 | Arcane Meditation | 3 | +10% Mana-regeneráció |
+| 2 | Improved Blink | 3 | A Blink −5% CD, és 1 m-rel messzebre visz |
+| 2 | Arcane Concentration (előfeltétel: Arcane Meditation 3/3) | 3 | 8% esély, hogy a Mana-varázslat (Blizzard) nem kerül Manába |
+| 3 | Arcane Mind | 2 | +3 Intellect (+6 max Mana) |
+| 3 | *Mirror Image* (módosító – Blink) | 1 | A Blink 3 mp-re tükörképet hagy az indulási helyén: a 4 m-en belüli ellenségek őt üldözik, eltűnésekor Arcane robbanás (2,5 m); legfeljebb 6 mp-enként |
+| 4 | Arcane Flows (előfeltétel: Improved Blink 3/3) | 3 | +4% Cooldown Reduction |
+| 4 | Arcane Celerity | 3 | +4% Haste |
+| 5 | **Arcane Power** (capstone) | 1 | Minden sebzés +25%, de a Mana-költségek +30% |
+
+#### Mage – Fire fa
+
+Kritikus találatok, Ignite és terjedő lángok; a Staff (Fire iskolájú fegyver) természetes
+párja. A fa a kaszt Masteryjére (Ignite) épül, így tanult abilityk nélkül is működik.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Critical Mass | 3 | +2% Crit |
+| 1 | Fire Power | 3 | +3% Fire sebzés (Ignite, égések, tűzvarázslatok, Staff) |
+| 2 | Empowered Fire (előfeltétel: Critical Mass 3/3) | 3 | +3 Mastery (erősebb Ignite) |
+| 2 | Incineration | 3 | +5% DoT-sebzés (Ignite, égések) |
+| 3 | Playing with Fire | 2 | +3% sebzés, de +2% elszenvedett sebzés |
+| 3 | *Living Bomb* (módosító – Fireball) | 1 | A Fireball égése élő bomba: ha lejár vagy a célpont meghal, felrobban – a Fireball sebzésének 40%-a 2,5 m-en belül |
+| 4 | Burnout (előfeltétel: Empowered Fire 3/3) | 3 | +10% krit sebzés |
+| 4 | Molten Fury | 3 | +5% sebzés a 35% HP alatti ellenségekre |
+| 5 | **Combustion** (capstone) | 1 | Ha egy fegyvertámadás (első találata) kritikus, lángba borítja a környéket: a célpont és a 2,5 m-en belüli legközelebbi ellenségek (összesen legfeljebb 4) 3 mp alatt a krit sebzés 20%-át kapják égésként (ugyanazt az ellenséget legfeljebb 1 mp-enként) |
+
+#### Mage – Frost fa
+
+Blizzard, fagyasztás, lassítás és jégpáncél. A fa a Blizzardból (RT, mindig megvan) maga
+állítja elő a fagyasztást, így az Ice Lance Frost Nova nélkül is működik; a társak
+kábításait is kihasználja.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Piercing Ice | 3 | +3% Frost sebzés |
+| 1 | Ice Armor | 3 | +2 Armor, és az Ice Barrier +8%-kal többet nyel el |
+| 2 | Improved Blizzard | 3 | A Blizzard sugara +3%, lassítása +10% |
+| 2 | Winter's Chill | 3 | +3% sebzés a lassított ellenségekre |
+| 3 | Arctic Winds | 2 | +2% Frost sebzés és −2% elszenvedett sebzés |
+| 3 | *Deep Freeze* (módosító – Blizzard) | 1 | Amikor a Blizzard véget ér, a benne maradt ellenségek 1,5 mp-re megfagynak |
+| 4 | Flash Freeze (előfeltétel: Improved Blizzard 3/3) | 3 | A Blizzard minden ütésénél 4% esély ellenségenként, hogy 1 mp-re megfagy |
+| 4 | Chilled to the Bone (előfeltétel: Winter's Chill 3/3) | 3 | +4% sebzés a fagyott és kábított ellenségekre |
+| 5 | **Ice Lance** (capstone) | 1 | A fagyott ellenségeket minden találatod kritként éri: a fegyvertalálat garantált krit, a varázslatok, égések és petek (amik nem kritelhetnek) dupla sebzést okoznak (+ Critical Damage bónusz) |
+
+#### Paladin – Holy fa
+
+A co-op gyógyító: több és nagyobb Word of Glory, akkor is jövő Holy Power, ha nem ütsz,
+szélesebb és védelmet adó aura, a sebesült társ lába elé hajított Consecration. A támadás
+gyenge, a hibrid Retributionnel ez javítható.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Healing Light | 3 | A Paladin-képességeid gyógyítása +4% |
+| 1 | Aura Mastery | 3 | +1 Mastery, és az Aura of Devotion hatótávja +1 m |
+| 2 | Eternal Glory | 3 | 8% esély, hogy a Word of Glory nem költ Holy Powert |
+| 2 | Unyielding Faith | 3 | 4 mp-enként 8% esély +1 Holy Powerre (akkor is, ha nem ütsz) |
+| 3 | Light's Grace | 2 | A Word of Glory gyógyítása +8%, és +1 sebesült társat gyógyít |
+| 3 | *Light's Hammer* (módosító – Consecration) | 1 | A Consecrationt a 10 m-en belüli legsebesültebb (80% HP alatti) hős lába elé hajítod (ha nincs ilyen, a saját lábad elé), és a benne álló hősök 0,5 mp-enként a Max HP-juk 1%-át gyógyulják |
+| 4 | Divine Guardian (előfeltétel: Aura Mastery 3/3) | 3 | Az Aura of Devotionön belüli hősök (te is) −2% sebzést kapnak |
+| 4 | Purifying Power | 3 | +5% Holy sebzés |
+| 5 | **Holy Shock** (capstone) | 1 | 4 mp-enként magától: ha 8 m-en belül van 90% HP alatti hős (te is), a legsebesültebbet gyógyítja (1 + a Max HP-ja 6%-a + 0,5 × Spell Power), különben a legközelebbi ellenségre 100%-os fegyversebzésű Holy csapást mér (+0,8 × Spell Power); a Haste és a Cooldown Reduction rövidíti |
+
+#### Paladin – Protection fa
+
+A tank: blokk, páncél és Stamina, blokkolásból jövő Holy Power, és a Consecration mint
+tauntoló föld, amiben állsz. A támadás abból jön, hogy eltalálnak (Reckoning, Holy Shield).
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Redoubt | 3 | Pajzzsal: +3% Block esély és +10% Block Value |
+| 1 | Stoicism | 3 | +2 Stamina és +1 Armor |
+| 2 | Consecrated Ground | 3 | A Consecration +0,5 mp-ig tart |
+| 2 | Guarded by the Light | 3 | Blokkoláskor 10% esély +1 Holy Powerre (legfeljebb 2 mp-enként) |
+| 3 | Ardent Defender | 2 | Ha a HP-d 35% alá esik: a Max HP 8%-át visszagyógyulod, és 8 mp-re +4 Armort kapsz (legfeljebb 20 mp-enként) |
+| 3 | *Righteous Fury* (módosító – Consecration) | 1 | A Consecrationödben álló ellenségek rád fókuszálnak (taunt, tickenként 1 mp-re frissül), és amíg a saját Consecrationödben állsz, −10% sebzést kapsz |
+| 4 | Shield of the Templar (előfeltétel: Redoubt 3/3) | 3 | Pajzzsal −3% elszenvedett sebzés és +10% Block Value |
+| 4 | Reckoning | 3 | Ha eltalálnak, 5% esély egy azonnali extra fegyvertámadásra |
+| 5 | **Holy Shield** (capstone) | 1 | Pajzzsal +20% Block; minden blokkolt találat a támadóra 60%-os fegyversebzésű Holy csapást mér (+0,5 × Spell Power), és a 8 m-en belüli legsebesültebb társadra a Max HP-ja 2%-ának megfelelő elnyelő pajzsot tesz 4 mp-re (legfeljebb 8%-ig halmozódik) |
+
+A Block esélye legfeljebb 50%, és egy blokk legfeljebb a találat 85%-át nyeli el (Block
+Value-tól függetlenül).
+
+#### Paladin – Retribution fa
+
+A csapásmérő: Strength és kritek, Holy Power a kritekből, Holy tűz, gyakoribb Consecration,
+Holy Power-befejező (Divine Verdict), a csapat sebzését emelő aura, és a Seal of Command
+gyógyító szent csapásai. Teljesen ellensúlyozza a kaszt −10% sebzését.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Divine Strength | 3 | +2 Strength |
+| 1 | Conviction | 3 | +2% Crit |
+| 2 | Art of War | 3 | Kritikus fegyvertalálatkor 20% esély +1 Holy Powerre (legfeljebb mp-enként egyszer) |
+| 2 | Sanctity of Battle | 3 | +4% Holy sebzés, és a Consecration cooldownja −0,5 mp |
+| 3 | Vengeance (előfeltétel: Conviction 3/3) | 2 | Kritikus találat után 8 mp-ig +1% sebzés, legfeljebb 2-szer halmozódik |
+| 3 | *Divine Verdict* (módosító – Word of Glory) | 1 | Ha a hatótávon belül senki sincs 80% HP alatt és nincs felélesztendő társ, a Word of Glory gyógyítás helyett ítéletet mond: a 4 m-en belüli legközelebbi ellenségre (elitre / bossra elsőként) 300%-os fegyversebzésű Holy csapás (+1,5 × Spell Power) |
+| 4 | Sanctified Retribution | 3 | Te és az Aura of Devotionön belüli társak +2% sebzést kaptok |
+| 4 | Righteous Vengeance | 3 | A kritikus fegyvertalálat sebzésének 10%-át 4 mp alatt Holy tűzként is elszenvedi a célpont |
+| 5 | **Seal of Command** (capstone) | 1 | Fegyvertámadásonként 15% esély egy extra Holy csapásra: a találat sebzésének 70%-a a célpontra és legfeljebb 2 további, tőle 3 m-en belüli ellenségre; minden ilyen csapás a 8 m-en belüli legsebesültebb hőst (téged is) a Max HP-ja 2%-ával gyógyítja |
+
+#### Rogue – Assassination fa
+
+Mérgek, Combo Pointok és halálos Fan of Knives. A kritikus találat Combo Pointot és Deadly
+Poisont ad, a Fan of Knives befejezőként elkölti őket (az Envenommal a mérget is
+„beváltja”); a capstone a hullám minden 3. legyezőjét garantált kritté teszi.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Malice | 3 | +2% Crit |
+| 1 | Improved Poisons | 3 | +3 Mastery (a Deadly Poison stackenként a krit sebzésének +3%-át okozza) |
+| 2 | Seal Fate (előfeltétel: Malice 3/3) | 3 | A kritikus fegyvertalálat 15% eséllyel egy extra Combo Pointot ad |
+| 2 | Coup de Grace | 3 | A Fan of Knives Combo Pointonként +2% sebzést kap (az alap 20% mellé) |
+| 3 | Lethality | 2 | +10% Critical Damage (tőrrel ×2,5 → ×2,6) |
+| 3 | *Envenom* (módosító – Fan of Knives) | 1 | A Fan of Knives elfogyasztja az eltalált ellenségek Deadly Poisonját: a hátralévő méregsebzés 150%-a azonnal, Nature sebzésként éri őket (ellenségenként dobásonként egyszer) |
+| 4 | Venomous Wounds | 3 | Ha egy Deadly Poisonnal mérgezett ellenség meghal, +1 Energy-t kapsz |
+| 4 | Master Poisoner (előfeltétel: Improved Poisons 3/3) | 3 | A Deadly Poison +1 stackkel többször halmozható (5 → 8), és +4% Nature sebzés |
+| 5 | **Cold Blood** (capstone) | 1 | A hullámban minden 3. Fan of Knives dobás garantált krit +50% krit sebzéssel (tőrrel ×3,0); a tőrök 3 mp-re 30%-kal lelassítják az eltalált ellenségeket |
+
+#### Rogue – Combat fa
+
+Két fegyver, Energy és közelharc a tömeg közepén: kitérés és visszavágás, gyorsabb és dupla
+ütések. A Fan of Knives a többi penge cooldownját pörgeti, a capstone a tömegben felgyorsítja
+az Energy-termelést, és a közeli társakat is gyorsítja.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Lightning Reflexes | 3 | +2% Dodge |
+| 1 | Combat Potency | 3 | +8% esély, hogy a fegyvertámadás 2 Energy-t adjon |
+| 2 | Unfair Advantage (előfeltétel: Lightning Reflexes 3/3) | 3 | +1% Dodge; kitéréskor +25% esély azonnali visszavágásra a fegyvereddel |
+| 2 | Aggression | 3 | +3% Physical sebzés |
+| 3 | Ambidexterity | 2 | Két fegyverrel (Dual Wield) +5% Haste |
+| 3 | *Restless Blades* (módosító – Fan of Knives) | 1 | A Fan of Knives minden elköltött Combo Pointja 0,2 mp-cel csökkenti a többi Rogue-ability cooldownját (5 ponttal 1 mp: Vanish, Killing Spree, Blade Flurry …) |
+| 4 | Hack and Slash | 3 | +4% Extra Attack (a fegyvertalálat azonnal még egyszer üt) |
+| 4 | Blade Tactics | 3 | A Blade Flurry és a Killing Spree +6% erő és −6% cooldown |
+| 5 | **Adrenaline Rush** (capstone) | 1 | Amíg legalább 3 ellenség van 5 m-en belül: +50% Energy-termelés, és a 8 m-en belüli társak +10% Haste-et kapnak |
+
+#### Rogue – Subtlety fa
+
+Vanish, támadás az árnyékból és garantált kritek. A Vanish Combo Pointot, Energy-t és
+sebzést ad, a végén ingyen tőrlegyezőt dob; a capstone után 5 mp-ig minden fegyvertalálat
+krit, és a közeli társak is kritesebbek.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Premeditation | 3 | A Vanish +1 Combo Pointot és +1 garantált kritet ad |
+| 1 | Enveloping Shadows | 3 | +3% Avoidance |
+| 2 | Master of Subtlety (előfeltétel: Premeditation 3/3) | 3 | A Vanish után 6 mp-ig +4% sebzés |
+| 2 | Shadow Focus | 3 | A Vanish 10 Energy-t ad |
+| 3 | Deadened Nerves | 2 | −4% elszenvedett sebzés |
+| 3 | *Unseen Blades* (módosító – Vanish) | 1 | Amikor a Vanish lejár, ingyen (Energy nélkül) dobsz egy Fan of Knives-t az árnyékból; a Combo Pointokat a szokásos módon elkölti |
+| 4 | Find Weakness | 3 | A kritikus fegyvertalálat 8% eséllyel garantált kritté teszi a következő fegyvertalálatot |
+| 4 | Sleight of Hand | 3 | A Shadowstep és a Cheat Death +6% erő és −6% cooldown |
+| 5 | **Shadow Dance** (capstone) | 1 | A Vanish után 5 mp-ig minden fegyvertalálatod krit (a Fan of Knives tőrei és a shurikenek is); a 8 m-en belüli társak ennyi időre +10% Critet kapnak; legfeljebb 12 mp-enként egyszer |
+
+#### Warlock – Affliction fa
+
+Átkok, életszívás és rettegés. Az **Agony** átok minden fegyvertalálattal a célpontra kerül,
+így a fa tanult DoT-abilityk nélkül is működik – a Corruption, a Seed of Corruption és a Fear
+(Dread) mellett még jobban. A capstone az átkozott ellenségek halálát láncreakcióvá teszi.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Curse of Agony | 3 | A fegyvertalálat Agony átkot tesz a célpontra: a találat sebzésének 5%-a Shadow sebzésként 6 mp alatt (az újabb találatok hozzáadódnak) |
+| 1 | Improved Drain Life | 3 | A Drain Life +6% sebzés és gyógyítás, −4% CD |
+| 2 | Shadow Mastery | 3 | +3% Shadow sebzés |
+| 2 | Curse of Exhaustion | 3 | Az átkaid (Agony, Corruption, Seed of Corruption, Dread) alatt álló ellenségek 10%-kal lassabbak |
+| 3 | Malediction | 2 | +6% DoT-sebzés |
+| 3 | *Dark Harvest* (módosító – Drain Life) | 1 | A Drain Life a hatótávján belül minden átkozott ellenséget is szív (legfeljebb 6-ot): egy tick sebzésének 25%-át kapják, és ez is gyógyít |
+| 4 | Writhe in Agony (előfeltétel: Curse of Agony 3/3) | 3 | Ha egy Agony alatt álló ellenség meghal, a megmaradt átok szétoszlik +1 közeli ellenségre (4 m-en belül, a hátralévő idővel; a sebzés összege nem nő) |
+| 4 | Death's Embrace | 3 | +5% sebzés a 35% HP alatti ellenségekre |
+| 5 | **Unstable Affliction** (capstone) | 1 | Ha egy átkaid alatt álló ellenség meghal (bárki ölte meg), szétrobban: Shadow sebzés a 3 m-en belüli ellenségekre és 1 mp kábítás (ellenségenként legfeljebb 4 mp-enként) |
+
+#### Warlock – Demonology fa
+
+Démonok a Warlock oldalán: az állandó Imp, a Voidwalker és az Infernal, Soul Shardok és
+szívós lélek. Az állandó Imp miatt a fa tanult pet nélkül is működik; a Wild Imps módosító a
+Rain of Fire-t démonidézéssé teszi.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Demonic Embrace | 3 | +3 Stamina |
+| 1 | Improved Imp | 3 | Az Imp tűzlövedékei +5% sebzés |
+| 2 | Unholy Power | 3 | +3% pet-sebzés (Imp, Voidwalker, Infernal, Spirit Wolf) |
+| 2 | Soul Harvest | 3 | Egy Soul Shardhoz 1-gyel kevesebb ölés kell (alapból 12) |
+| 3 | Demonic Aegis | 2 | −3% elszenvedett sebzés |
+| 3 | *Wild Imps* (módosító – Rain of Fire) | 1 | A Rain of Fire 2 Wild Impet is megidéz 6 mp-re: úgy harcolnak, mint az Imp, a sebzése 50%-ával (egyszerre legfeljebb 4) |
+| 4 | Master Demonologist (előfeltétel: Unholy Power 3/3) | 3 | +4 Mastery (Demonic Pact: +8% DoT- és pet-sebzés) |
+| 4 | Fel Synergy | 3 | 5 mp-enként a legsebesültebb hős (akár te) a Max HP-ja 1,5%-át gyógyul |
+| 5 | **Soul Link** (capstone) | 1 | A rád eső sebzés 20%-át a démonjaid viselik (−20% elszenvedett sebzés); a petek +30% sebzés |
+
+#### Warlock – Destruction fa
+
+Tűz és árnyék, kritikus találatok és tűzeső. A Staff Fire iskolájú, így a fa a fegyvert, a
+Rain of Fire-t és az Imp tűzlövedékeit egyszerre erősíti; a Soul Shardok több tűzesőt adnak.
+(A képességek nem kritelnek – a krit a fegyvertalálaté.)
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Devastation | 3 | +2% Crit |
+| 1 | Emberstorm | 3 | +3% Fire sebzés (Staff, Rain of Fire, Imp, Infernal) |
+| 2 | Fire and Brimstone | 3 | A Rain of Fire +4% sebzés és +2% sugár |
+| 2 | Aftermath | 3 | A Rain of Fire 10%-kal lassítja a benne álló ellenségeket |
+| 3 | Soul Leech | 2 | A kritikus találat a sebzése 20%-át Shadow sebzésként kiszívja a célpontból, és ennyit gyógyít |
+| 3 | *Shadowburn* (módosító – Drain Life) | 1 | A végigcsatornázott Drain Life végén Shadowburn: a célpont a csatornázás sebzésének 75%-át kapja egyszerre; ha 3 mp-en belül meghal, +1 Soul Shard (legfeljebb 10 mp-enként) |
+| 4 | Ruin (előfeltétel: Devastation 3/3) | 3 | +10% krit sebzés |
+| 4 | Burning Embers | 3 | +1 Soul Shard minden hullám elején |
+| 5 | **Conflagrate** (capstone) | 1 | A Rain of Fire égő földet hagy: a kör még 3 mp-ig ég 40%-os sebzéssel, és 30%-kal lassít; a kritikus találataid 10% eséllyel +1 Soul Shardot adnak |
 
 ### 7.5 Capstone-ok (minden kaszt, minden fa)
 
 | Kaszt | Fa | Capstone | Hatás |
 |---|---|---|---|
-| Warrior | Arms | Mortal Strike | lásd 7.4 |
-| Warrior | Fury | Rampage | Ölésenként +2% sebzés (max 20%), 5 mp-ig tart |
-| Warrior | Protection | Last Stand | Halálos találat helyett +30% Max HP 10 mp-re (hullámonként 1×) |
+| Warrior | Arms | Mortal Strike | Minden 5. fegyvertámadás extra 150%-os csapás, és 8 mp-re Mortal Wound-ot hagy: −50% gyógyulás (a Vampiric eliteken is), +10% sebzés tőled; Execute-tal szinergiában |
+| Warrior | Fury | Rampage | Ölésenként +2% sebzés (max 20%), 5 mp-ig tart (minden ölés frissíti); a 8 m-en belüli társak a bónusz felét kapják |
+| Warrior | Protection | Unbreakable (korábban Last Stand) | Halálos találat helyett talpon maradsz: +30% Max HP 10 mp-re (ennyit gyógyulsz is) és 1 mp sebezhetetlenség, hullámonként 1×; a 8 m-en belüli társak +15% Max HP-t kapnak |
 | Mage | Arcane | Arcane Power | A Mana-költségek +30%-kal nőnek, de minden sebzés +25% |
-| Mage | Fire | Combustion | Minden krit tűzbe borítja a célpont környékét |
-| Mage | Frost | Ice Lance | A fagyott célpontokra tett minden találat dupla és garantált krit |
-| Paladin | Holy | Holy Shock | Automatikus: 4 mp-enként gyógyítja a legsérültebb társat, vagy sebzi a legközelebbi ellenséget |
-| Paladin | Protection | Holy Shield | +20% Block, és a blokkolt találat szent sebzést ad vissza |
-| Paladin | Retribution | Seal of Command | 15% esély találatkor 70%-os extra szent csapásra |
-| Rogue | Assassination | Cold Blood | A Fan of Knives minden 3. használata garantált krit, +50% krit sebzéssel |
-| Rogue | Combat | Adrenaline Rush | Az Energy-regeneráció dupla, ha 3+ ellenség van közel |
-| Rogue | Subtlety | Shadow Dance | A Vanish után 5 mp-ig minden találat krit |
-| Warlock | Affliction | Unstable Affliction | Ha egy DoT-ot lejárat előtt eltávolít egy ellenség, AoE-robbanás és 1 mp-es Silence |
-| Warlock | Demonology | Soul Link | A sebzés 20%-át a pet viseli el; a pet +30% sebzés |
-| Warlock | Destruction | Conflagrate | A Rain of Fire égő földet hagy, és minden kritje +1 Soul Shardot ad (10% eséllyel) |
+| Mage | Fire | Combustion | Ha egy fegyvertámadás kritikus, lángba borítja a célpont környékét: a célpont és a 2,5 m-en belüli legközelebbi ellenségek (összesen legfeljebb 4) 3 mp alatt a krit sebzés 20%-át kapják égésként (ugyanazt az ellenséget legfeljebb 1 mp-enként) |
+| Mage | Frost | Ice Lance | A fagyott ellenségeket minden találatod kritként éri: a fegyvertalálat garantált krit, a varázslatok, égések és petek dupla sebzést okoznak (+ Critical Damage bónusz) |
+| Paladin | Holy | Holy Shock | Automatikus, 4 mp-enként (a Haste és a Cooldown Reduction rövidíti): a 8 m-en belüli legsebesültebb, 90% HP alatti hőst (téged is) a Max HP-ja 6%-ával gyógyítja, különben a legközelebbi ellenségre 100%-os fegyversebzésű Holy csapást mér |
+| Paladin | Protection | Holy Shield | Pajzzsal +20% Block; a blokkolt találat 60%-os fegyversebzésű Holy csapást mér a támadóra, és a 8 m-en belüli legsebesültebb társadra a Max HP-ja 2%-ának megfelelő pajzsot tesz (legfeljebb 8%) |
+| Paladin | Retribution | Seal of Command | Fegyvertámadásonként 15% esély extra Holy csapásra (a találat 70%-a) a célpontra és legfeljebb 2 közeli ellenségre; minden csapás a legsebesültebb közeli hőst a Max HP-ja 2%-ával gyógyítja |
+| Rogue | Assassination | Cold Blood | A hullámban minden 3. Fan of Knives dobás garantált krit +50% krit sebzéssel; az eltalált ellenségek 3 mp-re 30%-kal lelassulnak |
+| Rogue | Combat | Adrenaline Rush | Amíg legalább 3 ellenség van 5 m-en belül, +50% Energy-termelés, és a 8 m-en belüli társak +10% Haste-et kapnak |
+| Rogue | Subtlety | Shadow Dance | A Vanish után 5 mp-ig minden fegyvertalálat krit (a dobott tőrök és shurikenek is), a 8 m-en belüli társak +10% Critet kapnak; legfeljebb 12 mp-enként |
+| Warlock | Affliction | Unstable Affliction | Ha egy ellenség az átkaid (DoT-jaid) alatt hal meg – bárki ölte meg –, instabil árnyrobbanás sebzi a 3 m-en belüli ellenségeket, és 1 mp-re elkábítja őket (ellenségenként legfeljebb 4 mp-enként) |
+| Warlock | Demonology | Soul Link | A sebzés 20%-át a pet viseli el (−20% elszenvedett sebzés, a pet nem halhat meg); a pet +30% sebzés |
+| Warlock | Destruction | Conflagrate | A Rain of Fire égő földet hagy: a kör még 3 mp-ig ég 40%-os sebzéssel, és 30%-kal lassít; a kritikus találataid (fegyvertalálat) 10% eséllyel +1 Soul Shardot adnak |
 | Hunter | Beast Mastery | Bestial Wrath | 30 mp-enként 10 mp-ig a pet +50% sebzést kap és nem lehet lassítani |
 | Hunter | Marksmanship | Trueshot Aura | A közeli társak +5% sebzést kapnak; az Aimed Shot cooldownja felére csökken |
 | Hunter | Survival | Wildfire Bombs | Az Explosive Trap égő földet hagy, és 3 kisebb bombát szór szét |
@@ -982,9 +1382,24 @@ Egy fa **5 szintből (tier)** áll:
 | Shaman | Enhancement | Stormstrike | Minden 5. fegyvertalálat dupla villámcsapást vált ki |
 | Shaman | Restoration | Spirit Link Totem | Totem, ami kiegyenlíti a közeli társak HP-ját, és 20%-kal csökkenti a sebzésüket (co-op) |
 
-> **MVP-terjedelem:** mind az 5 kaszt × 3 fa váza, és mind a 15 capstone. A részletes
-> tier 1–4 talenteket a Warrior Arms mintája alapján, fánként egyenként tervezzük ki a
-> fejlesztés során (`TalentTreeData` adatfájlokban).
+**Értelmezések (a játék szabályai miatt):**
+- **A képességek nem kritelnek** (csak a Rogue fegyvertalálatos abilityjei), ezért a kritre
+  épülő capstone-ok a **fegyvertalálat** kritjére épülnek: Combustion, Ice Lance, Conflagrate.
+  - Az Ice Lance a nem kritelő találatokat (varázslat, égés, pet) duplázza.
+  - Az Ice Lance a procokat nem duplázza, mert azok már a fegyvertalálat kritjéből jönnek.
+- **Az ellenségek nem dispellelnek és nem varázsolnak:** az Unstable Affliction a halálra
+  reagál, a Silence helyett kábít.
+- **Az ellenségek nem gyógyulnak**, kivéve a Vampiric eliteket: a Mortal Strike −50%
+  gyógyulása rajtuk hat, és a Mortal Wound +10% sebzést is ad tőled.
+- **„Találatonként” = támadásonként:** egy ívcsapás, robbanó vagy átlövő lövedék egy
+  támadásnak számít (Mortal Strike, Combustion, Seal of Command). Az extra támadás külön
+  támadás.
+- **Co-op ráadások:** több capstone a társakat is segíti – Rampage, Unbreakable, Holy Shield,
+  Seal of Command, a Cold Blood lassítása, Adrenaline Rush, Shadow Dance.
+  - A társakra ható rész mindig kisebb a saját hatásnál.
+  - Minden hős a saját kulcsán adja, így két azonos kasztú hős hatása szorzódik, mint két
+    Battle Shouté.
+- **Mind a 15 capstone M5-ben kész** (a Hunter és a Shaman fái M8-ban jönnek).
 
 ### 7.6 Kapcsolat a többi rendszerrel
 
@@ -1010,29 +1425,79 @@ A fajok WoW-hangulatúak, de saját nevűek.
 | **Cultist Acolyte** | Kultista | Gyógyítja / pajzsolja a többieket, elsődleges célpont | 9. hullámtól |
 | **Flesh Golem** | Varrott óriás | Lassú, sok HP, időnként maga felé húz | 12. hullámtól |
 
+**Elitek**
+
+- **Mikor:** az 5. hullámtól, véletlenszerűen.
+  - Hullámonkénti várható szám: `(0,4 + 0,06 × (hullám − 5)) × (1 + 0,35 × (játékosok − 1))`.
+    A tört rész az esély még egy elitre.
+  - Egy játékossal az 5. hullámban 0,4, a 15.-ben 1,0, a 25.-ben 1,6; 4 játékossal ennek
+    2,05-szöröse.
+  - A 10., 20. és 25. hullám M6-ig normál hullámként viselkedik.
+- **Melyik ellenség:** a hullám 15–70%-a közé sorsolt időpontok után a következő csoport első
+  tagja lesz elit (bármilyen típus); egy időpont egy elitet ad. Az elitek beleszámítanak a
+  pályán lévő ellenségek számába.
+- **Erő:** 3× HP, ×1,3 méret, és **1 véletlen affix**:
+  - **Shielding:** érkezéskor és utána 8 mp-enként (ha az előző elfogyott) a Max HP-ja 30%-ának
+    megfelelő elnyelő pajzs, kék buborék; a sebzés először a pajzsot viszi („Absorb”).
+  - **Enraged:** 50% HP alatt egyszer: +50% sebzés, +30% sebesség, nem lassítható (a kábítás,
+    a fagyasztás és a fear működik), vörös árnyalat.
+  - **Frenzied:** +25% sebesség; a támadások, a nekirugaszkodás és az érintéses sebzés
+    cooldownja ×0,6.
+  - **Vampiric:** minden találata (közelharc vagy lövedék), ami hőst ér, a Max HP-ja 10%-ával
+    gyógyítja. A gyógyuláscsökkentés (Mortal Strike) hat rá.
+- **Kinézet:** ezüst, sárkányszárnyas névtábla a feje fölött („<Affix> <név>” ezüstben), alatta
+  vékony HP-csík és a pajzs szegmense. Az ellenségeknek nincs portréjuk, ezért nincs
+  portrékeret.
+- **Jutalom:**
+  - 10 gold (a normál gold helyett) és ×5 XP.
+  - **Garantált Rare+ item** (a gyilkos Fortune-jével), amit a hullám végén **Need / Greed /
+    Pass** dobással osztunk el (lásd 10.1). Ez nem számít bele a normál drop hullámlimitjébe.
+  - A normál dropesély is megmarad.
+  - A hullám végén eltűnő (meg nem ölt) elit nem ad semmit.
+- **Kivégzés:** az Execute az eliteket is azonnal megöli a küszöb alatt; a Slayer stat hat
+  rájuk.
+- **20. hullám – elit-hullám** (minden ellenség affixet kap): M6.
+
 **Loot Goblin** (ritka, különleges ellenség)
 
-- **Megjelenés:** a 3. hullámtól hullámonként 15% eséllyel jelenik meg (a Fortune növeli),
-  hullámonként legfeljebb 1. Elit- és boss-hullámon nem jön.
-- **Bejelentés:** csilingelő hang és kiírás: „*A Loot Goblin appeared!*”.
-- **Viselkedés:** **nem támad, menekül** a játékosoktól, gyors, sok HP-ja van.
-  15 mp után portált nyit, és eltűnik.
-- **Találatkor:** minden találatnál goldérmék szóródnak belőle.
+- **Megjelenés:**
+  - A 3. hullámtól, a 10., 20. és 25. hullám kivételével (boss- és elit-hullám), hullámonként
+    legfeljebb 1.
+  - Esély: **15% + 0,5 százalékpont** a csapat legmagasabb Fortune-jű élő hősének minden
+    Fortune-pontjáért, legfeljebb 50%.
+  - Időpont: a hullám 3. másodperce és a hullám 35%-a között jön, és csak akkor, ha utána még
+    legalább 18 mp hátravan.
+- **Bejelentés:** arany felirat: „*A Loot Goblin appeared!*” (a csilingelő hang az M7
+  hangrendszerrel jön). A feje fölött arany „Loot Goblin” felirat.
+- **Kamera:** a kamera a Loot Goblint is keretezi, amíg él és meg nem szökött (a portál
+  nyitása alatt is, mert addig még megölhető): kizoomol érte (legfeljebb a maximális
+  távolságig). A hősök mindig elsőbbséget kapnak: ha keskeny képernyőn nem fér ki velük
+  együtt, a kép csak felé dől, és a goblin sosem korlátozza, hova léphet egy hős. A
+  „Loot Goblin” felirat sosem lóg ki a képből: a képernyő szélén a szél mentén csúszik, így a
+  goblin irányát is mutatja.
+- **Viselkedés:**
+  - **Nem támad, menekül** a játékosoktól (a közelebbiektől erősebben), kerüli a falakat, és
+    0,6–1,2 mp-enként véletlenül irányt vált. Érintéssel nem sebez.
+  - 30 alap HP a szokásos hullám- és co-op-növekedéssel (≈ 7,5 Skeleton Gruntnyi).
+  - 4,4 m/s: gyors, de lassabb a hősöknél (5 m/s), így utol lehet érni.
+  - **Működik rajta:** kábítás, fagyasztás, lassítás, hátralökés.
+  - **Nem működik:** taunt, fear.
+- **Szökés:** 15 mp után megáll, és 1,2 mp alatt portált nyit – közben még megölhető –, majd
+  eltűnik: „*The Loot Goblin escaped!*” (szürke).
+- **Találatkor:** minden találatnál 1 goldérme szóródik belőle, legalább 0,15 mp-enként,
+  goblinonként legfeljebb 30.
 - **Ha megölik:**
-  - 30× a hullám átlagos ellenség-goldja,
-  - nagy XP-csomag (kb. 25 normál ellenségnyi),
-  - garantált item (Rare+, 25% eséllyel Epic+), Need / Greed / Pass dobással (lásd 10.1).
+  - 30× a hullám átlagos ellenség-goldja, kb. 8 kupacban,
+  - 25× a hullám átlagos ellenség-XP-je,
+  - garantált item (Rare+, 25% eséllyel Epic+), Need / Greed / Pass dobással (lásd 10.1); nem
+    számít a normál drop limitbe.
+- **Elit vagy nem:** a Slayer szempontjából elitnek számít, de elit-jutalmat (10 gold, ×5 XP,
+  elit-drop) nem kap. Az Execute normál ellenségként kezeli.
+- **Botok:** ha nincs más ellenség a közelükben és van elég HP-juk, üldözik.
 - **Ritka változat (később):** *Golden Goblin* – 1% eséllyel, csak goldot dob, de
   nagyon sokat.
 - **Co-op:** a csapatnak össze kell hangolnia, hogy körbezárják (pl. Frost Nova,
-  Hammer of Justice, Fear).
-
-**Elitek**
-
-- Az 5. hullámtól véletlenszerűen jelennek meg, ezüst sárkányos portrékerettel és névvel.
-- 3× HP, 1 véletlen affix (Shielding, Enraged, Frenzied, Vampiric).
-- Garantált itemet dobnak (Rare+), amit a hullám végén **Need / Greed / Pass** dobással
-  osztunk el (lásd 10.1).
+  Hammer of Justice, Charge, Blizzard lassítása).
 
 **Bossok**
 
@@ -1057,23 +1522,24 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
   - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
-  - sebzés-szorzó: `(1 + 0,15 × n) × 1,08^n`.
+  - sebzés-szorzó: `(1 + 0,15 × n) × 1,10^n`.
 
   Az összeadódó növekedést (+12% HP, +15% sebzés hullámonként) egy hullámonként kamatozó
-  szorzó egészíti ki (+22% HP, +8% sebzés), mert a hősök ereje (itemek, rangok, kártyák) is
-  kamatozva nő. Közelítő értékek (HP / sebzés):
+  szorzó egészíti ki (+22% HP, +10% sebzés), mert a hősök ereje (itemek, rangok, kártyák,
+  M5-től talentek, setek, kovácsolás) is kamatozva nő. Közelítő értékek (HP / sebzés):
 
   | Hullám | HP | Sebzés |
   |---|---|---|
-  | 5. | ×3,3 | ×2,2 |
-  | 10. | ×12 | ×4,7 |
-  | 15. | ×43 | ×9,1 |
-  | 20. | ×143 | ×17 |
-  | 25. | ×459 | ×29 |
+  | 5. | ×3,3 | ×2,3 |
+  | 10. | ×12 | ×5,5 |
+  | 15. | ×43 | ×12 |
+  | 20. | ×143 | ×24 |
+  | 25. | ×459 | ×45 |
 
-  A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez ideiglenes hangolás
-  M4 után, 4 ellenségtípussal; a végleges egyensúly M6-ban jön. A korábbi kiinduló érték +12%
-  HP és +8% sebzés volt, kamatozás nélkül.
+  A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez az M5 utáni
+  ideiglenes hangolás (talentekkel, setekkel, elitekkel, Loot Goblinnal); a végleges egyensúly
+  M6-ban jön. Korábban (M4) +8% volt a kamatozó sebzés, még korábban +12% HP és +8% sebzés,
+  kamatozás nélkül.
 - **Spawn:** a spawnpontok a pálya szélén és véletlen belső pontokon vannak, 1 mp-es
   figyelmeztető jellel (piros rúna a földön), mint a Brotatóban.
 - **Co-op skálázás:** minden további játékos után
@@ -1084,15 +1550,23 @@ A fajok WoW-hangulatúak, de saját nevűek.
   ellenségszám-szorzóval. Egy 4 fős teljes menet kb. 15 000 ellenség. Mivel minden ellenség
   goldot és XP-t ad, a szám lassan nő; a késői nehézséget a HP- és sebzés-skálázás adja.
 - **Ellenség-sebzés csapatlétszám szerint:** az ellenségek érintéses és lövedéksebzését a
-  csapatlétszám is szorozza: 1 / 2 / 3 / 4 játékosnál ×0,35 / ×0,45 / ×0,6 / ×0,8 (kb. ×1,3
+  csapatlétszám is szorozza: 1 / 2 / 3 / 4 játékosnál ×0,45 / ×0,6 / ×0,75 / ×0,95 (kb. ×1,3
   minden további játékossal).
   - **Miért:** kisebb csapatban kevesebben tudják felsegíteni az elesett hőst (egyedül az első
     elesés már vereség), és egy hősre több ellenség jut (a +60% ellenségszám kevesebb, mint egy
     újabb fejadag).
-  - A teljes csapat is ×0,8-at kap, mert a hullámgörbe teljes értékével 5 próbából 3-ban
-    elesett az egész csapat a 13–21. hullámon.
+  - A teljes csapat ×0,95-öt kap: M5 után (talentek, setek) ×0,9-cel 8 próbából egyik sem
+    esett el, és a késői hullámok nyomása több seeden gyenge volt; ×1,0-val 5 próbából kettő
+    már a 17–18. hullámon elesett.
   - Az ellenség HP-ja, száma és a gazdaság nem változik.
-  - Ideiglenes hangolás M4 után; a végleges egyensúly M6-ban jön.
+  - Ideiglenes hangolás M5 után; a végleges egyensúly M6-ban jön.
+  - **M5 mérés (botok, 25 hullám):** 4 fő: 8 seedből 7 végigért, 1 csapat a 20. hullámon
+    esett el, az első elesések a 5–22. hullámon, a 20–25. hullámon erős a nyomás. 2 fő: 6
+    próbából 5 végigért, 1 a 23. hullámon esett el. 1 fő: 13 próbából 6 végigért, a többi a
+    8–24. hullámon halt meg.
+  - **Nyitott kérdések M6-ra:** egyedül nagy a kasztok közti szórás (a Warrior egyedül a
+    15–19. hullámon hal meg, a Paladin és a Warlock végigér), és a késői kassza gyakran 2000
+    gold fölött van.
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
@@ -1127,18 +1601,38 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 **Koordinációs eszközök (hogy a közös kassza ne okozzon káoszt)**
 
-- **Kívánságjelzés (Ping):** a játékos megjelölhet egy bolti ajánlatot vagy Trainer-rangot
-  (kontrolleren a jobb kar benyomásával). Ekkor a többiek paneljén megjelenik:
-  „*P2 wants: Rare Dagger – 62g*”.
-- **Vásárlás megerősítése:** ha a vásárlás a kassza **több mint 50%-át** elvinné, 1 mp-ig
-  nyomva kell tartani az „A” gombot. Ez véletlen nagy költés ellen véd.
-- **Költésnapló:** a képernyő tetején a kassza mellett egy rövid lista látszik: ki mit vett
-  és mennyiért ebben a körben.
-- **Ready-állapot:** a kassza mellett látszik, ki van már kész. A ready-t meg lehet szüntetni,
-  ha valaki még vásárolni akar.
-- **Egyidejű vásárlás:** ha két játékos ugyanabban a pillanatban költene, és már csak az
-  egyiknek jut fedezet, az nyer, aki előbb nyomta meg a gombot. A másik „*Not enough gold*”
-  üzenetet kap.
+- **Kívánságjelzés (Ping):** a játékos a jobb kar benyomásával (R3, billentyűzeten Tab)
+  megjelölhet egy bolti ajánlatot vagy egy **Trainer-rangot**.
+  - A bolti ping a játékos színével az ajánlaton látszik, és rerollnál megmarad.
+  - A Trainer-ping a Trainer-soron látszik.
+  - Mindkettő megjelenik a kassza melletti táblán: „*Wants: P2 [Rare Dagger] 62 g · P4 Fireball
+    Rank III 45 g*”.
+  - A megvásárlás vagy egy új kör törli a jelzést.
+- **Vásárlás megerősítése:** ha a költés a kassza **több mint 50%-át** elvinné, 1 mp-ig nyomva
+  kell tartani az „A” gombot. Ez véletlen nagy költés ellen véd.
+  - Érvényes a bolti vásárlásra, a Trainer-rangra és a **Reset Talents**-re.
+  - A Reset Talents-nél ehhez még egy megerősítő A is kell.
+  - Rerollnál nincs nyomva tartás: a bolti reroll közös szavazás, a szintlépési reroll pedig
+    kicsi összeg.
+- **Kassza-tábla (Purse board):** a képernyő tetején, a kassza mellett. Három része van:
+  - **Ready-pipek:** minden játékosnak egy rombusz a színében, kitöltve, ha kész.
+  - **Költésnapló** (csak ez a kör, a legújabb elöl, legfeljebb két sor, utána „+N more”): ki,
+    mit, mennyiért. Pl. „*P1 [Rare Dagger] 62 · P2 Fireball Rank III 45 · Team Stall reroll
+    12*”.
+    - Minden költés benne van: bolti vásárlás, automatikus kovácsolás, bolti reroll
+      („Team”), Trainer-rang, szintlépési reroll, talent-reset.
+    - Az eladás és a Greed bevétele nem.
+  - **Kívánságsor:** a bolti és a Trainer-pingek összesítve. Ha a költésnapló csak egy sort
+    foglal, a kívánságsor a felszabadult második sort is használja.
+  - A bolt saját visszajelző sora (a pult alján) is megmarad.
+- **Ready-állapot:** a kassza mellett, a pipeken látszik, ki van már kész; a lenti ready-chipek
+  (a visszaszámlálással) megmaradnak. A ready-t a B megszünteti, ha valaki még vásárolni akar.
+- **Talentpont-jelzés:** a ready-chipen kis „★N” jelzi, ha a hősnek N szabad talentpontja
+  van.
+- **Egyidejű vásárlás:** ha két játékos ugyanabban a képkockában költene, és már csak az
+  egyiknek jut fedezet, a kisebb sorszámú játékos nyer (P1 → P4). A gombnyomások sorrendje egy
+  képkockán belül nem mérhető. A másik „*Not enough gold*” üzenetet kap, a naplóban egy
+  bejegyzés lesz.
 
 **XP**
 
@@ -1350,12 +1844,13 @@ indulnak.
 - **Trainer fül:** a megtanult abilityk listája, a jelenlegi rang, a következő rang
   hatása, ára és egy „Train” gomb. A Rank V-nél a 2 specializáció közül lehet választani.
 - **Talents fül:** WoW-szerű elrendezés – a 3 fa egymás mellett, tierenként sorokban.
-  - Kontrollerrel rácsban lehet lépkedni; „A” = pont elköltése, „X” = pont visszavétele
-    a fül bezárása előtt.
+  - Kontrollerrel rácsban lehet lépkedni; „A” = pont elköltése, „X” = az utolsó hullám óta
+    elköltött pont visszavétele, „Y” = a következő rang előnézete (lásd 7.3).
   - Felül a szabad pontok száma, alul a „Reset Talents” gomb és az ára.
 - **Kovácsolás:** a Character fülön a fegyvert kiválasztva (A) egy műveletmenü jelenik meg:
-  Equip / Forge / Sell. A Forge csak akkor aktív, ha van azonos párja. A boltban üllő-ikon
-  jelzi a kovácsolható ajánlatot.
+  Equip / Forge / Sell / Trade / Cancel. A Forge csak akkor aktív, ha van azonos párja;
+  különben szürke, és kiírja az okát (lásd 4.1). A boltban üllő-pip jelzi a kovácsolható
+  ajánlatot annak a játékosnak a színében, akinek van hozzá párja.
 - **Character fül:** WoW-szerű karakterpanel – bal oldalon a páncélslotok, jobb oldalon az
   ékszerek és trinketek, alul a fegyverek, középen a karakter 3D modellje, alatta a statlista.
 - **Backpack:** 10 hely a panel alján.
@@ -1506,6 +2001,43 @@ indulnak.
 | M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
+### 16.1 Jóváhagyott ötletek (backlog)
+
+A playtest után elfogadott bővítések, a tervezett mérföldkővel. A részletek a megvalósításkor
+kerülnek a megfelelő fejezetbe.
+
+| Ötlet | Mit jelent | Mérföldkő |
+|---|---|---|
+| **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
+| **Sebzésmérő és díjak** | WoW-szerű damage meter (sebzés, gyógyítás, elnyelt sebzés, felélesztések) a menet végén; címek: „Most damage”, „Most revives”, „Most deaths” stb. | M6 |
+| **Menet végi összefoglaló kártya** | Megosztható kép: kasztok, elért hullám, idő, legjobb itemek, díjak | M6 |
+| **Véletlen környezet menetenként** | 5 féle aréna-környezet (pl. temető, mocsár, vulkán, jégbarlang, erdei rom) saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | M6 (tartalom), M7 (látvány) |
+| **Hullám közbeni események** | Őrzött kincsesláda, megvédendő totem, elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | M6 |
+| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | M6 |
+| **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, ranglistával | M6 |
+| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | M6 |
+| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | M6 |
+| **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+
+**Dungeon-portál (M6)**
+
+- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után**: a hullámok közti szünetben
+  portál nyílik az arénában.
+- **Opcionális:** a csapat közösen dönt, belép-e (mint a bolti rerollnál, mindenki szavaz).
+  Ha nem lépnek be, a menet a szokásos módon folytatódik.
+- **Belül:** 3–4 kisebb, zárt terem egymás után, mindegyikben egy feladattal (takarítás,
+  túlélés, valami megvédése), a végén egy **mini-boss**. A harcrendszer és az aréna-technika
+  ugyanaz, mint a menetben.
+- **Szabályok:** nincs Spirit Healer, csak a társak tudnak feléleszteni.
+- **Siker:** nagyobb esély tier set-darabra, garantált Epic item (Need / Greed / Pass), később
+  Artifact-esély is.
+- **Bukás** (mindenki elesett): a dungeon véget ér, a csapat elveszíti a közös kassza
+  **50%-át**, és a menet a következő hullámmal folytatódik (a hullám elején mindenki feléled).
+- **Szerepek:** a kasztok úgy működnek, mint a menetben; külön tank / healer / DPS
+  hangsúly nincs.
+- **Később (M10, ha az M6-os változat bevált):** külön Dungeon mód a főmenüből, egymásba
+  nyíló termekkel és több bosszal.
+
 ---
 
 ## 17. Meta-progresszió (utolsó mérföldkő, M9)
@@ -1602,7 +2134,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 
 ## 18. Nyitott kérdések
 
-1. A 14 hiányzó talentfa részletes kidolgozása most, vagy a fejlesztés közben (M5)?
+Jelenleg nincs nyitott kérdés.
 
 ### Lezárt döntések
 
@@ -1614,7 +2146,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Cím | SmartOnion |
 | Nyelv | Angol |
 | Kamera | Közös képernyő; korlátos kizoomolás, a képernyő széle falként megállítja a játékosokat |
-| Felélesztés | Spirit Healer a pálya közepén: folyamatos 10 mp-es számláló, minden pulzus a körében álló szellemeket 100% HP-val feléleszti, utána 15 mp Resurrection Sickness (addig a Healer nem éleszt újra); egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog |
+| Felélesztés | Spirit Healer a pálya közepén: folyamatos 10 mp-es számláló, minden pulzus a körében álló szellemeket 100% HP-val feléleszti, utána 15 mp Resurrection Sickness (addig a Healer nem éleszt újra); egy társ 5 mp alatt is feléleszt (30% HP), cast barral és animációval; a szellem normál sebességgel mozog; a szellem 1,8 m-es körében az ellenségek 33%-kal lassabbak (nem halmozódik) |
 | Gyógyulás | Minden hullám elején teljes HP |
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
@@ -1623,6 +2155,7 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 | Zene | Egyelőre nincs |
 | Célzás | Csak automatikus (fegyverek és képességek); nincs kézi célzás |
 | Paladin Word of Glory | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP), kivéve, ha a Spirit Healer 1 mp-en belül úgyis feléleszti |
+| Talentfák | Mind a 15 fa kidolgozva (7.4), az M5-ben; a capstone-értelmezések a 7.5 alatt |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
 | Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |

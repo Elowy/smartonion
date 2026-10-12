@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"wand"
+display_name = "Moonquill"
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"every": 5,
+"hit_pct": 100.0,
+"at": "target",
+"radius": 2.5,
+"slow": 30.0,
+"slow_duration": 2.0,
+"school": "arcane"
+}
+unique_text = "Every 5th bolt bursts into moonlight: 100% of the hit as Arcane damage to the target and every enemy within 2.5 m, slowing them by 30% for 2 sec."
+flavor = "Written with starlight, signed with a flick."

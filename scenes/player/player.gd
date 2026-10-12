@@ -6,19 +6,26 @@ extends CharacterBody3D
 ##
 ## Stats come from a StatBlock with the sources &"base" (Stats.BASE_MASTERY), &"class"
 ## (ClassData.base_stats), &"weapon:main", &"weapon:off" (WeaponData.bonus_stats), the
-## equipped items, &"level" (LEVEL_STAMINA per team level gained) and &"level_cards" (stat
-## level-up cards). Every equipped weapon that
+## equipped items, &"level" (LEVEL_STAMINA per team level gained), &"level_cards" (stat
+## level-up cards), &"armor_spec" (refresh_armor_spec) and, from M5, &"talents" and
+## &"set_bonus" (the stats entries of [member bonuses]). Every equipped weapon that
 ## attacks gets its own WeaponRunner child. At 0 HP the player is downed (a ghost that does
 ## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
 ## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
 ## the arena's [SpiritHealer] (its 10 s pulse revives ghosts in its circle at full HP – see
-## healer_channel – and gives RES_SICKNESS_TIME of Resurrection Sickness).
+## healer_channel – and gives RES_SICKNESS_TIME of Resurrection Sickness). While downed, the
+## enemies inside the ghost's revive circle walk GHOST_SLOW_PCT slower (GDD 16.1, the ghost
+## slow: [method _update_ghost_slow]).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 ## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
 ## (refreshed on equipment.changed); weapon hits report to on_hit_dealt(), kills to
 ## notify_kill() (Life on Kill, on-kill procs); take_damage() handles Parry (riposte), Block
 ## Value, proc shields, cheat-death, Thorns and the when-struck / low-HP procs.
+## M5: [member talents] (TalentState) and [member bonuses] (PlayerBonuses, the bonus-effect
+## engine of talents and set bonuses) – every hook (hits with the base amount, kills, damage
+## taken, avoided hits, casts, wave start / end, ticks) reaches the engine; talent changes
+## re-apply the &"talents" entries, apply_equipment the &"set_bonus" ones.
 
 signal hp_changed(hp: float, max_hp: float)
 signal downed_changed(is_downed: bool)
@@ -38,6 +45,13 @@ const REVIVE_TIME := 5.0
 ## Every additional living reviver inside REVIVE_RADIUS adds this much revive speed
 ## (GDD 1: 1 reviver = 1x, 2 = 1.5x, 3 = 2x).
 const REVIVE_SPEED_PER_EXTRA_REVIVER := 0.5
+## Ghost slow (GDD 16.1): enemies whose centre is inside a downed hero's revive circle
+## (REVIVE_RADIUS around the ghost) walk this many percent slower, so the teammate channelling
+## the revive is not left defenceless. The ghost refreshes it every physics tick
+## (Enemy.apply_ghost_slow) for GHOST_SLOW_LINGER s, so it ends that soon after the enemy left
+## the circle or the ghost revived.
+const GHOST_SLOW_PCT := 33.0
+const GHOST_SLOW_LINGER := 0.1
 const INVULNERABLE_AFTER_HIT := 0.35
 
 ## Collision capsule height (the onion is ~1.3 m tall).
@@ -111,12 +125,21 @@ var equipment: Equipment
 var procs: ProcSystem
 ## Class abilities, resources and Mastery (child node "Abilities", GDD 3).
 var abilities: AbilityRunner
+## Talent / set-bonus effects (M5): the bonus-effect engine of this hero.
+var bonuses: PlayerBonuses
+## This hero's talent ranks and points (M5, GDD 7).
+var talents: TalentState
+## Base amount of the weapon hit being reported by on_hit_dealt (after the crit, before
+## Executioner / Slayer and the outgoing multipliers – valid during that call; kits read it).
+var last_hit_base := 0.0
 ## The next N weapon hits are guaranteed critical strikes (Vanish, talents ...).
 var forced_crits := 0
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
+## Enemies this ghost's revive circle slowed on its last tick (0 when alive; GDD 16.1).
+var ghost_slowed := 0
 ## Set every tick by the [SpiritHealer] while this ghost waits in its circle: progress
 ## towards the next pulse (0..1, 0 = not waiting) and the seconds until it (-1 = none). The
 ## cast bar shows whichever revive – teammates' or the healer's – is closer to completion.
@@ -178,6 +201,11 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.abilities = AbilityRunner.create(p)
 	p.add_child(p.abilities)
 	p.add_child(p.procs)
+	p.bonuses = PlayerBonuses.create(p)
+	p.talents = TalentState.create(p.class_data.id if p.class_data != null else &"")
+	p.talents.changed.connect(p._on_talents_changed)
+	p.bonuses.changed.connect(p._on_bonuses_changed)
+	p.abilities.ability_cast.connect(p._on_ability_cast)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons()
 	p.apply_equipment()
@@ -237,14 +265,27 @@ func is_reviving() -> bool:
 	return false
 
 
-## Wave cleared (before the intermission): abilities / Mastery drop auras and buffs.
+## Wave cleared (before the intermission): abilities / Mastery and talent / set scripts drop
+## auras and buffs, the proc buffs end (ProcSystem.end_wave), and Armor Specialization is
+## recomputed from what stays for the market.
 func end_wave() -> void:
 	if abilities != null:
 		abilities.end_wave()
+	if bonuses != null:
+		bonuses.end_wave()
+	if procs != null:
+		procs.end_wave()
+	refresh_armor_spec()
 
 
-## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1).
+## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1). The
+## talent points spent in the market become permanent first; once the last wave's proc buffs
+## are gone, Armor Specialization is recomputed (no share of an ended buff carries into the
+## wave); after the class resources were reset, the wave_start procs fire and the talent / set
+## scripts start their wave.
 func begin_wave() -> void:
+	if talents != null:
+		talents.commit()
 	velocity = Vector3.ZERO
 	_regen_accum = 0.0
 	_attack_look_left = 0.0
@@ -264,13 +305,20 @@ func begin_wave() -> void:
 		runner.reset()
 	if procs != null:
 		procs.begin_wave()
+	refresh_armor_spec()
 	if abilities != null:
 		abilities.begin_wave()
+	if procs != null:
+		procs.after_wave_start()
+	if bonuses != null:
+		bonuses.begin_wave()
 
 
 ## Called by enemies / enemy projectiles. Rolls dodge, parry (melee: negates the hit and
 ## ripostes) and block (Block Value absorbs more), applies armour etc., then a proc shield,
-## a cheat-death effect, Thorns (melee) and the when-struck / low-HP procs.
+## a cheat-death effect, Thorns (melee) and the when-struck / low-HP procs. A dodge, parry or
+## block reports to the procs / bonuses (_avoided); talent / set damage-taken entries scale the
+## damage after the temporary multipliers.
 ## [param kind] is one of CombatMath.KIND_*.
 func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null) -> void:
 	if downed or invulnerable_left > 0.0 or raw <= 0.0:
@@ -278,21 +326,25 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	var rng := RunState.rng
 	_text_side = -_text_side
 	var text_pos := self_text_position(_text_side)
+	var valid_source: Node3D = source if source != null and is_instance_valid(source) else null
 	if stats.get_stat(Stats.DODGE) > 0.0 and CombatMath.roll_dodge(stats, rng):
 		Vfx.floating_text(text_pos, "Dodge", DODGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+		_avoided(&"dodge", valid_source)
 		return
-	var valid_source: Node3D = source if source != null and is_instance_valid(source) else null
 	var attacker: Enemy = valid_source as Enemy
 	if kind == CombatMath.KIND_MELEE and stats.get_raw(Stats.PARRY) > 0.0 \
 			and CombatMath.roll_parry(stats, rng):
 		Vfx.floating_text(text_pos, "Parry", PARRY_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 		_riposte(attacker)
+		_avoided(&"parry", valid_source)
 		return
 	var amount := raw
 	var block := block_chance()
 	if block > 0.0 and CombatMath.roll_block(block, rng):
 		amount *= 1.0 - CombatMath.block_absorb(stats.get_raw(Stats.BLOCK_VALUE))
 		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
+		# Both a full and a partial block count as blocked.
+		_avoided(&"block", valid_source)
 		if amount <= 0.0001:
 			invulnerable_left = INVULNERABLE_AFTER_HIT
 			_thorns(attacker, kind)
@@ -300,6 +352,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	var dmg := CombatMath.incoming_damage(amount, stats, kind)
 	for m: float in damage_taken_mults.values():
 		dmg *= maxf(0.0, m)
+	if bonuses != null:
+		dmg *= bonuses.damage_taken_mult(kind, valid_source)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
@@ -320,6 +374,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	damage_taken.emit(dmg, source)
 	if abilities != null:
 		abilities.on_damage_taken(dmg)
+	if bonuses != null:
+		bonuses.on_damage_taken(dmg, valid_source)
 	if hp <= 0.0:
 		_go_down()
 	_thorns(attacker, kind)
@@ -346,15 +402,24 @@ func heal(amount: float) -> void:
 ## trigger further extra attacks) are passed on to the procs. On-hit procs roll once per
 ## attack: the further hits of a melee arc / projectile fan / pierce / explosion pass
 ## [param roll_procs] = false (leech still rolls per hit).
+## [param damage] is the dealt amount; [param base_damage] the hit's base amount (after the
+## crit, before Executioner / Slayer and the outgoing multipliers; < 0 = the dealt amount) –
+## what damage derived from the hit starts from (architecture §2.1): the procs and the talent /
+## set scripts get it (bonuses.on_hit on every hit, [code]first[/code] = roll_procs), and it is
+## [member last_hit_base] during the call. The Mastery keeps the dealt amount (M4 tuning).
 func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_crit: bool = false,
-		is_extra: bool = false, roll_procs: bool = true) -> void:
+		is_extra: bool = false, roll_procs: bool = true, base_damage: float = -1.0) -> void:
 	if downed:
 		return
+	var base := base_damage if base_damage >= 0.0 else damage
+	last_hit_base = base
 	hit_dealt.emit(damage, target)
 	if stats.get_stat(Stats.LEECH) > 0.0 and CombatMath.roll_leech(stats, RunState.rng):
 		heal(1.0)
 	if roll_procs and procs != null and target != null and is_instance_valid(target):
-		procs.on_hit(target, damage, weapon, is_crit, is_extra)
+		procs.on_hit(target, base, weapon, is_crit, is_extra)
+	if bonuses != null:
+		bonuses.on_hit(target, base, is_crit, roll_procs)
 	if abilities != null:
 		abilities.on_weapon_hit(target, damage, is_crit)
 
@@ -371,13 +436,18 @@ func notify_kill(enemy: Node3D) -> void:
 		heal(1.0)
 	if procs != null:
 		procs.on_kill(enemy)
+	if bonuses != null:
+		bonuses.on_kill(enemy)
 
 
 # --- Extra public helpers ------------------------------------------------------
 
 ## Re-applies [member equipment]: one stat source per equipped position (Items.source_for),
-## the equipped weapons (their bonus stats) and then Armor Specialization (+10% of the primary
-## stat with every other source – weapons included – in place, GDD 5.3).
+## the equipped weapons (their bonus stats), the set bonuses (PlayerBonuses source &"set_bonus" –
+## the engine rebuilds every source, so talent conditions follow the equipment), the procs –
+## refreshed once: by the bonus rebuild when the set procs changed, else here – then Armor
+## Specialization ([method refresh_armor_spec], with the procs' equip buffs in and no running
+## proc buff) and the ability params.
 func apply_equipment() -> void:
 	if equipment == null:
 		return
@@ -392,14 +462,24 @@ func apply_equipment() -> void:
 	var off := equipment.off_weapon()
 	if main != main_hand or off != off_hand:
 		equip_weapons(main, off)
-	stats.remove_source(&"armor_spec")
-	if class_data != null and equipment.armor_spec_active():
-		var primary := stats.get_raw(class_data.primary_stat)
-		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
-	if procs != null:
+	var procs_refreshed := false
+	if bonuses != null:
+		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
+	if procs != null and not procs_refreshed:
 		procs.refresh()
+	refresh_armor_spec()
 	if abilities != null:
 		abilities.invalidate_params()  # item ability mods
+
+
+## Armor Specialization (GDD 5.3): +10% of the primary stat with every other source in place
+## (weapons, talents, set bonuses), while every armour piece is of the class's type. The bonus
+## engine calls it after changing its stat sources.
+func refresh_armor_spec() -> void:
+	stats.remove_source(&"armor_spec")
+	if class_data != null and equipment != null and equipment.armor_spec_active():
+		var primary := stats.get_raw(class_data.primary_stat)
+		stats.set_source(&"armor_spec", {class_data.primary_stat: primary * Equipment.ARMOR_SPEC_BONUS})
 
 
 ## The WeaponRunner of [param weapon] (the first runner when [param weapon] is null or not
@@ -450,17 +530,19 @@ func equip_weapons(p_main: WeaponData, p_off: WeaponData) -> void:
 		model.set_weapons(p_main, p_off)
 
 
-## Total block chance (percent) of the equipped weapons (shields).
+## Total block chance (percent): the equipped weapons' (shields) + the Block stat (talents,
+## sets), at most Stats.BLOCK_CAP.
 func block_chance() -> float:
 	var total := 0.0
 	if main_hand != null:
 		total += main_hand.block_chance
 	if off_hand != null:
 		total += off_hand.block_chance
-	return total
+	return minf(total + stats.get_raw(Stats.BLOCK_CHANCE), Stats.BLOCK_CAP)
 
 
-## Multiplier on all outgoing damage of this player (Mastery, ability buffs ...).
+## Multiplier on all outgoing damage of this player (Mastery, ability buffs, talent / set
+## damage entries ...).
 ## [param source]: &"weapon", &"proc", &"dot", &"ability", &"pet". [param target] may be null.
 func outgoing_damage_mult(target: Node3D, school: StringName, source: StringName) -> float:
 	var m := 1.0
@@ -468,6 +550,8 @@ func outgoing_damage_mult(target: Node3D, school: StringName, source: StringName
 		m *= abilities.mastery.damage_mult(target, school, source)
 	for v in damage_mults.values():
 		m *= v
+	if bonuses != null:
+		m *= bonuses.damage_mult(target, school, source)
 	return maxf(0.0, m)
 
 
@@ -483,24 +567,31 @@ func consume_forced_crit() -> bool:
 	return true
 
 
-## Item modifiers for ability [param ability_id] from equipped items whose unique_effect is
-## &"ability_mod" and unique_params.ability == ability_id (merged "mods" dictionaries; see
-## AbilityRunner.apply_mods for the key conventions).
+## Modifiers for ability [param ability_id]: equipped items whose unique_effect is
+## &"ability_mod" and unique_params.ability == ability_id, then the talent / set mods
+## (bonuses.ability_mods_for) – one merged "mods" dictionary, numbers for the same key summed
+## (see AbilityRunner.apply_mods for the key conventions).
 func ability_mods(ability_id: StringName) -> Dictionary:
 	var out := {}
-	if equipment == null:
-		return out
-	for item in equipment.equipped_items():
-		if item.unique_effect != &"ability_mod" or StringName(item.unique_params.get("ability", "")) != ability_id:
-			continue
-		var mods: Dictionary = item.unique_params.get("mods", {})
-		for key: String in mods:
-			var v: Variant = mods[key]
-			if typeof(v) in [TYPE_INT, TYPE_FLOAT] and out.has(key) and typeof(out[key]) in [TYPE_INT, TYPE_FLOAT]:
-				out[key] = float(out[key]) + float(v)
-			else:
-				out[key] = v
+	if equipment != null:
+		for item in equipment.equipped_items():
+			if item.unique_effect != &"ability_mod" or StringName(item.unique_params.get("ability", "")) != ability_id:
+				continue
+			_merge_mods(out, item.unique_params.get("mods", {}))
+	if bonuses != null:
+		_merge_mods(out, bonuses.ability_mods_for(ability_id))
 	return out
+
+
+## Adds [param mods] into [param out]: numbers on a numeric key are summed, anything else
+## replaces.
+static func _merge_mods(out: Dictionary, mods: Dictionary) -> void:
+	for key: String in mods:
+		var v: Variant = mods[key]
+		if typeof(v) in [TYPE_INT, TYPE_FLOAT] and out.has(key) and typeof(out[key]) in [TYPE_INT, TYPE_FLOAT]:
+			out[key] = float(out[key]) + float(v)
+		else:
+			out[key] = v
 
 
 ## Revives a downed player at [param hp_ratio] of max HP (min 1 HP).
@@ -510,6 +601,7 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	downed = false
 	revive_progress = 0.0
 	reviver_count = 0
+	ghost_slowed = 0
 	healer_channel = 0.0
 	healer_seconds_left = -1.0
 	_regen_accum = 0.0
@@ -593,8 +685,11 @@ func _physics_process(delta: float) -> void:
 	_update_movement(delta)
 	if downed:
 		_update_revive(delta)
+		_update_ghost_slow()
 	else:
 		_update_regen(delta)
+	if bonuses != null:
+		bonuses.tick(delta)
 	if model != null and procs != null:
 		model.set_shield_ratio(procs.shield_hp / max_hp())
 
@@ -789,6 +884,28 @@ func _update_revive(delta: float) -> void:
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
 
 
+## Ghost slow (GDD 16.1): while downed, refreshes the GHOST_SLOW_PCT slow on every living enemy
+## whose centre is inside the revive circle (one EnemyGrid query, group order, no RNG) and
+## lights the ring's cue. Several ghosts refresh the same slot, so the slow never stacks.
+func _update_ghost_slow() -> void:
+	var n := 0
+	if downed and is_inside_tree():
+		var here := global_position
+		var r_sq := REVIVE_RADIUS * REVIVE_RADIUS
+		for node in EnemyGrid.gather_around(get_tree(), here, REVIVE_RADIUS):
+			var e := node as Enemy
+			if e == null or e.is_dead():
+				continue
+			var pos := e.global_position
+			var dx := pos.x - here.x
+			var dz := pos.z - here.z
+			if dx * dx + dz * dz <= r_sq and e.apply_ghost_slow(GHOST_SLOW_LINGER):
+				n += 1
+	ghost_slowed = n
+	if model != null:
+		model.set_ghost_slowing(n > 0)
+
+
 ## True when a living teammate stands within REVIVE_RADIUS.
 func _has_reviver() -> bool:
 	return not _revivers().is_empty()
@@ -903,6 +1020,36 @@ func _thorns(attacker: Enemy, kind: StringName) -> void:
 		procs.deal_raw(attacker, thorns, CombatMath.SCHOOL_PHYSICAL, false)
 
 
+## A hit was dodged / parried / blocked ([param kind] &"dodge" / &"parry" / &"block"; a block
+## may still let part of it through): the on_dodge / on_parry / on_block procs and the talent /
+## set scripts react. [param attacker] may be null.
+func _avoided(kind: StringName, attacker: Node3D) -> void:
+	if procs != null:
+		procs.on_avoided(kind, attacker)
+	if bonuses != null:
+		bonuses.on_avoided(kind, attacker)
+
+
+## AbilityRunner.ability_cast: the on_cast procs and the talent / set scripts.
+func _on_ability_cast(slot_index: int, ability: AbilityData) -> void:
+	if procs != null:
+		procs.on_ability_cast(ability)
+	if bonuses != null:
+		bonuses.on_cast(slot_index, ability)
+
+
+## Talent points were added / taken back / reset: the engine takes the new talent entries.
+func _on_talents_changed() -> void:
+	if bonuses != null and talents != null:
+		bonuses.set_effects(PlayerBonuses.SOURCE_TALENTS, talents.effects())
+
+
+## The bonus engine rebuilt: the ability params (talent / set mods) are stale.
+func _on_bonuses_changed() -> void:
+	if abilities != null:
+		abilities.invalidate_params()
+
+
 ## Parry (GDD 2.4.1): an immediate counter-strike with the first attacking weapon.
 func _riposte(attacker: Enemy) -> void:
 	if attacker == null or not is_instance_valid(attacker) or attacker.is_dead():
@@ -935,6 +1082,8 @@ static func _format_amount(value: float) -> String:
 func _exit_tree() -> void:
 	if abilities != null:
 		abilities.teardown()
+	if bonuses != null:
+		bonuses.teardown()
 
 
 func _notification(what: int) -> void:

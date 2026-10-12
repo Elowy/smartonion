@@ -1,0 +1,270 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_premeditation"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_premeditation"
+display_name = "Premeditation"
+description = "Vanish also grants {cp} Combo Point(s), and {crits} more of your next weapon hits are guaranteed critical strikes."
+values = {
+"cp": 1.0,
+"crits": 1.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"vanish"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "vanish",
+"effect": "resource",
+"label": "",
+"resource": "combo_points",
+"trigger": "on_cast",
+"value": 1
+},
+"scale": ["value"]
+}, {
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"auto_offense_add": 1,
+"forced_crits_add": 1
+}
+}])
+
+[sub_resource type="Resource" id="Resource_enveloping_shadows"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_enveloping_shadows"
+display_name = "Enveloping Shadows"
+description = "You take {avoid}% less damage from area attacks and projectiles (Avoidance)."
+values = {
+"avoid": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"avoidance"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"avoidance": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_master_of_subtlety"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_master_of_subtlety"
+display_name = "Master of Subtlety"
+description = "For {duration_fixed} sec after you Vanish, you deal {pct}% more damage."
+values = {
+"duration_fixed": 6.0,
+"pct": 4.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+prerequisite = &"rogue_subtlety_premeditation"
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "vanish",
+"duration": 6.0,
+"effect": "buff",
+"label": "",
+"stats": {
+"damage_pct": 4.0
+},
+"trigger": "on_cast"
+},
+"scale": ["stats"]
+}, {
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"auto_offense_add": 1
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shadow_focus"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_shadow_focus"
+display_name = "Shadow Focus"
+description = "Vanish restores {energy} Energy."
+values = {
+"energy": 10.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "vanish",
+"effect": "resource",
+"label": "",
+"resource": "energy",
+"trigger": "on_cast",
+"value": 10.0
+},
+"scale": ["value"]
+}, {
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"auto_offense_add": 1
+}
+}])
+
+[sub_resource type="Resource" id="Resource_deadened_nerves"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_deadened_nerves"
+display_name = "Deadened Nerves"
+description = "You take {pct}% less damage."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -4.0
+}])
+
+[sub_resource type="Resource" id="Resource_unseen_blades"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_unseen_blades"
+display_name = "Unseen Blades"
+description = "When Vanish ends, you strike from the shadows with a Fan of Knives that costs no Energy (it spends your Combo Points as usual)."
+values = {}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"vanish"
+icon = &"vanish"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"auto_offense_add": 1,
+"end_fan": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_find_weakness"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_find_weakness"
+display_name = "Find Weakness"
+description = "Your critical weapon hits have a {chance}% chance to make your next weapon hit a guaranteed critical strike."
+values = {
+"chance": 8.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 8.0,
+"count": 1,
+"effect": "forced_crit",
+"icd": 0.5,
+"label": "",
+"trigger": "on_crit"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_sleight_of_hand"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_sleight_of_hand"
+display_name = "Sleight of Hand"
+description = "Shadowstep and Cheat Death are {pct}% stronger and recharge {cd}% faster."
+values = {
+"cd": 6.0,
+"pct": 6.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"shadowstep"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"ids": ["shadowstep", "cheat_death"]
+},
+"mods": {
+"cooldown_pct": -6.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shadow_dance"]
+script = ExtResource("2_talent")
+id = &"rogue_subtlety_shadow_dance"
+display_name = "Shadow Dance"
+description = "After you Vanish, every weapon hit you deal for {duration} sec is a critical strike (thrown knives and shuriken too), and allies within {ally_radius} m gain {crit}% critical strike chance for as long. Can happen once every {icd} sec."
+values = {
+"ally_radius": 8.0,
+"crit": 10.0,
+"duration": 5.0,
+"icd": 12.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"ally_crit": 10.0,
+"ally_radius": 8.0,
+"duration": 5.0,
+"icd": 12.0
+},
+"script": "res://scenes/talents/rogue/subtlety_shadow_dance.gd"
+}, {
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"auto_offense_add": 1
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"rogue_subtlety"
+class_id = &"rogue"
+display_name = "Subtlety"
+index = 2
+description = "Vanish, strike from the shadows, and make every hit a critical strike."
+icon = &"vanish"
+color = Color(0.55, 0.4, 0.88, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_premeditation"), SubResource("Resource_enveloping_shadows"), SubResource("Resource_master_of_subtlety"), SubResource("Resource_shadow_focus"), SubResource("Resource_deadened_nerves"), SubResource("Resource_unseen_blades"), SubResource("Resource_find_weakness"), SubResource("Resource_sleight_of_hand"), SubResource("Resource_shadow_dance")])

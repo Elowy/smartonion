@@ -3,9 +3,13 @@ extends Control
 ## The shared shop in the middle of the between-wave screen (GDD 10, 12): a goblin merchant's
 ## stall ("The Goblin's Goods", ShopMerchant) showing Shop.offers as item cards
 ## (ShopOfferCard: icon, name in rarity colour, price, lock / ping markers, usable-by pips per
-## player), one colour-coded cursor per player (nested outlines + a corner tag in the player's
-## corner when several share a card), reroll vote pips + cost and the shared gold at the top,
-## and a short feedback / spending log ("P3 bought [Runed Plate Helm] – 62 g", "Backpack full").
+## player, an anvil above the pip of every player who could forge the offered weapon), one
+## colour-coded cursor per player (nested outlines + a corner tag in the player's corner when
+## several share a card), reroll vote pips + cost and the shared gold at the top, and a short
+## feedback / spending log ("P3 bought [Runed Plate Helm] – 62 g", "Backpack full").
+## Forging (GDD 4.1): with a full backpack, buying a weapon the buyer has a forge partner for
+## forges at once (Shop.BuyResult.FORGED): no "Backpack full", and the log says
+## "P1 bought and forged [Rare Dagger] – 62 g".
 ##
 ## Per player (handle_input, called by the Intermission for every slot whose focus is the
 ## shop): d-pad / stick moves the cursor, A buys (hold A for HOLD_TIME when the price is more
@@ -18,7 +22,9 @@ extends Control
 ## each other or the player panels in the screen corners and never hide their own card: each
 ## goes beside its hovered card on the stall if that spot is free, else on the card's other
 ## side, above / below it, or into the free band between the corner panels on the player's
-## side – at a smaller scale when nothing else fits ([method layout_tooltips]).
+## side – at a smaller scale when nothing else fits ([method layout_tooltips]). They also keep
+## clear of a corner panel's own item tooltip that reaches out of its panel into such a band
+## ([member tooltip_obstacles]).
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed (while hidden – the whole wave, the
 ## Intermission stays in the tree – a wallet change is caught up at the end of the frame the
@@ -44,8 +50,15 @@ const TOOLTIP_SCALE := 0.82
 const TOOLTIP_SCALES: Array[float] = [0.82, 0.72, 0.62, 0.54]
 ## Inset of the tooltips from the stall body's edges.
 const TOOLTIP_MARGIN := 8.0
+## A spot that covers the hovered card or a [member tooltip_obstacles] rect counts this many
+## times its overlapping area (another shop tooltip: once).
+const COVER_WEIGHT := 4.0
 
 var shop: Shop
+## Returns the global rects (Array[Rect2]) the shop tooltips keep clear of besides each other:
+## the Intermission hands over its corner panels' item tooltips that reach out of their panel
+## into the free bands (PlayerPanel.outside_tooltip_rect). Read once per layout; unset: none.
+var tooltip_obstacles: Callable
 ## Offer grid width (5 for 10 offers, 4 for 8 or 4, 3 for 6).
 var columns := MAX_COLUMNS
 var cards: Array[ShopOfferCard] = []
@@ -300,12 +313,13 @@ func buy_block_reason(slot: PlayerSlot, index: int) -> String:
 	var eq := equipment_of(slot)
 	if eq == null:
 		return "No hero to carry it"
-	if not eq.has_space():
+	if not eq.has_space() and not shop.forges_on_buy(index, slot):
 		return "Backpack full"
 	return ""
 
 
 ## Buys offer [param index] for [param slot] (no hold check) with feedback. True on success.
+## An auto-forge (full backpack, Shop.last_forged) reports and emits the forged weapon.
 func try_buy(slot: PlayerSlot, index: int) -> bool:
 	var reason := buy_block_reason(slot, index)
 	if reason != "":
@@ -317,8 +331,14 @@ func try_buy(slot: PlayerSlot, index: int) -> bool:
 	if not shop.buy(index, slot):
 		_say_to(slot, "The goblin refuses the deal")
 		return false
-	_say("%s bought %s – %s g" % [player_tag(slot), item_link(item), UiTheme.format_int(price)],
-		"%s bought [%s] – %d g" % [slot.label(), item.display_name, price])
+	var forged := shop.last_forged
+	if forged != null:
+		_say("%s bought and forged %s – %s g" % [player_tag(slot), item_link(forged), UiTheme.format_int(price)],
+			"%s bought and forged [%s] – %d g" % [slot.label(), forged.display_name, price])
+		item = forged
+	else:
+		_say("%s bought %s – %s g" % [player_tag(slot), item_link(item), UiTheme.format_int(price)],
+			"%s bought [%s] – %d g" % [slot.label(), item.display_name, price])
 	item_bought.emit(slot.index, item)
 	_update_cards()
 	return true
@@ -489,13 +509,11 @@ func _build() -> void:
 		_feedback_labels.append(l)
 
 	# Controls.
-	var r3 := UiGlyph.pad(PlayerInput.Pad.LB, 26.0)
-	r3.text = "R3"
 	col.add_child(UiTheme.prompt_row([
 		[UiGlyph.nav(26.0), "Move"],
 		[UiGlyph.pad(PlayerInput.Pad.A, 26.0), "Buy"],
 		[UiGlyph.pad(PlayerInput.Pad.X, 26.0), "Lock"],
-		[r3, "Ping"],
+		[UiGlyph.pad(PlayerInput.Pad.R3, 26.0), "Ping"],
 		[UiGlyph.pad(PlayerInput.Pad.Y, 26.0), "Reroll vote"],
 	], 18, UiTheme.TEXT_DIM))
 	var keys := UiTheme.centered_label("Keyboard: Enter buy · R lock · Tab ping · C reroll · Q / E panel · P ready",
@@ -807,22 +825,28 @@ func _update_tooltips() -> void:
 			_tooltip_keys.erase(s.index)
 			continue
 		var compare := ItemTooltip.equipped_for_compare(o.item, equipment_of(s))
-		var key := "%d:%d:%d" % [o.item.uid, o.price, compare.uid if compare != null else 0]
+		var key := "%d:%d:%s" % [o.item.uid, o.price, ItemTooltip.compare_key(compare)]
 		if _tooltip_keys.get(s.index, "") != key:
 			_tooltip_keys[s.index] = key
 			tip.owner_tag = "P%d" % (s.index + 1)
 			tip.owner_color = s.color
+			tip.viewer_equipment = equipment_of(s)
 			tip.show_item(o.item, s.class_data, compare, o.price)
-			tip.reset_size()
+			# Measured now: layout_tooltips places it in this very frame.
+			tip.layout_now()
 		tip.visible = true
 	layout_tooltips()
 
 
 ## Places every visible tooltip at the first free candidate spot, largest scale first. The
 ## player who acted last is placed first (the one browsing gets the best, full-size spot);
-## the others take what is left.
+## the others take what is left. A corner panel's tooltip that reaches into a free band
+## ([member tooltip_obstacles]) is there first: a spot over it counts COVER_WEIGHT times.
 func layout_tooltips() -> void:
 	var placed: Array[Rect2] = []
+	var blocked: Array[Rect2] = []
+	if tooltip_obstacles.is_valid():
+		blocked.assign(tooltip_obstacles.call())
 	var areas := tooltip_areas()
 	var order: Array[PlayerSlot] = []
 	for i in range(_act_order.size() - 1, -1, -1):
@@ -845,7 +869,8 @@ func layout_tooltips() -> void:
 		for scale_value in TOOLTIP_SCALES:
 			var tsize := raw * scale_value
 			for r in _candidates(tsize, card, index, s.index, areas):
-				var overlap := _overlap(r, placed) + (r.intersection(card).get_area() * 4.0 if r.intersects(card) else 0.0)
+				var overlap := _overlap(r, placed) + _overlap(r, blocked) * COVER_WEIGHT \
+						+ (r.intersection(card).get_area() * COVER_WEIGHT if r.intersects(card) else 0.0)
 				if overlap < best_overlap - 0.5:
 					best_overlap = overlap
 					best = r
@@ -854,6 +879,10 @@ func layout_tooltips() -> void:
 					break
 			if best_overlap <= 0.0:
 				break
+		if not best.has_area():
+			# Taller than the stall even at the smallest scale: at the stall's top, not the
+			# screen's corner.
+			best = Rect2(areas[0].position, raw * best_scale)
 		tip.scale = Vector2.ONE * best_scale
 		tip.position = best.position - global_position
 		placed.append(best)

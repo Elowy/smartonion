@@ -10,6 +10,7 @@ display_name = "Shield Wall"
 description = "Raise your shield: take {reduction}% less damage for {duration} sec."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"shield"])
 resource = &""
 cost = 0.0
 cooldown = 24.0

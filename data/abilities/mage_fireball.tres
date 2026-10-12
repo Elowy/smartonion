@@ -10,6 +10,7 @@ display_name = "Fireball"
 description = "Hurls a fireball at the nearest enemy: Fire damage (scales with Intellect and Spell Power) that sets it burning for {burn_pct}% more over {burn_duration} sec."
 class_id = &"mage"
 school = &"fire"
+tags = Array[StringName]([&"projectile", &"dot", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 4.0
@@ -17,6 +18,8 @@ targeting = 1
 cast_range = 10.0
 effect = ExtResource("2_effect")
 params = {
+"bomb_pct": 0.0,
+"bomb_radius": 2.5,
 "bounce_pct": 75.0,
 "bounces": 0,
 "burn_duration": 3.0,

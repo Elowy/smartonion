@@ -10,6 +10,7 @@ display_name = "Shuriken Toss"
 description = "Throws {shuriken} shuriken in a fan at the nearest enemy, each for {damage_pct}% weapon damage."
 class_id = &"rogue"
 school = &"physical"
+tags = Array[StringName]([&"projectile", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 4.0

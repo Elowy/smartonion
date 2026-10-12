@@ -10,6 +10,7 @@ display_name = "Battle Shout"
 description = "You and allies within {radius} m deal {bonus}% more damage for {duration} sec."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"buff"])
 resource = &""
 cost = 0.0
 cooldown = 15.0

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"bow"
+display_name = "Thornsong"
+unique_effect = &"chain"
+unique_params = {
+"trigger": "on_hit",
+"every": 3,
+"hit_pct": 70.0,
+"targets": 3,
+"school": "physical"
+}
+unique_text = "Every 3rd shot splits: a thorned arrow leaps between up to 3 enemies, hitting each for 70% of the shot."
+flavor = "The string hums a song the forest taught it."

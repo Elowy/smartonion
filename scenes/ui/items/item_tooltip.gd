@@ -4,9 +4,16 @@ extends PanelContainer
 ## top to bottom: name in rarity colour, "Looted", "Item Level N", slot + armor / weapon type
 ## (right-aligned, red when the viewer cannot use it), weapon damage / speed / DPS, white stat
 ## lines, "Classes: X" (red if not the viewer's class), green enchant lines
-## (EnchantRoll.description()), the unique effect line, flavor text in gold quotes, the buy
-## price (when given) and the sell value, and a comparison block against the viewer's equipped
-## item ("If you replace this item:" +green / -red per stat).
+## (EnchantRoll.description()), the unique effect line, the tier-set block (set name with
+## "(n/5)" worn by [member viewer_equipment] – "(5 pieces)" without one –, the five pieces,
+## bright when worn, then "(2) Set: …" / "(4) Set: …" green when active, grey otherwise;
+## SetBonuses.describe), flavor text in gold quotes, the buy price (when given) and the sell
+## value, and a comparison block against the viewer's equipped item ("If you replace this
+## item:" +green / -red per stat).
+## A set piece shown to a viewer (viewer_equipment set: the player panels, the shop) gets the
+## compact set block – the pieces as their slot names on one line ("Head  Shoulders  Chest …")
+## and no flavor text – so the tooltip stays readable inside a 4-player corner panel at 720p.
+## Without a viewer (the loot roll) the pieces keep their full names.
 ## Static helpers (stat_delta, upgrade_direction, item_score, equipped_for_compare) are shared
 ## with the shop, the loot roll and bots. Weapons compare with everything they would push out:
 ## a two-hander with main + off hand together (an EquippedPair), an off-hand item or a
@@ -26,6 +33,16 @@ const DELTA_GREEN := Color(0.2, 1.0, 0.2)
 const DELTA_RED := Color(1.0, 0.25, 0.2)
 const DIM := Color(0.62, 0.6, 0.58)
 const FILL := Color(0.03, 0.03, 0.055, 0.95)
+## Tier-set block: the set name, worn / missing piece names (active bonuses use ENCHANT_GREEN,
+## inactive ones DIM).
+const SET_NAME_COLOR := YELLOW
+const SET_PIECE_WORN := Color(1.0, 1.0, 0.6)
+const SET_PIECE_MISSING := Color(0.58, 0.58, 0.58)
+## Left indent of the piece names under the set name.
+const SET_PIECE_INDENT := 14
+## Gap between the slot names of the compact set block (no bullets, no indent: the five fit
+## one line of the tooltip).
+const SET_SLOT_GAP := 12
 
 ## upgrade_direction / item_score weights: the viewer's primary stat counts most, the other
 ## primary stats barely (they do nothing for the class), defensive stats by their budget cost
@@ -35,6 +52,11 @@ const OFF_PRIMARY_WEIGHT := 0.15
 const DPS_WEIGHT := 2.5
 const NOMINAL_PRIMARY := 10.0
 const UPGRADE_THRESHOLD := 0.25
+## Tier sets (GDD 5.5 "Botok"): a piece that completes a 2- / 4-piece bonus is an upgrade unless
+## its score is more than this share below the replaced item's; the other way round, an item
+## that would break an active bonus is an upgrade only when the set piece's score is more than
+## this share below it (so bots never flip-flop between the two).
+const SET_UPGRADE_TOLERANCE := 0.3
 
 const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
@@ -51,6 +73,9 @@ var comparison_visible := true
 ## and the frame border in that colour. Empty = none.
 var owner_tag := ""
 var owner_color := Color.WHITE
+## The viewer's equipment (M5): set bonuses use it to show the worn pieces "(n/5)" and which
+## bonuses are active. Null = no counts (the loot roll). Set it before show_item.
+var viewer_equipment: Equipment
 
 var _box: VBoxContainer
 static var _italic: FontVariation
@@ -96,6 +121,38 @@ func show_item(p_item: ItemInstance, p_viewer: ClassData = null, p_compare: Item
 	price = p_price
 	_rebuild()
 	visible = item != null
+
+
+## Lays the tooltip out now and shrinks it to its content, so a caller that places it in the
+## frame its content changed (ShopPanel.layout_tooltips) gets its real size. Without this the
+## wrapped lines still have the 40 px width they were created with until the containers sort at
+## the end of the frame – the tooltip measures several times its height. Containers top-down,
+## then each label's minimum size is refreshed (a label does not report a new width by itself).
+func layout_now() -> void:
+	reset_size()
+	_layout_tree(self)
+	reset_size()
+
+
+static func _layout_tree(node: Node) -> void:
+	if node is Container:
+		node.notification(Container.NOTIFICATION_SORT_CHILDREN)
+	for c in node.get_children():
+		if not c.is_queued_for_deletion():
+			_layout_tree(c)
+	if node is Label:
+		(node as Label).update_minimum_size()
+
+
+## Identifies the comparison item across calls: an EquippedPair is a new object every time
+## (equipped_for_compare), so it is known by its two parts.
+static func compare_key(p_compare: ItemInstance) -> String:
+	if p_compare == null:
+		return "0"
+	if p_compare is EquippedPair:
+		var parts := (p_compare as EquippedPair).parts
+		return "%d+%d" % [parts[0].uid, parts[1].uid]
+	return str(p_compare.uid)
 
 
 func set_owner_tag(tag: String, color: Color) -> void:
@@ -246,7 +303,13 @@ static func item_score(p_item: ItemInstance, p_viewer: ClassData) -> float:
 ## [param equipped] is what it would replace (equipped_for_compare). An item the viewer cannot
 ## use is never an upgrade, nor is anything that would leave the hero without an attacking
 ## weapon (a shield / tome replacing a two-hander; with [param equipment] every such case,
-## Equipment.equip_disarms); anything else usable beats an empty slot.
+## Equipment.equip_disarms); anything else usable beats an empty slot. With [param equipment]
+## tier sets count (SetBonuses.bonus_change): an item that would complete a set bonus is an
+## upgrade unless its score is more than SET_UPGRADE_TOLERANCE below the replaced item's, one
+## that would break an active bonus is worse unless the replaced piece's score is more than
+## SET_UPGRADE_TOLERANCE below its own. Backpack pieces of the same sets count as worn, as
+## many as the next threshold still needs ([method set_lookahead]), so a piece that makes the
+## next threshold reachable counts too.
 static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_viewer: ClassData,
 		equipment: Equipment = null) -> int:
 	if p_item == null:
@@ -257,12 +320,77 @@ static func upgrade_direction(p_item: ItemInstance, equipped: ItemInstance, p_vi
 		return -1
 	if equipped == null:
 		return 1
-	var diff := item_score(p_item, p_viewer) - item_score(equipped, p_viewer)
+	var mine := item_score(p_item, p_viewer)
+	var theirs := item_score(equipped, p_viewer)
+	if equipment != null:
+		var displaced: Array[ItemInstance] = [equipped]
+		if equipped is EquippedPair:
+			displaced.assign((equipped as EquippedPair).parts)
+		var lookahead := set_lookahead(p_item, displaced, equipment, p_viewer)
+		var change := SetBonuses.bonus_change(p_item, displaced, equipment, lookahead)
+		if change > 0 and mine >= theirs * (1.0 - SET_UPGRADE_TOLERANCE):
+			return 1
+		if change < 0 and theirs >= mine * (1.0 - SET_UPGRADE_TOLERANCE):
+			return -1
+	var diff := mine - theirs
 	if diff > UPGRADE_THRESHOLD:
 		return 1
 	if diff < -UPGRADE_THRESHOLD:
 		return -1
 	return 0
+
+
+## The backpack set pieces [method upgrade_direction] may count as worn when it weighs
+## [param p_item] against [param displaced] (SetBonuses.bonus_change's lookahead, which takes
+## from them, best first, only what the next threshold of each set still needs): pieces of
+## [param p_item]'s set or of a displaced piece's set that [param equipment] can equip into
+## other slots, each going where no set piece is worn and scoring at most
+## SET_UPGRADE_TOLERANCE below what it would replace (equipped_for_compare; an empty slot
+## always qualifies). Best item_score first (backpack order on ties), one piece per slot – the
+## best one. Empty when no set is involved.
+static func set_lookahead(p_item: ItemInstance, displaced: Array[ItemInstance], equipment: Equipment,
+		p_viewer: ClassData) -> Array[ItemInstance]:
+	var out: Array[ItemInstance] = []
+	if p_item == null or equipment == null:
+		return out
+	var sets: Array[StringName] = []
+	if p_item.set_id != &"":
+		sets.append(p_item.set_id)
+	for d in displaced:
+		if d != null and d.set_id != &"" and d.set_id not in sets:
+			sets.append(d.set_id)
+	if sets.is_empty():
+		return out
+	var pieces: Array[ItemInstance] = []
+	var scores: Dictionary[ItemInstance, float] = {}
+	for piece in equipment.backpack:
+		if piece != null and piece != p_item and piece.set_id in sets and piece not in scores:
+			pieces.append(piece)
+			scores[piece] = item_score(piece, p_viewer)
+	var order: Array[int] = []
+	order.assign(range(pieces.size()))
+	order.sort_custom(func(a: int, b: int) -> bool:
+		return scores[pieces[a]] > scores[pieces[b]] or (scores[pieces[a]] == scores[pieces[b]] and a < b))
+	var taken: Array[Items.EquipSlot] = []
+	taken.append_array(equipment.target_slots(p_item))
+	for i in order:
+		var piece := pieces[i]
+		if not equipment.can_equip(piece):
+			continue
+		var targets := equipment.target_slots(piece)
+		var clash := false
+		for t in targets:
+			if t in taken:
+				clash = true
+		if clash:
+			continue
+		var there := equipped_for_compare(piece, equipment)
+		if there != null and (there.set_id != &"" \
+				or scores[piece] < item_score(there, p_viewer) * (1.0 - SET_UPGRADE_TOLERANCE)):
+			continue
+		taken.append_array(targets)
+		out.append(piece)
+	return out
 
 
 ## Whether equipping [param p_item] in place of [param equipped] would leave the hero without
@@ -440,8 +568,8 @@ func _rebuild() -> void:
 	if item.unique_text != "":
 		_line(item.unique_text, ENCHANT_GREEN)
 	if item.set_id != &"":
-		_line("Part of the %s set" % String(item.set_id).capitalize(), DIM, SMALL_SIZE)
-	if item.flavor != "":
+		_set_block()
+	if item.flavor != "" and not compact_set():
 		var flavor := _line("\"%s\"" % item.flavor, YELLOW, SMALL_SIZE + 1, _italic_font())
 		flavor.add_theme_constant_override(&"outline_size", 3)
 
@@ -467,6 +595,82 @@ func _weapon_lines(w: WeaponData) -> void:
 			_line("Scales with " + ", ".join(parts), DIM, SMALL_SIZE)
 	if w.block_chance > 0.0:
 		_line("%s%% Block Chance" % fmt_number(w.block_chance), WHITE)
+
+
+## Whether the shown item gets the compact set block (a set piece with a viewer; see the
+## class doc).
+func compact_set() -> bool:
+	return item != null and item.set_id != &"" and viewer_equipment != null
+
+
+## The tier-set block (SetBonuses.describe for [member viewer_equipment]); a set_id without
+## SetData keeps the plain "Part of the … set" line.
+func _set_block() -> void:
+	var rows := SetBonuses.describe(item, viewer_equipment)
+	if rows.is_empty():
+		_line("Part of the %s set" % String(item.set_id).capitalize(), DIM, SMALL_SIZE)
+		return
+	_gap(4)
+	# The pieces flow in a few lines ("• Helm  • Pauldrons …") instead of five rows – in the
+	# compact block one line of slot names: tooltips inside a player panel shrink to the
+	# panel's height, so every line counts.
+	var compact := compact_set()
+	var pieces: HFlowContainer = null
+	var first_bonus := true
+	for row in rows:
+		var text := str(row.get("text", ""))
+		var active: bool = row.get("active", false)
+		match row.get("kind"):
+			SetBonuses.ROW_HEADER:
+				_line(text, SET_NAME_COLOR, BODY_SIZE)
+			SetBonuses.ROW_PIECE:
+				if pieces == null:
+					pieces = _piece_flow(compact)
+				var color := SET_PIECE_WORN if active else SET_PIECE_MISSING
+				if compact:
+					pieces.add_child(_slot_entry(str(row.get("slot", text)), color))
+				else:
+					pieces.add_child(_piece_entry(text, color))
+			SetBonuses.ROW_BONUS:
+				if first_bonus:
+					_gap(4)
+					first_bonus = false
+				_line(text, ENCHANT_GREEN if active else DIM, SMALL_SIZE)
+
+
+## An indented flow row for the set's piece names (under the set name); [param compact]: the
+## slot names' row (no indent, SET_SLOT_GAP apart).
+func _piece_flow(compact: bool = false) -> HFlowContainer:
+	var indent := MarginContainer.new()
+	indent.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	indent.add_theme_constant_override(&"margin_left", 0 if compact else SET_PIECE_INDENT)
+	var flow := HFlowContainer.new()
+	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flow.add_theme_constant_override(&"h_separation", SET_SLOT_GAP if compact else 14)
+	flow.add_theme_constant_override(&"v_separation", 0)
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	indent.add_child(flow)
+	_box.add_child(indent)
+	return flow
+
+
+## "• <piece name>" as one unit of the flow (bullet and name never split across lines).
+func _piece_entry(text: String, color: Color) -> HBoxContainer:
+	var entry := UiTheme.hbox(5)
+	for t in ["•", text]:
+		var l := UiTheme.label(t, &"", SMALL_SIZE, color)
+		l.add_theme_constant_override(&"outline_size", 4)
+		l.add_theme_constant_override(&"shadow_offset_y", 1)
+		entry.add_child(l)
+	return entry
+
+
+## One slot name of the compact set block ("Shoulders"), bright when worn.
+func _slot_entry(text: String, color: Color) -> Label:
+	var l := UiTheme.label(text, &"", SMALL_SIZE, color)
+	l.add_theme_constant_override(&"outline_size", 4)
+	l.add_theme_constant_override(&"shadow_offset_y", 1)
+	return l
 
 
 func _comparison_block() -> void:

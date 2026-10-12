@@ -10,6 +10,7 @@ display_name = "Avenger's Shield"
 description = "Hurls a holy shield that bounces between {targets} enemies, dealing {damage_pct}% weapon damage as Holy damage (+Spell Power) to each."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"projectile", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

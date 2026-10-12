@@ -1,0 +1,280 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_redoubt"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_redoubt"
+display_name = "Redoubt"
+description = "While you hold a shield, your chance to block is increased by {block}% and your blocks absorb {value}% more damage."
+values = {
+"block": 3.0,
+"value": 10.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"block_value"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"requires": {
+"weapon": "shield"
+},
+"stats": {
+"block_chance": 3.0,
+"block_value": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_stoicism"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_stoicism"
+display_name = "Stoicism"
+description = "Increases your Stamina by {stamina} and your Armor by {armor}."
+values = {
+"armor": 1.0,
+"stamina": 2.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"stamina"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"armor": 1.0,
+"stamina": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_consecrated_ground"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_consecrated_ground"
+display_name = "Consecrated Ground"
+description = "Your Consecration lasts {duration} sec longer."
+values = {
+"duration": 0.5
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"consecration"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "consecration"
+},
+"mods": {
+"duration_add": 0.5
+}
+}])
+
+[sub_resource type="Resource" id="Resource_guarded_by_the_light"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_guarded_by_the_light"
+display_name = "Guarded by the Light"
+description = "When you block an attack, you have a {chance}% chance to gain 1 Holy Power (at most once every {icd_fixed} sec)."
+values = {
+"chance": 10.0,
+"icd_fixed": 2.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 10.0,
+"effect": "resource",
+"icd": 2.0,
+"label": "",
+"resource": "holy_power",
+"trigger": "on_block",
+"value": 1
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_ardent_defender"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_ardent_defender"
+display_name = "Ardent Defender"
+description = "When your health drops below {threshold_fixed}%, you heal {heal}% of your maximum health and gain {armor} Armor for {duration_fixed} sec (at most once every {icd_fixed} sec)."
+values = {
+"armor": 4.0,
+"duration_fixed": 8.0,
+"heal": 8.0,
+"icd_fixed": 20.0,
+"threshold_fixed": 35.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"effect": "heal",
+"icd": 20.0,
+"label": "Ardent Defender",
+"max_hp_pct": 8.0,
+"target": "self",
+"threshold": 35.0,
+"trigger": "low_hp"
+},
+"scale": ["max_hp_pct"]
+}, {
+"kind": "proc",
+"proc": {
+"duration": 8.0,
+"effect": "buff",
+"icd": 20.0,
+"label": "",
+"stats": {
+"armor": 4.0
+},
+"threshold": 35.0,
+"trigger": "low_hp"
+},
+"scale": ["stats"]
+}])
+
+[sub_resource type="Resource" id="Resource_righteous_fury"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_righteous_fury"
+display_name = "Righteous Fury"
+description = "Enemies standing in your Consecration are taunted to you, and you take {ward}% less damage while you stand in it."
+values = {
+"ward": 10.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"consecration"
+icon = &"consecration"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "consecration"
+},
+"mods": {
+"taunt_add": 1.0,
+"ward_add": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shield_of_the_templar"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_shield_of_the_templar"
+display_name = "Shield of the Templar"
+description = "While you hold a shield, you take {pct}% less damage and your blocks absorb {value}% more damage."
+values = {
+"pct": 3.0,
+"value": 10.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"paladin_protection_redoubt"
+icon = &"versatility"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -3.0,
+"requires": {
+"weapon": "shield"
+}
+}, {
+"kind": "stats",
+"requires": {
+"weapon": "shield"
+},
+"stats": {
+"block_value": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_reckoning"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_reckoning"
+display_name = "Reckoning"
+description = "When an enemy hits you, you have a {chance}% chance to strike back at once with your weapon."
+values = {
+"chance": 5.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 5.0,
+"count": 1,
+"effect": "extra_attack",
+"icd": 0.5,
+"label": "",
+"trigger": "when_struck"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_holy_shield"]
+script = ExtResource("2_talent")
+id = &"paladin_protection_holy_shield"
+display_name = "Holy Shield"
+description = "With a shield: +{block}% block chance. Each block strikes back for {pct}% weapon damage as Holy and shields the most wounded ally within {range} m for {ally}% of max health for {duration} sec (up to {cap}%)."
+values = {
+"ally": 2.0,
+"block": 20.0,
+"cap": 8.0,
+"duration": 4.0,
+"pct": 60.0,
+"range": 8.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "stats",
+"requires": {
+"weapon": "shield"
+},
+"stats": {
+"block_chance": 20.0
+}
+}, {
+"kind": "script",
+"params": {
+"ally_range": 8.0,
+"ally_shield_cap_pct": 8.0,
+"ally_shield_duration": 4.0,
+"ally_shield_pct": 2.0,
+"beam_interval": 0.5,
+"sp_scale": 0.5,
+"weapon_pct": 60.0
+},
+"script": "res://scenes/talents/paladin/protection_holy_shield.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"paladin_protection"
+class_id = &"paladin"
+display_name = "Protection"
+index = 1
+description = "Shield, holy ground and taunts: the line no enemy crosses."
+icon = &"avengers_shield"
+color = Color(0.55, 0.72, 0.95, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_redoubt"), SubResource("Resource_stoicism"), SubResource("Resource_consecrated_ground"), SubResource("Resource_guarded_by_the_light"), SubResource("Resource_ardent_defender"), SubResource("Resource_righteous_fury"), SubResource("Resource_shield_of_the_templar"), SubResource("Resource_reckoning"), SubResource("Resource_holy_shield")])

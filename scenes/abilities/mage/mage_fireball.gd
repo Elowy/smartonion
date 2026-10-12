@@ -10,6 +10,10 @@ extends AbilityEffect
 ## speed, fireballs (Rank III: +1 – the extra ones go to the next nearest enemies),
 ## bounces + bounce_pct (Rank V "Bouncing Fireball"), splash_radius + splash_pct (Rank V
 ## "Explosive Fireball"; x Area Size).
+## Talent hook (M5, Fire modifier "Living Bomb", talents_mage.md 4.3): bomb_pct > 0 (neutral 0)
+## arms every burn a fireball starts ([member MageBolt.bomb_pct]): when the burn runs out or the
+## enemy dies while burning, it explodes for bomb_pct % of that hit within bomb_radius m
+## (x Area Size) – see [MageBurn].
 
 const TURN_RATE := 4.0
 ## Extra flight range beyond the cast range (a homing curve is longer than the line).
@@ -55,6 +59,8 @@ func cast(ctx: AbilityContext) -> bool:
 		bolt.splash_pct = ctx.num("splash_pct", 60.0)
 		bolt.set_bounces(roundi(ctx.num("bounces", 0.0)))
 		bolt.bounce_mult = ctx.num("bounce_pct", 75.0) / 100.0
+		bolt.bomb_pct = maxf(0.0, ctx.num("bomb_pct", 0.0))
+		bolt.bomb_radius = ctx.num("bomb_radius", 2.5) * MageSpell.area_mult(p)
 		bolts.append(bolt)
 	p.face_attack(WeaponRunner.flat(targets[0].global_position - p.global_position))
 	return true

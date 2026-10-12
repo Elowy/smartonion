@@ -101,7 +101,7 @@ func test_misc_formulas() -> void:
 	check_eq(CombatMath.ppm_chance(600.0, 1.0), 1.0, "capped at 100%")
 	check_eq(CombatMath.block_absorb(0.0), 0.5, "a block absorbs half")
 	check_eq(CombatMath.block_absorb(50.0), 0.75, "+50% Block Value")
-	check_eq(CombatMath.block_absorb(300.0), 1.0, "capped at everything")
+	check_eq(CombatMath.block_absorb(300.0), CombatMath.BLOCK_ABSORB_CAP, "capped at 85% (M5)")
 	check_eq(CombatMath.extra_projectiles(_stats({Stats.EXTRA_PROJECTILE: 1.5})), 1, "whole projectiles")
 	check_eq(CombatMath.extra_pierce(_stats({Stats.PIERCE: 2.0})), 2, "pierce")
 	check_eq(CombatMath.area_mult(_stats({Stats.AREA_SIZE: 25.0})), 1.25, "Area Size")
@@ -181,7 +181,7 @@ func test_crit_damage_and_executioner_on_hits() -> void:
 	enemy.hp = 900.0
 	WeaponRunner.apply_hit(p, enemy, base, false, Vector3.ZERO)
 	check_near(enemy.fake_damage_log[2], base, 0.0001, "no Executioner above 30%")
-	check(not enemy.is_elite(), "no elites before M5")
+	check(not enemy.is_elite(), "a plain enemy is not an elite")
 
 
 func test_parry_negates_melee_and_ripostes() -> void:
@@ -224,16 +224,27 @@ func test_block_value_absorbs_more() -> void:
 	var shield := Db.get_weapon(&"shield").duplicate() as WeaponData
 	shield.block_chance = 100.0
 	p.equip_weapons(Db.get_weapon(&"sword"), shield)
+	check_eq(p.block_chance(), Stats.BLOCK_CAP, "block chance is capped (M5)")
 	p.stats.set_source(&"test", {Stats.STAMINA: 100.0, Stats.BLOCK_VALUE: 50.0})
-	p.hp = p.max_hp()
-	var before := p.hp
-	p.take_damage(10.0, CombatMath.KIND_MELEE, null)
-	check_near(before - p.hp, CombatMath.incoming_damage(10.0 * 0.25, p.stats), 0.0001, "75% absorbed")
+	check_near(_blocked_hit(p, 10.0), CombatMath.incoming_damage(10.0 * 0.25, p.stats), 0.0001, "75% absorbed")
 	p.stats.set_source(&"test", {Stats.STAMINA: 100.0, Stats.BLOCK_VALUE: 100.0})
-	p.invulnerable_left = 0.0
-	before = p.hp
-	p.take_damage(10.0, CombatMath.KIND_MELEE, null)
-	check_eq(p.hp, before, "a full block takes nothing")
+	check_near(_blocked_hit(p, 10.0), CombatMath.incoming_damage(10.0 * 0.15, p.stats), 0.0001,
+		"a block absorbs at most 85% (M5)")
+
+
+## Damage [param p] took from the first blocked [param raw] melee hit (the capped block chance
+## is 50%: it is hit at full HP until one is blocked); -1 when none was.
+func _blocked_hit(p: Player, raw: float) -> float:
+	var unblocked := CombatMath.incoming_damage(raw, p.stats)
+	for i in 64:
+		p.invulnerable_left = 0.0
+		p.hp = p.max_hp()
+		var before := p.hp
+		p.take_damage(raw, CombatMath.KIND_MELEE, null)
+		var taken := before - p.hp
+		if taken < unblocked - 0.0001:
+			return taken
+	return -1.0
 
 
 func test_life_on_kill_and_kill_notification() -> void:

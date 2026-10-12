@@ -22,6 +22,8 @@ extends Node3D
 ## attacked target (else the first enemy it hits), a projectile attack on the first hit of
 ## any of its projectiles (fan, pierce and explosions share one [ProcGate]); Executioner /
 ## Slayer, leech, stuns and damage stay per target.
+## Crits (M5): a banked forced crit first (Player.consume_forced_crit), then a talent / set
+## script that forces one (PlayerBonuses.crit_forced, [method _bonus_crit]), then the roll.
 
 ## Fraction of the cooldown the off hand waits at wave start / after idling.
 const OFF_HAND_PHASE := 0.5
@@ -186,7 +188,8 @@ func riposte(target: Enemy) -> void:
 		return
 	var dir := flat(target.global_position - player.global_position)
 	dir = dir.normalized() if dir.length_squared() > 0.000001 else player.facing
-	var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
+	var crit := player.consume_forced_crit() or _bonus_crit(target) \
+			or CombatMath.roll_crit(player.stats, RunState.rng)
 	var dmg := CombatMath.weapon_hit_damage(weapon, player.stats) \
 			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
 	Vfx.slash_arc(player.global_position + Vector3.UP * 0.3, dir, 1.4, 70.0, _slash_color())
@@ -230,7 +233,7 @@ func _strike(target: Enemy, is_extra: bool) -> void:
 			_melee(origin, dir, is_extra, target)
 		WeaponData.AttackKind.PROJECTILE:
 			dir = _lead_direction(origin, target, dir)
-			_shoot(origin, dir, is_extra)
+			_shoot(origin, dir, is_extra, target)
 		_:
 			return
 	player.face_attack(dir)
@@ -255,7 +258,8 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 	for e in hits:
 		if not is_instance_valid(e) or e.is_dead():
 			continue
-		var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
+		var crit := player.consume_forced_crit() or _bonus_crit(e) \
+				or CombatMath.roll_crit(player.stats, RunState.rng)
 		var dmg := base * (crit_mult if crit else 1.0)
 		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color())
 		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration,
@@ -263,8 +267,9 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 
 
 ## Fires the weapon's projectile(s): 1 + Extra Projectile in a fan, with the extra Pierce and
-## the Area Size of the player.
-func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false) -> void:
+## the Area Size of the player. [param target] (the aimed enemy) is what talent crit checks
+## look at – a projectile may still hit another enemy.
+func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy = null) -> void:
 	var parent := effects_parent(player)
 	if parent == null:
 		return
@@ -280,7 +285,8 @@ func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false) -> void:
 		var shot := dir
 		if count > 1:
 			shot = dir.rotated(Vector3.UP, deg_to_rad(FAN_STEP_DEGREES * (float(i) - float(count - 1) * 0.5)))
-		var crit := player.consume_forced_crit() or CombatMath.roll_crit(stats, RunState.rng)
+		var crit := player.consume_forced_crit() or _bonus_crit(target) \
+				or CombatMath.roll_crit(stats, RunState.rng)
 		var dmg := CombatMath.weapon_hit_damage(weapon, stats) * (crit_mult if crit else 1.0)
 		var proj := Projectile.create(Projectile.TEAM_PLAYERS, dmg, crit, shot, weapon.projectile_speed,
 				weapon.attack_range + PROJECTILE_EXTRA_RANGE, pierce, radius, player, style, color)
@@ -292,6 +298,14 @@ func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false) -> void:
 		proj.proc_gate = gate
 		parent.add_child(proj)
 		proj.global_position = origin + Vector3.UP * Player.CHEST_HEIGHT + shot * (Player.RADIUS + 0.15)
+
+
+## A talent / set script forces this crit (PlayerBonuses.crit_forced; [param target] may be
+## null). Asked after consume_forced_crit() and before the crit roll – the order is intended:
+## a banked forced crit (Vanish, Find Weakness) is used first, so inside Shadow Dance it is not
+## wasted (judge B15). No rng draw when it says true; the roll is unchanged when it says false.
+func _bonus_crit(target: Enemy) -> bool:
+	return player.bonuses != null and player.bonuses.crit_forced(target)
 
 
 ## Aims a little ahead of a moving target.
@@ -394,12 +408,14 @@ static func enemies_in_arc(nodes: Array[Node], origin: Vector3, direction: Vecto
 ## rolls the stun, shows the damage number and triggers the attacker's on-hit effects (leech,
 ## procs – [param weapon], [param is_extra] and [param roll_procs] (false for the further
 ## hits of one attack: on-hit procs roll once per attack) are passed on, see
-## Player.on_hit_dealt).
+## Player.on_hit_dealt). The incoming [param damage] (crit included) is the hit's base amount,
+## passed on as well: damage derived from the hit starts from it (architecture §2.1).
 static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bool, knockback: Vector3,
 		stun_chance: float = 0.0, stun_duration: float = 0.5, weapon: WeaponData = null,
 		is_extra: bool = false, roll_procs: bool = true) -> void:
 	if enemy == null or not is_instance_valid(enemy) or enemy.is_dead():
 		return
+	var base := damage
 	var valid_attacker: Player = attacker if attacker != null and is_instance_valid(attacker) else null
 	if valid_attacker != null:
 		var ratio := enemy.hp / enemy.max_hp if enemy.max_hp > 0.0 else 1.0
@@ -414,7 +430,7 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 		enemy.apply_stun(stun_duration)
 	show_damage_number(text_pos, damage, is_crit, enemy)
 	if valid_attacker != null and is_instance_valid(valid_attacker):
-		valid_attacker.on_hit_dealt(damage, enemy, weapon, is_crit, is_extra, roll_procs)
+		valid_attacker.on_hit_dealt(damage, enemy, weapon, is_crit, is_extra, roll_procs, base)
 
 
 ## White number for normal hits, bigger yellow one for crits. Hits on the same

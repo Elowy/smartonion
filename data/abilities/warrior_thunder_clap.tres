@@ -10,6 +10,7 @@ display_name = "Thunder Clap"
 description = "Slam the ground: enemies within {radius} m take {damage_pct}% weapon damage and are slowed by {slow}% for {slow_duration} sec."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"aoe", &"cc", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 6.0

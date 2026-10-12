@@ -4,7 +4,8 @@ extends AbilityEffect
 ## enemy to enemy – every [code]interval[/code] (0.25) s it appears behind the enemy within
 ## [code]range[/code] (8) m it struck least often in this spree (nearest first, not the last
 ## target again unless it is alone) and strikes it with the main hand for [code]damage_pct[/code] (150) % of a weapon
-## hit x "power" – a real weapon hit (crit roll / guaranteed crit, Combo Points, Deadly Poison,
+## hit x "power" – a real weapon hit (guaranteed crit, then a talent script's forced crit –
+## RogueUtil.bonus_crit, Shadow Dance – then the crit roll; Combo Points, Deadly Poison,
 ## on-hit procs; never an extra-attack chain). While it lasts the Rogue takes
 ## [code]damage_taken_pct[/code] (50) % less damage (Player.damage_taken_mults
 ## [constant DR_KEY]). It ends early when no enemy is in reach. Each jump is kept inside the
@@ -197,7 +198,8 @@ func _strike(player: Player, target: Enemy) -> void:
 	for e in victims:
 		if not is_instance_valid(e) or e.is_dead():
 			continue
-		var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
+		var crit := player.consume_forced_crit() or RogueUtil.bonus_crit(player, e) \
+				or CombatMath.roll_crit(player.stats, RunState.rng)
 		var push := WeaponRunner.flat(e.global_position - player.global_position)
 		push = push.normalized() * KNOCKBACK if push.length_squared() > 0.0001 else Vector3.ZERO
 		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, STRIKE_COLOR)

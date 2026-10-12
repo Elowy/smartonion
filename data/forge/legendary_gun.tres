@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"gun"
+display_name = "Ashmouth"
+unique_effect = &"explode"
+unique_params = {
+"trigger": "on_hit",
+"every": 3,
+"hit_pct": 60.0,
+"radius": 2.5,
+"school": "fire",
+"dot": 8.0,
+"dot_duration": 3.0
+}
+unique_text = "Every 3rd shot explodes: 60% of the shot as Fire damage to the target and every enemy within 2.5 m, setting them alight for 8 Fire damage over 3 sec."
+flavor = "Packed with more powder than is strictly wise."

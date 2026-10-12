@@ -7,7 +7,9 @@ extends PanelContainer
 ## Trainer price in the shared wallet's gold (red while the wallet cannot pay it,
 ## "MAX" at Rank V, "Choose" while the Rank V specialisation is still open). An empty learned
 ## slot reads "Learn abilities on level-up". While A is held on an expensive rank the row fills
-## up in the player's colour ([member hold_progress]).
+## up in the player's colour ([member hold_progress]). A rank the player pinged (GDD 10, R3 /
+## Tab: "the team should save gold for this") shows a "Wants" tag in their colour before the
+## rank ([method set_ping]).
 
 const HEIGHT := 37.0
 const ICON_SIZE := 32.0
@@ -19,6 +21,8 @@ const TAG_FONT := 15
 const EMPTY_TEXT := "Learn abilities on level-up"
 const SPEC_TEXT := "Choose"
 const MAX_TEXT := "MAX"
+const WANT_TEXT := "Wants"
+const WANT_FONT := 14
 
 var slot_index := -1
 var ability: AbilityData
@@ -29,6 +33,9 @@ var price_label: Label
 var coin: UiIcon
 ## 0..1 while A is held on this row's rank (drawn as a fill behind the content).
 var hold_progress := 0.0
+## The player pinged this rank (the [member want_tag] shows).
+var pinged := false
+var want_tag: WantTag
 var selected := false
 var accent := UiTheme.GOLD
 
@@ -88,6 +95,34 @@ class PromptTag extends Control:
 			draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiTheme.TEXT)
 
 
+## The ping marker: a small "Wants" tag in the player's colour (like the shop's "P2 wants").
+class WantTag extends Control:
+	var color := UiTheme.GOLD
+
+	static func create() -> WantTag:
+		var t := WantTag.new()
+		t.name = "WantTag"
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var w := UiTheme.bold_font().get_string_size(WANT_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, WANT_FONT).x
+		t.custom_minimum_size = Vector2(ceilf(w + 12.0), 20.0)
+		t.visible = false
+		return t
+
+	func set_color(c: Color) -> void:
+		color = c
+		queue_redraw()
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(color.darkened(0.55), 0.92))
+		draw_rect(r, color, false, 2.0)
+		var font := UiTheme.bold_font()
+		var pos := Vector2(6.0, size.y * 0.5 + (font.get_ascent(WANT_FONT) - font.get_descent(WANT_FONT)) * 0.5)
+		draw_string_outline(font, pos, WANT_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, WANT_FONT, 4, UiTheme.OUTLINE)
+		draw_string(font, pos, WANT_TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, WANT_FONT, Color.WHITE)
+
+
 static func create(p_slot_index: int) -> TrainerRow:
 	var r := TrainerRow.new()
 	r.slot_index = p_slot_index
@@ -133,6 +168,8 @@ func _build() -> void:
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.custom_minimum_size.x = 40
 	row.add_child(name_label)
+	want_tag = WantTag.create()
+	row.add_child(want_tag)
 	rank_label = UiTheme.centered_label("", &"", 20, UiTheme.GOLD)
 	rank_label.add_theme_font_override(&"font", UiTheme.bold_font())
 	rank_label.custom_minimum_size = Vector2(RANK_WIDTH, 0)
@@ -206,6 +243,14 @@ func set_tag(input: PlayerInput) -> void:
 		_tag_holder.add_child(gear)
 	else:
 		_tag_holder.add_child(PromptTag.create(AbilityBar.prompt_text(input, slot_index), input is KeyboardInput, 22.0, TAG_FONT))
+
+
+## Shows / hides the "Wants" tag in [param color] (the pinging player's colour).
+func set_ping(on: bool, color: Color = UiTheme.GOLD) -> void:
+	pinged = on
+	want_tag.visible = on
+	if on:
+		want_tag.set_color(color)
 
 
 func set_selected(on: bool, color: Color = UiTheme.GOLD) -> void:

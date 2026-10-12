@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"set_mage_head"
+display_name = "Circlet of the Arcane"
+flavor = "Hums a little when you think too hard."
+slot_type = 0
+armor_type = 0
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 7.0,
+&"stamina": 6.0,
+&"haste": 3.0
+})
+class_restriction = &"mage"
+set_id = &"regalia_of_the_arcane"
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 6
+weight = 0.0

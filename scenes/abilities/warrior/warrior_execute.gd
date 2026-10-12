@@ -145,6 +145,7 @@ static func strike(p: Player, e: Enemy, hit: float, threshold_pct: float, boss_m
 		amount *= boss_mult
 	var execute := below and not e.is_boss()
 	if execute:
+		e.shield_hp = 0.0  # an execution goes through a Shielding elite's barrier
 		# Enough to finish it whatever the multipliers (outgoing and target bonuses).
 		var mult := p.outgoing_damage_mult(e, school, &"ability") \
 				* CombatMath.target_damage_mult(p.stats, ratio, e.is_elite())

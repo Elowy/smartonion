@@ -14,7 +14,14 @@ extends Node
 ##
 ## Charges: the "charges" param (default 1, item mods: "charges_add") lets an ability be cast
 ## that many times in a row; spent charges come back one per cooldown, in sequence. With one
-## charge this is the plain cooldown.
+## charge this is the plain cooldown. [method reduce_cooldown] shortens the running recharge
+## like time passing (one charge back at most); [method set_cooldown] with 0 refunds them all.
+##
+## Free casts (M5): the "free_chance" param (percent, talent / set mods "free_chance_add") is
+## the chance a cast of an ability with a resource cost spends nothing ("Free!"), at most
+## FREE_CHANCE_CAP. One RunState.rng draw per cast attempt that reaches the effect (before
+## the effect's own draws), and only when the chance is above 0 and the cast costs something.
+## [method last_paid] = what the current / last cast really pays (set before cast() runs).
 
 signal ability_cast(slot_index: int, ability: AbilityData)
 signal slots_changed
@@ -32,6 +39,10 @@ const AUTO_SLOTS: Array[int] = [4, 5, 6, 7]
 const AUTO_CAST_INTERVAL := 0.25
 ## Default cluster radius for DENSEST_CLUSTER targeting (m).
 const CLUSTER_RADIUS := 3.0
+## The "free_chance" param is clamped to this many percent (judge A10: a cooldown-0 ability can
+## never cast for free forever).
+const FREE_CHANCE_CAP := 75.0
+const FREE_TEXT := "Free!"
 
 var player: Player
 var slots: Array[AbilityData] = []
@@ -50,6 +61,8 @@ var _effects: Dictionary[StringName, AbilityEffect] = {}
 var _cooldown_left: Dictionary[StringName, float] = {}
 ## Ability id -> charges spent and not yet back.
 var _charges_spent: Dictionary[StringName, int] = {}
+## Ability id -> the resource the last cast of it really spent (0 = free / no cost).
+var _last_paid: Dictionary[StringName, float] = {}
 ## Ability id -> params_for result (read-only); cleared by invalidate_params.
 var _params_cache: Dictionary[StringName, Dictionary] = {}
 ## Ability id -> the context handed to that effect's tick(), refreshed every tick instead of
@@ -183,6 +196,7 @@ func forget(index: int) -> int:
 	_tick_contexts.erase(a.id)
 	_cooldown_left.erase(a.id)
 	_charges_spent.erase(a.id)
+	_last_paid.erase(a.id)
 	ranks.erase(a.id)
 	specs.erase(a.id)
 	slots[index] = null
@@ -282,6 +296,33 @@ func set_cooldown(ability: AbilityData, seconds: float) -> void:
 		_charges_spent[ability.id] = maxi(1, int(_charges_spent.get(ability.id, 0)))
 
 
+## M5 (talent / set cooldown procs, Restless Blades): shortens the running recharge of
+## [param ability] by [param seconds]; reaching 0 returns one charge and restarts the timer with
+## the leftover, like a tick would (never every spent charge, unlike set_cooldown(a, 0)).
+## Nothing happens when no recharge runs or [param seconds] <= 0.
+func reduce_cooldown(ability: AbilityData, seconds: float) -> void:
+	if ability == null or seconds <= 0.0 or not _cooldown_left.has(ability.id):
+		return
+	_advance_recharge(ability.id, _cooldown_left[ability.id] - seconds)
+
+
+## What the current / last cast of [param ability] really pays of its resource: its cost, 0
+## when the cast is free ("free_chance") or costs nothing, 0 before the first cast of the wave.
+## Set before the effect's cast() runs (a failed cast restores the old value), so it is valid
+## for strikes inside cast() as well as later ticks (kits that refund part of a cast – Meat
+## Cleaver – cap the refund with it).
+func last_paid(ability: AbilityData) -> float:
+	return _last_paid.get(ability.id, 0.0) if ability != null else 0.0
+
+
+## M5: seconds left of the running recharge of [param ability] – also while charges are left
+## (unlike [method remaining]); 0 when nothing recharges.
+func cooldown_left(ability: AbilityData) -> float:
+	if ability == null:
+		return 0.0
+	return _cooldown_left.get(ability.id, 0.0)
+
+
 ## Uses up one charge of [param ability] as a cast would (the recharge starts if it is not
 ## already running) – for passives that trigger themselves (Cheat Death).
 func spend_charge(ability: AbilityData, ctx: AbilityContext = null) -> void:
@@ -376,16 +417,48 @@ func _cheap_ready(index: int) -> bool:
 
 
 ## Casts slot [param index] with an already resolved [param ctx] (cost, cooldown / charge).
+## The payment is settled before the effect runs: the "free_chance" roll (one RunState.rng
+## draw, only when the clamped chance is above 0 and the cast costs something – before the
+## effect's own draws, also when the cast then fails) and [method last_paid], so strikes that
+## land inside cast() (Whirlwind's first pulse) already read this cast's payment. The
+## resource itself is spent after a successful cast (unless free); a failed cast spends
+## nothing and restores the previous last_paid.
 func _cast_with(index: int, ctx: AbilityContext) -> bool:
 	var a := slots[index]
 	var effect := effect_for(a)
+	var cost := cost_of(a, ctx) if a.resource != &"" else 0.0
+	var free := cost > 0.0 and _rolls_free(ctx)
+	var had_paid := _last_paid.has(a.id)
+	var old_paid: float = _last_paid.get(a.id, 0.0)
+	_last_paid[a.id] = 0.0 if free else cost
 	if not effect.cast(ctx):
+		if had_paid:
+			_last_paid[a.id] = old_paid
+		else:
+			_last_paid.erase(a.id)
 		return false
-	if a.resource != &"":
-		get_resource(a.resource).spend(cost_of(a, ctx))
+	if free:
+		_show_free(a)
+	elif a.resource != &"":
+		get_resource(a.resource).spend(cost)
 	spend_charge(a, ctx)
 	ability_cast.emit(index, a)
 	return true
+
+
+## The "free_chance" roll of a cast: the param clamped to 0..FREE_CHANCE_CAP; no draw at 0.
+static func _rolls_free(ctx: AbilityContext) -> bool:
+	var chance := clampf(ctx.num("free_chance", 0.0), 0.0, FREE_CHANCE_CAP)
+	return chance > 0.0 and RunState.rng.randf() * 100.0 < chance
+
+
+## "Free!" above the caster in the resource's colour.
+func _show_free(a: AbilityData) -> void:
+	if player == null or not player.is_inside_tree():
+		return
+	var res := get_resource(a.resource)
+	var color := res.data.color if res != null and res.data != null else Color.WHITE
+	Vfx.floating_text(player.self_text_position(1.0), FREE_TEXT, color, Player.SELF_TEXT_SIZE, 1.0)
 
 
 ## Resolves targets and the params (with item mods + rank) for a cast of [param ability].
@@ -520,9 +593,16 @@ static func apply_mods(base: Dictionary, mods: Dictionary) -> Dictionary:
 
 # --- Player hooks ----------------------------------------------------------------------------
 
+## Wave start: cooldowns and charges back, the class resources reset to their start values
+## (talent / set bonuses included: ClassResource.start_value), then the effects and the
+## Mastery start their wave. A Mastery may resize its pool there (MageMastery.sync_mana fills
+## Mana to its data maximum), so pools that start full are topped up to their start value once
+## more (ClassResource.top_up_to_start: a Mana max_value_add needs nothing in the Mage kit).
+## Player.begin_wave fires the wave_start procs right after this.
 func begin_wave() -> void:
 	_cooldown_left.clear()
 	_charges_spent.clear()
+	_last_paid.clear()
 	_stagger_auto_timer()
 	for id in resource_order:
 		resources[id].reset()
@@ -531,6 +611,8 @@ func begin_wave() -> void:
 			_effects[a.id].begin_wave(_light_context(a))
 	if mastery != null:
 		mastery.begin_wave()
+	for id in resource_order:
+		resources[id].top_up_to_start()
 
 
 ## Each player's auto-cast pass on its own tick (P1–P4: first passes on ticks 1 / 4 / 8 / 12
@@ -633,18 +715,24 @@ func _physics_process(delta: float) -> void:
 ## restarts the timer (with the current cooldown) while more are missing.
 func _tick_cooldowns(delta: float) -> void:
 	for id in _cooldown_left.keys():
-		var left: float = _cooldown_left[id] - delta
-		if left > 0.0:
-			_cooldown_left[id] = left
-			continue
-		var spent := int(_charges_spent.get(id, 0)) - 1
-		var ability := _slot_ability(id)
-		if spent > 0 and ability != null:
-			_charges_spent[id] = spent
-			_cooldown_left[id] = maxf(0.001, cooldown_of(ability) + left)
-		else:
-			_charges_spent.erase(id)
-			_cooldown_left.erase(id)
+		_advance_recharge(id, _cooldown_left[id] - delta)
+
+
+## Sets the recharge of [param id] to [param left] seconds; at or below 0 one charge comes back
+## and, while more are missing, the timer restarts with the current cooldown minus the
+## overshoot (at least 0.001 s – never a second charge at once).
+func _advance_recharge(id: StringName, left: float) -> void:
+	if left > 0.0:
+		_cooldown_left[id] = left
+		return
+	var spent := int(_charges_spent.get(id, 0)) - 1
+	var ability := _slot_ability(id)
+	if spent > 0 and ability != null:
+		_charges_spent[id] = spent
+		_cooldown_left[id] = maxf(0.001, cooldown_of(ability) + left)
+	else:
+		_charges_spent.erase(id)
+		_cooldown_left.erase(id)
 
 
 func _slot_ability(id: StringName) -> AbilityData:

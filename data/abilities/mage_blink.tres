@@ -10,6 +10,7 @@ display_name = "Blink"
 description = "Teleports you {distance} m in your movement direction and makes you untouchable for {invulnerable} sec. Charges: {charges}."
 class_id = &"mage"
 school = &"arcane"
+tags = Array[StringName]([&"movement"])
 resource = &""
 cost = 0.0
 cooldown = 6.0
@@ -22,6 +23,12 @@ params = {
 "burst_radius": 3.0,
 "charges": 1,
 "distance": 6.0,
+"image_burst_radius": 2.5,
+"image_cooldown": 6.0,
+"image_damage": 3.0,
+"image_duration": 0.0,
+"image_int_scaling": 0.4,
+"image_radius": 4.0,
 "invulnerable": 0.4,
 "nova_freeze": 0.0,
 "nova_radius": 3.0

@@ -14,6 +14,20 @@ extends AbilityEffect
 ## each with its own beam), overheal_shield (Dark Bargain: healing beyond full health becomes
 ## an absorb shield, up to this % of Max HP). "power" (Ranks II / IV) scales the damage (and
 ## so the healing). Rank III: +1 s channel. Rank V: Soul Siphon or Dark Bargain.
+##
+## Talent params (M5, neutral defaults in warlock_drain_life.tres):
+## - Dark Harvest (Affliction modifier): harvest_pct (% of a tick, 0 = off) and
+##   harvest_targets – every tick also drains up to harvest_targets enemies within range that
+##   carry one of this Warlock's afflictions and are not drained already (nearest first): each
+##   takes harvest_pct % of the tick's damage (&"ability", Shadow) and that damage heals too.
+##   Bots also channel at full health when 3+ afflicted enemies are in range.
+## - Shadowburn (Destruction modifier): shadowburn_pct (% of the channel's nominal damage, 0 =
+##   off), shadowburn_window (s), shadowburn_shard_icd (s) – when a channel completes (its last
+##   planned tick ran; not when it ends early), every live drained enemy is scorched for
+##   tick damage x ticks x shadowburn_pct %; one that dies within shadowburn_window seconds
+##   gives the Warlock 1 Soul Shard, at most once every shadowburn_shard_icd seconds (and once
+##   per channel). The watch list is cleared at wave start / end and when the Warlock goes
+##   down; the shard timer resets at wave start. No RNG.
 
 ## The drain holds until the target is this much further than the range.
 const BREAK_SLACK := 1.25
@@ -21,6 +35,13 @@ const TIME_EPSILON := 0.0001
 const SPARK_COLOR := Color(0.6, 0.3, 0.9)
 ## Dark Bargain shields last this long.
 const SHIELD_DURATION := 6.0
+## Dark Harvest: the bot rule's afflicted enemies in range.
+const HARVEST_AUTO_MIN := 3
+const HARVEST_BEAM_COLOR := Color(0.55, 0.9, 0.35)
+const SCORCH_COLOR := Color(0.7, 0.3, 0.95)
+const SHARD_TEXT := "+1 Soul Shard"
+const SHARD_TEXT_COLOR := Color(0.75, 0.45, 1.0)
+const SHARD_RESOURCE := &"soul_shard"
 
 ## The (first) enemy being drained (null when not channelling).
 var target: Enemy
@@ -39,6 +60,14 @@ var beam: WarlockDrainBeam
 ## Every drained enemy and its beam, the first target first (Soul Siphon drains several).
 var targets: Array = []
 var beams: Array = []
+## Dark Harvest totals of the current (or last) channel – tests, stats.
+var harvest_total := 0.0
+var harvest_hits := 0
+## Shadowburn: scorches dealt, shards gained (since the wave started) – tests, stats.
+var scorches := 0
+var shadowburn_shards := 0
+## Shadowburn: seconds until the next shard may come (0 = ready).
+var shard_cooldown := 0.0
 
 var _player: Player
 var _tick := 0.4
@@ -49,6 +78,16 @@ var _range := 8.0
 var _count := 1
 var _shield_pct := 0.0
 var _school: StringName = &"shadow"
+var _harvest_ratio := 0.0
+var _harvest_targets := 6
+var _shadowburn_ratio := 0.0
+var _shadowburn_window := 3.0
+var _shadowburn_icd := 10.0
+## Dark Harvest: enemies harvested in this channel (one beam each, no beam spam).
+var _harvested: Dictionary[int, bool] = {}
+## Shadowburn: scorched enemy id -> seconds its death still pays a shard.
+var _watch: Dictionary[int, float] = {}
+var _expired: Array[int] = []
 
 
 ## Shadow damage of one tick for [param stats] with [param params] (before the target
@@ -83,6 +122,11 @@ func cast(ctx: AbilityContext) -> bool:
 	_heal_ratio = maxf(0.0, ctx.num("heal_pct", 100.0) / 100.0)
 	_count = maxi(1, roundi(ctx.num("targets", 1.0)))
 	_shield_pct = maxf(0.0, ctx.num("overheal_shield", 0.0))
+	_harvest_ratio = maxf(0.0, ctx.num("harvest_pct", 0.0) / 100.0)
+	_harvest_targets = maxi(0, roundi(ctx.num("harvest_targets", 6.0)))
+	_shadowburn_ratio = maxf(0.0, ctx.num("shadowburn_pct", 0.0) / 100.0)
+	_shadowburn_window = maxf(0.0, ctx.num("shadowburn_window", 3.0))
+	_shadowburn_icd = maxf(0.0, ctx.num("shadowburn_shard_icd", 10.0))
 	channel_left = duration
 	ticks_total = maxi(1, roundi(duration / _tick))
 	ticks_done = 0
@@ -90,6 +134,9 @@ func cast(ctx: AbilityContext) -> bool:
 	damage_total = 0.0
 	healed_total = 0.0
 	shield_total = 0.0
+	harvest_total = 0.0
+	harvest_hits = 0
+	_harvested.clear()
 	if not p.downed_changed.is_connected(_on_downed_changed):
 		p.downed_changed.connect(_on_downed_changed)
 	_release_beams()
@@ -99,6 +146,7 @@ func cast(ctx: AbilityContext) -> bool:
 
 
 func tick(_ctx: AbilityContext, delta: float) -> void:
+	_tick_shadowburn(delta)
 	if not is_channeling():
 		return
 	if _player == null or not is_instance_valid(_player) or _player.downed or not _player.is_inside_tree():
@@ -112,7 +160,11 @@ func tick(_ctx: AbilityContext, delta: float) -> void:
 	while _tick_left <= TIME_EPSILON and is_channeling():
 		_tick_left += _tick
 		_drain_once()
-		if is_channeling() and not _refresh_targets():
+		if not is_channeling():
+			# The last planned tick ran: the channel completed (Shadowburn).
+			_shadowburn()
+			break
+		if not _refresh_targets():
 			stop()
 			return
 	if not is_channeling():
@@ -126,25 +178,34 @@ func stop() -> void:
 	_release_beams()
 
 
-## Wave start: a channel never carries over into the next wave.
+## Wave start: a channel never carries over into the next wave; Shadowburn starts afresh.
 func begin_wave(_ctx: AbilityContext) -> void:
 	if is_channeling():
 		stop()
+	_clear_watch()
+	shard_cooldown = 0.0
+	scorches = 0
+	shadowburn_shards = 0
 
 
 ## Wave cleared: no beam hangs in the air during the intermission.
 func end_wave(_ctx: AbilityContext) -> void:
 	if is_channeling():
 		stop()
+	_clear_watch()
 
 
-## Bots: hurt (HP below auto_cast_hp %) and an enemy within range.
+## Bots: hurt (HP below auto_cast_hp %) and an enemy within range; with Dark Harvest also at
+## full health when HARVEST_AUTO_MIN afflicted enemies are within range.
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var p := ctx.player
 	if p == null or ctx.target == null or is_channeling():
 		return false
 	var m := p.max_hp()
-	return m > 0.0 and p.hp / m * 100.0 < ctx.num("auto_cast_hp", 70.0)
+	if m > 0.0 and p.hp / m * 100.0 < ctx.num("auto_cast_hp", 70.0):
+		return true
+	return ctx.num("harvest_pct", 0.0) > 0.0 and p.is_inside_tree() \
+			and _afflicted_in_range(p, maxf(0.5, ctx.num("range", ctx.ability.cast_range))) >= HARVEST_AUTO_MIN
 
 
 ## One tick on every drained enemy.
@@ -162,6 +223,112 @@ func _drain_once() -> void:
 		damage_total += dealt
 		Vfx.hit_spark(e.global_position + Vector3.UP * Player.CHEST_HEIGHT, SPARK_COLOR)
 		_heal(real * _heal_ratio)
+	if _harvest_ratio > 0.0 and _harvest_targets > 0:
+		_harvest()
+
+
+## Dark Harvest: harvest_pct % of the tick on every afflicted enemy in range that is not drained
+## (up to harvest_targets, nearest first); the damage dealt heals like the drain.
+func _harvest() -> void:
+	var aff := WarlockAfflictions.of(_player, false)
+	if aff == null or not _player.is_inside_tree():
+		return
+	var exclude: Array[Enemy] = []
+	for t: Variant in targets:
+		if _is_live(t):
+			exclude.append(t as Enemy)
+	var found := WarlockSpell.nearest_enemies(_player.get_tree(), _player.global_position, _range,
+			_harvest_targets, aff.afflicted, exclude)
+	var amount := _tick_damage * _harvest_ratio
+	for e in found:
+		var id := e.get_instance_id()
+		var chest := WarlockSpell.chest(e)
+		var hp_before := maxf(0.0, e.hp)
+		var dealt := _player.procs.deal_raw(e, amount, _school, true, &"ability")
+		harvest_total += dealt
+		harvest_hits += 1
+		Vfx.hit_spark(chest, SPARK_COLOR)
+		if not _harvested.has(id):
+			_harvested[id] = true
+			ProcVfx.beam(chest, _player.global_position + Vector3.UP * Player.CHEST_HEIGHT, HARVEST_BEAM_COLOR)
+		_heal(minf(dealt, hp_before) * _heal_ratio)
+
+
+## Living enemies within [param reach] of [param p] that carry one of its afflictions.
+static func _afflicted_in_range(p: Player, reach: float) -> int:
+	var aff := WarlockAfflictions.of(p, false)
+	if aff == null or aff.count() == 0:
+		return 0
+	return WarlockSpell.nearest_enemies(p.get_tree(), p.global_position, reach, HARVEST_AUTO_MIN,
+			aff.afflicted).size()
+
+
+## Shadowburn: the channel completed – every live drained enemy is scorched for
+## shadowburn_pct % of the channel's nominal damage and watched for shadowburn_window seconds.
+func _shadowburn() -> void:
+	if _shadowburn_ratio <= 0.0 or _player == null or _player.downed or _player.procs == null:
+		return
+	var amount := _tick_damage * float(ticks_total) * _shadowburn_ratio
+	for t: Variant in targets.duplicate():
+		if not _is_live(t):
+			continue
+		var e := t as Enemy
+		var chest := WarlockSpell.chest(e)
+		scorches += 1
+		# Watch first: the scorch itself may kill it.
+		if _shadowburn_window > 0.0:
+			_watch[e.get_instance_id()] = _shadowburn_window
+			if not e.died.is_connected(_on_scorched_died):
+				e.died.connect(_on_scorched_died, CONNECT_ONE_SHOT)
+		Vfx.explosion(chest, 0.8, SCORCH_COLOR)
+		Vfx.hit_spark(chest, SCORCH_COLOR)
+		_player.procs.deal_raw(e, amount, _school, true, &"ability")
+
+
+## A scorched enemy died: one Soul Shard when it is still watched and the shard is ready.
+func _on_scorched_died(e: Enemy, _killer_index: int) -> void:
+	var id := e.get_instance_id()
+	if not _watch.has(id) or shard_cooldown > 0.0 or _player == null or not is_instance_valid(_player) \
+			or _player.downed or _player.abilities == null:
+		return
+	var res := _player.abilities.get_resource(SHARD_RESOURCE)
+	if res == null:
+		return
+	res.add(1.0, false)
+	shadowburn_shards += 1
+	shard_cooldown = _shadowburn_icd
+	_clear_watch()
+	if e.is_inside_tree() and _player.is_inside_tree():
+		var to := _player.global_position + Vector3.UP * Player.CHEST_HEIGHT
+		ProcVfx.beam(WarlockSpell.chest(e), to, WarlockSpell.SHADOW_COLOR)
+		Vfx.floating_text(to + Vector3.UP * 0.9, SHARD_TEXT, SHARD_TEXT_COLOR)
+
+
+## Counts the Shadowburn watch list and the shard timer down.
+func _tick_shadowburn(delta: float) -> void:
+	if shard_cooldown > 0.0:
+		shard_cooldown = maxf(0.0, shard_cooldown - delta)
+	if _watch.is_empty():
+		return
+	_expired.clear()
+	for id in _watch:
+		var left := _watch[id] - delta
+		if left <= 0.0 or not is_instance_id_valid(id):
+			_expired.append(id)
+		else:
+			_watch[id] = left
+	for id in _expired:
+		_watch.erase(id)
+
+
+## True while [param e] is watched by Shadowburn (tests).
+func is_watched(e: Node3D) -> bool:
+	return e != null and is_instance_valid(e) and _watch.has(e.get_instance_id())
+
+
+func _clear_watch() -> void:
+	_watch.clear()
+	_expired.clear()
 
 
 ## Heals the Warlock; Dark Bargain turns the part beyond full health into a shield.
@@ -262,8 +429,11 @@ func _holds(e: Variant) -> bool:
 
 
 func _on_downed_changed(is_downed: bool) -> void:
-	if is_downed and is_channeling():
+	if not is_downed:
+		return
+	if is_channeling():
 		stop()
+	_clear_watch()
 
 
 static func _is_live(e: Variant) -> bool:

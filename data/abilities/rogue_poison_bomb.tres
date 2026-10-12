@@ -10,6 +10,7 @@ display_name = "Poison Bomb"
 description = "Lobs a vial at the densest group of enemies. The poison cloud ({radius} m, {duration} sec) deals {damage_pct}% weapon damage as Nature damage every {tick} sec to every enemy inside."
 class_id = &"rogue"
 school = &"nature"
+tags = Array[StringName]([&"aoe", &"dot", &"ground"])
 resource = &""
 cost = 0.0
 cooldown = 9.0

@@ -10,6 +10,7 @@ display_name = "Frost Nova"
 description = "When an enemy gets close, frost bursts out around you: Frost damage to enemies within {radius} m and freezes them for {freeze} sec."
 class_id = &"mage"
 school = &"frost"
+tags = Array[StringName]([&"aoe", &"cc", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

@@ -67,6 +67,15 @@ const HP_BAR_YELLOW := Color(1.0, 0.8, 0.18)
 const HP_BAR_SHIELD := Color(0.75, 0.92, 1.0, 0.9)
 ## Revive area ring alpha (tinted with the downed player's own colour).
 const REVIVE_AREA_ALPHA := 0.7
+## Revive area ring fill (inner disc alpha) – normally a faint wash.
+const REVIVE_AREA_FILL := 0.06
+## Ghost slow cue (GDD 16.1, [method set_ghost_slowing]): while enemies inside the circle are
+## slowed, the ring leans towards a pale spectral blue and its inner disc breathes up by
+## GHOST_SLOW_FILL at GHOST_SLOW_PULSE rad/s.
+const GHOST_SLOW_TINT := Color(0.6, 0.82, 1.0)
+const GHOST_SLOW_TINT_MIX := 0.55
+const GHOST_SLOW_FILL := 0.14
+const GHOST_SLOW_PULSE := 2.6
 ## Purple flames (GDD 13: "horned hood and purple flames") on the warlock's horns.
 const WARLOCK_FLAME := Color(0.72, 0.38, 1.0)
 
@@ -101,6 +110,8 @@ var player_color := Color.WHITE
 var hp_ratio := 1.0
 var downed := false
 var revive_progress := 0.0
+## The ghost's revive circle slows enemies right now ([method set_ghost_slowing]).
+var ghost_slowing := false
 ## Absorb shield / max HP shown on the overhead health bar (see [method set_shield_ratio]).
 var shield_ratio := 0.0
 ## Player tag shown on the marker above the head ("P1" ...); "" hides the marker.
@@ -322,6 +333,23 @@ func set_downed(p_downed: bool) -> void:
 	set_hp_ratio(hp_ratio)
 	if not downed:
 		set_revive_progress(0.0)
+		set_ghost_slowing(false)
+
+
+## Ghost slow cue (GDD 16.1): [param active] while the downed hero's revive circle slows at
+## least one enemy (Player sets it every tick; only changes do anything). Active, the revive
+## ring turns spectral blue and its inner disc breathes ([method _pulse_ghost_slow]); off, the
+## plain player-colour ring comes back.
+func set_ghost_slowing(active: bool) -> void:
+	if ghost_slowing == active:
+		return
+	ghost_slowing = active
+	if _revive_area == null:
+		return
+	if active:
+		_pulse_ghost_slow()
+	else:
+		Mats.set_ring(_revive_area, Color(player_color.r, player_color.g, player_color.b, REVIVE_AREA_ALPHA), 0.88, 0.95, REVIVE_AREA_FILL)
 
 
 ## 0..1 revive progress shown while a teammate stands next to a downed player: an arc on
@@ -467,6 +495,8 @@ func _process(delta: float) -> void:
 			fl.scale = Vector3(1.0 / g, g, 1.0 / g)
 	if downed:
 		_pulse_ghost_ring()
+		if ghost_slowing:
+			_pulse_ghost_slow()
 	_update_marker(delta)
 	if _channel_target != null:
 		if not is_instance_valid(_channel_target) or not _channel_target.is_inside_tree() or downed:
@@ -673,7 +703,7 @@ func _build_ground_decals() -> void:
 	_revive_area.position.y = 0.02
 	_revive_area.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Tinted with the downed player's own colour: whose circle it is reads from afar.
-	Mats.set_ring(_revive_area, Color(player_color.r, player_color.g, player_color.b, REVIVE_AREA_ALPHA), 0.88, 0.95, 0.06)
+	Mats.set_ring(_revive_area, Color(player_color.r, player_color.g, player_color.b, REVIVE_AREA_ALPHA), 0.88, 0.95, REVIVE_AREA_FILL)
 	Mats.set_ring_stroke(_revive_area, 0.6)
 	_revive_area.visible = false
 	_revive_arc = _mesh("ReviveArc", self, _quad_mesh(), Mats.ring(), false)
@@ -832,6 +862,14 @@ func _pulse_ghost_ring() -> void:
 	var s := RING_SIZE * (1.08 + 0.14 * pulse)
 	_ring.scale = Vector3(s, 1, s)
 	Mats.set_ring(_ring, Color(player_color.r, player_color.g, player_color.b, 0.6 + 0.38 * pulse), 0.7, 0.93, 0.1 + 0.18 * pulse)
+
+
+## Ghost slow cue: the revive ring in the player colour leaning towards GHOST_SLOW_TINT, its
+## inner disc breathing between REVIVE_AREA_FILL and + GHOST_SLOW_FILL.
+func _pulse_ghost_slow() -> void:
+	var pulse := 0.5 + 0.5 * sin(_time * GHOST_SLOW_PULSE)
+	var c := player_color.lerp(GHOST_SLOW_TINT, GHOST_SLOW_TINT_MIX)
+	Mats.set_ring(_revive_area, Color(c.r, c.g, c.b, REVIVE_AREA_ALPHA), 0.88, 0.95, REVIVE_AREA_FILL + GHOST_SLOW_FILL * pulse)
 
 
 ## Nameplate diamond (white fill with soft facets, dark outline) – tinted per player through

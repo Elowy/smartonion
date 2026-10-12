@@ -17,6 +17,11 @@ extends Control
 ## HOLD_SHARE of the wallet needs A held for HOLD_TIME (the shop's rule; the row fills up; letting
 ## go, moving or B cancels). Reaching Rank V opens the SpecChooser (left / right, A learns
 ## AbilityRunner.set_spec, B decides later – the row then reads "Choose" and A reopens it).
+## R3 (keyboard Tab) pings the selected rank (GDD 10): a RunState want under Trainer.want_key
+## ("Fireball Rank III", the price) that the purse board shows to the team and the row marks
+## with a "Wants" tag in the player's colour; R3 again takes it back, buying the rank
+## (Trainer.try_buy_rank) or the next round clears it. A rank at V or waiting for its free
+## specialisation cannot be pinged; an unaffordable one can (that is what the ping is for).
 ## Bots never use it (Trainer.bot_train). Feedback goes out through [signal message].
 ## While hidden (another tab, or the whole wave: the Intermission stays in the tree) wallet and
 ## rank changes only mark the tab stale; it refreshes at the end of the frame it is shown in,
@@ -131,6 +136,25 @@ static func needs_hold(price: int) -> bool:
 	return price > RunState.gold * HOLD_SHARE
 
 
+## Whether this player pinged the next rank of slot [param index] (RunState.wants).
+func is_pinged(index: int) -> bool:
+	var a := ability_at(index)
+	return a != null and slot != null and RunState.has_want(slot.index, Trainer.want_key(a.id))
+
+
+## Why slot [param index]'s next rank cannot be pinged ("" = it can; gold does not matter).
+func ping_block_reason(index: int) -> String:
+	var a := ability_at(index)
+	if a == null:
+		return TrainerRow.EMPTY_TEXT
+	var r := runner()
+	if r.needs_spec(a.id):
+		return "Choose a specialization – it is free"
+	if not r.can_rank_up(a.id):
+		return "%s is at Rank V" % a.display_name
+	return ""
+
+
 ## Why slot [param index] cannot be trained right now ("" = it can).
 func train_block_reason(index: int) -> String:
 	var a := ability_at(index)
@@ -174,6 +198,7 @@ func refresh() -> void:
 			continue
 		var price := r.trainer_price(a.id)
 		row.show_ability(a, r.rank_of(a.id), price, RunState.gold >= price, r.needs_spec(a.id), r.spec_of(a.id) >= 0)
+	_update_pings()
 	if ability_at(selected) == null:
 		var first := _first_learned()
 		if first >= 0:
@@ -286,6 +311,29 @@ func choose_spec(index: int) -> bool:
 	return true
 
 
+## R3 / Tab: pings the next rank of slot [param index] for the team (a RunState want with the
+## rank's label and price), or takes the ping back. True when it is pinged afterwards.
+func toggle_ping(index: int) -> bool:
+	if slot == null:
+		return false
+	var reason := ping_block_reason(index)
+	if reason != "":
+		_say(reason, "", UiTheme.RED)
+		return false
+	var a := ability_at(index)
+	var r := runner()
+	var label := Trainer.spend_label(r, a.id)
+	var price := r.trainer_price(a.id)
+	var on := RunState.toggle_want(slot.index, Trainer.want_key(a.id), label, price)
+	var tag := "[color=#%s]%s[/color]" % [slot.color.lightened(0.25).to_html(false), slot.label()]
+	if on:
+		_say("%s wants: %s – %s g" % [tag, label, UiTheme.format_int(price)], "%s wants: %s – %d g" % [slot.label(), label, price], UiTheme.TEXT)
+	else:
+		_say("Ping removed: %s" % label, "", UiTheme.TEXT_DIM)
+	_update_pings()
+	return on
+
+
 ## Y: switches the description between the current and the next rank's numbers.
 func toggle_preview() -> void:
 	preview_next = not preview_next
@@ -337,6 +385,9 @@ func handle_input(input: PlayerInput, delta: float) -> bool:
 	if input.just_pressed(PlayerInput.Pad.A) and _hold.is_empty():
 		press_train()
 		used = true
+	if input.just_pressed(PlayerInput.Pad.R3):
+		toggle_ping(selected)
+		used = true
 	return used
 
 
@@ -353,6 +404,7 @@ func prompt_spec() -> Array:
 		elif runner().can_rank_up(a.id):
 			items.append([PlayerInput.Pad.A, "Hold to train" if needs_hold(price_of(selected)) else "Train"])
 			items.append([PlayerInput.Pad.Y, "Now" if preview_next else "Next rank"])
+			items.append([PlayerInput.Pad.R3, "Ping"])
 	items.append([NAV_PROMPT, "Select"])
 	return items
 
@@ -552,6 +604,14 @@ func _update_selection() -> void:
 	prompts_changed.emit()
 
 
+## The rows' "Wants" tags follow RunState.wants (RunState.wants_changed; cheap, so also while
+## hidden).
+func _update_pings() -> void:
+	var color := slot.color.lightened(0.15) if slot != null else UiTheme.GOLD
+	for i in rows.size():
+		rows[i].set_ping(is_pinged(i), color)
+
+
 func _update_hold_visual() -> void:
 	var holding_slot := int(_hold.get("slot", -1))
 	for i in rows.size():
@@ -645,6 +705,7 @@ func _fit_description() -> void:
 	var lines := maxi(MIN_DESCRIPTION_LINES, floori((room + spacing) / line_h))
 	if detail_description.max_lines_visible != lines:
 		detail_description.max_lines_visible = lines
+		detail_description.update_minimum_size()  # Godot keeps the old min height otherwise
 
 
 ## "CD 5.4 s · Power 125%" for [param a] with [param params] (AbilityRunner.params_for or
@@ -686,9 +747,13 @@ func _say(bbcode: String, plain: String, color: Color, coin: bool = false) -> vo
 func _enter_tree() -> void:
 	if not RunState.gold_changed.is_connected(_on_gold_changed):
 		RunState.gold_changed.connect(_on_gold_changed)
+	if not RunState.wants_changed.is_connected(_update_pings):
+		RunState.wants_changed.connect(_update_pings)
 
 
 func _exit_tree() -> void:
 	if RunState.gold_changed.is_connected(_on_gold_changed):
 		RunState.gold_changed.disconnect(_on_gold_changed)
+	if RunState.wants_changed.is_connected(_update_pings):
+		RunState.wants_changed.disconnect(_update_pings)
 	_unbind_runner()

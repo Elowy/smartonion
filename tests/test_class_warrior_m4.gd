@@ -19,6 +19,13 @@ class EliteFake extends Fakes.FakeEnemy:
 		return true
 
 
+## A fake elite whose Shielding barrier soaks damage first, the way Enemy.take_damage does.
+class ShieldingFake extends EliteFake:
+	func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
+			knockback: Vector3 = Vector3.ZERO) -> void:
+		super(_absorb(amount), is_crit, attacker, knockback)
+
+
 ## A fake boss (an elite that Execute never kills outright).
 class BossFake extends EliteFake:
 	func is_boss() -> bool:
@@ -626,6 +633,15 @@ func test_execute_kills_elites_below_the_threshold() -> void:
 	check(WarriorExecute.pick_victim(p2, 3.5, 20.0) == low, "an executable enemy goes first")
 	low.hp = 900.0
 	check(WarriorExecute.pick_victim(p2, 3.5, 20.0) == boss, "then the elite / boss with the lowest HP share")
+
+
+func test_execute_goes_through_a_shielding_elites_barrier() -> void:
+	var p := _hero()
+	var elite := _place(ShieldingFake.new(), Vector3(2.0, 0.0, 0.0), 150.0)
+	elite.shield_hp = elite.max_hp * EliteAffixes.SHIELD_PCT
+	var slot := _learn(p, &"execute")
+	check(p.abilities.try_cast(slot), "cast")
+	check(elite.hp <= 0.0, "executed despite the barrier: %s HP, %s shield left" % [elite.hp, elite.shield_hp])
 
 
 func test_execute_power_and_rank_three_threshold() -> void:

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"staff"
+display_name = "Pyrewillow"
+unique_effect = &"dot"
+unique_params = {
+"trigger": "on_hit",
+"every": 4,
+"hit_pct": 120.0,
+"duration": 4.0,
+"spread": 3.0,
+"school": "fire"
+}
+unique_text = "Every 4th bolt sets the target ablaze: it burns for 120% of the hit as Fire damage over 4 sec, and the flames leap to nearby enemies when it dies."
+flavor = "It grew from the ashes of a pyre and never stopped burning."

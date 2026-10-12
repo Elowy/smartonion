@@ -10,6 +10,7 @@ display_name = "Charge"
 description = "Rush up to {distance} m in your movement direction. Enemies you hit and everything where you land are stunned for {stun} sec. You cannot be hurt while charging."
 class_id = &"warrior"
 school = &"physical"
+tags = Array[StringName]([&"movement", &"cc"])
 resource = &""
 cost = 0.0
 cooldown = 8.0
@@ -22,9 +23,13 @@ params = {
 "distance": 7.0,
 "impact_pct": 0.0,
 "rage_gain": 0.0,
+"shield_duration": 5.0,
+"shield_max": 15.0,
+"shield_per_enemy": 0.0,
 "speed": 36.0,
 "stun": 1.0,
-"stun_radius": 2.0
+"stun_radius": 2.0,
+"taunt": 0.0
 }
 icon = &"charge"
 color = Color(0.95, 0.65, 0.25, 1)

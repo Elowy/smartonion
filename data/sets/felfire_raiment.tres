@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"felfire_raiment"
+display_name = "Felfire Raiment"
+class_id = &"warlock"
+piece_ids = Array[StringName]([&"set_warlock_head", &"set_warlock_shoulders", &"set_warlock_chest", &"set_warlock_hands", &"set_warlock_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "damage",
+"pct": 10.0,
+"source": "pet"
+}],
+"pieces": 2,
+"text": "Your pets deal 10% more damage."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "rain_of_fire"
+},
+"mods": {
+"free_chance_add": 20.0
+}
+}],
+"pieces": 4,
+"text": "Rain of Fire has a 20% chance to cost no Soul Shard."
+}])

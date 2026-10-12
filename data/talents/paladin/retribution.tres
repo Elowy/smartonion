@@ -1,0 +1,248 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_divine_strength"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_divine_strength"
+display_name = "Divine Strength"
+description = "Increases your Strength by {strength}."
+values = {
+"strength": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"strength"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"primary": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_conviction"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_conviction"
+display_name = "Conviction"
+description = "Increases your chance to get a critical strike by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_art_of_war"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_art_of_war"
+display_name = "Art of War"
+description = "Your critical weapon hits have a {chance}% chance to grant 1 Holy Power (at most once per second)."
+values = {
+"chance": 20.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 20.0,
+"effect": "resource",
+"icd": 1.0,
+"label": "",
+"resource": "holy_power",
+"trigger": "on_crit",
+"value": 1
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_sanctity_of_battle"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_sanctity_of_battle"
+display_name = "Sanctity of Battle"
+description = "Increases your Holy damage by {pct}%, and Consecration recharges {cd} sec faster."
+values = {
+"cd": 0.5,
+"pct": 4.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"holy_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"school": "holy"
+}, {
+"kind": "ability",
+"match": {
+"id": "consecration"
+},
+"mods": {
+"cooldown_add": -0.5
+}
+}])
+
+[sub_resource type="Resource" id="Resource_vengeance"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_vengeance"
+display_name = "Vengeance"
+description = "After a critical hit you deal {pct}% more damage for {duration_fixed} sec, stacking up to {stacks_fixed} times."
+values = {
+"duration_fixed": 8.0,
+"pct": 1.0,
+"stacks_fixed": 2.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+prerequisite = &"paladin_retribution_conviction"
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"duration": 8.0,
+"effect": "buff",
+"label": "",
+"max_stacks": 2,
+"stats": {
+"damage_pct": 1.0
+},
+"trigger": "on_crit"
+},
+"scale": ["stats"]
+}])
+
+[sub_resource type="Resource" id="Resource_divine_verdict"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_divine_verdict"
+display_name = "Divine Verdict"
+description = "When nobody in range is below {below}% health or needs a revive, Word of Glory strikes the nearest enemy within {range} m (elites and bosses first) for {pct}% weapon damage as Holy."
+values = {
+"below": 80.0,
+"pct": 300.0,
+"range": 4.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"word_of_glory"
+icon = &"word_of_glory"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"verdict_pct_add": 300.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_sanctified_retribution"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_sanctified_retribution"
+display_name = "Sanctified Retribution"
+description = "You and the allies inside your Aura of Devotion deal {pct}% more damage."
+values = {
+"pct": 2.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+icon = &"area_size"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "paladin_aura"
+},
+"mods": {
+"might_add": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_righteous_vengeance"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_righteous_vengeance"
+display_name = "Righteous Vengeance"
+description = "Your critical weapon hits also burn the target for {pct}% of the damage as Holy damage over {duration_fixed} sec."
+values = {
+"duration_fixed": 4.0,
+"pct": 10.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"duration": 4.0,
+"effect": "dot",
+"hit_pct": 10.0,
+"label": "",
+"school": "holy",
+"trigger": "on_crit"
+},
+"scale": ["hit_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_seal_of_command"]
+script = ExtResource("2_talent")
+id = &"paladin_retribution_seal_of_command"
+display_name = "Seal of Command"
+description = "Weapon attacks have a {chance}% chance to deal {pct}% of the hit as Holy damage to the target and up to {extra} enemies within {radius} m of it, healing the most wounded hero within {range} m for {heal}% of max health."
+values = {
+"chance": 15.0,
+"extra": 2.0,
+"heal": 2.0,
+"pct": 70.0,
+"radius": 3.0,
+"range": 8.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"chance": 15.0,
+"extra_targets": 2,
+"heal_max_hp_pct": 2.0,
+"heal_range": 8.0,
+"radius": 3.0,
+"strike_pct": 70.0
+},
+"script": "res://scenes/talents/paladin/retribution_seal_of_command.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"paladin_retribution"
+class_id = &"paladin"
+display_name = "Retribution"
+index = 2
+description = "Holy strikes, critical blows and the Light's verdict."
+icon = &"divine_storm"
+color = Color(0.95, 0.5, 0.25, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_divine_strength"), SubResource("Resource_conviction"), SubResource("Resource_art_of_war"), SubResource("Resource_sanctity_of_battle"), SubResource("Resource_vengeance"), SubResource("Resource_divine_verdict"), SubResource("Resource_sanctified_retribution"), SubResource("Resource_righteous_vengeance"), SubResource("Resource_seal_of_command")])

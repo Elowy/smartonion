@@ -10,6 +10,7 @@ display_name = "Summon Voidwalker"
 description = "A Voidwalker guards you, drawing nearby enemies to itself and pummeling them. Its Torment taunts all enemies within {torment_radius} m. It cannot die."
 class_id = &"warlock"
 school = &"shadow"
+tags = Array[StringName]([&"pet", &"cc"])
 resource = &""
 cost = 0.0
 cooldown = 8.0

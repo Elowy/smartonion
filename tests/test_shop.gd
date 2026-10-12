@@ -1,5 +1,6 @@
 extends TestCase
-## Shop: offer counts, class bias, price, locks, pings, buying edge cases, reroll vote.
+## Shop: offer counts, class bias, price, locks, pings, buying edge cases, reroll vote, the
+## full-backpack auto-forge (BuyResult.FORGED, GDD 4.1).
 
 const Support := preload("res://tests/test_loot_support.gd")
 
@@ -218,6 +219,97 @@ func test_buy_refused_with_full_backpack() -> void:
 	check(not shop.offers[0].sold, "offer still for sale")
 	check(shop.buy(0, slots[1]), "another player with room can still buy it")
 	check_eq(RunState.gold, 500 - shop.offers[0].price, "charged once")
+
+
+## Offer 0 becomes a Common sword at [param price]; slot 0 (warrior) holds a Common sword in
+## its otherwise full backpack (the forge partner). Returns the partner.
+func _forge_setup(price: int = 40) -> ItemInstance:
+	_open(1)
+	var eq := Support.equipment_of(slots[0])
+	var partner := Support.make_weapon(&"sword")
+	eq.add_to_backpack(partner)
+	Support.fill_backpack(slots[0])
+	shop.offers[0].item = Support.make_weapon(&"sword")
+	shop.offers[0].price = price
+	return partner
+
+
+func test_full_backpack_buys_and_forges_with_a_partner() -> void:
+	var partner := _forge_setup(40)
+	var o := shop.offers[0]
+	var offered := o.item
+	var eq := Support.equipment_of(slots[0])
+	RunState.add_gold(100)
+	var bought: Array[int] = []
+	shop.bought.connect(func(index: int, slot_index: int, price: int) -> void:
+		bought.append_array([index, slot_index, price]))
+	check(shop.forges_on_buy(0, slots[0]), "a buy would forge")
+	check(not shop.forges_on_buy(0, slots[1]), "not for the mage (room, no sword)")
+	check_eq(shop.try_buy(0, slots[0]), Shop.BuyResult.FORGED, "bought and forged")
+	var forged := shop.last_forged
+	check(forged != null and forged.rarity == Items.Rarity.UNCOMMON and forged.source_id == &"sword", "an Uncommon sword")
+	check(o.sold and o.locked_by == -1 and o.pinged_by.is_empty(), "the offer is sold")
+	check(not eq.backpack.has(offered), "the bought sword never entered the backpack")
+	check(not eq.backpack.has(partner) and eq.backpack.has(forged), "the partner became the result")
+	check_eq(eq.backpack.size(), Items.BACKPACK_SIZE, "still full")
+	check_eq(RunState.gold, 60, "the price was paid")
+	check_eq(bought, [0, 0, 40] as Array[int], "bought signal")
+	var entry: Dictionary = RunState.spend_log[-1]
+	check_eq(entry["kind"], &"shop_forge", "spend kind")
+	check_eq(entry["label"], "%s (forged)" % offered.display_name, "spend label")
+	check_eq(int(entry["amount"]), 40, "amount")
+	check_eq(int(entry["slot"]), 0, "who")
+	check_eq(RunState.weapons_forged, 1, "counted")
+	check(not shop.forges_on_buy(0, slots[0]), "a sold offer forges nothing")
+	check_eq(shop.try_buy(0, slots[0]), Shop.BuyResult.SOLD, "cannot buy twice")
+	check(shop.last_forged == null, "last_forged is cleared by every try_buy")
+
+
+func test_auto_forge_into_an_equipped_hand_and_buy_reports_success() -> void:
+	_open(1)
+	var eq := Support.equipment_of(slots[0])
+	eq.equip_starting_weapons()
+	var sword := eq.get_item(Items.EquipSlot.MAIN_HAND)
+	Support.fill_backpack(slots[0])
+	shop.offers[1].item = Support.make_weapon(&"sword")
+	shop.offers[1].price = 10
+	RunState.add_gold(10)
+	check(shop.buy(1, slots[0]), "buy() reports a forge as a success")
+	var forged := shop.last_forged
+	check(forged != null and eq.get_item(Items.EquipSlot.MAIN_HAND) == forged, "the result is in the main hand")
+	check(not eq.backpack.has(sword), "the old sword is gone")
+	check_eq(RunState.gold, 0, "paid")
+
+
+func test_auto_forge_refusals_change_nothing() -> void:
+	var partner := _forge_setup(40)
+	var eq := Support.equipment_of(slots[0])
+	RunState.add_gold(39)
+	check_eq(shop.try_buy(0, slots[0]), Shop.BuyResult.NOT_ENOUGH_GOLD, "the wallet decides")
+	check(eq.backpack.has(partner) and not shop.offers[0].sold, "nothing changed")
+	check(shop.last_forged == null and RunState.spend_log.is_empty(), "nothing logged")
+	check_eq(RunState.weapons_forged, 0, "nothing forged")
+	# Another offer without a partner: still "backpack full".
+	shop.offers[1].item = Support.make_weapon(&"bow")
+	check_eq(shop.try_buy(1, slots[0]), Shop.BuyResult.BACKPACK_FULL, "no partner for the bow")
+	shop.offers[1].item = Support.make_weapon(&"sword", Items.Rarity.RARE)
+	check_eq(shop.try_buy(1, slots[0]), Shop.BuyResult.BACKPACK_FULL, "a Rare sword has no Common partner")
+	check_eq(RunState.gold, 39, "no gold spent")
+
+
+func test_with_room_a_partner_does_not_forge() -> void:
+	_open(1)
+	var eq := Support.equipment_of(slots[0])
+	var partner := Support.make_weapon(&"sword")
+	eq.add_to_backpack(partner)
+	shop.offers[0].item = Support.make_weapon(&"sword")
+	RunState.add_gold(500)
+	check(not shop.forges_on_buy(0, slots[0]), "room in the backpack: no forge")
+	check_eq(shop.try_buy(0, slots[0]), Shop.BuyResult.OK, "a plain purchase")
+	check(eq.backpack.has(partner) and eq.backpack.has(shop.offers[0].item), "both swords in the backpack")
+	check(shop.last_forged == null, "nothing forged")
+	check_eq(RunState.spend_log[-1]["kind"], &"shop", "a plain shop spend")
+	check_eq(RunState.weapons_forged, 0, "not counted")
 
 
 func test_buy_invalid_requests() -> void:

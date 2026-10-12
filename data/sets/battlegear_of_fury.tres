@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"battlegear_of_fury"
+display_name = "Battlegear of Fury"
+class_id = &"warrior"
+piece_ids = Array[StringName]([&"set_warrior_head", &"set_warrior_shoulders", &"set_warrior_chest", &"set_warrior_hands", &"set_warrior_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "stats",
+"stats": {
+"resource_regen": 10.0
+}
+}],
+"pieces": 2,
+"text": "Increases your Rage generation by 10%."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"free_chance_add": 30.0
+}
+}],
+"pieces": 4,
+"text": "Whirlwind has a 30% chance to cost no Rage."
+}])

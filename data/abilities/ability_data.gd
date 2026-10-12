@@ -18,6 +18,10 @@ enum Kind { CORE, ACTIVE, AUTO }
 @export var class_id: StringName
 ## physical, fire, frost, arcane, holy, shadow, nature (talents / school % use it).
 @export var school: StringName = &"physical"
+## What the ability does, for talent / set matches ({"match": {"tag": ...}}, M5) – a subset of
+## BonusVocabulary.TAGS: aoe, projectile, dot, heal, shield, buff, cc, movement, pet, weapon,
+## spell, ground, stealth.
+@export var tags: Array[StringName] = []
 ## Resource id it spends (&"rage", &"mana", ...; &"" = free).
 @export var resource: StringName
 @export var cost: float = 0.0

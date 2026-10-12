@@ -10,6 +10,7 @@ display_name = "Word of Glory"
 description = "Heals you and the most wounded ally within 8 m. If an ally within 8 m is down, instantly resurrects them at 40% health instead."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"heal"])
 resource = &"holy_power"
 cost = 3.0
 cooldown = 0.0
@@ -25,7 +26,10 @@ params = {
 "revive_hp": 0.4,
 "shield_duration": 8.0,
 "shield_share": 0.0,
-"spell_power_scale": 1.0
+"spell_power_scale": 1.0,
+"verdict_pct": 0.0,
+"verdict_range": 4.0,
+"verdict_sp_scale": 1.5
 }
 icon = &"word_of_glory"
 color = Color(1, 0.88, 0.45, 1)

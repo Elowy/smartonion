@@ -10,6 +10,7 @@ display_name = "Spirit Wolf"
 description = "Summons a spirit wolf for {duration} sec. It hunts the enemies around you, biting for {bite_pct}% weapon damage as Nature damage every {bite_interval} sec."
 class_id = &""
 school = &"nature"
+tags = Array[StringName]([&"pet"])
 resource = &""
 cost = 0.0
 cooldown = 20.0

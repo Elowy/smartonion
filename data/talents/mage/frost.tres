@@ -1,0 +1,219 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_piercing_ice"]
+script = ExtResource("2_talent")
+id = &"mage_frost_piercing_ice"
+display_name = "Piercing Ice"
+description = "Increases your Frost damage by {pct}%."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"frost_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "frost"
+}])
+
+[sub_resource type="Resource" id="Resource_ice_armor"]
+script = ExtResource("2_talent")
+id = &"mage_frost_ice_armor"
+display_name = "Ice Armor"
+description = "Increases your Armor by {armor}, and your Ice Barrier absorbs {barrier}% more damage."
+values = {
+"armor": 2.0,
+"barrier": 8.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"armor": 2.0
+}
+}, {
+"kind": "ability",
+"match": {
+"id": "ice_barrier"
+},
+"mods": {
+"power_pct": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_blizzard"]
+script = ExtResource("2_talent")
+id = &"mage_frost_improved_blizzard"
+display_name = "Improved Blizzard"
+description = "Your Blizzard has a {radius}% larger radius and slows enemies by an additional {slow}%."
+values = {
+"radius": 3.0,
+"slow": 10.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"blizzard"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blizzard"
+},
+"mods": {
+"radius_pct": 3.0,
+"slow_add": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_winters_chill"]
+script = ExtResource("2_talent")
+id = &"mage_frost_winters_chill"
+display_name = "Winter's Chill"
+description = "You deal {pct}% more damage to slowed enemies."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"target": "slowed"
+}])
+
+[sub_resource type="Resource" id="Resource_arctic_winds"]
+script = ExtResource("2_talent")
+id = &"mage_frost_arctic_winds"
+display_name = "Arctic Winds"
+description = "Increases your Frost damage by {frost}% and reduces the damage you take by {taken}%."
+values = {
+"frost": 2.0,
+"taken": 2.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"ice_barrier"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 2.0,
+"school": "frost"
+}, {
+"kind": "damage_taken",
+"pct": -2.0
+}])
+
+[sub_resource type="Resource" id="Resource_deep_freeze"]
+script = ExtResource("2_talent")
+id = &"mage_frost_deep_freeze"
+display_name = "Deep Freeze"
+description = "When your Blizzard ends, every enemy still inside is frozen for {freeze} sec."
+values = {
+"freeze": 1.5
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"blizzard"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blizzard"
+},
+"mods": {
+"end_freeze_add": 1.5
+}
+}])
+
+[sub_resource type="Resource" id="Resource_flash_freeze"]
+script = ExtResource("2_talent")
+id = &"mage_frost_flash_freeze"
+display_name = "Flash Freeze"
+description = "Each tick of your Blizzard has a {chance}% chance to freeze each enemy inside for {freeze_fixed} sec."
+values = {
+"chance": 4.0,
+"freeze_fixed": 1.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"mage_frost_improved_blizzard"
+icon = &"frost_nova"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blizzard"
+},
+"mods": {
+"tick_freeze_chance_add": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_chilled_to_the_bone"]
+script = ExtResource("2_talent")
+id = &"mage_frost_chilled_to_the_bone"
+display_name = "Chilled to the Bone"
+description = "You deal {pct}% more damage to frozen and stunned enemies."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+prerequisite = &"mage_frost_winters_chill"
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"target": "stunned"
+}])
+
+[sub_resource type="Resource" id="Resource_ice_lance"]
+script = ExtResource("2_talent")
+id = &"mage_frost_ice_lance"
+display_name = "Ice Lance"
+description = "Frozen enemies take critical damage from all you do: your weapon hits always crit them, and your spells, burns and other hits deal {mult}x damage (plus your Critical Damage bonus)."
+values = {
+"mult": 2.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"fx_icd": 0.15,
+"spell_mult": 2.0
+},
+"script": "res://scenes/talents/mage/frost_ice_lance.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"mage_frost"
+class_id = &"mage"
+display_name = "Frost"
+index = 2
+description = "Blizzards, freezes and icy armor."
+icon = &"blizzard"
+color = Color(0.6, 0.86, 1, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_piercing_ice"), SubResource("Resource_ice_armor"), SubResource("Resource_improved_blizzard"), SubResource("Resource_winters_chill"), SubResource("Resource_arctic_winds"), SubResource("Resource_deep_freeze"), SubResource("Resource_flash_freeze"), SubResource("Resource_chilled_to_the_bone"), SubResource("Resource_ice_lance")])

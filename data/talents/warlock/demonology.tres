@@ -1,0 +1,213 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_demonic_embrace"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_demonic_embrace"
+display_name = "Demonic Embrace"
+description = "Increases your Stamina by {stamina} (+{stamina} Max HP)."
+values = {
+"stamina": 3.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"stamina"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"stamina": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_imp"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_improved_imp"
+display_name = "Improved Imp"
+description = "Your Imp's firebolts deal {pct}% more damage."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"fire_damage"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "warlock_imp"
+},
+"mods": {
+"damage_bonus_add": 5.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_unholy_power"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_unholy_power"
+display_name = "Unholy Power"
+description = "Your demons and other companions deal {pct}% more damage (Imp, Wild Imps, Voidwalker, Infernal, Spirit Wolf)."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"summon_voidwalker"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"source": "pet"
+}])
+
+[sub_resource type="Resource" id="Resource_soul_harvest"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_soul_harvest"
+display_name = "Soul Harvest"
+description = "Each Soul Shard takes {kills} kill(s) fewer to gather (normally 12)."
+values = {
+"kills": 1.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"rain_of_fire"
+effects = Array[Dictionary]([{
+"gain_per_kills_add": -1.0,
+"kind": "resource",
+"resource": "soul_shard"
+}])
+
+[sub_resource type="Resource" id="Resource_demonic_aegis"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_demonic_aegis"
+display_name = "Demonic Aegis"
+description = "You take {pct}% less damage."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -3.0
+}])
+
+[sub_resource type="Resource" id="Resource_wild_imps"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_wild_imps"
+display_name = "Wild Imps"
+description = "Rain of Fire also summons {imps} Wild Imps for {duration} sec. They fight like your Imp for {power}% of its damage (at most {max} at once)."
+values = {
+"duration": 6.0,
+"imps": 2.0,
+"max": 4.0,
+"power": 50.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"rain_of_fire"
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rain_of_fire"
+},
+"mods": {
+"wild_imps_add": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_master_demonologist"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_master_demonologist"
+display_name = "Master Demonologist"
+description = "Increases your Mastery by {mastery} (Demonic Pact: +{pact}% damage over time and pet damage)."
+values = {
+"mastery": 4.0,
+"pact": 8.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warlock_demonology_unholy_power"
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_fel_synergy"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_fel_synergy"
+display_name = "Fel Synergy"
+description = "Your demons tend your party: every {interval_fixed} sec the most wounded hero (you included) heals {pct}% of their Max HP."
+values = {
+"interval_fixed": 5.0,
+"pct": 1.5
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"spirit"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"effect": "heal",
+"interval": 5.0,
+"label": "",
+"max_hp_pct": 1.5,
+"target": "lowest_ally",
+"trigger": "periodic"
+},
+"scale": ["max_hp_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_soul_link"]
+script = ExtResource("2_talent")
+id = &"warlock_demonology_soul_link"
+display_name = "Soul Link"
+description = "Your soul is linked to your demons: they take {share}% of the damage meant for you, and they deal {pet}% more damage."
+values = {
+"pet": 30.0,
+"share": 20.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &"summon_infernal"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -20.0
+}, {
+"kind": "damage",
+"pct": 30.0,
+"source": "pet"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warlock_demonology"
+class_id = &"warlock"
+display_name = "Demonology"
+index = 1
+description = "Demons at your side, Soul Shards and a resilient soul."
+icon = &"summon_voidwalker"
+color = Color(0.45, 0.95, 0.25, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_demonic_embrace"), SubResource("Resource_improved_imp"), SubResource("Resource_unholy_power"), SubResource("Resource_soul_harvest"), SubResource("Resource_demonic_aegis"), SubResource("Resource_wild_imps"), SubResource("Resource_master_demonologist"), SubResource("Resource_fel_synergy"), SubResource("Resource_soul_link")])

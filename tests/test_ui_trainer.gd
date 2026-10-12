@@ -2,9 +2,10 @@ extends TestCase
 ## Trainer tab (GDD 6.3, PlayerPanel tab 2 / TrainerTab): the slot list (core, learned Active,
 ## learned Auto-cast, empty slots), buying ranks from the shared wallet (price escalation with
 ## the wave, max rank, the hold-to-buy rule), the Rank V specialisation prompt, the detail area
-## (stats beside the rank, description fitted to the room left) and the tab navigation – driven
-## through PlayerPanel.handle_input like a real pad – and no refreshes while hidden (one
-## deferred catch-up when shown).
+## (stats beside the rank, description fitted to the room left), Trainer pings (GDD 10: R3 / Tab
+## toggles a RunState want, the row's "Wants" tag, cleared by the purchase and the next round)
+## and the tab navigation – driven through PlayerPanel.handle_input like a real pad – and no
+## refreshes while hidden (one deferred catch-up when shown).
 ## Test abilities are built in code; the fit test also walks the shipped Db.abilities.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
@@ -372,6 +373,122 @@ func test_rank_v_asks_for_a_specialisation() -> void:
 	check(tab.row_for(2).rank_label.get_theme_color(&"font_color").is_equal_approx(AbilityIcon.RANK_SPEC_COLOR), "orange rank")
 
 
+# --- Pings (GDD 10) ----------------------------------------------------------------------------
+
+func test_r3_pings_the_selected_rank_for_the_team() -> void:
+	var slot := _mage_with_learned()
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	tab.select_slot(2)
+	var row := tab.row_for(2)
+	check(not row.want_tag.visible, "no marker before the ping")
+	check(str(tab.prompt_spec()).contains(str([PlayerInput.Pad.R3, "Ping"])), "the prompt row offers the ping: %s" % str(tab.prompt_spec()))
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	var key := Trainer.want_key(&"fireball")
+	check_eq(key, "trainer:fireball", "the want key")
+	check(RunState.has_want(slot.index, key), "R3 pings it – without any gold in the wallet")
+	check_eq(RunState.wants.size(), 1, "one want")
+	check_eq(RunState.wants[0], {"slot": slot.index, "key": key, "label": "Fireball Rank II", "price": 25}, "who, what, how much")
+	check(row.pinged and row.want_tag.visible, "the row shows the Wants tag")
+	check(row.want_tag.color.is_equal_approx(slot.color.lightened(0.15)), "in the player's colour")
+	check(not tab.row_for(4).want_tag.visible, "only on the pinged row")
+	check_eq(panel.last_message, "P1 wants: Fireball Rank II – 25 g", "feedback")
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	check(not RunState.has_want(slot.index, key), "R3 again takes it back")
+	check(not row.want_tag.visible, "marker gone")
+	check(panel.last_message.contains("Ping removed"), "feedback: %s" % panel.last_message)
+
+
+## The glyphs of [param panel]'s prompt row (rebuilt now), left to right.
+func _prompt_glyphs(panel: PlayerPanel) -> Array[UiGlyph]:
+	panel._update_prompts()
+	var out: Array[UiGlyph] = []
+	_collect_glyphs(panel._prompt_holder, out)
+	return out
+
+
+static func _collect_glyphs(node: Node, out: Array[UiGlyph]) -> void:
+	for c in node.get_children():
+		if c is UiGlyph:
+			out.append(c)
+		_collect_glyphs(c, out)
+
+
+func test_the_ping_prompt_reads_r3_on_a_pad_and_tab_on_the_keyboard() -> void:
+	var slot := _mage_with_learned()
+	var panel := _panel(slot)
+	panel.trainer.select_slot(2)
+	var glyphs := _prompt_glyphs(panel)
+	var r3 := glyphs.filter(func(g: UiGlyph) -> bool: return g.text == "R3")
+	check_eq(r3.size(), 1, "one R3 glyph in the controller's prompt row")
+	if r3.size() == 1:
+		check_eq((r3[0] as UiGlyph).style, UiGlyph.Style.PILL, "a stick click is a pill like LB / RB")
+	check(glyphs.all(func(g: UiGlyph) -> bool: return g.style != UiGlyph.Style.NAV),
+		"no left / right pair: the ping is no sideways move")
+	var l3 := UiGlyph.pad(PlayerInput.Pad.L3)
+	check(l3.style == UiGlyph.Style.PILL and l3.text == "L3", "L3 likewise")
+	var key := UiGlyph.for_input(KeyboardInput.new(), PlayerInput.Pad.R3)
+	check(key.style == UiGlyph.Style.KEY and key.text == "Tab", "the keyboard pings with Tab")
+	for g: UiGlyph in [l3, key]:
+		g.free()
+
+
+func test_buying_a_pinged_rank_clears_only_that_ping() -> void:
+	var slot := _mage_with_learned()
+	var r := _runner(slot)
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	tab.select_slot(2)
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	tab.select_slot(4)
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	# Another player with the same ability pinged it too (their own hero's rank).
+	RunState.toggle_want(3, Trainer.want_key(&"fireball"), "Fireball Rank IV", 75)
+	RunState.add_gold(200)
+	tab.select_slot(2)
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check_eq(r.rank_of(&"fireball"), 2, "bought")
+	check(not RunState.has_want(slot.index, Trainer.want_key(&"fireball")), "the purchase cleared the ping")
+	check(not tab.row_for(2).want_tag.visible, "and its marker")
+	check(RunState.has_want(slot.index, Trainer.want_key(&"frost_nova")), "the other ping stays")
+	check(tab.row_for(4).want_tag.visible, "with its marker")
+	check(RunState.has_want(3, Trainer.want_key(&"fireball")), "P4's ping on their own Fireball stays")
+	check_eq(RunState.spend_log[-1]["label"], "Fireball Rank II", "logged")
+
+
+func test_max_rank_and_an_open_specialisation_cannot_be_pinged() -> void:
+	var slot := _mage_with_learned()
+	var r := _runner(slot)
+	r.ranks[&"fireball"] = 5
+	r.ranks[&"frost_nova"] = 5
+	r.set_spec(&"fireball", 0)
+	r.invalidate_params()
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	tab.select_slot(2)
+	check(not str(tab.prompt_spec()).contains("Ping"), "no ping prompt at Rank V")
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	check(RunState.wants.is_empty(), "nothing to save gold for")
+	check_eq(panel.last_message, "Fireball is at Rank V", "reason")
+	tab.select_slot(4)
+	check(r.needs_spec(&"frost_nova"), "Frost Nova waits for its specialisation")
+	check_eq(tab.ping_block_reason(4), "Choose a specialization – it is free", "the free choice is not pinged")
+	check(not tab.toggle_ping(4), "refused")
+	check(RunState.wants.is_empty(), "still nothing")
+
+
+func test_a_new_round_clears_the_ping_marker() -> void:
+	var slot := _mage_with_learned()
+	var panel := _panel(slot)
+	var tab := panel.trainer
+	tab.select_slot(2)
+	_tap(panel, slot, PlayerInput.Pad.R3)
+	check(tab.row_for(2).want_tag.visible, "pinged")
+	RunState.begin_spend_round()
+	check(not RunState.has_want(slot.index, Trainer.want_key(&"fireball")), "a new round clears the wants")
+	check(not tab.row_for(2).want_tag.visible, "the marker follows (RunState.wants_changed)")
+
+
 func test_tabs_switch_with_lt_and_rt() -> void:
 	var slot := _mage_with_learned()
 	var panel := _panel(slot, false)
@@ -382,8 +499,11 @@ func test_tabs_switch_with_lt_and_rt() -> void:
 	check(panel.trainer.visible and not panel._body.visible, "Trainer shown")
 	check(panel.trainer.row_for(0).selected, "the Trainer has the focus outline")
 	_tap(panel, slot, PlayerInput.Pad.RT)
-	check_eq(panel.last_message, "Talents: coming soon", "Talents stays locked")
-	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "still the Trainer")
+	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "RT: the Talents tab opens (M5)")
+	check(panel.talents.visible and not panel.trainer.visible, "Talents shown")
+	check(not panel.trainer.row_for(0).selected, "the hidden Trainer lost the focus outline")
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "LT: back to the Trainer")
 	_tap(panel, slot, PlayerInput.Pad.LT)
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "LT: back to Character")
 	check(panel._body.visible and not panel.trainer.visible, "paper doll back")

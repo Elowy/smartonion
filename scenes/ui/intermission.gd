@@ -11,8 +11,10 @@ extends Control
 ##   MARKET – RunState.shop.open_round(cleared_wave, slots, RunState.rng) once per open; the
 ##            shared ShopPanel (goblin stall) in the middle, one PlayerPanel per player with a
 ##            hero in that player's corner (P1 top-left, P2 top-right, P3 bottom-left,
-##            P4 bottom-right, like the HUD), a compact wave-cleared summary on top and the
-##            ready chips + "Next wave in N s" countdown at the bottom.
+##            P4 bottom-right, like the HUD), a compact wave-cleared summary on top with the
+##            PurseBoard under it (the shared gold, ready pips, this round's spend ticker and
+##            the team's wants – GDD 10) and the ready chips (a "★N" badge while the hero has
+##            N talent points to spend) + "Next wave in N s" countdown at the bottom.
 ##
 ## Input (MARKET, per slot, through PlayerSlot.input): each player's focus is either the shop
 ## cursor (ShopPanel.handle_input) or their own panel (PlayerPanel.handle_input); LB / RB
@@ -24,11 +26,17 @@ extends Control
 ## every bot buys every affordable offer that is an upgrade for it (cheapest first,
 ## round-robin over the bots – bot_offer_choice) and equips what ItemTooltip.upgrade_direction
 ## calls an upgrade; then they buy ability ranks from the Trainer with what is left above a reserve
-## (_bots_train: Trainer.bot_train, the wallet shared out evenly), and gold that neither could
-## take rerolls the stall for another buying pass (_bots_reroll). Everyone ready ->
+## (_bots_train: Trainer.bot_train, the wallet shared out evenly) and spend their talent points
+## (_bots_talents: TalentBot), and gold that neither could take rerolls the stall for another
+## buying pass (_bots_reroll). Bots forge before buying (Forge.bot_forge_all). Everyone ready ->
 ## continue_requested (once per open). GDD 12: after [member auto_continue_time] seconds of
 ## MARKET the next wave starts anyway (the countdown does not run during the loot roll and the
 ## level-up cards).
+## Shared purse (GDD 10): open() starts a spend round (RunState.begin_spend_round: the spend log
+## and the wants start empty). Two players spending in the same frame are served in slot order
+## (_route_input runs P1 -> P4; key presses inside one frame have no order): the lower slot
+## index gets it, the other reads "Not enough gold", and the log holds one entry. A player who
+## leaves takes their Trainer pings along.
 ## See docs/ARCHITECTURE.md.
 
 signal continue_requested
@@ -59,9 +67,19 @@ const BOT_BUY_CHANCE := 1.0
 ## (1920x1080 canvas: the stall takes the middle, ShopPanel.STALL_SIZE).
 const MARGIN := 14.0
 const PANEL_AREA := Vector2(580, 518)
-## Vertical shift of the stall (between the header and the ready chips).
-const STALL_OFFSET_Y := -8.0
+## Vertical shift of the stall (between the header with the purse board and the ready chips).
+const STALL_OFFSET_Y := 36.0
+## Header: top offset, title font size, the overlap of the title and the summary line, the gap
+## above the purse board.
+const HEADER_TOP := 3.0
+const TITLE_FONT := 40
+const TITLE_LINE_OVERLAP := 7
+const BOARD_GAP := 1
+## Footer: distance of the countdown / prompt line from the bottom edge.
+const FOOTER_BOTTOM := 6.0
+## Ready chips: minimum size, gap between them (four fit between the bottom corner panels).
 const CHIP_SIZE := Vector2(170, 56)
+const CHIP_GAP := 6
 ## Smoke / demo bots keep this many Uncommon items' worth of gold (next wave's price) per two
 ## bots when they train after shopping, so the shop still gets their gold next round.
 const BOT_TRAIN_RESERVE_RARITY := Items.Rarity.UNCOMMON
@@ -89,7 +107,12 @@ var phase := Phase.CLOSED
 
 var title_label: Label
 var next_label: Label
+## The shared gold (the purse board's [member PurseBoard.gold_value]).
 var gold_value: Label
+## The shared purse's board in the header (GDD 10): gold, ready pips, spends, wants.
+var purse_board: PurseBoard
+## The title / summary / purse board column at the top centre.
+var header: VBoxContainer
 var level_value: Label
 var level_ups_value: Label
 var chips_row: HBoxContainer
@@ -124,6 +147,51 @@ var _bots_shopped := false
 var _was_auto: Dictionary[int, bool] = {}
 
 
+## The chip's "★N" badge (a star and the number of unspent talent points; the UI font has no
+## star glyph, so it is drawn).
+class TalentBadge extends Control:
+	const FONT_SIZE := 15
+	const HEIGHT := 19.0
+	const STAR := 6.5
+	## Where it sits on the 42 px portrait (sticking out of the top-left corner).
+	const OFFSET := Vector2(-7, -6)
+	var points := 0
+
+	static func create(p_points: int) -> TalentBadge:
+		var b := TalentBadge.new()
+		b.name = "TalentBadge"
+		b.points = p_points
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var w := UiTheme.bold_font().get_string_size(str(p_points), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+		b.size = Vector2(ceilf(STAR * 2.0 + w + 13.0), HEIGHT)
+		return b
+
+	## "★3" (tests, screenshots).
+	func text() -> String:
+		return "★%d" % points
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var box := StyleBoxFlat.new()
+		box.anti_aliasing = true
+		box.bg_color = Color(0.13, 0.09, 0.03, 0.96)
+		box.border_color = UiTheme.GOLD
+		box.set_border_width_all(2)
+		box.set_corner_radius_all(int(size.y * 0.5))
+		draw_style_box(box, r)
+		var c := Vector2(5.0 + STAR, size.y * 0.5 + 0.5)
+		var pts := PackedVector2Array()
+		for i in 10:
+			var a := -PI * 0.5 + i * PI / 5.0
+			var rad := STAR if i % 2 == 0 else STAR * 0.45
+			pts.append(c + Vector2(cos(a), sin(a)) * rad)
+		draw_colored_polygon(pts, UiTheme.GOLD)
+		var font := UiTheme.bold_font()
+		var pos := Vector2(c.x + STAR + 2.0, size.y * 0.5 + (font.get_ascent(FONT_SIZE) - font.get_descent(FONT_SIZE)) * 0.5)
+		draw_string_outline(font, pos, str(points), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 3, UiTheme.OUTLINE)
+		draw_string(font, pos, str(points), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, UiTheme.GOLD_BRIGHT)
+
+
 static func create() -> Intermission:
 	var im := Intermission.new()
 	im.name = "Intermission"
@@ -132,8 +200,10 @@ static func create() -> Intermission:
 
 
 ## Shows the screen for the wave that was just cleared: the loot roll first (if any loot),
-## then the market. Players ready up with START.
+## then the market. Players ready up with START. A new spend round starts (RunState's spend log
+## and wants are cleared; the purse board follows in _fill).
 func open(p_cleared_wave: int, p_level_ups: int) -> void:
+	RunState.begin_spend_round()
 	cleared_wave = p_cleared_wave
 	level_ups = p_level_ups
 	_done = false
@@ -248,6 +318,7 @@ func _start_market() -> void:
 	var slots := PlayerManager.get_slots()
 	shop_panel.set_shop(RunState.shop)
 	RunState.shop.open_round(cleared_wave, slots, RunState.rng)
+	purse_board.set_shop(RunState.shop)
 	_sync_panels(slots)
 	shop_panel.refresh(slots)
 	panel_focus.clear()
@@ -283,6 +354,27 @@ func _sync_panels(slots: Array[PlayerSlot]) -> void:
 	for i: int in panels.keys():
 		if not keep.has(i):
 			_free_panel(i)
+	# A tall item tooltip may reach down / up the screen column as far as the teammate's panel
+	# at its other end (P1 / P3, P2 / P4) – all the way when that corner is empty. When both of
+	# a column's tooltips reach into the band between the panels, the bottom one makes way.
+	for i: int in panels.keys():
+		var panel: PlayerPanel = panels[i]
+		panel.tooltip_column_mate = panels.has(i ^ 2)
+		var above: PlayerPanel = panels.get(i - 2) if i >= 2 else null
+		panel.tooltip_obstacle = above.planned_outside_tooltip_rect if above != null else Callable()
+
+
+## The corner panels' item tooltips that reach out of their panel into the free bands between
+## the panels (the shop keeps its own tooltips clear of them; ShopPanel.tooltip_obstacles). The
+## panels lay out before the shop each frame (they come first in the tree).
+func _panel_tooltip_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for panel: PlayerPanel in panels.values():
+		if is_instance_valid(panel):
+			var r := panel.outside_tooltip_rect()
+			if r.has_area():
+				out.append(r)
+	return out
 
 
 func _free_panel(index: int) -> void:
@@ -356,6 +448,7 @@ func _build() -> void:
 	shop_panel.offset_top = -ShopPanel.STALL_SIZE.y * 0.5 + STALL_OFFSET_Y
 	shop_panel.offset_bottom = ShopPanel.STALL_SIZE.y * 0.5 + STALL_OFFSET_Y
 	shop_panel.item_bought.connect(_on_item_bought)
+	shop_panel.tooltip_obstacles = _panel_tooltip_rects
 	_market_root.add_child(shop_panel)
 	_build_footer()
 
@@ -372,43 +465,43 @@ func _build() -> void:
 	visible = false
 
 
-## Compact wave-cleared summary at the top centre (between the two top panels).
+## Compact wave-cleared summary at the top centre (between the two top panels): the title, the
+## next wave and the team level, and under them the PurseBoard with the shared gold.
 func _build_header() -> void:
-	var col := UiTheme.vbox(-4)
-	col.anchor_left = 0.5
-	col.anchor_right = 0.5
-	col.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	col.offset_top = 8
-	_market_root.add_child(col)
-	title_label = UiTheme.centered_label("Wave 1 cleared!", UiTheme.TITLE, 48)
-	title_label.add_theme_constant_override(&"outline_size", 11)
+	header = UiTheme.vbox(BOARD_GAP)
+	header.name = "Header"
+	header.anchor_left = 0.5
+	header.anchor_right = 0.5
+	header.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	header.offset_top = HEADER_TOP
+	_market_root.add_child(header)
+	var col := UiTheme.vbox(-TITLE_LINE_OVERLAP)
+	header.add_child(col)
+	title_label = UiTheme.centered_label("Wave 1 cleared!", UiTheme.TITLE, TITLE_FONT)
+	title_label.add_theme_constant_override(&"outline_size", 10)
 	col.add_child(title_label)
 	var row := UiTheme.hbox(10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(row)
-	next_label = UiTheme.label("", UiTheme.DIM, 20)
+	next_label = UiTheme.label("", UiTheme.DIM, 19)
 	next_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(next_label)
 	row.add_child(_dot())
-	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(22, 22))
-	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(coin)
-	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, 22)
-	gold_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(gold_value)
-	row.add_child(_dot())
-	var lvl := UiTheme.label("Level", UiTheme.DIM, 20)
+	var lvl := UiTheme.label("Level", UiTheme.DIM, 19)
 	lvl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(lvl)
-	level_value = UiTheme.label("1", UiTheme.GOLD_LABEL, 22)
+	level_value = UiTheme.label("1", UiTheme.GOLD_LABEL, 21)
 	level_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(level_value)
-	level_ups_value = UiTheme.label("–", UiTheme.GOLD_LABEL, 20)
+	level_ups_value = UiTheme.label("–", UiTheme.GOLD_LABEL, 19)
 	level_ups_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(level_ups_value)
-	_level_ups_caption = UiTheme.label("this wave", UiTheme.DIM, 18)
+	_level_ups_caption = UiTheme.label("this wave", UiTheme.DIM, 17)
 	_level_ups_caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(_level_ups_caption)
+	purse_board = PurseBoard.create()
+	header.add_child(purse_board)
+	gold_value = purse_board.gold_value
 
 
 func _dot() -> Label:
@@ -426,10 +519,10 @@ func _build_footer() -> void:
 	col.anchor_bottom = 1.0
 	col.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	col.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	col.offset_top = -12
-	col.offset_bottom = -12
+	col.offset_top = -FOOTER_BOTTOM
+	col.offset_bottom = -FOOTER_BOTTOM
 	_market_root.add_child(col)
-	chips_row = UiTheme.hbox(8)
+	chips_row = UiTheme.hbox(CHIP_GAP)
 	chips_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	chips_row.custom_minimum_size = Vector2(0, CHIP_SIZE.y)
 	col.add_child(chips_row)
@@ -462,7 +555,9 @@ func _fill() -> void:
 	else:
 		next_label.text = "Next up: Wave %d of %d  ·  %d seconds%s" % [next, RunState.TOTAL_WAVES, int(RunState.wave_duration(next)), tag]
 	next_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.2) if tag != "" else UiTheme.TEXT_DIM)
-	_fill_gold()
+	purse_board.set_shop(RunState.shop)
+	purse_board.refresh()
+	purse_board.update(PlayerManager.get_slots())
 	level_value.text = str(RunState.level)
 	level_ups_value.text = "+%d" % level_ups if level_ups > 0 else "–"
 	level_ups_value.add_theme_color_override(&"font_color", UiTheme.GREEN if level_ups > 0 else UiTheme.TEXT_DIM)
@@ -471,8 +566,7 @@ func _fill() -> void:
 
 
 func _fill_gold() -> void:
-	gold_value.text = UiTheme.format_int(RunState.gold)
-	gold_value.add_theme_color_override(&"font_color", UiTheme.GOLD)
+	purse_board.refresh_gold()
 
 
 func _refresh_chips(force: bool = false) -> void:
@@ -493,8 +587,8 @@ func _refresh_chips(force: bool = false) -> void:
 			chips_row.add_child(chip)
 			_chips[s.index] = chip
 	for s in slots:
-		var key := "%s:%s:%s:%s" % [s.ready, is_auto_ready(s), s.class_data.id if s.class_data != null else &"",
-			has_panel_focus(s.index)]
+		var key := "%s:%s:%s:%s:%d" % [s.ready, is_auto_ready(s), s.class_data.id if s.class_data != null else &"",
+			has_panel_focus(s.index), talent_points_free(s)]
 		if _chip_keys.get(s.index, "") != key:
 			_chip_keys[s.index] = key
 			_fill_chip(_chips[s.index], s)
@@ -508,38 +602,55 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:
 	style.border = UiTheme.GREEN if s.ready else s.color.darkened(0.3)
 	style.border_width = 2
 	style.fill = Color(0.07, 0.13, 0.06, 0.97) if s.ready else UiTheme.STONE_DARK
-	style.content_margin_left = 8
-	style.content_margin_right = 10
+	style.content_margin_left = 7
+	style.content_margin_right = 8
 	style.content_margin_top = 4
 	style.content_margin_bottom = 4
 	chip.add_theme_stylebox_override(&"panel", style.rebuild())
 	chip.custom_minimum_size = CHIP_SIZE
-	var row := UiTheme.hbox(8)
+	var row := UiTheme.hbox(7)
 	chip.add_child(row)
 	var portrait := UiPortrait.create(42.0)
 	portrait.setup(s.color, s.class_data)
 	row.add_child(portrait)
+	var points := talent_points_free(s)
+	if points > 0:
+		# On the portrait's top-left corner (the class initial sits bottom-right): the chip keeps
+		# its size, so four chips still fit between the bottom panels.
+		var badge := TalentBadge.create(points)
+		badge.position = TalentBadge.OFFSET
+		portrait.add_child(badge)
 	var box := UiTheme.vbox(-2)
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(box)
 	var name_row := UiTheme.hbox(5)
-	name_row.add_child(UiTheme.label(s.label(), UiTheme.GOLD_LABEL, 19, s.color.lightened(0.3)))
-	name_row.add_child(UiTheme.label(s.class_data.display_name if s.class_data != null else "", UiTheme.GOLD_LABEL, 19))
+	name_row.add_child(UiTheme.label(s.label(), UiTheme.GOLD_LABEL, 18, s.color.lightened(0.3)))
+	name_row.add_child(UiTheme.label(s.class_data.display_name if s.class_data != null else "", UiTheme.GOLD_LABEL, 18))
 	box.add_child(name_row)
 	var status := UiTheme.hbox(5)
 	if s.ready:
-		status.add_child(UiIcon.create(UiIcon.Kind.CHECK, Vector2(18, 18)))
+		status.add_child(UiIcon.create(UiIcon.Kind.CHECK, Vector2(16, 16)))
 		var text := "Ready"
 		if s.is_bot():
 			text = "Ready (bot)"
 		elif s.input == null or not s.input.is_connected_device():
-			text = "Disconnected"
-		status.add_child(UiTheme.label(text, &"", 17, UiTheme.GREEN))
+			text = "Unplugged"
+		status.add_child(UiTheme.label(text, &"", 15, UiTheme.GREEN))
 	else:
 		status.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.START, 20.0))
-		var where := "in own panel" if has_panel_focus(s.index) else "to ready"
-		status.add_child(UiTheme.label(where, &"", 16, UiTheme.TEXT_DIM))
+		var where := "in panel" if has_panel_focus(s.index) else "to ready"
+		status.add_child(UiTheme.label(where, &"", 15, UiTheme.TEXT_DIM))
 	box.add_child(status)
+
+
+## Talent points [param s]'s hero has not spent yet (0 without a hero) – the chip's "★N".
+static func talent_points_free(s: PlayerSlot) -> int:
+	if s == null or not is_instance_valid(s.player):
+		return 0
+	var hero := s.player as Player
+	if hero == null or hero.talents == null:
+		return 0
+	return hero.talents.points_free()
 
 
 func _update_countdown() -> void:
@@ -606,6 +717,7 @@ func _process(delta: float) -> void:
 			_route_input(s)
 	# Standing reroll votes are evaluated every frame (a voter unplugged / gold arrived).
 	shop_panel.process_votes()
+	purse_board.update(slots)
 	_refresh_chips()
 	if slots.is_empty() or (PlayerManager.all_ready() and _bots_settled()):
 		_continue()
@@ -642,7 +754,9 @@ func _bots_settled() -> bool:
 ## included), then buys every affordable offer that is an upgrade for it – the cheapest first,
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
-## Then the bots train (_bots_train) and spend what is left over on rerolls (_bots_reroll).
+## Before buying, every bot forges what it can (Forge.bot_forge_all) and wears the results.
+## Then the bots train (_bots_train), spend their talent points (_bots_talents) and spend what
+## is left over on rerolls (_bots_reroll).
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -651,10 +765,13 @@ func _bots_shop() -> void:
 		if not s.is_bot() or ShopPanel.equipment_of(s) == null:
 			continue
 		bot_equip_upgrades(s)
+		if Forge.bot_forge_all(s) > 0:
+			bot_equip_upgrades(s)
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
 	_bots_buy(shoppers)
 	_bots_train()
+	_bots_talents()
 	_bots_reroll(shoppers)
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
@@ -701,6 +818,17 @@ func _bots_train() -> int:
 		if n > 0:
 			total += n
 			ranks_trained.emit(s.index, n)
+	return total
+
+
+## After training, every bot hero spends its free talent points (TalentBot.spend_all – no
+## RNG). Returns the points spent.
+func _bots_talents() -> int:
+	var total := 0
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.talents != null:
+			total += TalentBot.spend_all(hero, s.index)
 	return total
 
 
@@ -779,11 +907,26 @@ static func is_bot_upgrade(item: ItemInstance, s: PlayerSlot, eq: Equipment) -> 
 ## would replace (ItemTooltip.equipped_for_compare: the weaker ring / trinket, an empty slot
 ## first, both hands for a two-hander, the two-hander for an off-hand item). Each item is
 ## compared with the gear as it is at that moment, so equipping never flip-flops between a
-## two-hander and a pair of one-handers. Returns how many items were equipped.
+## two-hander and a pair of one-handers. Passes over the backpack repeat until one equips
+## nothing (at most Items.BACKPACK_SIZE passes), so an item that became an upgrade through a
+## later swap of the same pass – e.g. a set piece another piece's swap counted on
+## (SetBonuses.bonus_change's lookahead) – goes on in the same market. Returns how many items
+## were equipped.
 static func bot_equip_upgrades(s: PlayerSlot) -> int:
 	var eq := ShopPanel.equipment_of(s)
 	if eq == null:
 		return 0
+	var n := 0
+	for _pass in Items.BACKPACK_SIZE:
+		var equipped := _bot_equip_pass(s, eq)
+		n += equipped
+		if equipped == 0:
+			break
+	return n
+
+
+## One pass of [method bot_equip_upgrades] over the backpack as it is now; how many it equipped.
+static func _bot_equip_pass(s: PlayerSlot, eq: Equipment) -> int:
 	var n := 0
 	for item in eq.backpack.duplicate():
 		if not is_bot_upgrade(item, s, eq):
@@ -827,10 +970,15 @@ func _on_gold_changed(_gold: int, _delta: int) -> void:
 
 
 ## A player left while the screen is open (PlayerManager.leave): their panel, shop cursor,
-## chip and reroll vote go away, and the remaining voters may now complete a reroll.
+## chip, reroll vote, Trainer pings and shop pings go away, and the remaining voters may now
+## complete a reroll (offers only that player pinged are no longer kept out of it).
 func _on_player_left(slot: PlayerSlot) -> void:
 	_was_auto.erase(slot.index)
 	panel_focus.erase(slot.index)
+	for w in RunState.wants.duplicate():
+		if int(w.get("slot", -1)) == slot.index:
+			RunState.clear_want(slot.index, String(w.get("key", "")))
+	drop_shop_pings(RunState.shop, slot.index)
 	if not is_open():
 		return
 	if phase == Phase.LEVEL_UP:
@@ -841,7 +989,19 @@ func _on_player_left(slot: PlayerSlot) -> void:
 		shop_panel.refresh(slots)
 		if shop_panel.shop != null:
 			shop_panel.shop.prune_votes(shop_panel.voter_indices())
+		purse_board.update(PlayerManager.get_slots())
 	_refresh_chips(true)
+
+
+## Takes [param slot_index]'s "P2 wants" pings off every unsold offer of [param shop]
+## (Shop.toggle_ping, so Shop.changed redraws the stall cards and the purse board).
+static func drop_shop_pings(shop: Shop, slot_index: int) -> void:
+	if shop == null:
+		return
+	for i in shop.offers.size():
+		var o := shop.offers[i]
+		if o != null and not o.sold and o.pinged_by.has(slot_index):
+			shop.toggle_ping(i, slot_index)
 
 
 func _continue() -> void:

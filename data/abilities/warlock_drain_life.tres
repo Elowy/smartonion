@@ -10,6 +10,7 @@ display_name = "Drain Life"
 description = "Drains the nearest enemy for {duration} sec, healing you for {heal_pct}% of the Shadow damage. You keep moving; the drain jumps on when the target dies."
 class_id = &"warlock"
 school = &"shadow"
+tags = Array[StringName]([&"heal", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 8.0
@@ -20,10 +21,15 @@ params = {
 "auto_cast_hp": 70.0,
 "damage": 1.0,
 "duration": 2.0,
+"harvest_pct": 0.0,
+"harvest_targets": 6,
 "heal_pct": 100.0,
 "intellect_scale": 0.3,
 "overheal_shield": 0.0,
 "range": 8.0,
+"shadowburn_pct": 0.0,
+"shadowburn_shard_icd": 10.0,
+"shadowburn_window": 3.0,
 "spell_power_scale": 1.0,
 "targets": 1,
 "tick": 0.4

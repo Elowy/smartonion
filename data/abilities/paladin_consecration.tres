@@ -10,6 +10,7 @@ display_name = "Consecration"
 description = "Consecrates the ground beneath you for {duration} sec: enemies standing in it take Holy damage every {tick} sec (scales with Strength and Spell Power)."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"aoe", &"ground"])
 resource = &""
 cost = 0.0
 cooldown = 10.0
@@ -17,16 +18,20 @@ targeting = 0
 cast_range = 3.0
 effect = ExtResource("2_effect")
 params = {
+"ally_range": 0.0,
 "damage": 2.5,
 "duration": 4.0,
 "follows": false,
 "heal": 0.0,
+"heal_max_hp_pct": 0.0,
 "heal_spell_power_scale": 0.0,
 "radius": 3.0,
 "slow": 0.0,
 "spell_power_scale": 1.0,
 "strength_scale": 0.25,
-"tick": 0.5
+"taunt": 0.0,
+"tick": 0.5,
+"ward": 0.0
 }
 icon = &"consecration"
 color = Color(1, 0.84, 0.35, 1)

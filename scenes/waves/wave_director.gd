@@ -13,7 +13,17 @@ extends Node
 ## - At most MAX_ENEMIES alive + telegraphed. A small opening group is telegraphed at once.
 ## - When the timer runs out: [method stop] (enemies despawn without loot, telegraphs are
 ##   cancelled, pickups and loot bags are banked), then [signal wave_cleared].
+## - Elites (M5, GDD 8): at wave start [method EliteAffixes.schedule] picks this wave's elite
+##   spawn times (15–70% of the duration). When a group hatches, its enemies are walked in
+##   group order and each pops at most one time that has passed: that enemy becomes an elite
+##   ([method Enemy.make_elite] with [method EliteAffixes.roll_affix], before add_child) – two
+##   due times make the first two enemies elite, never one enemy twice. RunState.elites_spawned
+##   counts them; elites count towards MAX_ENEMIES. Times left at the wave end are dropped.
 ## Does not process while the tree is paused. Copes with enemies being freed at any time.
+##
+## RunState.rng order inside [method start_wave]: eligible list (no draw) → elite schedule
+## (count, then one time per elite) → next group pick → [signal wave_started] (the
+## GoblinSpawner draws there) → the opening group's telegraph (its type and size).
 
 signal wave_started(wave: int)
 signal wave_timer_changed(seconds_left: float)
@@ -61,6 +71,10 @@ var wave := 0
 var budget := 0.0
 ## Enemies spawned during the current wave.
 var spawned_this_wave := 0
+## Elites spawned during the current wave.
+var elites_this_wave := 0
+## Length (s) of the current wave.
+var duration := 0.0
 
 var _running := false
 var _pending: Array[PendingGroup] = []
@@ -69,6 +83,8 @@ var _eligible: Array[EnemyData] = []
 var _next_data: EnemyData
 var _next_count := 0
 var _last_timer_step := -1
+## Elite spawn times of this wave not used yet (seconds into the wave, ascending).
+var _elite_times: Array[float] = []
 
 
 static func create(p_arena: Arena) -> WaveDirector:
@@ -92,11 +108,16 @@ func start_wave(p_wave: int) -> void:
 	wave = maxi(1, p_wave)
 	RunState.set_wave(wave)
 	time_left = RunState.wave_duration(wave)
+	duration = time_left
 	budget = 0.0
 	spawned_this_wave = 0
+	elites_this_wave = 0
 	_running = true
 	_last_timer_step = -1
 	_eligible = eligible_enemies(wave)
+	_elite_times = EliteAffixes.schedule(wave, duration, RunState.player_count, RunState.rng)
+	if not _elite_times.is_empty():
+		ElitePlate.prepare()
 	_choose_next_group()
 	wave_started.emit(wave)
 	_emit_timer(true)
@@ -108,6 +129,7 @@ func stop() -> void:
 	_running = false
 	_pending.clear()
 	_pending_count = 0
+	_elite_times.clear()
 	budget = 0.0
 	if not is_inside_tree():
 		return
@@ -253,6 +275,16 @@ func pending_groups() -> int:
 	return _pending.size()
 
 
+## Seconds since the current wave started.
+func elapsed() -> float:
+	return maxf(0.0, duration - time_left)
+
+
+## Elite spawn times of this wave still waiting for a group (seconds into the wave, ascending).
+func elite_times() -> Array[float]:
+	return _elite_times.duplicate()
+
+
 # --- Frame update ---------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
@@ -354,6 +386,11 @@ func _spawn_group(g: PendingGroup) -> void:
 			pos = a.clamp_point(pos, g.data.radius + 0.1)
 		pos.y = 0.0
 		var e := Enemy.create(g.data, wave)
+		if _pop_due_elite_time():
+			e.make_elite(EliteAffixes.roll_affix(rng))
+			if e.is_elite():
+				RunState.elites_spawned += 1
+				elites_this_wave += 1
 		if parent_3d != null and parent_3d.is_inside_tree():
 			e.position = parent_3d.global_transform.affine_inverse() * pos
 		else:
@@ -363,6 +400,15 @@ func _spawn_group(g: PendingGroup) -> void:
 		enemy_spawned.emit(e)
 		if not _running:
 			return
+
+
+## Pops the earliest elite time if it has passed (true = the enemy being spawned becomes an
+## elite).
+func _pop_due_elite_time() -> bool:
+	if _elite_times.is_empty() or _elite_times[0] > elapsed() + 0.000001:
+		return false
+	_elite_times.remove_at(0)
+	return true
 
 
 func _emit_timer(force: bool) -> void:

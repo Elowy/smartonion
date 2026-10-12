@@ -10,6 +10,7 @@ display_name = "Shadowstep"
 description = "Step through the shadows behind an enemy ahead of you. Your next hit is a guaranteed critical strike, and you deal {damage_pct}% more damage for {buff_duration} sec."
 class_id = &"rogue"
 school = &"shadow"
+tags = Array[StringName]([&"movement", &"weapon"])
 resource = &""
 cost = 0.0
 cooldown = 10.0

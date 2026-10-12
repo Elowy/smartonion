@@ -1,7 +1,8 @@
 class_name UiGlyph
 extends Control
 ## Button prompt glyph drawn in code (GDD 11: Xbox naming): coloured face buttons (A B X Y),
-## a START / BACK pill, keyboard key caps ("Enter", "Esc") and a left / right navigation pair.
+## START / BACK, shoulder / trigger and stick-click pills (LB RB LT RT L3 R3), keyboard key caps
+## ("Enter", "Esc") and a left / right navigation pair.
 ## for_input() picks the right look for a player's device (keyboard -> key caps).
 
 enum Style { PAD, PILL, KEY, NAV, NAV_VERTICAL }
@@ -35,7 +36,7 @@ static func pad(button: PlayerInput.Pad, height: float = 30.0) -> UiGlyph:
 			g.style = Style.PILL
 			g.text = "START" if button == PlayerInput.Pad.START else "BACK"
 			g.color = Color(0.32, 0.31, 0.3)
-		PlayerInput.Pad.LB, PlayerInput.Pad.RB, PlayerInput.Pad.LT, PlayerInput.Pad.RT:
+		PlayerInput.Pad.LB, PlayerInput.Pad.RB, PlayerInput.Pad.LT, PlayerInput.Pad.RT, PlayerInput.Pad.L3, PlayerInput.Pad.R3:
 			g.style = Style.PILL
 			g.text = String(PlayerInput.Pad.keys()[button])
 			g.color = Color(0.32, 0.31, 0.3)

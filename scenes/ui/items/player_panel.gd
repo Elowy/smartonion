@@ -3,24 +3,32 @@ extends Control
 ## One player's personal between-wave panel (GDD 12), shown in that player's screen corner /
 ## quadrant (DESIGN_SIZE 700x480 on the 1920x1080 canvas; scale it with [member scale]).
 ## Header in the player's colour (Pn, class, Avg. Item Level), tabs Character | Trainer |
-## Talents (Talents "Coming soon"). Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
+## Talents. Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
 ## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
-## the Character tab. Character tab = WoW paper doll – Head, Neck,
+## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/: the three talent
+## trees, points, reset), wired the same way – its label shows the hero's free talent points
+## ("Talents (2)", TalentTab.tab_label, relabelled on TalentTab.points_changed; talent stats come
+## through stats.set_source, so that signal and showing the Character tab rebuild the stat list).
+## Character tab = WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
 ## Controller (only the PlayerInput passed to handle_input): d-pad / stick moves the
 ## selection, A opens the action menu (backpack: Equip (→ slot for rings / trinkets /
-## dual wield) / Sell / Trade → Pn / Cancel; equipped: Unequip / Cancel), X opens it on Sell,
-## B closes menus, Y toggles the comparison in the tooltip, LT / RT switch tabs (the Trainer tab
-## takes the rest of the input while it is shown; TrainerTab.handle_input).
+## dual wield) / Forge (weapons) / Sell / Trade → Pn / Cancel; equipped: Unequip / Forge
+## (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles the comparison in the
+## tooltip, LT / RT switch tabs (the Trainer and Talents tabs take the rest of the input while
+## they are shown; TrainerTab / TalentTab.handle_input – LT / RT stay with the panel unless the
+## tab is modal). Forge (M5): Forge.blocked_reason greys the entry out, Forge.result_text is its
+## detail, Forge.forge does it and the result gets selected.
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
 ## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
 ## two-hander, "Replaces Dagger + Dagger" for a two-hander). Nothing may leave the hero without
 ## an attacking weapon (Equipment.is_last_weapon / equip_disarms): those Equip / Unequip /
 ## Sell / Trade entries are greyed out with "You need a weapon".
-## The selected item's ItemTooltip floats beside the panel, towards the screen centre.
+## The selected item's ItemTooltip floats beside the panel, towards the screen centre (with
+## [member tooltip_inside] over the panel's other half); it hides while the action menu is open.
 
 signal trade_done(item: ItemInstance, to_slot_index: int)
 ## Emitted after an item was sold from the backpack ([param gold] went to RunState).
@@ -35,6 +43,20 @@ const BAG_GAP := 7.0
 const BAG_COLUMNS := 5
 const BODY_GAP := 12.0
 const MESSAGE_TIME := 2.8
+## With [member tooltip_inside] a tooltip taller than the panel shrinks to fit it, but not below
+## this scale: a still taller one (a set piece with the comparison block) reaches past the
+## panel's edge towards the middle of the screen instead of becoming unreadable at 720p – as
+## far as the other corner panel of the screen column allows ([member tooltip_column_mate]; it
+## shrinks below this only when this scale would cross into that panel).
+const MIN_INSIDE_TOOLTIP_FIT := 0.9
+## A tooltip that reaches out of the panel ends this far (canvas px) before the column's other
+## corner panel.
+const TOOLTIP_NEIGHBOUR_GAP := 8.0
+## A tooltip that moves aside for its column mate's ([member tooltip_obstacle]) may shrink down to
+## this to keep the selected icon in sight ([method _keep_tooltip_clear]).
+const MIN_MOVED_TOOLTIP_FIT := 0.75
+## Without [member tooltip_inside]: the tooltip shrinks to the screen height, down to this.
+const MIN_TOOLTIP_FIT := 0.4
 
 const LEFT_SLOTS: Array[Items.EquipSlot] = [
 	Items.EquipSlot.HEAD, Items.EquipSlot.NECK, Items.EquipSlot.SHOULDERS,
@@ -51,8 +73,11 @@ const BOTTOM_SLOTS: Array[Items.EquipSlot] = [
 const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents"]
 const CHARACTER_TAB := 0
 const TRAINER_TAB := 1
-## Tabs that only say "coming soon" (Talents: M5).
-const LOCKED_TABS: Array[int] = [2]
+const TALENTS_TAB := 2
+## Tabs that only say "coming soon" (none since M5 opened Talents).
+const LOCKED_TABS: Array[int] = []
+## --panel-tab values -> tab index (debug_start_tab).
+const TAB_IDS: Dictionary[String, int] = {"character": CHARACTER_TAB, "trainer": TRAINER_TAB, "talents": TALENTS_TAB}
 ## Stat list (two columns, at most MAX_STAT_ROWS rows so the panel never grows): the class's
 ## primary stat, then these, then the other primary stats and every other non-zero stat.
 ## Stamina is shown as Max HP (10 + Stamina).
@@ -62,11 +87,25 @@ const LISTED_STATS: Array[StringName] = [
 const PRIMARY_STATS: Array[StringName] = [Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT]
 const UNLISTED_STATS: Array[StringName] = [Stats.STAMINA]
 const MAX_STAT_ROWS := 6
+## Compact names of the stat list: the two columns share the inset's width (STAT_COLUMN_GAP
+## apart), so a name gets 90 design px next to a "12.5%" value (105 next to "30%"). Longer names
+## are cut with an ellipsis ([method _refresh_stats]) – the list never widens the panel; every
+## stat's name here or in Stats.DISPLAY_NAMES fits next to "12.5%". The spell schools drop the
+## "Damage" ("Shadow 30%" – plain Damage is its own row).
 const SHORT_STAT_NAMES := {
-	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Damage",
-	Stats.COOLDOWN_REDUCTION: "Cooldowns", Stats.EXTRA_PROJECTILE: "Projectiles",
-	Stats.RESOURCE_REGEN: "Resource Regen", Stats.PICKUP_RANGE: "Pickup Range",
+	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Dmg",
+	Stats.COOLDOWN_REDUCTION: "CDR", Stats.EXTRA_PROJECTILE: "Projectiles",
+	Stats.RESOURCE_REGEN: "Regen", Stats.PICKUP_RANGE: "Pickup", Stats.HEALING_DONE: "Healing",
+	Stats.ATTACK_POWER: "Atk Power", Stats.EXTRA_ATTACK: "Extra Atk", Stats.BLOCK_VALUE: "Block Val.",
+	Stats.EXECUTIONER: "Execute",
+	Stats.FIRE_DAMAGE: "Fire", Stats.FROST_DAMAGE: "Frost", Stats.ARCANE_DAMAGE: "Arcane",
+	Stats.HOLY_DAMAGE: "Holy", Stats.SHADOW_DAMAGE: "Shadow", Stats.NATURE_DAMAGE: "Nature",
+	Stats.PHYSICAL_DAMAGE: "Physical",
 }
+## Stat list inset: side padding, the gap between the two columns and between a name and its value.
+const STAT_INSET_PAD := 8
+const STAT_COLUMN_GAP := 14
+const STAT_VALUE_GAP := 6
 
 enum Mode { BROWSE, MENU }
 
@@ -78,6 +117,12 @@ class Cell:
 	## Centre in the design layout of the body (spatial navigation).
 	var pos := Vector2.ZERO
 	var icon: ItemIcon
+
+
+## Where the item tooltip goes: its scale and canvas rect (PlayerPanel._tooltip_plan).
+class TooltipPlan:
+	var fit := 1.0
+	var rect := Rect2()
 
 
 class MenuEntry:
@@ -97,6 +142,17 @@ var tooltip: ItemTooltip
 ## selection) instead of floating towards the screen centre – used between waves, where the
 ## middle of the screen holds the shared shop.
 var tooltip_inside := false
+## With [member tooltip_inside]: the other corner of this panel's screen column holds a
+## teammate's panel (the Intermission's corner layout – P1 / P3 left, P2 / P4 right – where it is
+## the mirror image of this panel about the view's horizontal centre line). A tooltip that
+## reaches out of this panel then ends TOOLTIP_NEIGHBOUR_GAP before it; false: before the screen
+## edge. The Intermission keeps it up to date ([method Intermission._sync_panels]).
+var tooltip_column_mate := true
+## With [member tooltip_inside]: returns a canvas Rect2 (empty: nothing) that this panel's
+## tooltip keeps clear of when it reaches out of the panel – it moves to the panel's other half
+## ([method _keep_tooltip_clear]). The Intermission hands a bottom-corner panel its column
+## mate's [method planned_outside_tooltip_rect] (P3 makes way for P1, P4 for P2); unset: none.
+var tooltip_obstacle: Callable
 ## Index into the cells (see select_equip_slot / select_backpack).
 var selected := 0
 ## Whether the tooltip shows the "If you replace this item:" block (Y toggles).
@@ -111,6 +167,12 @@ var last_input_consumed := false
 
 ## The Trainer tab's body (shown instead of the paper doll while active_tab is TRAINER_TAB).
 var trainer: TrainerTab
+## The Talents tab's body (shown while active_tab is TALENTS_TAB).
+var talents: TalentTab
+
+## Dev only (--panel-tab=talents / trainer / character, screenshots): when the market opens,
+## P1's panel switches to that tab once ("" = off).
+static var debug_start_tab := ""
 
 var _cells: Array[Cell] = []
 var _focused := false
@@ -122,6 +184,8 @@ var _player_label: Label
 var _class_label: Label
 var _ilvl_value: Label
 var _tabs_row: HBoxContainer
+## The tab strip's name labels (index = tab), relabelled in place (_refresh_tab_labels).
+var _tab_labels: Array[Label] = []
 var _stats_grid: GridContainer
 var _bag_count: Label
 var _spec_label: Label
@@ -139,6 +203,8 @@ var _toast_label: RichTextLabel
 var _toast_coin: UiIcon
 var _toast_time := 0.0
 var _initial_selection := true
+## debug_start_tab was applied to this panel.
+var _debug_tab_done := false
 
 ## Panels in the tree, so a trade can notify the receiver's panel.
 static var _open_panels: Array[PlayerPanel] = []
@@ -177,7 +243,10 @@ func refresh() -> void:
 	if mode == Mode.MENU and not _menu_item_still_there():
 		close_menu()
 	trainer.refresh()
+	talents.refresh()
+	_refresh_tab_labels()
 	_update_selection()
+	_apply_debug_start_tab()
 
 
 ## Whether this panel currently receives the player's input (the Intermission routes input
@@ -187,6 +256,7 @@ func set_input_focus(focused: bool) -> void:
 	if not focused and mode == Mode.MENU:
 		close_menu()
 	trainer.set_focused(focused and active_tab == TRAINER_TAB)
+	talents.set_focused(focused and active_tab == TALENTS_TAB)
 	_frame.add_theme_stylebox_override(&"panel", _frame_style(focused))
 	_update_selection()
 
@@ -203,6 +273,9 @@ func handle_input(input: PlayerInput, delta: float = -1.0) -> void:
 		return
 	if active_tab == TRAINER_TAB:
 		_trainer_input(input, delta if delta >= 0.0 else get_process_delta_time())
+		return
+	if active_tab == TALENTS_TAB:
+		_talents_input(input, delta if delta >= 0.0 else get_process_delta_time())
 		return
 	if mode == Mode.MENU:
 		last_input_consumed = input.nav_just_pressed() != Vector2i.ZERO or input.just_pressed(PlayerInput.Pad.A) \
@@ -397,6 +470,7 @@ func open_menu(sell_first: bool = false) -> void:
 	_menu_stack = [{"title": it.display_name, "color": _rarity_color(it), "entries": entries, "index": index, "item": it}]
 	mode = Mode.MENU
 	_render_menu()
+	_update_tooltip()
 	_update_prompts()
 
 
@@ -404,6 +478,7 @@ func close_menu() -> void:
 	_menu_stack.clear()
 	mode = Mode.BROWSE
 	_menu_panel.visible = false
+	_update_tooltip()
 	_update_prompts()
 
 
@@ -413,7 +488,7 @@ func toggle_comparison() -> void:
 	_update_prompts()
 
 
-## LT / RT: the neighbouring tab; a locked one (Talents) only says "coming soon".
+## LT / RT: the neighbouring tab; a locked one (none since M5) only says "coming soon".
 func switch_tab(step: int) -> void:
 	var target := posmod(active_tab + step, TAB_NAMES.size())
 	if target in LOCKED_TABS:
@@ -422,7 +497,7 @@ func switch_tab(step: int) -> void:
 	set_tab(target)
 
 
-## Shows tab [param index] (CHARACTER_TAB or TRAINER_TAB; locked tabs are refused).
+## Shows tab [param index] (CHARACTER_TAB, TRAINER_TAB or TALENTS_TAB; locked tabs are refused).
 func set_tab(index: int) -> void:
 	if index < 0 or index >= TAB_NAMES.size() or index in LOCKED_TABS or index == active_tab:
 		return
@@ -431,12 +506,43 @@ func set_tab(index: int) -> void:
 	active_tab = index
 	_body.visible = index == CHARACTER_TAB
 	trainer.visible = index == TRAINER_TAB
+	talents.visible = index == TALENTS_TAB
 	_refresh_tabs()
-	if index == TRAINER_TAB:
+	if index == CHARACTER_TAB:
+		# Talent points (and other set_source changes) do not fire Equipment.changed.
+		_refresh_stats(class_data())
+	elif index == TRAINER_TAB:
 		trainer.refresh()
+	elif index == TALENTS_TAB:
+		talents.refresh()
 	trainer.set_focused(_focused and index == TRAINER_TAB)
+	talents.set_focused(_focused and index == TALENTS_TAB)
 	_prompt_key = ""
 	_update_selection()
+
+
+## --panel-tab (dev): P1's panel opens on [member debug_start_tab] once, when the market first
+## shows it.
+func _apply_debug_start_tab() -> void:
+	if _debug_tab_done or debug_start_tab == "" or slot == null or slot.index != 0:
+		return
+	_debug_tab_done = true
+	set_tab(int(TAB_IDS.get(debug_start_tab, active_tab)))
+
+
+## LT / RT switch tabs unless the Talents tab is modal (a confirm / hold is open); everything
+## else goes to the Talents tab.
+func _talents_input(input: PlayerInput, delta: float) -> void:
+	if not talents.is_modal():
+		if input.just_pressed(PlayerInput.Pad.LT):
+			switch_tab(-1)
+			last_input_consumed = true
+			return
+		if input.just_pressed(PlayerInput.Pad.RT):
+			switch_tab(1)
+			last_input_consumed = true
+			return
+	last_input_consumed = talents.handle_input(input, delta)
 
 
 ## LT / RT switch tabs (not while the Rank V choice is open); everything else goes to the
@@ -473,6 +579,8 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	else:
 		_fill_equip_entry(equip, it, targets[0], Items.EQUIP_SLOT_NAMES.get(targets[0], ""))
 	out.append(equip)
+	if it.is_weapon():
+		out.append(_forge_entry(it))
 	var last_weapon := eq.is_last_weapon(it)
 	var sell := _entry("Sell")
 	sell.detail = "+%d gold" % it.sell_value()
@@ -507,10 +615,27 @@ func _equipped_entries(equip_slot: int) -> Array[MenuEntry]:
 	else:
 		unequip.action = _do_unequip.bind(equip_slot)
 	out.append(unequip)
+	var it := equipment().get_item(equip_slot as Items.EquipSlot)
+	if it != null and it.is_weapon():
+		out.append(_forge_entry(it))
 	var cancel := _entry("Cancel")
 	cancel.action = close_menu
 	out.append(cancel)
 	return out
+
+
+## "Forge" for weapon [param it] (M5): greyed out with Forge.blocked_reason, the result's rarity
+## (Forge.result_text) as the detail.
+func _forge_entry(it: ItemInstance) -> MenuEntry:
+	var e := _entry("Forge")
+	e.detail = Forge.result_text(it)
+	var reason := Forge.blocked_reason(equipment(), it)
+	if reason != "":
+		e.enabled = false
+		e.reason = reason
+	else:
+		e.action = _do_forge.bind(it)
+	return e
 
 
 func _open_equip_choice(it: ItemInstance) -> void:
@@ -592,6 +717,28 @@ func _do_unequip(equip_slot: int) -> void:
 		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
 	else:
 		_message("Your backpack is full", "", UiTheme.RED)
+
+
+## Forges [param it] with its partner (Forge.forge): "Forged [Rare Dagger]!" and the result is
+## selected (where it went: an equipped position or the backpack).
+func _do_forge(it: ItemInstance) -> void:
+	var eq := equipment()
+	var reason := Forge.blocked_reason(eq, it)
+	var result := Forge.forge(eq, it) if reason == "" else null
+	if result == null:
+		_message(reason if reason != "" else "Can't forge that", "", UiTheme.RED)
+		return
+	close_menu()
+	_message("Forged %s!" % _bb_item(result), "Forged %s!" % result.display_name, _rarity_color(result))
+	var at := eq.backpack.find(result)
+	if at >= 0:
+		select_backpack(at)
+	else:
+		for s in Items.EquipSlot.values():
+			if eq.get_item(s) == result:
+				select_equip_slot(s)
+				break
+	refresh()
 
 
 func _do_sell(it: ItemInstance) -> void:
@@ -711,6 +858,12 @@ func _build() -> void:
 	trainer.message.connect(_on_trainer_message)
 	trainer.prompts_changed.connect(_on_trainer_prompts_changed)
 	col.add_child(trainer)
+	talents = TalentTab.create(slot)
+	talents.visible = false
+	talents.message.connect(_on_talents_message)
+	talents.prompts_changed.connect(_on_talents_prompts_changed)
+	talents.points_changed.connect(_on_talent_points_changed)
+	col.add_child(talents)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
 	_build_menu()
@@ -764,6 +917,7 @@ func _refresh_tabs() -> void:
 	for c in _tabs_row.get_children():
 		_tabs_row.remove_child(c)
 		c.queue_free()
+	_tab_labels.clear()
 	for i in TAB_NAMES.size():
 		var tab := PanelContainer.new()
 		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -788,15 +942,17 @@ func _refresh_tabs() -> void:
 			var lock := UiIcon.create(UiIcon.Kind.LOCK, Vector2(16, 16), Color(0.55, 0.5, 0.44))
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(lock)
-		var l := UiTheme.label(TAB_NAMES[i], &"", 20 if active else UiTheme.FONT_SMALL,
+		var l := UiTheme.label(tab_text(i), &"", 20 if active else UiTheme.FONT_SMALL,
 			UiTheme.GOLD_BRIGHT if active else (Color(0.55, 0.52, 0.48) if locked else UiTheme.TEXT_DIM.lightened(0.1)))
 		if active:
 			l.add_theme_font_override(&"font", UiTheme.bold_font())
 		row.add_child(l)
+		_tab_labels.append(l)
 		_tabs_row.add_child(tab)
-	var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
-	soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_tabs_row.add_child(soon)
+	if not LOCKED_TABS.is_empty():
+		var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
+		soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_tabs_row.add_child(soon)
 	_tabs_row.add_child(UiTheme.spacer())
 	# LT / RT hint at the end of the strip.
 	var input := slot.input if slot != null else null
@@ -808,6 +964,32 @@ func _refresh_tabs() -> void:
 	hint.add_child(TrainerRow.PromptTag.create("LMB" if keyboard else "RT", keyboard, 20.0, 14))
 	hint.modulate = Color(1, 1, 1, 0.8)
 	_tabs_row.add_child(hint)
+
+
+## The label of tab [param index]: its name; the Talents tab adds the free talent points
+## ("Talents (2)", TalentTab.tab_label).
+func tab_text(index: int) -> String:
+	if index == TALENTS_TAB and talents != null:
+		return talents.tab_label()
+	return TAB_NAMES[index] if index >= 0 and index < TAB_NAMES.size() else ""
+
+
+## Updates the tab names in place (the free talent points changed; no strip rebuild).
+func _refresh_tab_labels() -> void:
+	for i in _tab_labels.size():
+		var text := tab_text(i)
+		if _tab_labels[i].text != text:
+			_tab_labels[i].text = text
+
+
+## TalentTab.points_changed (every talent add / take back / reset, and level-ups): relabels the
+## tab and, while the Character tab is shown, rebuilds its stat list – talent stats arrive
+## through stats.set_source, which fires no Equipment.changed (GDD 7.2: the Character tab shows
+## the new numbers). Another tab rebuilds the list when it switches back (set_tab).
+func _on_talent_points_changed() -> void:
+	_refresh_tab_labels()
+	if active_tab == CHARACTER_TAB:
+		_refresh_stats(class_data())
 
 
 func _build_doll() -> Control:
@@ -876,12 +1058,19 @@ func _build_side() -> Control:
 	var side := UiTheme.vbox(6)
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var stats_panel := UiTheme.panel(UiTheme.INSET_PANEL)
+	stats_panel.name = "StatsInset"
 	stats_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Nothing in the list may draw past the inset (the names clip, see _refresh_stats).
+	stats_panel.clip_contents = true
+	var inset := UiTheme.inset_style()
+	inset.content_margin_left = STAT_INSET_PAD
+	inset.content_margin_right = STAT_INSET_PAD
+	stats_panel.add_theme_stylebox_override(&"panel", inset)
 	side.add_child(stats_panel)
 	_stats_grid = GridContainer.new()
 	_stats_grid.columns = 2
 	_stats_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stats_grid.add_theme_constant_override(&"h_separation", 18)
+	_stats_grid.add_theme_constant_override(&"h_separation", STAT_COLUMN_GAP)
 	_stats_grid.add_theme_constant_override(&"v_separation", 1)
 	stats_panel.add_child(_stats_grid)
 
@@ -1043,11 +1232,16 @@ func _refresh_stats(cls: ClassData) -> void:
 	for row in stat_rows(stats, cls):
 		var stat: StringName = row[0]
 		var v: float = row[1]
-		var cell := UiTheme.hbox(6)
+		var cell := UiTheme.hbox(STAT_VALUE_GAP)
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var primary := cls != null and stat == cls.primary_stat
 		var name_label := UiTheme.label(_stat_name(stat), &"", UiTheme.FONT_SMALL, UiTheme.GOLD if primary else UiTheme.TEXT_DIM)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# The name takes what the value leaves and is cut with an ellipsis: its text never sets
+		# the column's width (the two columns share the inset evenly).
+		name_label.clip_text = true
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.custom_minimum_size.x = 0
 		cell.add_child(name_label)
 		var value_label := UiTheme.label(_stat_text(stat, v), &"", UiTheme.FONT_SMALL, UiTheme.RED if v < 0.0 else UiTheme.TEXT)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1145,23 +1339,32 @@ func _update_selection() -> void:
 	_update_prompts()
 
 
+## The selected item's tooltip – hidden while the action menu is open: both use the panel's
+## half away from the selection (_place_tooltip / _place_menu), and the menu's title names the
+## item anyway.
 func _update_tooltip() -> void:
 	var it := selected_item()
-	if not _focused or it == null or active_tab != CHARACTER_TAB:
+	if not _focused or it == null or active_tab != CHARACTER_TAB or mode == Mode.MENU:
 		tooltip.visible = false
 		return
 	var compare: ItemInstance = null
 	if _cells[selected].bag_index >= 0:
 		compare = ItemTooltip.equipped_for_compare(it, equipment())
 	tooltip.comparison_visible = comparison
+	tooltip.viewer_equipment = equipment()
 	tooltip.show_item(it, class_data(), compare)
 	if is_inside_tree():
+		# Measured now: placed with its real size in this frame (the shop reads its rect).
+		tooltip.layout_now()
 		_place_tooltip.call_deferred()
 
 
 func _update_prompts() -> void:
 	if active_tab == TRAINER_TAB:
 		_update_trainer_prompts()
+		return
+	if active_tab == TALENTS_TAB:
+		_update_tab_prompts("talents", talents.prompt_spec(), talents.context_text())
 		return
 	var cell := _cells[selected]
 	var it := selected_item()
@@ -1190,10 +1393,16 @@ func _update_prompts() -> void:
 
 
 func _update_trainer_prompts() -> void:
-	_context_label.text = trainer.context_text()
+	_update_tab_prompts("trainer", trainer.prompt_spec(), trainer.context_text())
+
+
+## The prompt row of the Trainer / Talents tab ([param tab_key]): [param spec] = [button, text]
+## pairs (PlayerInput.Pad or TrainerTab.NAV_PROMPT / NAV_PROMPT_SIDEWAYS), [param context] the
+## text on the left. Rebuilt only when something changed.
+func _update_tab_prompts(tab_key: String, spec: Array, context: String) -> void:
+	_context_label.text = context
 	var input := slot.input if slot != null else null
-	var spec := trainer.prompt_spec()
-	var key := "trainer:%s:%s" % [str(spec), _focused]
+	var key := "%s:%s:%s" % [tab_key, str(spec), _focused]
 	if key == _prompt_key:
 		return
 	_prompt_key = key
@@ -1222,6 +1431,15 @@ func _on_trainer_message(bbcode: String, plain: String, color: Color, coin: bool
 
 func _on_trainer_prompts_changed() -> void:
 	if active_tab == TRAINER_TAB and _prompt_holder != null:
+		_update_prompts()
+
+
+func _on_talents_message(bbcode: String, plain: String, color: Color, coin: bool) -> void:
+	_message(bbcode, plain, color, coin)
+
+
+func _on_talents_prompts_changed() -> void:
+	if active_tab == TALENTS_TAB and _prompt_holder != null:
 		_update_prompts()
 
 
@@ -1298,24 +1516,44 @@ func _place_menu() -> void:
 
 
 ## The tooltip floats beside the panel on the side facing the screen centre, level with the
-## selected icon and kept inside the visible area.
+## selected icon and kept inside the visible area. With [member tooltip_inside] it stays over the
+## panel (scaled down to its height, at least MIN_INSIDE_TOOLTIP_FIT); one taller than that hangs
+## from the panel's top edge downwards (top-corner panels) or rises from its bottom edge (bottom
+## corners), over the middle of the screen – and shrinks further if it would otherwise reach the
+## column's other corner panel ([method _inside_tooltip_span]). If it would then cover
+## [member tooltip_obstacle] (the column mate's tooltip in the same band), it moves aside
+## ([method _keep_tooltip_clear]).
 func _place_tooltip() -> void:
 	if not tooltip.visible or not is_inside_tree():
 		return
+	var plan := _tooltip_plan(true)
+	tooltip.size = tooltip.get_combined_minimum_size()
+	tooltip.scale = Vector2.ONE * plan.fit
+	tooltip.position = get_global_transform_with_canvas().affine_inverse() * plan.rect.position
+
+
+## Where the tooltip goes ([method _place_tooltip]): its scale and canvas rect, worked out from
+## the current selection without moving anything – so the column mate may ask for it too
+## ([method planned_outside_tooltip_rect]). [param keep_clear]: and clear of
+## [member tooltip_obstacle].
+func _tooltip_plan(keep_clear: bool) -> TooltipPlan:
 	var to_canvas := get_global_transform_with_canvas()
 	var panel_rect := to_canvas * Rect2(Vector2.ZERO, size)
 	var icon := _cells[selected].icon
 	var icon_rect := icon.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, icon.size)
-	var tip := tooltip.get_combined_minimum_size()
-	tooltip.size = tip
+	var tip := tooltip.get_combined_minimum_size() * to_canvas.get_scale()
 	var view := get_viewport_rect()
-	# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
-	# otherwise spill over the neighbouring player's panel).
-	var room := (minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)) \
-			if tooltip_inside else view.size.y - 8.0
-	var fit := clampf(room / maxf(1.0, tip.y * to_canvas.get_scale().y), 0.4, 1.0)
-	tooltip.scale = Vector2.ONE * fit
-	var tip_size := tip * to_canvas.get_scale() * fit
+	var tip_h := maxf(1.0, tip.y)
+	var fit := clampf((view.size.y - 8.0) / tip_h, MIN_TOOLTIP_FIT, 1.0)
+	var span := _inside_tooltip_span(panel_rect, view)
+	if tooltip_inside:
+		# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
+		# otherwise spill over the neighbouring player's panel) – but only so far, and never so
+		# little that it reaches the panel at the column's other end.
+		var room := minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)
+		var reach := maxf(room, span.y - span.x)
+		fit = minf(clampf(room / tip_h, MIN_INSIDE_TOOLTIP_FIT, 1.0), reach / tip_h)
+	var tip_size := tip * fit
 	var gap := 10.0 * to_canvas.get_scale().x
 	var x := panel_rect.end.x + gap
 	if tooltip_inside:
@@ -1325,13 +1563,100 @@ func _place_tooltip() -> void:
 			x = panel_rect.end.x - gap - tip_size.x
 	elif panel_rect.get_center().x > view.get_center().x:
 		x = panel_rect.position.x - gap - tip_size.x
-	x = clampf(x, view.position.x + 4.0, maxf(view.position.x + 4.0, view.end.x - tip_size.x - 4.0))
 	var top := panel_rect.position.y if tooltip_inside else view.position.y
 	var bottom := panel_rect.end.y if tooltip_inside else view.end.y
 	top = maxf(top, view.position.y + 4.0)
 	bottom = minf(bottom, view.end.y - 4.0)
 	var y := clampf(icon_rect.position.y - 6.0, top, maxf(top, bottom - tip_size.y))
-	tooltip.position = to_canvas.affine_inverse() * Vector2(x, y)
+	if tip_size.y > bottom - top + 0.5:
+		# Taller than the panel even at the minimum fit: out over the panel's inner edge.
+		y = top if panel_rect.get_center().y <= view.get_center().y else bottom - tip_size.y
+		y = clampf(y, view.position.y + 4.0, maxf(view.position.y + 4.0, view.end.y - 4.0 - tip_size.y))
+	var plan := TooltipPlan.new()
+	plan.fit = fit
+	plan.rect = Rect2(Vector2(_clamp_tooltip_x(x, tip_size.x, view), y), tip_size)
+	if keep_clear and tooltip_inside and tooltip_obstacle.is_valid() and not panel_rect.grow(0.5).encloses(plan.rect):
+		var obstacle: Rect2 = tooltip_obstacle.call()
+		if obstacle.has_area() and plan.rect.intersects(obstacle.grow(TOOLTIP_NEIGHBOUR_GAP)):
+			_keep_tooltip_clear(plan, obstacle, panel_rect, icon_rect, span, gap, view)
+	return plan
+
+
+## [param plan] reaches out of the panel over [param obstacle] (the column mate's tooltip in the
+## same band): it moves to the panel's other half – the selected icon's (both tooltips are at
+## most MIN_INSIDE_TOOLTIP_FIT there, so two fit side by side). In the room the column allows
+## ([param span]) it sits just above the selected icon, else just below it, shrunk for that down
+## to MIN_MOVED_TOOLTIP_FIT, so the icon stays in sight; when neither fits, at its size from the
+## panel's outer edge as before (over the icon). Only if the other half were no clearer (a
+## tooltip wider than half the panel) does it stay and shrink into the room beside the obstacle.
+static func _keep_tooltip_clear(plan: TooltipPlan, obstacle: Rect2, panel_rect: Rect2, icon_rect: Rect2, span: Vector2, gap: float, view: Rect2) -> void:
+	var r := plan.rect
+	var tip_h := r.size.y / plan.fit
+	var above := minf(plan.fit, (icon_rect.position.y - 6.0 - span.x) / tip_h)
+	var below := minf(plan.fit, (span.y - icon_rect.end.y - 6.0) / tip_h)
+	var fit := plan.fit
+	var y := r.position.y
+	if maxf(above, below) >= minf(plan.fit, MIN_MOVED_TOOLTIP_FIT) - 0.0001:
+		fit = maxf(above, below)
+		y = icon_rect.position.y - 6.0 - tip_h * fit if above >= below else icon_rect.end.y + 6.0
+	var moved_size := r.size * (fit / plan.fit)
+	var x := panel_rect.position.x + gap
+	if r.get_center().x < panel_rect.get_center().x:
+		x = panel_rect.end.x - gap - moved_size.x
+	var moved := Rect2(Vector2(_clamp_tooltip_x(x, moved_size.x, view), y), moved_size)
+	if not moved.intersects(obstacle.grow(TOOLTIP_NEIGHBOUR_GAP)):
+		plan.fit = fit
+		plan.rect = moved
+		return
+	var after := obstacle.get_center().y < r.get_center().y
+	var room := span.y - obstacle.end.y - TOOLTIP_NEIGHBOUR_GAP if after else obstacle.position.y - TOOLTIP_NEIGHBOUR_GAP - span.x
+	var shrink := clampf(room / r.size.y, 0.05, 1.0)
+	plan.fit *= shrink
+	plan.rect.size = r.size * shrink
+	plan.rect.position.y = span.y - plan.rect.size.y if after else span.x
+
+
+static func _clamp_tooltip_x(x: float, width: float, view: Rect2) -> float:
+	return clampf(x, view.position.x + 4.0, maxf(view.position.x + 4.0, view.end.x - width - 4.0))
+
+
+## The item tooltip's global rect while it is shown and reaches out of the panel (a tall one
+## with [member tooltip_inside], over the free band between two corner panels); an empty Rect2
+## while it is hidden or stays over the panel. The shop keeps its tooltips clear of it
+## (ShopPanel.tooltip_obstacles).
+func outside_tooltip_rect() -> Rect2:
+	if tooltip == null or not tooltip.visible or not is_visible_in_tree():
+		return Rect2()
+	var r := tooltip.get_global_transform() * Rect2(Vector2.ZERO, tooltip.size)
+	return Rect2() if (get_global_transform() * Rect2(Vector2.ZERO, size)).grow(0.5).encloses(r) else r
+
+
+## Like [method outside_tooltip_rect], but where the tooltip goes for the current selection
+## (canvas px; [method _tooltip_plan] without [member tooltip_obstacle]) rather than where it
+## was drawn – so the column mate that keeps clear of it (its [member tooltip_obstacle]) gets the
+## same answer whichever panel lays out first in a frame.
+func planned_outside_tooltip_rect() -> Rect2:
+	if tooltip == null or not tooltip.visible or not is_visible_in_tree() or _cells.is_empty():
+		return Rect2()
+	var r := _tooltip_plan(false).rect
+	return Rect2() if (get_global_transform_with_canvas() * Rect2(Vector2.ZERO, size)).grow(0.5).encloses(r) else r
+
+
+## The canvas y range (x = top, y = bottom) a [member tooltip_inside] tooltip may use when it
+## reaches out of the panel: from the panel's outer edge (top for the top corners, bottom for the
+## bottom ones) to TOOLTIP_NEIGHBOUR_GAP before the column's other corner panel (the mirror image
+## of this one, [member tooltip_column_mate]), or to the screen edge.
+func _inside_tooltip_span(panel_rect: Rect2, view: Rect2) -> Vector2:
+	var mirror_y := view.position.y + view.end.y
+	if panel_rect.get_center().y <= view.get_center().y:
+		var end := view.end.y - 4.0
+		if tooltip_column_mate:
+			end = minf(end, mirror_y - panel_rect.end.y - TOOLTIP_NEIGHBOUR_GAP)
+		return Vector2(maxf(panel_rect.position.y, view.position.y + 4.0), end)
+	var start := view.position.y + 4.0
+	if tooltip_column_mate:
+		start = maxf(start, mirror_y - panel_rect.position.y + TOOLTIP_NEIGHBOUR_GAP)
+	return Vector2(start, minf(panel_rect.end.y, view.end.y - 4.0))
 
 
 # --- Messages -----------------------------------------------------------------------------------

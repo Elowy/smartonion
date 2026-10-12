@@ -13,6 +13,10 @@ extends Projectile
 ##   homing – [member turn_rate] > 0 steers it towards [member home_target] (the turn gets
 ##     sharper with age so it never orbits); a dead target hands over to the nearest enemy
 ##     it has not hit within [constant RETARGET_RANGE] m.
+##   bomb_pct / bomb_radius – (Fireball with the "Living Bomb" talent) every burn this bolt
+##     starts is armed ([method MageBurn.arm_bomb]) for bomb_pct % of the hit that lit it
+##     (after bounce falloff / splash share, before the caster's multipliers); Pyroblast and
+##     Arcane Missiles never set it.
 
 const BOUNCE_RANGE := 6.0
 const RETARGET_RANGE := 6.0
@@ -26,6 +30,10 @@ var splash_radius := 0.0
 var splash_pct := 50.0
 var bounce_mult := 0.75
 var bounces_left := 0
+## Living Bomb: % of each hit its burn explodes for (0 = no bomb) and the blast radius (m,
+## Area Size already applied).
+var bomb_pct := 0.0
+var bomb_radius := 2.5
 var home_target: Enemy
 ## Radians per second (0 = flies straight).
 var turn_rate := 0.0
@@ -120,7 +128,9 @@ func _strike(caster: Player, e: Enemy, amount: float) -> void:
 	victim_ids.append(e.get_instance_id())
 	dealt += caster.procs.deal_raw(e, amount, school, true, &"ability")
 	if burn_pct > 0.0:
-		MageBurn.apply(e, caster, amount * burn_pct / 100.0, burn_duration, school)
+		var burn := MageBurn.apply(e, caster, amount * burn_pct / 100.0, burn_duration, school)
+		if burn != null and bomb_pct > 0.0:
+			burn.arm_bomb(amount * bomb_pct / 100.0, bomb_radius)
 
 
 func _splash(caster: Player, hit: Enemy, center: Vector3) -> void:

@@ -10,6 +10,7 @@ display_name = "Corruption"
 description = "Shadow damage over {duration} sec on the nearest uncorrupted enemy ({targets} per cast). When it dies, the curse jumps to an enemy within {spread_radius} m."
 class_id = &"warlock"
 school = &"shadow"
+tags = Array[StringName]([&"dot", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 4.0

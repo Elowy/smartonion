@@ -10,6 +10,7 @@ display_name = "Meteor"
 description = "Calls a meteor down on the densest group of enemies: after {fall} sec it deals heavy Fire damage within {radius} m and leaves burning ground for {ground_duration} sec."
 class_id = &"mage"
 school = &"fire"
+tags = Array[StringName]([&"aoe", &"ground", &"spell"])
 resource = &""
 cost = 0.0
 cooldown = 16.0

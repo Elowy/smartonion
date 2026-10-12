@@ -3,7 +3,9 @@ extends TestCase
 ## off-hand item next to a two-hander with that two-hander (ItemTooltip.equipped_for_compare /
 ## upgrade_direction, the character panel's "Replaces ..."), bots equip without flip-flopping
 ## and a hero never ends up without an attacking weapon (Equipment guards, PlayerPanel greys
-## out Unequip / Sell / Trade / Equip with "You need a weapon").
+## out Unequip / Sell / Trade / Equip with "You need a weapon"). Bot forging between waves
+## (M5, the Intermission._bots_shop order: equip upgrades -> Forge.bot_forge_all -> equip
+## again) keeps the hero armed and never forges two equipped weapons.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const Support := preload("res://tests/test_loot_support.gd")
@@ -127,6 +129,29 @@ func test_bots_do_not_flip_flop_between_a_bow_and_daggers() -> void:
 	check(oeq.backpack == [common_bow], "the bow waits in the backpack")
 
 
+## Intermission.bot_equip_upgrades repeats its pass until nothing more goes on: a shield
+## that would disarm the two-hander is no upgrade when the pass reaches it, but once a sword
+## replaced the two-hander later in that pass, it fills the free off hand in the same call.
+func test_bots_wear_what_a_later_swap_made_an_upgrade() -> void:
+	var slot := Support.make_slot(slots.size(), &"warrior")
+	slots.append(slot)
+	var cls := slot.class_data
+	var eq := Support.equipment_of(slot)
+	var axe := _weapon(&"two_hand_axe")
+	eq.add_to_backpack(axe)
+	check(eq.equip(axe) and eq.backpack.is_empty(), "a Common two-hander on")
+	var shield := _weapon(&"shield")
+	var sword := _weapon(&"sword", Items.Rarity.EPIC)
+	check(eq.add_to_backpack(shield) and eq.add_to_backpack(sword), "shield first, then the sword")
+	check_eq(ItemTooltip.upgrade_direction(shield, axe, cls, eq), -1, "fixture: the shield would disarm the two-hander")
+	check_eq(ItemTooltip.upgrade_direction(sword, axe, cls, eq), 1, "fixture: the Epic sword beats it")
+	check_eq(Intermission.bot_equip_upgrades(slot), 2, "sword, then the shield in the next pass")
+	check(eq.get_item(Items.EquipSlot.MAIN_HAND) == sword and eq.get_item(Items.EquipSlot.OFF_HAND) == shield,
+		"sword and shield in hand")
+	check(eq.backpack == [axe], "the two-hander waits in the backpack")
+	check_eq(Intermission.bot_equip_upgrades(slot), 0, "and stays")
+
+
 func test_mage_bot_keeps_its_staff_next_to_a_tome() -> void:
 	RunState.start_run(1, 3)
 	var slot := PlayerSlot.new(0, ScriptedInput.new("x"), Color.WHITE)
@@ -143,6 +168,56 @@ func test_mage_bot_keeps_its_staff_next_to_a_tome() -> void:
 	check(eq.get_item(Items.EquipSlot.MAIN_HAND) == staff, "still the staff")
 	check_eq(eq.get_item(Items.EquipSlot.OFF_HAND), null, "no tome pushed it out")
 	check_eq(p.weapons.size(), 1, "one attacking weapon")
+
+
+## What Intermission._bots_shop does with a bot's gear before buying (M5 hook).
+static func _bot_gear_pass(slot: PlayerSlot) -> int:
+	Intermission.bot_equip_upgrades(slot)
+	var forged := Forge.bot_forge_all(slot)
+	if forged > 0:
+		Intermission.bot_equip_upgrades(slot)
+	return forged
+
+
+func test_bots_wear_a_spare_one_hander_in_a_free_off_hand_instead_of_forging() -> void:
+	var warrior := _armed(&"warrior")
+	var eq := Support.equipment_of(warrior)
+	var sword := eq.get_item(Items.EquipSlot.MAIN_HAND)
+	var spare := _weapon(&"sword")
+	eq.add_to_backpack(spare)
+	check_eq(_bot_gear_pass(warrior), 0, "two equipped swords are never forged together")
+	check(eq.get_item(Items.EquipSlot.MAIN_HAND) == sword and eq.get_item(Items.EquipSlot.OFF_HAND) == spare,
+		"dual wield: the spare went into the free off hand")
+	check_eq(RunState.weapons_forged, 0, "nothing forged")
+
+
+func test_bots_forge_a_spare_into_the_equipped_weapon_and_stay_armed() -> void:
+	var paladin := _armed(&"paladin")
+	var eq := Support.equipment_of(paladin)
+	var mace := eq.get_item(Items.EquipSlot.MAIN_HAND)
+	var shield := eq.get_item(Items.EquipSlot.OFF_HAND)
+	eq.add_to_backpack(_weapon(&"mace"))
+	check_eq(_bot_gear_pass(paladin), 1, "the spare mace forges with the equipped one")
+	var forged := eq.get_item(Items.EquipSlot.MAIN_HAND)
+	check(forged != mace and forged.rarity == Items.Rarity.UNCOMMON, "the Uncommon mace is worn")
+	check(eq.get_item(Items.EquipSlot.OFF_HAND) == shield, "the shield stays")
+	check(eq.backpack.is_empty() and eq.is_armed(), "nothing left over, armed")
+
+
+func test_bots_chain_forges_after_wearing_an_upgrade() -> void:
+	var rogue := _armed(&"rogue")
+	var eq := Support.equipment_of(rogue)
+	eq.add_to_backpack(_weapon(&"dagger"))
+	eq.add_to_backpack(_weapon(&"dagger", Items.Rarity.UNCOMMON))
+	# The Uncommon dagger replaces a Common one, the two Commons in the backpack forge into an
+	# Uncommon, which forges with the worn Uncommon into a Rare (into that hand).
+	check_eq(_bot_gear_pass(rogue), 2, "two forges")
+	var rarities: Array[int] = [eq.get_item(Items.EquipSlot.MAIN_HAND).rarity, eq.get_item(Items.EquipSlot.OFF_HAND).rarity]
+	rarities.sort()
+	check_eq(rarities, [Items.Rarity.COMMON, Items.Rarity.RARE] as Array[int], "a Rare and a Common dagger in hand")
+	check(eq.backpack.is_empty(), "the backpack is empty")
+	for s in [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]:
+		check_eq(eq.get_item(s).source_id, &"dagger", "daggers in both hands")
 
 
 # --- Never without a weapon ---------------------------------------------------------------

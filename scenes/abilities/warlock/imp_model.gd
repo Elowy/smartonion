@@ -7,6 +7,8 @@ extends Node3D
 ## Body and the two wings are MeshKit meshes (cached, shared by every Imp) drawn with
 ## Mats.toon_vc(); the fireball uses a cached Mats.glow material. Animation (hover bob, wing
 ## flaps, fireball flicker, throw) only moves / scales nodes – no per-node materials.
+## [member wild] (Wild Imps, set before it enters the tree): smaller ([constant WILD_SCALE]),
+## a fel-green tint and a fel-green fireball.
 
 const HOVER_HEIGHT := 0.6
 const MODEL_SCALE := 0.85
@@ -24,6 +26,11 @@ const DARK := Color(0.08, 0.04, 0.05)
 const WHITE := Color(0.98, 0.97, 0.93)
 const FLAME := Color(1.0, 0.55, 0.15)
 const FLAME_CORE := Color(1.0, 0.9, 0.55)
+## Wild Imps: model scale (x MODEL_SCALE), body tint and fireball colours.
+const WILD_SCALE := 0.7
+const WILD_TINT := Color(0.75, 1.0, 0.6)
+const WILD_FLAME := Color(0.45, 1.0, 0.25)
+const WILD_FLAME_CORE := Color(0.85, 1.0, 0.6)
 
 ## Where the wings attach (pivot space) and the fireball floats.
 const WING_ROOT := Vector3(0.07, 0.1, 0.11)
@@ -38,6 +45,8 @@ var _yaw := 0.0
 var _target_yaw := 0.0
 var _moving := 0.0
 var _cast := 1.0
+## A Wild Imp's look (smaller, fel green).
+var wild := false
 
 
 func _init() -> void:
@@ -70,19 +79,22 @@ func _build() -> void:
 	_pivot = Node3D.new()
 	_pivot.name = "Pivot"
 	_pivot.position.y = HOVER_HEIGHT
-	_pivot.scale = Vector3.ONE * MODEL_SCALE
+	_pivot.scale = Vector3.ONE * MODEL_SCALE * (WILD_SCALE if wild else 1.0)
 	add_child(_pivot)
+	var skin_mat := Mats.toon_vc(true, WILD_TINT) if wild else Mats.toon_vc()
+	var flame := WILD_FLAME if wild else FLAME
+	var flame_core := WILD_FLAME_CORE if wild else FLAME_CORE
 	_body = MeshInstance3D.new()
 	_body.name = "Body"
 	_body.mesh = MeshKit.cached("warlock:imp:body", func() -> Mesh: return _body_mesh())
-	_body.material_override = Mats.toon_vc()
+	_body.material_override = skin_mat
 	_pivot.add_child(_body)
 	for side: float in [-1.0, 1.0]:
 		var wing := MeshInstance3D.new()
 		wing.name = "WingL" if side < 0.0 else "WingR"
 		var key := "warlock:imp:wing:%d" % int(side)
 		wing.mesh = MeshKit.cached(key, func() -> Mesh: return _wing_mesh(side))
-		wing.material_override = Mats.toon_vc()
+		wing.material_override = skin_mat
 		wing.position = Vector3(WING_ROOT.x * side, WING_ROOT.y, WING_ROOT.z)
 		_pivot.add_child(wing)
 		_wings.append(wing)
@@ -92,18 +104,18 @@ func _build() -> void:
 	_pivot.add_child(_flame)
 	var outer := MeshInstance3D.new()
 	outer.mesh = _sphere_mesh(0.085)
-	outer.material_override = Mats.glow(FLAME, 2.6)
+	outer.material_override = Mats.glow(flame, 2.6)
 	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_flame.add_child(outer)
 	var core := MeshInstance3D.new()
 	core.mesh = _sphere_mesh(0.05)
-	core.material_override = Mats.glow(FLAME_CORE, 3.2)
+	core.material_override = Mats.glow(flame_core, 3.2)
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	core.position = Vector3(0, 0.0, -0.03)
 	_flame.add_child(core)
 	var tip := MeshInstance3D.new()
 	tip.mesh = MeshKit.cached("warlock:imp:flame_tip", func() -> Mesh: return _flame_tip_mesh())
-	tip.material_override = Mats.glow(FLAME, 2.2)
+	tip.material_override = Mats.glow(flame, 2.2)
 	tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_flame.add_child(tip)
 	_pivot.rotation.y = _target_yaw

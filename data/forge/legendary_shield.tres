@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"shield"
+display_name = "Dawnwall"
+unique_effect = &"reflect"
+unique_params = {
+"trigger": "on_block",
+"icd": 1.5,
+"damage": 30.0,
+"stun": 1.0,
+"school": "holy"
+}
+unique_text = "When you block, the shield flares: 30 Holy damage to the attacker, stunning it for 1 sec. At most once every 1.5 sec."
+flavor = "Morning breaks on it, and so do they."

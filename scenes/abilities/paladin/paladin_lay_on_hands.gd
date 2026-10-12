@@ -5,8 +5,9 @@ extends AbilityEffect
 ## Glory stays the only instant revive (GDD 3.3), so downed heroes are skipped.
 ##
 ## Params: shield_max_hp / shield_duration (Rank III: the healed hero also gets an absorb
-## shield worth that % of its max HP x power), group_heal (spec "Hands of Mercy": instead
-## of one full heal, every living hero in range is healed for that % of max HP x power),
+## shield worth that % of its max HP x power x Healing Done), group_heal (spec "Hands of
+## Mercy": instead of one full heal, every living hero in range is healed for that % of max HP
+## x power x Healing Done – PaladinKit.healing_mult, talent Healing Light),
 ## guard / guard_duration (spec "Guardian's Touch": the healed hero takes -% damage x power
 ## for a while, Player.damage_taken_mults under [method guard_key]).
 ##
@@ -56,11 +57,12 @@ static func heal_targets(ctx: AbilityContext) -> Array[Player]:
 	return out
 
 
-## HP [param who] regains: everything missing, or group_heal % of max HP x power.
+## HP [param who] regains: everything missing, or group_heal % of max HP x power x the
+## caster's Healing Done (PaladinKit.healing_mult – a full heal cannot grow).
 static func heal_for(ctx: AbilityContext, who: Player) -> float:
 	var group := ctx.num("group_heal")
 	if group > 0.0:
-		return who.max_hp() * group / 100.0 * ctx.num("power", 1.0)
+		return who.max_hp() * group / 100.0 * ctx.num("power", 1.0) * PaladinKit.healing_mult(ctx.player)
 	return maxf(0.0, who.max_hp() - who.hp)
 
 
@@ -99,7 +101,7 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	_bind(p)
 	var power := ctx.num("power", 1.0)
-	var shield_pct := ctx.num("shield_max_hp")
+	var shield_pct := ctx.num("shield_max_hp") * PaladinKit.healing_mult(p)
 	var guard := minf(MAX_GUARD, ctx.num("guard") * power)
 	for hero in targets:
 		hero.heal(heal_for(ctx, hero))

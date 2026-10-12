@@ -1,6 +1,7 @@
 extends TestCase
 ## Item content (data/item_bases, data/affixes, data/uniques): counts from GDD 5.4 / 5.5 / 5.8,
-## unique effects in the shared proc vocabulary, no Blizzard trademarks.
+## unique effects in the shared proc vocabulary, no Blizzard trademarks. Tier-set pieces
+## (set_id, M5) have no unique effect – their set bonus is the effect (test_sets.gd).
 
 ## Shared unique-effect vocabulary (ProcSystem building blocks and triggers).
 const BLOCKS: Array[StringName] = [
@@ -17,6 +18,8 @@ const BANNED: Array[String] = [
 	"azeroth", "murloc", "horde", "alliance", "thunderfury", "frozen throne", "silver hand",
 	"ashbringer", "frostmourne", "warcraft", "lich king", "sylvanas", "windrunner", "arthas",
 	"illidan", "thrall", "stormwind", "orgrimmar", "time is money",
+	# Real tier-set names / WoW terms the M5 sets were renamed from (architecture §5 Q22).
+	"felheart", "shadowcraft", "lightforged",
 ]
 
 
@@ -72,6 +75,8 @@ func test_unique_counts() -> void:
 	var per_class := {}
 	for id in Db.uniques:
 		var data := Db.uniques[id]
+		if data.set_id != &"":
+			continue  # tier-set pieces (test_sets.gd)
 		if data.class_restriction != &"":
 			per_class[data.class_restriction] = per_class.get(data.class_restriction, 0) + 1
 		elif data.rarity == Items.Rarity.LEGENDARY:
@@ -91,7 +96,8 @@ func test_unique_data_is_valid() -> void:
 	for id in Db.uniques:
 		var data := Db.uniques[id]
 		check_eq(data.id, id, "id matches")
-		check(data.display_name != "" and data.unique_text != "", "%s: name and text" % id)
+		var set_piece := data.set_id != &""
+		check(data.display_name != "" and (data.unique_text != "" or set_piece), "%s: name and text" % id)
 		check(data.rarity >= Items.Rarity.UNCOMMON and data.rarity <= Items.Rarity.LEGENDARY, "%s: rarity" % id)
 		if data.weapon != null:
 			check_eq(data.slot_type, Items.SlotType.WEAPON, "%s: weapon slot" % id)
@@ -113,6 +119,10 @@ func test_unique_data_is_valid() -> void:
 			check(c != null, "%s: known class" % id)
 			check(data.rarity >= Items.Rarity.RARE, "%s: class items are Rare+" % id)
 			check(ItemGenerator.unique_usable_by(data, c), "%s: usable by its class" % id)
+		if set_piece:
+			check(data.unique_effect == &"" and data.unique_text == "", "%s: set pieces carry no unique effect" % id)
+			check(Db.get_set(data.set_id) != null, "%s: known set" % id)
+			continue
 		_check_effect(id, data.unique_effect, data.unique_params)
 
 
@@ -159,6 +169,10 @@ func test_no_blizzard_trademarks() -> void:
 		texts.append(Db.item_bases[id].display_name)
 	for id in Db.affixes:
 		texts.append(Db.affixes[id].suffix)
+	for id in Db.sets:
+		texts.append(Db.sets[id].display_name)
+		for bonus in Db.sets[id].bonuses:
+			texts.append(str(bonus.get("text", "")))
 	for text in texts:
 		for word in BANNED:
 			check(word not in text.to_lower(), "'%s' in \"%s\"" % [word, text])

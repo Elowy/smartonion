@@ -10,6 +10,7 @@ display_name = "Blessing of Kings"
 description = "Every hero gains {stat_pct}% of their own stats (Max HP, Strength, Agility, Intellect, Armor, Spirit, secondary stats, Attack and Spell Power) for {duration} sec."
 class_id = &"paladin"
 school = &"holy"
+tags = Array[StringName]([&"buff"])
 resource = &""
 cost = 0.0
 cooldown = 15.0

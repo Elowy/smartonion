@@ -2,7 +2,9 @@ class_name PaladinKit
 extends RefCounted
 ## Shared helpers of the Paladin's abilities (GDD 3.3, 6.4): holy strike damage, heals and
 ## absorb amounts, enemy / hero queries around a point (XZ, deterministic group order) and the
-## per-Paladin key used for named buffs on other heroes.
+## per-Paladin key used for named buffs on other heroes. M5: Healing Done
+## ([method healing_mult]) for the Holy talents; the talent scripts under
+## scenes/talents/paladin/ use the same helpers.
 
 const SCHOOL := &"holy"
 const HOLY_COLOR := Color(1.0, 0.86, 0.4)
@@ -27,12 +29,39 @@ static func strike_damage(player: Player, weapon_pct: float, sp_scale: float, po
 
 
 ## A Paladin heal on [param who]: [param flat] + [param max_hp_pct] % of the healed hero's
-## max HP + [param sp_scale] x the caster's Spell Power, times [param power].
+## max HP + [param sp_scale] x the caster's Spell Power, times [param power], times the
+## caster's Healing Done ([method healing_mult] – talent Healing Light).
 static func heal_amount(caster: Player, who: Player, flat: float, max_hp_pct: float, sp_scale: float,
 		power: float = 1.0) -> float:
 	var sp := maxf(0.0, caster.stats.get_raw(Stats.SPELL_POWER)) if caster != null else 0.0
 	var max_hp := who.max_hp() if who != null else 0.0
-	return maxf(0.0, (flat + max_hp * max_hp_pct / 100.0 + sp * sp_scale) * maxf(0.0, power))
+	return maxf(0.0, (flat + max_hp * max_hp_pct / 100.0 + sp * sp_scale) * maxf(0.0, power)) \
+			* healing_mult(caster)
+
+
+## M5: the Healing Done multiplier of [param caster] (Stats.HEALING_DONE, the Holy talent
+## Healing Light): 1 + Healing Done / 100 (negative values count as 0; 1 for null). Every
+## Paladin heal / absorb that can grow applies it once: [method heal_amount] (Word of Glory,
+## Divine Storm, Holy Shock), Consecration's ground heals (Hallowed Ground, Light's Hammer),
+## Divine Shield's Rank III heal, Lay on Hands' Hands of Mercy heal and Rank III shield, Seal of
+## Command's heal. Not Lay on Hands' full heal, not the revive HP, not Holy Shield's ally
+## absorbs (shields, not heals).
+static func healing_mult(caster: Player) -> float:
+	if caster == null:
+		return 1.0
+	return 1.0 + maxf(0.0, caster.stats.get_raw(Stats.HEALING_DONE)) / 100.0
+
+
+## M5: true when a hero other than [param exclude] lies downed anywhere in the arena (Divine
+## Verdict's bot rule keeps the Holy Power for a Word of Glory revive).
+static func any_downed(tree: SceneTree, exclude: Player = null) -> bool:
+	if tree == null:
+		return false
+	for node in tree.get_nodes_in_group(&"players"):
+		var p := node as Player
+		if p != null and p != exclude and p.downed and p.is_inside_tree():
+			return true
+	return false
 
 
 ## 0..1 share of max HP (1 for a missing hero).
