@@ -354,6 +354,27 @@ func _sync_panels(slots: Array[PlayerSlot]) -> void:
 	for i: int in panels.keys():
 		if not keep.has(i):
 			_free_panel(i)
+	# A tall item tooltip may reach down / up the screen column as far as the teammate's panel
+	# at its other end (P1 / P3, P2 / P4) – all the way when that corner is empty. When both of
+	# a column's tooltips reach into the band between the panels, the bottom one makes way.
+	for i: int in panels.keys():
+		var panel: PlayerPanel = panels[i]
+		panel.tooltip_column_mate = panels.has(i ^ 2)
+		var above: PlayerPanel = panels.get(i - 2) if i >= 2 else null
+		panel.tooltip_obstacle = above.planned_outside_tooltip_rect if above != null else Callable()
+
+
+## The corner panels' item tooltips that reach out of their panel into the free bands between
+## the panels (the shop keeps its own tooltips clear of them; ShopPanel.tooltip_obstacles). The
+## panels lay out before the shop each frame (they come first in the tree).
+func _panel_tooltip_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for panel: PlayerPanel in panels.values():
+		if is_instance_valid(panel):
+			var r := panel.outside_tooltip_rect()
+			if r.has_area():
+				out.append(r)
+	return out
 
 
 func _free_panel(index: int) -> void:
@@ -427,6 +448,7 @@ func _build() -> void:
 	shop_panel.offset_top = -ShopPanel.STALL_SIZE.y * 0.5 + STALL_OFFSET_Y
 	shop_panel.offset_bottom = ShopPanel.STALL_SIZE.y * 0.5 + STALL_OFFSET_Y
 	shop_panel.item_bought.connect(_on_item_bought)
+	shop_panel.tooltip_obstacles = _panel_tooltip_rects
 	_market_root.add_child(shop_panel)
 	_build_footer()
 

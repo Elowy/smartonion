@@ -22,7 +22,9 @@ extends Control
 ## each other or the player panels in the screen corners and never hide their own card: each
 ## goes beside its hovered card on the stall if that spot is free, else on the card's other
 ## side, above / below it, or into the free band between the corner panels on the player's
-## side – at a smaller scale when nothing else fits ([method layout_tooltips]).
+## side – at a smaller scale when nothing else fits ([method layout_tooltips]). They also keep
+## clear of a corner panel's own item tooltip that reaches out of its panel into such a band
+## ([member tooltip_obstacles]).
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed (while hidden – the whole wave, the
 ## Intermission stays in the tree – a wallet change is caught up at the end of the frame the
@@ -48,8 +50,15 @@ const TOOLTIP_SCALE := 0.82
 const TOOLTIP_SCALES: Array[float] = [0.82, 0.72, 0.62, 0.54]
 ## Inset of the tooltips from the stall body's edges.
 const TOOLTIP_MARGIN := 8.0
+## A spot that covers the hovered card or a [member tooltip_obstacles] rect counts this many
+## times its overlapping area (another shop tooltip: once).
+const COVER_WEIGHT := 4.0
 
 var shop: Shop
+## Returns the global rects (Array[Rect2]) the shop tooltips keep clear of besides each other:
+## the Intermission hands over its corner panels' item tooltips that reach out of their panel
+## into the free bands (PlayerPanel.outside_tooltip_rect). Read once per layout; unset: none.
+var tooltip_obstacles: Callable
 ## Offer grid width (5 for 10 offers, 4 for 8 or 4, 3 for 6).
 var columns := MAX_COLUMNS
 var cards: Array[ShopOfferCard] = []
@@ -818,23 +827,28 @@ func _update_tooltips() -> void:
 			_tooltip_keys.erase(s.index)
 			continue
 		var compare := ItemTooltip.equipped_for_compare(o.item, equipment_of(s))
-		var key := "%d:%d:%d" % [o.item.uid, o.price, compare.uid if compare != null else 0]
+		var key := "%d:%d:%s" % [o.item.uid, o.price, ItemTooltip.compare_key(compare)]
 		if _tooltip_keys.get(s.index, "") != key:
 			_tooltip_keys[s.index] = key
 			tip.owner_tag = "P%d" % (s.index + 1)
 			tip.owner_color = s.color
 			tip.viewer_equipment = equipment_of(s)
 			tip.show_item(o.item, s.class_data, compare, o.price)
-			tip.reset_size()
+			# Measured now: layout_tooltips places it in this very frame.
+			tip.layout_now()
 		tip.visible = true
 	layout_tooltips()
 
 
 ## Places every visible tooltip at the first free candidate spot, largest scale first. The
 ## player who acted last is placed first (the one browsing gets the best, full-size spot);
-## the others take what is left.
+## the others take what is left. A corner panel's tooltip that reaches into a free band
+## ([member tooltip_obstacles]) is there first: a spot over it counts COVER_WEIGHT times.
 func layout_tooltips() -> void:
 	var placed: Array[Rect2] = []
+	var blocked: Array[Rect2] = []
+	if tooltip_obstacles.is_valid():
+		blocked.assign(tooltip_obstacles.call())
 	var areas := tooltip_areas()
 	var order: Array[PlayerSlot] = []
 	for i in range(_act_order.size() - 1, -1, -1):
@@ -857,7 +871,8 @@ func layout_tooltips() -> void:
 		for scale_value in TOOLTIP_SCALES:
 			var tsize := raw * scale_value
 			for r in _candidates(tsize, card, index, s.index, areas):
-				var overlap := _overlap(r, placed) + (r.intersection(card).get_area() * 4.0 if r.intersects(card) else 0.0)
+				var overlap := _overlap(r, placed) + _overlap(r, blocked) * COVER_WEIGHT \
+						+ (r.intersection(card).get_area() * COVER_WEIGHT if r.intersects(card) else 0.0)
 				if overlap < best_overlap - 0.5:
 					best_overlap = overlap
 					best = r
@@ -866,6 +881,10 @@ func layout_tooltips() -> void:
 					break
 			if best_overlap <= 0.0:
 				break
+		if not best.has_area():
+			# Taller than the stall even at the smallest scale: at the stall's top, not the
+			# screen's corner.
+			best = Rect2(areas[0].position, raw * best_scale)
 		tip.scale = Vector2.ONE * best_scale
 		tip.position = best.position - global_position
 		placed.append(best)

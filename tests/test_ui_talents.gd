@@ -247,6 +247,48 @@ func test_the_tab_fits_the_panel() -> void:
 	check(UiTheme.bold_font().get_string_size("Assassination", HORIZONTAL_ALIGNMENT_LEFT, -1,
 		TalentTreeView.fitted_name_size("Assassination", arms.name_label.size.x)).x <= arms.name_label.size.x,
 		"at the fitted size")
+	# The small texts (sized to stay legible at 720p) stay inside their spots: the widest gate
+	# number in the rail, the capstone's rank pill and the points caption in the tree view.
+	var gate_w := UiTheme.bold_font().get_string_size(TalentTreeView.TierRail.gate_text(5), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		TalentTreeView.TierRail.FONT).x
+	check(gate_w <= TalentTreeView.TierRail.WIDTH, "gate number %.1f px in a %.1f px rail" % [gate_w, TalentTreeView.TierRail.WIDTH])
+	var cap_node := arms.node_for(cap.id)
+	check(cap_node.position.y + cap_node.side() + TalentNode.PILL_HEIGHT * 0.5 <= TalentTreeView.HEIGHT,
+		"the capstone's rank pill ends inside the tree")
+	var caption := arms.get_node("PointsCaption") as Label
+	check(caption.position.y + caption.size.y <= TalentTreeView.HEIGHT + 0.5 and caption.size.x >= caption.get_minimum_size().x,
+		"the points caption fits (%s at %s)" % [caption.size, caption.position])
+	finished.emit()
+
+
+## The detail's one-line kind ("Talent · Tier 2", "Modifier · Rain of Fire", "Capstone") fits
+## the column whole for every shipped talent – the tree's name is on the prompt row instead.
+func test_every_kind_line_fits_the_detail_column() -> void:
+	_async = true
+	var slot := _hero()
+	var panel := _panel(slot)
+	panel.size = PlayerPanel.DESIGN_SIZE
+	var tab := panel.talents
+	_select(panel, "arms", "t3m")
+	await tree.process_frame
+	await tree.process_frame
+	var label := tab.detail_kind
+	var width := label.size.x
+	check(width > 100.0, "laid out: %.1f" % width)
+	var font := label.get_theme_font(&"font")
+	var fs := label.get_theme_font_size(&"font_size")
+	var count := 0
+	for class_id: StringName in Db.classes:
+		for tree_data in Db.talent_trees_for(class_id):
+			for t in tree_data.talents:
+				var text := TalentTab.kind_text(t)
+				var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+				check(w <= width, "%s: '%s' is %.1f of %.1f px" % [t.id, text, w, width])
+				check(not text.begins_with(tree_data.display_name), "%s: no tree name in '%s'" % [t.id, text])
+				count += 1
+	check_eq(count, 135, "15 trees x 9 talents")
+	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t5"))), "Capstone", "capstone")
+	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t2a"))), "Talent · Tier 2", "talent")
 	finished.emit()
 
 
@@ -555,7 +597,7 @@ func test_modifier_of_an_unlearned_ability_says_so() -> void:
 	var panel := _panel(slot)
 	var tab := panel.talents
 	_select(panel, "arms", "t3m")
-	check_eq(tab.detail_kind.text, "Arms modifier · Whirlwind", "kind line names the ability")
+	check_eq(tab.detail_kind.text, "Modifier · Whirlwind", "kind line names the ability")
 	check_eq(tab.detail_hint.text, "", "Whirlwind is a core ability: learned")
 	_select(panel, "fury", "t3m")
 	check_eq(tab.detail_hint.text, "You haven't learned Execute", "the hint (GDD 7.2)")
@@ -712,6 +754,46 @@ func test_locked_tiers_rail_and_prerequisite_arrows() -> void:
 	check_eq(tab.rail.open, [true, true, true, false, false] as Array[bool], "the rail follows")
 	tab.select_talent(_id("fury", "t1a"))
 	check_eq(tab.rail.open, [true, false, false, false, false] as Array[bool], "the rail shows Fury's gates")
+
+
+## The picture a node of [param t] draws as one comparable key: two sources that draw the same
+## glyph (block_chance / block_value, an ability icon and the same ability as a modifier) match.
+static func _drawn_glyph(t: TalentData) -> String:
+	var source := TalentNode.source_for(t)
+	var key := StringName(source.get_slice(":", 1))
+	if source.begins_with("ability:"):
+		return "ability:%d" % AbilityIcon.glyph_for_ability(Db.get_ability(key))
+	if source.begins_with("school:"):
+		return "ability:%d" % AbilityIcon.glyph_for(&"", key, &"")
+	if source.begins_with("stat:"):
+		return "talent:%d" % TalentGlyph.for_stat(key)
+	return "talent:%d" % TalentGlyph.for_kind(t.kind)
+
+
+## Every shipped tree tells its talents apart at a glance: the capstone's glyph is its own (no
+## other node of the tree, modifiers included, draws it) and no two plain talents share one
+## (a modifier may show the glyph of the ability it changes – its gear badge sets it apart).
+func test_shipped_trees_have_distinct_glyphs() -> void:
+	var trees := 0
+	for class_id: StringName in Db.classes:
+		for tree_data in Db.talent_trees_for(class_id):
+			trees += 1
+			var seen: Dictionary[String, StringName] = {}
+			var capstone: TalentData = null
+			for t in tree_data.talents:
+				if t.is_capstone():
+					capstone = t
+				if t.is_modifier():
+					continue
+				var key := _drawn_glyph(t)
+				check(not seen.has(key), "%s: %s draws the glyph of %s (%s)" % [tree_data.id, t.id, seen.get(key, &""), TalentNode.source_for(t)])
+				seen[key] = t.id
+			check(capstone != null, "%s has a capstone" % tree_data.id)
+			for t in tree_data.talents:
+				if capstone != null and t != capstone:
+					check(_drawn_glyph(t) != _drawn_glyph(capstone),
+						"%s: the capstone %s shares its glyph with %s (%s)" % [tree_data.id, capstone.id, t.id, TalentNode.source_for(t)])
+	check_eq(trees, 15, "five classes, three trees each")
 
 
 func test_glyph_sources() -> void:

@@ -856,7 +856,7 @@ func _detail_talent(s: TalentState, t: TalentData) -> void:
 	var rank := s.rank_of(t.id)
 	_set_detail_glyph("talent:%s" % t.id, t)
 	detail_name.text = t.display_name
-	detail_kind.text = kind_text(t, tree)
+	detail_kind.text = kind_text(t)
 	var preview := preview_next and rank < t.max_rank
 	var shown := rank + 1 if preview else rank
 	detail_rank.text = "Rank %d/%d" % [shown, t.max_rank]
@@ -907,14 +907,15 @@ func _detail_reset(s: TalentState) -> void:
 	detail_tree.visible = false
 
 
-## "Arms talent · Tier 2", "Arms modifier · Whirlwind", "Arms capstone".
-static func kind_text(t: TalentData, tree: TalentTreeData) -> String:
-	var tree_name := tree.display_name if tree != null else ""
+## "Talent · Tier 2", "Modifier · Whirlwind", "Capstone" – without the tree's name, which the
+## prompt row's context already shows ("Arms · Tier 2"), so the one-line kind fits the detail
+## column (every shipped talent, also at 720p).
+static func kind_text(t: TalentData) -> String:
 	if t.is_capstone():
-		return "%s capstone" % tree_name
+		return "Capstone"
 	if t.is_modifier():
-		return "%s modifier · %s" % [tree_name, ability_name(t.ability)]
-	return "%s talent · Tier %d" % [tree_name, t.tier]
+		return "Modifier · %s" % ability_name(t.ability)
+	return "Talent · Tier %d" % t.tier
 
 
 static func ability_name(id: StringName) -> String:

@@ -19,8 +19,10 @@ enum State { LOCKED, UNAVAILABLE, AVAILABLE, PARTIAL, MAXED }
 
 const SIZE := 48.0
 const CAPSTONE_SIZE := 52.0
-const RANK_FONT := 15
-const PILL_HEIGHT := 17.0
+## Rank pill text and height ("2/3"): 17 px stays legible (about 9 px) on a 4-player corner
+## panel at 1280 x 720.
+const RANK_FONT := 17
+const PILL_HEIGHT := 19.0
 ## How far the rank pill reaches past the icon's right edge.
 const PILL_OVERHANG := 5.0
 const RIM_COLORS: Dictionary[State, Color] = {

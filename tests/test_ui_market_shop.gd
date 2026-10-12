@@ -317,6 +317,82 @@ func test_tooltips_on_the_stall_beside_the_hovered_card() -> void:
 	check(not t2.visible, "no tooltip on a sold offer")
 
 
+## True when [param r] lies on the stall or in a free band (ShopPanel.tooltip_areas).
+func _in_areas(r: Rect2) -> bool:
+	for a in panel.tooltip_areas():
+		if a.grow(1.0).encloses(r):
+			return true
+	return false
+
+
+## A tooltip whose content changed is measured at once – its wrapped lines included
+## (ItemTooltip.layout_now) – and placed on the stall in that very frame, not dropped in the
+## screen's corner with the height of lines that had no width yet.
+func test_a_new_tooltip_with_wrapped_lines_is_placed_in_its_first_frame() -> void:
+	var charm := MarketFakes.make_item("Charm of Many Words", Items.SlotType.TRINKET, Items.NO_ARMOR, Items.Rarity.EPIC)
+	charm.unique_text = "Chance on hit: Calls down a long-winded bolt that jumps between enemies, explains itself at length and then deals 20 Nature damage to each."
+	charm.flavor = "A charm that never stops talking about the old days, the weather and the price of onions."
+	var items: Array[ItemInstance] = [charm, MarketFakes.make_item("Band", Items.SlotType.RING)]
+	shop.stock(items, [10, 20] as Array[int])
+	panel.refresh(PlayerManager.get_slots())
+	panel.set_cursor(0, 0)
+	panel.set_cursor_active(1, false)
+	_layout(panel)
+	panel._process(DT)
+	var tip := panel.tooltip_of(0)
+	check(tip.visible and tip.item == charm, "P1's tooltip shows the charm")
+	var r := _tip_rect(tip)
+	check(_in_areas(r), "placed on the stall in its first frame: %s" % r)
+	check_near(tip.scale.x, ShopPanel.TOOLTIP_SCALES[0], 0.001, "at full size")
+	var first_h := tip.get_combined_minimum_size().y
+	_layout(tip)
+	panel._process(DT)
+	check_near(tip.get_combined_minimum_size().y, first_h, 0.5, "the first frame measured it right")
+	check(_tip_rect(tip).is_equal_approx(r), "and it stays put")
+	# Taller than the stall even at the smallest scale: at the stall's top, not the corner.
+	var giant := MarketFakes.make_item("Charm of Endless Words", Items.SlotType.TRINKET, Items.NO_ARMOR, Items.Rarity.EPIC)
+	giant.unique_text = "Chance on hit: it goes on and on, line after line, about the old days and the weather. ".repeat(24)
+	shop.offers[0].item = giant
+	shop.changed.emit()
+	panel._process(DT)
+	check(tip.item == giant, "the giant shows")
+	check(tip.get_combined_minimum_size().y * ShopPanel.TOOLTIP_SCALES[-1] > panel.tooltip_areas()[0].size.y,
+		"taller than the stall at the smallest scale: %s" % tip.get_combined_minimum_size())
+	check(_tip_rect(tip).position.is_equal_approx(panel.tooltip_areas()[0].position), "at the stall's top: %s" % _tip_rect(tip))
+
+
+## A two-hander hovered by a hero with both hands filled is compared with the pair (an
+## ItemTooltip.EquippedPair – a new object every call): the tooltip keeps its content and its
+## spot instead of being rebuilt every frame.
+func test_a_two_hander_tooltip_for_a_full_pair_of_hands_is_stable() -> void:
+	var eq := ShopPanel.equipment_of(PlayerManager.get_slot(0))
+	eq.slots[Items.EquipSlot.MAIN_HAND] = MarketFakes.make_weapon(&"sword")
+	eq.slots[Items.EquipSlot.OFF_HAND] = MarketFakes.make_weapon(&"sword")
+	var axe := MarketFakes.make_weapon(&"two_hand_axe", Items.Rarity.EPIC)
+	var items: Array[ItemInstance] = [axe, MarketFakes.make_item("Band", Items.SlotType.RING)]
+	shop.stock(items, [10, 20] as Array[int])
+	panel.refresh(PlayerManager.get_slots())
+	panel.set_cursor(0, 0)
+	panel.set_cursor_active(1, false)
+	_layout(panel)
+	panel._process(DT)
+	var tip := panel.tooltip_of(0)
+	check(tip.compare is ItemTooltip.EquippedPair, "compared with both hands: %s" % tip.compare)
+	var title := tip.find_line("Two-Hand", false)
+	var r := _tip_rect(tip)
+	for i in 3:
+		_layout(tip)
+		panel._process(DT)
+	check(title != null and tip.find_line("Two-Hand", false) == title, "the tooltip is not rebuilt")
+	check(_in_areas(_tip_rect(tip)), "on the stall: %s" % _tip_rect(tip))
+	check(_tip_rect(tip).is_equal_approx(r), "in the same spot")
+	# A different pair is a different comparison.
+	eq.slots[Items.EquipSlot.OFF_HAND] = MarketFakes.make_weapon(&"dagger")
+	panel._process(DT)
+	check(tip.find_line("Two-Hand", false) != title, "rebuilt for the new pair")
+	check(tip.find_line("Sword + Dagger", false) != null, "Equipped: Sword + Dagger: %s" % tip.line_texts())
+
+
 # --- Bot helpers ------------------------------------------------------------------------
 
 func test_cheapest_usable_affordable_offer() -> void:

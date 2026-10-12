@@ -64,7 +64,7 @@ tier = 2
 column = 0
 max_rank = 3
 prerequisite = &"rogue_combat_lightning_reflexes"
-icon = &"extra_attack"
+icon = &"parry"
 effects = Array[Dictionary]([{
 "kind": "stats",
 "stats": {

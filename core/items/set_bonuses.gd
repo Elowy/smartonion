@@ -77,7 +77,8 @@ static func active_bonuses(data: SetData, pieces: int) -> Array[Dictionary]:
 ## Tooltip rows for the set of [param item] as worn in [param eq] (null = nobody's equipment,
 ## the loot roll). Empty when the item is not a piece of a known set. In order:
 ##   {"kind": ROW_HEADER, "text": "Battlegear of Fury (2/5)" | "Battlegear of Fury (5 pieces)", "active": true}
-##   {"kind": ROW_PIECE, "text": <piece name>, "active": worn}           – one per SetData.piece_ids
+##   {"kind": ROW_PIECE, "text": <piece name>, "slot": "Head", "active": worn} – one per SetData.piece_ids
+##       ("slot": the piece's slot name, Items.SLOT_NAMES – the tooltip's compact block shows it)
 ##   {"kind": ROW_BONUS, "text": "(2) Set: <text>", "active": reached}   – one per bonus
 static func describe(item: ItemInstance, eq: Equipment) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -95,7 +96,8 @@ static func describe(item: ItemInstance, eq: Equipment) -> Array[Dictionary]:
 	for piece_id in data.piece_ids:
 		var piece := Db.get_unique(piece_id)
 		var piece_name := piece.display_name if piece != null else String(piece_id).capitalize()
-		out.append({"kind": ROW_PIECE, "text": piece_name, "active": piece_id in worn})
+		var slot_name: String = Items.SLOT_NAMES.get(piece.slot_type, piece_name) if piece != null else piece_name
+		out.append({"kind": ROW_PIECE, "text": piece_name, "slot": slot_name, "active": piece_id in worn})
 	for bonus in data.bonuses:
 		var needed := int(bonus.get("pieces", 0))
 		out.append({"kind": ROW_BONUS, "text": "(%d) Set: %s" % [needed, str(bonus.get("text", ""))],

@@ -10,9 +10,17 @@ var players: Array[Player] = []
 var panels: Array[PlayerPanel] = []
 var traded: Array = []
 var sold: Array = []
+var _async := false
+## The headless root's size while a test runs on a 1920 x 1080 root (restored in after_each).
+var _root_size := Vector2i.ZERO
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
+	_async = false
 	UiFakes.reset_players()
 	RunState.start_run(2, 9)
 	players.clear()
@@ -22,6 +30,9 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	if _root_size != Vector2i.ZERO:
+		tree.root.size = _root_size
+		_root_size = Vector2i.ZERO
 	for panel in panels:
 		UiFakes.free_node(panel)
 	for p in players:
@@ -141,6 +152,39 @@ func test_backpack_starts_selected_and_focus_shows_tooltip() -> void:
 	check(not panel.tooltip.visible, "empty slot: no tooltip")
 	panel.set_input_focus(false)
 	check(not panel.icon_for_equip_slot(Items.EquipSlot.HEAD).selected, "focus lost hides the cursor")
+
+
+## Between waves the tooltip stays over the panel on the half away from the selection – where
+## the action menu opens too: the menu (Forge, Unequip …) must not sit under the tooltip.
+func test_action_menu_hides_the_tooltip() -> void:
+	var slot := _join(&"warrior")
+	var helm := _helm("Iron Helm", ClassData.ArmorType.PLATE, 3)
+	_eq(slot).add_to_backpack(helm)
+	var panel := _panel(slot)
+	panel.tooltip_inside = true
+	panel.select_backpack(0)
+	check(panel.tooltip.visible, "browsing: the tooltip shows")
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(panel.is_menu_open(), "A opens the action menu")
+	check(not panel.tooltip.visible, "the tooltip hides while the menu is open")
+	_nav(panel, slot, Vector2i.DOWN)
+	check(not panel.tooltip.visible, "and stays hidden while the menu cursor moves")
+	_tap(panel, slot, PlayerInput.Pad.B)
+	check(not panel.is_menu_open(), "B closes the menu")
+	check(panel.tooltip.visible and panel.tooltip.item == helm, "the tooltip is back")
+	# An equipped weapon's menu (Unequip / Forge) likewise; X (Sell) on a backpack item too.
+	panel.select_equip_slot(Items.EquipSlot.MAIN_HAND)
+	check(panel.tooltip.visible, "the main hand's tooltip")
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(panel.is_menu_open() and "Forge" in panel.menu_labels(), "Unequip / Forge menu: %s" % panel.menu_labels())
+	check(not panel.tooltip.visible, "hidden")
+	_tap(panel, slot, PlayerInput.Pad.B)
+	panel.select_backpack(0)
+	_tap(panel, slot, PlayerInput.Pad.X)
+	check(panel.is_menu_open() and not panel.tooltip.visible, "X opens the menu on Sell, without the tooltip")
+	panel.set_tab(PlayerPanel.TRAINER_TAB)
+	panel.set_tab(PlayerPanel.CHARACTER_TAB)
+	check(not panel.is_menu_open() and panel.tooltip.visible, "a tab switch closes the menu; the tooltip returns")
 
 
 # --- Equip / unequip --------------------------------------------------------------------------
@@ -385,6 +429,186 @@ func test_stat_rows_and_header() -> void:
 	check_eq(panel._ilvl_value.text, "13", "Avg. Item Level of two common wave-1 daggers")
 
 
+## The long rows M5 talents and set bonuses put into the compact stat list (Resource Regen,
+## Cooldown Reduction, Crit Damage – a warrior also lists its base Speed) with wide values: the
+## names give way, so the grid fits the inset and the frame stays inside the 700 x 480 design box
+## (the 4-player corner layout scales that box, never past it). Every stat's compact name shows
+## whole next to a "30%" and a "12.5%" value (PlayerPanel.SHORT_STAT_NAMES).
+func test_stat_list_fits_its_inset_with_long_rows() -> void:
+	_async = true
+	var slot := _join(&"warrior")
+	var player := slot.player as Player
+	player.stats.set_source(&"test", {Stats.STAMINA: 990.0, Stats.ARMOR: 120.0, Stats.CRIT: 12.5,
+		Stats.HASTE: 14.0, Stats.VERSATILITY: 10.0, Stats.DODGE: 16.0, Stats.MASTERY: 40.0,
+		Stats.CRIT_DAMAGE: 120.0, Stats.COOLDOWN_REDUCTION: 12.0,
+		Stats.RESOURCE_REGEN: 19.0})
+	var panel := _panel(slot)
+	panel.refresh()
+	var ids: Array = PlayerPanel.stat_rows(player.stats, slot.class_data).map(func(r: Array) -> StringName: return r[0])
+	for stat in [Stats.CRIT_DAMAGE, Stats.COOLDOWN_REDUCTION, Stats.RESOURCE_REGEN]:
+		check(stat in ids, "%s listed: %s" % [stat, ids])
+	var frame_min := panel.get_child(0).get_combined_minimum_size() as Vector2
+	check(frame_min.x <= PlayerPanel.DESIGN_SIZE.x + 0.5 and frame_min.y <= PlayerPanel.DESIGN_SIZE.y + 0.5,
+		"the frame fits the design size: %s" % frame_min)
+	await tree.process_frame
+	await tree.process_frame
+	var inset := panel._stats_grid.get_parent() as Control
+	var room := inset.size.x - 2.0 * PlayerPanel.STAT_INSET_PAD
+	var grid_min := panel._stats_grid.get_combined_minimum_size().x
+	check(grid_min <= room + 0.5, "the stat grid needs %.1f of the inset's %.1f" % [grid_min, room])
+	check(inset.clip_contents, "the inset clips")
+	var frame := (panel.get_child(0) as Control).get_global_rect()
+	check(frame.end.x <= panel.get_global_rect().end.x + 0.5, "the frame ends inside the panel (%s / %s)" % [frame, panel.get_global_rect()])
+	check(inset.get_global_rect().end.x <= frame.end.x + 0.5, "the inset ends inside the frame")
+	# The compact names of these rows show whole next to a two-digit value.
+	for cell in panel._stats_grid.get_children():
+		var name_label := cell.get_child(0) as Label
+		var value_label := cell.get_child(1) as Label
+		var needed := name_label.get_theme_font(&"font").get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			name_label.get_theme_font_size(&"font_size")).x
+		if value_label.text.length() <= 3:
+			check(needed <= name_label.size.x + 0.5, "'%s' (%s) shows whole: %.1f / %.1f" % [name_label.text, value_label.text, needed, name_label.size.x])
+		check(value_label.get_global_rect().end.x <= inset.get_global_rect().end.x + 0.5, "'%s' value inside the inset" % name_label.text)
+	# Every stat's compact name shows whole next to "30%" and "12.5%" (a few stats at a time,
+	# each batch fits the twelve cells next to the always-listed rows).
+	var shown := {}
+	var all_stats: Array[StringName] = Stats.ALL.duplicate()
+	all_stats.erase(Stats.STAMINA)  # listed as Max HP
+	for value in [30.0, 12.5]:
+		for start in range(0, all_stats.size(), 3):
+			var batch := all_stats.slice(start, start + 3)
+			var values := {}
+			for stat in batch:
+				values[stat] = value
+			player.stats.set_source(&"test", values)
+			panel.refresh()
+			await tree.process_frame
+			await tree.process_frame
+			for cell in panel._stats_grid.get_children():
+				var name_label := cell.get_child(0) as Label
+				var value_label := cell.get_child(1) as Label
+				for stat in batch:
+					if name_label.text != PlayerPanel._stat_name(stat):
+						continue
+					shown["%s %s" % [stat, value]] = true
+					var needed := name_label.get_theme_font(&"font").get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+						name_label.get_theme_font_size(&"font_size")).x
+					check(needed <= name_label.size.x + 0.5, "'%s' next to '%s' shows whole: %.1f / %.1f" % [name_label.text,
+						value_label.text, needed, name_label.size.x])
+	check_eq(shown.size(), all_stats.size() * 2, "every stat was listed with both values")
+	finished.emit()
+
+
+## Every tier-set piece's tooltip in each corner of the 4-player market layout at 1920 x 1080
+## (Intermission scale, tooltip_inside, the root resized like the real screen): the compact set
+## block (slot names, no flavor) keeps a looted piece's tooltip inside its panel at a readable
+## scale (about 0.9 or more); with the comparison block on top it keeps that scale
+## (PlayerPanel.MIN_INSIDE_TOOLTIP_FIT) and reaches out of the panel towards the middle, on
+## screen. Neither it nor a wave-25 Legendary unique with the comparison block ever reaches the
+## other corner panel of its screen column (those shrink below the floor only when it would).
+func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
+	_async = true
+	_root_size = tree.root.size
+	tree.root.size = Vector2i(1920, 1080)
+	await tree.process_frame
+	# The body text of a 4-player panel's tooltip at 1280 x 720: 20 px x 0.83 x 0.67 x this ≈ 10 px.
+	const READABLE_FIT := 0.899
+	var s := Intermission.panel_scale(PlayerPanel.DESIGN_SIZE)
+	var shown := PlayerPanel.DESIGN_SIZE * s
+	var m := Intermission.MARGIN
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var pieces := 0
+	var legendaries := 0
+	for data: SetData in Db.sets.values():
+		var slot := _join(data.class_id)
+		var eq := _eq(slot)
+		var panel := _panel(slot)
+		panel.tooltip_inside = true
+		panel.scale = Vector2(s, s)
+		var view := panel.get_viewport_rect()
+		check_eq(view.size, Vector2(1920, 1080), "the 1920 x 1080 view")
+		var corners: Array[Vector2] = [Vector2(m, m), Vector2(view.end.x - m - shown.x, m),
+			Vector2(m, view.end.y - m - shown.y), Vector2(view.end.x - m - shown.x, view.end.y - m - shown.y)]
+		# The panel at the other end of each corner's column.
+		var mates: Array[Rect2] = [Rect2(corners[2], shown), Rect2(corners[3], shown), Rect2(corners[0], shown),
+			Rect2(corners[1], shown)]
+		for i in data.piece_ids.size():
+			var piece := Items_.set_piece(data.class_id, String(data.piece_ids[i]).get_slice("_", 2))
+			piece.looted = true
+			# Two other pieces worn ("(2/5)", the 2-piece bonus on), a plain item where this
+			# one goes (the comparison block), the piece in the backpack.
+			eq.slots.clear()
+			for j in [(i + 1) % 5, (i + 2) % 5]:
+				var other := Items_.set_piece(data.class_id, String(data.piece_ids[j]).get_slice("_", 2))
+				eq.slots[eq.target_slots(other)[0]] = other
+			eq.slots[eq.target_slots(piece)[0]] = Items_.armor("Plain Piece", piece.slot_type, piece.armor_type, 1, {"stamina": 2})
+			eq.backpack.clear()
+			eq.add_to_backpack(piece)
+			panel.select_backpack(0)
+			for comparison in [false, true]:
+				if panel.comparison != comparison:
+					panel.toggle_comparison()
+				check(panel.tooltip.visible and panel.tooltip.item == piece, "%s shown" % piece.display_name)
+				check(panel.tooltip.compact_set(), "%s: the compact set block" % piece.display_name)
+				await tree.process_frame
+				await tree.process_frame
+				for c in corners.size():
+					panel.position = corners[c]
+					panel._place_tooltip()
+					var what := "%s (comparison %s, corner %d)" % [piece.display_name, comparison, c + 1]
+					var tip := panel.tooltip.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.tooltip.size)
+					var panel_rect := panel.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.size)
+					check(panel.tooltip.scale.y >= READABLE_FIT,
+						"%s: readable scale %.2f" % [what, panel.tooltip.scale.y])
+					check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+					check(not tip.intersects(mates[c]), "%s: clear of the column's other panel %s / %s" % [what, tip, mates[c]])
+					if not comparison:
+						check(panel_rect.grow(0.5).encloses(tip), "%s: inside its panel %s / %s" % [what, tip, panel_rect])
+			pieces += 1
+		# The Legendary uniques this class can use, in the backpack, compared with an item of
+		# many other stats in every slot they could go to (a long comparison block).
+		if not panel.comparison:
+			panel.toggle_comparison()
+		for unique: UniqueItemData in Db.uniques.values():
+			if unique.rarity != Items.Rarity.LEGENDARY or not ItemGenerator.unique_usable_by(unique, slot.class_data):
+				continue
+			var item := ItemGenerator.from_unique(unique, 25, true, rng, slot.class_data)
+			eq.slots.clear()
+			for target in eq.target_slots(item):
+				var worn := Items_.armor("Worn Piece", item.slot_type, item.armor_type, 3, {})
+				if item.is_weapon():
+					worn = ItemInstance.from_weapon(item.weapon, Items.Rarity.EPIC, 20)
+				worn.stats = {Stats.STAMINA: 30.0, Stats.AGILITY: 20.0, Stats.INTELLECT: 20.0, Stats.MASTERY: 9.0,
+					Stats.VERSATILITY: 9.0, Stats.DODGE: 6.0, Stats.LEECH: 4.0, Stats.SPEED: 5.0}
+				eq.slots[target] = worn
+			eq.backpack.clear()
+			eq.add_to_backpack(item)
+			panel.select_backpack(0)
+			check(panel.tooltip.visible and panel.tooltip.compare != null, "%s: shown with the comparison block" % item.display_name)
+			await tree.process_frame
+			await tree.process_frame
+			for c in corners.size():
+				panel.position = corners[c]
+				panel._place_tooltip()
+				var what := "%s %s (corner %d)" % [data.class_id, item.display_name, c + 1]
+				var tip := panel.tooltip.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.tooltip.size)
+				check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+				check(not tip.intersects(mates[c]), "%s: clear of the column's other panel %s / %s" % [what, tip, mates[c]])
+				var room := view.size.y - 2.0 * m - shown.y - PlayerPanel.TOOLTIP_NEIGHBOUR_GAP
+				check(panel.tooltip.scale.y >= READABLE_FIT or tip.size.y >= room - 0.5,
+					"%s: below the floor (%.2f) only when it fills the column" % [what, panel.tooltip.scale.y])
+			legendaries += 1
+		panels.erase(panel)
+		UiFakes.free_node(panel)
+		players.erase(slot.player)
+		(slot.player as Player).free()
+		UiFakes.reset_players()
+	check_eq(pieces, 25, "five pieces of five sets")
+	check(legendaries >= 8, "Legendary uniques checked: %d" % legendaries)
+	finished.emit()
+
+
 func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
 	var slot := _join(&"warrior")
 	_eq(slot).add_to_backpack(_helm("Iron Helm", ClassData.ArmorType.PLATE, 3))
@@ -396,7 +620,7 @@ func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
 	check(panel.tooltip.visible, "tooltip shown")
 	var tip_h := panel.tooltip.get_combined_minimum_size().y * 0.5
 	var room := panel.size.y * 0.5
-	var expected := clampf(room / tip_h, 0.4, 1.0)
+	var expected := clampf(room / tip_h, PlayerPanel.MIN_INSIDE_TOOLTIP_FIT, 1.0)
 	check_near(panel.tooltip.scale.y, expected, 0.001, "scaled to the panel's height (%s / %s)" % [room, tip_h])
 	panel.tooltip_inside = false
 	panel._place_tooltip()

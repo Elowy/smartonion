@@ -86,7 +86,7 @@ kind = 0
 tier = 2
 column = 1
 max_rank = 3
-icon = &"block_chance"
+icon = &"resource_regen"
 effects = Array[Dictionary]([{
 "kind": "proc",
 "proc": {
@@ -185,7 +185,7 @@ tier = 4
 column = 0
 max_rank = 3
 prerequisite = &"paladin_protection_redoubt"
-icon = &"block_value"
+icon = &"versatility"
 effects = Array[Dictionary]([{
 "kind": "damage_taken",
 "pct": -3.0,

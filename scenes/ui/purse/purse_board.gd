@@ -14,7 +14,9 @@ extends PanelContainer
 ##            Selling and Greed gold are income, not spends.
 ##   Wants  – the shop pings (Shop.Offer.pinged_by of the unsold offers) and the Trainer pings
 ##            (RunState.wants) merged in slot order: "P2 [Rare Dagger] 62 g · P4 Fireball Rank
-##            III 45 g" on one line, then "+N more". Buying the thing or a new round clears a want.
+##            III 45 g" on the bottom line, then "+N more". While the ticker needs only one line,
+##            the wants may take its second one too (the "Wants" caption moves up a row). Buying
+##            the thing or a new round clears a want.
 ##
 ## Shop items show as "[Name]" in their rarity colour while the stall still lists the offer
 ## (sold offers stay until the next round), else in plain text colour. Entries are packed into
@@ -23,7 +25,8 @@ extends PanelContainer
 ## Shop.changed and a player leaving / joining mark them dirty, [method update] (every MARKET
 ## frame, from the Intermission) or [method refresh] rebuilds them – nothing happens while the
 ## Intermission waits hidden through a wave. [method refresh] is also how a new round shows
-## (RunState.begin_spend_round clears the log without a signal). No RNG.
+## (RunState.begin_spend_round clears the log without a signal). The per-frame check of the
+## players compares the last seen index / colour / ready flag field by field (no strings). No RNG.
 
 ## The board's design width (the stall's width; fits between the two top corner panels).
 const WIDTH := 712.0
@@ -36,6 +39,8 @@ const CAPTION_FONT := 15
 const LINE_HEIGHT := 23.0
 const LINE_OVERLAP := 4
 const TICKER_LINES := 2
+## Text rows of the board: the ticker's TICKER_LINES and the wants' own bottom row.
+const ROWS := TICKER_LINES + 1
 const SEPARATOR := " · "
 ## Room kept free at the end of every line (the text outline).
 const LINE_SLACK := 6.0
@@ -54,18 +59,26 @@ var gold_value: Label
 var pips: ReadyPips
 ## "2/4 ready".
 var ready_label: Label
+## The rows the ticker may use (the top TICKER_LINES of [member row_labels]).
 var ticker_labels: Array[RichTextLabel] = []
+## The bottom row: always the wants' (last) line.
 var wants_label: RichTextLabel
+## All ROWS text rows, top to bottom, and their captions ("Spent", "", "Wants" – the "Wants"
+## caption sits on the wants' first row).
+var row_labels: Array[RichTextLabel] = []
+var caption_labels: Array[Label] = []
 ## The Shop whose pings feed the wants line (the Intermission passes RunState.shop).
 var shop: Shop
 
-## Plain text of the ticker lines and of the wants line (tests, screenshots).
+## Plain text of the ticker lines and of the wants lines (tests, screenshots).
 var _ticker_plain: Array[String] = []
-var _wants_plain := ""
+var _wants_plain: Array[String] = []
 var _dirty := true
-var _pip_key := ""
-## Who is in, in which colour ([method update]): a change rebuilds the texts.
-var _players_key := ""
+## What [method update] saw last, per slot in order: index, colour (a change rebuilds the texts)
+## and ready flag (a change redraws the pips).
+var _seen_index: Array[int] = []
+var _seen_color: Array[Color] = []
+var _seen_ready: Array[bool] = []
 
 
 ## One diamond per player in their colour, filled while that player is ready.
@@ -227,9 +240,14 @@ func ticker_lines() -> Array[String]:
 	return _ticker_plain.duplicate()
 
 
-## The wants line as plain text, without the "Wants" caption.
+## The wants as plain text, without the "Wants" caption (both lines joined when they take two).
 func wants_text() -> String:
-	return _wants_plain
+	return SEPARATOR.join(_wants_plain)
+
+
+## The wants as plain text, one string per shown line (empty: none).
+func wants_lines() -> Array[String]:
+	return _wants_plain.duplicate()
 
 
 func is_dirty() -> bool:
@@ -265,12 +283,12 @@ func set_shop(p_shop: Shop) -> void:
 	_dirty = true
 
 
-## Rebuilds the gold, the ticker and the wants line now.
+## Rebuilds the gold, the ticker and the wants lines now.
 func refresh() -> void:
 	_dirty = false
 	refresh_gold()
-	_fill_ticker()
-	_fill_wants()
+	var used := _fill_ticker()
+	_fill_wants(ROWS - used)
 
 
 func refresh_gold() -> void:
@@ -282,16 +300,28 @@ func refresh_gold() -> void:
 ## a colour changed) marks the texts dirty too: the wants line skips players who left
 ## ([method merged_wants]) and the tags carry the players' colours.
 func update(slots: Array[PlayerSlot]) -> void:
-	var players := ""
-	var key := ""
-	for s in slots:
-		players += "%d:%s," % [s.index, s.color.to_html()]
-		key += "%d:%s:%s," % [s.index, s.ready, s.color.to_html()]
-	if players != _players_key:
-		_players_key = players
+	var players_changed := slots.size() != _seen_index.size()
+	var ready_changed := players_changed
+	if not players_changed:
+		for i in slots.size():
+			var s := slots[i]
+			if s.index != _seen_index[i] or s.color != _seen_color[i]:
+				players_changed = true
+				ready_changed = true
+				break
+			if s.ready != _seen_ready[i]:
+				ready_changed = true
+	if ready_changed:
+		_seen_index.clear()
+		_seen_color.clear()
+		_seen_ready.clear()
+		for s in slots:
+			_seen_index.append(s.index)
+			_seen_color.append(s.color)
+			_seen_ready.append(s.ready)
+	if players_changed:
 		_dirty = true
-	if key != _pip_key:
-		_pip_key = key
+	if ready_changed:
 		var states: Array[Dictionary] = []
 		for s in slots:
 			states.append({"color": s.color, "ready": s.ready})
@@ -349,7 +379,7 @@ func _build() -> void:
 	rule.custom_minimum_size = Vector2(RULE_WIDTH, 0)
 	row.add_child(rule)
 
-	# Captions and lines: Spent (two lines), Wants (one line).
+	# Captions and lines: Spent (up to two lines), Wants (the bottom line, or two).
 	var lines := UiTheme.hbox(int(CAPTION_GAP))
 	row.add_child(lines)
 	var captions := UiTheme.vbox(-LINE_OVERLAP)
@@ -357,23 +387,21 @@ func _build() -> void:
 	lines.add_child(captions)
 	var texts := UiTheme.vbox(-LINE_OVERLAP)
 	lines.add_child(texts)
-	for i in TICKER_LINES + 1:
-		var caption := ""
-		if i == 0:
-			caption = "Spent"
-		elif i == TICKER_LINES:
-			caption = "Wants"
-		var c := UiTheme.label(caption, &"", CAPTION_FONT, UiTheme.GOLD_DARK.lightened(0.45))
+	for i in ROWS:
+		var c := UiTheme.label("", &"", CAPTION_FONT, UiTheme.GOLD_DARK.lightened(0.45))
 		c.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		c.custom_minimum_size.y = LINE_HEIGHT
 		c.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 		captions.add_child(c)
+		caption_labels.append(c)
 		var l := _line()
 		texts.add_child(l)
+		row_labels.append(l)
 		if i < TICKER_LINES:
 			ticker_labels.append(l)
 		else:
 			wants_label = l
+	_set_captions(TICKER_LINES)
 
 
 func _line() -> RichTextLabel:
@@ -396,7 +424,8 @@ static func _font() -> Font:
 
 # --- Filling --------------------------------------------------------------------------------
 
-func _fill_ticker() -> void:
+## Fills the ticker rows; returns how many it used (at least one: the "nothing spent" line).
+func _fill_ticker() -> int:
 	var entries: Array[Dictionary] = []
 	for i in range(RunState.spend_log.size() - 1, -1, -1):
 		entries.append(RunState.spend_log[i])
@@ -406,29 +435,58 @@ func _fill_ticker() -> void:
 	if entries.is_empty():
 		_ticker_plain.append(EMPTY_TICKER)
 		ticker_labels[0].text = _dim(EMPTY_TICKER)
-		return
+		return 1
 	var plain: Array[String] = []
 	var bb: Array[String] = []
 	for e in entries:
 		plain.append(entry_text(e))
 		bb.append(_entry_bbcode(e))
 	_fill_lines(plain, bb, ticker_labels, _ticker_plain)
+	return maxi(1, _ticker_plain.size())
 
 
-func _fill_wants() -> void:
+## Fills the wants into the bottom [param free_rows] rows (what the ticker left: one or two),
+## bottom-aligned – one line of wants stays on the bottom row – and moves the "Wants" caption
+## to their first row.
+func _fill_wants(free_rows: int) -> void:
+	var rows := clampi(free_rows, 1, ROWS - 1)
+	for i in range(ROWS - rows, ROWS):
+		row_labels[i].text = ""
+	_wants_plain.clear()
 	var wants := merged_wants(shop, RunState.wants)
 	if wants.is_empty():
-		_wants_plain = ""
 		wants_label.text = _dim(EMPTY_WANTS)
+		_set_captions(ROWS - 1)
 		return
 	var plain: Array[String] = []
 	var bb: Array[String] = []
 	for w in wants:
 		plain.append(want_text(w))
 		bb.append(_want_bbcode(w))
-	var lines: Array[String] = []
-	_fill_lines(plain, bb, [wants_label] as Array[RichTextLabel], lines)
-	_wants_plain = lines[0] if not lines.is_empty() else ""
+	# Packed into as many rows as needed, then placed on the bottom ones.
+	var probe: Array[RichTextLabel] = []
+	for i in rows:
+		probe.append(row_labels[ROWS - rows + i])
+	_fill_lines(plain, bb, probe, _wants_plain)
+	var used := maxi(1, _wants_plain.size())
+	if used < rows:
+		for i in used:
+			row_labels[ROWS - used + i].text = probe[i].text
+		for i in rows - used:
+			row_labels[ROWS - rows + i].text = ""
+	_set_captions(ROWS - used)
+
+
+## "Spent" on the top row, "Wants" on row [param wants_row], the other captions empty.
+func _set_captions(wants_row: int) -> void:
+	for i in caption_labels.size():
+		var text := ""
+		if i == 0:
+			text = "Spent"
+		elif i == wants_row:
+			text = "Wants"
+		if caption_labels[i].text != text:
+			caption_labels[i].text = text
 
 
 ## Packs [param plain] / [param bb] (the same entries as plain text and BBCode) into
