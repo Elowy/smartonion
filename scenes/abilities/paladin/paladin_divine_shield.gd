@@ -3,7 +3,7 @@ extends AbilityEffect
 ## Divine Shield (GDD 6.4, Paladin Active): [code]duration[/code] (3) x power seconds of full
 ## invulnerability (Player.invulnerable_left) inside a golden bubble.
 ##
-## Params also: heal_max_hp (Rank III: heals that % of max HP x power at the cast),
+## Params also: heal_max_hp (Rank III: heals that % of max HP x power x Healing Done at the cast),
 ## aura_damage / aura_spell_power_scale / aura_radius / aura_tick (spec "Radiant Bubble":
 ## the bubble burns enemies around the Paladin for weapon-based Holy damage every tick; power
 ## only lengthens the bubble – more ticks – and never raises a tick, so it counts once),
@@ -78,7 +78,7 @@ func cast(ctx: AbilityContext) -> bool:
 	_shield(p, duration)
 	var heal_pct := ctx.num("heal_max_hp")
 	if heal_pct > 0.0:
-		p.heal(p.max_hp() * heal_pct / 100.0 * ctx.num("power", 1.0))
+		p.heal(p.max_hp() * heal_pct / 100.0 * ctx.num("power", 1.0) * PaladinKit.healing_mult(p))
 	var ally := shared_ally(ctx)
 	if ally != null:
 		_ally = ally

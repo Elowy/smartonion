@@ -14,11 +14,26 @@ extends AbilityEffect
 ## (Rank III: +1 – the most hurt allies in range healed besides the Paladin), heal_all (spec
 ## "Light of Dawn": every hero within range), shield_share / shield_duration (spec "Holy
 ## Bulwark": every healed hero also gets an absorb shield worth that % of the heal); "cost" is
-## seeded from AbilityData.cost (Libram of Devotion: cost_add -1).
+## seeded from AbilityData.cost (Libram of Devotion: cost_add -1). Heals x the caster's Healing
+## Done (PaladinKit.heal_amount); the revive HP is not.
+##
+## M5 – Divine Verdict (Retribution modifier, "verdict_pct_add"): verdict_pct (% weapon damage,
+## 0 = off), verdict_sp_scale (x Spell Power), verdict_range (m). With verdict_pct > 0 the cast
+## picks, in this order: (1) a revive (unchanged); (2) a heal when a hero within the cast range
+## (the Paladin included) is below [constant VERDICT_HEAL_RATIO] of max HP; (3) the Verdict – a
+## Holy strike on the nearest elite / boss within verdict_range, else the nearest enemy
+## ([method verdict_target]): PaladinKit.strike_damage(verdict_pct, verdict_sp_scale, power) as
+## &"ability" damage; (4) a heal of whoever else is hurt. Nothing to do: no cast (no Holy Power
+## spent). Same cost, free_chance (Eternal Glory) and power as the heal. Bots cast the Verdict
+## only while no teammate is downed anywhere (the Holy Power waits for a revive).
 
 const HOLY_COLOR := Color(1.0, 0.88, 0.45)
 ## Bots heal when a hero in range is below this share of max HP.
 const AUTO_HEAL_RATIO := 0.5
+## Divine Verdict: a hero in range below this share of max HP is healed instead.
+const VERDICT_HEAL_RATIO := 0.8
+const VERDICT_TEXT := "Verdict!"
+const VERDICT_SHAKE := 0.15
 ## A ghost the Spirit Healer revives within this many seconds (Player.healer_seconds_left) is
 ## not worth a revive.
 const HEALER_SOON := 1.0
@@ -93,14 +108,61 @@ static func _flat_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
-## Something to do: a downed teammate to raise or a hurt hero to heal (never wastes Holy Power).
+## Divine Verdict: the enemy a Verdict strikes – the nearest elite / boss within verdict_range
+## of the Paladin, else the nearest enemy (null without the talent or without an enemy).
+static func verdict_target(ctx: AbilityContext) -> Enemy:
+	var p := ctx.player
+	if ctx.num("verdict_pct") <= 0.0 or p == null or not p.is_inside_tree():
+		return null
+	var near := PaladinKit.enemies_by_distance(p.get_tree(), p.global_position, ctx.num("verdict_range", 4.0))
+	for e in near:
+		if e.is_elite() or e.is_boss():
+			return e
+	return near[0] if not near.is_empty() else null
+
+
+## True when a living hero within the cast range (the Paladin included) is below
+## [param ratio] of max HP.
+static func someone_below(ctx: AbilityContext, ratio: float) -> bool:
+	var p := ctx.player
+	if p == null:
+		return false
+	if p.is_alive() and PaladinKit.hp_ratio(p) < ratio:
+		return true
+	if not p.is_inside_tree():
+		return false
+	for hero in PaladinKit.living_heroes_around(p.get_tree(), p.global_position, ctx.ability.cast_range):
+		if PaladinKit.hp_ratio(hero) < ratio:
+			return true
+	return false
+
+
+## The Verdict target when this cast strikes instead of healing (Divine Verdict: no revive, no
+## hero in range below VERDICT_HEAL_RATIO, an enemy within verdict_range); null otherwise.
+static func verdict_now(ctx: AbilityContext) -> Enemy:
+	if ctx.num("verdict_pct") <= 0.0 or revive_target(ctx) != null:
+		return null
+	if someone_below(ctx, VERDICT_HEAL_RATIO):
+		return null
+	return verdict_target(ctx)
+
+
+## Divine Verdict damage of one cast (before the target bonuses, Mastery and the outgoing
+## multipliers, which deal_raw applies).
+static func verdict_damage(ctx: AbilityContext) -> float:
+	return PaladinKit.strike_damage(ctx.player, ctx.num("verdict_pct"), ctx.num("verdict_sp_scale", 1.5),
+			ctx.num("power", 1.0))
+
+
+## Something to do: a downed teammate to raise, a hurt hero to heal or (Divine Verdict) an enemy
+## to judge – never wastes Holy Power.
 func can_cast(ctx: AbilityContext) -> bool:
 	if revive_target(ctx) != null:
 		return true
 	for p in heal_targets(ctx):
 		if _is_hurt(p):
 			return true
-	return false
+	return verdict_now(ctx) != null
 
 
 func cast(ctx: AbilityContext) -> bool:
@@ -115,6 +177,9 @@ func cast(ctx: AbilityContext) -> bool:
 		Vfx.floating_text(downed.get_chest_position() + Vector3.UP * 0.6, "Resurrected!", Player.HEAL_TEXT_COLOR, 1.2)
 		ProcVfx.beam(paladin.get_chest_position(), downed.get_chest_position(), HOLY_COLOR)
 		return true
+	var judged := verdict_now(ctx)
+	if judged != null:
+		return _verdict(ctx, judged)
 	var healed := false
 	var shield_share := ctx.num("shield_share")
 	for p in heal_targets(ctx):
@@ -131,11 +196,36 @@ func cast(ctx: AbilityContext) -> bool:
 	return healed
 
 
-## Bots: always raise a downed teammate in range; heal when a hero in range is below half HP.
+## Bots: always raise a downed teammate in range; heal when a hero in range is below half HP;
+## with Divine Verdict, judge an enemy while nobody in range needs a heal and no teammate is
+## downed anywhere (the Holy Power waits for a revive).
 func wants_auto_cast(ctx: AbilityContext) -> bool:
 	if revive_target(ctx) != null:
 		return true
 	for p in heal_targets(ctx):
 		if p.hp < p.max_hp() * AUTO_HEAL_RATIO:
 			return true
-	return false
+	if ctx.num("verdict_pct") <= 0.0 or ctx.player == null or not ctx.player.is_inside_tree():
+		return false
+	if PaladinKit.any_downed(ctx.player.get_tree(), ctx.player):
+		return false
+	return verdict_now(ctx) != null
+
+
+## Divine Verdict on [param target]: a golden Holy strike (ability damage).
+func _verdict(ctx: AbilityContext, target: Enemy) -> bool:
+	var paladin := ctx.player
+	if paladin == null or paladin.procs == null or not is_instance_valid(target) or target.is_dead():
+		return false
+	var spot := target.global_position
+	var chest := spot + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT * 0.5
+	paladin.procs.deal_raw(target, verdict_damage(ctx), PaladinKit.SCHOOL, true, &"ability")
+	if paladin.is_inside_tree():
+		ProcVfx.beam(paladin.get_chest_position(), chest, HOLY_COLOR)
+	Vfx.explosion(spot + Vector3.UP * 0.1, 1.0, HOLY_COLOR)
+	Vfx.hit_spark(chest, HOLY_COLOR)
+	Vfx.floating_text(spot + Vector3.UP * (WeaponRunner.DAMAGE_TEXT_HEIGHT + 0.5), VERDICT_TEXT, HOLY_COLOR, 0.9)
+	var arena := Arena.current
+	if arena != null and is_instance_valid(arena) and is_instance_valid(arena.camera):
+		arena.camera.shake(VERDICT_SHAKE)
+	return true
