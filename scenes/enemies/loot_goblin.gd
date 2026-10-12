@@ -14,8 +14,9 @@ extends Enemy
 ##   JINK_MIN..JINK_MAX s in the open (near a wall it keeps its line along the wall). Without
 ##   a visible player (all stealthed or downed) it jogs at CALM_SPEED_RATIO, turning by each
 ##   jink once and holding that heading until the next one (walls still steer it).
-## - Stuns, freezes, slows and knockback work (co-op crowd control); taunt and fear do not
-##   ([method apply_taunt] / [method apply_fear] are ignored).
+## - Stuns, freezes, slows (the ghost slow of a downed hero's revive circle too) and
+##   knockback work (co-op crowd control); taunt and fear do not ([method apply_taunt] /
+##   [method apply_fear] are ignored).
 ## - Every damaging hit spills a 1-gold coin ([Pickup]) next to it – at most one per
 ##   COIN_INTERVAL s, MAX_COINS per goblin.
 ## - At [member escape_time] s of age (GoblinSpawner.ESCAPE_TIME, the age counts while stunned
@@ -214,7 +215,7 @@ func _think(delta: float, here: Vector3, _feared: bool) -> void:
 		_jink_angle = rng.randf_range(-JINK_ANGLE, JINK_ANGLE)
 		new_jink = true
 	var away := flee_vector(here)
-	var speed := move_speed
+	var speed := walk_speed()
 	var dir: Vector3
 	if away.length_squared() > 0.0000001:
 		var base := away.normalized()

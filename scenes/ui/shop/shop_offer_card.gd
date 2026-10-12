@@ -4,7 +4,8 @@ extends Control
 ## slot / armor type, the price with a coin (red while the shared wallet cannot pay it), a
 ## padlock in the colour of the player who locked it, "P2 wants" tags for pings, one small
 ## usable-by pip per player (crossed out when that class cannot use it, a green arrow when it
-## is an upgrade for that player), a small anvil in the player's colour sitting on the pip of
+## is an upgrade for that player – ItemTooltip.upgrade_direction with the player's equipment,
+## so completing a tier-set bonus counts), a small anvil in the player's colour sitting on the pip of
 ## every player who has a forge partner for the offered weapon (Forge.offer_forge_slots – full
 ## backpack or not, GDD 4.1) and a "SOLD" stamp once bought.
 
@@ -131,7 +132,7 @@ func set_offer(p_offer: Shop.Offer, slots: Array[PlayerSlot]) -> void:
 			var eq := ShopPanel.equipment_of(s)
 			if eq != null:
 				var current := ItemTooltip.equipped_for_compare(item, eq)
-				if ItemTooltip.upgrade_direction(item, current, s.class_data) > 0:
+				if ItemTooltip.upgrade_direction(item, current, s.class_data, eq) > 0:
 					level = 2
 		_usable[s.index] = level
 	update_state()

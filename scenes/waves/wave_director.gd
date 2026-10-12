@@ -23,7 +23,7 @@ extends Node
 ##
 ## RunState.rng order inside [method start_wave]: eligible list (no draw) → elite schedule
 ## (count, then one time per elite) → next group pick → [signal wave_started] (the
-## GoblinSpawner draws there) → opening group.
+## GoblinSpawner draws there) → the opening group's telegraph (its type and size).
 
 signal wave_started(wave: int)
 signal wave_timer_changed(seconds_left: float)

@@ -667,11 +667,14 @@ func _refresh_chips(force: bool = false) -> void:
 			_fill_chip(chip, s)
 
 
+## The chip's arrow for [param s]: ItemTooltip.upgrade_direction against the hero's own
+## equipment, so tier-set bonuses count like they do for the bots' Need.
 func _upgrade_direction(s: PlayerSlot) -> int:
 	if roll == null or roll.item == null or not roll.item.can_be_used_by(s.class_data):
 		return 0
-	var current_item := ItemTooltip.equipped_for_compare(roll.item, ShopPanel.equipment_of(s))
-	return ItemTooltip.upgrade_direction(roll.item, current_item, s.class_data)
+	var eq := ShopPanel.equipment_of(s)
+	var current_item := ItemTooltip.equipped_for_compare(roll.item, eq)
+	return ItemTooltip.upgrade_direction(roll.item, current_item, s.class_data, eq)
 
 
 func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:

@@ -5,11 +5,11 @@ extends TestCase
 ## ProcSystem through test doubles), RunState's spend log, wants, counters and start level, the
 ## launch options, Main's wiring and the panel's Forge entry / Talents tab.
 ##
-## Frozen (integrator only). Every check here is a contract that holds with or without the Wave-1
-## implementations and content: no "nothing yet" / "stub returns 0" asserts, no lookups of
-## shipping ids, fixtures live in Db only under the "zz_test" class and Db is restored after
-## each test. The P0 stub values are pinned in tests/test_p0_stub_<package>.gd, one file per
-## owning package, which that package deletes or replaces when it implements the stub.
+## Frozen (integrator only). Every check here is a contract of the P0 API that the Wave-1
+## implementations and content keep: no "nothing yet" asserts, no lookups of shipping ids,
+## fixtures live in Db only under the "zz_test" class and Db is restored after each test. The
+## P0 stubs have all been replaced by their packages (their pinned stub values went with them);
+## the cross-package behaviour is covered by tests/test_m5_integration.gd.
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -19,7 +19,7 @@ const TMP_DIR := "user://m5_p0_talent_tree_test/"
 
 
 ## PlayerBonuses with every method overridden neutrally (set_effects only stores): the doubles
-## below never run the real engine (T-CORE-A replaces the stub bodies), only the P0 API.
+## below never run the real engine, only the P0 API.
 class NeutralBonuses extends PlayerBonuses:
 	var stored: Dictionary = {}
 
@@ -824,7 +824,7 @@ func test_player_has_bonuses_talents_and_merges_mods() -> void:
 	check(p.bonuses != null and p.bonuses.player == p, "bonuses")
 	check(p.talents != null and p.talents.class_id == &"warrior", "talents of the class")
 	check(p.bonuses.effects_of(PlayerBonuses.SOURCE_SETS).is_empty(), "apply_equipment set the (empty) set bonuses")
-	# A fresh hero has no talents and no set pieces: neutral with the stub and with the engine.
+	# A fresh hero has no talents and no set pieces: the engine is neutral.
 	check_eq(p.bonuses.ability_mods_for(&"whirlwind"), {}, "no entries: no mods")
 	check_eq(p.bonuses.damage_mult(null, &"fire", &"weapon"), 1.0, "no entries: neutral damage")
 	check_eq(p.bonuses.damage_taken_mult(&"melee", null), 1.0, "no entries: neutral damage taken")
@@ -989,7 +989,7 @@ func test_avoided_hits_and_damage_taken_hooks() -> void:
 	check_eq(prec.taken + prec.kinds.count(&"dodge") + prec.kinds.count(&"parry"), 40, "blocked hits still land")
 
 
-## The hand-off APIs T-CORE-B fills (their P0 stub values: test_p0_stub_tcore_b.gd).
+## The hand-off APIs T-CORE-B implemented (AbilityRunner.cooldown_left, ClassResource.set_bonus).
 func test_cooldown_left_and_class_resource_bonus() -> void:
 	_player_world()
 	var p := Fakes.spawn_player(world, 0, &"mage")
@@ -1250,8 +1250,7 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	check(panel.tooltip.viewer_equipment == hero.equipment, "the tooltip knows the viewer's equipment")
 	panel.open_menu()
 	check_eq(Array(panel.menu_labels()), ["Unequip", "Forge", "Cancel"], "Forge after Unequip")
-	# The entry follows Forge.blocked_reason (the stub's or FORGE's): a lone starting sword has
-	# no partner either way.
+	# The entry follows Forge.blocked_reason: a lone starting sword has no partner.
 	var sword := hero.equipment.get_item(Items.EquipSlot.MAIN_HAND)
 	var reason := Forge.blocked_reason(hero.equipment, sword)
 	check(reason != "", "a lone starting sword cannot be forged")
@@ -1306,7 +1305,7 @@ func test_debug_start_tab_opens_p1_on_talents_once() -> void:
 	check_eq(p1.active_tab, PlayerPanel.CHARACTER_TAB, "once")
 
 
-## Frozen pieces of the stubbed classes (their stub values: tests/test_p0_stub_*.gd).
+## Frozen pieces of the classes P0 introduced (TalentEffect, EliteAffixes, PlayerBonuses ...).
 func test_talent_effect_base_and_constants() -> void:
 	var effect := TalentEffect.new()
 	effect.setup(null, 2, {"every": 5, "name": "x"})

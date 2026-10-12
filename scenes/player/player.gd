@@ -13,7 +13,9 @@ extends CharacterBody3D
 ## not attack); a living teammate standing within REVIVE_RADIUS for REVIVE_TIME seconds
 ## revives them (every additional reviver adds REVIVE_SPEED_PER_EXTRA_REVIVER), and so does
 ## the arena's [SpiritHealer] (its 10 s pulse revives ghosts in its circle at full HP – see
-## healer_channel – and gives RES_SICKNESS_TIME of Resurrection Sickness).
+## healer_channel – and gives RES_SICKNESS_TIME of Resurrection Sickness). While downed, the
+## enemies inside the ghost's revive circle walk GHOST_SLOW_PCT slower (GDD 16.1, the ghost
+## slow: [method _update_ghost_slow]).
 ## Movement respects the arena walls and, on the shared screen, the camera's walk rect
 ## (CameraRig.get_walk_rect, GDD 13): the screen edge is an invisible wall.
 ## M2: the equipped items' enchants / unique effects run in the child [ProcSystem] "Procs"
@@ -43,6 +45,13 @@ const REVIVE_TIME := 5.0
 ## Every additional living reviver inside REVIVE_RADIUS adds this much revive speed
 ## (GDD 1: 1 reviver = 1x, 2 = 1.5x, 3 = 2x).
 const REVIVE_SPEED_PER_EXTRA_REVIVER := 0.5
+## Ghost slow (GDD 16.1): enemies whose centre is inside a downed hero's revive circle
+## (REVIVE_RADIUS around the ghost) walk this many percent slower, so the teammate channelling
+## the revive is not left defenceless. The ghost refreshes it every physics tick
+## (Enemy.apply_ghost_slow) for GHOST_SLOW_LINGER s, so it ends that soon after the enemy left
+## the circle or the ghost revived.
+const GHOST_SLOW_PCT := 33.0
+const GHOST_SLOW_LINGER := 0.1
 const INVULNERABLE_AFTER_HIT := 0.35
 
 ## Collision capsule height (the onion is ~1.3 m tall).
@@ -129,6 +138,8 @@ var forced_crits := 0
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
+## Enemies this ghost's revive circle slowed on its last tick (0 when alive; GDD 16.1).
+var ghost_slowed := 0
 ## Set every tick by the [SpiritHealer] while this ghost waits in its circle: progress
 ## towards the next pulse (0..1, 0 = not waiting) and the seconds until it (-1 = none). The
 ## cast bar shows whichever revive – teammates' or the healer's – is closer to completion.
@@ -580,6 +591,7 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
 	downed = false
 	revive_progress = 0.0
 	reviver_count = 0
+	ghost_slowed = 0
 	healer_channel = 0.0
 	healer_seconds_left = -1.0
 	_regen_accum = 0.0
@@ -663,6 +675,7 @@ func _physics_process(delta: float) -> void:
 	_update_movement(delta)
 	if downed:
 		_update_revive(delta)
+		_update_ghost_slow()
 	else:
 		_update_regen(delta)
 	if bonuses != null:
@@ -859,6 +872,28 @@ func _update_revive(delta: float) -> void:
 		revive(REVIVE_HP_RATIO)
 		Vfx.resurrect_column(feet)
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
+
+
+## Ghost slow (GDD 16.1): while downed, refreshes the GHOST_SLOW_PCT slow on every living enemy
+## whose centre is inside the revive circle (one EnemyGrid query, group order, no RNG) and
+## lights the ring's cue. Several ghosts refresh the same slot, so the slow never stacks.
+func _update_ghost_slow() -> void:
+	var n := 0
+	if downed and is_inside_tree():
+		var here := global_position
+		var r_sq := REVIVE_RADIUS * REVIVE_RADIUS
+		for node in EnemyGrid.gather_around(get_tree(), here, REVIVE_RADIUS):
+			var e := node as Enemy
+			if e == null or e.is_dead():
+				continue
+			var pos := e.global_position
+			var dx := pos.x - here.x
+			var dz := pos.z - here.z
+			if dx * dx + dz * dz <= r_sq and e.apply_ghost_slow(GHOST_SLOW_LINGER):
+				n += 1
+	ghost_slowed = n
+	if model != null:
+		model.set_ghost_slowing(n > 0)
 
 
 ## True when a living teammate stands within REVIVE_RADIUS.

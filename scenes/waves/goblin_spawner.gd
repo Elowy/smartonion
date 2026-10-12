@@ -17,8 +17,11 @@ extends Node
 ## - [signal WaveDirector.wave_cleared] / a new wave cancel a pending spawn; a living goblin
 ##   is despawned by [method WaveDirector.stop] like any enemy (no loot).
 ##
-## Determinism (RunState.rng, in WaveDirector.start_wave after its own draws): one draw for
-## the chance when it is above 0, then one for the time only when the goblin comes.
+## Determinism (RunState.rng): the draws happen in [signal WaveDirector.wave_started], inside
+## WaveDirector.start_wave after the elite schedule and the first group choice and before the
+## opening group's telegraph draws – one draw for the chance when it is above 0, then one for
+## the time only when the goblin comes. The goblin's own draws (Enemy.setup, its jinks) come
+## during the wave.
 
 ## Banner text for the HUD ("A Loot Goblin appeared!", gold / "The Loot Goblin escaped!", grey).
 signal announced(text: String, color: Color)
