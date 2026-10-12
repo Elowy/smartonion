@@ -214,7 +214,7 @@ func _think(delta: float, here: Vector3, _feared: bool) -> void:
 		_jink_angle = rng.randf_range(-JINK_ANGLE, JINK_ANGLE)
 		new_jink = true
 	var away := flee_vector(here)
-	var speed := move_speed
+	var speed := walk_speed()
 	var dir: Vector3
 	if away.length_squared() > 0.0000001:
 		var base := away.normalized()

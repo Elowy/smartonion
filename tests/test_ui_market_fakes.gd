@@ -1,7 +1,7 @@
 extends TestCase
 ## Shared fakes for the M2 market UI tests (ShopPanel, LootRollScreen, Intermission phases):
-## a Shop and a LootRoll that follow the stub contracts but record every call and behave
-## predictably, plus item / hero builders. Preload it:
+## a Shop and a LootRoll that follow the real classes' contracts but record every call and
+## behave predictably, plus item / hero builders. Preload it:
 ##   const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
 ## (It is a test file itself only to check that the fakes keep following the contracts.)
 

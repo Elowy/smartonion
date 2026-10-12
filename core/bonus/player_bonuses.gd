@@ -517,9 +517,9 @@ func _apply_resources(sums: Dictionary[StringName, Dictionary]) -> void:
 		player.abilities.resources[id].set_bonus(sums.get(id, {}))
 
 
-## Hands changed sources to ProcSystem. The trailing refresh() is here because the P0
-## set_extra_procs only stores; once it rebuilds on its own (T-CORE-B), drop the refresh()
-## here so ProcSystem is its single owner (otherwise each proc change rebuilds twice).
+## Hands the changed sources to ProcSystem, then rebuilds it once: set_extra_procs only stores
+## (the engine owns the rebuild), so a change touching several sources rebuilds once and a
+## change that touches no proc keeps the running proc buffs.
 func _apply_procs(defs_by_source: Dictionary[StringName, Array]) -> void:
 	if player == null or player.procs == null:
 		return
