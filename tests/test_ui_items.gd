@@ -277,26 +277,33 @@ func test_set_block_for_the_viewers_equipment() -> void:
 	check(tip.find_line("Part of the") == null, "the old one-liner is gone")
 	var header := tip.find_line("Battlegear of Fury (2/5)", true)
 	check(header != null and _color(header).is_equal_approx(ItemTooltip.SET_NAME_COLOR), "set name + worn count in gold: %s" % tip.line_texts())
-	for piece_name in ["Helm of Fury", "Legplates of Fury"]:
-		var l := _exact(piece_name)
-		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "%s worn: bright" % piece_name)
-	for piece_name in ["Pauldrons of Fury", "Gauntlets of Fury"]:
-		var l := _exact(piece_name)
-		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING), "%s missing: grey" % piece_name)
-	var own := _exact("Breastplate of Fury")
+	# The viewer's own tooltip (panel, shop) has the compact block: the pieces as slot names.
+	check(tip.compact_set(), "a viewer: the compact set block")
+	for piece_name in ["Helm of Fury", "Pauldrons of Fury", "Legplates of Fury"]:
+		check(_exact(piece_name).is_empty(), "no full piece name %s" % piece_name)
+	for slot_name in ["Head", "Legs"]:
+		var l := _exact(slot_name)
+		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "%s worn: bright" % slot_name)
+	for slot_name in ["Shoulders", "Hands"]:
+		var l := _exact(slot_name)
+		check(l.size() == 1 and _color(l[0]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING), "%s missing: grey" % slot_name)
+	# "Chest" is also the left half of the slot / armor type line.
+	var own := _exact("Chest")
 	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING),
 		"the shown piece is listed too (grey until worn)")
+	check(_index_of("Battlegear of Fury (2/5)") < _index_of("Head") and _index_of("Head") < _index_of("Shoulders")
+		and _index_of("Shoulders") < _index_of("Legs"), "under the set name, in slot order")
 	var two := tip.find_line("(2) Set: Increases your Rage generation by 10%.", true)
 	check(two != null and _color(two).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "active 2-piece bonus green")
 	var four := tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)
 	check(four != null and _color(four).is_equal_approx(ItemTooltip.DIM), "inactive 4-piece bonus grey")
 	check(_index_of("Classes: Warrior") < _index_of("Battlegear of Fury (2/5)"), "after the Classes line")
-	check(_index_of("(4) Set: Whirlwind has a 30% chance to cost no Rage.") < _index_of("\"%s\"" % chest.flavor), "before the flavor text")
+	check(chest.flavor != "" and tip.find_line(chest.flavor) == null, "no flavor text in the compact block")
 	eq.slots[Items.EquipSlot.CHEST] = chest
 	eq.slots[Items.EquipSlot.HANDS] = set_piece(&"warrior", "hands")
 	tip.show_item(chest, warrior)
 	check(tip.find_line("Battlegear of Fury (4/5)", true) != null, "4 worn")
-	own = _exact("Breastplate of Fury")
+	own = _exact("Chest")
 	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "now worn")
 	four = tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)
 	check(four != null and _color(four).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "4-piece bonus active")
@@ -304,7 +311,11 @@ func test_set_block_for_the_viewers_equipment() -> void:
 
 func test_set_block_without_equipment() -> void:
 	tip.viewer_equipment = null
-	tip.show_item(set_piece(&"mage", "head"), Db.get_class_data(&"mage"))
+	var head := set_piece(&"mage", "head")
+	tip.show_item(head, Db.get_class_data(&"mage"))
+	check(not tip.compact_set(), "no viewer (the loot roll): the full block")
+	check(head.flavor != "" and _index_of("\"%s\"" % head.flavor) > _index_of("(2) Set: Increases your Haste by 10%."),
+		"with the flavor text after the set block")
 	var header := tip.find_line("Regalia of the Arcane (5 pieces)", true)
 	check(header != null and _color(header).is_equal_approx(ItemTooltip.SET_NAME_COLOR), "(5 pieces) without equipment")
 	for piece_name in ["Mantle of the Arcane", "Robes of the Arcane", "Gloves of the Arcane", "Leggings of the Arcane"]:

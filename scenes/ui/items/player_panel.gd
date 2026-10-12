@@ -43,6 +43,12 @@ const BAG_GAP := 7.0
 const BAG_COLUMNS := 5
 const BODY_GAP := 12.0
 const MESSAGE_TIME := 2.8
+## With [member tooltip_inside] a tooltip taller than the panel shrinks to fit it, but not below
+## this scale: a still taller one (a set piece with the comparison block) reaches past the
+## panel's edge towards the middle of the screen instead of becoming unreadable at 720p.
+const MIN_INSIDE_TOOLTIP_FIT := 0.9
+## Without [member tooltip_inside]: the tooltip shrinks to the screen height, down to this.
+const MIN_TOOLTIP_FIT := 0.4
 
 const LEFT_SLOTS: Array[Items.EquipSlot] = [
 	Items.EquipSlot.HEAD, Items.EquipSlot.NECK, Items.EquipSlot.SHOULDERS,
@@ -1480,7 +1486,10 @@ func _place_menu() -> void:
 
 
 ## The tooltip floats beside the panel on the side facing the screen centre, level with the
-## selected icon and kept inside the visible area.
+## selected icon and kept inside the visible area. With [member tooltip_inside] it stays over the
+## panel (scaled down to its height, at least MIN_INSIDE_TOOLTIP_FIT); one taller than that hangs
+## from the panel's top edge downwards (top-corner panels) or rises from its bottom edge (bottom
+## corners), over the middle of the screen.
 func _place_tooltip() -> void:
 	if not tooltip.visible or not is_inside_tree():
 		return
@@ -1492,10 +1501,11 @@ func _place_tooltip() -> void:
 	tooltip.size = tip
 	var view := get_viewport_rect()
 	# Inside the panel a tooltip taller than the panel is scaled down to fit it (it would
-	# otherwise spill over the neighbouring player's panel).
+	# otherwise spill over the neighbouring player's panel) – but only so far.
 	var room := (minf(panel_rect.end.y, view.end.y - 4.0) - maxf(panel_rect.position.y, view.position.y + 4.0)) \
 			if tooltip_inside else view.size.y - 8.0
-	var fit := clampf(room / maxf(1.0, tip.y * to_canvas.get_scale().y), 0.4, 1.0)
+	var min_fit := MIN_INSIDE_TOOLTIP_FIT if tooltip_inside else MIN_TOOLTIP_FIT
+	var fit := clampf(room / maxf(1.0, tip.y * to_canvas.get_scale().y), min_fit, 1.0)
 	tooltip.scale = Vector2.ONE * fit
 	var tip_size := tip * to_canvas.get_scale() * fit
 	var gap := 10.0 * to_canvas.get_scale().x
@@ -1513,6 +1523,10 @@ func _place_tooltip() -> void:
 	top = maxf(top, view.position.y + 4.0)
 	bottom = minf(bottom, view.end.y - 4.0)
 	var y := clampf(icon_rect.position.y - 6.0, top, maxf(top, bottom - tip_size.y))
+	if tip_size.y > bottom - top + 0.5:
+		# Taller than the panel even at the minimum fit: out over the panel's inner edge.
+		y = top if panel_rect.get_center().y <= view.get_center().y else bottom - tip_size.y
+		y = clampf(y, view.position.y + 4.0, maxf(view.position.y + 4.0, view.end.y - 4.0 - tip_size.y))
 	tooltip.position = to_canvas.affine_inverse() * Vector2(x, y)
 
 

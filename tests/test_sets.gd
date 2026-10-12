@@ -290,6 +290,11 @@ func test_describe_rows_with_and_without_equipment() -> void:
 		check(loose[i]["kind"] == SetBonuses.ROW_PIECE and not loose[i]["active"], "piece row %d, not worn" % i)
 	check_eq(names, ["Shadowstitch Hood", "Shadowstitch Spaulders", "Shadowstitch Tunic", "Shadowstitch Gloves",
 		"Shadowstitch Leggings"] as Array[String], "the five piece names in slot order")
+	var slot_names: Array[String] = []
+	for i in range(1, 6):
+		slot_names.append(str(loose[i].get("slot", "")))
+	check_eq(slot_names, ["Head", "Shoulders", "Chest", "Hands", "Legs"] as Array[String],
+		"and their slot names (the tooltip's compact block)")
 	check_eq(loose[6], {"kind": SetBonuses.ROW_BONUS, "text": "(2) Set: Increases your critical strike chance by 5%.", "active": false}, "2-piece row")
 	check_eq(str(loose[7]["text"]), "(4) Set: Vanish increases your critical strike damage by 50% for 4 sec.", "4-piece row")
 	var eq := wearing(&"rogue", ["head", "chest"])

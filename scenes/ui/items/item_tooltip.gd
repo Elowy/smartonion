@@ -5,11 +5,15 @@ extends PanelContainer
 ## (right-aligned, red when the viewer cannot use it), weapon damage / speed / DPS, white stat
 ## lines, "Classes: X" (red if not the viewer's class), green enchant lines
 ## (EnchantRoll.description()), the unique effect line, the tier-set block (set name with
-## "(n/5)" worn by [member viewer_equipment] – "(5 pieces)" without one –, the five piece names,
+## "(n/5)" worn by [member viewer_equipment] – "(5 pieces)" without one –, the five pieces,
 ## bright when worn, then "(2) Set: …" / "(4) Set: …" green when active, grey otherwise;
 ## SetBonuses.describe), flavor text in gold quotes, the buy price (when given) and the sell
 ## value, and a comparison block against the viewer's equipped item ("If you replace this
 ## item:" +green / -red per stat).
+## A set piece shown to a viewer (viewer_equipment set: the player panels, the shop) gets the
+## compact set block – the pieces as their slot names on one line ("Head  Shoulders  Chest …")
+## and no flavor text – so the tooltip stays readable inside a 4-player corner panel at 720p.
+## Without a viewer (the loot roll) the pieces keep their full names.
 ## Static helpers (stat_delta, upgrade_direction, item_score, equipped_for_compare) are shared
 ## with the shop, the loot roll and bots. Weapons compare with everything they would push out:
 ## a two-hander with main + off hand together (an EquippedPair), an off-hand item or a
@@ -36,6 +40,9 @@ const SET_PIECE_WORN := Color(1.0, 1.0, 0.6)
 const SET_PIECE_MISSING := Color(0.58, 0.58, 0.58)
 ## Left indent of the piece names under the set name.
 const SET_PIECE_INDENT := 14
+## Gap between the slot names of the compact set block (no bullets, no indent: the five fit
+## one line of the tooltip).
+const SET_SLOT_GAP := 12
 
 ## upgrade_direction / item_score weights: the viewer's primary stat counts most, the other
 ## primary stats barely (they do nothing for the class), defensive stats by their budget cost
@@ -474,7 +481,7 @@ func _rebuild() -> void:
 		_line(item.unique_text, ENCHANT_GREEN)
 	if item.set_id != &"":
 		_set_block()
-	if item.flavor != "":
+	if item.flavor != "" and not compact_set():
 		var flavor := _line("\"%s\"" % item.flavor, YELLOW, SMALL_SIZE + 1, _italic_font())
 		flavor.add_theme_constant_override(&"outline_size", 3)
 
@@ -502,6 +509,12 @@ func _weapon_lines(w: WeaponData) -> void:
 		_line("%s%% Block Chance" % fmt_number(w.block_chance), WHITE)
 
 
+## Whether the shown item gets the compact set block (a set piece with a viewer; see the
+## class doc).
+func compact_set() -> bool:
+	return item != null and item.set_id != &"" and viewer_equipment != null
+
+
 ## The tier-set block (SetBonuses.describe for [member viewer_equipment]); a set_id without
 ## SetData keeps the plain "Part of the … set" line.
 func _set_block() -> void:
@@ -510,8 +523,10 @@ func _set_block() -> void:
 		_line("Part of the %s set" % String(item.set_id).capitalize(), DIM, SMALL_SIZE)
 		return
 	_gap(4)
-	# The five piece names flow in a few lines ("• Helm  • Pauldrons …") instead of five rows:
-	# tooltips inside a player panel shrink to the panel's height, so every line counts.
+	# The pieces flow in a few lines ("• Helm  • Pauldrons …") instead of five rows – in the
+	# compact block one line of slot names: tooltips inside a player panel shrink to the
+	# panel's height, so every line counts.
+	var compact := compact_set()
 	var pieces: HFlowContainer = null
 	var first_bonus := true
 	for row in rows:
@@ -522,8 +537,12 @@ func _set_block() -> void:
 				_line(text, SET_NAME_COLOR, BODY_SIZE)
 			SetBonuses.ROW_PIECE:
 				if pieces == null:
-					pieces = _piece_flow()
-				pieces.add_child(_piece_entry(text, SET_PIECE_WORN if active else SET_PIECE_MISSING))
+					pieces = _piece_flow(compact)
+				var color := SET_PIECE_WORN if active else SET_PIECE_MISSING
+				if compact:
+					pieces.add_child(_slot_entry(str(row.get("slot", text)), color))
+				else:
+					pieces.add_child(_piece_entry(text, color))
 			SetBonuses.ROW_BONUS:
 				if first_bonus:
 					_gap(4)
@@ -531,14 +550,15 @@ func _set_block() -> void:
 				_line(text, ENCHANT_GREEN if active else DIM, SMALL_SIZE)
 
 
-## An indented flow row for the set's piece names (under the set name).
-func _piece_flow() -> HFlowContainer:
+## An indented flow row for the set's piece names (under the set name); [param compact]: the
+## slot names' row (no indent, SET_SLOT_GAP apart).
+func _piece_flow(compact: bool = false) -> HFlowContainer:
 	var indent := MarginContainer.new()
 	indent.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	indent.add_theme_constant_override(&"margin_left", SET_PIECE_INDENT)
+	indent.add_theme_constant_override(&"margin_left", 0 if compact else SET_PIECE_INDENT)
 	var flow := HFlowContainer.new()
 	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	flow.add_theme_constant_override(&"h_separation", 14)
+	flow.add_theme_constant_override(&"h_separation", SET_SLOT_GAP if compact else 14)
 	flow.add_theme_constant_override(&"v_separation", 0)
 	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	indent.add_child(flow)
@@ -555,6 +575,14 @@ func _piece_entry(text: String, color: Color) -> HBoxContainer:
 		l.add_theme_constant_override(&"shadow_offset_y", 1)
 		entry.add_child(l)
 	return entry
+
+
+## One slot name of the compact set block ("Shoulders"), bright when worn.
+func _slot_entry(text: String, color: Color) -> Label:
+	var l := UiTheme.label(text, &"", SMALL_SIZE, color)
+	l.add_theme_constant_override(&"outline_size", 4)
+	l.add_theme_constant_override(&"shadow_offset_y", 1)
+	return l
 
 
 func _comparison_block() -> void:

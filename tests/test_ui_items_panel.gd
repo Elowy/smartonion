@@ -466,6 +466,69 @@ func test_stat_list_fits_its_inset_with_long_rows() -> void:
 	finished.emit()
 
 
+## Every tier-set piece's tooltip in each corner of the 4-player market layout (Intermission
+## scale, tooltip_inside): the compact set block (slot names, no flavor) keeps a looted piece's
+## tooltip inside its panel at a readable scale (about 0.9 or more); with the comparison block on
+## top it keeps that scale (PlayerPanel.MIN_INSIDE_TOOLTIP_FIT) and reaches out of the panel
+## towards the middle, on screen.
+func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
+	_async = true
+	# The body text of a 4-player panel's tooltip at 1280 x 720: 20 px x 0.83 x 0.67 x this ≈ 10 px.
+	const READABLE_FIT := 0.899
+	var s := Intermission.panel_scale(PlayerPanel.DESIGN_SIZE)
+	var shown := PlayerPanel.DESIGN_SIZE * s
+	var m := Intermission.MARGIN
+	var pieces := 0
+	for data: SetData in Db.sets.values():
+		var slot := _join(data.class_id)
+		var eq := _eq(slot)
+		var panel := _panel(slot)
+		panel.tooltip_inside = true
+		panel.scale = Vector2(s, s)
+		var view := panel.get_viewport_rect()
+		var corners: Array[Vector2] = [Vector2(m, m), Vector2(view.end.x - m - shown.x, m),
+			Vector2(m, view.end.y - m - shown.y), Vector2(view.end.x - m - shown.x, view.end.y - m - shown.y)]
+		for i in data.piece_ids.size():
+			var piece := Items_.set_piece(data.class_id, String(data.piece_ids[i]).get_slice("_", 2))
+			piece.looted = true
+			# Two other pieces worn ("(2/5)", the 2-piece bonus on), a plain item where this
+			# one goes (the comparison block), the piece in the backpack.
+			eq.slots.clear()
+			for j in [(i + 1) % 5, (i + 2) % 5]:
+				var other := Items_.set_piece(data.class_id, String(data.piece_ids[j]).get_slice("_", 2))
+				eq.slots[eq.target_slots(other)[0]] = other
+			eq.slots[eq.target_slots(piece)[0]] = Items_.armor("Plain Piece", piece.slot_type, piece.armor_type, 1, {"stamina": 2})
+			eq.backpack.clear()
+			eq.add_to_backpack(piece)
+			panel.select_backpack(0)
+			for comparison in [false, true]:
+				if panel.comparison != comparison:
+					panel.toggle_comparison()
+				check(panel.tooltip.visible and panel.tooltip.item == piece, "%s shown" % piece.display_name)
+				check(panel.tooltip.compact_set(), "%s: the compact set block" % piece.display_name)
+				await tree.process_frame
+				await tree.process_frame
+				for c in corners.size():
+					panel.position = corners[c]
+					panel._place_tooltip()
+					var what := "%s (comparison %s, corner %d)" % [piece.display_name, comparison, c + 1]
+					var tip := panel.tooltip.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.tooltip.size)
+					var panel_rect := panel.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.size)
+					check(panel.tooltip.scale.y >= READABLE_FIT,
+						"%s: readable scale %.2f" % [what, panel.tooltip.scale.y])
+					check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+					if not comparison:
+						check(panel_rect.grow(0.5).encloses(tip), "%s: inside its panel %s / %s" % [what, tip, panel_rect])
+			pieces += 1
+		panels.erase(panel)
+		UiFakes.free_node(panel)
+		players.erase(slot.player)
+		(slot.player as Player).free()
+		UiFakes.reset_players()
+	check_eq(pieces, 25, "five pieces of five sets")
+	finished.emit()
+
+
 func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
 	var slot := _join(&"warrior")
 	_eq(slot).add_to_backpack(_helm("Iron Helm", ClassData.ArmorType.PLATE, 3))
@@ -477,7 +540,7 @@ func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
 	check(panel.tooltip.visible, "tooltip shown")
 	var tip_h := panel.tooltip.get_combined_minimum_size().y * 0.5
 	var room := panel.size.y * 0.5
-	var expected := clampf(room / tip_h, 0.4, 1.0)
+	var expected := clampf(room / tip_h, PlayerPanel.MIN_INSIDE_TOOLTIP_FIT, 1.0)
 	check_near(panel.tooltip.scale.y, expected, 0.001, "scaled to the panel's height (%s / %s)" % [room, tip_h])
 	panel.tooltip_inside = false
 	panel._place_tooltip()
