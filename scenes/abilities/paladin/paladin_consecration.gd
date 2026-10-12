@@ -269,8 +269,12 @@ func _set_ward(pct: float) -> void:
 		_ward_on = false
 
 
-static func _area_live(area: AbilityArea) -> bool:
-	return area != null and is_instance_valid(area) and area.is_inside_tree() and not area.is_queued_for_deletion()
+## (Variant: the area may already be freed.)
+static func _area_live(area: Variant) -> bool:
+	if area == null or not is_instance_valid(area):
+		return false
+	var a := area as AbilityArea
+	return a != null and a.is_inside_tree() and not a.is_queued_for_deletion()
 
 
 func _on_downed_changed(is_downed: bool) -> void:
