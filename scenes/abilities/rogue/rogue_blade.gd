@@ -9,6 +9,15 @@ extends Projectile
 ##                          do through the Mastery),
 ##   [member returns]     – at the end of its range the blade turns around and flies back
 ##                          along its path, able to hit every enemy again.
+## M5 talent hooks (Fan of Knives sets them; 0 = off):
+##   [member envenom_pct] – Envenom: before the blade's own hit, the Rogue's Deadly Poison on a
+##                          living enemy is consumed (RogueMastery.consume) and that share (%) of
+##                          its undealt damage lands at once as Nature dot damage
+##                          (deal_raw(..., target_bonus = false, &"dot"), like the ticks). Each
+##                          enemy once per cast: the knives of one fan share [member envenomed],
+##                          so a fan never detonates the fresh stacks its own crits put on.
+##   [member slow_pct] / [member slow_duration] – Cold Blood: a living enemy is slowed after
+##                          the hit.
 
 enum Look { KNIFE, SHURIKEN }
 
@@ -18,6 +27,15 @@ var poison_hits := false
 var returns := 0
 ## Turns made so far (tests, visuals).
 var turned := 0
+## Envenom share (%) of the consumed poison (0 = off).
+var envenom_pct := 0.0
+## Enemy instance ids this cast already envenomed – one dictionary shared by the cast's blades.
+var envenomed: Dictionary[int, bool] = {}
+## Cold Blood rider: slow (%) and its seconds (0 = none).
+var slow_pct := 0.0
+var slow_duration := 0.0
+## Envenom detonations of this blade (tests).
+var detonations := 0
 
 
 ## A blade of [param player] thrown along [param dir] with [param p_weapon]'s hit rules.
@@ -63,9 +81,39 @@ func _build_visual() -> void:
 
 
 func _apply_hit(body: Node3D, kb_dir: Vector3, from_explosion: bool) -> void:
+	if envenom_pct > 0.0:
+		_envenom(body)
 	super._apply_hit(body, kb_dir, from_explosion)
 	if poison_hits and not is_crit:
 		_poison(body)
+	if slow_pct > 0.0 and slow_duration > 0.0:
+		var e := body as Enemy
+		if e != null and is_instance_valid(e) and not e.is_dead():
+			e.apply_slow(slow_pct, slow_duration)
+
+
+## Envenom: detonates the Rogue's Deadly Poison on [param body] (once per cast and enemy).
+func _envenom(body: Node3D) -> void:
+	var enemy := body as Enemy
+	if enemy == null or not is_instance_valid(enemy) or enemy.is_dead():
+		return
+	var id := enemy.get_instance_id()
+	if envenomed.has(id):
+		return
+	envenomed[id] = true
+	var rogue := attacker as Player if attacker != null and is_instance_valid(attacker) else null
+	if rogue == null or rogue.abilities == null or rogue.procs == null or not rogue.is_alive():
+		return
+	var mastery := rogue.abilities.mastery as RogueMastery
+	if mastery == null:
+		return
+	var total := mastery.consume(enemy)
+	if total <= 0.0:
+		return
+	detonations += 1
+	if enemy.is_inside_tree():
+		Vfx.hit_spark(enemy.global_position + Vector3.UP * 0.6, RogueVfx.POISON_COLOR)
+	rogue.procs.deal_raw(enemy, total * envenom_pct / 100.0, RogueMastery.SCHOOL, false, &"dot")
 
 
 ## A Deadly Poison stack for the hit on [param body] (the Mastery's share of this blade's

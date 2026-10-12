@@ -18,8 +18,14 @@ targeting = 0
 cast_range = 7.0
 effect = ExtResource("2_effect")
 params = {
+"cdr_per_combo": 0.0,
+"cold_blood_crit_damage": 0.0,
+"cold_blood_every": 0,
+"cold_blood_slow": 0.0,
+"cold_blood_slow_duration": 0.0,
 "combo_bonus_pct": 20.0,
 "damage_pct": 110.0,
+"envenom_pct": 0.0,
 "knives": 10,
 "pierce": 1,
 "poison_hits": false,

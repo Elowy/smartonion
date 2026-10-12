@@ -4,8 +4,11 @@ extends Node3D
 ##   [method streak]     – a fading shadow ribbon on the ground between two points (Shadowstep,
 ##                         Killing Spree jumps),
 ##   [method step_puff]  – smoke where a teleport leaves / arrives,
-##   [method cheat_death] – a dark ring with rising pale wisps when Cheat Death saves the Rogue.
-## Frees itself.
+##   [method cheat_death] – a dark ring with rising pale wisps when Cheat Death saves the Rogue,
+##   [method ring]       – a thin ground ring under a hero for the M5 talents (Cold Blood's
+##                         "next fan is cold", Adrenaline Rush, Shadow Dance): a plain
+##                         MeshInstance3D child of the hero that its owner frees.
+## The streak / wisps nodes free themselves.
 
 const SHADOW_COLOR := Color(0.55, 0.38, 0.9)
 const SMOKE_COLOR := Color(0.32, 0.28, 0.42)
@@ -15,6 +18,12 @@ const STREAK_LIFE := 0.35
 const STREAK_WIDTH := 0.55
 const STREAK_ALPHA := 0.55
 const GROUND_Y := 0.08
+## Talent ground rings: band from RING_INNER to RING_OUTER of the quad's half size, a faint
+## fill inside it (RING_FILL; the shader multiplies band and fill by the ring's alpha).
+const RING_INNER := 0.86
+const RING_OUTER := 0.97
+const RING_FILL := 0.25
+const RING_Y := 0.05
 
 var life := STREAK_LIFE
 var _age := 0.0
@@ -42,6 +51,34 @@ static func streak(from: Vector3, to: Vector3, color: Color = SHADOW_COLOR) -> v
 ## Smoke where a teleporting Rogue leaves or lands ([param pos]: feet).
 static func step_puff(pos: Vector3, size: float = 0.8) -> void:
 	Vfx.death_puff(pos + Vector3.UP * 0.5, SMOKE_COLOR, size)
+
+
+## A flat ground ring of [param radius] m in [param color] (opacity [param alpha]) added to
+## [param parent] at its feet – a hero, so the ring follows it (the hero's body never rotates;
+## its model's Yaw does). Unshaded, no shadow, its own Mats.ring material (the owner may change
+## it with Mats.set_ring, e.g. to pulse). The caller frees it (queue_free) when the talent's
+## state ends; null when [param parent] is null.
+static func ring(parent: Node3D, color: Color, radius: float, alpha: float) -> MeshInstance3D:
+	if parent == null or not is_instance_valid(parent):
+		return null
+	var mi := MeshInstance3D.new()
+	mi.name = "RogueRing"
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(2.0 * radius, 2.0 * radius)
+	mi.mesh = quad
+	mi.material_override = Mats.ring()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(0.0, RING_Y, 0.0)
+	set_ring_alpha(mi, color, alpha)
+	parent.add_child(mi)
+	return mi
+
+
+## Re-colours a [method ring] ([param alpha] = the band's opacity).
+static func set_ring_alpha(ring_node: MeshInstance3D, color: Color, alpha: float) -> void:
+	if ring_node == null or not is_instance_valid(ring_node):
+		return
+	Mats.set_ring(ring_node, Color(color.r, color.g, color.b, alpha), RING_INNER, RING_OUTER, RING_FILL)
 
 
 ## Cheat Death saved the Rogue at [param pos] (feet).
