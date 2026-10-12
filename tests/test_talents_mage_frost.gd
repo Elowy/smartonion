@@ -308,7 +308,7 @@ func test_is_frozen_forgets_a_freed_enemy_and_a_new_run() -> void:
 
 func test_ice_lance_text_and_script() -> void:
 	check_eq(Db.get_talent(ICE_LANCE).text_for_rank(1),
-		"Frozen enemies take critical damage from everything you do: your weapon hits always crit them, and your spells, burns and other hits deal 2x damage to them (plus your Critical Damage bonus).",
+		"Frozen enemies take critical damage from all you do: your weapon hits always crit them, and your spells, burns and other hits deal 2x damage (plus your Critical Damage bonus).",
 		"text")
 	var p := _mage()
 	check(_ice_lance(p) == null, "no script before the capstone")

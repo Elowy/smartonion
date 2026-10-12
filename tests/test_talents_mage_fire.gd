@@ -155,7 +155,7 @@ func test_living_bomb_params_text_and_bot_deferral() -> void:
 	check_eq(float(_params(p, &"fireball")["bomb_pct"]), 40.0, "40% of the hit")
 	check_eq(float(_params(p, &"fireball")["bomb_radius"]), 2.5, "2.5 m")
 	check_eq(lb.text_for_rank(1),
-		"Fireball's burn becomes a Living Bomb: when it burns out or the enemy dies, it explodes for 40% of the Fireball's damage to enemies within 2.5 m.",
+		"Fireball's burn becomes a Living Bomb: it explodes for 40% of the Fireball's damage within 2.5 m when it ends or the enemy dies.",
 		"text")
 	_learn(p, &"fireball")
 	check(not TalentBot.is_deferred(p, lb), "not deferred once Fireball is slotted")
@@ -267,7 +267,7 @@ func test_living_bomb_keeps_the_bigger_bomb_and_survives_merged_burns() -> void:
 func test_combustion_text_and_script() -> void:
 	var t := Db.get_talent(COMBUSTION)
 	check_eq(t.text_for_rank(1),
-		"When the first hit of your weapon attack is a critical strike, it sets the area ablaze: the target and the nearest enemies within 2.5 m – up to 4 in all – burn for 20% of the critical hit's damage over 3 sec. An enemy burns from Combustion at most once every 1 sec.",
+		"When your weapon attack's first hit crits, up to 4 enemies (the target and the nearest within 2.5 m) burn for 20% of the crit's damage over 3 sec, each at most once every 1 sec.",
 		"text")
 	var p := _mage()
 	check(_combustion(p) == null, "no script before the capstone")

@@ -116,7 +116,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"mage_arcane_mirror_image"
 display_name = "Mirror Image"
-description = "When you Blink, a Mirror Image stays where you stood for {duration} sec. Enemies within {radius} m chase it instead of you, and it bursts for Arcane damage within {burst_radius} m when it fades. At most once every {icd} sec."
+description = "When you Blink, a Mirror Image stays behind for {duration} sec. Enemies within {radius} m chase it instead of you, and it bursts for Arcane damage within {burst_radius} m when it fades. Once every {icd} sec at most."
 values = {
 "burst_radius": 2.5,
 "duration": 3.0,

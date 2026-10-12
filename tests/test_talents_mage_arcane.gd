@@ -200,7 +200,7 @@ func test_mirror_image_params_and_text() -> void:
 	_add(p, "mage_arcane_mirror_image")
 	check_eq(float(_params(p, &"blink")["image_duration"]), 3.0, "3 sec image")
 	check_eq(Db.get_talent(&"mage_arcane_mirror_image").text_for_rank(1),
-		"When you Blink, a Mirror Image stays where you stood for 3 sec. Enemies within 4 m chase it instead of you, and it bursts for Arcane damage within 2.5 m when it fades. At most once every 6 sec.",
+		"When you Blink, a Mirror Image stays behind for 3 sec. Enemies within 4 m chase it instead of you, and it bursts for Arcane damage within 2.5 m when it fades. Once every 6 sec at most.",
 		"text")
 
 

@@ -108,7 +108,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"mage_fire_living_bomb"
 display_name = "Living Bomb"
-description = "Fireball's burn becomes a Living Bomb: when it burns out or the enemy dies, it explodes for {pct}% of the Fireball's damage to enemies within {radius} m."
+description = "Fireball's burn becomes a Living Bomb: it explodes for {pct}% of the Fireball's damage within {radius} m when it ends or the enemy dies."
 values = {
 "pct": 40.0,
 "radius": 2.5
@@ -174,7 +174,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"mage_fire_combustion"
 display_name = "Combustion"
-description = "When the first hit of your weapon attack is a critical strike, it sets the area ablaze: the target and the nearest enemies within {radius} m – up to {targets} in all – burn for {pct}% of the critical hit's damage over {duration} sec. An enemy burns from Combustion at most once every {icd} sec."
+description = "When your weapon attack's first hit crits, up to {targets} enemies (the target and the nearest within {radius} m) burn for {pct}% of the crit's damage over {duration} sec, each at most once every {icd} sec."
 values = {
 "duration": 3.0,
 "icd": 1.0,
