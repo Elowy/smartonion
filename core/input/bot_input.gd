@@ -11,6 +11,10 @@ extends ScriptedInput
 ##   nearest living teammate). A living bot only runs to a downed teammate within
 ##   RESCUE_RANGE and stands next to it until the revive is done – farther ghosts use the
 ##   healer while the bot keeps fighting.
+## - Loot Goblin (M5, GDD 8 "Botok"): a [LootGoblin] is never a threat (no kiting, no crowd,
+##   no rescue panic); with no other enemy within CROWD_RADIUS and HP at or above
+##   RETREAT_HP_RATIO a living bot chases the nearest goblin within ENGAGE_DISTANCE up to its
+##   keep distance (melee: inside its reach, ranged: KITE_DISTANCE). No RNG.
 
 ## Ranged bots keep this far (m) from enemies.
 const KITE_DISTANCE := 6.0
@@ -49,6 +53,8 @@ const RESCUE_PANIC_DISTANCE := 1.6
 const RESCUE_THREAT_RADIUS := 3.5
 const RESCUE_MAX_THREATS := 2
 const RESCUE_MIN_HP_RATIO := 0.35
+## Steering weight of a goblin chase (loot pickups weigh 1.5, a melee engage 1.2).
+const GOBLIN_CHASE_WEIGHT := 2.0
 
 var body: Node3D
 var _wander := Vector2.ZERO
@@ -77,6 +83,8 @@ func think(delta: float) -> void:
 	var nearest_enemy := INF
 	var to_nearest := Vector2.ZERO
 	var crowd := 0
+	var goblin_dist := INF
+	var to_goblin := Vector2.ZERO
 	for e in tree.get_nodes_in_group(&"enemies"):
 		var n := e as Node3D
 		if n == null:
@@ -84,6 +92,12 @@ func think(delta: float) -> void:
 		var d := pos - Vector2(n.global_position.x, n.global_position.z)
 		var dist := d.length()
 		if dist < 0.001:
+			continue
+		if n is LootGoblin:
+			# Harmless and worth a fortune: a chase target, never a threat.
+			if dist < goblin_dist:
+				goblin_dist = dist
+				to_goblin = -d / dist
 			continue
 		enemies.append(d)
 		if dist < CROWD_RADIUS:
@@ -125,6 +139,10 @@ func think(delta: float) -> void:
 			return
 	if alive and melee and nearest_enemy > keep and nearest_enemy < ENGAGE_DISTANCE:
 		steer += to_nearest * 1.2
+	if alive and crowd == 0 and _hp_ratio() >= RETREAT_HP_RATIO and goblin_dist < ENGAGE_DISTANCE:
+		var chase_keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE)
+		if goblin_dist > chase_keep:
+			steer += to_goblin * GOBLIN_CHASE_WEIGHT
 	var best_loot := Vector2.ZERO
 	var best_dist := 9.0
 	for p in tree.get_nodes_in_group(&"pickups"):
