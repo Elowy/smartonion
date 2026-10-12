@@ -12,7 +12,8 @@ extends Enemy
 ##   and takes the one that runs away best without entering the wall margin, so a cornered
 ##   goblin breaks out along a wall), with a random jink of up to JINK_ANGLE every
 ##   JINK_MIN..JINK_MAX s in the open (near a wall it keeps its line along the wall). Without
-##   a visible player it jogs along its jinks.
+##   a visible player (all stealthed or downed) it jogs at CALM_SPEED_RATIO, turning by each
+##   jink once and holding that heading until the next one (walls still steer it).
 ## - Stuns, freezes, slows and knockback work (co-op crowd control); taunt and fear do not
 ##   ([method apply_taunt] / [method apply_fear] are ignored).
 ## - Every damaging hit spills a 1-gold coin ([Pickup]) next to it – at most one per
@@ -197,25 +198,31 @@ func _physics_process(delta: float) -> void:
 	_update_escape(delta)
 
 
-## Flight (see the class notes); stands still while the portal opens.
+## Flight (see the class notes); stands still while the portal opens. Fleeing, the current
+## jink is an offset from the escape direction on every tick; calm (no visible player), the
+## heading turns by a jink only on the tick it is drawn and is kept in between.
 func _think(delta: float, here: Vector3, _feared: bool) -> void:
 	if is_opening_portal():
 		_move_velocity = Vector3.ZERO
 		return
 	_track_heading(here)
 	_jink_left -= delta
+	var new_jink := false
 	if _jink_left <= 0.0:
 		var rng := RunState.rng
 		_jink_left = rng.randf_range(JINK_MIN, JINK_MAX)
 		_jink_angle = rng.randf_range(-JINK_ANGLE, JINK_ANGLE)
+		new_jink = true
 	var away := flee_vector(here)
 	var speed := move_speed
-	var base := _facing
+	var dir: Vector3
 	if away.length_squared() > 0.0000001:
-		base = away.normalized()
+		var base := away.normalized()
+		dir = best_heading(here, base.rotated(Vector3.UP, _jink_angle), base)
 	else:
 		speed *= CALM_SPEED_RATIO
-	var dir := best_heading(here, base.rotated(Vector3.UP, _jink_angle), base)
+		var calm := _facing.rotated(Vector3.UP, _jink_angle) if new_jink else _facing
+		dir = best_heading(here, calm, calm)
 	_steer(dir * speed, delta)
 	_facing = dir
 

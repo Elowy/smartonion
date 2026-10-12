@@ -334,6 +334,49 @@ func test_goblin_runs_along_walls_and_out_of_corners() -> void:
 	check(b.grow(0.01).has_point(Vector2(g.global_position.x, g.global_position.z)), "inside the arena")
 
 
+## Steps [param g] tick by tick for [param seconds]; returns [distance moved, total facing
+## turn in degrees, largest single-tick turn in degrees].
+func _calm_run(g: LootGoblin, seconds: float) -> Array[float]:
+	var start := g.global_position
+	var turned := 0.0
+	var max_tick := 0.0
+	var facing := g._facing
+	for i in roundi(seconds / DT):
+		g._physics_process(DT)
+		var step_deg := rad_to_deg(facing.angle_to(g._facing))
+		turned += step_deg
+		max_tick = maxf(max_tick, step_deg)
+		facing = g._facing
+	return [EFakes.flat_distance(g.global_position, start), turned, max_tick]
+
+
+func test_goblin_jogs_without_a_visible_player() -> void:
+	# Nobody around, a stealthed hero next to it (Vanish / Killing Spree), a downed one: calm
+	# jog – each jink turns it once, it does not spin on the spot.
+	for variant in ["none", "stealthed", "downed"]:
+		var p: EFakes.FakePlayer = null
+		if variant != "none":
+			p = EFakes.spawn_player(world, Vector3(1.5, 0, 0))
+			if variant == "stealthed":
+				p.stealth_left = 10.0
+			else:
+				p.downed = true
+			Enemy.invalidate_player_cache()
+		var g := _goblin(Vector3.ZERO)
+		var out := _calm_run(g, 2.0)
+		check_eq(g.flee_vector(g.global_position), Vector3.ZERO, "%s: no visible player" % variant)
+		check(out[0] > 1.5, "%s: jogs (%.2f m in 2 s)" % [variant, out[0]])
+		check(out[1] < 360.0, "%s: does not spin (turned %.0f° in 2 s)" % [variant, out[1]])
+		check(out[2] <= rad_to_deg(LootGoblin.JINK_ANGLE) + 0.5,
+				"%s: at most one jink per tick (%.1f°)" % [variant, out[2]])
+		check(g.velocity.length() <= g.move_speed * LootGoblin.CALM_SPEED_RATIO + 0.01,
+				"%s: at the calm speed (%.2f)" % [variant, g.velocity.length()])
+		g.free()
+		if p != null:
+			p.free()
+		Enemy.invalidate_player_cache()
+
+
 func test_no_contact_damage() -> void:
 	var p := EFakes.spawn_player(world, Vector3.ZERO)
 	var g := _goblin(Vector3(0.3, 0, 0))
