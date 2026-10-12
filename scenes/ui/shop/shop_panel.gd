@@ -509,13 +509,11 @@ func _build() -> void:
 		_feedback_labels.append(l)
 
 	# Controls.
-	var r3 := UiGlyph.pad(PlayerInput.Pad.LB, 26.0)
-	r3.text = "R3"
 	col.add_child(UiTheme.prompt_row([
 		[UiGlyph.nav(26.0), "Move"],
 		[UiGlyph.pad(PlayerInput.Pad.A, 26.0), "Buy"],
 		[UiGlyph.pad(PlayerInput.Pad.X, 26.0), "Lock"],
-		[r3, "Ping"],
+		[UiGlyph.pad(PlayerInput.Pad.R3, 26.0), "Ping"],
 		[UiGlyph.pad(PlayerInput.Pad.Y, 26.0), "Reroll vote"],
 	], 18, UiTheme.TEXT_DIM))
 	var keys := UiTheme.centered_label("Keyboard: Enter buy · R lock · Tab ping · C reroll · Q / E panel · P ready",
