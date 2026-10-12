@@ -2,8 +2,8 @@ class_name RogueCombatAdrenalineRush
 extends TalentEffect
 ## Adrenaline Rush – the Rogue Combat capstone (GDD 7.5, talents_rogue.md 2.4): while at least
 ## min_enemies (3) living enemies are within radius (5) m of the Rogue, its Energy is generated
-## regen_pct (50) % faster – a Resource Regen stat source on the hero (&"rogue_combat_adrenaline_rush":
-## the regeneration AND every Energy gain – Combat Potency, Venomous Wounds, Shadow Focus; Combo
+## regen_pct (50) % faster – a Resource Regen stat source on the hero ([constant SELF_KEY]: the
+## regeneration AND every Energy gain – Combat Potency, Venomous Wounds, Shadow Focus; Combo
 ## Points are pips and stay exact) – and the other living heroes within ally_radius (8) m gain
 ## ally_haste (10) % Haste (a stat source per Rogue, "rogue_combat_adrenaline_rush:<slot>", so
 ## two Combat Rogues stack like two Battle Shouts).
