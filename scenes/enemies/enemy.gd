@@ -25,6 +25,19 @@ extends CharacterBody3D
 ## override [method _think] (the AI step), [method deals_contact_damage] and
 ## [method _death_loot] (gold / XP pickup and the item drop roll). Healing (Vampiric elites)
 ## goes through [method heal], which healing reduction (Mortal Wound) lowers.
+##
+## Elites (M5, GDD 8, architecture §2.5): [method make_elite] (WaveDirector calls it before
+## add_child) turns any enemy into an elite – HP ×3, size ×1.3 (model and body radius), one
+## affix ([member elite_affix], numbers in [EliteAffixes]) and an [ElitePlate] child (nameplate,
+## shield bubble, enrage tint). Affixes act through per-enemy state used everywhere the base
+## numbers are: [member shield_hp] (Shielding – [method take_damage] drains it first),
+## [member speed_mult] (walking: [method walk_speed]), [member attack_cooldown_mult] (contact,
+## lunge and throw cooldowns: [method attack_cooldown]) and [member damage_mult] (contact and
+## thrown damage); Enraged ignores slows once it raged ([method is_enraged]); Vampiric heals
+## through the heroes' [signal Player.damage_taken]. Elite rewards (10 gold, XP ×5, a
+## guaranteed Rare+ [method LootDrops.drop_special], [method RunState.record_special_kill])
+## key on [member elite_affix], never on [method is_elite] (the Loot Goblin returns true there
+## for Slayer / targeting only).
 
 signal died(enemy: Enemy, killer_index: int)
 
@@ -95,6 +108,12 @@ const OPEN_FIELD_HEIGHT := Vector2(0.05, 2.0)
 const LOOT_SCATTER := 0.4
 ## Size of the green heal number ([method heal]).
 const HEAL_TEXT_SIZE := 0.7
+## Shielding elites: "Absorb" text colour / size and the least seconds between two of them.
+const ABSORB_TEXT_COLOR := Color(0.62, 0.86, 1.0)
+const ABSORB_TEXT_SIZE := 0.7
+const ABSORB_TEXT_INTERVAL := 0.3
+## Enraged elites: the "Enrage!" text when it triggers.
+const ENRAGE_TEXT_COLOR := Color(1.0, 0.32, 0.22)
 ## State timers end this close to zero (keeps frame counts exact despite float error).
 const TIMER_EPSILON := 0.0001
 
@@ -132,6 +151,18 @@ var heal_reduction_pct := 0.0
 var heal_reduction_left := 0.0
 var knockback_velocity := Vector3.ZERO
 
+## Elite affix (one of EliteAffixes.ALL) or &"" for a normal enemy ([method make_elite]).
+var elite_affix: StringName = &""
+## Shielding elites: absorb shield left (drained before HP; regrows, see EliteAffixes).
+var shield_hp := 0.0
+## Per-enemy multipliers (elite affixes): walking speed, contact / lunge / throw cooldowns,
+## contact and thrown damage.
+var speed_mult := 1.0
+var attack_cooldown_mult := 1.0
+var damage_mult := 1.0
+## The elite's nameplate / look (null for normal enemies).
+var elite_plate: ElitePlate
+
 var _dead := false
 var _move_velocity := Vector3.ZERO
 var _facing := Vector3.FORWARD
@@ -154,6 +185,14 @@ var _players_serial := -1
 ## this enemy in that build, and the last build this enemy moved with.
 var _grid_tag := -1
 var _grid_used := -1
+## Shielding: seconds until the broken shield regrows.
+var _shield_regrow_left := 0.0
+## _age of the last "Absorb" text.
+var _absorb_text_at := -INF
+var _enraged := false
+## Vampiric: the heroes whose damage_taken this elite listens to (untyped: entries may be
+## freed heroes, never copied into a Player-typed variable before is_instance_valid).
+var _vampiric_heroes: Array = []
 
 # Open-field fast path (see OPEN_FIELD_MARGIN): the collider-free interior of this tick.
 static var _open_frame := -1
@@ -227,6 +266,7 @@ func _exit_tree() -> void:
 	# that leaves alive (wave end, tests) must not linger in the grid.
 	if not _dead:
 		EnemyGrid.mark_dirty()
+	_disconnect_vampiric()
 
 
 func is_dead() -> bool:
@@ -237,9 +277,17 @@ func is_stunned() -> bool:
 	return stun_left > 0.0
 
 
-## Elites and bosses (Slayer bonus). Regular enemies only until M5 / M6 add elites.
+## Elites (an [member elite_affix], [method make_elite]) and bosses: Slayer, Execute's victim
+## choice and other targeting. Rewards never key on it (the Loot Goblin overrides it with
+## true and must not get elite rewards – see [method _death_loot]).
 func is_elite() -> bool:
-	return false
+	return elite_affix != &""
+
+
+## An Enraged elite that has raged (at or below EliteAffixes.ENRAGE_HP_RATIO, once): more
+## damage and speed, immune to slows.
+func is_enraged() -> bool:
+	return _enraged
 
 
 ## Bosses only (a boss is also [method is_elite]): immune to instant kills such as Execute.
@@ -254,9 +302,9 @@ func is_slowed() -> bool:
 
 ## Slows walking (and lunges) by [param pct] percent (at most 90) for [param duration]
 ## seconds. A stronger slow replaces the running one, an equal one extends it, a weaker one
-## is ignored while the stronger one lasts.
+## is ignored while the stronger one lasts. An enraged elite ignores slows.
 func apply_slow(pct: float, duration: float) -> void:
-	if is_dead() or pct <= 0.0 or duration <= 0.0:
+	if is_dead() or pct <= 0.0 or duration <= 0.0 or _enraged:
 		return
 	var p := clampf(pct, 0.0, 90.0)
 	if slow_left <= 0.0 or p > slow_pct:
@@ -267,10 +315,14 @@ func apply_slow(pct: float, duration: float) -> void:
 
 
 ## [param attacker] is the Player (or null). [param knockback] is a world-space impulse.
+## A Shielding elite's [member shield_hp] takes the damage first ("Absorb"); knockback and the
+## hit flash happen either way. An Enraged elite rages when this drops it to half HP.
 func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 		knockback: Vector3 = Vector3.ZERO) -> void:
 	if is_dead() or amount <= 0.0:
 		return
+	if shield_hp > 0.0:
+		amount = _absorb(amount)
 	hp -= amount
 	if knockback.x != 0.0 or knockback.z != 0.0:
 		var resist := clampf(data.knockback_resist, 0.0, 1.0) if data != null else 0.0
@@ -280,6 +332,20 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 		model.flash_hit()
 	if hp <= 0.0:
 		_die(attacker)
+	elif elite_affix == EliteAffixes.ENRAGED and not _enraged \
+			and hp <= max_hp * EliteAffixes.ENRAGE_HP_RATIO:
+		_enrage()
+
+
+## Kills this enemy outright – through a Shielding elite's absorb shield – with the normal
+## death (kill credit, loot, [signal died]). For instant kills such as Execute; callers check
+## [method is_boss] themselves.
+func kill(attacker: Node3D = null) -> void:
+	if is_dead():
+		return
+	shield_hp = 0.0
+	hp = 0.0
+	_die(attacker)
 
 
 ## Runs away from [param from] for [param duration] seconds (Fear): no attacks, no contact
@@ -381,7 +447,7 @@ func apply_stun(duration: float) -> void:
 		ai_state = AiState.MOVE
 		state_left = 0.0
 		if data != null:
-			attack_cooldown_left = maxf(attack_cooldown_left, data.attack_cooldown * 0.5)
+			attack_cooldown_left = maxf(attack_cooldown_left, attack_cooldown() * 0.5)
 	if not was_stunned and model != null:
 		model.set_stunned(true)
 
@@ -393,6 +459,117 @@ func despawn() -> void:
 	_dead = true
 	_leave_world()
 	queue_free()
+
+
+# --- Elites (M5) -------------------------------------------------------------------
+
+## Turns this enemy into an elite with [param affix] (one of EliteAffixes.ALL): HP ×3 (hp and
+## max_hp), model and body ×1.3, the affix's state and an [ElitePlate] child. Called before
+## add_child (WaveDirector), so it needs no tree: a Vampiric elite connects to the heroes of
+## PlayerManager's slots right here (heroes that join later are not connected – there is no
+## drop-in during a wave). Draws nothing from the rng. An enemy is made elite at most once;
+## an unknown affix is an error.
+func make_elite(affix: StringName) -> void:
+	if elite_affix != &"" or is_dead():
+		return
+	if affix not in EliteAffixes.ALL:
+		push_error("Enemy.make_elite: unknown affix '%s'" % affix)
+		return
+	elite_affix = affix
+	max_hp *= EliteAffixes.HP_MULT
+	hp *= EliteAffixes.HP_MULT
+	radius *= EliteAffixes.MODEL_SCALE
+	var shape := get_node_or_null(^"Shape") as CollisionShape3D
+	if shape != null and shape.shape is SphereShape3D:
+		(shape.shape as SphereShape3D).radius = radius
+	if model != null:
+		model.scale = Vector3.ONE * EliteAffixes.MODEL_SCALE
+	match affix:
+		EliteAffixes.SHIELDING:
+			_raise_shield()
+		EliteAffixes.FRENZIED:
+			speed_mult *= EliteAffixes.FRENZY_SPEED_MULT
+			attack_cooldown_mult *= EliteAffixes.FRENZY_COOLDOWN_MULT
+			attack_cooldown_left *= EliteAffixes.FRENZY_COOLDOWN_MULT
+		EliteAffixes.VAMPIRIC:
+			_connect_vampiric()
+	elite_plate = ElitePlate.create(self)
+	add_child(elite_plate)
+	EnemyGrid.mark_dirty()  # the radius changed
+
+
+## Walking speed (m/s): [member move_speed] × [member speed_mult] (Frenzied / Enraged).
+func walk_speed() -> float:
+	return move_speed * speed_mult
+
+
+## Seconds between two lunges / throws: data.attack_cooldown × [member attack_cooldown_mult].
+func attack_cooldown() -> float:
+	return (data.attack_cooldown if data != null else 0.0) * attack_cooldown_mult
+
+
+## Shielding: a fresh absorb shield of EliteAffixes.SHIELD_PCT of max HP.
+func _raise_shield() -> void:
+	shield_hp = max_hp * EliteAffixes.SHIELD_PCT
+	_shield_regrow_left = 0.0
+
+
+## The shield takes what it can of [param amount]; returns the rest. A broken shield starts
+## its regrow timer.
+func _absorb(amount: float) -> float:
+	var absorbed := minf(shield_hp, amount)
+	shield_hp -= absorbed
+	if shield_hp <= 0.0001:
+		shield_hp = 0.0
+		_shield_regrow_left = EliteAffixes.SHIELD_REGROW
+	if absorbed > 0.0 and _age - _absorb_text_at >= ABSORB_TEXT_INTERVAL:
+		_absorb_text_at = _age
+		var pos := global_position if is_inside_tree() else position
+		Vfx.floating_text(pos + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT, "Absorb",
+				ABSORB_TEXT_COLOR, ABSORB_TEXT_SIZE)
+	return amount - absorbed
+
+
+## Enraged: more damage and speed for the rest of its life, slows end and no longer land.
+func _enrage() -> void:
+	_enraged = true
+	damage_mult *= EliteAffixes.ENRAGE_DAMAGE_MULT
+	speed_mult *= EliteAffixes.ENRAGE_SPEED_MULT
+	slow_pct = 0.0
+	slow_left = 0.0
+	var pos := global_position if is_inside_tree() else position
+	var top := model.head_height * EliteAffixes.MODEL_SCALE if model != null else 1.2
+	Vfx.floating_text(pos + Vector3.UP * top, "Enrage!", ENRAGE_TEXT_COLOR, 1.0)
+
+
+## Vampiric: listens to every joined hero's damage_taken (see [method make_elite]).
+func _connect_vampiric() -> void:
+	for slot in PlayerManager.get_slots():
+		if not is_instance_valid(slot.player):
+			continue
+		var hero := slot.player as Player
+		if hero == null or _vampiric_heroes.has(hero):
+			continue
+		hero.damage_taken.connect(_on_hero_damage_taken)
+		_vampiric_heroes.append(hero)
+
+
+func _disconnect_vampiric() -> void:
+	for i in _vampiric_heroes.size():
+		if not is_instance_valid(_vampiric_heroes[i]):
+			continue
+		var hero := _vampiric_heroes[i] as Player
+		if hero != null and hero.damage_taken.is_connected(_on_hero_damage_taken):
+			hero.damage_taken.disconnect(_on_hero_damage_taken)
+	_vampiric_heroes.clear()
+
+
+## A hero took [param amount] damage from [param source]: when that was this Vampiric elite
+## (contact or one of its axes), heal EliteAffixes.VAMPIRIC_HEAL_PCT of max HP.
+func _on_hero_damage_taken(amount: float, source: Node3D) -> void:
+	if source != self or amount <= 0.0 or is_dead():
+		return
+	heal(max_hp * EliteAffixes.VAMPIRIC_HEAL_PCT)
 
 
 # --- Shared player lookup ------------------------------------------------------
@@ -471,6 +648,10 @@ func _physics_process(delta: float) -> void:
 		if heal_reduction_left <= 0.0:
 			heal_reduction_left = 0.0
 			heal_reduction_pct = 0.0
+	if _shield_regrow_left > 0.0 and shield_hp <= 0.0:
+		_shield_regrow_left -= delta
+		if _shield_regrow_left <= TIMER_EPSILON:
+			_raise_shield()
 	if stunned:
 		stun_left -= delta
 		if stun_left <= 0.0:
@@ -500,7 +681,7 @@ func _physics_process(delta: float) -> void:
 		if _facing.dot(_sent_facing) < 0.9995:
 			_sent_facing = _facing
 			model.set_facing(_facing)
-		var moving := clampf(_move_velocity.length() / maxf(0.1, move_speed), 0.0, 1.0)
+		var moving := clampf(_move_velocity.length() / maxf(0.1, walk_speed()), 0.0, 1.0)
 		if absf(moving - _sent_moving) > 0.03:
 			_sent_moving = moving
 			model.set_moving(moving)
@@ -514,7 +695,7 @@ func _think(delta: float, here: Vector3, feared: bool) -> void:
 	if feared:
 		var away := Vector3(here.x - _fear_from.x, 0.0, here.z - _fear_from.z)
 		var dir := away.normalized() if away.length_squared() > 0.0001 else _facing
-		_steer(dir * move_speed, delta)
+		_steer(dir * walk_speed(), delta)
 		_facing = dir
 	elif is_taunted():
 		_target_pos = Vector3(taunt_target.global_position.x, 0.0, taunt_target.global_position.z)
@@ -566,8 +747,8 @@ func _scan_players(here: Vector3, stunned: bool) -> void:
 				continue  # went down (or away) since the snapshot
 			var p := players[i]
 			can_hit = false
-			contact_cooldown_left = CONTACT_COOLDOWN
-			p.take_damage(contact_damage, CombatMath.KIND_MELEE, self)
+			contact_cooldown_left = CONTACT_COOLDOWN * attack_cooldown_mult
+			p.take_damage(contact_damage * damage_mult, CombatMath.KIND_MELEE, self)
 			LivingPlayers.mark_dirty()
 			if _dead or not is_inside_tree():
 				return
@@ -586,7 +767,7 @@ func _scan_players(here: Vector3, stunned: bool) -> void:
 func _update_chase(delta: float, here: Vector3) -> void:
 	var dir := _dir_to_target(here)
 	var dist := sqrt(_target_dist_sq)
-	var speed := move_speed
+	var speed := walk_speed()
 	if dist <= (radius + Player.RADIUS) * CONTACT_HOLD_RATIO:
 		speed = 0.0
 	var desired := dir * speed
@@ -618,8 +799,8 @@ func _update_lunge(delta: float, here: Vector3) -> void:
 			if state_left <= TIMER_EPSILON:
 				ai_state = AiState.MOVE
 				state_left = 0.0
-				attack_cooldown_left = data.attack_cooldown
-				_move_velocity = _aim_dir * move_speed
+				attack_cooldown_left = attack_cooldown()
+				_move_velocity = _aim_dir * walk_speed()
 		_:
 			if attack_cooldown_left <= 0.0 and _target_dist_sq <= LUNGE_TRIGGER_RANGE * LUNGE_TRIGGER_RANGE:
 				ai_state = AiState.WINDUP
@@ -643,7 +824,7 @@ func _update_ranged(delta: float, here: Vector3) -> void:
 		if state_left <= TIMER_EPSILON:
 			ai_state = AiState.MOVE
 			state_left = 0.0
-			attack_cooldown_left = data.attack_cooldown
+			attack_cooldown_left = attack_cooldown()
 			_throw(here)
 		return
 	var dist := sqrt(_target_dist_sq)
@@ -662,15 +843,16 @@ func _update_ranged(delta: float, here: Vector3) -> void:
 		if rng.randf() < 0.6:
 			_strafe_sign = -_strafe_sign
 	var preferred := data.preferred_distance
+	var speed := walk_speed()
 	var desired: Vector3
 	if dist > preferred + RANGED_DISTANCE_SLACK:
-		desired = dir * move_speed
+		desired = dir * speed
 	elif dist < preferred - RANGED_DISTANCE_SLACK:
-		desired = -dir * move_speed
+		desired = -dir * speed
 	else:
 		var side := Vector3(-dir.z, 0.0, dir.x) * _strafe_sign
 		var radial := (dist - preferred) / RANGED_DISTANCE_SLACK
-		desired = (side * STRAFE_SPEED_RATIO + dir * (radial * 0.5)) * move_speed
+		desired = (side * STRAFE_SPEED_RATIO + dir * (radial * 0.5)) * speed
 	_steer(desired, delta)
 
 
@@ -683,7 +865,7 @@ func _update_wander(delta: float) -> void:
 			_wander_dir = Vector3.ZERO
 		else:
 			_wander_dir = Vector3.FORWARD.rotated(Vector3.UP, rng.randf() * TAU)
-	_steer(_wander_dir * move_speed * WANDER_SPEED_RATIO, delta)
+	_steer(_wander_dir * walk_speed() * WANDER_SPEED_RATIO, delta)
 	if _wander_dir != Vector3.ZERO:
 		_facing = _wander_dir
 
@@ -693,7 +875,7 @@ func _throw(here: Vector3) -> void:
 	if parent == null:
 		return
 	var dir := _aim_dir
-	var proj := Projectile.create(Projectile.TEAM_ENEMIES, projectile_damage, false, dir,
+	var proj := Projectile.create(Projectile.TEAM_ENEMIES, projectile_damage * damage_mult, false, dir,
 			data.projectile_speed, THROW_RANGE, 0, 0.0, self, &"axe", Projectile.default_color(&"axe"))
 	parent.add_child(proj)
 	# Released a little in front of the body so it does not start inside the thrower.
@@ -817,15 +999,32 @@ func _die(attacker: Node3D) -> void:
 
 ## What a death leaves at [param pos]: the gold / XP pickup and the item drop roll (GDD 10.1 –
 ## the killer's Fortune counts; a null / freed [param attacker] uses the base chance).
-## Subclasses with their own rewards (the Loot Goblin) replace it.
+## An elite ([member elite_affix] set – not [method is_elite], which the Loot Goblin
+## overrides) pays EliteAffixes.GOLD instead of data.gold and data.xp × XP_MULT, drops a
+## guaranteed Rare+ item through [method LootDrops.drop_special] (killer's Fortune, not
+## counted against the normal cap) and records the special kill; the normal drop roll still
+## follows. Subclasses with their own rewards (the Loot Goblin) replace it.
 func _death_loot(pos: Vector3, attacker: Node3D) -> void:
-	if data != null:
+	var killer: Node3D = attacker if attacker != null and is_instance_valid(attacker) else null
+	if elite_affix != &"":
+		_drop_pickup(pos, EliteAffixes.GOLD, (data.xp if data != null else 0) * EliteAffixes.XP_MULT)
+		LootDrops.drop_special(ItemGenerator.Source.ELITE, self, killer)
+		var killer_player := killer as Player
+		RunState.record_special_kill(&"elite",
+				killer_player.slot.index if killer_player != null and killer_player.slot != null else -1)
+	elif data != null:
 		_drop_loot(pos)
-	LootDrops.on_enemy_killed(self, attacker if attacker != null and is_instance_valid(attacker) else null)
+	LootDrops.on_enemy_killed(self, killer)
 
 
+## The regular gold / XP pickup of data.gold and data.xp.
 func _drop_loot(pos: Vector3) -> void:
-	if data.gold <= 0 and data.xp <= 0:
+	_drop_pickup(pos, data.gold, data.xp)
+
+
+## A gold / XP pickup scattered up to LOOT_SCATTER around [param pos] (two rng draws).
+func _drop_pickup(pos: Vector3, gold: int, xp: int) -> void:
+	if gold <= 0 and xp <= 0:
 		return
 	var parent := _world_parent()
 	if parent == null:
@@ -835,11 +1034,13 @@ func _drop_loot(pos: Vector3) -> void:
 	var at := Vector3(pos.x + offset.x, 0.0, pos.z + offset.z)
 	if Arena.current != null:
 		at = Arena.current.clamp_point(at, 0.3)
-	Pickup.drop(parent, data.gold, data.xp, at)
+	Pickup.drop(parent, gold, xp, at)
 
 
-## Leaves the group and stops colliding / processing (death, despawn).
+## Leaves the group and stops colliding / processing (death, despawn); a Vampiric elite stops
+## listening to the heroes.
 func _leave_world() -> void:
+	_disconnect_vampiric()
 	if is_in_group(&"enemies"):
 		remove_from_group(&"enemies")
 	collision_layer = 0
