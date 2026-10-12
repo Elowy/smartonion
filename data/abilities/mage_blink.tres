@@ -23,6 +23,12 @@ params = {
 "burst_radius": 3.0,
 "charges": 1,
 "distance": 6.0,
+"image_burst_radius": 2.5,
+"image_cooldown": 6.0,
+"image_damage": 3.0,
+"image_duration": 0.0,
+"image_int_scaling": 0.4,
+"image_radius": 4.0,
 "invulnerable": 0.4,
 "nova_freeze": 0.0,
 "nova_radius": 3.0

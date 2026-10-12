@@ -9,6 +9,21 @@ extends AbilityEffect
 ## Ranks (GDD 6.3): Rank III duration_add +1 s; Rank V "Wandering Storm" (follow: the storm
 ## follows the enemy it was cast on) or "Permafrost" (freeze: the hail freezes each enemy
 ## once – AbilityArea.stun).
+##
+## Talent hooks (M5, Frost tree, talents_mage.md 4.2), neutral by default:
+##   end_freeze (s, 0 = off – the "Deep Freeze" modifier): when a storm ends, every living enemy
+##     within its radius of its last centre is frozen ([method MageSpell.freeze]) – once per
+##     storm.
+##   tick_freeze_chance (%, 0 = off – "Flash Freeze") / tick_freeze (s): on every tick of a storm
+##     (its "tick" interval, the first right after the cast) each living enemy inside that is
+##     not frozen yet ([method MageFrozen.is_frozen], group order) rolls
+##     RunState.rng.randf() * 100 < tick_freeze_chance and is frozen for tick_freeze s. These
+##     are the effect's only RNG draws, made only while the chance is above 0.
+## Only casts with one of them get a [Storm] record (numbers copied from the cast's context,
+## never the context itself), counted down in [method tick]; the centre / radius follow the
+## area while it exists (Wandering Storm moves it). Kit effects do not tick while the Mage is
+## down, so going down drops the pending storms (Player.downed_changed); wave start / end clear
+## them too (no finale on an empty arena).
 
 const FROST := &"frost"
 const AREA_COLOR := Color(0.55, 0.85, 1.0, 0.35)
@@ -19,9 +34,35 @@ const DEFAULT_TICK := 0.5
 const BOT_MIN_CLUSTER := 4
 ## Bots do not stack a new Blizzard on one that still covers this share of the new radius.
 const OVERLAP_SHARE := 0.6
+const EPSILON := 0.0001
+
+
+## One storm of this Mage tracked for the talent hooks (Deep Freeze, Flash Freeze).
+class Storm extends RefCounted:
+	## The storm's area (may be freed – check is_instance_valid before use).
+	var area: Object
+	## Seconds of hail left / until the next Flash Freeze roll; the tick interval.
+	var left := 0.0
+	var tick_left := 0.0
+	var tick := 0.5
+	## Last known centre and radius (Area Size applied).
+	var centre := Vector3.ZERO
+	var radius := 0.0
+	var end_freeze := 0.0
+	var chance := 0.0
+	var tick_freeze := 1.0
+
 
 ## My running areas (bots check them so they do not stack Blizzards on one spot).
 var _areas: Array[AbilityArea] = []
+## Storms waiting for their Deep Freeze finale / Flash Freeze ticks (talent hooks).
+var storms: Array[Storm] = []
+## Enemies frozen by the finales / the tick rolls (tests).
+var finale_freezes := 0
+var tick_freezes := 0
+
+## Instance id of the Mage whose downed_changed is connected (0 = none yet).
+var _downed_hooked_id := 0
 
 
 func can_cast(ctx: AbilityContext) -> bool:
@@ -47,7 +88,96 @@ func cast(ctx: AbilityContext) -> bool:
 		area.follow = ctx.target
 	BlizzardShards.attach(area)
 	_areas.append(area)
+	_track(ctx, area)
 	return true
+
+
+## Records [param area] for the talent hooks when the cast has one (zero cost otherwise).
+func _track(ctx: AbilityContext, area: AbilityArea) -> void:
+	var end_freeze := maxf(0.0, ctx.num("end_freeze", 0.0))
+	var chance := maxf(0.0, ctx.num("tick_freeze_chance", 0.0))
+	if end_freeze <= 0.0 and chance <= 0.0:
+		return
+	_hook_downed(ctx.player)
+	var s := Storm.new()
+	s.area = area
+	s.left = area.duration
+	s.tick = area.tick_interval
+	s.tick_left = 0.0
+	s.centre = area.global_position
+	s.radius = area.radius
+	s.end_freeze = end_freeze
+	s.chance = chance
+	s.tick_freeze = maxf(0.0, ctx.num("tick_freeze", 1.0))
+	storms.append(s)
+
+
+func tick(ctx: AbilityContext, delta: float) -> void:
+	if storms.is_empty():
+		return
+	var player := ctx.player
+	var i := 0
+	while i < storms.size():
+		var s := storms[i]
+		if is_instance_valid(s.area) and (s.area as Node3D).is_inside_tree():
+			var area := s.area as AbilityArea
+			s.centre = area.global_position
+			s.radius = area.radius
+		if s.chance > 0.0:
+			s.tick_left -= delta
+			if s.tick_left <= EPSILON and s.left > EPSILON:
+				s.tick_left = maxf(s.tick_left + s.tick, EPSILON)
+				_flash_freeze(player, s)
+		s.left -= delta
+		if s.left <= EPSILON:
+			storms.remove_at(i)
+			_deep_freeze(player, s)
+			continue
+		i += 1
+
+
+## "Flash Freeze": each enemy inside that is not frozen yet rolls the chance once per tick.
+func _flash_freeze(player: Player, s: Storm) -> void:
+	if player == null or not player.is_inside_tree() or s.tick_freeze <= 0.0:
+		return
+	for e in MageSpell.enemies_in(player.get_tree(), s.centre, s.radius):
+		if MageFrozen.is_frozen(e):
+			continue
+		if RunState.rng.randf() * 100.0 < s.chance:
+			if MageSpell.freeze(e, player, s.tick_freeze) != null:
+				tick_freezes += 1
+
+
+## "Deep Freeze": the storm's finale freezes everything still inside.
+func _deep_freeze(player: Player, s: Storm) -> void:
+	if s.end_freeze <= 0.0 or player == null or not player.is_inside_tree():
+		return
+	for e in MageSpell.enemies_in(player.get_tree(), s.centre, s.radius):
+		if MageSpell.freeze(e, player, s.end_freeze) != null:
+			finale_freezes += 1
+	MageFx.frost_nova(WeaponRunner.flat(s.centre), s.radius)
+
+
+func begin_wave(_ctx: AbilityContext) -> void:
+	storms.clear()
+
+
+func end_wave(_ctx: AbilityContext) -> void:
+	storms.clear()
+
+
+## Going down drops the pending storms (kit effects do not tick while downed: no late finale).
+func _hook_downed(player: Player) -> void:
+	if player == null or _downed_hooked_id == player.get_instance_id():
+		return
+	_downed_hooked_id = player.get_instance_id()
+	if not player.downed_changed.is_connected(_on_downed_changed):
+		player.downed_changed.connect(_on_downed_changed)
+
+
+func _on_downed_changed(is_downed: bool) -> void:
+	if is_downed:
+		storms.clear()
 
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:

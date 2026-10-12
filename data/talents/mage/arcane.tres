@@ -1,0 +1,218 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_arcane_focus"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_focus"
+display_name = "Arcane Focus"
+description = "Increases your Arcane damage by {pct}% (wand bolts, Arcane Missiles, Blink bursts)."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"arcane_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "arcane"
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_meditation"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_meditation"
+display_name = "Arcane Meditation"
+description = "Your Mana regenerates {regen}% faster."
+values = {
+"regen": 10.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"resource_regen": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_blink"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_improved_blink"
+display_name = "Improved Blink"
+description = "Blink recharges {cd}% faster and carries you {dist} m further."
+values = {
+"cd": 5.0,
+"dist": 1.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"blink"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blink"
+},
+"mods": {
+"cooldown_pct": -5.0,
+"distance_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_concentration"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_concentration"
+display_name = "Arcane Concentration"
+description = "Your Mana spells (Blizzard) have a {chance}% chance to cost no Mana."
+values = {
+"chance": 8.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+prerequisite = &"mage_arcane_arcane_meditation"
+icon = &"blizzard"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"resource": "mana"
+},
+"mods": {
+"free_chance_add": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_mind"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_mind"
+display_name = "Arcane Mind"
+description = "Increases your Intellect by {int} (+{mana} maximum Mana)."
+values = {
+"int": 3.0,
+"mana": 6.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"intellect"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"primary": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_mirror_image"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_mirror_image"
+display_name = "Mirror Image"
+description = "When you Blink, a Mirror Image stays where you stood for {duration} sec. Enemies within {radius} m chase it instead of you, and it bursts for Arcane damage within {burst_radius} m when it fades. At most once every {icd} sec."
+values = {
+"burst_radius": 2.5,
+"duration": 3.0,
+"icd": 6.0,
+"radius": 4.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"blink"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blink"
+},
+"mods": {
+"image_duration_add": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_flows"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_flows"
+display_name = "Arcane Flows"
+description = "Your abilities recharge {cdr}% faster."
+values = {
+"cdr": 4.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"mage_arcane_improved_blink"
+icon = &"cooldown_reduction"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"cooldown_reduction": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_celerity"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_celerity"
+display_name = "Arcane Celerity"
+description = "Increases your Haste by {haste}%."
+values = {
+"haste": 4.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"haste": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_arcane_power"]
+script = ExtResource("2_talent")
+id = &"mage_arcane_arcane_power"
+display_name = "Arcane Power"
+description = "All your damage is increased by {dmg}%, but your Mana spells cost {cost}% more Mana."
+values = {
+"cost": 30.0,
+"dmg": 25.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 25.0
+}, {
+"kind": "ability",
+"match": {
+"resource": "mana"
+},
+"mods": {
+"cost_pct": 30.0
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"mage_arcane"
+class_id = &"mage"
+display_name = "Arcane"
+index = 0
+description = "Arcane bolts, Blink tricks, Haste and a deep Mana pool."
+icon = &"arcane_missiles"
+color = Color(0.78, 0.45, 1, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_arcane_focus"), SubResource("Resource_arcane_meditation"), SubResource("Resource_improved_blink"), SubResource("Resource_arcane_concentration"), SubResource("Resource_arcane_mind"), SubResource("Resource_mirror_image"), SubResource("Resource_arcane_flows"), SubResource("Resource_arcane_celerity"), SubResource("Resource_arcane_power")])

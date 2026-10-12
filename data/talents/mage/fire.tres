@@ -1,0 +1,212 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_critical_mass"]
+script = ExtResource("2_talent")
+id = &"mage_fire_critical_mass"
+display_name = "Critical Mass"
+description = "Increases your critical strike chance by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_fire_power"]
+script = ExtResource("2_talent")
+id = &"mage_fire_fire_power"
+display_name = "Fire Power"
+description = "Increases your Fire damage by {pct}% (Ignite, burns, fire spells, staves)."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"fire_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "fire"
+}])
+
+[sub_resource type="Resource" id="Resource_empowered_fire"]
+script = ExtResource("2_talent")
+id = &"mage_fire_empowered_fire"
+display_name = "Empowered Fire"
+description = "Increases your Mastery by {mastery}: Ignite burns for a bigger share of your critical hits."
+values = {
+"mastery": 3.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+prerequisite = &"mage_fire_critical_mass"
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_incineration"]
+script = ExtResource("2_talent")
+id = &"mage_fire_incineration"
+display_name = "Incineration"
+description = "Your burns and other damage over time deal {pct}% more damage."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"pyroblast"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"source": "dot"
+}])
+
+[sub_resource type="Resource" id="Resource_playing_with_fire"]
+script = ExtResource("2_talent")
+id = &"mage_fire_playing_with_fire"
+display_name = "Playing with Fire"
+description = "You deal {dmg}% more damage, but take {taken}% more damage."
+values = {
+"dmg": 3.0,
+"taken": 2.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0
+}, {
+"kind": "damage_taken",
+"pct": 2.0
+}])
+
+[sub_resource type="Resource" id="Resource_living_bomb"]
+script = ExtResource("2_talent")
+id = &"mage_fire_living_bomb"
+display_name = "Living Bomb"
+description = "Fireball's burn becomes a Living Bomb: when it burns out or the enemy dies, it explodes for {pct}% of the Fireball's damage to enemies within {radius} m."
+values = {
+"pct": 40.0,
+"radius": 2.5
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"fireball"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fireball"
+},
+"mods": {
+"bomb_pct_add": 40.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_burnout"]
+script = ExtResource("2_talent")
+id = &"mage_fire_burnout"
+display_name = "Burnout"
+description = "Your critical strikes deal {pct}% more damage."
+values = {
+"pct": 10.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"mage_fire_empowered_fire"
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit_damage": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_molten_fury"]
+script = ExtResource("2_talent")
+id = &"mage_fire_molten_fury"
+display_name = "Molten Fury"
+description = "You deal {pct}% more damage to enemies below {hp_fixed}% health."
+values = {
+"hp_fixed": 35.0,
+"pct": 5.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"executioner"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"target": "below_pct",
+"target_pct": 35.0
+}])
+
+[sub_resource type="Resource" id="Resource_combustion"]
+script = ExtResource("2_talent")
+id = &"mage_fire_combustion"
+display_name = "Combustion"
+description = "When the first hit of your weapon attack is a critical strike, it sets the area ablaze: the target and the nearest enemies within {radius} m – up to {targets} in all – burn for {pct}% of the critical hit's damage over {duration} sec. An enemy burns from Combustion at most once every {icd} sec."
+values = {
+"duration": 3.0,
+"icd": 1.0,
+"pct": 20.0,
+"radius": 2.5,
+"targets": 4.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &"fireball"
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"burn_pct": 20.0,
+"duration": 3.0,
+"fx_icd": 0.25,
+"max_targets": 4,
+"radius": 2.5,
+"refresh_icd": 1.0
+},
+"script": "res://scenes/talents/mage/fire_combustion.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"mage_fire"
+class_id = &"mage"
+display_name = "Fire"
+index = 1
+description = "Critical strikes, Ignite and spreading flames."
+icon = &"fireball"
+color = Color(1, 0.48, 0.12, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_critical_mass"), SubResource("Resource_fire_power"), SubResource("Resource_empowered_fire"), SubResource("Resource_incineration"), SubResource("Resource_playing_with_fire"), SubResource("Resource_living_bomb"), SubResource("Resource_burnout"), SubResource("Resource_molten_fury"), SubResource("Resource_combustion")])
