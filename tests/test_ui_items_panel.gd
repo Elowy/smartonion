@@ -10,9 +10,15 @@ var players: Array[Player] = []
 var panels: Array[PlayerPanel] = []
 var traded: Array = []
 var sold: Array = []
+var _async := false
+
+
+func is_async() -> bool:
+	return _async
 
 
 func before_each() -> void:
+	_async = false
 	UiFakes.reset_players()
 	RunState.start_run(2, 9)
 	players.clear()
@@ -383,6 +389,48 @@ func test_stat_rows_and_header() -> void:
 		"a full stat list still fits the design size: %s" % needed)
 	check_eq(panel._class_label.text, "Rogue", "class in the header")
 	check_eq(panel._ilvl_value.text, "13", "Avg. Item Level of two common wave-1 daggers")
+
+
+## The long rows M5 talents and set bonuses put into the compact stat list (Resource Regen,
+## Cooldown Reduction, Crit Damage – a warrior also lists its base Speed) with wide values: the
+## names give way, so the grid fits the inset and the frame stays inside the 700 x 480 design box
+## (the 4-player corner layout scales that box, never past it).
+func test_stat_list_fits_its_inset_with_long_rows() -> void:
+	_async = true
+	var slot := _join(&"warrior")
+	var player := slot.player as Player
+	player.stats.set_source(&"test", {Stats.STAMINA: 990.0, Stats.ARMOR: 120.0, Stats.CRIT: 12.5,
+		Stats.HASTE: 14.0, Stats.VERSATILITY: 10.0, Stats.DODGE: 16.0, Stats.MASTERY: 40.0,
+		Stats.CRIT_DAMAGE: 120.0, Stats.COOLDOWN_REDUCTION: 12.0,
+		Stats.RESOURCE_REGEN: 19.0})
+	var panel := _panel(slot)
+	panel.refresh()
+	var ids: Array = PlayerPanel.stat_rows(player.stats, slot.class_data).map(func(r: Array) -> StringName: return r[0])
+	for stat in [Stats.CRIT_DAMAGE, Stats.COOLDOWN_REDUCTION, Stats.RESOURCE_REGEN]:
+		check(stat in ids, "%s listed: %s" % [stat, ids])
+	var frame_min := panel.get_child(0).get_combined_minimum_size() as Vector2
+	check(frame_min.x <= PlayerPanel.DESIGN_SIZE.x + 0.5 and frame_min.y <= PlayerPanel.DESIGN_SIZE.y + 0.5,
+		"the frame fits the design size: %s" % frame_min)
+	await tree.process_frame
+	await tree.process_frame
+	var inset := panel._stats_grid.get_parent() as Control
+	var room := inset.size.x - 2.0 * PlayerPanel.STAT_INSET_PAD
+	var grid_min := panel._stats_grid.get_combined_minimum_size().x
+	check(grid_min <= room + 0.5, "the stat grid needs %.1f of the inset's %.1f" % [grid_min, room])
+	check(inset.clip_contents, "the inset clips")
+	var frame := (panel.get_child(0) as Control).get_global_rect()
+	check(frame.end.x <= panel.get_global_rect().end.x + 0.5, "the frame ends inside the panel (%s / %s)" % [frame, panel.get_global_rect()])
+	check(inset.get_global_rect().end.x <= frame.end.x + 0.5, "the inset ends inside the frame")
+	# The compact names of these rows show whole next to a two-digit value.
+	for cell in panel._stats_grid.get_children():
+		var name_label := cell.get_child(0) as Label
+		var value_label := cell.get_child(1) as Label
+		var needed := name_label.get_theme_font(&"font").get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			name_label.get_theme_font_size(&"font_size")).x
+		if value_label.text.length() <= 3:
+			check(needed <= name_label.size.x + 0.5, "'%s' (%s) shows whole: %.1f / %.1f" % [name_label.text, value_label.text, needed, name_label.size.x])
+		check(value_label.get_global_rect().end.x <= inset.get_global_rect().end.x + 0.5, "'%s' value inside the inset" % name_label.text)
+	finished.emit()
 
 
 func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:

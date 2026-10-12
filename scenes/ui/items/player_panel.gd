@@ -72,11 +72,22 @@ const LISTED_STATS: Array[StringName] = [
 const PRIMARY_STATS: Array[StringName] = [Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT]
 const UNLISTED_STATS: Array[StringName] = [Stats.STAMINA]
 const MAX_STAT_ROWS := 6
+## Compact names of the stat list: the two columns share the inset's width (STAT_COLUMN_GAP
+## apart), so a name gets about 100 design px next to a "12%" value. Longer names are cut with
+## an ellipsis ([method _refresh_stats]) – the list never widens the panel.
 const SHORT_STAT_NAMES := {
-	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Damage",
+	&"max_hp": "Max HP", Stats.CRIT: "Crit", Stats.CRIT_DAMAGE: "Crit Dmg",
 	Stats.COOLDOWN_REDUCTION: "Cooldowns", Stats.EXTRA_PROJECTILE: "Projectiles",
-	Stats.RESOURCE_REGEN: "Resource Regen", Stats.PICKUP_RANGE: "Pickup Range",
+	Stats.RESOURCE_REGEN: "Regen", Stats.PICKUP_RANGE: "Pickup", Stats.HEALING_DONE: "Healing",
+	Stats.ATTACK_POWER: "Atk Power", Stats.EXTRA_ATTACK: "Extra Atk",
+	Stats.FIRE_DAMAGE: "Fire Dmg", Stats.FROST_DAMAGE: "Frost Dmg", Stats.ARCANE_DAMAGE: "Arcane Dmg",
+	Stats.HOLY_DAMAGE: "Holy Dmg", Stats.SHADOW_DAMAGE: "Shadow Dmg", Stats.NATURE_DAMAGE: "Nature Dmg",
+	Stats.PHYSICAL_DAMAGE: "Phys. Dmg",
 }
+## Stat list inset: side padding, the gap between the two columns and between a name and its value.
+const STAT_INSET_PAD := 8
+const STAT_COLUMN_GAP := 14
+const STAT_VALUE_GAP := 6
 
 enum Mode { BROWSE, MENU }
 
@@ -1010,12 +1021,19 @@ func _build_side() -> Control:
 	var side := UiTheme.vbox(6)
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var stats_panel := UiTheme.panel(UiTheme.INSET_PANEL)
+	stats_panel.name = "StatsInset"
 	stats_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Nothing in the list may draw past the inset (the names clip, see _refresh_stats).
+	stats_panel.clip_contents = true
+	var inset := UiTheme.inset_style()
+	inset.content_margin_left = STAT_INSET_PAD
+	inset.content_margin_right = STAT_INSET_PAD
+	stats_panel.add_theme_stylebox_override(&"panel", inset)
 	side.add_child(stats_panel)
 	_stats_grid = GridContainer.new()
 	_stats_grid.columns = 2
 	_stats_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stats_grid.add_theme_constant_override(&"h_separation", 18)
+	_stats_grid.add_theme_constant_override(&"h_separation", STAT_COLUMN_GAP)
 	_stats_grid.add_theme_constant_override(&"v_separation", 1)
 	stats_panel.add_child(_stats_grid)
 
@@ -1177,11 +1195,16 @@ func _refresh_stats(cls: ClassData) -> void:
 	for row in stat_rows(stats, cls):
 		var stat: StringName = row[0]
 		var v: float = row[1]
-		var cell := UiTheme.hbox(6)
+		var cell := UiTheme.hbox(STAT_VALUE_GAP)
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var primary := cls != null and stat == cls.primary_stat
 		var name_label := UiTheme.label(_stat_name(stat), &"", UiTheme.FONT_SMALL, UiTheme.GOLD if primary else UiTheme.TEXT_DIM)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# The name takes what the value leaves and is cut with an ellipsis: its text never sets
+		# the column's width (the two columns share the inset evenly).
+		name_label.clip_text = true
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.custom_minimum_size.x = 0
 		cell.add_child(name_label)
 		var value_label := UiTheme.label(_stat_text(stat, v), &"", UiTheme.FONT_SMALL, UiTheme.RED if v < 0.0 else UiTheme.TEXT)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
