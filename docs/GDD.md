@@ -613,7 +613,7 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 |---|---|---|---|
 | Warrior | Battlegear of Fury | +10% Rage-termelés | A Whirlwind 30%-ban ingyenes |
 | Mage | Regalia of the Arcane | +10% Haste | A Blink után 3 mp-ig +30% sebzés (legfeljebb 6 mp-enként) |
-| Paladin | Dawnforged Plate | +3 Armor | A Word of Glory az összes társat gyógyítja |
+| Paladin | Dawnforged Plate | +3 Armor | A Word of Glory minden hőst gyógyít 8 m-en belül, és a gyógyítás a Max HP további 10%-át adja vissza |
 | Rogue | Shadowstitch Garb | +5% Crit | A Vanish után 4 mp-ig +50% krit sebzés |
 | Warlock | Felfire Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
 | Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
@@ -622,6 +622,10 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 - **Nevek:** a Paladin, a Rogue és a Warlock setje új nevet kapott (korábban Lightforged
   Plate, Shadowcraft Garb, Felheart Raiment), mert azok WoW-setek, illetve -kifejezések
   nevei (14. fejezet).
+- **Dawnforged Plate 4 darab:** a „minden hőst gyógyít” rész ugyanaz, mint a Word of Glory
+  V. rangú „Light of Dawn” specializációja, ezért a bónusz +10 százalékpontot is ad a
+  gyógyítás Max HP-arányos részéhez (25% → 35%, × a rang ereje). Így a Light of Dawnt
+  választó Paladinnak is ér valamit a 4 darab.
 - **A darabok:**
   - Epic ritkaságúak, kaszthoz kötöttek („Classes: X”), a kaszt páncéltípusában.
   - Kézzel tervezett statjuk van: elsődleges stat + Stamina + egy másodlagos, az Epic
@@ -640,8 +644,22 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
   - A set neve és az állás: „(n/5)”, a dobóablakban „(5 pieces)”.
   - Az öt darab neve, a felvettek világosan.
   - A „(2) Set: …” / „(4) Set: …” sor zöld, ha aktív, egyébként szürke.
-- **Botok:** a 2-es vagy 4-es küszöböt elérő darab fejlesztésnek számít, hacsak a statjai
-  30%-nál többel nem rosszabbak.
+- **Botok:**
+  - A 2-es vagy 4-es küszöböt elérő darab fejlesztésnek számít, hacsak a statjai 30%-nál
+    többel nem rosszabbak.
+  - A botok a hátizsákba is előre néznek: ha ugyanannak a setnek más darabjai (más slotra,
+    ahol nincs setdarab, és legfeljebb 30%-kal gyengébbek annál, amit leváltanának) a
+    hátizsákban várnak, ezekből annyit számítanak viseltnek, amennyi a következő küszöbhöz
+    (2 vagy 4 darab) még hiányzik – a legjobbakat. Így a 3. darab is fejlesztés, ha a 4. már
+    megvan, a 4. darab akkor is, ha egy 5. is vár mellette, és a botok egy piacon elérik a
+    4 darabos bónuszt.
+  - Egy sima tárgy, amely egy így elérhető 4 darabos bónuszból venné ki a 3. darabot,
+    rosszabbnak számít (hacsak nem több mint 30%-kal jobb); egy viselt 4 darabos bónuszt sem
+    bontanak meg azért, mert a leváltott darab a hátizsákban vár. Teljes (5 darabos) setből
+    egy darabot odaadhatnak egy jobb sima tárgyért, egy másodikat már nem.
+  - Addig ismétlik a felszerelést a hátizsákból, amíg már semmit sem vesznek fel (legfeljebb
+    a hátizsák méretének megfelelő körben), így ami egy későbbi csere után lett fejlesztés, az
+    ugyanazon a piacon felkerül.
 
 #### Artifact fegyverek (kasztonként 1)
 
@@ -1449,6 +1467,12 @@ A fajok WoW-hangulatúak, de saját nevűek.
     legalább 18 mp hátravan.
 - **Bejelentés:** arany felirat: „*A Loot Goblin appeared!*” (a csilingelő hang az M7
   hangrendszerrel jön). A feje fölött arany „Loot Goblin” felirat.
+- **Kamera:** a kamera a Loot Goblint is keretezi, amíg él és meg nem szökött (a portál
+  nyitása alatt is, mert addig még megölhető): kizoomol érte (legfeljebb a maximális
+  távolságig). A hősök mindig elsőbbséget kapnak: ha keskeny képernyőn nem fér ki velük
+  együtt, a kép csak felé dől, és a goblin sosem korlátozza, hova léphet egy hős. A
+  „Loot Goblin” felirat sosem lóg ki a képből: a képernyő szélén a szél mentén csúszik, így a
+  goblin irányát is mutatja.
 - **Viselkedés:**
   - **Nem támad, menekül** a játékosoktól (a közelebbiektől erősebben), kerüli a falakat, és
     0,6–1,2 mp-enként véletlenül irányt vált. Érintéssel nem sebez.

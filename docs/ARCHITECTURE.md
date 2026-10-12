@@ -325,6 +325,12 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   - Camera framing (`CameraRig.framing_points(living, ghosts, anchors)` →
     `compute_framing`): the living players plus, while anybody is a ghost, the Spirit Healer
     (so it is always on screen and reachable); everybody down → the ghosts (old fallback).
+  - `CameraRig.compute_framing(points, aspect, rect, extras)` – `extras` are soft points (the
+    living, not escaped Loot Goblins, `CameraRig.goblin_points(get_nodes_in_group(&"loot_goblins"))`,
+    only while somebody stands). They count for the zoom and the centroid; `keep_in_margins`
+    first fits all points, then the hard points again, so the players' margin guarantee wins
+    and the view leans as far towards the goblin as the players allow. Goblins never enter
+    `get_walk_rect`. `CameraRig.PROCESS_PRIORITY` (100) is the rig's process priority.
   - Camera framing keeps heroes out from under the HUD: per-side margins `FRAME_MARGIN`
     (sides), `FRAME_MARGIN_BOTTOM` and `CameraRig.top_margin(distance)` (grows with the zoom –
     the wave / timer plaque covers a fixed share of the screen – capped so the whole arena
@@ -992,7 +998,10 @@ scenes/ui/purse/     PurseBoard
   `procs.on_ability_cast` + `bonuses.on_cast`.
 - `apply_equipment`: item sources → weapons → `bonuses.set_effects(&"set_bonus", …)` →
   `refresh_armor_spec()` (Armor Specialization; the engine also calls it after a stat
-  rebuild) → `procs.refresh()` → `invalidate_params()`.
+  rebuild) → `procs.refresh()` (once per equipment change) → `invalidate_params()`.
+- `begin_wave` recomputes Armor Specialization right after `procs.begin_wave()` (the transient
+  proc buffs are gone); `end_wave` ends the proc buffs (`ProcSystem.end_wave()`), so market
+  recomputes never see them.
 - `ability_mods(id)`: item mods, then `bonuses.ability_mods_for(id)` (numbers summed);
   `outgoing_damage_mult` × `bonuses.damage_mult`.
 - `take_damage`: a dodge / parry / block (full or partial) calls `_avoided(kind, attacker)` →
@@ -1375,9 +1384,21 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   (the loot roll), the five piece names (bright when worn), then "(2) Set: …" / "(4) Set: …"
   green when active. A `set_id` without `SetData` keeps the old "Part of the … set" line.
 - **Bot value** (`ItemTooltip.upgrade_direction(item, equipped, viewer, equipment)` – bot
-  equips and buys, Need, badges): `SetBonuses.bonus_change(item, displaced, eq)`. Completing a
-  bonus is an upgrade unless the item scores more than `SET_UPGRADE_TOLERANCE` (30%) below the
-  replaced one; breaking one is a downgrade unless the set piece scores 30% below the new item.
+  equips and buys, Need, badges): `SetBonuses.bonus_change(item, displaced, eq, lookahead)`.
+  Completing a bonus is an upgrade unless the item scores more than `SET_UPGRADE_TOLERANCE`
+  (30%) below the replaced one; breaking one is a downgrade unless the set piece scores 30%
+  below the new item.
+- **Look-ahead:** `ItemTooltip.set_lookahead(item, displaced, eq, viewer)` lists the backpack
+  candidates, best `item_score` first (the item's or a displaced piece's set; other slots; the
+  best piece per slot; never displacing a worn set piece; at most `SET_UPGRADE_TOLERANCE` below
+  what they replace); `upgrade_direction` passes it, so `Intermission.bot_equip_upgrades`,
+  `LootRoll.bot_choice`, `Intermission.bot_offer_choice` and the UI badges all use it. Per
+  set, `bonus_change` counts only as many look-ahead pieces as
+  `SetBonuses.pieces_to_next_bonus(data, worn)` still needs, in list order (worn = with the
+  item on for the item's set, before the swap for a displaced piece's set); they count as worn
+  on both sides, pieces already counted (or the item itself) are skipped.
+- `Intermission.bot_equip_upgrades` repeats its backpack pass (`_bot_equip_pass`) until one
+  equips nothing, at most `Items.BACKPACK_SIZE` passes; it returns the total equipped.
 
 ### Elites (GDD 8)
 
@@ -1451,6 +1472,11 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   - Look: `EnemyModel` style **goblin** (big ears, gold-tooth grin, a sack of gold with a
     twinkling glint) and a gold "Loot Goblin" label; `GoblinPortal` is a violet swirl with a
     ground ring (meshes via `MeshKit.cached`).
+  - `keep_tag_on_screen()` runs in `_process` (process_priority =
+    `CameraRig.PROCESS_PRIORITY + 1`, rendered frames only, no RNG, no gameplay state): the
+    "Loot Goblin" tag stays `TAG_SCREEN_PAD` px inside the viewport (`clamp_tag`,
+    `tag_screen_size`); off its home spot it is placed with `Camera3D.project_position` at the
+    same depth.
 - **Bots** never count the goblin as a threat. A living bot with no other enemy within
   `CROWD_RADIUS` and HP ≥ `RETREAT_HP_RATIO` chases the nearest goblin within
   `ENGAGE_DISTANCE` up to its keep distance (melee reach, or `KITE_DISTANCE` when ranged).
