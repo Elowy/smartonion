@@ -642,7 +642,9 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
   nincs.
 - **Tooltip:**
   - A set neve és az állás: „(n/5)”, a dobóablakban „(5 pieces)”.
-  - Az öt darab neve, a felvettek világosan.
+  - Az öt darab: a saját panelen és a boltban röviden, a slotjuk nevével egy sorban
+    („Head  Shoulders  Chest  Hands  Legs”, a felvettek világosan), flavor szöveg nélkül –
+    így a sarokpanelben is olvasható; a dobóablakban a darabok teljes nevével.
   - A „(2) Set: …” / „(4) Set: …” sor zöld, ha aktív, egyébként szürke.
 - **Botok:**
   - A 2-es vagy 4-es küszöböt elérő darab fejlesztésnek számít, hacsak a statjai 30%-nál
@@ -1620,7 +1622,8 @@ A fajok WoW-hangulatúak, de saját nevűek.
     - Minden költés benne van: bolti vásárlás, automatikus kovácsolás, bolti reroll
       („Team”), Trainer-rang, szintlépési reroll, talent-reset.
     - Az eladás és a Greed bevétele nem.
-  - **Kívánságsor:** a bolti és a Trainer-pingek összesítve.
+  - **Kívánságsor:** a bolti és a Trainer-pingek összesítve. Ha a költésnapló csak egy sort
+    foglal, a kívánságsor a felszabadult második sort is használja.
   - A bolt saját visszajelző sora (a pult alján) is megmarad.
 - **Ready-állapot:** a kassza mellett, a pipeken látszik, ki van már kész; a lenti ready-chipek
   (a visszaszámlálással) megmaradnak. A ready-t a B megszünteti, ha valaki még vásárolni akar.

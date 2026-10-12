@@ -588,6 +588,49 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
   - **Unplug / leave:** a pad that comes back is un-readied (auto-ready lasts only while it is
     unplugged); an unplugged player's shop cursor and tooltip are hidden;
     `PlayerManager.player_left` refreshes panels, chips, the shop cursors and the votes.
+- **Market tooltips** (corner panels, `tooltip_inside`): inside a corner panel the selected
+  item's tooltip sits on the panel half away from the selection, scaled down to the panel's
+  height but never below `PlayerPanel.MIN_INSIDE_TOOLTIP_FIT` (0.9) – except to stop short of
+  the column's other corner panel.
+  - A taller one (a set piece or a Legendary with the comparison block) hangs from the panel's
+    top edge (top corners) or rises from its bottom edge (bottom corners) over the free band
+    between the two panels of its screen column (P1 / P3 left, P2 / P4 right), at most as far
+    as `PlayerPanel.TOOLTIP_NEIGHBOUR_GAP` (8 px) before the other panel
+    (`_inside_tooltip_span`: the y range from the panel's outer edge to the mirror-image panel
+    at the column's other end); only then does its scale drop below 0.9 (at 1920 × 1080 the
+    room is 646 px; a wave-25 Stormcaller compared with a many-stat sword ends at about
+    0.66–0.70). When the column's other corner is empty (`tooltip_column_mate`, kept up to date
+    by `Intermission._sync_panels`, also after a player leaves) it keeps 0.9 and may reach the
+    screen edge.
+  - Column mates: when both players of a column show such a tooltip and the two would meet in
+    the band, the top one (P1 / P2) keeps its place and the bottom one (P3 / P4) makes way.
+    `_sync_panels` hands each bottom panel its column mate's `planned_outside_tooltip_rect` as
+    `PlayerPanel.tooltip_obstacle` (where the top tooltip goes for the current selection – a
+    plan computed by `_tooltip_plan`, not the drawn rect, so layout order does not matter and
+    the two never resize each other). The bottom tooltip moves to its panel's other half – the
+    selected icon's (`_keep_tooltip_clear`) – just above the selected icon (else just below
+    it), shrunk for that down to `MIN_MOVED_TOOLTIP_FIT` (0.75); when even that does not fit it
+    keeps its size and rises from the panel's bottom edge over the icon. It moves back once the
+    top tooltip is gone or no longer reaches it.
+  - Shop tooltips keep clear of such a panel tooltip: `Intermission` hands the visible ones that
+    reach out of their panel (`PlayerPanel.outside_tooltip_rect`) to
+    `ShopPanel.tooltip_obstacles`, and `ShopPanel.layout_tooltips` counts a spot over one
+    `COVER_WEIGHT` (4) times its overlap, like covering the hovered card. The panels lay out
+    before the shop each frame (they come first in the tree).
+  - A shop tooltip whose content changes is measured at once (`ItemTooltip.layout_now`: the
+    containers sort top-down and the wrapped lines report their real height) and placed in
+    that same frame; `PlayerPanel` measures its tooltip the same way. The tooltip is rebuilt
+    only when the offer, its price or the compared item change – a two-hander compared with
+    both hands (`ItemTooltip.EquippedPair`, a new object every call) is identified by its parts
+    (`ItemTooltip.compare_key`). A tooltip that fits no spot even at the smallest scale goes to
+    the stall's top-left, never to the screen's corner.
+  - The panel tooltip hides while the panel's action menu (Equip / Sell / Trade / Forge …) is
+    open – both use that half.
+  - The Character tab's compact stat list never widens the panel: the names clip with an
+    ellipsis, the inset clips, and the long stats have short names (`SHORT_STAT_NAMES`: Regen,
+    CDR, Crit Dmg, Healing, Pickup, Atk Power, Extra Atk, Block Val., Execute, and the spell
+    schools without "Dmg"); every stat's name shows whole next to a "12.5%" value in a
+    700 × 480 panel (`test_stat_list_fits_its_inset_with_long_rows`).
 - **Bots** (smoke / demo): equip upgrades from the backpack, then buy every affordable offer
   that is an upgrade (cheapest first, one buy per bot per pass so the shared wallet is spread)
   and wear it; sell non-upgrades when the backpack is full (never the last weapon); Need only
@@ -1153,10 +1196,14 @@ scenes/ui/purse/     PurseBoard
   `TalentGlyph` stat glyph), else the kind's `TalentGlyph` (rune, gear, crown); state rim
   (`State` LOCKED / UNAVAILABLE / AVAILABLE / PARTIAL / MAXED), rank pill "2/3" ringed in the
   player's colour while ranks are pending, gear badge on modifiers, gold capstone frame.
-  `state_for` / `source_for` are pure.
+  `state_for` / `source_for` are pure. Sizes kept legible on a 4-player panel at 1280 × 720:
+  rank pill 17 px (19 high), tier gate numbers 16 px, the "pts" caption 15 px. Within a shipped
+  tree no two plain talents draw the same glyph and the capstone's glyph is its own (modifiers
+  may show the ability they change; `test_shipped_trees_have_distinct_glyphs`).
 - Right: the header ("Talent points: 2 free · 11 spent", or "Talent points from level 10
-  (level 7)" – the trees stay browsable), the selection's detail ("Arms talent · Tier 2" /
-  "Arms modifier · Whirlwind" / "Arms capstone", rank + "+1 this round", the text at the
+  (level 7)" – the trees stay browsable), the selection's detail ("Talent · Tier 2" /
+  "Modifier · Whirlwind" / "Capstone" – the tree's name is on the prompt row; every shipped
+  talent's kind fits the column on one line –, rank + "+1 this round", the text at the
   current rank – rank 0 shows rank 1 –, "Next rank: …" in green, "You haven't learned X" for a
   modifier whose ability is not slotted, the block reason in red, the tree's identity line
   when it fits; long texts shrink from 16 to 14 px before they are cut) and the Reset row
@@ -1276,9 +1323,12 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
     (`entry_text`: "P1 [Rare Dagger] 62 · Team Stall reroll 12", shop items in their rarity
     colour while the stall lists them);
   - **Wants**: `merged_wants(shop, RunState.wants)` – shop pings, then Trainer pings, per player
-    in slot order, one line + "+N more"; players who left are skipped;
+    in slot order, on the bottom line + "+N more"; while the spend ticker needs only one line
+    the wants may take its second one too (bottom-aligned, the "Wants" caption moves up a row;
+    `wants_lines()`, `wants_text()` joins them); players who left are skipped;
   - lines packed by measured width (`pack`); signals only mark the board dirty, `update`
-    (every MARKET frame) / `refresh` rebuild it; nothing runs during waves; no RNG.
+    (every MARKET frame; it compares the players' last index / colour / ready flag field by
+    field – typed arrays, no strings) / `refresh` rebuild it; nothing runs during waves; no RNG.
 - **Trainer pings**: R3 (keyboard Tab) on a row → `TrainerTab.toggle_ping(i)` →
   `RunState.toggle_want(slot, Trainer.want_key(id) = "trainer:<ability_id>",
   Trainer.spend_label(...), price)`; again removes it. Refused for an empty slot, Rank V and an
@@ -1381,7 +1431,11 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   `set_bonuses`.
 - **Tooltip** (`ItemTooltip`, rows from `SetBonuses.describe(item, eq)`): the set name with
   "(n/5)" for `viewer_equipment` (PlayerPanel / ShopPanel set it) or "(5 pieces)" without
-  (the loot roll), the five piece names (bright when worn), then "(2) Set: …" / "(4) Set: …"
+  (the loot roll), the five pieces (bright when worn) – with a
+  `viewer_equipment` (the player panels, the shop) the compact block: the pieces' slot names on
+  one line ("Head  Shoulders  Chest  Hands  Legs", `SetBonuses.describe` piece rows carry
+  `"slot"`) and no flavor text (`ItemTooltip.compact_set()`); without one (the loot roll) the
+  full piece names and the flavor –, then "(2) Set: …" / "(4) Set: …"
   green when active. A `set_id` without `SetData` keeps the old "Part of the … set" line.
 - **Bot value** (`ItemTooltip.upgrade_direction(item, equipped, viewer, equipment)` – bot
   equips and buys, Need, badges): `SetBonuses.bonus_change(item, displaced, eq, lookahead)`.
