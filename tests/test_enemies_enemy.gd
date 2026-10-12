@@ -4,7 +4,7 @@ extends TestCase
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const DT := 1.0 / 60.0
 ## RunState.coop_damage_mult() for 1..4 players (GDD 9).
-const COOP_DAMAGE: Array[float] = [0.45, 0.6, 0.75, 0.9]
+const COOP_DAMAGE: Array[float] = [0.45, 0.6, 0.75, 0.95]
 
 var world: Node3D
 
