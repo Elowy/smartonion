@@ -1520,23 +1520,24 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
 - **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
   - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
-  - sebzés-szorzó: `(1 + 0,15 × n) × 1,08^n`.
+  - sebzés-szorzó: `(1 + 0,15 × n) × 1,10^n`.
 
   Az összeadódó növekedést (+12% HP, +15% sebzés hullámonként) egy hullámonként kamatozó
-  szorzó egészíti ki (+22% HP, +8% sebzés), mert a hősök ereje (itemek, rangok, kártyák) is
-  kamatozva nő. Közelítő értékek (HP / sebzés):
+  szorzó egészíti ki (+22% HP, +10% sebzés), mert a hősök ereje (itemek, rangok, kártyák,
+  M5-től talentek, setek, kovácsolás) is kamatozva nő. Közelítő értékek (HP / sebzés):
 
   | Hullám | HP | Sebzés |
   |---|---|---|
-  | 5. | ×3,3 | ×2,2 |
-  | 10. | ×12 | ×4,7 |
-  | 15. | ×43 | ×9,1 |
-  | 20. | ×143 | ×17 |
-  | 25. | ×459 | ×29 |
+  | 5. | ×3,3 | ×2,3 |
+  | 10. | ×12 | ×5,5 |
+  | 15. | ×43 | ×12 |
+  | 20. | ×143 | ×24 |
+  | 25. | ×459 | ×45 |
 
-  A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez ideiglenes hangolás
-  M4 után, 4 ellenségtípussal; a végleges egyensúly M6-ban jön. A korábbi kiinduló érték +12%
-  HP és +8% sebzés volt, kamatozás nélkül.
+  A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez az M5 utáni
+  ideiglenes hangolás (talentekkel, setekkel, elitekkel, Loot Goblinnal); a végleges egyensúly
+  M6-ban jön. Korábban (M4) +8% volt a kamatozó sebzés, még korábban +12% HP és +8% sebzés,
+  kamatozás nélkül.
 - **Spawn:** a spawnpontok a pálya szélén és véletlen belső pontokon vannak, 1 mp-es
   figyelmeztető jellel (piros rúna a földön), mint a Brotatóban.
 - **Co-op skálázás:** minden további játékos után
@@ -1547,15 +1548,23 @@ A fajok WoW-hangulatúak, de saját nevűek.
   ellenségszám-szorzóval. Egy 4 fős teljes menet kb. 15 000 ellenség. Mivel minden ellenség
   goldot és XP-t ad, a szám lassan nő; a késői nehézséget a HP- és sebzés-skálázás adja.
 - **Ellenség-sebzés csapatlétszám szerint:** az ellenségek érintéses és lövedéksebzését a
-  csapatlétszám is szorozza: 1 / 2 / 3 / 4 játékosnál ×0,35 / ×0,45 / ×0,6 / ×0,8 (kb. ×1,3
+  csapatlétszám is szorozza: 1 / 2 / 3 / 4 játékosnál ×0,45 / ×0,6 / ×0,75 / ×0,95 (kb. ×1,3
   minden további játékossal).
   - **Miért:** kisebb csapatban kevesebben tudják felsegíteni az elesett hőst (egyedül az első
     elesés már vereség), és egy hősre több ellenség jut (a +60% ellenségszám kevesebb, mint egy
     újabb fejadag).
-  - A teljes csapat is ×0,8-at kap, mert a hullámgörbe teljes értékével 5 próbából 3-ban
-    elesett az egész csapat a 13–21. hullámon.
+  - A teljes csapat ×0,95-öt kap: M5 után (talentek, setek) ×0,9-cel 8 próbából egyik sem
+    esett el, és a késői hullámok nyomása több seeden gyenge volt; ×1,0-val 5 próbából kettő
+    már a 17–18. hullámon elesett.
   - Az ellenség HP-ja, száma és a gazdaság nem változik.
-  - Ideiglenes hangolás M4 után; a végleges egyensúly M6-ban jön.
+  - Ideiglenes hangolás M5 után; a végleges egyensúly M6-ban jön.
+  - **M5 mérés (botok, 25 hullám):** 4 fő: 8 seedből 7 végigért, 1 csapat a 20. hullámon
+    esett el, az első elesések a 5–22. hullámon, a 20–25. hullámon erős a nyomás. 2 fő: 6
+    próbából 5 végigért, 1 a 23. hullámon esett el. 1 fő: 13 próbából 6 végigért, a többi a
+    8–24. hullámon halt meg.
+  - **Nyitott kérdések M6-ra:** egyedül nagy a kasztok közti szórás (a Warrior egyedül a
+    15–19. hullámon hal meg, a Paladin és a Warlock végigér), és a késői kassza gyakran 2000
+    gold fölött van.
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
