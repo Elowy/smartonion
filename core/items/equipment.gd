@@ -8,6 +8,7 @@ extends RefCounted
 ## unequip() refuses the last equipped attacking weapon, and remove_from_backpack() (sell,
 ## trade) refuses the last usable attacking weapon of a hero who has none equipped
 ## (is_last_weapon / equip_disarms; the UI shows NEED_WEAPON). take() is not guarded.
+## Tier-set pieces worn are counted by [method set_counts] (SetBonuses turns them into bonuses).
 
 signal changed
 
@@ -238,6 +239,24 @@ func armor_spec_active() -> bool:
 		if item == null or item.armor_type != class_data.armor_type:
 			return false
 	return true
+
+
+## Tier sets (GDD 5.5, SetBonuses): set id -> pieces of that set equipped (distinct pieces).
+func set_counts() -> Dictionary[StringName, int]:
+	return count_sets(equipped_items())
+
+
+## Set id -> distinct set pieces (by source id) among [param items]; items without a set_id
+## are ignored. A duplicate of a piece counts once.
+static func count_sets(items: Array[ItemInstance]) -> Dictionary[StringName, int]:
+	var out: Dictionary[StringName, int] = {}
+	var seen: Array[StringName] = []
+	for item in items:
+		if item == null or item.set_id == &"" or item.source_id in seen:
+			continue
+		seen.append(item.source_id)
+		out[item.set_id] = out.get(item.set_id, 0) + 1
+	return out
 
 
 ## Average Item Level of the equipped items (character panel header).

@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shadowstitch_garb"
+display_name = "Shadowstitch Garb"
+class_id = &"rogue"
+piece_ids = Array[StringName]([&"set_rogue_head", &"set_rogue_shoulders", &"set_rogue_chest", &"set_rogue_hands", &"set_rogue_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "stats",
+"stats": {
+"crit": 5.0
+}
+}],
+"pieces": 2,
+"text": "Increases your critical strike chance by 5%."
+}, {
+"effects": [{
+"kind": "proc",
+"proc": {
+"ability": "vanish",
+"duration": 4.0,
+"effect": "buff",
+"stats": {
+"crit_damage": 50.0
+},
+"trigger": "on_cast"
+}
+}],
+"pieces": 4,
+"text": "Vanish increases your critical strike damage by 50% for 4 sec."
+}])

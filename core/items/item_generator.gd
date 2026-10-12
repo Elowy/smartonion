@@ -14,6 +14,12 @@ extends RefCounted
 ##   extra secondary stat). Armor pieces also get implicit Armor (free, not from the budget).
 ## Hand-made items (UniqueItemData) keep their name and stats (scaled by tier and the loot bonus);
 ## Legendary rolls become a hand-made Legendary whenever one fits.
+## Tier sets (GDD 5.5 / 5.2, M5): right after the rarity roll an EPIC roll becomes a set piece
+## with SET_CHANCE_SHOP (shop) or SET_CHANCE_SHOP x SET_LOOT_MULT (loot, elite, goblin, boss),
+## for one class: &"usable_by", else the &"class_data" bias, else a random &"team_classes"
+## class with a set, else (no team given) any class with a set; the piece is uniform among
+## that set's pieces available at the wave (set_piece_available; pieces have weight 0, so the
+## plain unique roll never picks them). See [method _roll_set_piece] for the rng draws.
 ## Attack Power / Spell Power enchants (Mighty / Arcane-touched) follow the class when one is
 ## known (&"class_data" bias or &"usable_by"): classes whose own weapon is magic (Mage,
 ## Warlock) mostly roll Spell Power, the others Attack Power (power_enchant_weight); items
@@ -98,6 +104,15 @@ const LEGENDARY_ENCHANTS := 2
 ## Chance that a non-Legendary roll becomes a hand-made item of the same rarity (named and
 ## class-specific items; trinkets come through the trinket slot instead).
 const UNIQUE_CHANCE := 0.05
+## Tier sets (GDD 5.5 / 5.2): chance that an Epic shop roll becomes a set piece; every loot
+## source (LOOT, ELITE, GOBLIN, BOSS) rolls SET_LOOT_MULT times that ("3x more common in loot").
+const SET_CHANCE_SHOP := 0.05
+const SET_LOOT_MULT := 3.0
+## The slots tier-set pieces exist for (a forced other slot never rolls a set piece).
+const SET_SLOTS: Array[int] = [
+	Items.SlotType.HEAD, Items.SlotType.SHOULDERS, Items.SlotType.CHEST, Items.SlotType.HANDS,
+	Items.SlotType.LEGS,
+]
 ## &"class_data" option: share of items made for that class (usable + favoured stats).
 const CLASS_BIAS_CHANCE := 0.6
 const OWN_ARMOR_WEIGHT := 4.0
@@ -306,6 +321,8 @@ static func enchant_fits(enchant: EnchantData, item: ItemInstance) -> bool:
 ##   &"slot_type": Items.SlotType – force the slot
 ##   &"rarity": int – force the rarity (the shop still never goes above Epic)
 ##   &"fortune": float
+##   &"team_classes": Array[ClassData] – the party (LootDrops.team_classes): a tier-set piece
+##       rolled without &"usable_by" / &"class_data" is for one of these classes
 static func generate(source: Source, wave: int, rng: RandomNumberGenerator, options: Dictionary = {}) -> ItemInstance:
 	wave = maxi(1, wave)
 	var looted := source != Source.SHOP
@@ -317,13 +334,21 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 	var max_rarity := Items.Rarity.EPIC if source == Source.SHOP else Items.Rarity.LEGENDARY
 	rarity = clampi(rarity, Items.Rarity.COMMON, max_rarity)
 	var usable := options.get(&"usable_by") as ClassData
-	var favour: ClassData = null
 	var bias := options.get(&"class_data") as ClassData
+	var forced := int(options.get(&"slot_type", -1))
+
+	# Tier sets: an Epic roll may become a set piece (GDD 5.5).
+	if rarity == Items.Rarity.EPIC:
+		var set_class := usable if usable != null else bias
+		var piece := _roll_set_piece(source, wave, forced, set_class, options.get(&"team_classes", []), rng)
+		if piece != null:
+			return from_unique(piece, wave, looted, rng, Db.get_class_data(piece.class_restriction))
+
+	var favour: ClassData = null
 	if bias != null and rng.randf() < CLASS_BIAS_CHANCE:
 		favour = bias
 		if usable == null:
 			usable = bias
-	var forced := int(options.get(&"slot_type", -1))
 
 	# Hand-made items: a Legendary roll is a hand-made Legendary whenever one fits.
 	if rarity >= Items.Rarity.LEGENDARY or rng.randf() < UNIQUE_CHANCE:
@@ -638,6 +663,73 @@ static func _pick_unique(source: Source, wave: int, rarity: int, slot: int, with
 		weights.append(data.weight * (OWN_CLASS_UNIQUE_WEIGHT if own else 1.0))
 	var i := _pick_index(weights, rng)
 	return pool[i] if i >= 0 else null
+
+
+## Chance (0..1) that an Epic roll from [param source] becomes a tier-set piece.
+static func set_chance(source: Source) -> float:
+	return SET_CHANCE_SHOP if source == Source.SHOP else SET_CHANCE_SHOP * SET_LOOT_MULT
+
+
+## Whether the set piece [param data] may come from [param source] at [param wave]: like
+## [method unique_available] but without the weight (pieces have weight 0 so that the plain
+## unique roll never picks them).
+static func set_piece_available(data: UniqueItemData, source: Source, wave: int) -> bool:
+	if data == null or data.set_id == &"" or not Db.is_unlocked(data.id):
+		return false
+	if source_id(source) not in data.sources or wave < data.min_wave:
+		return false
+	return source != Source.SHOP or data.rarity <= Items.Rarity.EPIC
+
+
+## The classes a set piece may be rolled for: [param for_class] alone when given, else the
+## [param team] classes that have a set (in team order), else – no team given – every class
+## with a set (Db.class_ids order). Empty when none fits.
+static func set_classes(for_class: ClassData, team: Array) -> Array[ClassData]:
+	var out: Array[ClassData] = []
+	if for_class != null:
+		if Db.set_for_class(for_class.id) != null:
+			out.append(for_class)
+		return out
+	if not team.is_empty():
+		for c: Variant in team:
+			var cd := c as ClassData
+			if cd != null and cd not in out and Db.set_for_class(cd.id) != null:
+				out.append(cd)
+		return out
+	for id in Db.class_ids:
+		if Db.set_for_class(id) != null:
+			out.append(Db.get_class_data(id))
+	return out
+
+
+## The tier-set roll of an Epic item (null = it stays a normal Epic). [param rng] (RunState.rng
+## for loot, the shop rng for offers) draws, in order: 1. the set chance (randf) – only when
+## [param forced_slot] is none or a set slot; on a hit 2. the class (randi_range) – only when
+## more than one class fits; 3. the piece (randi_range) – only when more than one piece of that
+## set is available for the slot / wave.
+## A hit without an available piece (wave < min_wave, a team without a set) draws no more.
+static func _roll_set_piece(source: Source, wave: int, forced_slot: int, for_class: ClassData,
+		team: Array, rng: RandomNumberGenerator) -> UniqueItemData:
+	if forced_slot >= 0 and forced_slot not in SET_SLOTS:
+		return null
+	if rng.randf() >= set_chance(source):
+		return null
+	var classes := set_classes(for_class, team)
+	if classes.is_empty():
+		return null
+	var cls := classes[0] if classes.size() == 1 else classes[rng.randi_range(0, classes.size() - 1)]
+	var set_data := Db.set_for_class(cls.id)
+	var pool: Array[UniqueItemData] = []
+	for piece_id in set_data.piece_ids:
+		var data := Db.get_unique(piece_id)
+		if not set_piece_available(data, source, wave) or not unique_usable_by(data, cls):
+			continue
+		if forced_slot >= 0 and unique_slot(data) != forced_slot:
+			continue
+		pool.append(data)
+	if pool.is_empty():
+		return null
+	return pool[0] if pool.size() == 1 else pool[rng.randi_range(0, pool.size() - 1)]
 
 
 ## Whether [param data] may come from [param source] at [param wave]: unlocked, listed source,

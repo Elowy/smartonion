@@ -299,3 +299,59 @@ func test_bot_choice_weighs_a_two_hander_against_both_hands() -> void:
 	var dagger := ItemTooltip.weapon_dps(eq.get_item(Items.EquipSlot.MAIN_HAND), Stats.AGILITY, ItemTooltip.NOMINAL_PRIMARY)
 	check(ItemTooltip.weapon_dps(Support.make_weapon(&"bow", Items.Rarity.EPIC), Stats.AGILITY, ItemTooltip.NOMINAL_PRIMARY) > dagger,
 			"(although it beats one dagger)")
+
+
+# --- Tier sets and special drops (M5) ----------------------------------------------------------
+
+static func _set_piece(id: StringName) -> ItemInstance:
+	return ItemGenerator.from_unique(Db.get_unique(id), 9, true, RandomNumberGenerator.new())
+
+
+## Bots Need a set piece that completes a set bonus even when its stats are a little worse
+## (GDD 5.5 "Botok": up to 30% below what it replaces), and Greed it when it is far worse.
+func test_bot_needs_a_set_piece_that_completes_a_bonus() -> void:
+	var warrior := slots[0]
+	var eq := Support.equipment_of(warrior)
+	check(eq.equip(_set_piece(&"set_warrior_head")), "one piece worn")
+	var hands := _set_piece(&"set_warrior_hands")
+	var score := ItemTooltip.item_score(hands, warrior.class_data)
+	var gloves := _gear(30, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 14, Stats.STAMINA: 2}, Items.SlotType.HANDS)
+	check(ItemTooltip.item_score(gloves, warrior.class_data) > score and score >= ItemTooltip.item_score(gloves, warrior.class_data) * 0.7,
+		"fixture: the gloves are a little better")
+	check(eq.equip(gloves), "plain gloves on")
+	check_eq(LootRoll.bot_choice(warrior, hands), LootRoll.Choice.NEED, "the 2-piece bonus is worth it -> Need")
+	check(eq.equip(_gear(30, ClassData.ArmorType.PLATE, {Stats.STRENGTH: 20, Stats.STAMINA: 4}, Items.SlotType.HANDS)), "far better gloves on")
+	check_eq(LootRoll.bot_choice(warrior, hands), LootRoll.Choice.GREED, "more than 30% worse -> Greed")
+	check_eq(LootRoll.bot_choice(slots[1], hands), LootRoll.Choice.GREED, "another class's piece -> Greed")
+
+
+## Guaranteed drops of elites / the goblin / bosses (LootDrops.drop_special) roll their
+## Epics into set pieces at the loot rate, always for a class of the party.
+func test_special_drops_roll_set_pieces_for_the_party() -> void:
+	PlayerManager.clear()
+	PlayerManager.add_bot(&"warlock", 1)
+	PlayerManager.add_bot(&"paladin", 2)
+	RunState.start_run(2, 808)
+	RunState.set_wave(14)
+	var world := Node3D.new()
+	tree.root.add_child(world)
+	var enemy := Node3D.new()
+	world.add_child(enemy)
+	var classes := {}
+	var pieces := 0
+	for i in 600:
+		var bag := LootDrops.drop_special(ItemGenerator.Source.BOSS, enemy, null)
+		check(bag != null and bag.item.rarity >= Items.Rarity.EPIC, "boss drops are Epic+")
+		if bag != null and bag.item.set_id != &"":
+			pieces += 1
+			classes[bag.item.class_restriction] = true
+			check(bag.item.looted, "looted")
+		if bag != null:
+			bag.free()
+	world.free()
+	PlayerManager.clear()
+	check(pieces > 30, "some boss Epics are set pieces (%d / 600)" % pieces)
+	check_eq(classes.keys().size(), 2, "both party classes: %s" % [classes.keys()])
+	for c in classes:
+		check(c in [&"warlock", &"paladin"], "a party class: %s" % c)
+	check_eq(RunState.loot_drops_this_wave, 0, "special drops never count against the cap")

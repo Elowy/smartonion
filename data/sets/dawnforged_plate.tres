@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"dawnforged_plate"
+display_name = "Dawnforged Plate"
+class_id = &"paladin"
+piece_ids = Array[StringName]([&"set_paladin_head", &"set_paladin_shoulders", &"set_paladin_chest", &"set_paladin_hands", &"set_paladin_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "stats",
+"stats": {
+"armor": 3.0
+}
+}],
+"pieces": 2,
+"text": "Increases your Armor by 3."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"heal_all": true
+}
+}],
+"pieces": 4,
+"text": "Word of Glory heals every hero within 8 m, not just the most wounded."
+}])

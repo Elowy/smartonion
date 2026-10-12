@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"set_paladin_chest"
+display_name = "Dawnforged Breastplate"
+flavor = "The sunrise is engraved on it. So is a small onion."
+slot_type = 3
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 7.0,
+&"stamina": 6.0,
+&"versatility": 2.0
+})
+class_restriction = &"paladin"
+set_id = &"dawnforged_plate"
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 6
+weight = 0.0
