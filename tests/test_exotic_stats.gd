@@ -181,7 +181,7 @@ func test_crit_damage_and_executioner_on_hits() -> void:
 	enemy.hp = 900.0
 	WeaponRunner.apply_hit(p, enemy, base, false, Vector3.ZERO)
 	check_near(enemy.fake_damage_log[2], base, 0.0001, "no Executioner above 30%")
-	check(not enemy.is_elite(), "no elites before M5")
+	check(not enemy.is_elite(), "a plain enemy is not an elite")
 
 
 func test_parry_negates_melee_and_ripostes() -> void:

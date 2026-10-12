@@ -2,7 +2,7 @@ class_name ItemInstance
 extends RefCounted
 ## A concrete item in a run (bought, looted or a starting weapon). Built by ItemGenerator
 ## (or from_weapon / from_unique). Plain data – UI and gameplay read it, nobody mutates it
-## after creation except rarity upgrades by forging (M5).
+## after creation (forging, M5, consumes two instances and builds a new one – see Forge).
 
 static var _next_uid := 1
 
