@@ -1,0 +1,226 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_curse_of_agony"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_curse_of_agony"
+display_name = "Curse of Agony"
+description = "Your weapon hits curse their target with Agony: {pct}% of the hit's damage as Shadow damage over {duration_fixed} sec. Further hits add to the curse."
+values = {
+"duration_fixed": 6.0,
+"pct": 5.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"corruption"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "warlock_afflictions"
+},
+"mods": {
+"agony_pct_add": 5.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_drain_life"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_improved_drain_life"
+display_name = "Improved Drain Life"
+description = "Drain Life deals and heals {power}% more and recharges {cd}% faster."
+values = {
+"cd": 4.0,
+"power": 6.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"drain_life"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "drain_life"
+},
+"mods": {
+"cooldown_pct": -4.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_shadow_mastery"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_shadow_mastery"
+display_name = "Shadow Mastery"
+description = "Your Shadow damage is increased by {pct}% (Drain Life, Agony, Corruption, Shadow Bolt, your Voidwalker)."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"shadow_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "shadow"
+}])
+
+[sub_resource type="Resource" id="Resource_curse_of_exhaustion"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_curse_of_exhaustion"
+display_name = "Curse of Exhaustion"
+description = "Enemies suffering from your afflictions (Agony, Corruption, Seed of Corruption, Dread) are slowed by {slow}%."
+values = {
+"slow": 10.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"speed"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "warlock_afflictions"
+},
+"mods": {
+"slow_add": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_malediction"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_malediction"
+display_name = "Malediction"
+description = "Your damage-over-time effects deal {pct}% more damage."
+values = {
+"pct": 6.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"seed_of_corruption"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 6.0,
+"source": "dot"
+}])
+
+[sub_resource type="Resource" id="Resource_dark_harvest"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_dark_harvest"
+display_name = "Dark Harvest"
+description = "Drain Life also drains every enemy within its range that suffers from your afflictions (up to {targets}): each takes {pct}% of a tick's damage, and that damage heals you too."
+values = {
+"pct": 25.0,
+"targets": 6.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"drain_life"
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "drain_life"
+},
+"mods": {
+"harvest_pct_add": 25.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_writhe_in_agony"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_writhe_in_agony"
+display_name = "Writhe in Agony"
+description = "When an enemy suffering from your Agony dies, the rest of the curse is split between up to {targets} enemy(s) within {radius_fixed} m, with the time it had left."
+values = {
+"radius_fixed": 4.0,
+"targets": 1.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warlock_affliction_curse_of_agony"
+icon = &"corruption"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "warlock_afflictions"
+},
+"mods": {
+"agony_spread_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_deaths_embrace"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_deaths_embrace"
+display_name = "Death's Embrace"
+description = "You deal {pct}% more damage to enemies below {hp_fixed}% health."
+values = {
+"hp_fixed": 35.0,
+"pct": 5.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"executioner"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"target": "below_pct",
+"target_pct": 35.0
+}])
+
+[sub_resource type="Resource" id="Resource_unstable_affliction"]
+script = ExtResource("2_talent")
+id = &"warlock_affliction_unstable_affliction"
+display_name = "Unstable Affliction"
+description = "When an enemy suffering from any of your afflictions dies – no matter who killed it – it bursts with unstable shadow: Shadow damage to every enemy within {radius} m, stunning them for {stun} sec (each enemy at most once every {icd} sec)."
+values = {
+"icd": 4.0,
+"radius": 3.0,
+"stun": 1.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &"seed_of_corruption"
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage": 2.0,
+"intellect_scale": 0.35,
+"max_per_tick": 4,
+"queue_cap": 32,
+"radius": 3.0,
+"spell_power_scale": 0.5,
+"stun": 1.0,
+"stun_icd": 4.0
+},
+"script": "res://scenes/talents/warlock/affliction_unstable_affliction.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warlock_affliction"
+class_id = &"warlock"
+display_name = "Affliction"
+index = 0
+description = "Lingering curses, life drain and dread."
+icon = &"corruption"
+color = Color(0.62, 0.3, 0.95, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_curse_of_agony"), SubResource("Resource_improved_drain_life"), SubResource("Resource_shadow_mastery"), SubResource("Resource_curse_of_exhaustion"), SubResource("Resource_malediction"), SubResource("Resource_dark_harvest"), SubResource("Resource_writhe_in_agony"), SubResource("Resource_deaths_embrace"), SubResource("Resource_unstable_affliction")])

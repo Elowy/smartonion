@@ -3,16 +3,24 @@ extends Node3D
 ## Little look on an enemy afflicted by the Warlock, added as a child of the enemy (it moves
 ## and dies with it): Corruption = three purple wisps circling the body; Seed of Corruption =
 ## a glowing fel seed over the head that throbs faster as it ripens; Fear = a pale purple
-## ghost wisp wobbling over the head. One MeshInstance3D each (a cached merged mesh with a
+## ghost wisp wobbling over the head; Agony (M5 Curse of Agony) = a dark-crimson ring of thorns
+## slowly turning at the enemy's feet. One MeshInstance3D each (a cached merged mesh with a
 ## cached glow material); the animation only moves / scales the node. [method finish] frees it.
 
 const CORRUPTION := &"corruption"
 const SEED := &"seed"
 const FEAR := &"fear"
+const AGONY := &"agony"
 
 const CORRUPTION_COLOR := Color(0.62, 0.3, 0.98)
 const SEED_COLOR := Color(0.55, 1.0, 0.3)
 const FEAR_COLOR := Color(0.8, 0.62, 1.0)
+const AGONY_COLOR := Color(0.78, 0.08, 0.22)
+## Agony's thorn ring: radius (m, per model scale), height over the feet, turn speed (rad/s).
+const AGONY_RADIUS := 0.55
+const AGONY_HEIGHT := 0.1
+const AGONY_SPIN := 0.9
+const AGONY_THORNS := 8
 const SPIN_SPEED := 3.2
 const ORBIT_RADIUS := 0.5
 ## Heights over the enemy's feet, per model scale.
@@ -34,7 +42,12 @@ static func attach(enemy: Enemy, p_kind: StringName) -> WarlockAfflictionMarker:
 	m.name = "Warlock%sMarker" % String(p_kind).capitalize().replace(" ", "")
 	m.kind = p_kind
 	var s := enemy.data.model_scale if enemy.data != null else 1.0
-	m._base_y = WarlockSpell.body_height(enemy) if p_kind == CORRUPTION else HEAD_HEIGHT * s
+	if p_kind == CORRUPTION:
+		m._base_y = WarlockSpell.body_height(enemy)
+	elif p_kind == AGONY:
+		m._base_y = AGONY_HEIGHT
+	else:
+		m._base_y = HEAD_HEIGHT * s
 	m.position = Vector3(0.0, m._base_y, 0.0)
 	m.scale = Vector3.ONE * clampf(s, 0.7, 1.4)
 	m._build()
@@ -63,6 +76,9 @@ func _build() -> void:
 		FEAR:
 			_mesh.mesh = MeshKit.cached("warlock:marker:fear", func() -> Mesh: return _fear_mesh())
 			_mesh.material_override = Mats.glow(FEAR_COLOR, 1.8)
+		AGONY:
+			_mesh.mesh = MeshKit.cached("warlock:marker:agony", func() -> Mesh: return _thorns_mesh())
+			_mesh.material_override = Mats.glow(AGONY_COLOR, 1.6)
 		_:
 			_mesh.mesh = MeshKit.cached("warlock:marker:corruption", func() -> Mesh: return _wisps_mesh())
 			_mesh.material_override = Mats.glow(CORRUPTION_COLOR, 2.2)
@@ -81,6 +97,8 @@ func _process(delta: float) -> void:
 		FEAR:
 			position.y = _base_y + 0.08 * sin(_time * 6.0)
 			_mesh.rotation.z = 0.25 * sin(_time * 9.0)
+		AGONY:
+			_mesh.rotation.y = _time * AGONY_SPIN
 		_:
 			_mesh.rotation.y = -_time * SPIN_SPEED
 			_mesh.position.y = 0.06 * sin(_time * 2.0)
@@ -110,6 +128,24 @@ static func _seed_mesh() -> Mesh:
 	k.add_cylinder(0.0, 0.08, 0.16, MeshKit.xf(Vector3(0, 0.2, 0)), Color.WHITE, 8)
 	for side: float in [-1.0, 1.0]:
 		k.add_segment(Vector3(0, 0.22, 0), Vector3(0.12 * side, 0.34, 0.02), 0.025, 0.0, Color.WHITE, 5)
+	return k.build()
+
+
+## A flat ring of thorns: a thin band with AGONY_THORNS hooked spikes pointing outwards and up.
+static func _thorns_mesh() -> Mesh:
+	var k := MeshKit.new()
+	var segments := AGONY_THORNS * 2
+	for i in segments:
+		var a := TAU * float(i) / float(segments)
+		var b := TAU * float(i + 1) / float(segments)
+		k.add_segment(Vector3(cos(a), 0.0, sin(a)) * AGONY_RADIUS, Vector3(cos(b), 0.0, sin(b)) * AGONY_RADIUS,
+				0.025, 0.025, Color.WHITE, 4)
+	for i in AGONY_THORNS:
+		var a := TAU * (float(i) + 0.25) / float(AGONY_THORNS)
+		var root := Vector3(cos(a), 0.0, sin(a)) * AGONY_RADIUS
+		var bent := TAU * (float(i) + 0.45) / float(AGONY_THORNS)
+		var tip := Vector3(cos(bent), 0.0, sin(bent)) * (AGONY_RADIUS + 0.16) + Vector3(0, 0.12, 0)
+		k.add_segment(root, tip, 0.035, 0.0, Color.WHITE, 5)
 	return k.build()
 
 

@@ -10,7 +10,13 @@ extends Node3D
 ##
 ## Numbers live in [constant BASE_PARAMS]; items change them through ability_mod on the pseudo
 ## ability [constant MOD_ID] (Grimoire of the Imp Lord: {"damage_bonus_add": 50,
-## "targets_add": 1}).
+## "targets_add": 1}); talents too (Improved Imp: "damage_bonus_add").
+##
+## Wild Imps (M5 Demonology modifier on Rain of Fire, [method spawn_wild]): smaller, fel-green
+## imps with the same logic and params that live [member lifetime] seconds (counted down also
+## while hidden – the Warlock down), deal [member power_mult] of a bolt's damage and hover at
+## their own [member orbit_slot] spot (four presets around the Warlock; the permanent Imp keeps
+## back-left). WarlockRainOfFire owns and dismisses them; they are never WarlockMastery.imp.
 
 const MOD_ID := &"warlock_imp"
 const BASE_PARAMS := {
@@ -52,6 +58,9 @@ const FIRST_SHOT_DELAY := 0.5
 ## Turns towards its last target for this long after a shot.
 const LOOK_TIME := 0.6
 const SUMMON_COLOR := Color(0.45, 1.0, 0.3)
+## Wild Imps' spots around the Warlock as (back, left) shares of the follow distance, like
+## ORBIT_BACK / ORBIT_SIDE: front-left, front-right, back-right, back.
+const WILD_ORBITS: Array[Vector2] = [Vector2(-0.6, 0.8), Vector2(-0.6, -0.8), Vector2(0.55, -0.85), Vector2(1.0, 0.0)]
 
 var owner_player: Player
 var model: WarlockImpModel
@@ -59,6 +68,12 @@ var model: WarlockImpModel
 var shots_fired := 0
 ## The last bolt fired (tests); may be freed.
 var last_bolt: WarlockImpBolt
+## Seconds a Wild Imp has left (< 0 = permanent: the Mastery's Imp).
+var lifetime := -1.0
+## Share of a bolt's damage (Wild Imps: wild_imp_power / 100).
+var power_mult := 1.0
+## -1 = the Imp's back-left spot; 0..3 = a Wild Imp spot ([constant WILD_ORBITS]).
+var orbit_slot := -1
 
 var _shot_left := FIRST_SHOT_DELAY
 var _hidden := false
@@ -81,6 +96,40 @@ static func spawn(p_owner: Player) -> WarlockImp:
 		imp.snap_to_owner()
 		imp._puff()
 	return imp
+
+
+## A Wild Imp (Rain of Fire's Wild Imps): lives [param p_lifetime] seconds, deals
+## [param p_power] x the Imp's bolt damage, hovers at orbit spot [param p_slot] (0..3).
+## Smaller and fel-green. Not in the tree when the Warlock has no effects parent.
+static func spawn_wild(p_owner: Player, p_lifetime: float, p_power: float, p_slot: int) -> WarlockImp:
+	var imp := WarlockImp.new()
+	imp.name = "WildImp"
+	imp.owner_player = p_owner
+	imp.lifetime = maxf(0.0, p_lifetime)
+	imp.power_mult = maxf(0.0, p_power)
+	imp.orbit_slot = clampi(p_slot, 0, WILD_ORBITS.size() - 1)
+	imp.model = WarlockImpModel.new()
+	imp.model.wild = true
+	imp.add_child(imp.model)
+	var parent := WeaponRunner.effects_parent(p_owner)
+	if parent != null:
+		parent.add_child(imp)
+		imp.snap_to_owner()
+		imp._puff()
+	return imp
+
+
+func is_wild() -> bool:
+	return lifetime >= 0.0
+
+
+## Leaves now ([param puff]: the summon puff where it was).
+func dismiss(puff: bool = false) -> void:
+	if is_queued_for_deletion():
+		return
+	if puff and is_inside_tree() and visible:
+		Vfx.death_puff(global_position + Vector3.UP * BOLT_HEIGHT, SUMMON_COLOR, 0.6)
+	queue_free()
 
 
 ## The Imp's numbers with the Warlock's item mods applied.
@@ -128,6 +177,11 @@ func _physics_process(delta: float) -> void:
 	if not _owner_valid():
 		queue_free()
 		return
+	if lifetime >= 0.0:
+		lifetime -= delta
+		if lifetime <= 0.0:
+			dismiss(true)
+			return
 	if not owner_player.is_inside_tree() or not is_inside_tree():
 		return
 	var hide_now := owner_player.downed
@@ -169,7 +223,7 @@ func try_shoot() -> bool:
 	dir = dir.normalized()
 	_look_dir = dir
 	_look_left = LOOK_TIME
-	last_bolt = WarlockImpBolt.fire(owner_player, from, dir, bolt_damage(owner_player.stats, params),
+	last_bolt = WarlockImpBolt.fire(owner_player, from, dir, bolt_damage(owner_player.stats, params) * power_mult,
 			maxi(1, roundi(float(params.get("targets", 1)))), reach + 1.5,
 			float(params.get("bolt_speed", 13.0)))
 	shots_fired += 1
@@ -202,14 +256,18 @@ func _follow(delta: float) -> void:
 	_speed_ratio = clampf(step.length() / maxf(0.0001, delta) / 4.0, 0.0, 1.0)
 
 
-## Unit vector (XZ) from the Warlock to the Imp's favourite spot: behind its left shoulder.
+## Unit vector (XZ) from the Warlock to the Imp's favourite spot: behind its left shoulder
+## (a Wild Imp: its [constant WILD_ORBITS] spot).
 func _preferred_dir() -> Vector3:
 	var facing := _flat(owner_player.facing) if _owner_valid() else Vector3.FORWARD
 	if facing.length_squared() < 0.0001:
 		facing = Vector3.FORWARD
 	facing = facing.normalized()
 	var left := Vector3(facing.z, 0.0, -facing.x)
-	return (-facing * ORBIT_BACK + left * ORBIT_SIDE).normalized()
+	var spot := Vector2(ORBIT_BACK, ORBIT_SIDE)
+	if orbit_slot >= 0 and orbit_slot < WILD_ORBITS.size():
+		spot = WILD_ORBITS[orbit_slot]
+	return (-facing * spot.x + left * spot.y).normalized()
 
 
 func _owner_valid() -> bool:

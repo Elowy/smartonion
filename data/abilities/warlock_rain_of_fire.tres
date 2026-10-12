@@ -21,12 +21,20 @@ params = {
 "auto_cast_min": 4,
 "damage": 2.0,
 "duration": 4.0,
+"ember_duration": 0.0,
+"ember_share": 40.0,
+"ember_slow": 30.0,
 "follows": false,
 "intellect_scale": 0.3,
 "radius": 3.0,
+"slow": 0.0,
 "spell_power_scale": 1.0,
 "storms": 1,
-"tick": 0.5
+"tick": 0.5,
+"wild_imp_duration": 6.0,
+"wild_imp_max": 4,
+"wild_imp_power": 50.0,
+"wild_imps": 0
 }
 icon = &"rain_of_fire"
 color = Color(1, 0.45, 0.12, 1)

@@ -10,18 +10,49 @@ extends MasteryEffect
 ## Soul Shards: +1 every ResourceData.gain_per_kills kills (soul_shards.tres: 12), counted by
 ## ClassResource. Items change the rule through ability_mod on the pseudo ability
 ## [constant SHARDS_MOD_ID] (Soulbinder's Sash: {"gain_per_kills": 8}); the Warlock's shard
-## resource then runs on a private copy of the ResourceData with the modded numbers.
+## resource then runs on a private copy of the ResourceData with the modded numbers. Talent
+## "resource" entries (Soul Harvest: gain_per_kills_add) stay in ClassResource.bonus and apply
+## on top of whichever copy is in place ([method kills_per_shard] reads the effective rule).
+##
+## Afflictions (M5 talents, pseudo ability [constant AFFLICTIONS_MOD_ID] – talent / item mods
+## on [constant AFFLICTION_BASE], read through [method affliction_params]): Curse of Agony
+## ("agony_pct" > 0) makes every weapon hit of the Warlock curse its target with Agony –
+## agony_pct % of the hit's base amount (Player.last_hit_base, not the dealt amount: the
+## derived-damage rule, talent_vocabulary §3.6) as Shadow damage over agony_duration seconds
+## (WarlockAfflictions.agonize); Writhe in Agony ("agony_spread") splits a dying host's curse;
+## Curse of Exhaustion ("slow") slows every afflicted enemy. Agony is cleared, without
+## spreading, at wave start and end.
 
 ## Demonic Pact: % more DoT and pet damage per Mastery point.
 const PCT_PER_POINT := 2.0
 ## Pseudo ability id whose ability_mod items change the Soul Shard rule.
 const SHARDS_MOD_ID := &"warlock_shards"
 const SHARD_RESOURCE := &"soul_shard"
+## Pseudo ability id of the affliction numbers (BonusVocabulary.PSEUDO_IDS).
+const AFFLICTIONS_MOD_ID := &"warlock_afflictions"
+## The affliction numbers before talent / item mods (all neutral: no Agony, no slow).
+const AFFLICTION_BASE := {
+	## % of each weapon hit's base amount that becomes Agony (0 = no Agony; Curse of Agony).
+	"agony_pct": 0.0,
+	## Seconds an Agony lasts (a new hit restarts it).
+	"agony_duration": 6.0,
+	## Enemies a dying host's Agony is split between (Writhe in Agony).
+	"agony_spread": 0.0,
+	## m (x Area Size) around the corpse the split looks for enemies.
+	"agony_spread_radius": 4.0,
+	## % slow of every affliction of this Warlock (Curse of Exhaustion).
+	"slow": 0.0,
+}
 
 var imp: WarlockImp
 
 var _base_shard_data: ResourceData
 var _equipment: Equipment
+var _bonuses: PlayerBonuses
+## affliction_params() result (read-only), dropped when the bonuses / equipment change.
+var _affliction_params: Dictionary = {}
+var _affliction_slow := 0.0
+var _agony_pct := 0.0
 
 
 ## Damage multiplier of Demonic Pact for DoTs and pets (1 + Mastery x 2%).
@@ -43,14 +74,68 @@ func tick(_delta: float) -> void:
 		ensure_imp()
 
 
+## Curse of Agony: a weapon hit of the (living) Warlock curses its target – agony_pct % of the
+## hit's base amount (Player.last_hit_base, valid during on_hit_dealt) over agony_duration
+## seconds. Every hit counts: pierced / arced enemies and extra attacks too.
+func on_hit(target: Node3D, damage: float, _is_crit: bool) -> void:
+	if _agony_pct <= 0.0 and _affliction_params.is_empty():
+		affliction_params()
+	if _agony_pct <= 0.0 or damage <= 0.0 or player == null:
+		return
+	var e := target as Enemy
+	if not WarlockSpell.is_live(e):
+		return
+	var params := affliction_params()
+	var total := maxf(0.0, player.last_hit_base) * _agony_pct / 100.0
+	var aff := WarlockAfflictions.of(player)
+	if aff == null or total <= 0.0:
+		return
+	aff.agonize(e, total, float(params["agony_duration"]), roundi(float(params["agony_spread"])),
+			WarlockSpell.area(player.stats, float(params["agony_spread_radius"])))
+
+
+## The affliction numbers: [constant AFFLICTION_BASE] with the talent / item mods of
+## [constant AFFLICTIONS_MOD_ID]. Cached (read-only) until the bonuses or the equipment change.
+func affliction_params() -> Dictionary:
+	_hook_bonuses()
+	if not _affliction_params.is_empty():
+		return _affliction_params
+	var mods: Dictionary = player.ability_mods(AFFLICTIONS_MOD_ID) if player != null else {}
+	var out := AbilityRunner.apply_mods(AFFLICTION_BASE, mods)
+	out.make_read_only()
+	_affliction_params = out
+	_affliction_slow = maxf(0.0, float(out.get("slow", 0.0)))
+	_agony_pct = maxf(0.0, float(out.get("agony_pct", 0.0)))
+	return out
+
+
+## Curse of Exhaustion: % slow of every affliction (0 = none).
+func affliction_slow() -> float:
+	affliction_params()
+	return _affliction_slow
+
+
+## Drops the cached affliction numbers (the bonuses or the equipment changed).
+func invalidate_affliction_params() -> void:
+	_affliction_params = {}
+	_affliction_slow = 0.0
+	_agony_pct = 0.0
+
+
 func on_kill(_enemy: Node3D) -> void:
 	_hook_equipment()
 
 
 func begin_wave() -> void:
 	_hook_equipment()
+	_clear_agony()
 	if has_imp():
 		imp.begin_wave()
+
+
+## Wave cleared: no Agony carries over (cleared without spreading).
+func end_wave() -> void:
+	_clear_agony()
 
 
 func teardown() -> void:
@@ -59,7 +144,13 @@ func teardown() -> void:
 	imp = null
 	if _equipment != null and _equipment.changed.is_connected(refresh_shard_rule):
 		_equipment.changed.disconnect(refresh_shard_rule)
+	if _equipment != null and _equipment.changed.is_connected(invalidate_affliction_params):
+		_equipment.changed.disconnect(invalidate_affliction_params)
 	_equipment = null
+	if _bonuses != null and _bonuses.changed.is_connected(invalidate_affliction_params):
+		_bonuses.changed.disconnect(invalidate_affliction_params)
+	_bonuses = null
+	invalidate_affliction_params()
 	var res := shard_resource()
 	if res != null and _base_shard_data != null:
 		res.data = _base_shard_data
@@ -94,10 +185,11 @@ func shard_resource() -> ClassResource:
 	return player.abilities.get_resource(SHARD_RESOURCE)
 
 
-## Kills per Soul Shard right now (12, Soulbinder's Sash: 8).
+## Kills per Soul Shard right now (12, Soulbinder's Sash: 8; talent "gain_per_kills_add"
+## bonuses included – ClassResource.gain_per_kills).
 func kills_per_shard() -> int:
 	var res := shard_resource()
-	return res.data.gain_per_kills if res != null and res.data != null else 0
+	return res.gain_per_kills() if res != null and res.data != null else 0
 
 
 ## Re-reads the shard rule from the equipped items (on equipment.changed). Items may change
@@ -137,9 +229,31 @@ func _hook_equipment() -> void:
 		return
 	if _equipment != null and _equipment.changed.is_connected(refresh_shard_rule):
 		_equipment.changed.disconnect(refresh_shard_rule)
+	if _equipment != null and _equipment.changed.is_connected(invalidate_affliction_params):
+		_equipment.changed.disconnect(invalidate_affliction_params)
 	_equipment = player.equipment
 	_equipment.changed.connect(refresh_shard_rule)
+	_equipment.changed.connect(invalidate_affliction_params)
+	invalidate_affliction_params()
 	refresh_shard_rule()
+
+
+## Connects to the player's PlayerBonuses (created after the Mastery): talent / set changes
+## drop the cached affliction numbers.
+func _hook_bonuses() -> void:
+	if player == null or player.bonuses == null or _bonuses == player.bonuses:
+		return
+	if _bonuses != null and _bonuses.changed.is_connected(invalidate_affliction_params):
+		_bonuses.changed.disconnect(invalidate_affliction_params)
+	_bonuses = player.bonuses
+	_bonuses.changed.connect(invalidate_affliction_params)
+	invalidate_affliction_params()
+
+
+func _clear_agony() -> void:
+	var aff := WarlockAfflictions.of(player, false) if player != null else null
+	if aff != null:
+		aff.clear(WarlockAfflictions.AGONY)
 
 
 static func _fmt(v: float) -> String:
