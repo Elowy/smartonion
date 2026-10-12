@@ -1,0 +1,230 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_cruelty"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_cruelty"
+display_name = "Cruelty"
+description = "Increases your chance to get a critical strike by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_unbridled_wrath"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_unbridled_wrath"
+display_name = "Unbridled Wrath"
+description = "Your critical hits generate {rage} extra Rage."
+values = {
+"rage": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"gain_on_crit_add": 3.0,
+"kind": "resource",
+"resource": "rage"
+}])
+
+[sub_resource type="Resource" id="Resource_improved_whirlwind"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_improved_whirlwind"
+display_name = "Improved Whirlwind"
+description = "Whirlwind costs {cost} less Rage and deals {pct}% more damage."
+values = {
+"cost": 2.0,
+"pct": 5.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"whirlwind"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"cost_add": -2.0,
+"power_pct": 5.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_blood_craze"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_blood_craze"
+display_name = "Blood Craze"
+description = "Your killing blows heal you for {heal}% of your maximum health (at most once every {icd_fixed} sec)."
+values = {
+"heal": 1.0,
+"icd_fixed": 1.5
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"leech"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"effect": "heal",
+"icd": 1.5,
+"label": "",
+"max_hp_pct": 1.0,
+"target": "self",
+"trigger": "on_kill"
+},
+"scale": ["max_hp_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_dual_wield_specialization"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_dual_wield_specialization"
+display_name = "Dual Wield Specialization"
+description = "While dual wielding you deal {pct}% more damage."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"requires": {
+"weapon": "dual_wield"
+}
+}])
+
+[sub_resource type="Resource" id="Resource_meat_cleaver"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_meat_cleaver"
+display_name = "Meat Cleaver"
+description = "Whirlwind refunds {rage} Rage for each enemy it strikes, up to {max} Rage per spin (never more than the spin cost)."
+values = {
+"max": 12.0,
+"rage": 3.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"whirlwind"
+icon = &"whirlwind"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"rage_per_enemy_add": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_flurry"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_flurry"
+display_name = "Flurry"
+description = "After a critical hit, your attack speed is increased by {haste}% for {duration_fixed} sec."
+values = {
+"duration_fixed": 3.0,
+"haste": 6.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warrior_fury_cruelty"
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"duration": 3.0,
+"effect": "buff",
+"label": "",
+"stats": {
+"haste": 6.0
+},
+"trigger": "on_crit"
+},
+"scale": ["stats"]
+}])
+
+[sub_resource type="Resource" id="Resource_death_wish"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_death_wish"
+display_name = "Death Wish"
+description = "Increases your Mastery by {mastery}. Battle Fury: the lower your health, the harder you hit."
+values = {
+"mastery": 4.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_rampage"]
+script = ExtResource("2_talent")
+id = &"warrior_fury_rampage"
+display_name = "Rampage"
+description = "Each enemy you kill grants a stack of Rampage for {duration} sec (kills refresh it): +{pct}% damage per stack, up to {stacks} stacks. Allies within {radius} m gain half of your Rampage bonus."
+values = {
+"duration": 5.0,
+"pct": 2.0,
+"radius": 8.0,
+"stacks": 10.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"ally_interval": 0.25,
+"ally_radius": 8.0,
+"ally_share_pct": 50.0,
+"duration": 5.0,
+"max_stacks": 10,
+"pct_per_stack": 2.0
+},
+"script": "res://scenes/talents/warrior/fury_rampage.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warrior_fury"
+class_id = &"warrior"
+display_name = "Fury"
+index = 1
+description = "Dual-wielding frenzy: critical hits, Rage and killing sprees."
+icon = &"whirlwind"
+color = Color(0.85, 0.22, 0.15, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_cruelty"), SubResource("Resource_unbridled_wrath"), SubResource("Resource_improved_whirlwind"), SubResource("Resource_blood_craze"), SubResource("Resource_dual_wield_specialization"), SubResource("Resource_meat_cleaver"), SubResource("Resource_flurry"), SubResource("Resource_death_wish"), SubResource("Resource_rampage")])
