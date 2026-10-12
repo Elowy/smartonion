@@ -390,6 +390,15 @@ func test_set_lookahead_picks_the_reachable_backpack_pieces() -> void:
 	var plain_chest := armor("Plain chest", Items.SlotType.CHEST, ClassData.ArmorType.PLATE, 3, {"strength": 1})
 	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [legs, hands] as Array[ItemInstance],
 		"a plain item pushing out a piece: that piece's set is looked at (one piece per slot)")
+	check(ItemTooltip.item_score(legs, warrior) > ItemTooltip.item_score(hands, warrior), "fixture: the legs score higher")
+	eq.backpack.assign([hands, legs])
+	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [legs, hands] as Array[ItemInstance],
+		"best item_score first, whatever the backpack order")
+	var better_legs := set_piece(&"warrior", "legs")
+	better_legs.stats[Stats.STRENGTH] = float(better_legs.stats.get(Stats.STRENGTH, 0.0)) + 50.0
+	eq.backpack.append(better_legs)
+	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [better_legs, hands] as Array[ItemInstance],
+		"the best piece for a slot takes it")
 
 
 # --- ItemIcon / ItemArt ---------------------------------------------------------------------------

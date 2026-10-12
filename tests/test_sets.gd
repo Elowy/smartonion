@@ -323,7 +323,8 @@ func test_bonus_change_counts_thresholds() -> void:
 
 
 ## The lookahead (ItemTooltip.set_lookahead): reachable backpack pieces count as worn on both
-## sides, so the item gets its own share of the bonuses within reach.
+## sides (as many as the next threshold needs), so the item gets its own share of the bonus
+## within reach.
 func test_bonus_change_looks_ahead_to_reachable_pieces() -> void:
 	var eq := wearing(&"paladin", ["head", "chest"])
 	var legs := piece(&"paladin", "legs")
@@ -343,6 +344,56 @@ func test_bonus_change_looks_ahead_to_reachable_pieces() -> void:
 	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq), 0, "3 -> 2 pieces: still active")
 	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq, [hands] as Array[ItemInstance]), -1,
 		"but it pushes the reachable 4-piece away: -1")
+
+
+func test_pieces_to_next_bonus() -> void:
+	var data := Db.get_set(&"dawnforged_plate")
+	var got: Array[int] = []
+	for n in 6:
+		got.append(SetBonuses.pieces_to_next_bonus(data, n))
+	check_eq(got, [2, 1, 0, 1, 0, 0] as Array[int], "2- and 4-piece thresholds; nothing above 4")
+	check_eq(SetBonuses.pieces_to_next_bonus(null, 1), 0, "no set data")
+
+
+## Review cases: only the pieces the next threshold still needs count, so spare pieces in the
+## backpack never cancel the item out, and a waiting piece never stands in for a worn one.
+func test_bonus_change_counts_only_the_pieces_the_next_threshold_needs() -> void:
+	var none: Array[ItemInstance] = []
+	# (A) 3 worn, legs + hands waiting: the legs are the 4th piece whatever else waits.
+	var eq := wearing(&"paladin", ["head", "chest", "shoulders"])
+	var legs := piece(&"paladin", "legs")
+	var hands := piece(&"paladin", "hands")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "(A) the 4th piece: +1")
+	check_eq(SetBonuses.bonus_change(hands, none, eq, [legs] as Array[ItemInstance]), 1, "(A) either of them")
+	# (B) 2 worn, three pieces waiting: the 3rd piece needs one of the other two.
+	eq = wearing(&"paladin", ["head", "chest"])
+	var shoulders := piece(&"paladin", "shoulders")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands, shoulders] as Array[ItemInstance]), 1, "(B) a 3rd piece: +1")
+	check_eq(SetBonuses.bonus_change(shoulders, none, eq, [legs, hands] as Array[ItemInstance]), 1, "(B) any of them")
+	# The 2nd piece completes the 2-piece by itself: +1 with one or two pieces waiting.
+	eq = wearing(&"paladin", ["head"])
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "2nd piece, one waiting: +1")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands, shoulders] as Array[ItemInstance]), 1, "2nd piece, two waiting: +1")
+	# (C) 4 worn after giving the legs away for a plain pair: the waiting legs do not count
+	# as worn when a plain item would push out the hands (4 -> 3 breaks the 4-piece).
+	eq = wearing(&"paladin", ["head", "chest", "shoulders", "hands"])
+	var plain_legs := ItemInstance.new()
+	plain_legs.slot_type = Items.SlotType.LEGS
+	plain_legs.armor_type = ClassData.ArmorType.PLATE
+	eq.slots[Items.EquipSlot.LEGS] = plain_legs
+	var worn_hands := eq.get_item(Items.EquipSlot.HANDS)
+	var plain_hands := ItemInstance.new()
+	plain_hands.slot_type = Items.SlotType.HANDS
+	plain_hands.armor_type = ClassData.ArmorType.PLATE
+	check_eq(SetBonuses.bonus_change(plain_hands, [worn_hands] as Array[ItemInstance], eq, [legs] as Array[ItemInstance]), -1,
+		"(C) breaks the worn 4-piece: -1")
+	# A full set gives one piece away for free: 5 -> 4.
+	eq.slots[Items.EquipSlot.LEGS] = legs
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq), 0, "5 -> 4 pieces: 0")
+	# Pieces already worn (or a duplicate of one) never count twice.
+	eq = wearing(&"paladin", ["head", "chest"])
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [piece(&"paladin", "head")] as Array[ItemInstance]), 0,
+		"a duplicate of a worn piece in the backpack: no 4th piece")
 
 
 # --- Player: entries reach the bonus engine ----------------------------------------------------
