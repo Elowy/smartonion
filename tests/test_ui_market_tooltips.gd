@@ -4,7 +4,9 @@ extends TestCase
 ## Legendary with the comparison block) reaches out of its panel over the free band but stops
 ## before the panel at the other end of its screen column (PlayerPanel.tooltip_column_mate;
 ## below MIN_INSIDE_TOOLTIP_FIT only when that floor would cross into it) – all the way to the
-## screen edge when that corner is empty; the shop's tooltips keep clear of it in the band
+## screen edge when that corner is empty; when both players of a column show such a tooltip on
+## the same half of their panels, the bottom one moves to its panel's other half
+## (PlayerPanel.tooltip_obstacle); the shop's tooltips keep clear of them in the band
 ## (ShopPanel.tooltip_obstacles, fed by Intermission._panel_tooltip_rects).
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
@@ -101,7 +103,129 @@ func _show_from_backpack(i: int, item: ItemInstance) -> void:
 
 
 func _stormcaller(i: int) -> ItemInstance:
-	return ItemGenerator.from_unique(Db.get_unique(&"stormcaller"), 25, true, rng, PlayerManager.get_slot(i).class_data)
+	return _unique(i, &"stormcaller")
+
+
+## A wave-25 looted [param id] rolled for [param i]'s class.
+func _unique(i: int, id: StringName) -> ItemInstance:
+	return ItemGenerator.from_unique(Db.get_unique(id), 25, true, rng, PlayerManager.get_slot(i).class_data)
+
+
+## A many-stat Epic piece in every slot of [param i]'s equipment that [param item] could go to:
+## the item's tooltip gets a long comparison block.
+func _wear_rich_for(i: int, item: ItemInstance) -> void:
+	var eq := _eq(i)
+	for target in eq.target_slots(item):
+		var worn: ItemInstance
+		if item.is_weapon():
+			worn = ItemInstance.from_weapon(item.weapon, Items.Rarity.EPIC, 20)
+		else:
+			worn = MarketFakes.make_item("Worn Piece", item.slot_type, item.armor_type, Items.Rarity.EPIC)
+		worn.stats = {Stats.STAMINA: 30.0, Stats.AGILITY: 20.0, Stats.INTELLECT: 20.0, Stats.MASTERY: 9.0,
+			Stats.VERSATILITY: 9.0, Stats.DODGE: 6.0}
+		eq.slots[target] = worn
+
+
+## [param item] against rich gear, in [param i]'s backpack ([param on_doll]: worn instead),
+## selected with the comparison block.
+func _show_tall(i: int, item: ItemInstance, on_doll := false) -> void:
+	_wear_rich_for(i, item)
+	if not on_doll:
+		await _show_from_backpack(i, item)
+		return
+	var panel := screen.panels[i]
+	var target: int = _eq(i).target_slots(item)[0]
+	_eq(i).backpack.clear()
+	_eq(i).slots[target] = item
+	panel.refresh()
+	panel.select_equip_slot(target)
+	if not panel.comparison:
+		panel.toggle_comparison()
+	await tree.process_frame
+	await tree.process_frame
+
+
+## The selected icon of [param i]'s panel (global).
+func _selected_icon(i: int) -> Rect2:
+	var panel := screen.panels[i]
+	var bag := panel.selected_bag_index()
+	return _rect(panel.icon_for_bag_index(bag) if bag >= 0 else panel.icon_for_equip_slot(panel.selected_equip_slot()))
+
+
+## Both players of the column under [param top] (P1 / P2) show their tooltips: each on screen,
+## clear of the other panel and of the other tooltip. Returns whether the bottom one made way
+## (its plan without the top one's tooltip would have covered it).
+func _check_column_apart(top: int, what: String) -> bool:
+	var bottom := top + 2
+	var t := _check_clear_of_the_column_mate(top, "%s: P%d" % [what, top + 1])
+	var b := _check_clear_of_the_column_mate(bottom, "%s: P%d" % [what, bottom + 1])
+	check(not t.intersects(b), "%s: P%d's tooltip %s and P%d's %s keep apart" % [what, top + 1, t, bottom + 1, b])
+	var panel := screen.panels[bottom]
+	var would := panel._tooltip_plan(false).rect
+	if not would.intersects(t):
+		check(b.is_equal_approx(would), "%s: P%d's tooltip stays where it would be anyway" % [what, bottom + 1])
+		return false
+	var own := _rect(panel)
+	var icon := _selected_icon(bottom)
+	check((b.get_center().x < own.get_center().x) == (icon.get_center().x < own.get_center().x),
+		"%s: P%d's tooltip moved to the selected icon's half" % [what, bottom + 1])
+	check_near(b.size.y, would.size.y, 0.5, "%s: at the same size" % what)
+	var band_top := _rect(screen.panels[top]).end.y + PlayerPanel.TOOLTIP_NEIGHBOUR_GAP
+	if b.size.y <= icon.position.y - 6.0 - band_top:
+		check(not b.intersects(icon), "%s: P%d's tooltip leaves the selected icon in sight (%s / %s)" % [what, bottom + 1, b, icon])
+	return true
+
+
+## Both players of a column look at a tall item from their own backpacks – the tooltips on the
+## same half of their panels, both reaching into the band between them: the top one keeps its
+## place, the bottom one moves to its panel's other half (and back once the top one is gone).
+func test_two_tall_tooltips_in_one_column_keep_apart() -> void:
+	await _open_market(CLASSES)
+	for top in 2:
+		var bottom := top + 2
+		var what := "P%d Stormcaller / P%d Bulwark of the Last Stand" % [top + 1, bottom + 1]
+		screen.set_panel_focus(top, true)
+		await _show_tall(top, _stormcaller(top))
+		var alone := _rect(screen.panels[top].tooltip)
+		screen.set_panel_focus(bottom, true)
+		await _show_tall(bottom, _unique(bottom, &"bulwark_of_the_last_stand"))
+		check(screen.panels[bottom].tooltip.item.display_name == "Bulwark of the Last Stand", "%s shown" % what)
+		check(_check_column_apart(top, what), "%s: the bottom one had to make way" % what)
+		check(_rect(screen.panels[top].tooltip).is_equal_approx(alone), "%s: P%d's tooltip keeps its place" % [what, top + 1])
+		# The top player goes back to the shop: the bottom tooltip returns to the half away
+		# from the selected icon.
+		screen.set_panel_focus(top, false)
+		await tree.process_frame
+		await tree.process_frame
+		var own := _rect(screen.panels[bottom])
+		var b := _rect(screen.panels[bottom].tooltip)
+		check((b.get_center().x < own.get_center().x) != (_selected_icon(bottom).get_center().x < own.get_center().x),
+			"P%d's tooltip back on the half away from the selected icon" % (bottom + 1))
+		var obstacle := screen.panels[bottom].tooltip_obstacle
+		check(obstacle.is_valid() and not (obstacle.call() as Rect2).has_area(), "P%d's tooltip has nothing to make way for" % (bottom + 1))
+		screen.set_panel_focus(bottom, false)
+	# Every Legendary unique against the next one, both from the backpack, then both worn.
+	var legendaries: Array[UniqueItemData] = []
+	for data: UniqueItemData in Db.uniques.values():
+		if data.rarity == Items.Rarity.LEGENDARY:
+			legendaries.append(data)
+	var made_way := 0
+	for on_doll in [false, true]:
+		for k in legendaries.size():
+			for top in 2:
+				var bottom := top + 2
+				var a := legendaries[k]
+				var z := legendaries[(k + 1) % legendaries.size()]
+				screen.set_panel_focus(top, true)
+				screen.set_panel_focus(bottom, true)
+				await _show_tall(top, ItemGenerator.from_unique(a, 25, true, rng, PlayerManager.get_slot(top).class_data), on_doll)
+				await _show_tall(bottom, ItemGenerator.from_unique(z, 25, true, rng, PlayerManager.get_slot(bottom).class_data), on_doll)
+				if _check_column_apart(top, "P%d %s / P%d %s%s" % [top + 1, a.display_name, bottom + 1, z.display_name, " (worn)" if on_doll else ""]):
+					made_way += 1
+				screen.set_panel_focus(top, false)
+				screen.set_panel_focus(bottom, false)
+	check(made_way >= 8, "the bottom tooltip made way %d times" % made_way)
+	finished.emit()
 
 
 ## [param i]'s tooltip: shown, on screen, clear of the panel at the other end of the column.
