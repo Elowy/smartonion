@@ -1,0 +1,229 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_devastation"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_devastation"
+display_name = "Devastation"
+description = "Increases your critical strike chance by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_emberstorm"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_emberstorm"
+display_name = "Emberstorm"
+description = "Your Fire damage is increased by {pct}% (your staff, Rain of Fire, your Imp, the Infernal)."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"fire_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "fire"
+}])
+
+[sub_resource type="Resource" id="Resource_fire_and_brimstone"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_fire_and_brimstone"
+display_name = "Fire and Brimstone"
+description = "Rain of Fire deals {power}% more damage and its circle is {radius}% wider."
+values = {
+"power": 4.0,
+"radius": 2.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"rain_of_fire"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rain_of_fire"
+},
+"mods": {
+"power_pct": 4.0,
+"radius_pct": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_aftermath"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_aftermath"
+display_name = "Aftermath"
+description = "Rain of Fire slows enemies inside it by {slow}%."
+values = {
+"slow": 10.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"speed"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rain_of_fire"
+},
+"mods": {
+"slow_add": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_soul_leech"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_soul_leech"
+display_name = "Soul Leech"
+description = "Your critical strikes drain {pct}% of their damage from the target as Shadow damage, healing you for the amount."
+values = {
+"pct": 20.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"leech"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"effect": "drain",
+"hit_pct": 20.0,
+"label": "",
+"school": "shadow",
+"trigger": "on_crit"
+},
+"scale": ["hit_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_shadowburn"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_shadowburn"
+display_name = "Shadowburn"
+description = "When Drain Life's channel completes, Shadowburn scorches the drained enemy for {pct}% of the channel's damage. If it dies within {window} sec, you gain a Soul Shard (at most once every {icd} sec)."
+values = {
+"icd": 10.0,
+"pct": 75.0,
+"window": 3.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"drain_life"
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "drain_life"
+},
+"mods": {
+"shadowburn_pct_add": 75.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_ruin"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_ruin"
+display_name = "Ruin"
+description = "Your critical strikes deal {pct}% more damage."
+values = {
+"pct": 10.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"warlock_destruction_devastation"
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit_damage": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_burning_embers"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_burning_embers"
+display_name = "Burning Embers"
+description = "You start every wave with {shards} extra Soul Shard(s)."
+values = {
+"shards": 1.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"rain_of_fire"
+effects = Array[Dictionary]([{
+"kind": "resource",
+"resource": "soul_shard",
+"start_value_add": 1.0
+}])
+
+[sub_resource type="Resource" id="Resource_conflagrate"]
+script = ExtResource("2_talent")
+id = &"warlock_destruction_conflagrate"
+display_name = "Conflagrate"
+description = "Rain of Fire leaves the ground burning: the circle burns on for {embers} sec at {share}% damage and slows enemies inside by {slow}%. Your critical strikes have a {chance}% chance to grant a Soul Shard."
+values = {
+"chance": 10.0,
+"embers": 3.0,
+"share": 40.0,
+"slow": 30.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &"rain_of_fire"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rain_of_fire"
+},
+"mods": {
+"ember_duration_add": 3.0
+}
+}, {
+"kind": "proc",
+"proc": {
+"chance": 10.0,
+"effect": "resource",
+"label": "Soul Shard",
+"resource": "soul_shard",
+"trigger": "on_crit",
+"value": 1.0
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"warlock_destruction"
+class_id = &"warlock"
+display_name = "Destruction"
+index = 2
+description = "Fire from the sky, critical blasts and Soul Shards."
+icon = &"rain_of_fire"
+color = Color(1, 0.45, 0.12, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_devastation"), SubResource("Resource_emberstorm"), SubResource("Resource_fire_and_brimstone"), SubResource("Resource_aftermath"), SubResource("Resource_soul_leech"), SubResource("Resource_shadowburn"), SubResource("Resource_ruin"), SubResource("Resource_burning_embers"), SubResource("Resource_conflagrate")])
