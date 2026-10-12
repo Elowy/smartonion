@@ -11,9 +11,10 @@ extends TalentEffect
 ## Slayer and the outgoing multipliers – the derived-damage rule, talent_vocabulary §3.6) as
 ## Holy damage to the target and to up to extra_targets more living enemies within radius m of
 ## it (nearest first): deal_raw(..., target_bonus = false, &"proc"), so the outgoing multipliers
-## (Holy %, Purifying Power, Vengeance, auras) apply exactly once. Each strike also heals the
-## most wounded living hero within heal_range m of the Paladin (the Paladin included) for
-## heal_max_hp_pct % of their max HP x the Paladin's Healing Done. Procs never trigger procs.
+## (Holy %, Purifying Power, Vengeance, auras) apply exactly once. Each seal then heals once
+## (however many enemies it struck) the most wounded living hero within heal_range m of the
+## Paladin (the Paladin included) for heal_max_hp_pct % of their max HP x the Paladin's
+## Healing Done. Procs never trigger procs.
 ## Nothing persists between attacks: begin_wave / end_wave / teardown have nothing to undo.
 ## Passive for bots.
 ##

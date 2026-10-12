@@ -4,7 +4,9 @@ extends TestCase
 ## Battle, Vengeance, the Divine Verdict modifier (Word of Glory strikes while the party is
 ## healthy), Righteous Vengeance and the Seal of Command capstone (one RunState.rng roll per
 ## attack, derived damage from the hit's base amount). Sanctified Retribution (the aura's
-## "might") is checked with the other aura talent in test_talents_paladin.gd.
+## "might") is checked with the other aura talent in test_talents_paladin.gd. Every talent is
+## taken back again (player.talents.remove; Seal of Command through Reset Talents) and checked
+## back at neutral.
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -156,6 +158,11 @@ func test_art_of_war_gives_holy_power_on_crits() -> void:
 	p.procs._physics_process(1.1)
 	p.procs.on_hit(e, 5.0, p.main_hand, true)
 	check_eq(hp.value, 2.0, "a second later again")
+	_remove(p, "art_of_war", 3)
+	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone: no talent procs")
+	p.procs._physics_process(1.1)
+	p.procs.on_hit(e, 5.0, p.main_hand, true)
+	check_eq(hp.value, 2.0, "a crit gives nothing after the take-back")
 
 
 func test_sanctity_of_battle_holy_damage_and_consecration_cooldown() -> void:
@@ -194,6 +201,11 @@ func test_vengeance_stacks_twice_after_crits() -> void:
 	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), base + 4.0, "3 crits: 2 stacks of +2%")
 	p.procs._physics_process(8.1)
 	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), base, "gone 8 sec later")
+	_remove(p, "vengeance", 2)
+	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone: no talent procs")
+	for i in 3:
+		p.procs.on_hit(e, 5.0, p.main_hand, true)
+	check_eq(p.stats.get_raw(Stats.DAMAGE_PCT), base, "crits stack nothing after the take-back")
 
 
 func test_divine_verdict_strikes_while_the_party_is_healthy() -> void:
@@ -233,6 +245,15 @@ func test_divine_verdict_strikes_while_the_party_is_healthy() -> void:
 	EnemyGrid.mark_dirty()
 	check(not p.abilities.can_cast(LT), "no enemy within 4 m and nobody hurt: nothing to do")
 	check(not p.abilities.try_cast(LT) and hp.value == 3.0, "no Holy Power spent")
+	e.global_position = Vector3(3.0, 0, 0)
+	EnemyGrid.mark_dirty()
+	check(p.abilities.can_cast(LT), "the enemy back within 4 m")
+	_remove(p, "divine_verdict")
+	params = p.abilities.params_for(Db.get_ability(&"word_of_glory"))
+	check_eq(float(params.get("verdict_pct", 0.0)), 0.0, "undone: verdict_pct 0")
+	check(PaladinWordOfGlory.verdict_target(_wog_ctx(p)) == null, "no Verdict target")
+	check(not p.abilities.can_cast(LT), "a healthy party: nothing to do again")
+	check(not p.abilities.try_cast(LT) and hp.value == 3.0 and e.fake_hits() == 1, "no strike, no Holy Power spent")
 
 
 func test_divine_verdict_prefers_elites_and_the_bot_keeps_holy_power_for_revives() -> void:
@@ -284,6 +305,12 @@ func test_righteous_vengeance_burns_on_crits() -> void:
 	for d in e.fake_damage_log:
 		total += d
 	check_near(total, 10.0 * 0.3 * p.outgoing_damage_mult(e, &"holy", &"dot"), 0.001, "30% of the hit's base amount")
+	_remove(p, "righteous_vengeance", 3)
+	check(_def(p, id).is_empty(), "undone: no burn proc")
+	check_eq(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).size(), 1, "only Art of War's proc is left")
+	var fresh := _enemy(Vector3(-1.2, 0, 0))
+	p.procs.on_hit(fresh, 10.0, p.main_hand, true)
+	check_eq(p.procs.dot_stacks(fresh, id), 0, "a crit burns nothing after the take-back")
 
 
 # --- Seal of Command ---------------------------------------------------------------------------

@@ -4,8 +4,10 @@ extends TestCase
 ## Aura Mastery, Eternal Glory, Unyielding Faith, Light's Grace, Light's Hammer, Divine
 ## Guardian, Purifying Power, the Holy Shock capstone), the aura talents of both trees (Divine
 ## Guardian, Sanctified Retribution) and the bot paths of all three trees (TalentBot reaches
-## each capstone at point 13). Protection: test_talents_paladin_protection.gd; Retribution:
-## test_talents_paladin_retribution.gd.
+## each capstone at point 13). Every talent is also taken back (player.talents.remove, the
+## capstone through Reset Talents) and checked back at neutral. Protection:
+## test_talents_paladin_protection.gd; Retribution: test_talents_paladin_retribution.gd; the
+## texts in the Talents tab: test_talents_paladin_ui.gd.
 ##
 ## Pseudo ability id &"paladin_aura" (BonusVocabulary.PSEUDO_IDS, read by
 ## PaladinAuraOfDevotion.aura_params): BASE {"radius": 6.0, "guard": 0.0, "might": 0.0} –
@@ -194,7 +196,7 @@ func test_the_three_paladin_trees_in_tab_order() -> void:
 	var p := _paladin()
 	check_eq(p.talents.trees().size(), 3, "a Paladin's TalentState holds them")
 	check_eq(Db.get_talent(&"paladin_holy_holy_shock").text_for_rank(1),
-		"Every 4 sec, Holy Shock heals the most wounded hero within 8 m below 90% health (you included) for 6% of their maximum health – or, when nobody needs it, strikes the nearest enemy within 8 m for 100% weapon damage as Holy damage. Haste shortens the interval.",
+		"Every 4 sec: heals the most wounded hero within 8 m below 90% health (you too) for 6% of max health, else smites the nearest enemy in range for 100% weapon damage as Holy. Haste shortens the interval.",
 		"capstone text")
 
 
@@ -293,6 +295,14 @@ func test_eternal_glory_and_lights_grace_change_word_of_glory() -> void:
 	_remove(p, "holy", "lights_grace", 2)
 	var undone := p.abilities.params_for(wog)
 	check(is_equal_approx(float(undone["power"]), 1.0) and is_equal_approx(float(undone["allies"]), 1.0), "Light's Grace undone")
+	_remove(p, "holy", "eternal_glory", 3)
+	check_eq(float(p.abilities.params_for(wog).get("free_chance", 0.0)), 0.0, "Eternal Glory undone: no free casts")
+	allies[0].hp = allies[0].max_hp() * 0.5
+	_holy_power(p).set_value(3.0)
+	p.abilities.set_cooldown(wog, 0.0)
+	_seed_roll(24.0, true)
+	check(p.abilities.try_cast(LT), "cast after the take-back")
+	check_eq(_holy_power(p).value, 0.0, "the same roll no longer makes it free")
 
 
 func test_unyielding_faith_grants_holy_power_on_a_timer() -> void:
@@ -321,6 +331,15 @@ func test_unyielding_faith_grants_holy_power_on_a_timer() -> void:
 	for i in 40:
 		p.procs._physics_process(1.0)
 	check_eq(p.procs.fire_count(&"paladin_holy_unyielding_faith"), fired, "nothing while downed")
+	p.revive(1.0)
+	_remove(p, "holy", "unyielding_faith", 3)
+	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone: no talent procs")
+	gained = 0.0
+	for i in 100:
+		hp.set_value(0.0)
+		p.procs._physics_process(1.0)
+		gained += hp.value
+	check_eq(gained, 0.0, "no Holy Power in 100 s after the take-back")
 
 
 # --- Light's Hammer ----------------------------------------------------------------------------
@@ -354,6 +373,19 @@ func test_lights_hammer_hurls_consecration_at_the_most_wounded_hero() -> void:
 	_step_abilities(p, 299)
 	check_near(ally.hp - before, tick * 8.0, 0.0001, "8 ticks in 4 sec")
 	check_eq(_consecration(p).ground_count(), 0, "the ground's record ends with it")
+	_remove(p, "holy", "lights_hammer")
+	var undone := p.abilities.params_for(cons)
+	check(float(undone["ally_range"]) == 0.0 and float(undone["heal_max_hp_pct"]) == 0.0, "undone: neutral params")
+	for a in _areas():
+		a.free()
+	check(ally.hp < ally.max_hp() * 0.8, "the ally is still the most wounded hero")
+	p.abilities.set_cooldown(cons, 0.0)
+	check(p.abilities.try_cast(RT), "cast after the take-back")
+	check_near(_areas()[0].global_position.x, 0.0, 0.001, "at your feet again")
+	check_eq(_consecration(p).ground_count(), 0, "no rider record")
+	before = ally.hp
+	_step_abilities(p, 30)
+	check_eq(ally.hp, before, "no heal")
 
 
 func test_lights_hammer_placement_rules_and_power() -> void:
@@ -457,6 +489,14 @@ func test_divine_guardian_shields_everybody_in_the_aura() -> void:
 	check(not ally.damage_taken_mults.has(key) and not ally.stats.has_source(key), "the ally left: key and source gone")
 	ally.global_position = Vector3(3.0, 0, 0)
 	aura.refresh()
+	_remove(p, "holy", "divine_guardian", 3)
+	aura.refresh()
+	check(not ally.damage_taken_mults.has(key) and not p.damage_taken_mults.has(key), "undone: the key goes on the next refresh")
+	check(ally.stats.has_source(key), "the Armor of the aura stays (Aura Mastery's Mastery)")
+	check_eq(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0, "nothing left in the engine")
+	_add(p, "holy", "divine_guardian", 3)
+	aura.refresh()
+	check_near(float(ally.damage_taken_mults.get(key, 1.0)), 0.94, 0.0001, "taken again")
 	p.end_wave()
 	check(not ally.damage_taken_mults.has(key) and not p.damage_taken_mults.has(key), "wave end: nobody keeps it")
 	p.begin_wave()
@@ -509,6 +549,8 @@ func test_purifying_power_raises_holy_damage() -> void:
 	check_eq(e.fake_hits(), 1, "one tick")
 	if e.fake_hits() > 0:
 		check_near(e.fake_damage_log[0], area.damage_per_tick * 1.15, 0.0001, "the ground's Holy damage x1.15")
+	_remove(p, "holy", "purifying_power", 3)
+	check_eq(p.bonuses.damage_mult(null, &"holy", &"ability"), 1.0, "undone")
 
 
 # --- Holy Shock --------------------------------------------------------------------------------

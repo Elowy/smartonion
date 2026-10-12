@@ -203,7 +203,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"paladin_holy_holy_shock"
 display_name = "Holy Shock"
-description = "Every {interval} sec, Holy Shock heals the most wounded hero within {range} m below {below}% health (you included) for {heal}% of their maximum health – or, when nobody needs it, strikes the nearest enemy within {range} m for {pct}% weapon damage as Holy damage. Haste shortens the interval."
+description = "Every {interval} sec: heals the most wounded hero within {range} m below {below}% health (you too) for {heal}% of max health, else smites the nearest enemy in range for {pct}% weapon damage as Holy. Haste shortens the interval."
 values = {
 "below": 90.0,
 "heal": 6.0,

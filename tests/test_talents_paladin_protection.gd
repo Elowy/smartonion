@@ -3,7 +3,9 @@ extends TestCase
 ## PlayerBonuses on a real Paladin: Redoubt, Stoicism, Consecrated Ground, Guarded by the
 ## Light, Ardent Defender, the Righteous Fury modifier (Consecration taunts + ward), Shield of
 ## the Templar, Reckoning and the Holy Shield capstone. Proc talents are fired through the real
-## ProcSystem (chance forced to 100% where noted – a test override of the built proc).
+## ProcSystem (chance forced to 100% where noted – a test override of the built proc). Every
+## talent is taken back again (player.talents.remove; Holy Shield through Reset Talents) and
+## checked back at neutral.
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -158,6 +160,13 @@ func test_consecrated_ground_lengthens_consecration() -> void:
 		"Your Consecration lasts 1.5 sec longer.", "text at rank 3")
 	check(p.abilities.try_cast(RT), "cast")
 	check_near(_areas()[0].duration, 5.5, 0.0001, "the ground lasts 5.5 sec")
+	_remove(p, "consecrated_ground", 3)
+	check_eq(float(p.abilities.params_for(cons)["duration"]), 4.0, "undone: 4 sec")
+	for a in _areas():
+		a.free()
+	p.abilities.set_cooldown(cons, 0.0)
+	check(p.abilities.try_cast(RT), "cast after the take-back")
+	check_near(_areas()[0].duration, 4.0, 0.0001, "the ground lasts 4 sec again")
 
 
 func test_guarded_by_the_light_gives_holy_power_on_blocks() -> void:
@@ -181,6 +190,11 @@ func test_guarded_by_the_light_gives_holy_power_on_blocks() -> void:
 	p.procs._physics_process(2.1)
 	p._avoided(&"block", e)
 	check_eq(hp.value, 2.0, "after the icd again")
+	_remove(p, "guarded_by_the_light", 3)
+	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone: no talent procs")
+	p.procs._physics_process(2.1)
+	p._avoided(&"block", e)
+	check_eq(hp.value, 2.0, "a block gives nothing after the take-back")
 
 
 # --- Tier 3 ------------------------------------------------------------------------------------
@@ -257,6 +271,34 @@ func test_righteous_fury_taunts_enemies_in_consecration_and_wards_you() -> void:
 	check_eq(_consecration(p).taunted_count(), 0, "nothing remembered")
 
 
+func test_righteous_fury_taken_back_in_the_market() -> void:
+	var p := _paladin()
+	var key := PaladinConsecration.ward_key(p)
+	var cons := Db.get_ability(&"consecration")
+	var inside := _enemy(Vector3(1.0, 0, 0))
+	_add(p, "redoubt", 3)
+	_add(p, "stoicism", 3)
+	_add(p, "righteous_fury")
+	check(p.abilities.try_cast(RT), "cast")
+	_step_abilities(p, 1)
+	check(inside.is_taunted() and p.damage_taken_mults.has(key), "taunt and ward")
+	# The wave ends, the market opens: the pending point is taken back.
+	p.end_wave()
+	for a in _areas():
+		a.free()
+	check(not inside.is_taunted() and not p.damage_taken_mults.has(key), "wave end: released")
+	_remove(p, "righteous_fury")
+	var params := p.abilities.params_for(cons)
+	check(float(params["taunt"]) == 0.0 and float(params["ward"]) == 0.0, "undone: taunt 0, ward 0")
+	p.begin_wave()
+	p.abilities.set_cooldown(cons, 0.0)
+	check(p.abilities.try_cast(RT), "cast in the next wave")
+	_step_abilities(p, 1)
+	check(not inside.is_taunted(), "a new ground taunts nobody")
+	check(not p.damage_taken_mults.has(key), "no ward")
+	check_eq(_consecration(p).ground_count(), 0, "a plain ground: no rider record")
+
+
 # --- Tier 4 ------------------------------------------------------------------------------------
 
 func test_shield_of_the_templar_needs_redoubt_and_a_shield() -> void:
@@ -272,9 +314,15 @@ func test_shield_of_the_templar_needs_redoubt_and_a_shield() -> void:
 		_add(p, "shield_of_the_templar")
 		check_near(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0 - 0.03 * n, 0.0001, "-3% damage taken per rank")
 		check_eq(p.stats.get_raw(Stats.BLOCK_VALUE), block_value + 30.0 + 10.0 * n, "+10% Block Value per rank")
+	var shield := p.equipment.get_item(Items.EquipSlot.OFF_HAND)
 	_swap_to_tome(p)
 	check_eq(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0, "a Tome: off")
 	check_eq(p.stats.get_raw(Stats.BLOCK_VALUE), block_value, "a Tome: no Block Value")
+	check(p.equipment.equip(shield), "the shield back")
+	check_near(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 0.91, 0.0001, "on again")
+	_remove(p, "shield_of_the_templar", 3)
+	check_eq(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0, "undone: full damage taken")
+	check_eq(p.stats.get_raw(Stats.BLOCK_VALUE), block_value + 30.0, "undone: Redoubt's Block Value only")
 
 
 func test_reckoning_strikes_back_when_struck() -> void:
@@ -296,6 +344,11 @@ func test_reckoning_strikes_back_when_struck() -> void:
 	p.procs._physics_process(0.6)
 	p.procs.on_struck(e, 1.0)
 	check_eq(e.fake_hits(), 2, "after the icd again")
+	_remove(p, "reckoning", 3)
+	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone: no talent procs")
+	p.procs._physics_process(0.6)
+	p.procs.on_struck(e, 1.0)
+	check_eq(e.fake_hits(), 2, "no strike back after the take-back")
 
 
 # --- Holy Shield -------------------------------------------------------------------------------

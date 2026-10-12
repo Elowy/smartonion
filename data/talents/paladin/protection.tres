@@ -232,7 +232,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"paladin_protection_holy_shield"
 display_name = "Holy Shield"
-description = "While you hold a shield, your chance to block is increased by {block}%. Each blocked hit strikes the attacker for {pct}% weapon damage as Holy damage and shields the most wounded ally within {range} m for {ally}% of their maximum health for {duration} sec (up to {cap}%)."
+description = "With a shield: +{block}% block chance. Each block strikes back for {pct}% weapon damage as Holy and shields the most wounded ally within {range} m for {ally}% of max health for {duration} sec (up to {cap}%)."
 values = {
 "ally": 2.0,
 "block": 20.0,

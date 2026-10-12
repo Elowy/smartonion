@@ -133,7 +133,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"paladin_retribution_divine_verdict"
 display_name = "Divine Verdict"
-description = "When no hero in range is below {below}% health and nobody needs a revive, Word of Glory instead strikes the nearest enemy within {range} m (elites and bosses first) for {pct}% weapon damage as Holy damage."
+description = "When nobody in range is below {below}% health or needs a revive, Word of Glory strikes the nearest enemy within {range} m (elites and bosses first) for {pct}% weapon damage as Holy."
 values = {
 "below": 80.0,
 "pct": 300.0,
@@ -209,7 +209,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"paladin_retribution_seal_of_command"
 display_name = "Seal of Command"
-description = "Your weapon attacks have a {chance}% chance to unleash a holy strike for {pct}% of the hit's damage on the target and up to {extra} more enemies within {radius} m of it. Each strike heals the most wounded hero within {range} m (you included) for {heal}% of their maximum health."
+description = "Weapon attacks have a {chance}% chance to deal {pct}% of the hit as Holy damage to the target and up to {extra} enemies within {radius} m of it, healing the most wounded hero within {range} m for {heal}% of max health."
 values = {
 "chance": 15.0,
 "extra": 2.0,
