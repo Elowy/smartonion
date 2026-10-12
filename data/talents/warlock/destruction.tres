@@ -174,7 +174,7 @@ kind = 0
 tier = 4
 column = 1
 max_rank = 3
-icon = &"rain_of_fire"
+icon = &"resource_regen"
 effects = Array[Dictionary]([{
 "kind": "resource",
 "resource": "soul_shard",
@@ -196,7 +196,6 @@ kind = 2
 tier = 5
 column = 0
 max_rank = 1
-icon = &"rain_of_fire"
 effects = Array[Dictionary]([{
 "kind": "ability",
 "match": {

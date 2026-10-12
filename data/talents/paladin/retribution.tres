@@ -167,7 +167,7 @@ kind = 0
 tier = 4
 column = 0
 max_rank = 3
-icon = &"damage_pct"
+icon = &"area_size"
 effects = Array[Dictionary]([{
 "kind": "ability",
 "match": {

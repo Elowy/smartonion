@@ -106,7 +106,7 @@ kind = 0
 tier = 3
 column = 0
 max_rank = 2
-icon = &"seed_of_corruption"
+icon = &"damage_pct"
 effects = Array[Dictionary]([{
 "kind": "damage",
 "pct": 6.0,
@@ -152,7 +152,7 @@ tier = 4
 column = 0
 max_rank = 3
 prerequisite = &"warlock_affliction_curse_of_agony"
-icon = &"corruption"
+icon = &"area_size"
 effects = Array[Dictionary]([{
 "kind": "ability",
 "match": {

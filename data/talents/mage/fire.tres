@@ -186,7 +186,6 @@ kind = 2
 tier = 5
 column = 0
 max_rank = 1
-icon = &"fireball"
 effects = Array[Dictionary]([{
 "kind": "script",
 "params": {

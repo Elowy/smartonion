@@ -56,7 +56,7 @@ tier = 2
 column = 0
 max_rank = 3
 prerequisite = &"rogue_assassination_malice"
-icon = &"crit"
+icon = &"extra_attack"
 effects = Array[Dictionary]([{
 "kind": "proc",
 "proc": {

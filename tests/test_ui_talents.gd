@@ -756,6 +756,46 @@ func test_locked_tiers_rail_and_prerequisite_arrows() -> void:
 	check_eq(tab.rail.open, [true, false, false, false, false] as Array[bool], "the rail shows Fury's gates")
 
 
+## The picture a node of [param t] draws as one comparable key: two sources that draw the same
+## glyph (block_chance / block_value, an ability icon and the same ability as a modifier) match.
+static func _drawn_glyph(t: TalentData) -> String:
+	var source := TalentNode.source_for(t)
+	var key := StringName(source.get_slice(":", 1))
+	if source.begins_with("ability:"):
+		return "ability:%d" % AbilityIcon.glyph_for_ability(Db.get_ability(key))
+	if source.begins_with("school:"):
+		return "ability:%d" % AbilityIcon.glyph_for(&"", key, &"")
+	if source.begins_with("stat:"):
+		return "talent:%d" % TalentGlyph.for_stat(key)
+	return "talent:%d" % TalentGlyph.for_kind(t.kind)
+
+
+## Every shipped tree tells its talents apart at a glance: the capstone's glyph is its own (no
+## other node of the tree, modifiers included, draws it) and no two plain talents share one
+## (a modifier may show the glyph of the ability it changes – its gear badge sets it apart).
+func test_shipped_trees_have_distinct_glyphs() -> void:
+	var trees := 0
+	for class_id: StringName in Db.classes:
+		for tree_data in Db.talent_trees_for(class_id):
+			trees += 1
+			var seen: Dictionary[String, StringName] = {}
+			var capstone: TalentData = null
+			for t in tree_data.talents:
+				if t.is_capstone():
+					capstone = t
+				if t.is_modifier():
+					continue
+				var key := _drawn_glyph(t)
+				check(not seen.has(key), "%s: %s draws the glyph of %s (%s)" % [tree_data.id, t.id, seen.get(key, &""), TalentNode.source_for(t)])
+				seen[key] = t.id
+			check(capstone != null, "%s has a capstone" % tree_data.id)
+			for t in tree_data.talents:
+				if capstone != null and t != capstone:
+					check(_drawn_glyph(t) != _drawn_glyph(capstone),
+						"%s: the capstone %s shares its glyph with %s (%s)" % [tree_data.id, capstone.id, t.id, TalentNode.source_for(t)])
+	check_eq(trees, 15, "five classes, three trees each")
+
+
 func test_glyph_sources() -> void:
 	var t := TalentData.new()
 	t.icon = &"whirlwind"
