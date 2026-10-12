@@ -11,6 +11,8 @@ var panels: Array[PlayerPanel] = []
 var traded: Array = []
 var sold: Array = []
 var _async := false
+## The headless root's size while a test runs on a 1920 x 1080 root (restored in after_each).
+var _root_size := Vector2i.ZERO
 
 
 func is_async() -> bool:
@@ -28,6 +30,9 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	if _root_size != Vector2i.ZERO:
+		tree.root.size = _root_size
+		_root_size = Vector2i.ZERO
 	for panel in panels:
 		UiFakes.free_node(panel)
 	for p in players:
@@ -494,19 +499,27 @@ func test_stat_list_fits_its_inset_with_long_rows() -> void:
 	finished.emit()
 
 
-## Every tier-set piece's tooltip in each corner of the 4-player market layout (Intermission
-## scale, tooltip_inside): the compact set block (slot names, no flavor) keeps a looted piece's
-## tooltip inside its panel at a readable scale (about 0.9 or more); with the comparison block on
-## top it keeps that scale (PlayerPanel.MIN_INSIDE_TOOLTIP_FIT) and reaches out of the panel
-## towards the middle, on screen.
+## Every tier-set piece's tooltip in each corner of the 4-player market layout at 1920 x 1080
+## (Intermission scale, tooltip_inside, the root resized like the real screen): the compact set
+## block (slot names, no flavor) keeps a looted piece's tooltip inside its panel at a readable
+## scale (about 0.9 or more); with the comparison block on top it keeps that scale
+## (PlayerPanel.MIN_INSIDE_TOOLTIP_FIT) and reaches out of the panel towards the middle, on
+## screen. Neither it nor a wave-25 Legendary unique with the comparison block ever reaches the
+## other corner panel of its screen column (those shrink below the floor only when it would).
 func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 	_async = true
+	_root_size = tree.root.size
+	tree.root.size = Vector2i(1920, 1080)
+	await tree.process_frame
 	# The body text of a 4-player panel's tooltip at 1280 x 720: 20 px x 0.83 x 0.67 x this ≈ 10 px.
 	const READABLE_FIT := 0.899
 	var s := Intermission.panel_scale(PlayerPanel.DESIGN_SIZE)
 	var shown := PlayerPanel.DESIGN_SIZE * s
 	var m := Intermission.MARGIN
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
 	var pieces := 0
+	var legendaries := 0
 	for data: SetData in Db.sets.values():
 		var slot := _join(data.class_id)
 		var eq := _eq(slot)
@@ -514,8 +527,12 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 		panel.tooltip_inside = true
 		panel.scale = Vector2(s, s)
 		var view := panel.get_viewport_rect()
+		check_eq(view.size, Vector2(1920, 1080), "the 1920 x 1080 view")
 		var corners: Array[Vector2] = [Vector2(m, m), Vector2(view.end.x - m - shown.x, m),
 			Vector2(m, view.end.y - m - shown.y), Vector2(view.end.x - m - shown.x, view.end.y - m - shown.y)]
+		# The panel at the other end of each corner's column.
+		var mates: Array[Rect2] = [Rect2(corners[2], shown), Rect2(corners[3], shown), Rect2(corners[0], shown),
+			Rect2(corners[1], shown)]
 		for i in data.piece_ids.size():
 			var piece := Items_.set_piece(data.class_id, String(data.piece_ids[i]).get_slice("_", 2))
 			piece.looted = true
@@ -545,15 +562,50 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 					check(panel.tooltip.scale.y >= READABLE_FIT,
 						"%s: readable scale %.2f" % [what, panel.tooltip.scale.y])
 					check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+					check(not tip.intersects(mates[c]), "%s: clear of the column's other panel %s / %s" % [what, tip, mates[c]])
 					if not comparison:
 						check(panel_rect.grow(0.5).encloses(tip), "%s: inside its panel %s / %s" % [what, tip, panel_rect])
 			pieces += 1
+		# The Legendary uniques this class can use, in the backpack, compared with an item of
+		# many other stats in every slot they could go to (a long comparison block).
+		if not panel.comparison:
+			panel.toggle_comparison()
+		for unique: UniqueItemData in Db.uniques.values():
+			if unique.rarity != Items.Rarity.LEGENDARY or not ItemGenerator.unique_usable_by(unique, slot.class_data):
+				continue
+			var item := ItemGenerator.from_unique(unique, 25, true, rng, slot.class_data)
+			eq.slots.clear()
+			for target in eq.target_slots(item):
+				var worn := Items_.armor("Worn Piece", item.slot_type, item.armor_type, 3, {})
+				if item.is_weapon():
+					worn = ItemInstance.from_weapon(item.weapon, Items.Rarity.EPIC, 20)
+				worn.stats = {Stats.STAMINA: 30.0, Stats.AGILITY: 20.0, Stats.INTELLECT: 20.0, Stats.MASTERY: 9.0,
+					Stats.VERSATILITY: 9.0, Stats.DODGE: 6.0, Stats.LEECH: 4.0, Stats.SPEED: 5.0}
+				eq.slots[target] = worn
+			eq.backpack.clear()
+			eq.add_to_backpack(item)
+			panel.select_backpack(0)
+			check(panel.tooltip.visible and panel.tooltip.compare != null, "%s: shown with the comparison block" % item.display_name)
+			await tree.process_frame
+			await tree.process_frame
+			for c in corners.size():
+				panel.position = corners[c]
+				panel._place_tooltip()
+				var what := "%s %s (corner %d)" % [data.class_id, item.display_name, c + 1]
+				var tip := panel.tooltip.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.tooltip.size)
+				check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+				check(not tip.intersects(mates[c]), "%s: clear of the column's other panel %s / %s" % [what, tip, mates[c]])
+				var room := view.size.y - 2.0 * m - shown.y - PlayerPanel.TOOLTIP_NEIGHBOUR_GAP
+				check(panel.tooltip.scale.y >= READABLE_FIT or tip.size.y >= room - 0.5,
+					"%s: below the floor (%.2f) only when it fills the column" % [what, panel.tooltip.scale.y])
+			legendaries += 1
 		panels.erase(panel)
 		UiFakes.free_node(panel)
 		players.erase(slot.player)
 		(slot.player as Player).free()
 		UiFakes.reset_players()
 	check_eq(pieces, 25, "five pieces of five sets")
+	check(legendaries >= 8, "Legendary uniques checked: %d" % legendaries)
 	finished.emit()
 
 
