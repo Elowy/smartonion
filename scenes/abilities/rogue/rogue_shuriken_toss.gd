@@ -5,7 +5,8 @@ extends AbilityEffect
 ## a weapon-based hit of the main hand ([code]damage_pct[/code] % x "power", rolls its own
 ## crit) flying [code]range[/code] m at [code]speed[/code] m/s through [code]pierce[/code]
 ## enemies – [RogueBlade]s, so crits give Combo Points and Deadly Poison and the throw rolls
-## the on-hit procs once.
+## the on-hit procs once. A talent script that forces crits (Shadow Dance) is asked before each
+## star's roll (RogueUtil.bonus_crit).
 ## Rank III: +2 shuriken. Rank V: "Razor Stars" ([code]pierce[/code] +2, [code]range[/code]
 ## +4) or "Twin Volley" ([code]volleys[/code] 2: a second fan [code]volley_delay[/code] s later,
 ## re-aimed at the nearest enemy; dropped when the Rogue goes down and with the wave).
@@ -39,7 +40,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var dir := WeaponRunner.flat(ctx.target.global_position - player.global_position)
 	dir = dir.normalized() if dir.length_squared() > 0.0001 else WeaponRunner.flat(ctx.direction).normalized()
 	_fallback_dir = dir
-	if not throw_volley(player, dir, _params):
+	if not throw_volley(player, dir, _params, ctx.target):
 		return false
 	_volleys_left = maxi(1, roundi(ctx.num("volleys", 1.0))) - 1
 	_volley_delay = maxf(0.05, ctx.num("volley_delay", 0.25))
@@ -67,7 +68,7 @@ func tick(_ctx: AbilityContext, delta: float) -> void:
 		var to := WeaponRunner.flat(target.global_position - _player.global_position)
 		if to.length_squared() > 0.0001:
 			dir = to.normalized()
-	throw_volley(_player, dir, _params)
+	throw_volley(_player, dir, _params, target)
 
 
 func begin_wave(_ctx: AbilityContext) -> void:
@@ -86,8 +87,10 @@ func _on_downed_changed(is_downed: bool) -> void:
 
 
 ## One fan of shuriken from [param player] centred on [param dir]. False when nothing could be
-## thrown (no weapon, not in a tree).
-static func throw_volley(player: Player, dir: Vector3, params: Dictionary) -> bool:
+## thrown (no weapon, not in a tree). [param target] (the aimed enemy, may be null) is what a
+## talent script that forces crits is asked about (RogueUtil.bonus_crit – Shadow Dance) before
+## each star's own roll.
+static func throw_volley(player: Player, dir: Vector3, params: Dictionary, target: Node3D = null) -> bool:
 	var weapon := RogueUtil.weapon(player)
 	var parent := WeaponRunner.effects_parent(player)
 	if weapon == null or parent == null:
@@ -106,7 +109,7 @@ static func throw_volley(player: Player, dir: Vector3, params: Dictionary) -> bo
 		if count > 1:
 			angle = spread * (float(i) / float(count - 1) - 0.5)
 		var shot := dir.rotated(Vector3.UP, angle)
-		var crit := CombatMath.roll_crit(player.stats, RunState.rng)
+		var crit := RogueUtil.bonus_crit(player, target) or CombatMath.roll_crit(player.stats, RunState.rng)
 		var star := RogueBlade.throw(player, weapon, damage * (crit_mult if crit else 1.0), crit, shot,
 				speed, reach, pierce, COLOR, RogueBlade.Look.SHURIKEN)
 		star.knockback = KNOCKBACK

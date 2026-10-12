@@ -3,7 +3,7 @@ extends AbilityEffect
 ## Blade Flurry (GDD 6.4, Rogue Auto): for [code]duration[/code] (5) seconds every weapon hit
 ## of the Rogue (daggers, thrown knives and shuriken, Killing Spree strikes) also strikes
 ## [code]targets[/code] (1) other enemies – the nearest living ones within [code]range[/code]
-## (5) m of the enemy that was hit – for [code]damage_pct[/code] (60) % of that hit x "power".
+## (5) m of the enemy that was hit – for [code]damage_pct[/code] (50) % of that hit x "power".
 ##
 ## Listens to Player.hit_dealt while active. The echo is ability damage
 ## (ProcSystem.deal_raw(..., &"ability")), not a weapon hit, so it never echoes again, rolls
@@ -12,7 +12,7 @@ extends AbilityEffect
 ## the new target, with that target's own bonus), its crit is kept.
 ## Rank III: +1 extra target. Rank V: "Relentless Flurry" ([code]extend_on_kill[/code]: every
 ## kill while it lasts adds that many seconds, up to [code]max_extend[/code]) or "Adrenaline
-## Rush" ([code]haste_pct[/code] % Haste x power while it lasts, StatBlock source
+## Surge" ([code]haste_pct[/code] % Haste x power while it lasts, StatBlock source
 ## [constant HASTE_SOURCE]).
 ## Ends with the duration, when the Rogue goes down, with the wave, and when forgotten.
 

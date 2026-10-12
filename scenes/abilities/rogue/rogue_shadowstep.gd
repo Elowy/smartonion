@@ -10,7 +10,9 @@ extends AbilityEffect
 ## props (RogueUtil.spot_behind); no enemy in range: nothing happens, nothing is spent.
 ## Rank III: +1 guaranteed crit. Rank V: "Ambush" ([code]strike_pct[/code]: the step ends in
 ## a weapon strike on the target for that % x power – it takes the guaranteed crit – and a
-## [code]stun[/code] s stun) or "Shadow Dance" ([code]charges[/code] +1: two steps in a row).
+## [code]stun[/code] s stun) or "Twin Shadows" ([code]charges[/code] +1: two steps in a row).
+## The Ambush strike asks a talent script that forces crits (RogueUtil.bonus_crit – Shadow
+## Dance) after the banked guaranteed crit and before its own roll.
 ## Bot rule: an enemy at least AUTO_MIN_GAP m away, the Rogue healthy enough and not reviving,
 ## and not too many enemies waiting around the target.
 
@@ -147,7 +149,8 @@ static func _ambush(player: Player, enemy: Enemy, mult: float) -> void:
 	var weapon := RogueUtil.weapon(player)
 	if weapon == null or not is_instance_valid(enemy) or enemy.is_dead():
 		return
-	var crit := player.consume_forced_crit() or CombatMath.roll_crit(player.stats, RunState.rng)
+	var crit := player.consume_forced_crit() or RogueUtil.bonus_crit(player, enemy) \
+			or CombatMath.roll_crit(player.stats, RunState.rng)
 	var damage := CombatMath.weapon_hit_damage(weapon, player.stats) * mult \
 			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
 	var dir := WeaponRunner.flat(enemy.global_position - player.global_position)

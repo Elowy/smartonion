@@ -18,8 +18,10 @@ targeting = 0
 cast_range = 5.0
 effect = ExtResource("2_effect")
 params = {
+"auto_offense": 0.0,
 "cooldown": 15.0,
 "duration": 2.0,
+"end_fan": 0.0,
 "forced_crits": 1,
 "heal_max_hp_pct": 30.0,
 "invulnerable": 0,

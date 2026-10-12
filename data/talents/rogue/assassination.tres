@@ -1,0 +1,229 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_malice"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_malice"
+display_name = "Malice"
+description = "Increases your chance to get a critical strike by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_improved_poisons"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_improved_poisons"
+display_name = "Improved Poisons"
+description = "Increases your Mastery by {mastery}: each Deadly Poison stack deals more of the critical hit's damage."
+values = {
+"mastery": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_seal_fate"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_seal_fate"
+display_name = "Seal Fate"
+description = "Your critical weapon hits have a {chance}% chance to grant an extra Combo Point."
+values = {
+"chance": 15.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+prerequisite = &"rogue_assassination_malice"
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 15.0,
+"effect": "resource",
+"label": "",
+"resource": "combo_points",
+"trigger": "on_crit",
+"value": 1
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_coup_de_grace"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_coup_de_grace"
+display_name = "Coup de Grace"
+description = "Fan of Knives deals an extra {pct}% damage for each Combo Point it spends."
+values = {
+"pct": 2.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"fan_of_knives"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fan_of_knives"
+},
+"mods": {
+"combo_bonus_pct_add": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_lethality"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_lethality"
+display_name = "Lethality"
+description = "Your critical strikes deal {crit}% more damage."
+values = {
+"crit": 10.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit_damage": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_envenom"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_envenom"
+display_name = "Envenom"
+description = "Fan of Knives consumes the Deadly Poison of every enemy it hits: the enemy takes {pct}% of the poison's remaining damage at once as Nature damage."
+values = {
+"pct": 150.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"fan_of_knives"
+icon = &"fan_of_knives"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fan_of_knives"
+},
+"mods": {
+"envenom_pct_add": 150.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_venomous_wounds"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_venomous_wounds"
+display_name = "Venomous Wounds"
+description = "When an enemy carrying your Deadly Poison dies, you regain {energy} Energy."
+values = {
+"energy": 1.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rogue_deadly_poison"
+},
+"mods": {
+"kill_energy_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_master_poisoner"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_master_poisoner"
+display_name = "Master Poisoner"
+description = "Your Deadly Poison can stack {stacks} more time(s), and your Nature damage is increased by {pct}%."
+values = {
+"pct": 4.0,
+"stacks": 1.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+prerequisite = &"rogue_assassination_improved_poisons"
+icon = &"nature_damage"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "rogue_deadly_poison"
+},
+"mods": {
+"max_stacks_add": 1
+}
+}, {
+"kind": "damage",
+"pct": 4.0,
+"school": "nature"
+}])
+
+[sub_resource type="Resource" id="Resource_cold_blood"]
+script = ExtResource("2_talent")
+id = &"rogue_assassination_cold_blood"
+display_name = "Cold Blood"
+description = "Every third Fan of Knives you throw in a wave is a guaranteed critical strike with {crit}% more critical damage, and its knives cripple: enemies hit are {slow}% slower for {slow_duration} sec."
+values = {
+"crit": 50.0,
+"slow": 30.0,
+"slow_duration": 3.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fan_of_knives"
+},
+"mods": {
+"cold_blood_crit_damage": 50.0,
+"cold_blood_every": 3,
+"cold_blood_slow": 30.0,
+"cold_blood_slow_duration": 3.0
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"rogue_assassination"
+class_id = &"rogue"
+display_name = "Assassination"
+index = 0
+description = "Deadly poisons, Combo Points and lethal Fans of Knives."
+icon = &"poison_bomb"
+color = Color(0.45, 0.8, 0.3, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_malice"), SubResource("Resource_improved_poisons"), SubResource("Resource_seal_fate"), SubResource("Resource_coup_de_grace"), SubResource("Resource_lethality"), SubResource("Resource_envenom"), SubResource("Resource_venomous_wounds"), SubResource("Resource_master_poisoner"), SubResource("Resource_cold_blood")])

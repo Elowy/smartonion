@@ -1,0 +1,238 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_lightning_reflexes"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_lightning_reflexes"
+display_name = "Lightning Reflexes"
+description = "Increases your chance to dodge attacks by {dodge}%."
+values = {
+"dodge": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"dodge"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"dodge": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_combat_potency"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_combat_potency"
+display_name = "Combat Potency"
+description = "Your weapon attacks have a {chance}% chance to generate {energy_fixed} Energy."
+values = {
+"chance": 8.0,
+"energy_fixed": 2.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 8.0,
+"effect": "resource",
+"label": "",
+"resource": "energy",
+"trigger": "on_hit",
+"value": 2.0
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_unfair_advantage"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_unfair_advantage"
+display_name = "Unfair Advantage"
+description = "Increases your chance to dodge by {dodge}%. When you dodge an attack, you have a {chance}% chance to strike back at once."
+values = {
+"chance": 25.0,
+"dodge": 1.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+prerequisite = &"rogue_combat_lightning_reflexes"
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"dodge": 1.0
+}
+}, {
+"kind": "proc",
+"proc": {
+"chance": 25.0,
+"count": 1,
+"effect": "extra_attack",
+"icd": 0.5,
+"label": "",
+"trigger": "on_dodge"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_aggression"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_aggression"
+display_name = "Aggression"
+description = "Increases your Physical damage by {pct}%."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"physical_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "physical"
+}])
+
+[sub_resource type="Resource" id="Resource_ambidexterity"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_ambidexterity"
+display_name = "Ambidexterity"
+description = "While dual wielding, your Haste is increased by {haste}%."
+values = {
+"haste": 5.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"requires": {
+"weapon": "dual_wield"
+},
+"stats": {
+"haste": 5.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_restless_blades"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_restless_blades"
+display_name = "Restless Blades"
+description = "For each Combo Point Fan of Knives spends, the cooldowns of your other Rogue abilities are reduced by {sec} sec."
+values = {
+"sec": 0.2
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"fan_of_knives"
+icon = &"fan_of_knives"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fan_of_knives"
+},
+"mods": {
+"cdr_per_combo": 0.2
+}
+}])
+
+[sub_resource type="Resource" id="Resource_hack_and_slash"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_hack_and_slash"
+display_name = "Hack and Slash"
+description = "Your weapon hits have a {chance}% chance to strike again at once."
+values = {
+"chance": 4.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"extra_attack": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_blade_tactics"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_blade_tactics"
+display_name = "Blade Tactics"
+description = "Blade Flurry and Killing Spree deal {pct}% more damage and recharge {cd}% faster."
+values = {
+"cd": 6.0,
+"pct": 6.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"killing_spree"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"ids": ["blade_flurry", "killing_spree"]
+},
+"mods": {
+"cooldown_pct": -6.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_adrenaline_rush"]
+script = ExtResource("2_talent")
+id = &"rogue_combat_adrenaline_rush"
+display_name = "Adrenaline Rush"
+description = "While {enemies} or more enemies are within {radius} m of you, your Energy is generated {regen}% faster and allies within {ally_radius} m gain {haste}% Haste."
+values = {
+"ally_radius": 8.0,
+"enemies": 3.0,
+"haste": 10.0,
+"radius": 5.0,
+"regen": 50.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"ally_haste": 10.0,
+"ally_radius": 8.0,
+"interval": 0.25,
+"linger": 1.0,
+"min_enemies": 3,
+"radius": 5.0,
+"regen_pct": 50.0,
+"text_interval": 8.0
+},
+"script": "res://scenes/talents/rogue/combat_adrenaline_rush.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"rogue_combat"
+class_id = &"rogue"
+display_name = "Combat"
+index = 1
+description = "Dual-wielding melee: dodges, Energy and a storm of blades."
+icon = &"blade_flurry"
+color = Color(0.95, 0.78, 0.25, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_lightning_reflexes"), SubResource("Resource_combat_potency"), SubResource("Resource_unfair_advantage"), SubResource("Resource_aggression"), SubResource("Resource_ambidexterity"), SubResource("Resource_restless_blades"), SubResource("Resource_hack_and_slash"), SubResource("Resource_blade_tactics"), SubResource("Resource_adrenaline_rush")])

@@ -1,7 +1,9 @@
 class_name RogueUtil
 extends RefCounted
 ## Small helpers shared by the Rogue kit (Fan of Knives, Vanish, Deadly Poison, the learned
-## M4 abilities, bots): weapon damage, enemy queries and the teleports' landing spots.
+## M4 abilities, bots): weapon damage, enemy queries and the teleports' landing spots; the M5
+## talent hooks [method bonus_crit] (Shadow Dance) and [method reduce_other_cooldowns]
+## (Restless Blades).
 
 const COMBO_ID := &"combo_points"
 const ENERGY_ID := &"energy"
@@ -58,6 +60,34 @@ static func weapon_damage(player: Player, school: StringName = CombatMath.SCHOOL
 ## Crit multiplier of the Rogue's weapon (x2 without one).
 static func crit_mult(player: Player) -> float:
 	return CombatMath.crit_multiplier(weapon(player), player.stats) if player != null else 2.0
+
+
+## True when a talent / set script forces the crit of a Rogue weapon-hit ability on
+## [param target] (PlayerBonuses.crit_forced – Shadow Dance; [param target] may be null for
+## blades rolled at the throw). The kit asks it after Player.consume_forced_crit() and before
+## its own CombatMath.roll_crit, so without such a script the RunState.rng draws are unchanged.
+static func bonus_crit(player: Player, target: Node3D) -> bool:
+	return player != null and player.bonuses != null and player.bonuses.crit_forced(target)
+
+
+## Restless Blades (Combat talent, Fan of Knives "cdr_per_combo"): shortens the running
+## recharge of every slotted Rogue ability (AbilityData.class_id &"rogue") except
+## [param except] by [param seconds] through AbilityRunner.reduce_cooldown – one charge back at
+## most, never below 0; general abilities (Sprint, Berserking ...) are not touched. Returns how
+## many recharges were shortened.
+static func reduce_other_cooldowns(player: Player, except: AbilityData, seconds: float) -> int:
+	if player == null or player.abilities == null or seconds <= 0.0:
+		return 0
+	var runner := player.abilities
+	var count := 0
+	for a in runner.slots:
+		if a == null or a.class_id != &"rogue" or (except != null and a.id == except.id):
+			continue
+		if runner.cooldown_left(a) <= 0.0:
+			continue
+		runner.reduce_cooldown(a, seconds)
+		count += 1
+	return count
 
 
 ## Living enemies whose body touches the circle of [param radius] around [param center] (XZ),

@@ -22,6 +22,17 @@ extends AbilityEffect
 ## mesh's new "own" material and the mesh is faded again (at once on hp_changed and every
 ## tick). The effect ends early when the player goes down (before the downed ghost look saves
 ## the materials), and with the wave (begin_wave / end_wave).
+##
+## M5 talent params (neutral defaults in the data – talents_rogue.md 4.3):
+##   [code]end_fan[/code] (0)      – Unseen Blades: when the Vanish runs out on its own (not a
+##                                   recast, going down or a wave hook), the hero throws a free
+##                                   Fan of Knives (RogueFanOfKnives.throw_free).
+##   [code]auto_offense[/code] (0) – bots only (Vanish is a core LT slot humans press): above
+##                                   0, a bot also vanishes offensively – HP at least
+##                                   AUTO_OFFENSE_HP, AUTO_OFFENSE_MIN enemies within
+##                                   AUTO_OFFENSE_RANGE m, Energy at least AUTO_OFFENSE_ENERGY
+##                                   and not reviving a teammate. Every Subtlety talent that
+##                                   rewards casting Vanish adds it.
 
 const SMOKE_COLOR := Color(0.36, 0.33, 0.46)
 const SPEED_SOURCE := &"vanish"
@@ -34,10 +45,19 @@ const TEXT_COLOR := Color(0.74, 0.68, 0.95)
 ## Bots vanish below this share of their HP when an enemy is this close (m).
 const AUTO_HP_RATIO := 0.4
 const AUTO_ENEMY_RANGE := 4.0
+## Offensive bot rule ("auto_offense" > 0): healthy, in a pack, with Energy for the fans.
+const AUTO_OFFENSE_HP := 0.5
+const AUTO_OFFENSE_MIN := 3
+const AUTO_OFFENSE_RANGE := 5.0
+const AUTO_OFFENSE_ENERGY := 50.0
 const TIME_EPSILON := 0.0001
 
 var _player: Player
 var _left := 0.0
+## Unseen Blades: this Vanish throws a free fan when it runs out (cleared by every end).
+var _end_fan := false
+## Free fans thrown by Unseen Blades (tests).
+var end_fans := 0
 ## The meshes turned into the silhouette, their own materials and the silhouette material.
 var _faded: Array[MeshInstance3D] = []
 var _originals: Array[Material] = []
@@ -49,19 +69,26 @@ func wants_auto_cast(ctx: AbilityContext) -> bool:
 	var player := ctx.player
 	if player == null or not player.is_inside_tree() or player.max_hp() <= 0.0:
 		return false
-	if player.hp / player.max_hp() >= AUTO_HP_RATIO:
+	var ratio := player.hp / player.max_hp()
+	if ratio < AUTO_HP_RATIO:
+		return RogueUtil.enemies_within(player, AUTO_ENEMY_RANGE) >= 1
+	if ctx.num("auto_offense", 0.0) <= 0.0 or ratio < AUTO_OFFENSE_HP or player.is_reviving():
 		return false
-	return RogueUtil.enemies_within(player, AUTO_ENEMY_RANGE) >= 1
+	var energy := player.abilities.get_resource(RogueUtil.ENERGY_ID) if player.abilities != null else null
+	if energy == null or energy.value < AUTO_OFFENSE_ENERGY:
+		return false
+	return RogueUtil.enemies_within(player, AUTO_OFFENSE_RANGE) >= AUTO_OFFENSE_MIN
 
 
 func cast(ctx: AbilityContext) -> bool:
 	var player := ctx.player
 	if player == null:
 		return false
-	end()  # (a recast while still hidden)
+	end()  # (a recast while still hidden: the old Vanish throws no Unseen Blades fan)
 	_player = player
 	_connect(player)
 	_left = maxf(0.0, ctx.num("duration", 2.0))
+	_end_fan = ctx.num("end_fan", 0.0) > 0.0 and _left > 0.0
 	player.forced_crits = maxi(player.forced_crits, int(ctx.num("forced_crits", 1.0)))
 	apply_stealth(player, _left, ctx.num("invulnerable", 0.0) > 0.0)
 	var power := ctx.num("power", 1.0)
@@ -84,7 +111,10 @@ func tick(_ctx: AbilityContext, delta: float) -> void:
 		_refade()
 		_left -= delta
 		if _left <= TIME_EPSILON:
+			var fan := _end_fan
 			end()
+			if fan and RogueFanOfKnives.throw_free(_player):
+				end_fans += 1
 
 
 ## A new wave starts visible (Player.begin_wave already dropped the stealth).
@@ -112,6 +142,7 @@ func time_left() -> float:
 func end(puff: bool = true) -> void:
 	var was_active := _left > 0.0 or not _faded.is_empty()
 	_left = 0.0
+	_end_fan = false
 	for i in _faded.size():
 		var mi := _faded[i]
 		if not is_instance_valid(mi):
