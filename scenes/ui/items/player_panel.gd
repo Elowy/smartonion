@@ -52,6 +52,9 @@ const MIN_INSIDE_TOOLTIP_FIT := 0.9
 ## A tooltip that reaches out of the panel ends this far (canvas px) before the column's other
 ## corner panel.
 const TOOLTIP_NEIGHBOUR_GAP := 8.0
+## A tooltip that moves aside for its column mate's ([member tooltip_obstacle]) may shrink down to
+## this to keep the selected icon in sight ([method _keep_tooltip_clear]).
+const MIN_MOVED_TOOLTIP_FIT := 0.75
 ## Without [member tooltip_inside]: the tooltip shrinks to the screen height, down to this.
 const MIN_TOOLTIP_FIT := 0.4
 
@@ -1580,32 +1583,37 @@ func _tooltip_plan(keep_clear: bool) -> TooltipPlan:
 
 
 ## [param plan] reaches out of the panel over [param obstacle] (the column mate's tooltip in the
-## same band): it moves to the panel's other half – the selected icon's – at the same scale
-## (both are at most MIN_INSIDE_TOOLTIP_FIT there, so two fit side by side). In the room the
-## column allows ([param span]) it sits just above the selected icon, else just below it, so
-## the icon stays in sight; when neither fits, from the panel's outer edge as before (over the
-## icon). Only if the other half were no clearer (a tooltip wider than half the panel) does it
-## stay and shrink into the room beside the obstacle.
+## same band): it moves to the panel's other half – the selected icon's (both tooltips are at
+## most MIN_INSIDE_TOOLTIP_FIT there, so two fit side by side). In the room the column allows
+## ([param span]) it sits just above the selected icon, else just below it, shrunk for that down
+## to MIN_MOVED_TOOLTIP_FIT, so the icon stays in sight; when neither fits, at its size from the
+## panel's outer edge as before (over the icon). Only if the other half were no clearer (a
+## tooltip wider than half the panel) does it stay and shrink into the room beside the obstacle.
 func _keep_tooltip_clear(plan: TooltipPlan, obstacle: Rect2, panel_rect: Rect2, icon_rect: Rect2, span: Vector2, gap: float, view: Rect2) -> void:
 	var r := plan.rect
-	var moved := r
+	var tip_h := r.size.y / plan.fit
+	var above := minf(plan.fit, (icon_rect.position.y - 6.0 - span.x) / tip_h)
+	var below := minf(plan.fit, (span.y - icon_rect.end.y - 6.0) / tip_h)
+	var fit := plan.fit
+	var y := r.position.y
+	if maxf(above, below) >= minf(plan.fit, MIN_MOVED_TOOLTIP_FIT) - 0.0001:
+		fit = maxf(above, below)
+		y = icon_rect.position.y - 6.0 - tip_h * fit if above >= below else icon_rect.end.y + 6.0
+	var moved_size := r.size * (fit / plan.fit)
 	var x := panel_rect.position.x + gap
 	if r.get_center().x < panel_rect.get_center().x:
-		x = panel_rect.end.x - gap - r.size.x
-	moved.position.x = _clamp_tooltip_x(x, r.size.x, view)
-	if icon_rect.position.y - 6.0 - r.size.y >= span.x:
-		moved.position.y = icon_rect.position.y - 6.0 - r.size.y
-	elif icon_rect.end.y + 6.0 + r.size.y <= span.y:
-		moved.position.y = icon_rect.end.y + 6.0
+		x = panel_rect.end.x - gap - moved_size.x
+	var moved := Rect2(Vector2(_clamp_tooltip_x(x, moved_size.x, view), y), moved_size)
 	if not moved.intersects(obstacle.grow(TOOLTIP_NEIGHBOUR_GAP)):
+		plan.fit = fit
 		plan.rect = moved
 		return
-	var below := obstacle.get_center().y < r.get_center().y
-	var room := span.y - obstacle.end.y - TOOLTIP_NEIGHBOUR_GAP if below else obstacle.position.y - TOOLTIP_NEIGHBOUR_GAP - span.x
+	var after := obstacle.get_center().y < r.get_center().y
+	var room := span.y - obstacle.end.y - TOOLTIP_NEIGHBOUR_GAP if after else obstacle.position.y - TOOLTIP_NEIGHBOUR_GAP - span.x
 	var shrink := clampf(room / r.size.y, 0.05, 1.0)
 	plan.fit *= shrink
 	plan.rect.size = r.size * shrink
-	plan.rect.position.y = span.y - plan.rect.size.y if below else span.x
+	plan.rect.position.y = span.y - plan.rect.size.y if after else span.x
 
 
 static func _clamp_tooltip_x(x: float, width: float, view: Rect2) -> float:

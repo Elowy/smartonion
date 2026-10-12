@@ -5,8 +5,8 @@ extends TestCase
 ## before the panel at the other end of its screen column (PlayerPanel.tooltip_column_mate;
 ## below MIN_INSIDE_TOOLTIP_FIT only when that floor would cross into it) – all the way to the
 ## screen edge when that corner is empty; when both players of a column show such a tooltip on
-## the same half of their panels, the bottom one moves to its panel's other half
-## (PlayerPanel.tooltip_obstacle); the shop's tooltips keep clear of them in the band
+## the same half of their panels, the bottom one moves to its panel's other half – clear of the
+## selected icon where the band has room (PlayerPanel.tooltip_obstacle); the shop's tooltips keep clear of them in the band
 ## (ShopPanel.tooltip_obstacles, fed by Intermission._panel_tooltip_rects).
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
@@ -169,10 +169,18 @@ func _check_column_apart(top: int, what: String) -> bool:
 	var icon := _selected_icon(bottom)
 	check((b.get_center().x < own.get_center().x) == (icon.get_center().x < own.get_center().x),
 		"%s: P%d's tooltip moved to the selected icon's half" % [what, bottom + 1])
-	check_near(b.size.y, would.size.y, 0.5, "%s: at the same size" % what)
+	# At its size, or smaller (not below MIN_MOVED_TOOLTIP_FIT) only to keep the selected icon
+	# in sight – which it does whenever that floor fits above the icon.
+	var fit := panel.tooltip.scale.y
+	var would_fit := panel._tooltip_plan(false).fit
+	check(fit <= would_fit + 0.001, "%s: P%d's tooltip no larger than before (%.3f / %.3f)" % [what, bottom + 1, fit, would_fit])
+	if fit < would_fit - 0.001:
+		check(fit >= PlayerPanel.MIN_MOVED_TOOLTIP_FIT - 0.001, "%s: shrunk at most to the floor (%.3f)" % [what, fit])
 	var band_top := _rect(screen.panels[top]).end.y + PlayerPanel.TOOLTIP_NEIGHBOUR_GAP
-	if b.size.y <= icon.position.y - 6.0 - band_top:
+	if would.size.y * minf(1.0, PlayerPanel.MIN_MOVED_TOOLTIP_FIT / would_fit) <= icon.position.y - 6.0 - band_top or fit < would_fit - 0.001:
 		check(not b.intersects(icon), "%s: P%d's tooltip leaves the selected icon in sight (%s / %s)" % [what, bottom + 1, b, icon])
+	else:
+		check_near(fit, would_fit, 0.001, "%s: no room by the icon – at its size" % what)
 	return true
 
 
