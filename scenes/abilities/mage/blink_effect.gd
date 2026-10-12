@@ -10,6 +10,15 @@ extends AbilityEffect
 ## spot you left are frozen – [method MageSpell.freeze]) or "Arcane Burst" (burst_damage +
 ## burst_int_scaling x Intellect as an Arcane spell x power to enemies within burst_radius m
 ## of where you arrive).
+##
+## Talent hook (M5, Arcane modifier "Mirror Image", talents_mage.md 4.1): image_duration > 0
+## (neutral 0) leaves a [MageMirrorImage] where a successful Blink started – it lures the
+## enemies within image_radius m (x Area Size) for image_duration s and bursts for Arcane
+## damage (image_damage + image_int_scaling x Intellect + Spell Power, x power – computed at the
+## cast) within image_burst_radius m (x Area Size) when it fades. At most one image per
+## image_cooldown s per hero (counted in [method tick] while the hero lives); a refused Blink
+## makes none. Wave start / end (and the hero leaving: AbilityRunner.teardown) remove the images
+## without a burst and clear the image cooldown.
 
 const DEFAULT_DISTANCE := 6.0
 const DEFAULT_INVULNERABLE := 0.4
@@ -24,6 +33,10 @@ const ESCAPE_MIN_DISTANCE := 2.5
 
 var _player: Player
 var _ability: AbilityData
+## Mirror Images standing right now (talent hook).
+var images: Array[Node3D] = []
+## Seconds until the next Mirror Image may appear.
+var image_cooldown_left := 0.0
 
 
 func wants_auto_cast(ctx: AbilityContext) -> bool:
@@ -66,7 +79,26 @@ func cast(ctx: AbilityContext) -> bool:
 	if player.is_inside_tree():
 		_frost_blink(ctx, from)
 		_arcane_burst(ctx, dest)
+		_mirror_image(ctx, from)
 	return true
+
+
+## Talent "Mirror Image": a luring decoy at the spot the hero left (once per image_cooldown).
+func _mirror_image(ctx: AbilityContext, at: Vector3) -> void:
+	var duration := ctx.num("image_duration", 0.0)
+	if duration <= 0.0 or image_cooldown_left > 0.0:
+		return
+	var area := MageSpell.area_mult(ctx.player)
+	var image := MageMirrorImage.spawn(ctx.player, at, duration,
+			ctx.num("image_radius", 4.0) * area,
+			MageSpell.damage_from(ctx, MageSpell.ARCANE, "image_"),
+			ctx.num("image_burst_radius", 2.5) * area)
+	if not image.is_inside_tree():
+		image.free()
+		return
+	image_cooldown_left = maxf(0.0, ctx.num("image_cooldown", 6.0))
+	MageSpell.prune(images)
+	images.append(image)
 
 
 ## Rank V "Frost Blink": freezes the enemies around the spot the hero left.
@@ -91,9 +123,29 @@ func _arcane_burst(ctx: AbilityContext, at: Vector3) -> void:
 	Vfx.explosion(at + Vector3.UP * 0.3, radius, MageSpell.ARCANE_COLOR)
 
 
-func tick(ctx: AbilityContext, _delta: float) -> void:
+func tick(ctx: AbilityContext, delta: float) -> void:
 	_player = ctx.player
 	_ability = ctx.ability
+	if image_cooldown_left > 0.0:
+		image_cooldown_left = maxf(0.0, image_cooldown_left - delta)
+
+
+func begin_wave(_ctx: AbilityContext) -> void:
+	_clear_images()
+
+
+func end_wave(_ctx: AbilityContext) -> void:
+	_clear_images()
+
+
+## Removes every Mirror Image without a burst and clears the image cooldown.
+func _clear_images() -> void:
+	image_cooldown_left = 0.0
+	for i in images.size():
+		var image := images[i] as MageMirrorImage if is_instance_valid(images[i]) else null
+		if image != null:
+			image.dismiss()
+	images.clear()
 
 
 ## Blinks available right now (0 or 1 without the extra charge).

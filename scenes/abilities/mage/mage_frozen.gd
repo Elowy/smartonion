@@ -8,6 +8,14 @@ extends Node3D
 ## [MageFrozen.ShatterGroup]: each enemy takes that nova's shatter at most once, however many
 ## frozen neighbours burst around it. Child of the enemy – freed with it; an enemy that dies
 ## frozen does not shatter. One per caster per enemy: a new freeze extends it.
+##
+## "Frozen" (M5 talents – Ice Lance, Flash Freeze): [method is_frozen] answers in O(1) without
+## allocating from a static count of live ice per enemy (instance id -> ice nodes of any Mage).
+## A new ice node counts in [method apply]; it stops counting exactly once – when it melts
+## ([method _end], after its shatter, so the enemy is still frozen during its own shatter) or
+## when it leaves the tree first (the enemy was freed / despawned). The count remembers
+## RunState.run_serial and clears itself when a new run started, so nothing leaks between runs
+## or tests.
 
 const EPSILON := 0.0001
 const SHELL_COLOR := Color(0.7, 0.9, 1.0, 0.32)
@@ -19,6 +27,11 @@ const CRYSTALS := 5
 class ShatterGroup extends RefCounted:
 	var hit: Dictionary[int, bool] = {}
 
+
+## Enemy instance id -> live ice nodes on it ([method is_frozen]); keys are erased at 0.
+static var _frozen: Dictionary[int, int] = {}
+## RunState.run_serial the counts belong to.
+static var _frozen_serial := -1
 
 var caster: Player
 var enemy: Enemy
@@ -34,6 +47,27 @@ var shatter_hits := 0
 
 var _age := 0.0
 var _body: Node3D
+## This ice is in the [method is_frozen] count (for [member _counted_id], run
+## [member _counted_serial]); cleared when it stops counting.
+var _counted := false
+var _counted_id := 0
+var _counted_serial := 0
+
+
+## True while [param e] carries live ice of any Mage (O(1), no allocation; null / freed → false).
+static func is_frozen(e: Node3D) -> bool:
+	if e == null or not is_instance_valid(e):
+		return false
+	if _frozen_serial != RunState.run_serial:
+		_reset_count()
+	return _frozen.has(e.get_instance_id())
+
+
+## Enemies counted as frozen right now (tests).
+static func frozen_count() -> int:
+	if _frozen_serial != RunState.run_serial:
+		_reset_count()
+	return _frozen.size()
 
 
 static func apply(e: Enemy, p_caster: Player, duration: float, p_shatter_damage: float = 0.0,
@@ -50,6 +84,7 @@ static func apply(e: Enemy, p_caster: Player, duration: float, p_shatter_damage:
 		ice.left = 0.0
 		e.add_child(ice)
 		ice._build(e.radius)
+		ice._count_in(e.get_instance_id())
 	ice.left = maxf(ice.left, duration)
 	if p_shatter_damage > 0.0:
 		ice.shatter_radius = maxf(ice.shatter_radius, p_shatter_radius) if ice.shatter_damage > 0.0 \
@@ -103,10 +138,44 @@ func _process(delta: float) -> void:
 
 
 func _end() -> void:
+	_count_out()
 	set_physics_process(false)
 	set_process(false)
 	name = "SpentIce"
 	queue_free()
+
+
+## The enemy was freed / despawned while frozen (or the ice was removed): stop counting.
+func _exit_tree() -> void:
+	_count_out()
+
+
+func _count_in(enemy_id: int) -> void:
+	if _frozen_serial != RunState.run_serial:
+		_reset_count()
+	_counted = true
+	_counted_id = enemy_id
+	_counted_serial = _frozen_serial
+	_frozen[enemy_id] = int(_frozen.get(enemy_id, 0)) + 1
+
+
+## Takes this ice out of the count (once; ice of an earlier run is ignored).
+func _count_out() -> void:
+	if not _counted:
+		return
+	_counted = false
+	if _counted_serial != _frozen_serial or not _frozen.has(_counted_id):
+		return
+	var n := _frozen[_counted_id] - 1
+	if n > 0:
+		_frozen[_counted_id] = n
+	else:
+		_frozen.erase(_counted_id)
+
+
+static func _reset_count() -> void:
+	_frozen.clear()
+	_frozen_serial = RunState.run_serial
 
 
 func _build(body_radius: float) -> void:

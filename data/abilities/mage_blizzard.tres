@@ -25,7 +25,10 @@ params = {
 "follow": false,
 "freeze": 0.0,
 "slow": 40.0,
-"tick": 0.5
+"tick": 0.5,
+"end_freeze": 0.0,
+"tick_freeze": 1.0,
+"tick_freeze_chance": 0.0
 }
 icon = &"blizzard"
 color = Color(0.55, 0.85, 1, 1)
