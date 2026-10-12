@@ -885,11 +885,26 @@ static func is_bot_upgrade(item: ItemInstance, s: PlayerSlot, eq: Equipment) -> 
 ## would replace (ItemTooltip.equipped_for_compare: the weaker ring / trinket, an empty slot
 ## first, both hands for a two-hander, the two-hander for an off-hand item). Each item is
 ## compared with the gear as it is at that moment, so equipping never flip-flops between a
-## two-hander and a pair of one-handers. Returns how many items were equipped.
+## two-hander and a pair of one-handers. Passes over the backpack repeat until one equips
+## nothing (at most Items.BACKPACK_SIZE passes), so an item that became an upgrade through a
+## later swap of the same pass – e.g. a set piece another piece's swap counted on
+## (SetBonuses.bonus_change's lookahead) – goes on in the same market. Returns how many items
+## were equipped.
 static func bot_equip_upgrades(s: PlayerSlot) -> int:
 	var eq := ShopPanel.equipment_of(s)
 	if eq == null:
 		return 0
+	var n := 0
+	for _pass in Items.BACKPACK_SIZE:
+		var equipped := _bot_equip_pass(s, eq)
+		n += equipped
+		if equipped == 0:
+			break
+	return n
+
+
+## One pass of [method bot_equip_upgrades] over the backpack as it is now; how many it equipped.
+static func _bot_equip_pass(s: PlayerSlot, eq: Equipment) -> int:
 	var n := 0
 	for item in eq.backpack.duplicate():
 		if not is_bot_upgrade(item, s, eq):

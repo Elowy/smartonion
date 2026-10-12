@@ -26,7 +26,7 @@ extends Node
 ##   extra_attack {count}             – instant extra attacks of the hitting weapon
 ##   buff {stats: Dictionary, duration} – temporary stats (stat ids or "primary" = the class's
 ##                                      primary stat; numeric params named like a stat are
-##                                      added too); duration <= 0 = until the next wave;
+##                                      added too); duration <= 0 = until the wave ends;
 ##                                      optional max_stacks (default 1), heal (self)
 ##                                      ("equip" trigger: permanent while equipped)
 ##   heal {amount, target: "self"|"lowest_ally"}
@@ -459,6 +459,13 @@ func begin_wave() -> void:
 	_dots.clear()
 	_clear_buffs()
 	clear_shields()
+
+
+## Wave end (Player.end_wave, as the market opens): the timed and until-the-next-wave buffs
+## end, so the market's stats – and Armor Specialization recomputed there – never see them.
+## "equip" buffs stay; cooldowns, DoTs and shields wait for [method begin_wave].
+func end_wave() -> void:
+	_clear_buffs()
 
 
 ## Adds an absorb shield (shield procs, Word of Glory, Ice Barrier ...): [param amount] HP for

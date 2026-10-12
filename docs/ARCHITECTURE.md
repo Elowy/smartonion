@@ -1455,6 +1455,27 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   `CROWD_RADIUS` and HP ≥ `RETREAT_HP_RATIO` chases the nearest goblin within
   `ENGAGE_DISTANCE` up to its keep distance (melee reach, or `KITE_DISTANCE` when ranged).
 
+### Ghost slow (GDD 16.1, M5 integration)
+
+- While a hero is downed, every physics tick `Player._update_ghost_slow()` (after
+  `_update_revive`) asks `EnemyGrid.gather_around(ghost, REVIVE_RADIUS)` for the enemies
+  around the ghost and refreshes `Enemy.apply_ghost_slow(Player.GHOST_SLOW_LINGER)` (0.1 s)
+  on every living one whose centre is within `Player.REVIVE_RADIUS` (1.8 m) – the circle a
+  teammate channels the revive in. `Player.ghost_slowed` counts them (0 when alive).
+- `Enemy.ghost_slow_left` is a slot of its own next to `apply_slow`'s `slow_pct` /
+  `slow_left`: several ghosts refresh the same slot (it never stacks), it never replaces or
+  shortens another slow, and it runs out 0.1 s after the last refresh (the enemy left the
+  circle, the ghost walked away or revived). `Enemy.current_slow_pct()` = the stronger of the
+  two (`Player.GHOST_SLOW_PCT` 33 vs `slow_pct`); `_apply_movement` inlines the same rule for
+  walking and lunges. `is_slowed()` is true for either (the `slowed` talent condition counts
+  it). An enraged elite ignores it like every slow (`apply_ghost_slow` refuses, `_enrage`
+  clears it); the Loot Goblin is slowed like by every other crowd control.
+- Cost: one grid query per ghost per tick, no allocation per enemy, no RNG (group order).
+- Look: `OnionModel.set_ghost_slowing(active)` (the Player forwards `ghost_slowed > 0`; only
+  changes act): the revive ring leans towards `GHOST_SLOW_TINT` (pale spectral blue,
+  `GHOST_SLOW_TINT_MIX` 0.55) and its inner disc breathes from `REVIVE_AREA_FILL` 0.06 up by
+  `GHOST_SLOW_FILL` 0.14 at `GHOST_SLOW_PULSE` 2.6 rad/s; `set_downed(false)` turns it off.
+
 ### Determinism (M5 draw points)
 
 Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identical per seed.
@@ -1505,3 +1526,20 @@ Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identic
 - Feature smoke: `godot --headless --fixed-fps 60 --path . -- --smoke --waves=3 --start-wave=4
   --goblin-chance=1 --elite-mult=3 --seed=5`; class smoke with talents: `--smoke --waves=2
   --start-wave=14 --start-level=30 --classes=mage,mage,mage --seed=7`.
+- Integration (Wave 3): `test_m5_integration.gd` – tier sets through the engine (Warrior:
+  2-piece Resource Regen as a stat and as Rage gained, 4-piece free Whirlwind as a param and as
+  the runner's free roll; Mage: 2-piece Haste, 4-piece Blink proc firing / buffing / icd; each
+  unequip takes its bonus along), forged Legendaries on real weapon hits (Knell of Stone: every
+  5th hit, 80% of the base amount at the target and within 2 m, stun, an outgoing multiplier
+  applied once; Pyrewillow: every 4th bolt, a burn of 120% of the base amount), an elite's and
+  a goblin's guaranteed drops from the kill through `WaveDirector.stop` banking into the
+  Intermission's loot roll, the spend log (a source scan: no `try_spend(` outside RunState and
+  exactly the four known spender scripts; then all six kinds in one round with payers, amounts
+  and totals), `params_for` merging talents + set + item mods (+ the rank) on Whirlwind and an
+  item + talent `radius_pct` summed on Blizzard, a talent reset (refund, every effect kind
+  removed, the logged payment, the doubled price, a refused reset logs nothing), the set-aware
+  upgrade badges (shop pip, loot chip) and the goblin's `walk_speed()`.
+- `test_ghost_slow.gd` – the ghost slow (inside / outside / edge, a living hero slows nothing,
+  corpses skipped, 67% speed and ground covered, leaving the circle, a moving ghost, revive
+  directly and through a channelling teammate, several ghosts without stacking, other slows
+  kept, the goblin slowed, an enraged elite immune, no RNG and repeatable positions).

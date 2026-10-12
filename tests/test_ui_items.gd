@@ -373,6 +373,45 @@ func test_upgrade_direction_values_set_thresholds() -> void:
 		"a bot would put the set shoulders on")
 
 
+## Which backpack pieces upgrade_direction counts as worn (SetBonuses.bonus_change lookahead).
+func test_set_lookahead_picks_the_reachable_backpack_pieces() -> void:
+	var warrior := Db.get_class_data(&"warrior")
+	var eq := Equipment.new(warrior)
+	eq.slots[Items.EquipSlot.HEAD] = set_piece(&"warrior", "head")
+	eq.slots[Items.EquipSlot.CHEST] = set_piece(&"warrior", "chest")
+	var legs := set_piece(&"warrior", "legs")
+	var hands := set_piece(&"warrior", "hands")
+	var shoulders := set_piece(&"warrior", "shoulders")
+	var none: Array[ItemInstance] = []
+	check(ItemTooltip.set_lookahead(legs, none, eq, warrior).is_empty(), "empty backpack: nothing")
+	eq.backpack.append_array([legs, hands, set_piece(&"warrior", "legs"), set_piece(&"mage", "shoulders")])
+	check_eq(ItemTooltip.set_lookahead(legs, none, eq, warrior), [hands] as Array[ItemInstance],
+		"the hands (an empty slot); not the item, not a piece for its own slot, not another set")
+	var plain := armor("Plain", Items.SlotType.SHOULDERS, ClassData.ArmorType.PLATE, 3, {"strength": 1})
+	check(ItemTooltip.set_lookahead(plain, none, eq, warrior).is_empty(), "a plain item replacing a plain one: no set involved")
+	eq.slots[Items.EquipSlot.HANDS] = armor("Gauntlets", Items.SlotType.HANDS, ClassData.ArmorType.PLATE, 3, {"strength": 60, "stamina": 30})
+	check(ItemTooltip.item_score(hands, warrior) < ItemTooltip.item_score(eq.get_item(Items.EquipSlot.HANDS), warrior) * 0.7,
+		"fixture: the worn gauntlets are far better")
+	check(ItemTooltip.set_lookahead(legs, none, eq, warrior).is_empty(), "more than 30% worse than what it replaces: not counted")
+	eq.slots[Items.EquipSlot.HANDS] = set_piece(&"rogue", "hands")
+	check(ItemTooltip.set_lookahead(legs, none, eq, warrior).is_empty(), "never pushes out a worn set piece")
+	eq.slots.erase(Items.EquipSlot.HANDS)
+	eq.slots[Items.EquipSlot.SHOULDERS] = shoulders
+	var chest := eq.get_item(Items.EquipSlot.CHEST)
+	var plain_chest := armor("Plain chest", Items.SlotType.CHEST, ClassData.ArmorType.PLATE, 3, {"strength": 1})
+	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [legs, hands] as Array[ItemInstance],
+		"a plain item pushing out a piece: that piece's set is looked at (one piece per slot)")
+	check(ItemTooltip.item_score(legs, warrior) > ItemTooltip.item_score(hands, warrior), "fixture: the legs score higher")
+	eq.backpack.assign([hands, legs])
+	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [legs, hands] as Array[ItemInstance],
+		"best item_score first, whatever the backpack order")
+	var better_legs := set_piece(&"warrior", "legs")
+	better_legs.stats[Stats.STRENGTH] = float(better_legs.stats.get(Stats.STRENGTH, 0.0)) + 50.0
+	eq.backpack.append(better_legs)
+	check_eq(ItemTooltip.set_lookahead(plain_chest, [chest] as Array[ItemInstance], eq, warrior), [better_legs, hands] as Array[ItemInstance],
+		"the best piece for a slot takes it")
+
+
 # --- ItemIcon / ItemArt ---------------------------------------------------------------------------
 
 func test_item_icon_state() -> void:

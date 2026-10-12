@@ -183,7 +183,8 @@ func test_bonus_numbers_follow_the_design_table() -> void:
 	check_eq(bonus_effects(&"regalia_of_the_arcane", 2), [{"kind": "stats", "stats": {"haste": 10.0}}], "Regalia 2: +10% Haste")
 	check_eq(bonus_effects(&"dawnforged_plate", 2), [{"kind": "stats", "stats": {"armor": 3.0}}], "Dawnforged 2: +3 Armor")
 	check_eq(bonus_effects(&"dawnforged_plate", 4),
-		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true}}], "Dawnforged 4: Word of Glory heals all")
+		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true, "heal_max_hp_pct_add": 10.0}}],
+		"Dawnforged 4: Word of Glory heals all, +10% of Max HP")
 	check_eq(bonus_effects(&"shadowstitch_garb", 2), [{"kind": "stats", "stats": {"crit": 5.0}}], "Shadowstitch 2: +5% crit")
 	check_eq(bonus_effects(&"shadowstitch_garb", 4), [{"kind": "proc", "proc": {"trigger": "on_cast", "ability": "vanish",
 		"effect": "buff", "stats": {"crit_damage": 50.0}, "duration": 4.0}}], "Shadowstitch 4: Vanish +50% crit damage 4 s")
@@ -326,6 +327,80 @@ func test_bonus_change_counts_thresholds() -> void:
 	check_eq(SetBonuses.bonus_change(piece(&"paladin", "hands"), [] as Array[ItemInstance], null), 0, "no equipment")
 
 
+## The lookahead (ItemTooltip.set_lookahead): reachable backpack pieces count as worn on both
+## sides (as many as the next threshold needs), so the item gets its own share of the bonus
+## within reach.
+func test_bonus_change_looks_ahead_to_reachable_pieces() -> void:
+	var eq := wearing(&"paladin", ["head", "chest"])
+	var legs := piece(&"paladin", "legs")
+	var hands := piece(&"paladin", "hands")
+	var none: Array[ItemInstance] = []
+	check_eq(SetBonuses.bonus_change(legs, none, eq), 0, "3rd piece alone: no threshold")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "with the 4th piece reachable: +1")
+	check_eq(SetBonuses.bonus_change(hands, none, eq, [legs] as Array[ItemInstance]), 1, "and the other way round")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [legs, hands] as Array[ItemInstance]), 1, "the item itself in the lookahead is skipped")
+	var head := eq.get_item(Items.EquipSlot.HEAD)
+	check_eq(SetBonuses.bonus_change(piece(&"paladin", "head"), [head] as Array[ItemInstance], eq, [hands] as Array[ItemInstance]), 0,
+		"a duplicate gains nothing from the backpack")
+	var plain_legs := ItemInstance.new()
+	plain_legs.slot_type = Items.SlotType.LEGS
+	plain_legs.armor_type = ClassData.ArmorType.PLATE
+	eq.slots[Items.EquipSlot.LEGS] = legs
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq), 0, "3 -> 2 pieces: still active")
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq, [hands] as Array[ItemInstance]), -1,
+		"but it pushes the reachable 4-piece away: -1")
+
+
+func test_pieces_to_next_bonus() -> void:
+	var data := Db.get_set(&"dawnforged_plate")
+	var got: Array[int] = []
+	for n in 6:
+		got.append(SetBonuses.pieces_to_next_bonus(data, n))
+	check_eq(got, [2, 1, 0, 1, 0, 0] as Array[int], "2- and 4-piece thresholds; nothing above 4")
+	check_eq(SetBonuses.pieces_to_next_bonus(null, 1), 0, "no set data")
+
+
+## Review cases: only the pieces the next threshold still needs count, so spare pieces in the
+## backpack never cancel the item out, and a waiting piece never stands in for a worn one.
+func test_bonus_change_counts_only_the_pieces_the_next_threshold_needs() -> void:
+	var none: Array[ItemInstance] = []
+	# (A) 3 worn, legs + hands waiting: the legs are the 4th piece whatever else waits.
+	var eq := wearing(&"paladin", ["head", "chest", "shoulders"])
+	var legs := piece(&"paladin", "legs")
+	var hands := piece(&"paladin", "hands")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "(A) the 4th piece: +1")
+	check_eq(SetBonuses.bonus_change(hands, none, eq, [legs] as Array[ItemInstance]), 1, "(A) either of them")
+	# (B) 2 worn, three pieces waiting: the 3rd piece needs one of the other two.
+	eq = wearing(&"paladin", ["head", "chest"])
+	var shoulders := piece(&"paladin", "shoulders")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands, shoulders] as Array[ItemInstance]), 1, "(B) a 3rd piece: +1")
+	check_eq(SetBonuses.bonus_change(shoulders, none, eq, [legs, hands] as Array[ItemInstance]), 1, "(B) any of them")
+	# The 2nd piece completes the 2-piece by itself: +1 with one or two pieces waiting.
+	eq = wearing(&"paladin", ["head"])
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands] as Array[ItemInstance]), 1, "2nd piece, one waiting: +1")
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [hands, shoulders] as Array[ItemInstance]), 1, "2nd piece, two waiting: +1")
+	# (C) 4 worn after giving the legs away for a plain pair: the waiting legs do not count
+	# as worn when a plain item would push out the hands (4 -> 3 breaks the 4-piece).
+	eq = wearing(&"paladin", ["head", "chest", "shoulders", "hands"])
+	var plain_legs := ItemInstance.new()
+	plain_legs.slot_type = Items.SlotType.LEGS
+	plain_legs.armor_type = ClassData.ArmorType.PLATE
+	eq.slots[Items.EquipSlot.LEGS] = plain_legs
+	var worn_hands := eq.get_item(Items.EquipSlot.HANDS)
+	var plain_hands := ItemInstance.new()
+	plain_hands.slot_type = Items.SlotType.HANDS
+	plain_hands.armor_type = ClassData.ArmorType.PLATE
+	check_eq(SetBonuses.bonus_change(plain_hands, [worn_hands] as Array[ItemInstance], eq, [legs] as Array[ItemInstance]), -1,
+		"(C) breaks the worn 4-piece: -1")
+	# A full set gives one piece away for free: 5 -> 4.
+	eq.slots[Items.EquipSlot.LEGS] = legs
+	check_eq(SetBonuses.bonus_change(plain_legs, [legs] as Array[ItemInstance], eq), 0, "5 -> 4 pieces: 0")
+	# Pieces already worn (or a duplicate of one) never count twice.
+	eq = wearing(&"paladin", ["head", "chest"])
+	check_eq(SetBonuses.bonus_change(legs, none, eq, [piece(&"paladin", "head")] as Array[ItemInstance]), 0,
+		"a duplicate of a worn piece in the backpack: no 4th piece")
+
+
 # --- Player: entries reach the bonus engine ----------------------------------------------------
 
 func test_apply_equipment_hands_the_entries_to_player_bonuses() -> void:
@@ -366,6 +441,8 @@ func test_each_class_set_reaches_the_engine() -> void:
 		_wear(paladin, piece(&"paladin", s))
 	check_eq(paladin.stats.get_source(&"set_bonus").get(Stats.ARMOR, 0.0), 3.0, "Dawnforged 2: Armor")
 	check_eq(paladin.abilities.params_for(Db.get_ability(&"word_of_glory")).get("heal_all"), true, "Dawnforged 4: heal_all")
+	check_eq(paladin.abilities.params_for(Db.get_ability(&"word_of_glory")).get("heal_max_hp_pct"), 35.0,
+		"Dawnforged 4: 25 + 10% of Max HP")
 	var rogue := Fakes.spawn_player(world, 2, &"rogue", Vector3(12, 0, 0))
 	for s in ["head", "shoulders", "hands", "legs"]:
 		_wear(rogue, piece(&"rogue", s))
@@ -378,6 +455,38 @@ func test_each_class_set_reaches_the_engine() -> void:
 	check_near(warlock.bonuses.damage_mult(null, &"fire", &"pet"), 1.1, 0.0001, "Felfire 2: +10% pet damage")
 	check_near(warlock.bonuses.damage_mult(null, &"fire", &"ability"), 1.0, 0.0001, "only pets")
 	check_eq(float(warlock.abilities.params_for(Db.get_ability(&"rain_of_fire")).get("free_chance", 0.0)), 20.0, "Felfire 4: free Rain of Fire")
+
+
+## Word of Glory Rank V "Light of Dawn" already heals every hero within 8 m; the Dawnforged
+## 4-piece still pays off for that Paladin: every heal restores 10% more of Max HP.
+func test_dawnforged_4_piece_still_helps_with_light_of_dawn() -> void:
+	var paladin := _player(&"paladin")
+	var wog := Db.get_ability(&"word_of_glory")
+	var slot := paladin.abilities.slot_of(wog.id)
+	check(slot >= 0, "Word of Glory is known")
+	while paladin.abilities.rank_of(wog.id) < 5:
+		check(paladin.abilities.rank_up(wog.id), "rank up")
+	check(paladin.abilities.set_spec(wog.id, 0), "Light of Dawn chosen")
+	var spec_only := paladin.abilities.params_for(wog)
+	check(spec_only.get("heal_all") == true and float(spec_only.get("heal_max_hp_pct")) == 25.0, "the spec heals every hero, 25%")
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3, 0, 0))
+	var holy := paladin.abilities.get_resource(&"holy_power")
+	ally.hp = 2.0
+	holy.set_value(3.0)
+	check(paladin.abilities.try_cast(slot), "cast without the set")
+	var power := float(spec_only.get("power", 1.0))
+	var heal_spec := ally.hp - 2.0
+	check_near(heal_spec, (3.0 + ally.max_hp() * 0.25) * power, 0.001, "spec heal: flat + 25% of Max HP, x power")
+	for s in ["head", "shoulders", "chest", "legs"]:
+		_wear(paladin, piece(&"paladin", s))
+	var with_set := paladin.abilities.params_for(wog)
+	check(with_set.get("heal_all") == true, "still every hero")
+	check_eq(float(with_set.get("heal_max_hp_pct")), 35.0, "the 4-piece adds 10% of Max HP")
+	ally.hp = 2.0
+	holy.set_value(3.0)
+	check(paladin.abilities.try_cast(slot), "cast with the 4-piece")
+	check_near(ally.hp - 2.0, (3.0 + ally.max_hp() * 0.35) * power, 0.001, "the heal grew by 10% of Max HP x power")
+	check(ally.hp - 2.0 > heal_spec, "the set is worth something next to Light of Dawn")
 
 
 # --- Generator: the set roll -------------------------------------------------------------------

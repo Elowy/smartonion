@@ -345,3 +345,124 @@ func test_rig_frames_the_spirit_healer_while_a_ghost_exists() -> void:
 	check_near(hr.end.x, h.x + spread.x, 0.001, "both ways")
 	ghost.alive = true
 	check(not h in rig._player_points(), "revived: the healer is no longer framed")
+
+
+# --- Loot Goblin (GDD 8, M5) ----------------------------------------------------------
+
+func _arena_in_tree() -> Arena:
+	var arena := Arena.create()
+	_nodes.append(arena)
+	tree.root.add_child(arena)
+	return arena
+
+
+func _goblin_in(arena: Arena, pos: Vector3) -> LootGoblin:
+	var g := LootGoblin.create(LootGoblin.goblin_data(), 5)
+	arena.entities.add_child(g)
+	g.global_position = pos
+	return g
+
+
+## [param p] lies inside the screen margins of a camera on [param focus] at [param dist].
+func _framed(p: Vector3, focus: Vector3, dist: float, aspect: float) -> bool:
+	var ext := CameraRig.ground_extents(dist, aspect)
+	return p.z - (focus.z - ext.y) >= CameraRig.top_margin(dist) - 0.001 \
+		and (focus.z + ext.z) - p.z >= CameraRig.FRAME_MARGIN_BOTTOM - 0.001 \
+		and ext.x - absf(p.x - focus.x) >= CameraRig.FRAME_MARGIN - 0.001
+
+
+## The goblin's name tag on screen (px): bottom-centre anchored at the label.
+func _tag_rect(g: LootGoblin) -> Rect2:
+	var cam := g.get_viewport().get_camera_3d()
+	var size := g.tag_screen_size(cam.get_viewport().get_visible_rect().size.y, cam.fov)
+	var s := cam.unproject_position(g.label.global_position)
+	return Rect2(s.x - size.x * 0.5, s.y - size.y, size.x, size.y)
+
+
+func test_rig_frames_a_living_loot_goblin_and_its_tag() -> void:
+	var arena := _arena_in_tree()
+	var rig := arena.camera
+	var hero := _player(Vector3(-6, 0, 4))
+	var g := _goblin_in(arena, Vector3(10, 0, -8))
+	rig.snap()
+	var aspect := rig._aspect()
+	check(_framed(g.global_position, rig.focus, rig.distance, aspect),
+		"the goblin is framed (focus %s, d %.1f)" % [rig.focus, rig.distance])
+	check(_framed(hero.global_position, rig.focus, rig.distance, aspect), "the hero too")
+	check(rig.distance > CameraRig.MIN_DISTANCE and rig.distance <= CameraRig.MAX_DISTANCE,
+		"zoomed out for it, at most MAX_DISTANCE: %.1f" % rig.distance)
+	g.keep_tag_on_screen()
+	check(g.label.position.is_equal_approx(g.tag_home()), "framed: the tag stays above its head")
+	var view := Rect2(Vector2.ZERO, rig.get_viewport().get_visible_rect().size)
+	check(view.encloses(_tag_rect(g)), "the whole name tag is on screen: %s in %s" % [_tag_rect(g), view])
+	check(rig.get_walk_rect(hero).size.x > 1.0e5, "the goblin never limits where the hero may walk")
+
+
+func test_rig_frames_only_living_goblins_while_a_hero_stands() -> void:
+	var arena := _arena_in_tree()
+	var rig := arena.camera
+	var hero := _player(Vector3(0, 0, 0))
+	var g := _goblin_in(arena, Vector3(8, 0, 3))
+	check(g.global_position in rig._goblin_points(), "a living goblin is framed")
+	g.portal_left = 0.5
+	check(g.is_opening_portal() and g.global_position in rig._goblin_points(),
+		"still framed while its portal opens (it can be killed until it is gone)")
+	g._escaped = true
+	check(rig._goblin_points().is_empty(), "escaped: no longer framed")
+	g._escaped = false
+	g.hp = 0.0
+	check(rig._goblin_points().is_empty(), "dead: no longer framed")
+	g.hp = g.max_hp
+	hero.alive = false
+	check(rig._goblin_points().is_empty(), "nobody stands: the ghosts' framing stays as it was")
+	check(not g.global_position in rig._player_points(), "and the goblin is never a hard framing point")
+
+
+func test_compute_framing_leans_towards_extras_but_keeps_the_players() -> void:
+	var aspect := 1.0
+	var none: Array[Vector3] = []
+	var pts: Array[Vector3] = [Vector3(-8, 0, 0), Vector3(-4, 0, 2)]
+	var plain := CameraRig.compute_framing(pts, aspect)
+	var same := CameraRig.compute_framing(pts, aspect, Rect2(), none)
+	check((plain["target"] as Vector3).is_equal_approx(same["target"]) and is_equal_approx(plain["distance"], same["distance"]),
+		"no extras: the old framing")
+	var near: Array[Vector3] = [Vector3(6, 0, -4)]
+	var f := CameraRig.compute_framing(pts, aspect, Rect2(), near)
+	for p: Vector3 in [pts[0], pts[1], near[0]]:
+		check(_framed(p, f["target"], f["distance"], aspect), "fits: %s framed" % p)
+	var far: Array[Vector3] = [Vector3(30, 0, 0)]
+	var lean := CameraRig.compute_framing(pts, aspect, Rect2(), far)
+	check_near(lean["distance"], CameraRig.MAX_DISTANCE, 0.001, "zoomed all the way out")
+	for p in pts:
+		check(_framed(p, lean["target"], lean["distance"], aspect), "too far: the heroes still framed (%s)" % p)
+	var ext := CameraRig.ground_extents(CameraRig.MAX_DISTANCE, aspect)
+	check_near((lean["target"] as Vector3).x, -8.0 + ext.x - CameraRig.FRAME_MARGIN, 0.001,
+		"leans towards the goblin as far as the leftmost hero allows")
+
+
+func test_clamp_tag_keeps_the_tag_inside_the_view() -> void:
+	var view := Vector2(1000, 600)
+	var size := Vector2(200, 40)
+	check_eq(LootGoblin.clamp_tag(Vector2(500, 300), size, view, 8.0), Vector2(500, 300), "inside: unchanged")
+	check_eq(LootGoblin.clamp_tag(Vector2(950, 300), size, view, 8.0), Vector2(892, 300), "right edge")
+	check_eq(LootGoblin.clamp_tag(Vector2(-300, 900), size, view, 8.0), Vector2(108, 592), "beyond the bottom left")
+	check_eq(LootGoblin.clamp_tag(Vector2(500, 10), size, view, 8.0), Vector2(500, 48), "top: its height fits")
+
+
+func test_goblin_tag_stays_on_screen_while_the_goblin_is_off_it() -> void:
+	var arena := _arena_in_tree()
+	var rig := arena.camera
+	_player(Vector3(0, 0, 0))
+	rig.snap()
+	# Added after the snap: the camera has not moved to it yet.
+	var g := _goblin_in(arena, Vector3(16, 0, 0))
+	var cam := rig.camera
+	var view := Rect2(Vector2.ZERO, rig.get_viewport().get_visible_rect().size)
+	check(cam.unproject_position(g.global_position).x > view.end.x, "the goblin itself is off screen")
+	g.keep_tag_on_screen()
+	var r := _tag_rect(g)
+	check(view.grow(-LootGoblin.TAG_SCREEN_PAD + 0.5).encloses(r), "the tag is on screen: %s in %s" % [r, view])
+	check_near(r.end.x, view.end.x - LootGoblin.TAG_SCREEN_PAD, 1.0, "at the right edge, pointing the way")
+	g.global_position = Vector3(1, 0, 0)
+	g.keep_tag_on_screen()
+	check(g.label.position.is_equal_approx(g.tag_home()), "back on screen: above its head again")

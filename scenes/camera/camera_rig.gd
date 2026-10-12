@@ -5,7 +5,13 @@ extends Node3D
 ## players' spread so everyone stays on screen, and clamps so the view stays inside the
 ## decorated area around the arena (Arena.current.get_view_rect()). While anybody is a ghost
 ## it also frames the arena's Spirit Healer (Arena.current.spirit_healer), so the healer is
-## always on screen and reachable for the ghost ([method framing_points]).
+## always on screen and reachable for the ghost ([method framing_points]). A living Loot
+## Goblin (group &"loot_goblins", not dead and not escaped – still framed while its portal
+## opens, it can be killed until it is gone) is framed too, with its name tag, as a soft
+## point ([method goblin_points], the extras of [method compute_framing]): the camera zooms
+## out (at most MAX_DISTANCE) to show it, but the players always win – when the goblin does
+## not fit with them (a narrow screen), the view only leans towards it, and it never limits
+## where a player may walk ([method get_walk_rect]).
 ##
 ## The rig node sits at the look-at point on the ground; [member camera] is offset back and
 ## up along the pitch. Framing math is static (see [method compute_framing]) and unit tested.
@@ -32,6 +38,9 @@ const SHAKE_DECAY := 1.8
 ## Max screen offset of the camera (metres at the focus plane) at full trauma.
 const SHAKE_MAX_OFFSET := 0.55
 const SHAKE_MAX_ROLL := 0.035
+## The rig moves late in each rendered frame (after the bodies it follows); screen-space
+## overlays that read the camera (the Loot Goblin's tag) run after it.
+const PROCESS_PRIORITY := 100
 ## Extra room below the top screen edge in [method walk_rect] so a player's head (1.3 m)
 ## stays on screen: at the top edge the view ray is ~37 degrees steep.
 const WALK_HEAD_ROOM := 1.8
@@ -50,7 +59,7 @@ var _rng := RandomNumberGenerator.new()
 
 func _init() -> void:
 	name = "CameraRig"
-	process_priority = 100
+	process_priority = PROCESS_PRIORITY
 	camera = Camera3D.new()
 	camera.name = "Camera3D"
 	camera.fov = FOV
@@ -142,7 +151,7 @@ func _goal() -> Dictionary:
 	var rect := view_rect
 	if rect.size == Vector2.ZERO and Arena.current != null and is_instance_valid(Arena.current):
 		rect = Arena.current.get_view_rect()
-	return compute_framing(points, _aspect(), rect)
+	return compute_framing(points, _aspect(), rect, _goblin_points())
 
 
 func _aspect() -> float:
@@ -189,6 +198,37 @@ func _anchor_points(living: Array[Node3D], ghosts: Array[Node3D]) -> Array[Vecto
 	var healer := arena.spirit_healer
 	if healer != null and is_instance_valid(healer) and healer.is_inside_tree():
 		out.append(healer.global_position)
+	return out
+
+
+## The soft framing points of the tree's Loot Goblins ([method goblin_points]); empty while
+## nobody stands (the ghosts' fallback framing stays as it was).
+func _goblin_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if not is_inside_tree():
+		return out
+	var goblins := get_tree().get_nodes_in_group(&"loot_goblins")
+	if goblins.is_empty():
+		return out
+	var living: Array[Node3D] = []
+	var ghosts: Array[Node3D] = []
+	_split_players(living, ghosts)
+	if living.is_empty():
+		return out
+	return goblin_points(goblins)
+
+
+## Ground positions of the [param goblins] the camera frames: LootGoblins in the tree that
+## are neither dead nor escaped (one whose portal is opening still counts – it can be killed
+## until it is gone).
+static func goblin_points(goblins: Array[Node]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for node in goblins:
+		var g := node as LootGoblin
+		if g == null or not g.is_inside_tree() or g.is_queued_for_deletion() or g.is_dead() \
+				or g.has_escaped():
+			continue
+		out.append(g.global_position)
 	return out
 
 
@@ -374,25 +414,46 @@ static func clamp_to_view(target: Vector3, dist: float, aspect: float, rect: Rec
 ## Follows the centroid, respects the view rect, and finally guarantees (within
 ## MAX_DISTANCE) that every player stays inside the screen margins (so out from under the
 ## HUD: [method top_margin] / FRAME_MARGIN_BOTTOM / FRAME_MARGIN).
-static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 = Rect2()) -> Dictionary:
+## [param extras] (the Loot Goblins, [method goblin_points]) are framed the same way when
+## they fit together with [param points] – they count for the zoom and the centroid – but
+## [param points] keep the guarantee: when everything does not fit, the view leans as far
+## towards the extras as the points allow.
+static func compute_framing(points: Array[Vector3], aspect: float, rect: Rect2 = Rect2(),
+		extras: Array[Vector3] = []) -> Dictionary:
+	if points.is_empty():
+		return {"target": Vector3.ZERO, "distance": MIN_DISTANCE}
+	var framed := points
+	if not extras.is_empty():
+		framed = points.duplicate()
+		framed.append_array(extras)
 	var centroid := Vector3.ZERO
+	for p in framed:
+		centroid += p
+	centroid /= float(framed.size())
+	centroid.y = 0.0
+	var dist := required_distance(framed, aspect)
+	var target := clamp_to_view(centroid, dist, aspect, rect)
+	if not extras.is_empty():
+		target = keep_in_margins(target, framed, dist, aspect)
+	return {"target": keep_in_margins(target, points, dist, aspect), "distance": dist}
+
+
+## [param target] moved as little as possible so that every one of [param points] is inside
+## the screen margins of a camera at [param dist] (FRAME_MARGIN at the sides,
+## [method top_margin] / FRAME_MARGIN_BOTTOM); on an axis where they cannot all fit, the
+## middle of their extent.
+static func keep_in_margins(target: Vector3, points: Array[Vector3], dist: float, aspect: float) -> Vector3:
 	var lo := Vector2(INF, INF)
 	var hi := Vector2(-INF, -INF)
 	for p in points:
-		centroid += p
 		lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
 		hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
-	if points.is_empty():
-		return {"target": Vector3.ZERO, "distance": MIN_DISTANCE}
-	centroid /= float(points.size())
-	centroid.y = 0.0
-	var dist := required_distance(points, aspect)
-	var target := clamp_to_view(centroid, dist, aspect, rect)
+	var out := target
 	var ext := ground_extents(dist, aspect)
 	var lo_x := hi.x + FRAME_MARGIN - ext.x
 	var hi_x := lo.x - FRAME_MARGIN + ext.x
-	target.x = clampf(target.x, lo_x, hi_x) if lo_x <= hi_x else (lo.x + hi.x) * 0.5
+	out.x = clampf(out.x, lo_x, hi_x) if lo_x <= hi_x else (lo.x + hi.x) * 0.5
 	var lo_z := hi.y + FRAME_MARGIN_BOTTOM - ext.z
 	var hi_z := lo.y - top_margin(dist) + ext.y
-	target.z = clampf(target.z, lo_z, hi_z) if lo_z <= hi_z else (lo_z + hi_z) * 0.5
-	return {"target": target, "distance": dist}
+	out.z = clampf(out.z, lo_z, hi_z) if lo_z <= hi_z else (lo_z + hi_z) * 0.5
+	return out

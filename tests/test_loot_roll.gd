@@ -325,6 +325,127 @@ func test_bot_needs_a_set_piece_that_completes_a_bonus() -> void:
 	check_eq(LootRoll.bot_choice(slots[1], hands), LootRoll.Choice.GREED, "another class's piece -> Greed")
 
 
+## A plain piece for [param set_item]'s slot with its stats raised by [param factor].
+static func _plain_like(set_item: ItemInstance, factor: float) -> ItemInstance:
+	var stats: Dictionary = {}
+	for stat: StringName in set_item.stats:
+		stats[stat] = set_item.stats[stat] * factor
+	return _gear(set_item.item_level, set_item.armor_type, stats, set_item.slot_type)
+
+
+## The review case (GDD 5.5 "Botok"): a warrior wears the Battlegear head + chest (2-piece)
+## and plain legs / hands ~10% better than the set legs / hands. A 3rd piece crosses no
+## threshold on its own, so the bots look ahead to the backpack: with the 4th piece waiting
+## there, the 3rd one counts (Need, equip) and the bot reaches the 4-piece.
+func test_bots_look_ahead_to_the_backpack_for_the_4_piece() -> void:
+	var warrior := slots[0]
+	var cls := warrior.class_data
+	var eq := Support.equipment_of(warrior)
+	check(eq.equip(_set_piece(&"set_warrior_head")) and eq.equip(_set_piece(&"set_warrior_chest")), "2-piece worn")
+	var legs := _set_piece(&"set_warrior_legs")
+	var hands := _set_piece(&"set_warrior_hands")
+	var plain_legs := _plain_like(legs, 1.1)
+	var plain_hands := _plain_like(hands, 1.1)
+	for pair: Array in [[legs, plain_legs], [hands, plain_hands]]:
+		var s := ItemTooltip.item_score(pair[0], cls)
+		var p := ItemTooltip.item_score(pair[1], cls)
+		check(p - s > ItemTooltip.UPGRADE_THRESHOLD and s >= p * (1.0 - ItemTooltip.SET_UPGRADE_TOLERANCE),
+			"fixture: the plain piece is ~10%% better (%.1f vs %.1f)" % [p, s])
+	check(eq.equip(plain_legs) and eq.equip(plain_hands), "plain legs and hands on")
+	check_eq(LootRoll.bot_choice(warrior, legs), LootRoll.Choice.GREED, "nothing in the backpack: a 3rd piece goes by its stats")
+	check(eq.add_to_backpack(hands), "the set hands wait in the backpack")
+	check_eq(LootRoll.bot_choice(warrior, legs), LootRoll.Choice.NEED, "with the 4th piece in the backpack: Need the 3rd")
+	check(eq.add_to_backpack(legs), "won")
+	check_eq(ItemTooltip.upgrade_direction(legs, plain_legs, cls, eq), 1, "legs: an upgrade")
+	check_eq(ItemTooltip.upgrade_direction(hands, plain_hands, cls, eq), 1, "hands: an upgrade")
+	check_eq(Intermission.bot_equip_upgrades(warrior), 2, "the bot puts both on")
+	check_eq(SetBonuses.counts(eq).get(&"battlegear_of_fury", 0), 4, "4 pieces worn")
+	check_eq(SetBonuses.active_count(eq), 2, "the 4-piece bonus is reached")
+	check_eq(Intermission.bot_equip_upgrades(warrior), 0, "and kept: the plain pieces would break it")
+
+
+## A warrior bot (a fresh slot, freed in after_each) wearing the Battlegear pieces [param worn]
+## and, in each slot of [param plain], a plain piece better than the set piece by the factor
+## given there; the set pieces of those slots are returned by part name.
+func _fury_bot(worn: Array[String], plain: Dictionary) -> Dictionary:
+	var bot := Support.make_slot(3, &"warrior")
+	slots.append(bot)
+	var cls := bot.class_data
+	var eq := Support.equipment_of(bot)
+	for part in worn:
+		check(eq.equip(_set_piece(StringName("set_warrior_" + part))), "%s worn" % part)
+	var out: Dictionary = {"slot": bot, "eq": eq}
+	for part: String in plain:
+		var set_item := _set_piece(StringName("set_warrior_" + part))
+		var plain_item := _plain_like(set_item, float(plain[part]))
+		var s_score := ItemTooltip.item_score(set_item, cls)
+		var p_score := ItemTooltip.item_score(plain_item, cls)
+		check(p_score - s_score > ItemTooltip.UPGRADE_THRESHOLD and s_score >= p_score * (1.0 - ItemTooltip.SET_UPGRADE_TOLERANCE),
+			"fixture: the plain %s is a little better (%.1f vs %.1f)" % [part, p_score, s_score])
+		check(eq.equip(plain_item), "plain %s on" % part)
+		out[part] = set_item
+		out["plain_" + part] = plain_item
+	return out
+
+
+## Review case A: 3 pieces worn, the set legs and hands both wait in the backpack. Either is
+## the 4th piece, the spare one does not cancel it out: both count as upgrades, the bot puts
+## one on and keeps the plain item in the other slot (a 5th piece goes by its stats).
+func test_bots_put_the_4th_piece_on_when_a_spare_waits_too() -> void:
+	var b := _fury_bot(["head", "chest", "shoulders"] as Array[String], {"legs": 1.1, "hands": 1.15})
+	var bot: PlayerSlot = b["slot"]
+	var eq: Equipment = b["eq"]
+	var cls := bot.class_data
+	check(eq.add_to_backpack(b["legs"]) and eq.add_to_backpack(b["hands"]), "both set pieces wait")
+	check_eq(ItemTooltip.upgrade_direction(b["legs"], b["plain_legs"], cls, eq), 1, "legs: the 4th piece")
+	check_eq(ItemTooltip.upgrade_direction(b["hands"], b["plain_hands"], cls, eq), 1, "hands: the 4th piece too")
+	check_eq(Intermission.bot_equip_upgrades(bot), 1, "the bot puts one on")
+	check_eq(SetBonuses.counts(eq).get(&"battlegear_of_fury", 0), 4, "4 pieces worn")
+	check_eq(SetBonuses.active_count(eq), 2, "the 4-piece bonus is reached")
+	check(eq.get_item(Items.EquipSlot.HANDS) == b["plain_hands"], "the plain hands stay on")
+
+
+## Review case B: 2 pieces worn, three more wait in the backpack. Each is a 3rd piece with a
+## 4th one in reach, so each counts; the bot goes from 2 to 4 pieces in one market.
+func test_bots_go_from_2_to_4_pieces_with_three_waiting() -> void:
+	var b := _fury_bot(["head", "chest"] as Array[String], {"legs": 1.1, "hands": 1.15, "shoulders": 1.1})
+	var bot: PlayerSlot = b["slot"]
+	var eq: Equipment = b["eq"]
+	var cls := bot.class_data
+	for part in ["legs", "hands", "shoulders"]:
+		check(eq.add_to_backpack(b[part]), "set %s waits" % part)
+	for part in ["legs", "hands", "shoulders"]:
+		check_eq(ItemTooltip.upgrade_direction(b[part], b["plain_" + part], cls, eq), 1, "%s: an upgrade" % part)
+	var more := _set_piece(&"set_warrior_legs")
+	eq.remove_from_backpack(b["legs"])
+	check_eq(LootRoll.bot_choice(bot, more), LootRoll.Choice.NEED, "a rolled 3rd piece with two more waiting: Need")
+	check(eq.add_to_backpack(b["legs"]), "legs back")
+	check_eq(Intermission.bot_equip_upgrades(bot), 2, "the bot puts two on")
+	check_eq(SetBonuses.counts(eq).get(&"battlegear_of_fury", 0), 4, "4 pieces worn")
+	check_eq(SetBonuses.active_count(eq), 2, "the 4-piece bonus is reached")
+	check_eq(Intermission.bot_equip_upgrades(bot), 0, "and kept")
+
+
+## Review case C: a full set gives one piece away for a better plain item (5 -> 4 keeps the
+## 4-piece), but not a second one – the piece it gave away waits in the backpack and must not
+## count as worn. Both orders of the plain items end the pass with the 4-piece active.
+func test_bots_keep_the_4_piece_when_trading_from_5() -> void:
+	for plain_order: Array in [["legs", "hands"], ["hands", "legs"]]:
+		var b := _fury_bot(["head", "chest", "shoulders", "legs", "hands"] as Array[String], {})
+		var bot: PlayerSlot = b["slot"]
+		var eq: Equipment = b["eq"]
+		var factors: Dictionary = {"legs": 1.1, "hands": 1.15}
+		for part: String in plain_order:
+			var worn := eq.get_item(Items.equip_slots_for(_set_piece(StringName("set_warrior_" + part)).slot_type)[0])
+			check(eq.add_to_backpack(_plain_like(worn, factors[part])), "plain %s waits" % part)
+		check_eq(Intermission.bot_equip_upgrades(bot), 1, "%s first: one plain item goes on" % plain_order[0])
+		check(eq.get_item(Items.EquipSlot.LEGS if plain_order[0] == "legs" else Items.EquipSlot.HANDS).set_id == &"",
+			"the first one (5 -> 4)")
+		check_eq(SetBonuses.counts(eq).get(&"battlegear_of_fury", 0), 4, "4 pieces worn")
+		check_eq(SetBonuses.active_count(eq), 2, "the 4-piece bonus is kept")
+		check_eq(Intermission.bot_equip_upgrades(bot), 0, "and stays")
+
+
 ## Guaranteed drops of elites / the goblin / bosses (LootDrops.drop_special) roll their
 ## Epics into set pieces at the loot rate, always for a class of the party.
 func test_special_drops_roll_set_pieces_for_the_party() -> void:

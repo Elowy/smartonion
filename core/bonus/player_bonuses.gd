@@ -121,10 +121,12 @@ static func create(p_player: Player) -> PlayerBonuses:
 	return b
 
 
-## Replaces every entry of [param source] with [param entries] and rebuilds.
-func set_effects(source: StringName, entries: Array[Dictionary]) -> void:
+## Replaces every entry of [param source] with [param entries] and rebuilds. Returns true when
+## the rebuild refreshed the procs (a source's proc defs changed, ProcSystem.refresh ran) –
+## Player.apply_equipment then skips its own refresh.
+func set_effects(source: StringName, entries: Array[Dictionary]) -> bool:
 	_effects[source] = entries.duplicate(true)
-	_rebuild()
+	return _rebuild()
 
 
 ## The entries [param source] last set (a copy; empty when none).
@@ -342,7 +344,8 @@ static func target_condition_met(target: Node3D, condition: StringName, target_p
 
 # --- Rebuild -----------------------------------------------------------------------------------
 
-func _rebuild() -> void:
+## Rebuilds everything derived from the entries; true when the procs were refreshed.
+func _rebuild() -> bool:
 	var stats_by_source: Dictionary[StringName, Dictionary] = {}
 	var defs_by_source: Dictionary[StringName, Array] = {}
 	var resource_sums: Dictionary[StringName, Dictionary] = {}
@@ -397,11 +400,12 @@ func _rebuild() -> void:
 		defs_by_source[source] = defs
 	_apply_stats(stats_by_source)
 	_apply_resources(resource_sums)
-	_apply_procs(defs_by_source)
+	var refreshed := _apply_procs(defs_by_source)
 	_apply_scripts(wanted)
 	if player != null and player.abilities != null:
 		player.abilities.invalidate_params()
 	changed.emit()
+	return refreshed
 
 
 func _ordered_sources() -> Array[StringName]:
@@ -519,10 +523,10 @@ func _apply_resources(sums: Dictionary[StringName, Dictionary]) -> void:
 
 ## Hands the changed sources to ProcSystem, then rebuilds it once: set_extra_procs only stores
 ## (the engine owns the rebuild), so a change touching several sources rebuilds once and a
-## change that touches no proc keeps the running proc buffs.
-func _apply_procs(defs_by_source: Dictionary[StringName, Array]) -> void:
+## change that touches no proc keeps the running proc buffs. True when it refreshed.
+func _apply_procs(defs_by_source: Dictionary[StringName, Array]) -> bool:
 	if player == null or player.procs == null:
-		return
+		return false
 	var dirty := false
 	for source in defs_by_source:
 		var defs: Array = defs_by_source[source]
@@ -535,6 +539,7 @@ func _apply_procs(defs_by_source: Dictionary[StringName, Array]) -> void:
 		dirty = true
 	if dirty:
 		player.procs.refresh()
+	return dirty
 
 
 ## Keeps unchanged scripts, tears the removed ones down, then sets the new ones up (so a new
