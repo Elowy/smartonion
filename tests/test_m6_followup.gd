@@ -38,9 +38,11 @@ func after_each() -> void:
 	screen = null
 	Support.free_slots(slots)
 	slots.clear()
-	if world != null:
-		UiFakes.free_node(world)
-		world = null
+	UiFakes.free_node(world)
+	world = null
+	if _ework != null:
+		EFakes.free_world(tree, _ework)
+		_ework = null
 	Enemy.invalidate_player_cache()
 	UiFakes.reset_players()
 	RunState.start_run(1, 1)
@@ -213,3 +215,110 @@ func test_a_bot_with_a_weapon_still_enchants_the_weapon_first() -> void:
 	check(done >= 1, "acted")
 	check_eq(sword.enchant_uses, done, "the weapon took every action")
 	check_eq(chest.enchant_uses, 0, "the armour was left alone")
+
+
+# --- 4a. The rescue stand ends inside a hazard (BotInput) ------------------------------------------
+
+var _ework: Node3D
+
+
+func _arena_world() -> Node3D:
+	if _ework == null:
+		_ework = EFakes.make_world(tree)
+	return _ework
+
+
+func _entities() -> Node3D:
+	return EFakes.arena_of(_arena_world()).entities
+
+
+## A real bot hero (own BotInput) in the arena.
+func _bot_hero(pos: Vector3, index: int, class_id: StringName = &"warrior") -> Player:
+	var slot := PlayerSlot.new(index, BotInput.new("bot:f%d" % index, 3 + index), PlayerManager.PLAYER_COLORS[index])
+	slot.class_data = Db.get_class_data(class_id)
+	var p := Player.create(slot)
+	_entities().add_child(p)
+	p.global_position = pos
+	Enemy.invalidate_player_cache()
+	return p
+
+
+func _bot_move(p: Player) -> Vector2:
+	var bot := p.slot.input as BotInput
+	bot.think(DT)
+	return bot.get_move()
+
+
+func test_a_bot_beside_a_downed_teammate_stands_still_without_a_hazard() -> void:
+	var rescuer := _bot_hero(Vector3(6.5, 0, 0), 0)
+	var ghost := _bot_hero(Vector3(6.0, 0, 0), 1, &"mage")
+	ghost.downed = true
+	check(not ghost.is_alive(), "the teammate is down")
+	check(6.5 - 6.0 < BotInput.RESCUE_DISTANCE, "inside the revive circle")
+	check_eq(_bot_move(rescuer), Vector2.ZERO, "no enemy, no hazard: the rescuer stands still and revives")
+	# A hazard far away is no reason to leave the downed teammate.
+	PoisonPuddle.spawn(_entities(), Vector3(-14, 0, 8), 1.6, 3.0, 0.5, 2.0, Color.GREEN)
+	check_eq(_bot_move(rescuer), Vector2.ZERO, "a puddle far away changes nothing")
+
+
+func test_a_bot_beside_a_downed_teammate_leaves_a_puddle_it_stands_in() -> void:
+	var rescuer := _bot_hero(Vector3(6.5, 0, 0), 0)
+	var ghost := _bot_hero(Vector3(6.0, 0, 0), 1, &"mage")
+	ghost.downed = true
+	PoisonPuddle.spawn(_entities(), Vector3(5.5, 0, 0), 1.6, 3.0, 0.5, 2.0, Color.GREEN)
+	var move := _bot_move(rescuer)
+	check(move.x > 0.5, "no enemy near, but the puddle under it: the rescuer steps out, east (%s)" % move)
+
+
+func test_a_bot_beside_a_downed_teammate_leaves_a_boss_circle() -> void:
+	var rescuer := _bot_hero(Vector3(6.5, 0, 0), 0)
+	var ghost := _bot_hero(Vector3(6.0, 0, 0), 1, &"mage")
+	ghost.downed = true
+	FrostCircle.spawn(_entities(), Vector3(6.0, 0, 1.0), 2.2, 1.2, 1.0, 0.0, 0.0)
+	var move := _bot_move(rescuer)
+	check(move.length() > 0.5, "inside the telegraphed circle: the rescuer moves out of it (%s)" % move)
+	check(move.y < -0.5, "away from the middle, which lies to the south (%s)" % move)
+
+
+# --- 4b. A reroll's redrawn Black Market offer is bought (Intermission._bots_reroll) ------------------
+
+func _bot_market(cleared_wave: int, gold: int, p_seed: int) -> PlayerSlot:
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)
+	UiFakes.reset_players()
+	RunState.start_run(1, p_seed)
+	RunState.set_wave(cleared_wave)
+	RunState.add_gold(gold)
+	world = MarketFakes.make_world(tree)
+	var slot := MarketFakes.bot_with_hero(world, "bot:0", &"warrior")
+	screen = Intermission.create()
+	screen.bot_shopping = true
+	tree.root.add_child(screen)
+	screen.open(cleared_wave, 0)
+	return slot
+
+
+func test_a_bot_reroll_that_redraws_an_affordable_black_market_upgrade_buys_it() -> void:
+	var bought_after_reroll := false
+	var tried := 0
+	for p_seed in [7, 8, 9, 10, 11, 12]:
+		var slot := _bot_market(16, 20000, p_seed)
+		tried += 1
+		var stall := screen.shop_panel.shop
+		check(screen.shop_panel.has_black_market(), "the Black Market is open at wave 16")
+		var first := stall.black_market.item
+		var eq := (slot.player as Player).equipment
+		var cheap_rerolls := stall.reroll_cost()
+		check(RunState.gold - cheap_rerolls > Intermission.BOT_REROLL_RESERVE_MULT * Intermission.bot_train_reserve(16, 1), "rich enough to reroll")
+		var shoppers: Array[PlayerSlot] = [slot]
+		var rerolls := screen._bots_reroll(shoppers)
+		check(rerolls >= 1, "the bot rerolled the stall (%d)" % rerolls)
+		if RunState.black_market_bought == 1:
+			# Bought inside _bots_reroll – the pass that only looks at the redrawn offer.
+			check(stall.black_market.sold, "the redrawn offer is sold")
+			check(stall.black_market.item != first, "and it is the redrawn one, not the first")
+			check(eq.equipped_items().has(stall.black_market.item) or eq.backpack.has(stall.black_market.item), "and worn / carried by the bot")
+			check(RunState.spend_log.any(func(e: Dictionary) -> bool: return e["kind"] == &"black_market"), "logged")
+			bought_after_reroll = true
+			break
+	check(bought_after_reroll, "a reroll's redrawn Black Market upgrade was bought within %d seeds" % tried)
