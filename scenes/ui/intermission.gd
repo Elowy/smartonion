@@ -280,7 +280,23 @@ func _start_loot() -> void:
 	phase = Phase.LOOT
 	_market_root.visible = false
 	loot_screen.show()
-	loot_screen.open(RunState.take_team_loot(), PlayerManager.get_slots())
+	var loot := RunState.take_team_loot()
+	_bots_make_room_for_artifacts(loot)
+	loot_screen.open(loot, PlayerManager.get_slots())
+
+
+## Need puts an item into the backpack, so a bot with a full one could not Need an Artifact of its
+## class (GDD 5.5: the biggest drop of the run must not be lost to clutter): before the roll
+## it sells its first non-upgrade item ([method _bot_make_room]) for every such Artifact in
+## [param loot].
+func _bots_make_room_for_artifacts(loot: Array[ItemInstance]) -> void:
+	for item in loot:
+		if item == null or not item.is_artifact():
+			continue
+		for s in PlayerManager.get_slots():
+			var eq := ShopPanel.equipment_of(s) if s.is_bot() else null
+			if eq != null and not eq.has_space() and item.can_be_used_by(s.class_data):
+				_bot_make_room(s, eq)
 
 
 func _on_loot_finished() -> void:

@@ -4,6 +4,7 @@ extends TestCase
 ## panel, the compare / upgrade rules and what bots do with an Artifact (Need, equip, never sell).
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
+const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
 
 var players: Array[Player] = []
 var panels: Array[PlayerPanel] = []
@@ -290,3 +291,57 @@ func test_a_bot_never_sells_an_artifact_to_make_room() -> void:
 	check(foreign in eq.backpack, "the Artifact stays")
 	check(eq.has_space(), "a junk item was sold instead")
 	check(RunState.gold > gold, "for gold")
+
+
+func _join_bot(class_id: StringName) -> PlayerSlot:
+	var slot := PlayerManager.add_bot(class_id)
+	players.append(Player.create(slot))
+	return slot
+
+
+func test_a_bot_with_a_full_backpack_makes_room_for_its_artifact_before_the_roll() -> void:
+	var warrior := _join_bot(&"warrior")
+	var mage := _join_bot(&"mage")
+	var eq := _eq(warrior)
+	var mage_eq := _eq(mage)
+	for target in [eq, mage_eq]:
+		for i in Items.BACKPACK_SIZE:
+			var junk := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe" if target == mage_eq else &"wand"), Items.Rarity.COMMON, 1)
+			junk.buy_price = 5
+			target.add_to_backpack(junk)
+		check(not target.has_space(), "a full backpack")
+	var item := _artifact(&"warrior")
+	var screen := Intermission.new()
+	var gold := RunState.gold
+	var loot: Array[ItemInstance] = [item]
+	screen._bots_make_room_for_artifacts(loot)
+	screen.free()
+	check(eq.has_space(), "the Warrior's bot sold a junk item")
+	check(not mage_eq.has_space(), "the Mage's backpack is left alone (it cannot use the Artifact)")
+	check(RunState.gold > gold, "for gold")
+	check(LootRoll.create(item).can_need(warrior), "so the Warrior can Need it")
+	var ordinary: Array[ItemInstance] = [ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)]
+	var before := RunState.gold
+	var other := Intermission.new()
+	other._bots_make_room_for_artifacts(ordinary)
+	other.free()
+	check_eq(RunState.gold, before, "ordinary loot never makes a bot sell")
+
+
+func test_the_loot_phase_makes_room_for_the_bots_artifact() -> void:
+	var world := MarketFakes.make_world(tree)
+	RunState.shop = MarketFakes.FakeShop.new()
+	var warrior := MarketFakes.bot_with_hero(world, "bot:w", &"warrior")
+	var eq := _eq(warrior)
+	for i in Items.BACKPACK_SIZE:
+		var junk := ItemInstance.from_weapon(Db.get_weapon(&"wand"), Items.Rarity.COMMON, 1)
+		junk.buy_price = 5
+		eq.add_to_backpack(junk)
+	RunState.add_team_loot(_artifact(&"warrior"))
+	var screen := Intermission.create()
+	tree.root.add_child(screen)
+	screen.open(10, 0)
+	check_eq(screen.phase, Intermission.Phase.LOOT, "the loot roll opened")
+	check(eq.has_space(), "the bot sold a junk item before the roll")
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)
