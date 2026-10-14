@@ -10,13 +10,22 @@ extends Node3D
 ## Stun stars are created lazily on the first stun.
 ## The goblin: a short green goblin with a big gold sack on its back; its Glow part is a
 ## bright gold glint on the sack (twinkles like the candle flame).
+## M6: the Plague Ghoul (ghoul: gaunt, hunched, weeping boils; the Glow part is the toxic
+## boil on its back), the Cultist Acolyte (cultist: a hooded robe with a staff; the Glow
+## part is the violet orb floating over its free hand) and the Flesh Golem (golem: a huge
+## stitched brute with an iron belly plate; its arm carries the chain and meat hook).
+## The wind-up tell can be tinted ([method play_windup]): the Acolyte's channel is violet
+## ([method play_channel]), everything else red.
 
-const STYLES: Array[StringName] = [&"skeleton", &"candlekin", &"gurgler", &"troll", &"goblin"]
+const STYLES: Array[StringName] = [&"skeleton", &"candlekin", &"gurgler", &"troll", &"goblin",
+		&"ghoul", &"cultist", &"golem"]
 const TURN_SPEED := 12.0
 const FLASH_TIME := 0.12
 const ATTACK_TIME := 0.32
 const MAX_WINDUP := 1.2
 const WINDUP_COLOR := Color(1.0, 0.18, 0.1)
+## The Acolyte's channel tell.
+const CHANNEL_COLOR := Color(0.7, 0.3, 1.0)
 ## Angular speed of the pulsing wind-up tint (shader side).
 const WINDUP_PULSE := 30.0
 
@@ -30,6 +39,12 @@ const WHITE := Color(0.97, 0.96, 0.92)
 const GOLD := Color(1.0, 0.8, 0.22)
 const SACK := Color(0.7, 0.54, 0.32)
 const LEATHER := Color(0.4, 0.24, 0.12)
+## Plague Ghoul: rags, boil pus; Cultist: gold trim, void face, eye / orb glow; Golem: sutures.
+const RAG := Color(0.33, 0.29, 0.22)
+const PUS := Color(0.82, 0.9, 0.3)
+const VOID := Color(0.1, 0.06, 0.14)
+const OCCULT := Color(0.86, 0.42, 1.0)
+const SUTURE := Color(0.15, 0.07, 0.09)
 
 var data: EnemyData
 var style: StringName = &""
@@ -51,6 +66,7 @@ var _phase := 0.0
 var _time := 0.0
 var _flash := 0.0
 var _windup := -1.0
+var _windup_color := WINDUP_COLOR
 var _attack := 1.0
 var _stunned := false
 var _overlay_dirty := false
@@ -119,9 +135,26 @@ func flash_hit() -> void:
 	_apply_overlay()
 
 
-## Wind-up tell before a lunge / throw.
-func play_windup() -> void:
+## Wind-up tell before a lunge / throw / hook: the arm rises and the body pulses in
+## [param color] (red) until [method play_attack] or [method cancel_windup] (or MAX_WINDUP).
+func play_windup(color: Color = WINDUP_COLOR) -> void:
+	if color != _windup_color:
+		_windup_color = color
+		_overlay_state = Vector2i.ZERO  # the applied tint must change with it
 	_windup = 0.0
+
+
+## The Cultist Acolyte's channel: [method play_windup] in violet.
+func play_channel() -> void:
+	play_windup(CHANNEL_COLOR)
+
+
+## Stops a running wind-up tell without an attack swing (the channel / hook was interrupted).
+func cancel_windup() -> void:
+	if _windup < 0.0:
+		return
+	_windup = -1.0
+	_overlay_dirty = true
 
 
 func play_attack() -> void:
@@ -211,7 +244,7 @@ func _apply_overlay() -> void:
 	if state == _overlay_state:
 		return
 	_overlay_state = state
-	var color := WINDUP_COLOR if state.x == 2 else Color.WHITE
+	var color := _windup_color if state.x == 2 else Color.WHITE
 	var amount := float(state.y) / Mats.OVERLAY_STEPS
 	var pulse := WINDUP_PULSE if state.x == 2 else 0.0
 	Mats.set_overlay(_body, color, amount, pulse)
@@ -246,6 +279,21 @@ static func parts_for(p_style: StringName, color: Color) -> Dictionary:
 			out["glow"] = MeshKit.cached("enemy:glint", func() -> Mesh: return _glint_mesh())
 			out["glow_pos"] = Vector3(0.1, 0.98, 0.3)
 			out["glow_color"] = Color(1.0, 0.86, 0.35)
+		&"ghoul":
+			out["arm_pivot"] = Vector3(0.3, 1.0, -0.1)
+			out["head_y"] = 1.32
+			out["glow"] = MeshKit.cached("enemy:boil", func() -> Mesh: return _boil_mesh())
+			out["glow_pos"] = Vector3(0.0, 1.08, 0.27)
+			out["glow_color"] = Color(0.7, 1.0, 0.25)
+		&"cultist":
+			out["arm_pivot"] = Vector3(0.24, 0.98, 0.0)
+			out["head_y"] = 1.42
+			out["glow"] = MeshKit.cached("enemy:orb", func() -> Mesh: return _orb_mesh())
+			out["glow_pos"] = Vector3(-0.3, 0.82, -0.36)
+			out["glow_color"] = OCCULT
+		&"golem":
+			out["arm_pivot"] = Vector3(0.62, 1.22, -0.02)
+			out["head_y"] = 1.62
 		_:
 			out["arm_pivot"] = Vector3(0.21, 0.8, 0.0)
 			out["head_y"] = 1.24
@@ -275,6 +323,21 @@ static func _build(p_style: StringName, color: Color, arm: bool) -> Mesh:
 				_goblin_arm(k, color)
 			else:
 				_goblin(k, color)
+		&"ghoul":
+			if arm:
+				_ghoul_arm(k, color)
+			else:
+				_ghoul(k, color)
+		&"cultist":
+			if arm:
+				_cultist_arm(k, color)
+			else:
+				_cultist(k, color)
+		&"golem":
+			if arm:
+				_golem_arm(k, color)
+			else:
+				_golem(k, color)
 		_:
 			if arm:
 				_skeleton_arm(k, color)
@@ -566,6 +629,235 @@ static func _goblin_arm(k: MeshKit, skin: Color) -> void:
 	k.add_sphere(0.05, _xf(ha), skin.lightened(0.05), 8, 4)
 	# A gold coin clutched in the fist.
 	k.add_cylinder(0.05, 0.05, 0.016, _xf(ha + Vector3(0.0, -0.01, -0.05), Vector3(70, 0, 0)), GOLD, 12)
+
+
+# Plague Ghoul: gaunt and hunched, grey-green hide over its ribs, long arms with claws, a wide
+# toothy maw, sunken toxic eyes, tattered rags and weeping boils; the big boil on its back is the
+# Glow part and pulses.
+static func _ghoul(k: MeshKit, skin: Color) -> void:
+	var dark := skin.darkened(0.3)
+	var belly := skin.lerp(Color(0.85, 0.88, 0.6), 0.3)
+	# Bent legs and big clawed feet.
+	for side: float in [-1.0, 1.0]:
+		var hip := Vector3(0.13 * side, 0.54, 0.08)
+		var knee := Vector3(0.18 * side, 0.3, -0.06)
+		var foot := Vector3(0.16 * side, 0.05, -0.08)
+		k.add_segment(hip, knee, 0.08, 0.055, skin, 7)
+		k.add_segment(knee, foot, 0.055, 0.045, skin, 7)
+		k.add_sphere(0.06, _xf(knee), dark, 6, 3)
+		k.add_sphere(0.085, _xf(foot + Vector3(0, -0.01, -0.07), Vector3.ZERO, Vector3(0.9, 0.5, 1.7)), dark, 8, 4)
+		for c in 3:
+			var toe := foot + Vector3((c - 1) * 0.045, 0.0, -0.17)
+			k.add_segment(toe, toe + Vector3(0, -0.01, -0.09), 0.016, 0.0, BONE, 4)
+	# Hunched torso (leaning forward), pale belly, ribs showing, a spine of bony bumps.
+	k.add_capsule(0.25, 0.74, Transform3D(MeshKit.basis_from_y(Vector3(0.0, 1.0, -0.6)), Vector3(0.0, 0.8, 0.0)), skin, 12, 5)
+	k.add_sphere(0.18, _xf(Vector3(0, 0.68, -0.2), Vector3.ZERO, Vector3(1.0, 1.15, 0.65)), belly, 10, 5)
+	for i in 3:
+		var y := 0.84 + i * 0.08
+		k.add_box(Vector3(0.34 - i * 0.04, 0.022, 0.03), _xf(Vector3(0, y, -(y - 0.8) * 0.6 - 0.235), Vector3(-30, 0, 0)), dark)
+	for i in 4:
+		var y := 0.7 + i * 0.12
+		k.add_sphere(0.04, _xf(Vector3(0, y, -(y - 0.8) * 0.6 + 0.25)), BONE.darkened(0.2), 6, 3)
+	k.add_sphere(0.2, _xf(Vector3(0, 1.0, 0.16), Vector3.ZERO, Vector3(1.0, 0.9, 1.0)), skin, 12, 6)
+	# Weeping boils.
+	k.add_sphere(0.065, _xf(Vector3(-0.2, 1.06, 0.0)), PUS, 8, 4)
+	k.add_sphere(0.05, _xf(Vector3(0.22, 0.86, 0.1)), PUS, 8, 4)
+	k.add_sphere(0.04, _xf(Vector3(-0.12, 0.74, -0.3)), PUS, 6, 3)
+	# Head: low and forward, jaw hanging open on rows of teeth, sunken glowing eyes, drool.
+	var head := Vector3(0.0, 1.16, -0.34)
+	k.add_segment(Vector3(0, 0.98, -0.14), head, 0.09, 0.08, skin, 6)
+	k.add_sphere(0.17, _xf(head, Vector3.ZERO, Vector3(1.0, 0.95, 1.05)), skin, 14, 7)
+	k.add_sphere(0.12, _xf(head + Vector3(0, -0.12, -0.06), Vector3(20, 0, 0), Vector3(1.1, 0.55, 1.0)), dark, 10, 5)
+	k.add_sphere(0.085, _xf(head + Vector3(0, -0.09, -0.1), Vector3.ZERO, Vector3(1.3, 0.45, 0.8)), Color(0.35, 0.05, 0.07), 10, 4)
+	for i in 5:
+		var x := -0.07 + i * 0.035
+		k.add_cylinder(0.0, 0.014, 0.05, _xf(head + Vector3(x, -0.065, -0.19), Vector3(180, 0, 0)), WHITE, 4)
+		k.add_cylinder(0.0, 0.014, 0.045, _xf(head + Vector3(x, -0.13, -0.17)), WHITE, 4)
+	for side: float in [-1.0, 1.0]:
+		k.add_sphere(0.05, _xf(head + Vector3(0.075 * side, 0.04, -0.14)), DARK, 8, 4)
+		k.add_sphere(0.027, _xf(head + Vector3(0.078 * side, 0.04, -0.178)), Color(0.82, 1.0, 0.25), 6, 3)
+		k.add_segment(head + Vector3(0.15 * side, 0.0, 0.0), head + Vector3(0.27 * side, 0.07, 0.05), 0.04, 0.0, skin, 5)
+	for i in 3:
+		var x := -0.07 + i * 0.07
+		k.add_segment(head + Vector3(x, 0.14, 0.04), head + Vector3(x * 1.6, -0.06, 0.22), 0.012, 0.004, DARK.lightened(0.12), 4)
+	k.add_segment(head + Vector3(0.03, -0.14, -0.15), head + Vector3(0.03, -0.3, -0.16), 0.014, 0.01, PUS, 4)
+	# Free arm: long, nearly to the knee, three claws.
+	var sh := Vector3(-0.3, 1.0, -0.1)
+	var el := Vector3(-0.38, 0.72, -0.2)
+	var ha := Vector3(-0.34, 0.4, -0.3)
+	k.add_sphere(0.085, _xf(sh), skin, 8, 4)
+	k.add_segment(sh, el, 0.055, 0.045, skin, 7)
+	k.add_segment(el, ha, 0.045, 0.035, skin, 7)
+	k.add_sphere(0.06, _xf(ha), dark, 8, 4)
+	for i in 3:
+		var c := ha + Vector3((i - 1) * 0.035, -0.02, -0.03)
+		k.add_segment(c, c + Vector3(0, -0.04, -0.12), 0.016, 0.0, BONE, 4)
+	# Rags.
+	k.add_box(Vector3(0.3, 0.2, 0.03), _xf(Vector3(0, 0.47, -0.1), Vector3(12, 0, 0)), RAG)
+	k.add_box(Vector3(0.12, 0.17, 0.03), _xf(Vector3(0.1, 0.36, -0.12), Vector3(10, 0, 8)), RAG.darkened(0.2))
+	k.add_box(Vector3(0.1, 0.14, 0.03), _xf(Vector3(-0.09, 0.37, -0.12), Vector3(10, 0, -10)), RAG.darkened(0.1))
+	k.add_tube(PackedVector3Array([Vector3(-0.22, 1.02, -0.08), Vector3(0.0, 0.88, -0.27), Vector3(0.2, 0.68, -0.2)]), 0.025, 0.025, RAG.darkened(0.3), 5)
+
+
+static func _ghoul_arm(k: MeshKit, skin: Color) -> void:
+	var dark := skin.darkened(0.3)
+	var el := Vector3(0.08, -0.28, -0.1)
+	var ha := Vector3(0.05, -0.58, -0.22)
+	k.add_sphere(0.09, _xf(Vector3.ZERO), skin, 8, 4)
+	k.add_segment(Vector3.ZERO, el, 0.058, 0.046, skin, 7)
+	k.add_segment(el, ha, 0.046, 0.036, skin, 7)
+	k.add_sphere(0.062, _xf(ha), dark, 8, 4)
+	for i in 3:
+		var c := ha + Vector3((i - 1) * 0.035, -0.02, -0.03)
+		k.add_segment(c, c + Vector3(0, -0.04, -0.13), 0.017, 0.0, BONE, 4)
+
+
+# Cultist Acolyte: a hooded figure in a long robe with gold trim, a void for a face with two
+# glowing eyes, a rope belt and an occult pendant. The free hand holds a floating violet orb
+# (the Glow part); the staff arm rises when it channels.
+static func _cultist(k: MeshKit, robe: Color) -> void:
+	var dark := robe.darkened(0.4)
+	var light := robe.lightened(0.12)
+	var trim := GOLD.darkened(0.15)
+	var rope := Color(0.76, 0.64, 0.42)
+	# The robe: a bell from the hem to the shoulders, open at the bottom (both faces drawn).
+	var profile := PackedVector2Array([Vector2(0.36, 0.03), Vector2(0.35, 0.12), Vector2(0.3, 0.38),
+		Vector2(0.23, 0.68), Vector2(0.21, 0.88), Vector2(0.16, 1.0)])
+	k.add_lathe(profile, Transform3D(), robe, 20, 0.0, 360.0, true)
+	k.add_torus(0.33, 0.375, _xf(Vector3(0, 0.05, 0), Vector3.ZERO, Vector3(1, 0.5, 1)), trim, 18, 4)
+	for side: float in [-1.0, 1.0]:
+		k.add_sphere(0.07, _xf(Vector3(0.1 * side, 0.04, -0.24), Vector3.ZERO, Vector3(0.8, 0.5, 1.4)), dark, 6, 3)
+	# Rope belt with dangling ends, mantle over the shoulders.
+	k.add_torus(0.21, 0.25, _xf(Vector3(0, 0.68, 0), Vector3.ZERO, Vector3(1, 0.7, 1)), rope, 14, 4)
+	k.add_segment(Vector3(0.09, 0.68, -0.24), Vector3(0.12, 0.34, -0.3), 0.016, 0.012, rope, 4)
+	k.add_segment(Vector3(0.04, 0.68, -0.25), Vector3(0.05, 0.4, -0.32), 0.016, 0.012, rope.darkened(0.15), 4)
+	k.add_sphere(0.25, _xf(Vector3(0, 0.94, 0.0), Vector3.ZERO, Vector3(1.0, 0.55, 0.95)), light, 14, 6)
+	k.add_torus(0.2, 0.245, _xf(Vector3(0, 0.88, 0.0), Vector3.ZERO, Vector3(1, 0.45, 0.95)), trim, 16, 4)
+	# Hood: a dome with a drooping tip, the face a dark void with two glowing eyes.
+	k.add_sphere(0.2, _xf(Vector3(0, 1.14, 0.01), Vector3(-8, 0, 0), Vector3(1.0, 1.05, 1.1)), robe, 14, 7)
+	k.add_cylinder(0.0, 0.14, 0.3, _xf(Vector3(0, 1.3, 0.15), Vector3(-35, 0, 0)), robe, 10)
+	k.add_sphere(0.135, _xf(Vector3(0, 1.11, -0.12), Vector3.ZERO, Vector3(1.0, 1.05, 0.7)), VOID, 12, 6)
+	for side: float in [-1.0, 1.0]:
+		k.add_sphere(0.03, _xf(Vector3(0.055 * side, 1.13, -0.2)), Color(1.0, 0.72, 1.0), 6, 3)
+	# Occult pendant on the chest.
+	k.add_cylinder(0.065, 0.065, 0.02, _xf(Vector3(0, 0.86, -0.225), Vector3(90, 0, 0)), trim, 12)
+	k.add_sphere(0.032, _xf(Vector3(0, 0.86, -0.24)), OCCULT, 8, 4)
+	# Free arm (left): the sleeve reaches forward, the hand holds up the orb.
+	var sh := Vector3(-0.22, 0.95, 0.0)
+	var el := Vector3(-0.31, 0.78, -0.12)
+	var ha := Vector3(-0.28, 0.8, -0.3)
+	k.add_sphere(0.075, _xf(sh), robe, 8, 4)
+	k.add_segment(sh, el, 0.06, 0.055, robe, 7)
+	k.add_segment(el, ha, 0.055, 0.045, robe, 7)
+	k.add_torus(0.04, 0.07, _xf(el.lerp(ha, 0.75), Vector3(60, 0, 0)), trim, 8, 3)
+	k.add_sphere(0.045, _xf(ha + Vector3(0, 0.01, -0.03)), Color(0.55, 0.45, 0.5), 6, 3)
+
+
+static func _cultist_arm(k: MeshKit, robe: Color) -> void:
+	var trim := GOLD.darkened(0.15)
+	var el := Vector3(0.04, -0.22, -0.08)
+	var ha := Vector3(0.0, -0.36, -0.2)
+	k.add_sphere(0.075, _xf(Vector3.ZERO), robe, 8, 4)
+	k.add_segment(Vector3.ZERO, el, 0.06, 0.055, robe, 7)
+	k.add_segment(el, ha, 0.055, 0.045, robe, 7)
+	k.add_torus(0.04, 0.07, _xf(el.lerp(ha, 0.75), Vector3(60, 0, 0)), trim, 8, 3)
+	k.add_sphere(0.045, _xf(ha), Color(0.55, 0.45, 0.5), 6, 3)
+	# The staff: dark wood, a golden crescent with a small skull on top.
+	k.add_segment(ha + Vector3(0, -0.45, 0), ha + Vector3(0, 0.8, -0.02), 0.022, 0.02, WOOD.darkened(0.3), 6)
+	k.add_torus(0.045, 0.085, _xf(ha + Vector3(0, 0.84, -0.02), Vector3(90, 0, 0)), trim, 12, 4)
+	k.add_sphere(0.045, _xf(ha + Vector3(0, 0.84, -0.02), Vector3.ZERO, Vector3(1, 1.1, 1)), BONE, 8, 4)
+	k.add_cylinder(0.0, 0.03, 0.12, _xf(ha + Vector3(0, -0.5, -0.02), Vector3(180, 0, 0)), trim, 6)
+
+
+# Flesh Golem: a huge stitched-together brute – patchwork flesh in three skin tones, thick stump
+# legs, a barrel chest with an iron belly plate and a stitched incision, a small head sunk
+# between the shoulders (bolts in the neck, one big eye and one small, a stitched mouth), a ham
+# of a free arm; the weapon arm carries the chain and meat hook it pulls heroes in with.
+static func _golem(k: MeshKit, flesh: Color) -> void:
+	var dark := flesh.darkened(0.28)
+	var patch := flesh.lerp(Color(0.52, 0.62, 0.5), 0.55)
+	var pale := flesh.lerp(Color(0.85, 0.8, 0.75), 0.35)
+	# Stump legs, big feet, stitched knees.
+	for side: float in [-1.0, 1.0]:
+		k.add_capsule(0.19, 0.62, _xf(Vector3(0.22 * side, 0.34, 0.0)), dark, 10, 4)
+		k.add_box(Vector3(0.3, 0.1, 0.42), _xf(Vector3(0.22 * side, 0.05, -0.06)), dark.darkened(0.15))
+		k.add_torus(0.17, 0.205, _xf(Vector3(0.22 * side, 0.36, 0.0), Vector3.ZERO, Vector3(1, 0.5, 1)), SUTURE, 12, 3)
+	# Torso: a barrel with a paler belly and patches of other skin.
+	k.add_sphere(0.5, _xf(Vector3(0, 0.95, 0.02), Vector3.ZERO, Vector3(1.0, 0.95, 0.82)), flesh, 16, 8)
+	k.add_sphere(0.36, _xf(Vector3(0, 0.7, -0.12), Vector3.ZERO, Vector3(1.15, 0.95, 0.8)), pale, 14, 7)
+	k.add_sphere(0.24, _xf(Vector3(-0.3, 1.12, -0.28), Vector3.ZERO, Vector3(1.0, 0.9, 0.5)), patch, 10, 5)
+	k.add_sphere(0.2, _xf(Vector3(0.34, 0.85, -0.15), Vector3.ZERO, Vector3(0.6, 1.0, 0.9)), dark, 10, 5)
+	# Iron belly plate with rivets.
+	k.add_box(Vector3(0.42, 0.3, 0.06), _xf(Vector3(0.02, 0.62, -0.43), Vector3(6, 0, 4)), IRON)
+	for corner: Vector2 in [Vector2(-0.16, 0.1), Vector2(0.16, 0.1), Vector2(-0.16, -0.1), Vector2(0.16, -0.1)]:
+		k.add_sphere(0.03, _xf(Vector3(0.02 + corner.x, 0.62 + corner.y, -0.465)), IRON.lightened(0.25), 6, 3)
+	# A stitched Y-incision down the chest with cross stitches.
+	k.add_box(Vector3(0.035, 0.3, 0.03), _xf(Vector3(0.0, 0.98, -0.41), Vector3(8, 0, 0)), SUTURE)
+	k.add_box(Vector3(0.03, 0.2, 0.03), _xf(Vector3(-0.09, 1.2, -0.38), Vector3(8, 0, 35)), SUTURE)
+	k.add_box(Vector3(0.03, 0.2, 0.03), _xf(Vector3(0.09, 1.2, -0.38), Vector3(8, 0, -35)), SUTURE)
+	for i in 5:
+		k.add_box(Vector3(0.14, 0.02, 0.02), _xf(Vector3(0.0, 0.86 + i * 0.07, -0.42), Vector3(8, 0, 0)), SUTURE)
+	# Head sunk between the shoulders: heavy brow, one big and one small eye, stitched mouth, neck bolts.
+	var head := Vector3(0, 1.47, -0.12)
+	k.add_sphere(0.21, _xf(head, Vector3.ZERO, Vector3(1.1, 0.95, 1.0)), flesh.lightened(0.04), 14, 7)
+	k.add_sphere(0.14, _xf(head + Vector3(0, -0.1, -0.09), Vector3.ZERO, Vector3(1.3, 0.6, 0.9)), pale, 10, 5)
+	k.add_box(Vector3(0.3, 0.045, 0.06), _xf(head + Vector3(0, 0.08, -0.18), Vector3(0, 0, 6)), dark)
+	k.add_sphere(0.06, _xf(head + Vector3(-0.08, 0.03, -0.17)), Color(1.0, 0.95, 0.8), 10, 5)
+	k.add_sphere(0.028, _xf(head + Vector3(-0.085, 0.03, -0.225)), DARK, 6, 3)
+	k.add_sphere(0.034, _xf(head + Vector3(0.09, 0.04, -0.185)), Color(0.95, 0.9, 0.55), 8, 4)
+	k.add_sphere(0.016, _xf(head + Vector3(0.092, 0.04, -0.215)), DARK, 6, 3)
+	k.add_box(Vector3(0.2, 0.025, 0.02), _xf(head + Vector3(0, -0.1, -0.2)), SUTURE)
+	for i in 4:
+		k.add_box(Vector3(0.015, 0.06, 0.02), _xf(head + Vector3(-0.07 + i * 0.047, -0.1, -0.205)), SUTURE)
+	for side: float in [-1.0, 1.0]:
+		k.add_cylinder(0.035, 0.035, 0.14, _xf(head + Vector3(0.21 * side, -0.1, 0.0), Vector3(0, 0, 90)), IRON, 8)
+		k.add_sphere(0.05, _xf(head + Vector3(0.29 * side, -0.1, 0.0)), IRON.lightened(0.2), 8, 4)
+	# The free arm: a ham of an arm with a stitched elbow and a big fist.
+	var sh := Vector3(-0.58, 1.2, 0.0)
+	var el := Vector3(-0.72, 0.85, -0.05)
+	var fist := Vector3(-0.66, 0.5, -0.14)
+	k.add_sphere(0.22, _xf(sh), flesh, 10, 5)
+	k.add_segment(sh, el, 0.18, 0.15, flesh, 9)
+	k.add_segment(el, fist, 0.15, 0.13, patch, 9)
+	k.add_sphere(0.17, _xf(fist), pale, 10, 5)
+	k.add_torus(0.13, 0.175, _xf(el, Vector3(0, 0, 14), Vector3(1, 0.5, 1)), SUTURE, 10, 3)
+
+
+static func _golem_arm(k: MeshKit, flesh: Color) -> void:
+	var patch := flesh.lerp(Color(0.52, 0.62, 0.5), 0.55)
+	var pale := flesh.lerp(Color(0.85, 0.8, 0.75), 0.35)
+	var el := Vector3(0.14, -0.38, -0.05)
+	var fist := Vector3(0.06, -0.72, -0.14)
+	k.add_sphere(0.22, _xf(Vector3.ZERO), flesh, 10, 5)
+	k.add_segment(Vector3.ZERO, el, 0.18, 0.15, flesh, 9)
+	k.add_segment(el, fist, 0.15, 0.13, patch, 9)
+	k.add_sphere(0.17, _xf(fist), pale, 10, 5)
+	# Chain links wound round the forearm, then the chain and the meat hook hanging from the fist.
+	var forearm := (fist - el).normalized()
+	for i in 3:
+		var at := el.lerp(fist, 0.2 + i * 0.25)
+		k.add_torus(0.135, 0.175, Transform3D(MeshKit.basis_from_y(forearm), at), IRON, 10, 3)
+	k.add_tube(PackedVector3Array([fist + Vector3(0.0, -0.08, -0.12), Vector3(0.0, -0.45, -0.24),
+			Vector3(0.0, -0.66, -0.22)]), 0.032, 0.032, IRON.darkened(0.1), 5)
+	k.add_tube(PackedVector3Array([Vector3(0.0, -0.66, -0.22), Vector3(0.0, -0.82, -0.3), Vector3(0.0, -0.95, -0.2),
+			Vector3(0.0, -0.9, -0.06), Vector3(0.0, -0.74, -0.04)]), 0.045, 0.02, IRON.lightened(0.25), 6)
+	k.add_segment(Vector3(0.0, -0.74, -0.04), Vector3(0.0, -0.62, -0.1), 0.02, 0.0, IRON.lightened(0.4), 5)
+
+
+## The Plague Ghoul's pulsing boil (Glow part).
+static func _boil_mesh() -> Mesh:
+	var k := MeshKit.new()
+	k.add_sphere(0.1, _xf(Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.0, 0.9)), Color.WHITE, 10, 5)
+	k.add_sphere(0.05, _xf(Vector3(0.09, 0.06, 0.0)), Color.WHITE, 8, 4)
+	return k.build()
+
+
+## The Cultist Acolyte's floating orb (Glow part): a ball with a thin ring.
+static func _orb_mesh() -> Mesh:
+	var k := MeshKit.new()
+	k.add_sphere(0.085, Transform3D(), Color.WHITE, 10, 5)
+	k.add_torus(0.1, 0.12, _xf(Vector3.ZERO, Vector3(70, 0, 20)), Color.WHITE, 12, 3)
+	return k.build()
 
 
 ## Gold glint on the goblin's sack: a small 3D twinkle (spikes along every axis).

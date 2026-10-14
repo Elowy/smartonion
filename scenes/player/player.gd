@@ -59,6 +59,8 @@ const REVIVE_SPEED_PER_EXTRA_REVIVER := 0.5
 const GHOST_SLOW_PCT := 33.0
 const GHOST_SLOW_LINGER := 0.1
 const INVULNERABLE_AFTER_HIT := 0.35
+## Seconds a hook's pull ([method pull_toward]) takes (the Flesh Golem drags a hero in fast).
+const PULL_TIME := 0.22
 
 ## Collision capsule height (the onion is ~1.3 m tall).
 const BODY_HEIGHT := 1.2
@@ -174,6 +176,11 @@ var _attack_look_left := 0.0
 var _text_side := 1.0
 ## XP Gain fraction carried to this hero's next pickup (see xp_with_gain).
 var _xp_carry := 0.0
+## A pull in progress ([method pull_toward], the Flesh Golem's hook): the unit direction, the
+## metres still to go and the speed (m/s).
+var _pull_dir := Vector3.ZERO
+var _pull_left := 0.0
+var _pull_speed := 0.0
 
 
 ## Creates and configures a player for [param p_slot]. Not yet in the tree.
@@ -719,7 +726,7 @@ func _update_movement(delta: float) -> void:
 	var rate := ACCELERATION if move.length() > MOVE_DEADZONE else DECELERATION
 	velocity = Vector3(velocity.x, 0.0, velocity.z).move_toward(target, rate * delta)
 	var arena := Arena.current if is_inside_tree() else null
-	var motion := velocity * delta + _separation_motion(delta)
+	var motion := velocity * delta + _separation_motion(delta) + _pull_motion(delta)
 	if arena != null:
 		motion = _clamp_motion_to_arena(arena, motion)
 	# Shared screen (GDD 13): the screen edge of the fully zoomed-out camera is a wall.
@@ -749,6 +756,60 @@ func _update_movement(delta: float) -> void:
 			look = _attack_look_dir
 		model.set_facing(look)
 		model.set_moving(clampf(velocity.length() / maxf(0.01, max_speed), 0.0, 1.0))
+
+
+## An enemy's HOOK (M6, the Flesh Golem): the hit is rolled like any attack (kind
+## [constant CombatMath.KIND_PROJECTILE], ONE Dodge roll – a Dodge avoids the damage and the
+## pull alike; invulnerability, Divine Shield, Charge ... too) and, when it lands, drags this
+## hero [param distance] metres towards [param toward] ([method pull_toward]). Returns whether
+## the hook landed (also when it brought the hero down). A dodged hit leaves no
+## invulnerability behind, every other outcome does ([constant INVULNERABLE_AFTER_HIT]):
+## that tells the two apart without a second roll.
+func take_hook(raw: float, toward: Vector3, distance: float, source: Node3D = null) -> bool:
+	if downed or invulnerable_left > 0.0 or raw <= 0.0:
+		return false
+	take_damage(raw, CombatMath.KIND_PROJECTILE, source)
+	if not downed and invulnerable_left <= 0.0:
+		return false  # dodged
+	pull_toward(toward, distance)
+	return true
+
+
+## Drags this hero up to [param distance] metres in a straight line towards [param point] (XZ),
+## spread over [param duration] seconds, through the normal movement step (so walls and the
+## screen edge still stop it, and the hero's own input still applies). A new pull replaces the
+## running one. Returns the distance it will cover (0 when downed, already at the point or
+## distance <= 0).
+func pull_toward(point: Vector3, distance: float, duration: float = PULL_TIME) -> float:
+	if downed or distance <= 0.0 or duration <= 0.0:
+		return 0.0
+	var here := global_position if is_inside_tree() else position
+	var to := Vector3(point.x - here.x, 0.0, point.z - here.z)
+	var gap := to.length()
+	if gap < 0.01:
+		return 0.0
+	var d := minf(distance, gap)
+	_pull_dir = to / gap
+	_pull_left = d
+	_pull_speed = d / duration
+	return d
+
+
+## True while a pull ([method pull_toward]) is still dragging this hero.
+func is_pulled() -> bool:
+	return _pull_left > 0.0
+
+
+## This tick's share of the running pull (zero without one; a downed hero loses it).
+func _pull_motion(delta: float) -> Vector3:
+	if _pull_left <= 0.0:
+		return Vector3.ZERO
+	if downed:
+		_pull_left = 0.0
+		return Vector3.ZERO
+	var step := minf(_pull_speed * delta, _pull_left)
+	_pull_left -= step
+	return _pull_dir * step
 
 
 ## Gentle push away from teammates standing (almost) on the same spot (see
