@@ -490,7 +490,19 @@ func test_the_purse_board_names_the_new_spends() -> void:
 
 # --- The 4-player stall at both window sizes -------------------------------------------------------
 
+## Frees whatever the test already built (the two heroes of before_each included: leftover
+## heroes would stay in the "players" group and disturb every later test).
+func _free_scene() -> void:
+	UiFakes.free_node(panel)
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)
+	panel = null
+	screen = null
+	world = null
+
+
 func _four_player_screen() -> void:
+	_free_scene()
 	UiFakes.reset_players()
 	RunState.start_run(4, 9)
 	RunState.set_wave(15)
@@ -545,10 +557,7 @@ func test_the_four_player_stall_fits_both_window_sizes() -> void:
 		for panel_node: PlayerPanel in screen.panels.values():
 			var pr := panel_node.get_global_transform() * Rect2(Vector2.ZERO, panel_node.size)
 			check(not pr.intersects(Rect2(stall.position + Vector2(10, 0), stall.size - Vector2(20, 0))), "%s: the corner panel %s is clear of the stall" % [label, pr])
-		UiFakes.free_node(screen)
-		UiFakes.free_node(world)
-		screen = null
-		world = null
+		_free_scene()
 	finished.emit()
 
 
@@ -581,6 +590,7 @@ func test_the_four_player_cursors_reach_every_card_and_tooltips_stay_inside() ->
 # --- Bots ------------------------------------------------------------------------------------------
 
 func _bot_market(cleared_wave: int, gold: int, classes: Array[StringName]) -> void:
+	_free_scene()
 	UiFakes.reset_players()
 	RunState.start_run(classes.size(), 7)
 	RunState.set_wave(cleared_wave)
