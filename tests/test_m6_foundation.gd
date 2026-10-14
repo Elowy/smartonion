@@ -572,15 +572,22 @@ func test_item_instance_counts_enchant_uses() -> void:
 
 # --- Shop / Intermission hooks -----------------------------------------------------------------
 
-func test_shop_has_empty_consumable_and_black_market_slots() -> void:
+func test_shop_keeps_the_consumable_row_and_black_market_next_to_the_offers() -> void:
+	# P0 pinned both as empty; SHOPSINKS fills them (details: test_m6_shopsinks_core.gd). What stays:
+	# they are separate from the item offers, which still follow offer_count.
 	var shop := Shop.new()
-	check(shop.consumables.is_empty(), "no consumables row yet")
-	check(shop.black_market == null, "no Black Market offer yet")
+	check(shop.consumables.is_empty(), "no row before the first round")
+	check(shop.black_market == null, "no Black Market offer before the first round")
 	RunState.set_wave(15)
 	var slot := PlayerManager.join(ScriptedInput.new("m6:shop"), Db.get_class_data(&"warrior"))
-	shop.open_round(15, [slot] as Array[PlayerSlot], RunState.rng)
+	shop.open_round(14, [slot] as Array[PlayerSlot], RunState.rng)
 	check_eq(shop.offers.size(), Shop.offer_count(1), "the offers are unchanged")
-	check(shop.consumables.is_empty() and shop.black_market == null, "open_round leaves them empty")
+	check_eq(shop.consumables.size(), Consumables.ROW_SIZE, "open_round fills the consumables row")
+	check(shop.black_market == null, "wave 14: no Black Market yet")
+	shop.open_round(15, [slot] as Array[PlayerSlot], RunState.rng)
+	check_eq(shop.offers.size(), Shop.offer_count(1), "the offers are still unchanged")
+	check(shop.black_market != null and shop.black_market.item != null, "wave 15: the Black Market offer")
+	check(shop.black_market not in shop.offers, "outside the offers array")
 
 
 func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
@@ -595,8 +602,8 @@ func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
 	var plain := Intermission.create()
 	nodes.append(plain)
 	tree.root.add_child(plain)
-	check_eq(plain._bots_black_market(), 0, "black market stub")
-	check_eq(plain._bots_consumables(), 0, "consumables stub")
+	check_eq(plain._bots_black_market(), 0, "no bots, no Black Market purchase")
+	check_eq(plain._bots_consumables(), 0, "no bots, no consumables")
 	check_eq(plain._bots_enchant(), 0, "enchant stub")
 
 

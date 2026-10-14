@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"elixir_of_swiftness"
+display_name = "Elixir of Swiftness"
+kind = 0
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"haste": 10.0,
+"speed": 10.0
+}
+}])
+base_price = 12
+icon_id = &"elixir_of_swiftness"
+description = "Fizzes in the throat. You act and run faster for one wave."

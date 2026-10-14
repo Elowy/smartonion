@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"smoked_boar_ribs"
+display_name = "Smoked Boar Ribs"
+kind = 1
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -8.0
+}])
+base_price = 12
+icon_id = &"smoked_boar_ribs"
+description = "Falls off the bone and fills the belly. Blows hurt a little less for one wave."
