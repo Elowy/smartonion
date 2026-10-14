@@ -75,10 +75,11 @@ var body: Node3D
 var _wander := Vector2.ZERO
 var _wander_timer := 0.0
 var _rng := RandomNumberGenerator.new()
-## The hook (golem instance id, Enemy.hook_serial) the bot last decided about, and the decision.
-var _hook_owner := 0
-var _hook_serial := -1
-var _hook_dodges := false
+## Per telegraphed hook, whether the bot sidesteps it: golem instance id -> Enemy.hook_serial of
+## the hook decided about, and golem instance id -> the decision. Kept per golem so several golems
+## aiming at the bot at once do not re-roll each other every tick; pruned in [method think].
+var _hook_serials: Dictionary[int, int] = {}
+var _hook_dodges: Dictionary[int, bool] = {}
 
 
 func _init(p_key: String = "bot", p_seed: int = 0) -> void:
@@ -136,6 +137,8 @@ func think(delta: float) -> void:
 		if dist < nearest_enemy:
 			nearest_enemy = dist
 			to_nearest = -d / dist
+	if not _hook_serials.is_empty():
+		_prune_hook_decisions()
 	var melee := _reach() < MELEE_REACH and _hp_ratio() >= RETREAT_HP_RATIO and crowd < CROWD_COUNT
 	var keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE) if melee else KITE_DISTANCE
 	var steer := Vector2.ZERO
@@ -225,14 +228,23 @@ static func priority_enemy(tree: SceneTree, pos: Vector3, reach: float) -> Enemy
 	return best
 
 
-## Whether the bot sidesteps [param golem]'s current hook (decided once per hook).
+## Whether the bot sidesteps [param golem]'s current hook (one roll per golem and hook).
 func _wants_dodge(golem: Enemy) -> bool:
 	var id := golem.get_instance_id()
-	if id != _hook_owner or golem.hook_serial != _hook_serial:
-		_hook_owner = id
-		_hook_serial = golem.hook_serial
-		_hook_dodges = _rng.randf() < HOOK_DODGE_CHANCE
-	return _hook_dodges
+	if not _hook_serials.has(id) or _hook_serials[id] != golem.hook_serial:
+		_hook_serials[id] = golem.hook_serial
+		_hook_dodges[id] = _rng.randf() < HOOK_DODGE_CHANCE
+	return _hook_dodges[id]
+
+
+## Forgets the decisions of golems that are gone or no longer aiming the hook they were made for.
+func _prune_hook_decisions() -> void:
+	for id: int in _hook_serials.keys():
+		var golem := instance_from_id(id) as Enemy
+		if golem == null or golem.ai_state != Enemy.AiState.HOOK \
+				or golem.hook_serial != _hook_serials[id]:
+			_hook_serials.erase(id)
+			_hook_dodges.erase(id)
 
 
 static func _is_alive(node: Node) -> bool:
