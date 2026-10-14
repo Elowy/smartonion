@@ -12,7 +12,8 @@ extends RefCounted
 ##   - otherwise a guaranteed tier-set piece (GDD 5.5) of a class in the team, preferably a piece
 ##     the hero's set is still missing (not worn and not in the backpack of a hero of that class),
 ##     else any piece of those sets that exists at the wave; a team without such a piece (no
-##     class with a set, wave before the sets) gets the max-roll Epic instead.
+##     class with a set, wave before the sets) gets the max-roll Epic instead. A set piece is
+##     NOT looted (no loot budget, no "Looted" tag): it is exactly the shop's piece of that wave.
 ## Both are Epic: the stall never sells Legendary (GDD 10). The offer's price is
 ## [constant PRICE_MULT] x the Epic shop price of the wave ([method price], about 570 g at wave 15
 ## in the GDD's numbers); the item itself keeps the normal Epic buy price, so selling it back or
@@ -115,7 +116,9 @@ static func _roll_set_piece(wave: int, slots: Array[PlayerSlot], rng: RandomNumb
 	if pool.is_empty():
 		pool = all
 	var pick := pool[0] if pool.size() == 1 else pool[rng.randi_range(0, pool.size() - 1)]
-	return ItemGenerator.from_unique(pick["data"], wave, true, rng, pick["class"])
+	# Not looted: the loot budget (+25% stats, +1 enchant rank, "Looted" tag) belongs to the max-roll
+	# Epic only; a set piece is the same piece the shop sells, the offer is just guaranteed.
+	return ItemGenerator.from_unique(pick["data"], wave, false, rng, pick["class"])
 
 
 ## A loot-quality Epic with two enchants, made for a random class of the team (usable by it,

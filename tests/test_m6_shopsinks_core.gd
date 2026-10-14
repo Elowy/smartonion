@@ -487,6 +487,31 @@ func test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic() -> void:
 	check(maxed > 60, "about 40%% max-roll Epics (%d of 300)" % maxed)
 
 
+func test_a_set_piece_is_not_looted_but_a_max_roll_epic_is() -> void:
+	# The loot budget (+25% stats, +1 enchant rank, +6 item level, the "Looted" tag) is the max-roll
+	# Epic's alone; a set piece is exactly the shop's piece of the wave.
+	var slots: Array[PlayerSlot] = [_hero(&"warrior").slot, _hero(&"mage", 1).slot]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var sets := 0
+	var maxed := 0
+	for i in 160:
+		var item := BlackMarket.roll(18, slots, rng)
+		if item.set_id != &"":
+			sets += 1
+			check(not item.looted, "set piece %s is not looted" % item.display_name)
+			check_eq(item.item_level, Items.item_level(18, Items.Rarity.EPIC, false), "plain Epic item level")
+			var plain := ItemGenerator.from_unique(Db.get_unique(item.source_id), 18, false, RandomNumberGenerator.new())
+			check_eq(item.stats, plain.stats, "the shop's stats for %s" % item.source_id)
+			check_eq(item.enchants.size(), plain.enchants.size(), "the shop's enchant count")
+			for k in item.enchants.size():
+				check_eq(item.enchants[k].rank, plain.enchants[k].rank, "the shop's enchant rank")
+		else:
+			maxed += 1
+			check(item.looted, "the max-roll Epic keeps the loot budget")
+	check(sets > 30 and maxed > 30, "both branches rolled (%d sets, %d max-roll)" % [sets, maxed])
+
+
 func test_a_max_roll_epic_beats_a_normal_shop_epic() -> void:
 	# The loot budget: every rolled stat of a max-roll Epic is at least what the shop budget gives.
 	var shop_budget := ItemGenerator.stat_budget(Items.Rarity.EPIC, Items.SlotType.CHEST, 18, false)
