@@ -230,6 +230,9 @@ func test_the_cursor_walks_from_the_grid_into_the_row_and_back() -> void:
 
 func test_a_cursor_on_a_vanished_card_is_clamped() -> void:
 	_open(15)
+	panel.set_cursor(0, _cons(2))
+	panel.refresh(PlayerManager.get_slots())
+	check_eq(panel.cursor_of(0), _cons(2), "a cursor on the row survives a refresh")
 	panel.set_cursor(0, panel.black_market_index())
 	shop.open_round(9, PlayerManager.get_slots(), rng)
 	panel.refresh(PlayerManager.get_slots())

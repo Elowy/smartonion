@@ -967,7 +967,9 @@ func _bot_trainees() -> Array[PlayerSlot]:
 ## and pays it alone, then they all go through the offers again (_bots_buy). At most
 ## [constant BOT_MAX_REROLLS] a round, each only while the wallet keeps
 ## [constant BOT_REROLL_RESERVE_MULT] x [method bot_train_reserve] after paying, and never
-## while a human votes on rerolls (Shop.reroll_cost, RunState.rng). Returns the rerolls bought.
+## while a human votes on rerolls (Shop.reroll_cost, RunState.rng). A reroll also redraws the
+## Black Market offer, which the bots look at again after each one (_bots_black_market). Returns the
+## rerolls bought.
 func _bots_reroll(shoppers: Array[PlayerSlot]) -> int:
 	var stall := shop_panel.shop if shop_panel != null else null
 	if stall == null or shoppers.is_empty() or not shop_panel.voter_indices().is_empty():
@@ -984,6 +986,7 @@ func _bots_reroll(shoppers: Array[PlayerSlot]) -> int:
 		n += 1
 		bot_rerolled.emit(voter.index, cost)
 		_bots_buy(shoppers)
+		_bots_black_market()  # the reroll redrew the Black Market offer too
 	return n
 
 
