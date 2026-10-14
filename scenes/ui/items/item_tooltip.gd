@@ -1,9 +1,9 @@
 class_name ItemTooltip
 extends PanelContainer
 ## WoW-style item tooltip (GDD 12) on a dark frame bordered in the item's rarity colour,
-## top to bottom: name in rarity colour, "Looted", "Item Level N", slot + armor / weapon type
-## (right-aligned, red when the viewer cannot use it), weapon damage / speed / DPS, white stat
-## lines, "Classes: X" (red if not the viewer's class), green enchant lines
+## top to bottom: name in rarity colour, "Looted" (not on an Artifact), "Item Level N", slot +
+## armor / weapon type (right-aligned, red when the viewer cannot use it), weapon damage / speed /
+## DPS, white stat lines, "Classes: X" (red if not the viewer's class), green enchant lines
 ## (EnchantRoll.description()), the unique effect line, the tier-set block (set name with
 ## "(n/5)" worn by [member viewer_equipment] – "(5 pieces)" without one –, the five pieces,
 ## bright when worn, then "(2) Set: …" / "(4) Set: …" green when active, grey otherwise;
@@ -463,6 +463,12 @@ static func equipped_for_compare(p_item: ItemInstance, equipment: Equipment) -> 
 	return worst
 
 
+## Whether [param p_item] carries the green "Looted" tag (tooltip, loot-roll info row): looted
+## items do, an Artifact does not – it has no "Looted" Item Level bonus (10 + 3 x wave + 25).
+static func shows_looted_tag(p_item: ItemInstance) -> bool:
+	return p_item != null and p_item.looted and not p_item.is_artifact()
+
+
 ## "Head", "Finger", "One-Hand", "Two-Hand", "Off Hand" ...
 static func slot_text(p_item: ItemInstance) -> String:
 	if p_item.is_weapon():
@@ -565,7 +571,7 @@ func _rebuild() -> void:
 
 	var title := _line(item.display_name, UiTheme.RARITY_COLORS[rarity], NAME_SIZE, UiTheme.bold_font())
 	title.add_theme_constant_override(&"outline_size", 6)
-	if item.looted:
+	if shows_looted_tag(item):
 		_line("Looted", ENCHANT_GREEN, SMALL_SIZE)
 	_line("Item Level %d" % item.item_level, YELLOW, SMALL_SIZE)
 

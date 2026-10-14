@@ -27,6 +27,22 @@ const ITEM_INPUT_DELAY := 0.25
 const LOG_LINES := 16
 const QUEUE_SHOWN := 7
 const CHIP_SIZE := Vector2(290, 96)
+## The window's middle row (queue, frame, log) is centred this far above the screen's middle.
+const MIDDLE_OFFSET := -70.0
+## Gap below the player chips row to the screen's bottom edge.
+const BOTTOM_MARGIN := 24.0
+## The item frame keeps this far from the screen's top edge and from the chips (its stone border
+## would otherwise touch them).
+const FRAME_TOP_MARGIN := 8.0
+const FRAME_CHIPS_GAP := 8.0
+## Room kept in the frame for a winner line of two lines (a long Greed result wraps): the frame
+## grows by that when the timer bar gives way to the result.
+const RESULT_RESERVE := 48.0
+## Widths the item tooltip may take, its normal one first: a tall one (an Artifact with its two
+## property blocks) is made wider – fewer wrapped lines – before it is scaled down to the room.
+const TOOLTIP_WIDTHS: Array[float] = [ItemTooltip.WIDTH, 480.0, 600.0]
+## The tooltip is never scaled below this (a window far too small for it overflows instead).
+const MIN_TOOLTIP_FIT := 0.5
 
 ## Seconds a bot "thinks" before deciding (0 = at once; demo mode slows bots down a little
 ## so the ticks can be watched).
@@ -56,7 +72,11 @@ var counter_label: Label
 var name_label: Label
 var info_label: Label
 var icon: ItemIcon
+## The item frame (head, tooltip, timer bar / winner line) in the middle of the window.
+var frame: PanelContainer
 var tooltip: ItemTooltip
+## The scale the tooltip was fitted to the room with (1 = as it is; see [method _fit_tooltip]).
+var tooltip_fit := 1.0
 var timer_bar: UiBar
 var result_label: RichTextLabel
 var chips_row: HBoxContainer
@@ -77,6 +97,10 @@ var _legend_solo: bool = false
 var _legend_built := false
 var _queue_box: VBoxContainer
 var _backdrop: TextureRect
+var _bottom: VBoxContainer
+var _tip_holder: CenterContainer
+## Holds the (scaled) tooltip at the size it is drawn at, so the frame measures that.
+var _tip_box: Control
 var _t := 0.0
 
 
@@ -455,22 +479,23 @@ func _build() -> void:
 	middle.anchor_top = 0.5
 	middle.anchor_bottom = 0.5
 	middle.grow_vertical = Control.GROW_DIRECTION_BOTH
-	middle.offset_top = -70
-	middle.offset_bottom = -70
+	middle.offset_top = MIDDLE_OFFSET
+	middle.offset_bottom = MIDDLE_OFFSET
 	add_child(middle)
 	middle.add_child(_build_queue())
 	middle.add_child(_build_frame())
 	middle.add_child(_build_log())
 
 	var bottom := UiTheme.vbox(10)
+	_bottom = bottom
 	bottom.anchor_left = 0.5
 	bottom.anchor_right = 0.5
 	bottom.anchor_top = 1.0
 	bottom.anchor_bottom = 1.0
 	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	bottom.offset_top = -24
-	bottom.offset_bottom = -24
+	bottom.offset_top = -BOTTOM_MARGIN
+	bottom.offset_bottom = -BOTTOM_MARGIN
 	add_child(bottom)
 	chips_row = UiTheme.hbox(14)
 	chips_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -483,7 +508,7 @@ func _build() -> void:
 
 
 func _build_frame() -> Control:
-	var frame := UiTheme.panel()
+	frame = UiTheme.panel()
 	var style := UiTheme.stone_style()
 	style.content_margin_left = 26
 	style.content_margin_right = 26
@@ -511,13 +536,16 @@ func _build_frame() -> Control:
 	info_label = UiTheme.label("", UiTheme.DIM, 20)
 	names.add_child(info_label)
 	col.add_child(UiTheme.divider(0))
-	var tip_holder := CenterContainer.new()
-	tip_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tip_holder.custom_minimum_size = Vector2(0, 120)
-	col.add_child(tip_holder)
+	_tip_holder = CenterContainer.new()
+	_tip_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_holder.custom_minimum_size = Vector2(0, 120)
+	col.add_child(_tip_holder)
+	_tip_box = Control.new()
+	_tip_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_holder.add_child(_tip_box)
 	tooltip = ItemTooltip.create()
 	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tip_holder.add_child(tooltip)
+	_tip_box.add_child(tooltip)
 	timer_bar = UiBar.create(Color(0.95, 0.62, 0.15), 28.0, UiTheme.FONT_BODY - 2)
 	timer_bar.animated = false
 	col.add_child(timer_bar)
@@ -607,16 +635,49 @@ func _fill_item() -> void:
 	if item.item_level > 0:
 		bits.append("Item Level %d" % item.item_level)
 	bits.append("%s %s" % [item.rarity_name(), ShopOfferCard.type_text(item)])
-	if item.looted:
+	if ItemTooltip.shows_looted_tag(item):
 		bits.append("Looted")
 	info_label.text = "  ·  ".join(bits)
 	tooltip.show_item(item, null, null, 0)
-	tooltip.reset_size()
 	counter_label.text = "Items: %d / %d" % [current + 1, items.size()]
 	timer_bar.visible = true
 	timer_bar.set_values(ROLL_TIME, ROLL_TIME, "%d s" % int(ROLL_TIME))
 	result_label.visible = false
+	_fit_tooltip()
 	_fill_queue()
+
+
+## The tallest the item tooltip may be so the frame stays on screen and clear of the player chips
+## (at the 1920 x 1080 design size; the winner line's room included): the frame is centred on the
+## middle row's line, between FRAME_TOP_MARGIN and FRAME_CHIPS_GAP above the chips; what is not
+## the tooltip (head, dividers, timer bar, margins) is measured, not assumed.
+func tooltip_room() -> float:
+	var view_h := size.y
+	if view_h <= 0.0:
+		view_h = get_viewport_rect().size.y if is_inside_tree() else float(ProjectSettings.get_setting("display/window/size/viewport_height", 1080))
+	var centre := view_h * 0.5 + MIDDLE_OFFSET
+	var chips_top := view_h - BOTTOM_MARGIN - _bottom.get_combined_minimum_size().y
+	var frame_h := 2.0 * minf(centre - FRAME_TOP_MARGIN, chips_top - FRAME_CHIPS_GAP - centre)
+	var chrome := frame.get_combined_minimum_size().y - _tip_holder.get_combined_minimum_size().y
+	return frame_h - chrome - RESULT_RESERVE
+
+
+## Fits the tooltip into [method tooltip_room]: its normal width first, then the wider ones
+## (TOOLTIP_WIDTHS: fewer wrapped lines), and only when even the widest is too tall it is scaled
+## down (not below MIN_TOOLTIP_FIT). The holder takes the size it is drawn at.
+func _fit_tooltip() -> void:
+	var room := tooltip_room()
+	var height := 0.0
+	for width in TOOLTIP_WIDTHS:
+		tooltip.custom_minimum_size.x = width
+		tooltip.layout_now()
+		height = tooltip.get_combined_minimum_size().y
+		if height <= room:
+			break
+	tooltip_fit = clampf(room / maxf(1.0, height), MIN_TOOLTIP_FIT, 1.0)
+	tooltip.scale = Vector2.ONE * tooltip_fit
+	tooltip.position = Vector2.ZERO
+	_tip_box.custom_minimum_size = tooltip.size * tooltip_fit
 
 
 func _fill_queue() -> void:
