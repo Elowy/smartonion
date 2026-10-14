@@ -225,6 +225,39 @@ func test_solo_take_sell_leave() -> void:
 	check_eq(finishes, 1, "done")
 
 
+## M6: a real LootRoll everybody passed on is disenchanted; the result line says how much Dust.
+func test_a_passed_item_becomes_dust_and_the_line_says_so() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null  # the screen builds a plain LootRoll
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	var items := _open(2)
+	items[0].rarity = Items.Rarity.EPIC
+	items[1].rarity = Items.Rarity.EPIC
+	_settle()
+	_tap(a, PlayerInput.Pad.B)
+	check_eq(screen.result_text, "Disenchanted [%s] into 8 Dust" % items[0].display_name, "solo leave")
+	check_eq(RunState.arcane_dust, 8, "into the team pile")
+	check(screen.result_label.text.contains("8 Dust"), "the result label shows the Dust: %s" % screen.result_label.text)
+	_step(LootRollScreen.RESULT_TIME + 0.01)
+	_settle()
+	_tap(a, PlayerInput.Pad.A)
+	check_eq(RunState.arcane_dust, 8, "taking an item makes no Dust")
+
+
+func test_everybody_passing_in_a_party_disenchants_too() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	var b := MarketFakes.human_with_hero(world, "pad:b", &"mage")
+	var items := _open(1)
+	items[0].rarity = Items.Rarity.RARE
+	_settle()
+	_tap(a, PlayerInput.Pad.B)
+	_tap(b, PlayerInput.Pad.B)
+	check_eq(screen.result_text, "Everyone passed on [%s] – disenchanted into 4 Dust" % items[0].display_name, "party pass")
+	check_eq(RunState.arcane_dust, 4, "Rare = 4")
+
+
 func test_statistics_are_counted_once() -> void:
 	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
 	var b := MarketFakes.human_with_hero(world, "pad:b", &"mage")

@@ -8,7 +8,8 @@ extends Control
 ## B = Pass, Y = Greed all remaining (counts in every phase, the result line included; the
 ## first moments of an item ignore the others). Choices stay hidden until everyone decided (or the time
 ## ran out: undecided = Pass). Bots decide with LootRoll.bot_choice; unplugged controllers
-## pass. Solo: Take (A) / Sell (X) / Leave (B), Y = sell all remaining.
+## pass. Solo: Take (A) / Sell (X) / Leave (B), Y = sell all remaining. An item everybody passed on
+## (solo: Leave) is disenchanted into team Arcane Dust (LootRoll.apply; the result line says how much).
 ## Each roll is resolved with RunState.rng and applied (LootRoll.apply); the winner line shows
 ## for RESULT_TIME before the next item. finished is emitted once after the last item.
 
@@ -308,6 +309,11 @@ func _result_plain(item: ItemInstance) -> String:
 			if is_solo() or w == null:
 				return "Sold %s for %d g" % [name, gold]
 			return "%s sold for %d g (%s won the Greed roll)" % [name, gold, w.label()]
+	if roll.dust > 0:
+		# M6: an item nobody wanted is disenchanted into team Arcane Dust.
+		if is_solo():
+			return "Disenchanted %s into %s" % [name, DustIcon.text(roll.dust)]
+		return "Everyone passed on %s – disenchanted into %s" % [name, DustIcon.text(roll.dust)]
 	if is_solo():
 		return "Left %s behind" % name
 	return "Everyone passed on %s" % name
@@ -325,6 +331,10 @@ func _result_bb(item: ItemInstance) -> String:
 			if is_solo() or w == null:
 				return "Sold %s for %s" % [link, gold_bb]
 			return "%s sold for %s (%s won the Greed roll)" % [link, gold_bb, ShopPanel.player_tag(w)]
+	if roll.dust > 0:
+		if is_solo():
+			return "[color=#a09a90]Disenchanted[/color] %s [color=#a09a90]into[/color] %s" % [link, DustIcon.bbcode(roll.dust)]
+		return "[color=#a09a90]Everyone passed on[/color] %s [color=#a09a90]– disenchanted into[/color] %s" % [link, DustIcon.bbcode(roll.dust)]
 	if is_solo():
 		return "[color=#a09a90]Left %s behind[/color]" % ShopPanel.bb_escape("[%s]" % (item.display_name if item != null else "?"))
 	return "[color=#a09a90]Everyone passed on %s[/color]" % ShopPanel.bb_escape("[%s]" % (item.display_name if item != null else "?"))
