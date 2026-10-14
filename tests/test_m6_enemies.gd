@@ -146,6 +146,8 @@ func test_marsh_gurgler_groups_of_four_to_six_and_greedy_five_percent() -> void:
 	var greedy := Db.get_enchant(&"greedy")
 	check_eq(greedy.chance, 5.0, "Greedy: 5% (GDD 5.8)")
 	check("5%" in greedy.description, "the tooltip says 5%")
+	check_eq(greedy.params["amount"], 1.0, "Greedy: +1 gold (GDD 5.8)")
+	check("find 1 extra gold" in EnchantRoll.new(greedy, 0).description(), "the rank I tooltip says 1 gold: %s" % EnchantRoll.new(greedy, 0).description())
 
 
 func test_the_director_picks_the_new_types_from_their_first_wave() -> void:
@@ -389,6 +391,59 @@ func test_acolyte_picks_the_most_injured_within_seven_metres() -> void:
 	_step(a, DT)
 	check(a._support_target == worst, "the lowest HP share in reach, not the one 7.5 m away")
 	check_eq(a._support_action, Enemy.SupportAction.HEAL, "a heal")
+
+
+func test_acolyte_heals_by_hp_share_not_by_absolute_hp() -> void:
+	var a := _acolyte(Vector3.ZERO, Vector3(7.5, 0.0, 0.0))
+	# The lower share (30%) has the higher absolute HP (30 vs 5): the share decides.
+	var big := _dummy(Vector3(0.0, 0.0, 3.0), 100.0)
+	big.hp = 30.0
+	var small := _dummy(Vector3(0.0, 0.0, -3.0), 10.0)
+	small.hp = 5.0
+	_step(a, DT)
+	check(a._support_target == big, "30% of 100 before 50% of 10, although 30 HP > 5 HP")
+	_step(a, 0.7)
+	check_near(big.hp, 30.0 + 100.0 * 0.25, 0.001, "the big one is healed")
+	check_eq(small.hp, 5.0, "the small one is not")
+	# And the share, not the HP missing: 20% of 10 (8 missing) before 60% of 100 (40 missing).
+	EnemyGrid.mark_dirty()
+	big.hp = 60.0
+	small.hp = 2.0
+	check(a._pick_support_target(a.global_position) == small, "the lowest share, not the most HP missing")
+
+
+func test_acolyte_never_heals_a_boss_but_may_shield_it() -> void:
+	var boss_data := EFakes.enemy_data()
+	boss_data.is_boss = true
+	boss_data.max_hp = 450.0
+	boss_data.move_speed = 0.0
+	var a := _acolyte(Vector3.ZERO, Vector3(7.5, 0.0, 0.0))
+	var boss := EFakes.spawn_enemy(world, boss_data, Vector3(0.0, 0.0, 4.0))
+	check(boss.is_boss(), "the control: it is a boss")
+	boss.hp = 100.0
+	# Alone and badly hurt: no heal. (The shield is allowed.)
+	_step(a, DT)
+	check_eq(a._support_action, Enemy.SupportAction.SHIELD, "a boss is shielded, not healed")
+	check(a._support_target == boss, "the shield goes to the boss")
+	_step(a, 0.7)
+	check_eq(boss.hp, 100.0, "no HP for the boss")
+	check_near(boss.shield_hp, 450.0 * 0.2, 0.001, "its shield is 20% of max HP")
+	# The shield only refreshes: with it full there is nothing left to do.
+	_step(a, 4.7)
+	check_near(boss.shield_hp, 450.0 * 0.2, 0.001, "no stacking")
+	check_eq(boss.hp, 100.0, "still no HP")
+	check_eq(a.ai_state, Enemy.AiState.MOVE, "nothing to do: it waits")
+	# A hurt normal enemy beside the (lower HP share) boss is healed instead.
+	var grunt := _dummy(Vector3(0.0, 0.0, -3.0), 20.0)
+	grunt.hp = 15.0
+	EnemyGrid.mark_dirty()
+	a.attack_cooldown_left = 0.0
+	_step(a, DT)
+	check_eq(a._support_action, Enemy.SupportAction.HEAL, "now there is somebody to heal")
+	check(a._support_target == grunt, "the grunt, though the boss has the lower HP share")
+	_step(a, 0.7)
+	check_near(grunt.hp, 15.0 + 20.0 * 0.25, 0.001, "the grunt is healed")
+	check_eq(boss.hp, 100.0, "the boss is not")
 
 
 func test_acolyte_shields_the_strongest_when_nobody_is_hurt_and_never_stacks() -> void:
@@ -720,6 +775,55 @@ func test_a_stealthed_hero_is_not_hooked() -> void:
 	_step(g, 1.0)
 	check_eq(g.ai_state, Enemy.AiState.MOVE, "hidden heroes are neither targeted nor hooked")
 	check_eq(g.hook_serial, 0, "no hook started")
+
+
+func test_a_hero_who_turns_stealthed_during_the_telegraph_is_not_pulled() -> void:
+	# A second, visible hero keeps the golem aiming; the first one is the hook target.
+	var g := _golem(Vector3.ZERO, Vector3(5.0, 0.0, 0.0))
+	var target := _hero()
+	var other := EFakes.spawn_player(world, Vector3(0.0, 0.0, -8.0))
+	Enemy.invalidate_player_cache()
+	_step(g, 0.3)
+	check_eq(g.ai_state, Enemy.AiState.HOOK, "the hero was visible: telegraphing")
+	check(g._aim_dir.is_equal_approx(Vector3(1.0, 0.0, 0.0)), "aimed at the nearer hero: %s" % g._aim_dir)
+	target.stealth_left = 5.0  # Vanish
+	Enemy.invalidate_player_cache()
+	_step(g, 0.1)
+	check_eq(g.ai_state, Enemy.AiState.HOOK, "the other hero is still in sight: the telegraph goes on")
+	_step(g, 0.8)
+	check_eq(target.fake_hooks.size(), 0, "the chain skips the hero who vanished: no damage, no pull")
+	check_eq(other.fake_hooks.size(), 0, "the other hero stood outside the line")
+	check_eq(g.ai_state, Enemy.AiState.MOVE, "the hook is over")
+	check(g.attack_cooldown_left > 5.0 and g.attack_cooldown_left <= 6.0, "a whiff still costs the whole cooldown (%f)" % g.attack_cooldown_left)
+
+
+func test_a_lone_hero_who_vanishes_during_the_telegraph_makes_the_golem_drop_the_hook() -> void:
+	var g := _golem(Vector3.ZERO, Vector3(6.0, 0.0, 0.0))
+	var hero := _hero()
+	_step(g, 0.3)
+	check_eq(g.ai_state, Enemy.AiState.HOOK, "telegraphing")
+	hero.stealth_left = 5.0
+	Enemy.invalidate_player_cache()
+	_step(g, 0.1)
+	check_eq(g.ai_state, Enemy.AiState.MOVE, "nobody to see: the hook is dropped")
+	check(g._hook_line == null, "no line")
+	check_near(g.attack_cooldown_left, 3.0 - 0.1, 0.1, "half the cooldown, like any interruption")
+	_step(g, 1.0)
+	check_eq(hero.fake_hooks.size(), 0, "the hidden hero is never hooked")
+
+
+func test_the_golem_aims_at_a_visible_hero_not_at_a_nearer_stealthed_one() -> void:
+	var g := _golem(Vector3.ZERO, Vector3(5.0, 0.0, 0.0))
+	var hidden := _hero()
+	hidden.stealth_left = 5.0
+	var seen := EFakes.spawn_player(world, Vector3(0.0, 0.0, 8.0))
+	Enemy.invalidate_player_cache()
+	_step(g, DT)
+	check_eq(g.ai_state, Enemy.AiState.HOOK, "a visible hero in the band: it hooks")
+	check(g._aim_dir.is_equal_approx(Vector3(0.0, 0.0, 1.0)), "aimed at the visible hero: %s" % g._aim_dir)
+	_step(g, 1.0)
+	check_eq(seen.fake_hooks.size(), 1, "the visible hero is hooked")
+	check_eq(hidden.fake_hooks.size(), 0, "the stealthed one is not")
 
 
 func test_a_stun_a_fear_or_a_taunt_cancels_the_hook_and_knockback_does_not() -> void:

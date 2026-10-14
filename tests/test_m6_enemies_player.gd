@@ -183,6 +183,55 @@ func test_a_bot_in_a_telegraphed_hook_line_sidesteps_it() -> void:
 	check(absf(bot.get_move().y) > 0.99, "the decision holds for the whole hook")
 
 
+## The bot's move vectors over [param ticks] ticks of an unchanged scene.
+func _moves(bot: BotInput, ticks: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for _i in ticks:
+		bot.think(DT)
+		out.append(bot.get_move())
+	return out
+
+
+func test_two_golems_hooking_one_bot_do_not_re_roll_the_dodge_every_tick() -> void:
+	var bot_hero := _hero(&"mage", Vector3(6.0, 0.0, 0.1), 0)
+	# Two golems telegraphing at the same bot from opposite sides: one line along +x, one along -x.
+	var g1 := _golem_in_hook_state(Vector3.ZERO)
+	var g2 := _golem_in_hook_state(Vector3(12.0, 0.0, 0.0))
+	Fakes.step(g1, DT)
+	Fakes.step(g2, DT)
+	check_eq(g1.ai_state, Enemy.AiState.HOOK, "golem 1 aims")
+	check_eq(g2.ai_state, Enemy.AiState.HOOK, "golem 2 aims")
+	var escapes := 0
+	for s in 12:
+		var bot := BotInput.new("bot:m6e-two-golems-%d" % s, s)
+		bot.body = bot_hero
+		var moves := _moves(bot, 20)
+		var steady := true
+		for m in moves:
+			steady = steady and m.is_equal_approx(moves[0])
+		check(steady, "seed %d: one decision per golem for the whole hook, not a new roll per tick: %s" % [s, moves])
+		if absf(moves[0].y) > 0.99 and absf(moves[0].x) < 0.1:
+			escapes += 1
+	check(escapes > 0, "the control: some bots do sidestep (%d of 12)" % escapes)
+
+
+func test_the_bots_hook_decisions_are_dropped_when_the_hook_is_over_or_the_golem_is_gone() -> void:
+	var bot_hero := _hero(&"mage", Vector3(6.0, 0.0, 0.1), 3)
+	var g1 := _golem_in_hook_state(Vector3.ZERO)
+	var g2 := _golem_in_hook_state(Vector3(12.0, 0.0, 0.0))
+	Fakes.step(g1, DT)
+	Fakes.step(g2, DT)
+	var bot := bot_hero.slot.input as BotInput
+	bot.think(DT)
+	check_eq(bot._hook_serials.size(), 2, "one decision per golem")
+	check_eq(bot._hook_dodges.size(), 2, "...with its answer")
+	Fakes.step(g1, 1.0)  # the hook fires: golem 1 is walking again
+	g2.free()  # golem 2 is gone mid-aim
+	bot.think(DT)
+	check(bot._hook_serials.is_empty(), "nothing is remembered for a finished hook or a freed golem")
+	check(bot._hook_dodges.is_empty(), "the answers go with it")
+
+
 func test_a_bot_that_does_not_dodge_this_hook_is_left_in_the_line() -> void:
 	var seed_slow := 0
 	for s in 200:
