@@ -391,7 +391,7 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 
 **Hol lehet kovácsolni:**
 - **Karakterpanel / backpack:** a fegyvert kiválasztva (A) megjelenő műveletmenüben
-  (Equip / **Forge** / Sell / Trade / Cancel) minden fegyvernél ott a „Forge”.
+  (Equip / **Forge** / Sell / Disenchant / Trade / Cancel) minden fegyvernél ott a „Forge”.
   - Mellette látszik az eredmény ritkasága („→ Rare”).
   - Ha nincs párja, szürke, és kiírja az okát: „No other Common Dagger”, „Hand-made weapons
     cannot be forged”, „Legendary is the highest rarity”.
@@ -798,8 +798,10 @@ jelennek meg, pontosan úgy, mint a WoW-ban:
 **Hány enchant jár:** a ritkaságtól függ (5.2). A **lootolt** itemek enchantjai egy
 ranggal erősebbek, és a lootolt Uncommon itemeken mindig van 1 enchant.
 
-**Rangok:** minden enchantnak I–III. rangja van az item hullámszintje szerint (I: 1–8.,
-II: 9–16., III: 17. hullámtól). A rang növeli az értékét vagy a proc sebzését.
+**Rangok:** minden enchantnak I–V. rangja van. Az **induló rang** az item hullámszintje
+szerint I–III. (I: 1–8., II: 9–16., III: 17. hullámtól; a lootolt itemeké eggyel magasabb, de
+legfeljebb III.), a IV. és az V. rangot csak az **Empower** adja (lásd lent). A rang növeli az
+értékét vagy a proc sebzését: I ×1, II ×1,5, III ×2, IV ×2,5, V ×3.
 
 **Proc-szabályok (WoW-szerűen):**
 
@@ -849,11 +851,43 @@ II: 9–16., III: 17. hullámtól). A rang növeli az értékét vagy a proc seb
 | Frozen Ward | When struck | 10% eséllyel Frost Nova körülötted | 10%, 8 mp ICD |
 | Retribution | When struck | 6 Holy sebzés a támadónak | 100%, 0,5 mp ICD |
 
-**Enchanting (későbbi bővítés):**
+**Enchanting – Arcane Dust és az Enchanter (M6a):**
 
-- A Passolt vagy eladott itemeket **Disenchantolni** lehet, ebből *Arcane Dust* lesz.
-- Ebből és goldból az **Enchanter** fülön egy item enchantja **újragörgethető** vagy
-  **rangja emelhető**.
+Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kassza-táblán látszik
+(10. fejezet), és bárki költheti.
+
+- **Honnan jön a Dust:**
+  - **Disenchant:** a Character fül item-menüjében (a Sell mellett) az item Dustra bontható –
+    az **Artifact kivételével**. A Dust a ritkaságtól függ (lásd a táblát).
+  - **Automatikus Disenchant:** ha egy loot-dobás itemére **mindenki Passt** nyom, az item
+    magától Dust lesz (10.1).
+  - Az eladás továbbra is csak gold (a vételár 35%-a), abból nem lesz Dust.
+
+  | Ritkaság | Dust |
+  |---|---|
+  | Common | 1 |
+  | Uncommon | 2 |
+  | Rare | 4 |
+  | Epic | 8 |
+  | Legendary | 16 |
+
+- **Az Enchanter fül** (a 4. személyes fül; a címkéje a csapat Dustját mutatja: „Enchanter
+  (12✦)”): kiválasztod az itemet (előbb a felszereltek, utána a backpack), majd egy műveletet:
+  - **Reroll:** az item egy enchantját újrasorsolja – új véletlen enchant, ami a slotra illik,
+    **ugyanazon a rangon**.
+  - **Empower:** egy enchant rangját +1-gyel emeli, **V. rangig**.
+  - **Imbue:** az Uncommon vagy magasabb ritkaságú item, amelyen kevesebb enchant van, mint
+    amennyit a ritkasága megenged (5.2), kap egy új enchantot.
+- **Ár** (mindkét művelet goldot **és** Dustot kér):
+  - **gold** = az item bolti árának **25%-a** az aktuális hullámon × 2^használat,
+  - **Dust** = a ritkaság Dust-értéke × 2^használat.
+  - A használatok száma **itemenként** számít: ugyanazon az itemen minden újabb művelet
+    kétszer annyiba kerül, mint az előző. Így ez a fő, felső korlát nélküli sink (16.1).
+  - Példa: egy Epic item a 15. hullámon (bolti ár kb. 191 gold): az 1. művelet kb. 48 gold és
+    8 Dust, a 2. kb. 96 gold és 16 Dust, a 3. kb. 191 gold és 32 Dust.
+  - A gold-költségre a szokásos **nyomva tartás** vonatkozik (10. fejezet).
+- **Botok:** a 12. hullámtól a legjobb fegyverükre költenek az Enchanteren, ha a közös
+  kasszában a botok tartaléka fölött marad gold.
 
 ### 5.8 Tartalomcél – „sok item”
 
@@ -1710,17 +1744,20 @@ sebzés 4)
   - A megvásárlás vagy egy új kör törli a jelzést.
 - **Vásárlás megerősítése:** ha a költés a kassza **több mint 50%-át** elvinné, 1 mp-ig nyomva
   kell tartani az „A” gombot. Ez véletlen nagy költés ellen véd.
-  - Érvényes a bolti vásárlásra, a Trainer-rangra és a **Reset Talents**-re.
+  - Érvényes a bolti vásárlásra, a Trainer-rangra, az Enchanter-műveletre és a **Reset
+    Talents**-re.
   - A Reset Talents-nél ehhez még egy megerősítő A is kell.
   - Rerollnál nincs nyomva tartás: a bolti reroll közös szavazás, a szintlépési reroll pedig
     kicsi összeg.
-- **Kassza-tábla (Purse board):** a képernyő tetején, a kassza mellett. Három része van:
+- **Kassza-tábla (Purse board):** a képernyő tetején, a kassza mellett. A gold mellett itt látszik
+  a csapat **Arcane Dust** készlete is (5.7). Három része van:
   - **Ready-pipek:** minden játékosnak egy rombusz a színében, kitöltve, ha kész.
   - **Költésnapló** (csak ez a kör, a legújabb elöl, legfeljebb két sor, utána „+N more”): ki,
     mit, mennyiért. Pl. „*P1 [Rare Dagger] 62 · P2 Fireball Rank III 45 · Team Stall reroll
     12*”.
     - Minden költés benne van: bolti vásárlás, automatikus kovácsolás, bolti reroll
-      („Team”), Trainer-rang, szintlépési reroll, talent-reset.
+      („Team”), Trainer-rang, szintlépési reroll, talent-reset, valamint M6a-tól a
+      fogyóeszköz, a Black Market és az Enchanter-művelet (a gold mellett a Dust-költség is).
     - Az eladás és a Greed bevétele nem.
   - **Kívánságsor:** a bolti és a Trainer-pingek összesítve. Ha a költésnapló csak egy sort
     foglal, a kívánságsor a felszabadult második sort is használja.
@@ -1829,9 +1866,11 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
      nyertes backpackjébe kerül. Döntetlennél a döntetlenek újra dobnak.
    - **Nincs Need, de van Greed:** a greedelők dobnak (a statisztikához, ki „nyerte” el),
      az item **azonnal eladódik**. Az ár a **közös kasszába** kerül, és **50%**-os
-     eladási áron megy, ami jobb a normál 35%-nál, így a Greed is valódi jutalom.
-   - **Mindenki Passt nyom:** az item elvész. (Később: *Disenchant*, ami anyagot ad
-     a fegyverkovácsoláshoz.)
+     eladási áron megy, ami jobb a normál 35%-nál, így a Greed is valódi jutalom. (Kivétel
+     az Artifact: az az adott hullám Epic árának 5-szörösét adja, lásd 5.5.)
+   - **Mindenki Passt nyom:** az item automatikusan **Disenchantolódik**: *Arcane Dust* lesz
+     belőle a csapat közös készletébe (ritkaságtól függően 1 / 2 / 4 / 8 / 16, lásd 5.7). Az
+     Artifact kivétel: azt nem lehet Disenchantolni. A kovácsoláshoz nem kell anyag (4.1).
 5. **Eredmény:** WoW-stílusú üzenetsor, pl.:
    „*P2 rolls 87 (Need) for [Stormcaller]*” → „*P2 wins [Stormcaller]*”.
 
@@ -1949,8 +1988,9 @@ indulnak.
     elköltött pont visszavétele, „Y” = a következő rang előnézete (lásd 7.3).
   - Felül a szabad pontok száma, alul a „Reset Talents” gomb és az ára.
 - **Kovácsolás:** a Character fülön a fegyvert kiválasztva (A) egy műveletmenü jelenik meg:
-  Equip / Forge / Sell / Trade / Cancel. A Forge csak akkor aktív, ha van azonos párja;
-  különben szürke, és kiírja az okát (lásd 4.1). A boltban üllő-pip jelzi a kovácsolható
+  Equip / Forge / Sell / Disenchant / Trade / Cancel. A Forge csak akkor aktív, ha van azonos
+  párja; különben szürke, és kiírja az okát (lásd 4.1). A **Disenchant** a Sell mellett áll, és
+  Arcane Dustot ad (5.7); az Artifactnál nincs. A boltban üllő-pip jelzi a kovácsolható
   ajánlatot annak a játékosnak a színében, akinek van hozzá párja.
 - **Character fül:** WoW-szerű karakterpanel – bal oldalon a páncélslotok, jobb oldalon az
   ékszerek és trinketek, alul a fegyverek, középen a karakter 3D modellje, alatta a statlista.
