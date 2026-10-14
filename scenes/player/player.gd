@@ -41,6 +41,9 @@ signal wave_began
 ## End of [method end_wave] (the wave's buffs are gone, the market follows): M6 per-wave extras
 ## (artifact growth, consumables clear, …).
 signal wave_ended
+## The hero's consumables changed (bought in the market, applied at the wave start, gone at its
+## end – [member consumables_pending] / [member consumables_active]); the unit frame's icons.
+signal consumables_changed
 
 const RADIUS := 0.45
 ## Height (metres) where projectiles / damage numbers originate.
@@ -169,6 +172,11 @@ var death_guards: Array[Callable] = []
 ## Percent of the damage this hero's pets deal that heals the hero (Skull of the Damned,
 ## warlock_pet_leech.gd; ProcSystem.deal_raw with source &"pet"). 0 = off.
 var pet_leech_pct := 0.0
+## Consumables (M6 SHOPSINKS, [Consumables]): bought in the market, applied by the next wave start
+## (at most one potion + one food) ...
+var consumables_pending: Array[ConsumableData] = []
+## ... and in effect during this wave (gone when it ends).
+var consumables_active: Array[ConsumableData] = []
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -221,6 +229,8 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.talents = TalentState.create(p.class_data.id if p.class_data != null else &"")
 	p.talents.changed.connect(p._on_talents_changed)
 	p.bonuses.changed.connect(p._on_bonuses_changed)
+	p.wave_began.connect(p._on_wave_began_consumables)
+	p.wave_ended.connect(p._on_wave_ended_consumables)
 	p.abilities.ability_cast.connect(p._on_ability_cast)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons()
@@ -416,6 +426,23 @@ func heal(amount: float, _source_slot: int = -1) -> void:
 	_text_side = -_text_side
 	Vfx.floating_text(self_text_position(_text_side), "+" + _format_amount(gained), HEAL_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	_hp_updated()
+
+
+## Raises HP by [param amount] (clamped to Max HP) without it being a heal: no number, nothing
+## for the damage meter. For the HP a Max HP bonus adds at the wave start (consumables).
+func fill_hp(amount: float) -> void:
+	if downed or amount <= 0.0:
+		return
+	hp = minf(max_hp(), hp + amount)
+	_hp_updated()
+
+
+func _on_wave_began_consumables() -> void:
+	Consumables.apply(self)
+
+
+func _on_wave_ended_consumables() -> void:
+	Consumables.clear(self)
 
 
 ## Called by this player's weapons after each successful hit (leech, on-hit procs). Proc

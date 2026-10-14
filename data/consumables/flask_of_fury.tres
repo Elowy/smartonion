@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"flask_of_fury"
+display_name = "Flask of Fury"
+kind = 0
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 15.0
+}])
+base_price = 14
+icon_id = &"flask_of_fury"
+description = "A flask of something red and angry. Your hits land harder for one wave."

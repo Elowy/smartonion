@@ -39,17 +39,30 @@ extends RefCounted
 ##   the backpack the item goes there as usual, partner or not (forging is the player's call).
 ## - M6 gold sinks next to the offers (kept OUT of [member offers]: that array drives
 ##   offer_count, the usable-per-player maths, the reroll positions and the card grid):
-##   [member consumables] (the consumables row, one per hero, SHOPSINKS) and
-##   [member black_market] (the one extra Black Market offer from wave 15). Both are empty
-##   until SHOPSINKS fills them in open_round / try_reroll. Their purchases use the spend kinds
-##   &"consumable" and &"black_market" of [method RunState.try_spend_for] (the Enchanter's
-##   &"enchant" belongs to the Enchanter, not the stall).
+##   - [member consumables]: the consumables row, [constant Consumables.ROW_SIZE] DIFFERENT
+##     random consumables, redrawn by every open_round and by every reroll (also when every item
+##     offer is locked: the row is part of the reroll, but it never makes a reroll possible on its
+##     own). Unlimited stock: a purchase ([method buy_consumable]) never empties a card, and every
+##     hero buys for itself – the buyer's hero gets it as its pending potion / food
+##     ([method Consumables.give]: a newer one of the same kind replaces the pending one, no
+##     refund). Price: base x the shop price multiplier of the wave. Spend kind &"consumable".
+##   - [member black_market]: the one extra Black Market offer from wave [constant
+##     BlackMarket.FIRST_WAVE] (null before). An [class Offer] like the item offers: locked offers
+##     survive a round, a ping keeps it out of a reroll, a reroll redraws it (and it alone can make
+##     a reroll possible); it is addressed by the index [constant BLACK_MARKET] in [method
+##     offer_at], [method try_buy], [method toggle_lock] and [method toggle_ping]. Price 3 x the
+##     Epic price (BlackMarket); spend kind &"black_market"; the content is BlackMarket.roll.
+##   Both draw from a side rng of their own, seeded once from the seed of the rng the first
+##   open_round gets: the item offers of a seeded run stay exactly what they were without them.
+##   (The Enchanter's &"enchant" spend kind belongs to the Enchanter, not the stall.)
 
 signal changed
 ## An offer was sold (offer index, buyer slot index, price) - for the spending log.
 signal bought(index: int, slot_index: int, price: int)
 ## The stall was rerolled (new rerolls_this_round).
 signal rerolled(count: int)
+## A consumable was bought (row index, buyer slot index, price) - for the spending log.
+signal consumable_bought(index: int, slot_index: int, price: int)
 
 ## FORGED: bought and forged with a partner at once (full backpack, see the class doc).
 enum BuyResult { OK, INVALID_OFFER, SOLD, NO_PLAYER, BACKPACK_FULL, NOT_ENOUGH_GOLD, FORGED }
@@ -58,6 +71,11 @@ enum BuyResult { OK, INVALID_OFFER, SOLD, NO_PLAYER, BACKPACK_FULL, NOT_ENOUGH_G
 const USABLE_PER_PLAYER := 2
 ## Biased draws per offer before the strict "usable_by" generation kicks in.
 const BIAS_TRIES := 3
+## The "index" of the Black Market offer for [method offer_at], [method try_buy],
+## [method toggle_lock] and [method toggle_ping] (the item offers are 0 .. n - 1).
+const BLACK_MARKET := -2
+## XORed into the first rng's seed for the side rng of the consumables row and the Black Market.
+const SIDE_RNG_SALT := 0x5C0DE17
 
 
 class Offer:
@@ -76,11 +94,17 @@ class Offer:
 		return not pinged_by.is_empty()
 
 
+## One card of the consumables row: unlimited stock, so there is no sold / lock / ping state.
+class ConsumableOffer:
+	var data: ConsumableData
+	var price := 0
+
+
 var offers: Array[Offer] = []
-## The consumables row (M6, SHOPSINKS): the compact cards below the offers, refreshed with the
-## reroll and every round. Empty until the package defines the offer type and fills it.
-var consumables: Array = []
-## The Black Market offer (M6, SHOPSINKS; wave 15+): null = none this round.
+## The consumables row (M6): the compact cards below the offers, redrawn by every round and every
+## reroll (see the class doc).
+var consumables: Array[ConsumableOffer] = []
+## The Black Market offer (M6; wave 15+): null = none this round (see the class doc).
 var black_market: Offer = null
 ## Slot index -> voted for a reroll this round (absent = no vote).
 var reroll_votes: Dictionary[int, bool] = {}
@@ -88,9 +112,14 @@ var rerolls_this_round := 0
 var wave := 1
 ## The weapon the last [method try_buy] forged (BuyResult.FORGED); null after any other result.
 var last_forged: ItemInstance
+## The pending consumable the last [method try_buy_consumable] replaced (null = none).
+var last_replaced: ConsumableData
 
 ## The slots of the current round (class bias for the offers; set by open_round).
 var _slots: Array[PlayerSlot] = []
+## The rng of the consumables row and the Black Market, seeded on first use ([method _side]).
+var _side_rng := RandomNumberGenerator.new()
+var _side_seeded := false
 
 
 static func offer_count(players: int) -> int:
@@ -129,6 +158,8 @@ func open_round(p_wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerato
 			empty_positions.append(i)
 	offers = fresh
 	_fill(empty_positions, rng)
+	_refresh_consumables(rng)
+	_refresh_black_market(rng, true)
 	changed.emit()
 
 
@@ -160,7 +191,8 @@ func try_buy(index: int, slot: PlayerSlot) -> BuyResult:
 		return BuyResult.NO_PLAYER
 	if not player.equipment.has_space():
 		return _buy_and_forge(index, o, slot, player.equipment)
-	if not RunState.try_spend_for(o.price, slot.index, &"shop", o.item.display_name):
+	var kind: StringName = &"black_market" if index == BLACK_MARKET else &"shop"
+	if not RunState.try_spend_for(o.price, slot.index, kind, o.item.display_name):
 		return BuyResult.NOT_ENOUGH_GOLD
 	if not player.equipment.add_to_backpack(o.item):
 		RunState.add_gold(o.price)  # cannot happen (space was checked) - never keep the gold
@@ -186,7 +218,8 @@ func forges_on_buy(index: int, slot: PlayerSlot) -> bool:
 func _buy_and_forge(index: int, o: Offer, slot: PlayerSlot, eq: Equipment) -> BuyResult:
 	if not forges_on_buy(index, slot):
 		return BuyResult.BACKPACK_FULL
-	if not RunState.try_spend_for(o.price, slot.index, &"shop_forge", "%s (forged)" % o.item.display_name):
+	var kind: StringName = &"black_market" if index == BLACK_MARKET else &"shop_forge"
+	if not RunState.try_spend_for(o.price, slot.index, kind, "%s (forged)" % o.item.display_name):
 		return BuyResult.NOT_ENOUGH_GOLD
 	var result := Forge.forge_with_offer(eq, o.item)
 	if result == null:
@@ -201,6 +234,8 @@ func _sell(index: int, o: Offer, slot: PlayerSlot) -> void:
 	o.sold = true
 	o.locked_by = -1
 	o.pinged_by.clear()
+	if index == BLACK_MARKET:
+		RunState.black_market_bought += 1
 	bought.emit(index, slot.index, o.price)
 	changed.emit()
 
@@ -249,14 +284,21 @@ func try_reroll(joined: Array[int], rng: RandomNumberGenerator) -> bool:
 	if not reroll_ready(joined) or not RunState.try_spend_for(reroll_cost(), -1, &"shop_reroll", "Stall reroll"):
 		return false
 	var positions := rerollable_positions()
+	var redraw_black_market := black_market_rerollable()
 	for i in positions:
 		offers[i] = null
 	for o in offers:
 		if o != null:
 			o.pinged_by.clear()
+	if black_market != null:
+		black_market.pinged_by.clear()
 	reroll_votes.clear()
 	rerolls_this_round += 1
 	_fill(positions, rng)
+	_refresh_consumables(rng)
+	if redraw_black_market:
+		black_market = null
+		_refresh_black_market(rng, false)
 	rerolled.emit(rerolls_this_round)
 	changed.emit()
 	return true
@@ -282,7 +324,8 @@ func reroll_ready(joined: Array[int]) -> bool:
 	for i in joined:
 		if not reroll_votes.get(i, false):
 			return false
-	return RunState.can_afford(reroll_cost()) and not rerollable_positions().is_empty()
+	return RunState.can_afford(reroll_cost()) \
+		and (not rerollable_positions().is_empty() or black_market_rerollable())
 
 
 ## Offer positions a reroll would redraw: unsold, not locked, not pinged.
@@ -295,11 +338,99 @@ func rerollable_positions() -> Array[int]:
 	return out
 
 
-## The offer at [param index] (null if out of range).
+## True when a reroll would redraw the Black Market offer: there is one, unsold, not locked, not
+## pinged.
+func black_market_rerollable() -> bool:
+	var o := black_market
+	return o != null and not o.sold and o.locked_by < 0 and o.pinged_by.is_empty()
+
+
+## The offer at [param index] (null if out of range); [constant BLACK_MARKET] is the Black Market
+## offer.
 func offer_at(index: int) -> Offer:
+	if index == BLACK_MARKET:
+		return black_market
 	if index < 0 or index >= offers.size():
 		return null
 	return offers[index]
+
+
+# --- The consumables row and the Black Market ---------------------------------------------------
+
+## The consumables card at [param index] (null if out of range).
+func consumable_at(index: int) -> ConsumableOffer:
+	if index < 0 or index >= consumables.size():
+		return null
+	return consumables[index]
+
+
+## Buys the consumables card [param index] for [param slot]'s hero (unlimited stock: the card
+## stays): the shared wallet pays (&"consumable"), the hero gets it as its pending potion / food
+## ([method Consumables.give]). [member last_replaced] is the pending one it pushed out. True on
+## success.
+func buy_consumable(index: int, slot: PlayerSlot) -> bool:
+	return try_buy_consumable(index, slot) == BuyResult.OK
+
+
+## [method buy_consumable] with the reason for a refusal (nothing is spent unless the result is
+## OK; INVALID_OFFER / NO_PLAYER / NOT_ENOUGH_GOLD are the possible refusals).
+func try_buy_consumable(index: int, slot: PlayerSlot) -> BuyResult:
+	last_replaced = null
+	var c := consumable_at(index)
+	if c == null or c.data == null:
+		return BuyResult.INVALID_OFFER
+	var player: Player = null
+	if slot != null:
+		player = slot.player as Player
+	if player == null or not is_instance_valid(player):
+		return BuyResult.NO_PLAYER
+	if not RunState.try_spend_for(c.price, slot.index, &"consumable", c.data.display_name):
+		return BuyResult.NOT_ENOUGH_GOLD
+	last_replaced = Consumables.give(player, c.data)
+	RunState.consumables_bought += 1
+	consumable_bought.emit(index, slot.index, c.price)
+	changed.emit()
+	return BuyResult.OK
+
+
+## The rng of the consumables row and the Black Market. Seeded the first time from the seed of
+## [param base] (the rng the stall is opened with): independent of every other draw, so the item
+## offers (and everything else on RunState.rng) do not depend on these two features.
+func _side(base: RandomNumberGenerator) -> RandomNumberGenerator:
+	if not _side_seeded:
+		_side_seeded = true
+		_side_rng.seed = base.seed ^ SIDE_RNG_SALT
+	return _side_rng
+
+
+## Draws a new consumables row (all cards replaced).
+func _refresh_consumables(rng: RandomNumberGenerator) -> void:
+	consumables.clear()
+	for data in Consumables.roll_row(_side(rng)):
+		var c := ConsumableOffer.new()
+		c.data = data
+		c.price = Consumables.price(data, wave)
+		consumables.append(c)
+
+
+## The Black Market offer for the new round ([param keep_locked]) or after a reroll: null before
+## BlackMarket.FIRST_WAVE; a locked, unsold offer stays for the next round; otherwise a new roll.
+func _refresh_black_market(rng: RandomNumberGenerator, keep_locked: bool) -> void:
+	if not BlackMarket.is_open(wave):
+		black_market = null
+		return
+	var kept := black_market
+	if keep_locked and kept != null and kept.item != null and not kept.sold and kept.locked_by >= 0:
+		kept.pinged_by.clear()
+		return
+	var item := BlackMarket.roll(wave, _slots, _side(rng))
+	if item == null:
+		black_market = null
+		return
+	var o := Offer.new()
+	o.item = item
+	o.price = BlackMarket.price(wave)
+	black_market = o
 
 
 ## Number of unsold offers [param class_data] can use.
