@@ -835,10 +835,11 @@ const BOT_FOOD_PRIORITY: Array[StringName] = [
 
 
 ## From wave [constant BOT_CONSUMABLES_FROM_WAVE] on every bot buys one potion and one food for its
-## own hero (the best of each kind the row offers, BOT_POTION_PRIORITY / BOT_FOOD_PRIORITY – the
-## row has distinct cards, so the bots share them out in slot order) while the wallet keeps
-## [method bot_train_reserve] afterwards. A hero that already holds a pending one of that kind
-## buys no more. Draws nothing from RunState.rng. Returns the consumables bought.
+## own hero (the best of each kind the row offers, BOT_POTION_PRIORITY / BOT_FOOD_PRIORITY) while
+## the wallet keeps [method bot_train_reserve] afterwards. The stock is unlimited and the choice
+## does not depend on the bot, so all bots take the SAME best potion and the SAME best food (the
+## wallet, not the row, limits how many of them can pay). A hero that already holds a pending one
+## of that kind buys no more. Draws nothing from RunState.rng. Returns the consumables bought.
 func _bots_consumables() -> int:
 	var stall := shop_panel.shop if shop_panel != null else null
 	if stall == null or cleared_wave < BOT_CONSUMABLES_FROM_WAVE or stall.consumables.is_empty():

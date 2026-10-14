@@ -701,10 +701,31 @@ func test_bots_buy_a_potion_and_a_food_each_from_wave_6() -> void:
 		var hero := s.player as Player
 		check(hero.consumables_pending.size() <= 2, "at most a potion and a food")
 		check(Consumables.of_kind(hero.consumables_pending, ConsumableData.Kind.POTION) != null, "%s holds a potion" % s.label())
-	# The row has distinct cards: the bots share the best out; with seven in the pool two bots find
-	# something of each kind in most rows (a row without any food leaves the foods out).
+	# The stock is unlimited, so both bots take the row's best of each kind (see
+	# test_every_bot_takes_the_same_best_potion_and_food); a row without any food leaves the foods out.
 	check(n >= 2 and n <= expected + 2, "one potion each at least")
 	check_eq(screen._bots_consumables(), 0, "a second pass buys nothing: everybody holds one of each kind")
+
+
+func test_every_bot_takes_the_same_best_potion_and_food() -> void:
+	# Unlimited stock + a choice that does not depend on the bot: four bots, one row, one potion and
+	# one food for all of them (the _bots_consumables doc says so; the wallet is the only limit).
+	_bot_market(10, 20000, [&"warrior", &"mage", &"paladin", &"rogue"] as Array[StringName])
+	var stall := screen.shop_panel.shop
+	stall.consumables.clear()
+	for id in [&"elixir_of_fortune", &"smoked_boar_ribs", &"flask_of_fury", &"hearty_onion_stew"]:
+		var c := Shop.ConsumableOffer.new()
+		c.data = Db.get_consumable(id)
+		c.price = Consumables.price(c.data, 10)
+		stall.consumables.append(c)
+	screen.shop_panel.refresh(PlayerManager.get_slots())
+	check_eq(screen._bots_consumables(), 8, "a potion and a food for each of the four bots")
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		var ids: Array[StringName] = []
+		for c in hero.consumables_pending:
+			ids.append(c.id)
+		check_eq(ids, [&"flask_of_fury", &"hearty_onion_stew"] as Array[StringName], "%s: the best potion and the best food, as everybody else" % s.label())
 
 
 func test_bots_pick_by_priority_and_only_with_the_reserve() -> void:
