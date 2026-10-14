@@ -181,7 +181,7 @@ func _apply() -> void:
 			if g <= 0.0:
 				continue
 			ally.stats.set_source(ally_key, {Stats.STAMINA: g})
-			ally.heal(g)
+			ally.heal(g, player.slot_index())
 			_allies[ally.get_instance_id()] = ally
 	if shown:
 		WarriorKit.shout_text(player, TEXT, GOLD)

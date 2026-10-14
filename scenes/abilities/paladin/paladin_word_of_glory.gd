@@ -170,7 +170,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var downed := revive_target(ctx)
 	if downed != null:
 		var feet := downed.global_position
-		downed.revive(revive_ratio(ctx))
+		downed.revive(revive_ratio(ctx), [paladin.slot_index()] as Array[int])
 		if downed.downed:
 			return false
 		Vfx.resurrect_column(feet)
@@ -186,9 +186,9 @@ func cast(ctx: AbilityContext) -> bool:
 		if not _is_hurt(p):
 			continue
 		var amount := heal_amount(ctx, paladin, p)
-		p.heal(amount)
+		p.heal(amount, paladin.slot_index())
 		if shield_share > 0.0 and p.procs != null:
-			p.procs.add_shield(amount * shield_share / 100.0, ctx.num("shield_duration", 8.0))
+			p.procs.add_shield(amount * shield_share / 100.0, ctx.num("shield_duration", 8.0), &"", paladin.slot_index())
 		Vfx.hit_spark(p.get_chest_position(), HOLY_COLOR)
 		if p != paladin:
 			ProcVfx.beam(paladin.get_chest_position(), p.get_chest_position(), HOLY_COLOR)

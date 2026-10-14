@@ -113,13 +113,13 @@ static func bandage(ctx: AbilityContext, who: Player) -> GeneralBuff:
 	if ctx.flag("instant"):
 		var look := GeneralBuff.apply(who, KEY, INSTANT_LOOK_TIME, {}, mult,
 				GeneralAuraVfx.Style.BANDAGE)
-		who.heal(total)
+		who.heal(total, Player.slot_index_of(ctx.player))
 		return look
 	var duration := maxf(0.05, ctx.num("duration", 3.0))
 	var tick := clampf(ctx.num("tick", 0.5), 0.05, duration)
 	var buff := GeneralBuff.apply(who, KEY, duration, {}, mult, GeneralAuraVfx.Style.BANDAGE)
 	if buff != null:
-		buff.set_heal(total, maxi(1, roundi(duration / tick)), tick)
+		buff.set_heal(total, maxi(1, roundi(duration / tick)), tick, Player.slot_index_of(ctx.player))
 	return buff
 
 

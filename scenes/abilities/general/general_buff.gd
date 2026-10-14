@@ -21,6 +21,9 @@ var taken_mult := 1.0
 ## HP restored by each heal tick and the ticks still to come.
 var heal_per_tick := 0.0
 var heal_ticks_left := 0
+## Slot index of the hero who put the heal on (the damage meter credits the ticks to them; -1 = the
+## buffed hero itself).
+var heal_source := -1
 var tick_interval := 0.5
 ## Seconds left.
 var left := 0.0
@@ -113,8 +116,10 @@ func set_taken_mult(mult: float) -> void:
 
 
 ## Heals [param total] HP in [param ticks] equal ticks, every [param interval] seconds (the
-## first one an interval after now).
-func set_heal(total: float, ticks: int, interval: float) -> void:
+## first one an interval after now). [param source_slot] = the healer's slot index (-1 = the buffed
+## hero, see [member heal_source]).
+func set_heal(total: float, ticks: int, interval: float, source_slot: int = -1) -> void:
+	heal_source = source_slot
 	heal_ticks_left = maxi(0, ticks)
 	tick_interval = maxf(0.05, interval)
 	heal_per_tick = total / float(heal_ticks_left) if heal_ticks_left > 0 else 0.0
@@ -164,7 +169,7 @@ func step(delta: float) -> void:
 		while _tick_left <= GeneralKit.TIME_EPSILON and heal_ticks_left > 0:
 			heal_ticks_left -= 1
 			_tick_left += tick_interval
-			target.heal(heal_per_tick)
+			target.heal(heal_per_tick, heal_source)
 	if left <= GeneralKit.TIME_EPSILON and heal_ticks_left <= 0:
 		end()
 
