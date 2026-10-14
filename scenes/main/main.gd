@@ -1026,6 +1026,7 @@ func _on_boss_spawned(boss: Boss) -> void:
 	if hud != null and boss.boss_data != null:
 		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
 	_log(boss_arrival_text(boss, wave, players.size()))
+	_log(heroes_defence_text(players))
 
 
 ## The smoke-log line of a boss's arrival.
@@ -1034,6 +1035,20 @@ static func boss_arrival_text(boss: Boss, p_wave: int, player_count: int) -> Str
 		boss.boss_data.display_name if boss.boss_data != null else "?", p_wave,
 		format_position(boss.global_position if boss.is_inside_tree() else boss.position),
 		boss.max_hp, player_count]
+
+
+## The smoke-log line of the party's toughness (balance data: how many raw hits a hero can take):
+## "heroes: P1 warrior 123 HP (takes 41% of a raw hit), P2 mage ...". [param heroes] are the Players.
+static func heroes_defence_text(heroes: Array[Player]) -> String:
+	var parts: Array[String] = []
+	for p in heroes:
+		if not is_instance_valid(p) or p.stats == null:
+			continue
+		var share := CombatMath.incoming_damage(100.0, p.stats, CombatMath.KIND_MELEE)
+		parts.append("P%d %s %.0f HP (takes %.0f%% of a raw hit)" % [
+			p.slot_index() + 1, String(p.slot.class_data.id) if p.slot != null and p.slot.class_data != null else "?",
+			p.max_hp(), share])
+	return "heroes: " + ", ".join(parts)
 
 
 ## The smoke-log line of a run that was lost while [param boss] still stood (balance data: how

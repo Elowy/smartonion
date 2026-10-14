@@ -81,3 +81,15 @@ func test_the_smoke_result_lists_the_damage_by_source() -> void:
 	RunState.record_damage_taken(0, 5.04, &"flesh_golem")
 	var out := RunSummary.source_damage_dict()
 	check_eq(out, {"flesh_golem": {"12": 5.0}}, "string keys, rounded to 0.1")
+
+
+# --- Boss-arrival log: how tough the party is ----------------------------------------------------
+
+func test_the_heroes_defence_line_shows_hp_and_the_share_of_a_raw_hit() -> void:
+	var w := _hero(&"warrior", Vector3.ZERO)
+	var m := _hero(&"mage", Vector3(3.0, 0.0, 0.0))
+	var line := Main.heroes_defence_text([w, m] as Array[Player])
+	var share_w := CombatMath.incoming_damage(100.0, w.stats, CombatMath.KIND_MELEE)
+	check(line.begins_with("heroes: P1 warrior %.0f HP (takes %.0f%% of a raw hit)" % [w.max_hp(), share_w]), line)
+	check("P2 mage" in line, "every hero is listed: " + line)
+	check_eq(Main.heroes_defence_text([] as Array[Player]), "heroes: ", "nobody: just the prefix")
