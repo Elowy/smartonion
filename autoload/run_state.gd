@@ -29,6 +29,9 @@ signal special_killed(kind: StringName, killer_index: int)
 ## Arcane Dust (the team's second currency) changed by [param delta] (add_dust,
 ## try_spend_dust_for; start_run emits it with delta 0).
 signal dust_changed(dust: int, delta: int)
+## An Artifact dropped (LootDrops.roll_artifact hit): the new [param item] and the id of the kill's
+## source (ItemGenerator.SOURCE_IDS: &"boss", &"goblin", &"elite", &"loot"). Main logs it.
+signal artifact_dropped(item: ItemInstance, source: StringName)
 
 const TOTAL_WAVES := 25
 const BOSS_WAVES: Array[int] = [10, 25]

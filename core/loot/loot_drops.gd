@@ -131,6 +131,7 @@ static func roll_artifact(source: ItemGenerator.Source, enemy: Node3D, killer: N
 		RunState.add_team_loot(item)  # nowhere to put a bag (no arena): the team still gets it
 	else:
 		Vfx.floating_text(Vector3(at.x, 2.4, at.z), "Artifact!", UiTheme.RARITY_COLORS[Items.Rarity.ARTIFACT], 1.6)
+	RunState.artifact_dropped.emit(item, ItemGenerator.SOURCE_IDS[kill_source])
 	return bag
 
 

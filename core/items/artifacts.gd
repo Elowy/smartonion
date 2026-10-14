@@ -183,6 +183,25 @@ static func effects_for(equipment: Equipment) -> Array[Dictionary]:
 	return out
 
 
+## The smoke log line of an Artifact that just dropped ("artifact drop: Earthsplitter (warrior) on
+## wave 10 from boss, item level 65"; Main prints it behind "SMOKE ").
+static func drop_line(item: ItemInstance, source: StringName, wave: int) -> String:
+	var data := data_of(item)
+	return "artifact drop: %s (%s) on wave %d from %s, item level %d" % [
+		item.display_name, data.class_id if data != null else item.class_restriction, wave, source, item.item_level]
+
+
+## The smoke log line of an Artifact a hero holds at a wave end ("artifact held: P1 warrior
+## Earthsplitter after wave 12, waves held 3, item level 74, properties awake 1/2, equipped").
+## [param equipped]: in the hand (the properties only work then), else in the backpack.
+static func held_line(slot_label: String, item: ItemInstance, wave: int, equipped: bool) -> String:
+	var data := data_of(item)
+	return "artifact held: %s %s %s after wave %d, waves held %d, item level %d, properties awake %d/%d, %s" % [
+		slot_label, data.class_id if data != null else item.class_restriction, item.display_name, wave,
+		item.artifact_waves, item.item_level, awake_count(item), data.properties.size() if data != null else 0,
+		"equipped" if equipped else "in the backpack"]
+
+
 ## The content check of one Artifact's data ("" = valid, else the first problem): a class and a
 ## weapon of that class, 2 properties with a name, a text, a short text and valid entries, unlock waves in
 ## order, a pair weapon the class can use, fixed enchants that exist.
