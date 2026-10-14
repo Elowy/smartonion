@@ -19,17 +19,35 @@ extends Node
 ##   ([method Enemy.make_elite] with [method EliteAffixes.roll_affix], before add_child) – two
 ##   due times make the first two enemies elite, never one enemy twice. RunState.elites_spawned
 ##   counts them; elites count towards MAX_ENEMIES. Times left at the wave end are dropped.
+## - Boss waves (M6, GDD 8 "Bossok"; RunState.BOSS_WAVES with a [BossData] in Db.bosses): there
+##   is no timer. A telegraphed [Boss] arrives BOSS_TELEGRAPH_TIME s after the wave starts, far
+##   from the heroes ([member boss], [signal boss_spawned]); the usual spawning goes on at
+##   BOSS_ADD_RATE_MULT of its rate (the adds; no elites, no Loot Goblin); the wave ends when
+##   the boss dies ([signal boss_defeated], then [method _finish_wave] on the next tick: the rest
+##   despawns, pickups and loot bags are banked like at a normal end). [member time_left] is a
+##   huge number (BOSS_WAVE_TIME) that nobody reaches, so code that forces the end by setting it
+##   to 0 keeps working. A boss wave without a BossData in Db runs as a normal timed wave.
+##   [method summon] is how a boss brings adds. In smoke runs ([member smoke_boss_timeout]) a boss
+##   that lives SMOKE_BOSS_GRACE s past its enrage is killed ("SMOKE boss timeout"), so a run
+##   always ends.
+## - Elite wave (RunState.ELITE_WAVES, wave 20): every enemy gets an elite affix, a "lite" one
+##   (HP x EliteAffixes.LITE_HP_MULT, normal rewards, a compact look; Enemy.make_elite); the real
+##   elites (HP x3, elite rewards) come twice as often (EliteAffixes.expected_count).
 ## Does not process while the tree is paused. Copes with enemies being freed at any time.
 ##
 ## RunState.rng order inside [method start_wave]: eligible list (no draw) → elite schedule
-## (count, then one time per elite) → next group pick → [signal wave_started] (the
-## GoblinSpawner draws there) → the opening group's telegraph (its type and size).
+## (count, then one time per elite; none on boss waves) → next group pick → [signal wave_started]
+## (the GoblinSpawner draws there) → the opening group's telegraph (its type and size) → on a
+## boss wave the boss's spawn point.
 
 signal wave_started(wave: int)
 signal wave_timer_changed(seconds_left: float)
 signal wave_cleared(wave: int)
 ## Emitted for every enemy the director adds to the arena.
 signal enemy_spawned(enemy: Enemy)
+## A boss wave's boss arrived (the HUD shows its frame) / died (the wave ends right after).
+signal boss_spawned(boss: Boss)
+signal boss_defeated(boss: Boss)
 
 const MAX_ENEMIES := 150
 
@@ -52,6 +70,18 @@ const LAST_TELEGRAPH_TIME := TELEGRAPH_TIME + 0.1
 ## Max new groups telegraphed per physics frame.
 const MAX_GROUPS_PER_FRAME := 4
 const TIMER_SIGNAL_STEP := 0.1
+
+## Boss waves: [member time_left] at the start (the boss, not the clock, ends the wave).
+const BOSS_WAVE_TIME := 1.0e6
+## Boss waves: the share of the normal spawn rate that goes on (the boss's adds).
+const BOSS_ADD_RATE_MULT := 0.5
+## Boss waves: seconds between the boss's rune appearing and the boss, its radius (m), and the
+## least distance (m) from every living hero it is placed at.
+const BOSS_TELEGRAPH_TIME := 2.0
+const BOSS_TELEGRAPH_RADIUS := 2.6
+const BOSS_MIN_PLAYER_DISTANCE := 10.0
+## Smoke runs: a boss still alive this many seconds after its enrage starts is killed.
+const SMOKE_BOSS_GRACE := 120.0
 
 
 ## A telegraphed group waiting to appear.
@@ -86,6 +116,19 @@ var _last_timer_step := -1
 ## Elite spawn times of this wave not used yet (seconds into the wave, ascending).
 var _elite_times: Array[float] = []
 
+## The boss of the running (or last) boss wave (null before it arrives and on normal waves;
+## dead or freed once it died) and the definition of this wave's boss (null on a normal wave).
+var boss: Boss
+var boss_data: BossData
+## Smoke runs only (Main sets it): kill a boss that outlives its enrage by SMOKE_BOSS_GRACE.
+var smoke_boss_timeout := false
+## This wave is an elite wave (wave 20): every spawn gets a lite affix.
+var elite_wave := false
+
+var _boss_arrival_left := -1.0
+var _boss_arrival_pos := Vector3.ZERO
+var _boss_dead := false
+
 
 static func create(p_arena: Arena) -> WaveDirector:
 	var d := WaveDirector.new()
@@ -107,7 +150,12 @@ func start_wave(p_wave: int) -> void:
 	_pending_count = 0
 	wave = maxi(1, p_wave)
 	RunState.set_wave(wave)
-	time_left = RunState.wave_duration(wave)
+	boss = null
+	_boss_dead = false
+	_boss_arrival_left = -1.0
+	boss_data = BossData.for_wave(wave) if RunState.is_boss_wave(wave) else null
+	elite_wave = RunState.is_elite_wave(wave)
+	time_left = BOSS_WAVE_TIME if boss_data != null else RunState.wave_duration(wave)
 	duration = time_left
 	budget = 0.0
 	spawned_this_wave = 0
@@ -115,13 +163,18 @@ func start_wave(p_wave: int) -> void:
 	_running = true
 	_last_timer_step = -1
 	_eligible = eligible_enemies(wave)
-	_elite_times = EliteAffixes.schedule(wave, duration, RunState.player_count, RunState.rng)
-	if not _elite_times.is_empty():
+	if boss_data != null:
+		_elite_times.clear()  # the boss is the elite of its wave
+	else:
+		_elite_times = EliteAffixes.schedule(wave, duration, RunState.player_count, RunState.rng)
+	if not _elite_times.is_empty() or elite_wave:
 		ElitePlate.prepare()
 	_choose_next_group()
 	wave_started.emit(wave)
 	_emit_timer(true)
 	_telegraph_opening_group()
+	if boss_data != null:
+		_announce_boss()
 
 
 ## Stops spawning, removes remaining enemies (no loot) and banks dropped pickups and loot bags.
@@ -157,6 +210,12 @@ func stop() -> void:
 	for node in tree.get_nodes_in_group(&"ability_areas"):
 		if is_instance_valid(node) and not node.is_queued_for_deletion():
 			node.queue_free()
+	# Enemy ground hazards (the bosses' circles, cones, fields, meteors; poison puddles) and the
+	# chill they put on heroes end with the wave too.
+	for node in tree.get_nodes_in_group(EnemyHazard.GROUP):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			node.queue_free()
+	GeneralBuff.clear(tree, FrostCircle.CHILL_KEY)
 
 
 # --- Queries / formulas -------------------------------------------------------------
@@ -167,9 +226,11 @@ static func spawn_rate(p_wave: int, coop_mult: float = 1.0) -> float:
 	return (BASE_SPAWN_RATE + SPAWN_RATE_PER_WAVE * (maxi(1, p_wave) - 1)) * coop_mult
 
 
-## Spawn budget per second of the current wave for the current team size.
+## Spawn budget per second of the current wave for the current team size (BOSS_ADD_RATE_MULT of
+## it on a boss wave).
 func spawn_budget_per_second() -> float:
-	return spawn_rate(wave, RunState.coop_count_mult())
+	var rate := spawn_rate(wave, RunState.coop_count_mult())
+	return rate * BOSS_ADD_RATE_MULT if boss_data != null else rate
 
 
 ## Enemy types that may appear at [param p_wave] (first_wave <= p_wave, positive weight),
@@ -291,6 +352,10 @@ func _physics_process(delta: float) -> void:
 	if not _running:
 		return
 	time_left = maxf(0.0, time_left - delta)
+	if boss_data != null:
+		_update_boss(delta)
+		if not _running:
+			return
 	if time_left <= 0.0:
 		_finish_wave()
 		return
@@ -391,6 +456,9 @@ func _spawn_group(g: PendingGroup) -> void:
 			if e.is_elite():
 				RunState.elites_spawned += 1
 				elites_this_wave += 1
+		elif elite_wave:
+			# Elite wave: everybody else gets a lite affix (HP x1.5, normal rewards).
+			e.make_elite(EliteAffixes.roll_affix(rng), true)
 		if parent_3d != null and parent_3d.is_inside_tree():
 			e.position = parent_3d.global_transform.affine_inverse() * pos
 		else:
@@ -412,10 +480,117 @@ func _pop_due_elite_time() -> bool:
 
 
 func _emit_timer(force: bool) -> void:
+	if boss_data != null:
+		return  # the HUD shows the boss frame instead of the clock
 	var step := ceili(time_left / TIMER_SIGNAL_STEP - 0.0001)
 	if force or step != _last_timer_step:
 		_last_timer_step = step
 		wave_timer_changed.emit(time_left)
+
+
+# --- Boss waves ------------------------------------------------------------------------------
+
+## A point for the boss: preferably on screen, at least BOSS_MIN_PLAYER_DISTANCE from every
+## living hero (and the Spirit Healer).
+func find_boss_point() -> Vector3:
+	var tree := get_tree() if is_inside_tree() else null
+	var a := _arena()
+	var view := Rect2()
+	if a != null and is_instance_valid(a.camera) and a.camera.is_inside_tree():
+		view = a.camera.get_safe_ground_rect()
+	var avoid := Enemy.living_player_positions(tree)
+	if a != null and is_instance_valid(a.spirit_healer):
+		avoid.append(a.spirit_healer.global_position)
+	return pick_spawn_point(a, RunState.rng, avoid, BOSS_MIN_PLAYER_DISTANCE, SPAWN_POINT_TRIES, view)
+
+
+## Boss wave start: picks the boss's place (one rng draw round) and shows its rune.
+func _announce_boss() -> void:
+	_boss_arrival_pos = find_boss_point()
+	_boss_arrival_left = BOSS_TELEGRAPH_TIME
+	Vfx.spawn_telegraph(_boss_arrival_pos, BOSS_TELEGRAPH_RADIUS, BOSS_TELEGRAPH_TIME)
+
+
+## One tick of a boss wave: the boss arrives, the smoke safety, and the wave ends the tick after
+## the boss died.
+func _update_boss(delta: float) -> void:
+	if boss == null:
+		if _boss_arrival_left >= 0.0:
+			_boss_arrival_left -= delta
+			if _boss_arrival_left <= 0.0:
+				_boss_arrival_left = -1.0
+				_spawn_boss()
+		return
+	if _boss_dead or not is_instance_valid(boss) or boss.is_dead():
+		_finish_wave()
+		return
+	if smoke_boss_timeout and boss.age() >= boss_data.enrage_time + SMOKE_BOSS_GRACE:
+		print("SMOKE boss timeout: %s still alive %.0f s after its enrage (phase %d, %.0f%% HP) - killed" % [
+			boss_data.display_name, SMOKE_BOSS_GRACE, boss.phase, boss.hp_ratio() * 100.0])
+		boss.kill()
+
+
+func _spawn_boss() -> void:
+	var parent := _spawn_parent()
+	if parent == null or boss_data == null:
+		return
+	var b := Boss.create(boss_data, wave)
+	b.director = self
+	var pos := _boss_arrival_pos
+	var a := _arena()
+	if a != null:
+		pos = a.clamp_point(pos, boss_data.radius * boss_data.model_scale * 0.5 + 0.2)
+	pos.y = 0.0
+	var parent_3d := parent as Node3D
+	if parent_3d != null and parent_3d.is_inside_tree():
+		b.position = parent_3d.global_transform.affine_inverse() * pos
+	else:
+		b.position = pos
+	boss = b
+	_boss_dead = false
+	b.died.connect(_on_boss_died)
+	parent.add_child(b)
+	spawned_this_wave += 1
+	boss_spawned.emit(b)
+	enemy_spawned.emit(b)
+
+
+func _on_boss_died(dead: Enemy, _killer_index: int) -> void:
+	if dead != boss:
+		return
+	_boss_dead = true
+	boss_defeated.emit(dead as Boss)
+
+
+## Adds [param count] enemies of [param add_data] on a ring of [param scatter] m around
+## [param center] (a boss's Raise Dead / Imp Swarm), as many as MAX_ENEMIES allows. They count
+## as spawned this wave, like any group member; nothing here draws from the rng except
+## Enemy.setup. Returns the new enemies.
+func summon(add_data: EnemyData, count: int, center: Vector3, scatter: float) -> Array[Enemy]:
+	var out: Array[Enemy] = []
+	var parent := _spawn_parent()
+	if not _running or parent == null or add_data == null:
+		return out
+	var n := mini(count, MAX_ENEMIES - alive_count() - _pending_count)
+	var a := _arena()
+	var parent_3d := parent as Node3D
+	for i in maxi(0, n):
+		var angle := TAU * float(i) / float(maxi(1, n)) + 0.4
+		var pos := center + Vector3(cos(angle), 0.0, sin(angle)) * scatter
+		if a != null:
+			pos = a.clamp_point(pos, add_data.radius + 0.1)
+		pos.y = 0.0
+		var e := Enemy.create(add_data, wave)
+		if parent_3d != null and parent_3d.is_inside_tree():
+			e.position = parent_3d.global_transform.affine_inverse() * pos
+		else:
+			e.position = pos
+		parent.add_child(e)
+		spawned_this_wave += 1
+		Vfx.death_puff(pos + Vector3.UP * 0.4, add_data.color, maxf(0.6, add_data.model_scale))
+		enemy_spawned.emit(e)
+		out.append(e)
+	return out
 
 
 func _arena() -> Arena:

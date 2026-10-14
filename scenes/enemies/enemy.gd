@@ -160,6 +160,9 @@ var knockback_velocity := Vector3.ZERO
 
 ## Elite affix (one of EliteAffixes.ALL) or &"" for a normal enemy ([method make_elite]).
 var elite_affix: StringName = &""
+## A "lite" affix (M6, the elite wave 20): the affix effect and look, HP x EliteAffixes.LITE_HP_MULT,
+## but no elite stat block, rewards or elite targeting ([method make_elite] with lite = true).
+var elite_lite := false
 ## Shielding elites: absorb shield left (drained before HP; regrows, see EliteAffixes).
 var shield_hp := 0.0
 ## Per-enemy multipliers (elite affixes): walking speed, contact / lunge / throw cooldowns,
@@ -288,7 +291,7 @@ func is_stunned() -> bool:
 ## choice and other targeting. Rewards never key on it (the Loot Goblin overrides it with
 ## true and must not get elite rewards – see [method _death_loot]).
 func is_elite() -> bool:
-	return elite_affix != &"" or is_boss()
+	return (elite_affix != &"" and not elite_lite) or is_boss()
 
 
 ## An Enraged elite that has raged (at or below EliteAffixes.ENRAGE_HP_RATIO, once): more
@@ -500,21 +503,27 @@ func despawn() -> void:
 ## PlayerManager's slots right here (heroes that join later are not connected – there is no
 ## drop-in during a wave). Draws nothing from the rng. An enemy is made elite at most once;
 ## an unknown affix is an error.
-func make_elite(affix: StringName) -> void:
+## [param lite] (the elite wave 20, GDD 8): only the affix – its effect and a compact plate
+## (no name, bar or wings) – with HP ×[constant EliteAffixes.LITE_HP_MULT], the normal size, the
+## normal rewards ([method _death_loot]) and no elite targeting ([method is_elite]).
+func make_elite(affix: StringName, lite: bool = false) -> void:
 	if elite_affix != &"" or is_dead():
 		return
 	if affix not in EliteAffixes.ALL:
 		push_error("Enemy.make_elite: unknown affix '%s'" % affix)
 		return
 	elite_affix = affix
-	max_hp *= EliteAffixes.HP_MULT
-	hp *= EliteAffixes.HP_MULT
-	radius *= EliteAffixes.MODEL_SCALE
+	elite_lite = lite
+	var hp_mult := EliteAffixes.LITE_HP_MULT if lite else EliteAffixes.HP_MULT
+	var size_mult := 1.0 if lite else EliteAffixes.MODEL_SCALE
+	max_hp *= hp_mult
+	hp *= hp_mult
+	radius *= size_mult
 	var shape := get_node_or_null(^"Shape") as CollisionShape3D
 	if shape != null and shape.shape is SphereShape3D:
 		(shape.shape as SphereShape3D).radius = radius
 	if model != null:
-		model.scale = Vector3.ONE * EliteAffixes.MODEL_SCALE
+		model.scale = Vector3.ONE * size_mult
 	match affix:
 		EliteAffixes.SHIELDING:
 			_raise_shield()
@@ -524,7 +533,7 @@ func make_elite(affix: StringName) -> void:
 			attack_cooldown_left *= EliteAffixes.FRENZY_COOLDOWN_MULT
 		EliteAffixes.VAMPIRIC:
 			_connect_vampiric()
-	elite_plate = ElitePlate.create(self)
+	elite_plate = ElitePlate.create(self, lite)
 	add_child(elite_plate)
 	EnemyGrid.mark_dirty()  # the radius changed
 
@@ -1070,7 +1079,7 @@ func _on_death_effect() -> void:
 ## follows. Subclasses with their own rewards (the Loot Goblin) replace it.
 func _death_loot(pos: Vector3, attacker: Node3D) -> void:
 	var killer: Node3D = attacker if attacker != null and is_instance_valid(attacker) else null
-	if elite_affix != &"":
+	if elite_affix != &"" and not elite_lite:
 		_drop_pickup(pos, EliteAffixes.GOLD, (data.xp if data != null else 0) * EliteAffixes.XP_MULT)
 		LootDrops.drop_special(ItemGenerator.Source.ELITE, self, killer)
 		var killer_player := killer as Player

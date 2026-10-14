@@ -15,6 +15,11 @@ extends ScriptedInput
 ##   no rescue panic); with no other enemy within CROWD_RADIUS and HP at or above
 ##   RETREAT_HP_RATIO a living bot chases the nearest goblin within ENGAGE_DISTANCE up to its
 ##   keep distance (melee: inside its reach, ranged: KITE_DISTANCE). No RNG.
+## - Enemy hazards (M6, GDD 8 "Botok"): a living bot steps out of the telegraphed circles and
+##   cones and the burning fields the bosses lay down ([method _hazard_steer]: every node of the
+##   group &"enemy_hazards" with a hazard_push(from) method says which way to go; a team of bots
+##   gathers in a Meteor circle, whose damage is shared). The push outweighs everything but
+##   the walls' ([constant HAZARD_WEIGHT]) and also ends a rescue stand inside a hazard.
 
 ## Ranged bots keep this far (m) from enemies.
 const KITE_DISTANCE := 6.0
@@ -55,6 +60,8 @@ const RESCUE_MAX_THREATS := 2
 const RESCUE_MIN_HP_RATIO := 0.35
 ## Steering weight of a goblin chase (loot pickups weigh 1.5, a melee engage 1.2).
 const GOBLIN_CHASE_WEIGHT := 2.0
+## Steering weight of the enemy hazards' push (each hazard pushes 1..2 long, a Meteor pull is 3).
+const HAZARD_WEIGHT := 5.0
 
 var body: Node3D
 var _wander := Vector2.ZERO
@@ -113,6 +120,8 @@ func think(delta: float) -> void:
 		if dist < keep:
 			# Same push at the keep distance's edge whatever the keep distance is.
 			steer += d / dist * (keep - dist) * (KITE_DISTANCE / keep)
+	var hazard := _hazard_steer(pos) if alive else Vector2.ZERO
+	steer += hazard * HAZARD_WEIGHT
 	# A ghost walks straight to the Spirit Healer (enemies ignore ghosts) and waits there.
 	# With Resurrection Sickness the healer cannot help yet: drift to a living teammate.
 	var sick := body is Player and (body as Player).res_sickness_left > 0.0
@@ -134,7 +143,7 @@ func think(delta: float) -> void:
 			var avoid := steer.limit_length(2.0) * 0.5 if alive else Vector2.ZERO
 			move = (avoid + to / gap * 2.5).normalized()
 			return
-		if not alive or nearest_enemy > RESCUE_PANIC_DISTANCE:
+		if not alive or (nearest_enemy > RESCUE_PANIC_DISTANCE and hazard == Vector2.ZERO):
 			move = Vector2.ZERO
 			return
 	if alive and melee and nearest_enemy > keep and nearest_enemy < ENGAGE_DISTANCE:
@@ -163,6 +172,19 @@ func think(delta: float) -> void:
 		_wander = Vector2.from_angle(_rng.randf() * TAU) * 0.6
 	steer += _wander
 	move = steer.normalized() if steer.length() > 0.05 else Vector2.ZERO
+
+
+## The push away from the dangerous ground effects of the enemies around [param pos] (XZ): the
+## sum of every &"enemy_hazards" node's hazard_push(from) (EnemyHazard: telegraphed circles and
+## cones, burning fields; a harmless or faded hazard answers zero; the Meteor pulls a team in).
+## Zero when none is near.
+func _hazard_steer(pos: Vector2) -> Vector2:
+	var out := Vector2.ZERO
+	var from := Vector3(pos.x, 0.0, pos.y)
+	for node in body.get_tree().get_nodes_in_group(EnemyHazard.GROUP):
+		if node.has_method(&"hazard_push"):
+			out += node.call(&"hazard_push", from) as Vector2
+	return out
 
 
 static func _is_alive(node: Node) -> bool:

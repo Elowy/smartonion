@@ -6,10 +6,14 @@ extends RefCounted
 ##
 ## - Count: from FIRST_WAVE, (0.4 + 0.06 (w − 5)) × (1 + 0.35 (players − 1)) × [member rate_mult]
 ##   expected elites per wave; the fraction is the chance of one more (solo: w5 0.4, w15 1.0,
-##   w25 1.6; 4 players ×2.05). Waves 10 / 20 / 25 are regular waves until M6.
+##   w25 1.6; 4 players ×2.05). Wave 20 (RunState.ELITE_WAVES) doubles it
+##   ([constant ELITE_WAVE_COUNT_MULT]) and gives every other enemy a lite affix; the boss waves
+##   10 / 25 have no elites (the boss is the elite).
 ## - Times: each elite gets one random time in [WINDOW_START, WINDOW_END] × the wave duration;
 ##   the first enemy of the next group that spawns after it becomes the elite.
 ## - Affix (one, uniform): Shielding, Enraged, Frenzied, Vampiric.
+## - Elite wave 20 (M6, GDD 8): [method Enemy.make_elite] with lite = true for every enemy that is
+##   not a real elite: the affix with HP ×[constant LITE_HP_MULT], normal size and rewards.
 ##
 ## RunState.rng draw points (all deterministic for a seed):
 ## - [method roll_count]: one draw when the expected count is > 0, none below FIRST_WAVE (or
@@ -37,6 +41,10 @@ const COLORS: Dictionary[StringName, Color] = {
 ## Elites appear from this wave on.
 const FIRST_WAVE := 5
 const HP_MULT := 3.0
+## Elite wave 20: the HP factor of the lite affix every ordinary enemy gets, and the factor on
+## the expected number of real elites.
+const LITE_HP_MULT := 1.5
+const ELITE_WAVE_COUNT_MULT := 2.0
 ## Gold an elite drops instead of EnemyData.gold (GDD 10).
 const GOLD := 10
 const XP_MULT := 5
@@ -73,13 +81,15 @@ static var rate_mult := 1.0
 
 
 ## Expected elites in wave [param wave] for [param players] heroes (fraction = chance of one
-## more): (0.4 + 0.06 (w − 5)) × (1 + 0.35 (n − 1)) × rate_mult, 0 below FIRST_WAVE.
+## more): (0.4 + 0.06 (w − 5)) × (1 + 0.35 (n − 1)) × rate_mult (× 2 on the elite wave), 0 below
+## FIRST_WAVE.
 static func expected_count(wave: int, players: int) -> float:
 	if wave < FIRST_WAVE or rate_mult <= 0.0:
 		return 0.0
 	var per_wave := BASE_COUNT + COUNT_PER_WAVE * float(wave - FIRST_WAVE)
 	var party := 1.0 + COUNT_PER_PLAYER * float(maxi(1, players) - 1)
-	return maxf(0.0, per_wave * party * rate_mult)
+	var wave_mult := ELITE_WAVE_COUNT_MULT if RunState.is_elite_wave(wave) else 1.0
+	return maxf(0.0, per_wave * party * wave_mult * rate_mult)
 
 
 ## Whole elites of the wave: the whole part of [method expected_count] plus one more with the
