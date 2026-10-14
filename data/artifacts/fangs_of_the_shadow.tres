@@ -38,6 +38,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Shadow's Bite",
 "needs": "fan_of_knives",
+"short": "Every 5th crit throws a free Fan of Knives.",
 "text": "Every 5th critical strike throws a free Fan of Knives."
 }, {
 "effects": [{
@@ -54,6 +55,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Hidden Fangs",
 "needs": "vanish",
+"short": "After Vanish your next 3 hits are crits.",
 "text": "After Vanish your next 3 hits are critical strikes."
 }])
 weapon_color = Color(0.58, 0.42, 0.88, 1)

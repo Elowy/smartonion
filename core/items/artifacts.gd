@@ -18,6 +18,9 @@ extends RefCounted
 
 ## The PlayerBonuses source of every Artifact entry.
 const SOURCE := &"artifact"
+## The longest "short" text of a property (two tooltip lines): the compact tooltip of a hero's
+## panel or the shop shows it instead of the full text so it fits a 4-player corner panel.
+const SHORT_TEXT_MAX := 72
 ## Item Level gained per wave end held (GDD 5.5).
 const GROWTH_ITEM_LEVEL := 3
 ## Weapon damage gained per wave end held, in % of the damage at pickup (GDD 5.5).
@@ -120,7 +123,8 @@ static func ability_name(ability_id: StringName) -> String:
 	return a.display_name if a != null else String(ability_id).capitalize().replace("_", " ")
 
 
-## One property of [param item] as the tooltip shows it: {"index", "name", "text", "state"
+## One property of [param item] as the tooltip shows it: {"index", "name", "text", "short" (the
+## compact tooltip's text of a viewer's tooltip; the full text when the data has none), "state"
 ## (STATE_*), "waves_left", "needs" (ability display name, "" = none)}. [param hero] (may be
 ## null: then nothing counts as missing) decides STATE_NEEDS_ABILITY.
 static func property_rows(item: ItemInstance, hero: Player = null) -> Array[Dictionary]:
@@ -140,6 +144,7 @@ static func property_rows(item: ItemInstance, hero: Player = null) -> Array[Dict
 			"index": i,
 			"name": str(p.get("name", "")),
 			"text": str(p.get("text", "")),
+			"short": str(p.get("short", p.get("text", ""))),
 			"state": state,
 			"waves_left": waves_left(item, i),
 			"needs": ability_name(needs) if needs != &"" else "",
@@ -179,7 +184,7 @@ static func effects_for(equipment: Equipment) -> Array[Dictionary]:
 
 
 ## The content check of one Artifact's data ("" = valid, else the first problem): a class and a
-## weapon of that class, 2 properties with a name, a text and valid entries, unlock waves in
+## weapon of that class, 2 properties with a name, a text, a short text and valid entries, unlock waves in
 ## order, a pair weapon the class can use, fixed enchants that exist.
 static func validate(data: ArtifactData) -> String:
 	if data == null:
@@ -206,6 +211,9 @@ static func validate(data: ArtifactData) -> String:
 		var p := data.properties[i]
 		if str(p.get("name", "")) == "" or str(p.get("text", "")) == "":
 			return "property %d needs a name and a text" % i
+		var short := str(p.get("short", ""))
+		if short == "" or short.length() > SHORT_TEXT_MAX:
+			return "property %d needs a short text of at most %d characters (the compact tooltip)" % [i, SHORT_TEXT_MAX]
 		var needs := needs_of(p)
 		if needs != &"" and Db.get_ability(needs) == null:
 			return "property %d needs unknown ability '%s'" % [i, needs]

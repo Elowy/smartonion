@@ -11,6 +11,8 @@ extends UniqueItemData
 ## A property is a Dictionary:
 ##   "name"     the title shown in the tooltip ("Earthquake")
 ##   "text"     the tooltip line, golden once awake ("Whirlwind leaves an earthquake zone ...")
+##   "short"    the same in at most Artifacts.SHORT_TEXT_MAX characters, for the compact tooltip of
+##              a hero's panel and the shop (they sit in a 4-player corner of the screen)
 ##   "needs"    optional ability id the hero must have learned for it to work ("whirlwind"); the
 ##              tooltip greys the line with "(needs Whirlwind)" while the hero lacks it (the
 ##              engine entries also carry {"requires": {"knows": ...}})

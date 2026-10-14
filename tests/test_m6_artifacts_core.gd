@@ -290,6 +290,53 @@ func test_effects_come_only_from_equipped_awake_properties() -> void:
 			check_eq(BonusVocabulary.validate(e, data.class_id), "", "%s: %s" % [id, e.get("id")])
 
 
+## The compact tooltip of a player's panel shows each property's short text (Artifacts.SHORT_TEXT_MAX
+## characters at most – two tooltip lines): every shipped property has one, shorter than its text.
+func test_every_property_has_a_short_text_for_the_compact_tooltip() -> void:
+	var seen := 0
+	for data: ArtifactData in Db.artifacts.values():
+		for i in data.properties.size():
+			var p := data.properties[i]
+			var short := str(p.get("short", ""))
+			check(short != "", "%s property %d has a short text" % [data.id, i + 1])
+			check(short.length() <= Artifacts.SHORT_TEXT_MAX, "%s property %d: short text %d characters" % [data.id, i + 1, short.length()])
+			check(short.length() <= str(p["text"]).length(), "%s property %d: not longer than the full text" % [data.id, i + 1])
+			seen += 1
+	check_eq(seen, 10, "ten properties")
+
+
+func test_validate_wants_a_short_text() -> void:
+	var data := Db.artifact_for_class(&"warrior").duplicate(true) as ArtifactData
+	check_eq(Artifacts.validate(data), "", "the shipped data is valid")
+	var props := data.properties.duplicate(true)
+	props[1].erase("short")
+	data.properties = props
+	check("short text" in Artifacts.validate(data), "a property without one: %s" % Artifacts.validate(data))
+	props[1]["short"] = "x".repeat(Artifacts.SHORT_TEXT_MAX + 1)
+	data.properties = props
+	check("short text" in Artifacts.validate(data), "one that is too long")
+	props[1]["short"] = "x".repeat(Artifacts.SHORT_TEXT_MAX)
+	data.properties = props
+	check_eq(Artifacts.validate(data), "", "exactly the limit is fine")
+
+
+func test_property_rows_carry_the_short_text_and_fall_back_to_the_full_one() -> void:
+	var item := _artifact(&"warrior")
+	var rows := Artifacts.property_rows(item)
+	var data := Artifacts.data_of(item)
+	check_eq(rows[0]["short"], data.properties[0]["short"], "the short text")
+	check_eq(rows[0]["text"], data.properties[0]["text"], "next to the full one")
+	var bare := data.duplicate(true) as ArtifactData
+	var props := bare.properties.duplicate(true)
+	props[0].erase("short")
+	bare.properties = props
+	var saved := Db.artifacts[data.id]
+	Db.artifacts[data.id] = bare
+	var fallback := Artifacts.property_rows(item)
+	Db.artifacts[data.id] = saved
+	check_eq(fallback[0]["short"], data.properties[0]["text"], "no short text: the full one")
+
+
 func test_property_rows_report_sleeping_awake_and_missing_abilities() -> void:
 	var item := _artifact(&"warrior")
 	var rows := Artifacts.property_rows(item)

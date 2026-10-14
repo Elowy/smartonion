@@ -42,6 +42,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Earthquake",
 "needs": "whirlwind",
+"short": "Whirlwind leaves a quake: 3 sec, 30% weapon damage a tick.",
 "text": "Whirlwind leaves an earthquake zone behind: it lasts 3 sec and every tick deals 30% weapon damage."
 }, {
 "effects": [{
@@ -59,6 +60,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Shockwave",
 "needs": "charge",
+"short": "Charge stuns enemies within 3 m for 1 sec.",
 "text": "Charge ends in a shockwave that stuns every enemy within 3 m for 1 sec."
 }])
 weapon_color = Color(0.86, 0.42, 0.2, 1)

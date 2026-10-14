@@ -168,6 +168,111 @@ func test_the_weapon_lines_show_the_grown_damage() -> void:
 	check("Item Level %d" % (65 + 3) in after, "Item Level +3")
 
 
+# --- The compact tooltip of a viewer (player panels, shop) ---------------------------------
+
+## A hero's tooltip of [param item] ([member ItemTooltip.viewer_equipment] set) against [param worn]
+## (the comparison block; may be null).
+func _viewer_tooltip(slot: PlayerSlot, item: ItemInstance, worn: ItemInstance = null) -> ItemTooltip:
+	var t := ItemTooltip.create()
+	tree.root.add_child(t)
+	t.viewer_equipment = _eq(slot)
+	t.show_item(item, slot.class_data, worn)
+	tips.append(t)
+	return t
+
+
+func test_a_viewers_tooltip_shows_the_short_property_text() -> void:
+	var slot := _join(&"warrior")
+	var item := _artifact(&"warrior", 3)
+	var data := Artifacts.data_of(item)
+	var viewer := _lines(_viewer_tooltip(slot, item))
+	var plain := _lines(_tooltip(item, slot.class_data))
+	for i in 2:
+		var p := data.properties[i]
+		check(str(p["short"]) in viewer, "the short text of property %d for a viewer" % (i + 1))
+		check(str(p["text"]) not in viewer, "not its full text")
+		check(str(p["text"]) in plain, "the full text without a viewer (the loot roll)")
+		check(str(p["short"]) not in plain, "not the short one")
+	check("Earthquake" in viewer and "Awakens in 3 waves" in viewer, "names and the waiting line stay")
+
+
+func test_the_compact_artifact_block_drops_flavor_scaling_and_the_own_class_line() -> void:
+	var slot := _join(&"warrior")
+	var item := _artifact(&"warrior")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	check(viewer.compact_artifact() and not plain.compact_artifact(), "compact only with a viewer's equipment")
+	check(plain.find_line("The ground remembers every blow") != null, "the flavor text shows in the roll window")
+	check(viewer.find_line("The ground remembers every blow") == null, "but not in the compact block")
+	check(plain.find_line("Scales with") != null and viewer.find_line("Scales with") == null, "the Scales with line too")
+	check(plain.find_line("Classes: Warrior", true) != null, "the class line shows without a viewer")
+	check(viewer.find_line("Classes:") == null, "the hero's own class line is left out")
+	# Someone else's class keeps the red line even in the compact block.
+	var mage := _join(&"mage")
+	var other := _viewer_tooltip(mage, item)
+	var red := other.find_line("Classes: Warrior", true)
+	check(red != null and red.get_theme_color(&"font_color") == ItemTooltip.UNUSABLE_RED, "a viewer of another class still sees it, red")
+	check(viewer.find_line("Item Level", false) != null and viewer.find_line("Damage") != null, "the rest stays")
+
+
+func test_the_compact_artifact_tooltip_is_much_shorter() -> void:
+	var slot := _join(&"warlock")
+	var item := _artifact(&"warlock")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	viewer.layout_now()
+	plain.layout_now()
+	var short := viewer.get_combined_minimum_size().y
+	var full := plain.get_combined_minimum_size().y
+	check(short <= full - 150.0, "compact %.0f px against %.0f px" % [short, full])
+
+
+func test_the_compact_artifact_block_packs_its_lines_closer() -> void:
+	var slot := _join(&"mage")
+	var item := _artifact(&"mage")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	check_eq(viewer._box.get_theme_constant(&"separation"), ItemTooltip.COMPACT_ARTIFACT_SEPARATION, "compact: packed")
+	check_eq(plain._box.get_theme_constant(&"separation"), ItemTooltip.LINE_SEPARATION, "the loot roll's tooltip: the normal gap")
+	# Showing an ordinary item in the same tooltip restores the normal gap.
+	var ring := MarketFakes.make_item("Band", Items.SlotType.RING)
+	viewer.show_item(ring, slot.class_data)
+	check_eq(viewer._box.get_theme_constant(&"separation"), ItemTooltip.LINE_SEPARATION, "back to normal for a ring")
+
+
+func test_the_compact_comparison_block_flows_its_differences() -> void:
+	var slot := _join(&"rogue")
+	var item := _artifact(&"rogue")
+	var worn := ItemGenerator.generate_weapon(Db.get_weapon(&"dagger"), Items.Rarity.EPIC, 10, true, RandomNumberGenerator.new())
+	var viewer := _viewer_tooltip(slot, item, worn)
+	var plain := ItemTooltip.create()
+	tree.root.add_child(plain)
+	plain.show_item(item, slot.class_data, worn)
+	tips.append(plain)
+	var dps := viewer.find_line("Damage per second")
+	check(dps != null and dps.get_parent() is HFlowContainer, "the compact differences sit in a flow: %s" % viewer.line_texts())
+	var plain_dps := plain.find_line("Damage per second")
+	check(plain_dps != null and not (plain_dps.get_parent() is HFlowContainer), "one row each without a viewer")
+	var delta_texts := PackedStringArray()
+	for l in dps.get_parent().get_children():
+		delta_texts.append((l as Label).text)
+	check(delta_texts.size() >= 3, "the stat differences share that flow: %s" % delta_texts)
+	check(viewer.find_line("If you replace this item:") != null and viewer.find_line("Equipped:") != null, "the heading and the worn item stay")
+
+
+func test_an_ordinary_set_piece_or_item_keeps_its_full_layout_for_a_viewer() -> void:
+	var slot := _join(&"warrior")
+	var sword := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)
+	sword.flavor = "A plain old blade."
+	var worn := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.RARE, 5)
+	var t := _viewer_tooltip(slot, sword, worn)
+	check(not t.compact_artifact(), "not an Artifact")
+	check(t.find_line("Scales with") != null, "Scales with stays for a sword")
+	check(t.find_line("A plain old blade.") != null or t.find_line("\"A plain old blade.\"") != null, "the flavor stays")
+	var dps := t.find_line("Damage per second")
+	check(dps == null or not (dps.get_parent() is HFlowContainer), "one row per difference")
+
+
 # --- The panel --------------------------------------------------------------------------
 
 func test_the_sell_entry_of_an_artifact_is_greyed_out() -> void:

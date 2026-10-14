@@ -41,6 +41,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Frostwyrm's Breath",
 "needs": "blizzard",
+"short": "Every 4th Blizzard has double the radius.",
 "text": "Every 4th Blizzard has double the radius."
 }, {
 "effects": [{
@@ -53,6 +54,7 @@ properties = Array[Dictionary]([{
 "script": "res://scenes/artifacts/mage_frost_shards.gd"
 }],
 "name": "Shatterfrost",
+"short": "Slowed or frozen kills burst into frost shards: 40% slow, 2 sec, 3 m.",
 "text": "Enemies you kill while they are slowed or frozen burst into frost shards that slow enemies within 3 m by 40% for 2 sec."
 }])
 weapon_color = Color(0.55, 0.85, 1, 1)

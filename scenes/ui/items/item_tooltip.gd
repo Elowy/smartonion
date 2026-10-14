@@ -14,7 +14,8 @@ extends PanelContainer
 ## special properties awake in gold ("Earthquake" + text), asleep dim with "Awakens in N waves",
 ## and grey with "(needs Whirlwind)" when the viewing hero has not learned the ability; no sell
 ## price (an Artifact is never sold); a pair (Fangs of the Shadow) says it equips with its other
-## piece. See Artifacts.property_rows.
+## piece. See Artifacts.property_rows. Shown to a viewer (viewer_equipment set: the player panels,
+## the shop) the block is compact (compact_artifact).
 ## A set piece shown to a viewer (viewer_equipment set: the player panels, the shop) gets the
 ## compact set block – the pieces as their slot names on one line ("Head  Shoulders  Chest …")
 ## and no flavor text – so the tooltip stays readable inside a 4-player corner panel at 720p.
@@ -51,6 +52,11 @@ const SET_PIECE_INDENT := 14
 ## Gap between the slot names of the compact set block (no bullets, no indent: the five fit
 ## one line of the tooltip).
 const SET_SLOT_GAP := 12
+## Gap between the differences of the compact Artifact comparison block.
+const DELTA_FLOW_GAP := 16
+## Gap between two lines of the tooltip (px); the compact Artifact block packs them closer.
+const LINE_SEPARATION := 3
+const COMPACT_ARTIFACT_SEPARATION := 1
 
 ## upgrade_direction / item_score weights: the viewer's primary stat counts most, the other
 ## primary stats barely (they do nothing for the class), defensive stats by their budget cost
@@ -112,7 +118,7 @@ static func create() -> ItemTooltip:
 	t.theme = UiTheme.get_theme()
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	t.custom_minimum_size = Vector2(WIDTH, 0)
-	t._box = UiTheme.vbox(3)
+	t._box = UiTheme.vbox(LINE_SEPARATION)
 	t.add_child(t._box)
 	t.add_theme_stylebox_override(&"panel", frame_style(0))
 	t.minimum_size_changed.connect(t._shrink_to_fit, CONNECT_DEFERRED)
@@ -561,6 +567,7 @@ func _rebuild() -> void:
 		c.queue_free()
 	if item == null:
 		return
+	_box.add_theme_constant_override(&"separation", COMPACT_ARTIFACT_SEPARATION if compact_artifact() else LINE_SEPARATION)
 	var style := frame_style(item.rarity)
 	if owner_tag != "":
 		style.border = owner_color
@@ -589,7 +596,10 @@ func _rebuild() -> void:
 
 	if item.class_restriction != &"":
 		var own := viewer == null or viewer.id == item.class_restriction
-		_line("Classes: %s" % class_display_name(item.class_restriction), WHITE if own else UNUSABLE_RED)
+		# (The compact Artifact block leaves out the class line of the hero's own class: an
+		# Artifact is always its class's.)
+		if not (own and compact_artifact()):
+			_line("Classes: %s" % class_display_name(item.class_restriction), WHITE if own else UNUSABLE_RED)
 	for roll in item.enchants:
 		var text := enchant_text(roll)
 		if text != "":
@@ -600,7 +610,7 @@ func _rebuild() -> void:
 		_artifact_block()
 	if item.set_id != &"":
 		_set_block()
-	if item.flavor != "" and not compact_set():
+	if item.flavor != "" and not compact_set() and not compact_artifact():
 		var flavor := _line("\"%s\"" % item.flavor, YELLOW, SMALL_SIZE + 1, _italic_font())
 		flavor.add_theme_constant_override(&"outline_size", 3)
 
@@ -638,7 +648,7 @@ func _artifact_block() -> void:
 			Artifacts.STATE_NEEDS_ABILITY:
 				status = "(needs %s)" % row["needs"]
 		_pair(str(row["name"]), status, color, DIM if not awake else color)
-		_line(str(row["text"]), color, SMALL_SIZE)
+		_line(str(row["short"] if compact_artifact() else row["text"]), color, SMALL_SIZE)
 
 
 ## The hero looking at this tooltip (their equipment is [member viewer_equipment]; else the
@@ -664,7 +674,7 @@ func _weapon_lines(w: WeaponData) -> void:
 		var parts := PackedStringArray()
 		for stat: StringName in _ordered(w.scaling.keys()):
 			parts.append("%s %d%%" % [Stats.display_name(stat), roundi(float(w.scaling[stat]) * 100.0)])
-		if not parts.is_empty():
+		if not parts.is_empty() and not compact_artifact():
 			_line("Scales with " + ", ".join(parts), DIM, SMALL_SIZE)
 	if w.block_chance > 0.0:
 		_line("%s%% Block Chance" % fmt_number(w.block_chance), WHITE)
@@ -674,6 +684,16 @@ func _weapon_lines(w: WeaponData) -> void:
 ## class doc).
 func compact_set() -> bool:
 	return item != null and item.set_id != &"" and viewer_equipment != null
+
+
+## Whether the shown item gets the compact Artifact block (an Artifact with a viewer: the player
+## panels, the shop): each property's short text, no flavor text, no "Scales with" line and no
+## class line for the hero's own class, the lines closer together, and the comparison block's
+## differences flow in a few lines – an Artifact's two property blocks make
+## the tallest tooltip of the game and a corner panel has no room for it in full.
+## Without a viewer (the loot roll) everything keeps its full text.
+func compact_artifact() -> bool:
+	return item != null and item.is_artifact() and viewer_equipment != null
 
 
 ## The tier-set block (SetBonuses.describe for [member viewer_equipment]); a set_id without
@@ -756,18 +776,43 @@ func _comparison_block() -> void:
 	var rc := UiTheme.RARITY_COLORS[clampi(compare.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)]
 	_line("Equipped: %s (ilvl %d)" % [compare.display_name, compare.item_level], rc.lerp(DIM, 0.35), SMALL_SIZE)
 	var any := false
+	# The compact Artifact block: the differences flow in a few lines instead of one row each.
+	var flow: HFlowContainer = _delta_flow() if compact_artifact() else null
 	if item.is_weapon() or compare.is_weapon():
 		var dps := weapon_dps(item) - weapon_dps(compare)
 		if absf(dps) >= 0.05:
-			_line("%s%s Damage per second" % ["+" if dps > 0.0 else "", fmt_number(dps, 1)], DELTA_GREEN if dps > 0.0 else DELTA_RED)
+			_delta_line("%s%s Damage per second" % ["+" if dps > 0.0 else "", fmt_number(dps, 1)], DELTA_GREEN if dps > 0.0 else DELTA_RED, flow)
 			any = true
 	var delta := stat_delta(item, compare)
 	for stat in _ordered(delta.keys()):
 		var v: float = delta[stat]
-		_line("%s %s" % [Stats.format_value(stat, v), Stats.display_name(stat)], DELTA_GREEN if v > 0.0 else DELTA_RED)
+		_delta_line("%s %s" % [Stats.format_value(stat, v), Stats.display_name(stat)], DELTA_GREEN if v > 0.0 else DELTA_RED, flow)
 		any = true
 	if not any:
 		_line("No stat changes", DIM, SMALL_SIZE)
+
+
+## One difference of the comparison block: its own row, or – in the compact Artifact block – one
+## unit of [param flow].
+func _delta_line(text: String, color: Color, flow: HFlowContainer) -> void:
+	if flow == null:
+		_line(text, color)
+		return
+	var l := UiTheme.label(text, &"", BODY_SIZE, color)
+	l.add_theme_constant_override(&"outline_size", 4)
+	l.add_theme_constant_override(&"shadow_offset_y", 1)
+	flow.add_child(l)
+
+
+## The wrapping row the compact Artifact comparison block puts its differences in.
+func _delta_flow() -> HFlowContainer:
+	var flow := HFlowContainer.new()
+	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flow.add_theme_constant_override(&"h_separation", DELTA_FLOW_GAP)
+	flow.add_theme_constant_override(&"v_separation", 0)
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_box.add_child(flow)
+	return flow
 
 
 func _line(text: String, color: Color, font_size: int = BODY_SIZE, font: Font = null) -> Label:

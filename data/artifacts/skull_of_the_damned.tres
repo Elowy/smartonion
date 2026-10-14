@@ -32,6 +32,7 @@ properties = Array[Dictionary]([{
 "script": "res://scenes/artifacts/warlock_second_voidwalker.gd"
 }],
 "name": "Bound Soul",
+"short": "A second, permanent pet: a Voidwalker that taunts.",
 "text": "A second, permanent pet fights at your side: a Voidwalker that draws the enemies to itself."
 }, {
 "effects": [{
@@ -46,6 +47,7 @@ properties = Array[Dictionary]([{
 "script": "res://scenes/artifacts/warlock_pet_leech.gd"
 }],
 "name": "Soul Siphon",
+"short": "Pets deal 25% more damage; you heal for 10% of it.",
 "text": "Your pets deal 25% more damage, and you heal for 10% of the damage they deal."
 }])
 weapon_color = Color(0.5, 0.92, 0.3, 1)
