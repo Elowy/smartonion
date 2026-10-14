@@ -755,8 +755,10 @@ func _bots_settled() -> bool:
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
 ## Before buying, every bot forges what it can (Forge.bot_forge_all) and wears the results.
-## Then the bots train (_bots_train), spend their talent points (_bots_talents) and spend what
-## is left over on rerolls (_bots_reroll).
+## Then the bots take the Black Market (_bots_black_market) and consumables (_bots_consumables),
+## train (_bots_train), spend their talent points (_bots_talents), enchant (_bots_enchant) and
+## spend what is left over on rerolls (_bots_reroll). The three M6 passes are empty hooks until
+## their packages fill them in.
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -770,12 +772,33 @@ func _bots_shop() -> void:
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
 	_bots_buy(shoppers)
+	_bots_black_market()
+	_bots_consumables()
 	_bots_train()
 	_bots_talents()
+	_bots_enchant()
 	_bots_reroll(shoppers)
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
 			panels[s.index].refresh()
+
+
+## M6 hook (SHOPSINKS): after the item buying pass the bots take the Black Market offer when it
+## is an upgrade for one of them and affordable above the reserve. Returns the offers bought.
+func _bots_black_market() -> int:
+	return 0
+
+
+## M6 hook (SHOPSINKS): from wave 6 every bot buys one potion and one food when the wallet keeps
+## the reserve. Returns the consumables bought.
+func _bots_consumables() -> int:
+	return 0
+
+
+## M6 hook (ENCHANTER): from wave 12 the bots spend Gold and Dust at the Enchanter on their best
+## weapon when the wallet keeps its reserve. Returns the actions done.
+func _bots_enchant() -> int:
+	return 0
 
 
 ## The buying passes of [method _bots_shop] over [param p_shoppers] (the list is not changed).

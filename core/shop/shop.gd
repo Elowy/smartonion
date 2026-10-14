@@ -37,6 +37,13 @@ extends RefCounted
 ##   Forge.forge_with_offer – the bought weapon never enters the backpack; spend kind
 ##   &"shop_forge", label "<name> (forged)"; the result is [member last_forged]). With room in
 ##   the backpack the item goes there as usual, partner or not (forging is the player's call).
+## - M6 gold sinks next to the offers (kept OUT of [member offers]: that array drives
+##   offer_count, the usable-per-player maths, the reroll positions and the card grid):
+##   [member consumables] (the consumables row, one per hero, SHOPSINKS) and
+##   [member black_market] (the one extra Black Market offer from wave 15). Both are empty
+##   until SHOPSINKS fills them in open_round / try_reroll. Their purchases use the spend kinds
+##   &"consumable" and &"black_market" of [method RunState.try_spend_for] (the Enchanter's
+##   &"enchant" belongs to the Enchanter, not the stall).
 
 signal changed
 ## An offer was sold (offer index, buyer slot index, price) - for the spending log.
@@ -70,6 +77,11 @@ class Offer:
 
 
 var offers: Array[Offer] = []
+## The consumables row (M6, SHOPSINKS): the compact cards below the offers, refreshed with the
+## reroll and every round. Empty until the package defines the offer type and fills it.
+var consumables: Array = []
+## The Black Market offer (M6, SHOPSINKS; wave 15+): null = none this round.
+var black_market: Offer = null
 ## Slot index -> voted for a reroll this round (absent = no vote).
 var reroll_votes: Dictionary[int, bool] = {}
 var rerolls_this_round := 0
