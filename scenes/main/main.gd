@@ -363,6 +363,7 @@ func end_run(p_victory: bool) -> void:
 	if hud != null:
 		hud.hide()
 	RunState.end_run(p_victory)
+	_record_hero_results()
 	_set_state(State.GAME_OVER)
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
@@ -373,6 +374,16 @@ func end_run(p_victory: bool) -> void:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
 		get_tree().create_timer(DEMO_RESTART_DELAY, true).timeout.connect(_on_demo_restart)
+
+
+## How every hero ended the run (standing or down, the best item), taken now because the heroes are
+## freed when the screen is left: RunState.hero_results, read by the end screen and the run card.
+func _record_hero_results() -> void:
+	for slot in PlayerManager.get_slots():
+		var hero := slot.player as Player
+		var valid := hero != null and is_instance_valid(hero)
+		RunState.record_hero_result(slot.index, valid and hero.is_alive(),
+				RunSummary.best_item(hero.equipment) if valid else null)
 
 
 ## Pause Menu "Quit to Menu": abandons the run.
@@ -820,6 +831,8 @@ func _finish_smoke(result: String) -> void:
 		return
 	_smoke_done = true
 	var data := smoke_result(result)
+	for line in meter_lines(data["meter"]):
+		print("SMOKE meter " + line)
 	print("SMOKE_RESULT " + JSON.stringify(data))
 	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
 
@@ -829,7 +842,8 @@ func _finish_smoke(result: String) -> void:
 ## talent_points_spent (all heroes), talent_resets, set_bonuses (active bonuses of all heroes),
 ## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
 ## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
-## (seconds of wave play, RunState.tick_run_time).
+## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
+## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
@@ -883,6 +897,7 @@ func smoke_result(result: String) -> Dictionary:
 		"dust_earned": RunState.dust_earned,
 		"dust_spent": RunState.dust_spent,
 		"run_time": snappedf(RunState.run_time, 0.1),
+		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
@@ -893,6 +908,17 @@ func smoke_result(result: String) -> Dictionary:
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
 	return data
+
+
+## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).
+static func meter_lines(meter: Dictionary) -> Array[String]:
+	var lines: Array[String] = []
+	for key: String in meter:
+		var m: Dictionary = meter[key]
+		lines.append("P%d %s: damage %d, healing %d, absorbed %d, taken %d, revives %d, downs %d, kills %d, bosses %d" % [
+			int(key) + 1, m.get("class", "?"), m["damage"], m["healing"], m["absorbed"], m["taken"],
+			m["revives"], m["downs"], m["kills"], m["bosses"]])
+	return lines
 
 
 ## Learned abilities (RB / LB and auto-cast slots) over every hero (SMOKE_RESULT).
@@ -933,11 +959,24 @@ func _force_view() -> void:
 				wave_director.time_left = minf(wave_director.time_left, 0.001)
 		"game_over":
 			end_run(false)
+			_end_screen_extras()
 		"victory":
 			end_run(true)
+			_end_screen_extras()
 		"pause":
 			var slots := PlayerManager.get_slots()
 			pause_game(slots[0] if not slots.is_empty() else null)
+
+
+## --end-page / --save-card on the forced end screen (screenshots of the Damage Meter and the card).
+func _end_screen_extras() -> void:
+	if game_over == null:
+		return
+	if options.end_page != "":
+		game_over.set_page(GameOverScreen.page_from_name(options.end_page))
+	if options.save_card:
+		game_over.card_saved.connect(func(path: String) -> void: print("CARD %s" % path), CONNECT_ONE_SHOT)
+		game_over.save_card()
 
 
 func _take_screenshot() -> void:
