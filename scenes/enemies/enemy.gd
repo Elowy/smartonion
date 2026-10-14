@@ -977,7 +977,8 @@ func _is_cult_ally(e: Enemy) -> bool:
 ## data.support_range -> [constant SupportAction.HEAL]; with nobody hurt, the strongest one
 ## (highest max HP) whose shield is below data.support_shield_pct of its max HP ->
 ## [constant SupportAction.SHIELD]; null (and [member _support_action] NONE) when nobody needs
-## anything. Ties go to the first in group order.
+## anything. Ties go to the first in group order. A boss is never healed (it would be the
+## most hurt one every time), only shielded: the shield tops up to 20%, it never stacks.
 func _pick_support_target(here: Vector3) -> Enemy:
 	_support_action = SupportAction.NONE
 	var range_sq := data.support_range * data.support_range
@@ -994,7 +995,7 @@ func _pick_support_target(here: Vector3) -> Enemy:
 		var dz := p.z - here.z
 		if dx * dx + dz * dz > range_sq:
 			continue
-		if e.hp < e.max_hp - 0.001:
+		if e.hp < e.max_hp - 0.001 and not e.is_boss():
 			var ratio := e.hp / e.max_hp
 			if ratio < hurt_ratio:
 				hurt_ratio = ratio
