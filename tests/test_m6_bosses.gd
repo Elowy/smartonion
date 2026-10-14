@@ -684,6 +684,9 @@ func test_boss_death_item_rarity_has_legendaries() -> void:
 		var b := _boss(VORTHALAX, Vector3.ZERO, 25)
 		b.kill()
 		for bag in tree.get_nodes_in_group(&"loot_bags"):
+			if (bag as LootBag).item.rarity == Items.Rarity.ARTIFACT:
+				bag.free()  # the boss's Artifact roll (15% + pity) is on top of the four items
+				continue
 			total += 1
 			if (bag as LootBag).item.rarity == Items.Rarity.LEGENDARY:
 				legendary += 1
