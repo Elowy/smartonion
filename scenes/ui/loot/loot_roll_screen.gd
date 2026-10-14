@@ -8,8 +8,9 @@ extends Control
 ## B = Pass, Y = Greed all remaining (counts in every phase, the result line included; the
 ## first moments of an item ignore the others). Choices stay hidden until everyone decided (or the time
 ## ran out: undecided = Pass). Bots decide with LootRoll.bot_choice; unplugged controllers
-## pass. Solo: Take (A) / Sell (X) / Leave (B), Y = sell all remaining. An item everybody passed on
-## (solo: Leave) is disenchanted into team Arcane Dust (LootRoll.apply; the result line says how much).
+## pass. Solo: Take (A) / Sell (X) / Disenchant (B), Y = sell all remaining. An item everybody passed on
+## (solo: B) is disenchanted into team Arcane Dust (LootRoll.apply; the result line says how much);
+## the B prompt names the Dust ([method pass_label]; an Artifact cannot be disenchanted: "Leave").
 ## Each roll is resolved with RunState.rng and applied (LootRoll.apply); the winner line shows
 ## for RESULT_TIME before the next item. finished is emitted once after the last item.
 
@@ -75,6 +76,7 @@ var _chips: Dictionary[int, PanelContainer] = {}
 var _chip_keys: Dictionary[int, String] = {}
 var _legend: HBoxContainer
 var _legend_solo: bool = false
+var _legend_pass := ""
 var _legend_built := false
 var _queue_box: VBoxContainer
 var _backdrop: TextureRect
@@ -585,18 +587,32 @@ func _build_queue() -> Control:
 	return panel
 
 
-func _build_legend(solo: bool) -> void:
-	if _legend_built and solo == _legend_solo:
+## The B prompt (GDD 10.1) for [param item]. Solo: "Disenchant (8 Dust)" – B leaves the item and it
+## becomes team Arcane Dust – but "Leave" for an Artifact (nothing to disenchant). Party: "Pass",
+## with the hint that an item everybody passes on becomes Dust ("Pass (all pass: 8 Dust)"; plain
+## "Pass" for an Artifact). Without an item: "Leave" / "Pass".
+static func pass_label(solo: bool, item: ItemInstance) -> String:
+	var dust := Enchanter.dust_for(item)
+	if solo:
+		return "Disenchant (%s)" % DustIcon.text(dust) if dust > 0 else "Leave"
+	return "Pass (all pass: %s)" % DustIcon.text(dust) if dust > 0 else "Pass"
+
+
+## (Re)builds the prompt row; the B text follows [param item] (see [method pass_label]).
+func _build_legend(solo: bool, item: ItemInstance = null) -> void:
+	var pass_text := pass_label(solo, item)
+	if _legend_built and solo == _legend_solo and pass_text == _legend_pass:
 		return
 	_legend_built = true
 	_legend_solo = solo
+	_legend_pass = pass_text
 	for c in _legend.get_children():
 		_legend.remove_child(c)
 		c.queue_free()
 	var parts: Array = [
 		[UiGlyph.pad(PlayerInput.Pad.A), RollIcon.make(RollIcon.Kind.DICE, 26.0), "Take" if solo else "Need"],
 		[UiGlyph.pad(PlayerInput.Pad.X), RollIcon.make(RollIcon.Kind.COIN, 26.0), "Sell" if solo else "Greed"],
-		[UiGlyph.pad(PlayerInput.Pad.B), RollIcon.make(RollIcon.Kind.PASS, 26.0), "Leave" if solo else "Pass"],
+		[UiGlyph.pad(PlayerInput.Pad.B), RollIcon.make(RollIcon.Kind.PASS, 26.0), pass_text],
 		[UiGlyph.pad(PlayerInput.Pad.Y), "Sell all remaining" if solo else "Greed all remaining"],
 	]
 	var row := UiTheme.prompt_row(parts, UiTheme.FONT_BODY, UiTheme.TEXT)
@@ -611,6 +627,7 @@ func _build_legend(solo: bool) -> void:
 func _fill_item() -> void:
 	var item := items[current]
 	icon.set_item(item)
+	_build_legend(is_solo(), item)
 	name_label.text = item.display_name
 	name_label.add_theme_color_override(&"font_color", ShopOfferCard.rarity_color(item))
 	var bits: Array[String] = []
@@ -737,7 +754,10 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:
 				status.add_child(UiTheme.label(label, UiTheme.GOLD_LABEL, 24, UiTheme.GOLD_BRIGHT if won else UiTheme.TEXT))
 			_:
 				status.add_child(RollIcon.make(RollIcon.Kind.PASS, 26.0))
-				var label := ("Leave" if is_solo() else "Pass") + (" (time)" if timed_out.get(s.index, false) else "")
+				var passed := "Pass"
+				if is_solo():
+					passed = "Disenchant" if roll != null and roll.dust > 0 else "Leave"
+				var label := passed + (" (time)" if timed_out.get(s.index, false) else "")
 				status.add_child(UiTheme.label(label, &"", 20, UiTheme.TEXT_DIM))
 	elif choice != LootRoll.Choice.UNDECIDED:
 		status.add_child(UiIcon.create(UiIcon.Kind.CHECK, Vector2(22, 22)))
