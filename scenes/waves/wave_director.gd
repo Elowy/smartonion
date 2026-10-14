@@ -127,6 +127,9 @@ var elite_wave := false
 
 var _boss_arrival_left := -1.0
 var _boss_arrival_pos := Vector3.ZERO
+## The boss has arrived (kept apart from [member boss]: a freed boss compares equal to null) and
+## has died.
+var _boss_arrived := false
 var _boss_dead := false
 
 
@@ -151,6 +154,7 @@ func start_wave(p_wave: int) -> void:
 	wave = maxi(1, p_wave)
 	RunState.set_wave(wave)
 	boss = null
+	_boss_arrived = false
 	_boss_dead = false
 	_boss_arrival_left = -1.0
 	boss_data = BossData.for_wave(wave) if RunState.is_boss_wave(wave) else null
@@ -514,7 +518,7 @@ func _announce_boss() -> void:
 ## One tick of a boss wave: the boss arrives, the smoke safety, and the wave ends the tick after
 ## the boss died.
 func _update_boss(delta: float) -> void:
-	if boss == null:
+	if not _boss_arrived:
 		if _boss_arrival_left >= 0.0:
 			_boss_arrival_left -= delta
 			if _boss_arrival_left <= 0.0:
@@ -547,6 +551,7 @@ func _spawn_boss() -> void:
 	else:
 		b.position = pos
 	boss = b
+	_boss_arrived = true
 	_boss_dead = false
 	b.died.connect(_on_boss_died)
 	parent.add_child(b)

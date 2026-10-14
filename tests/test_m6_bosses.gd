@@ -783,6 +783,34 @@ func test_boss_wave_ends_only_when_the_boss_dies() -> void:
 			or coin.is_collected_to_bank(), "pickups banked")
 
 
+func test_the_wave_ends_when_the_dead_boss_is_already_freed() -> void:
+	# In a real run queue_free() has deleted the boss by the next tick when something other than a
+	# hero killed it (the smoke safety): a freed boss compares equal to null, which once left the
+	# wave running forever.
+	_hero(Vector3(-9, 0, 0))
+	var d := _director()
+	var cleared: Array[int] = []
+	d.wave_cleared.connect(func(w: int) -> void: cleared.append(w))
+	d.start_wave(10)
+	EFakes.step(d, WaveDirector.BOSS_TELEGRAPH_TIME + 0.1)
+	d.boss.kill()
+	d.boss.free()
+	d._physics_process(DT)
+	check_eq(cleared, [10] as Array[int], "the wave still ends")
+
+
+func test_the_wave_ends_when_the_boss_is_freed_without_a_death() -> void:
+	_hero(Vector3(-9, 0, 0))
+	var d := _director()
+	var cleared: Array[int] = []
+	d.wave_cleared.connect(func(w: int) -> void: cleared.append(w))
+	d.start_wave(10)
+	EFakes.step(d, WaveDirector.BOSS_TELEGRAPH_TIME + 0.1)
+	d.boss.free()
+	d._physics_process(DT)
+	check_eq(cleared, [10] as Array[int], "a vanished boss does not strand the wave either")
+
+
 func test_boss_wave_pickups_are_banked_like_a_normal_end() -> void:
 	_hero(Vector3(-9, 0, 0))
 	var d := _director()
@@ -852,8 +880,9 @@ func test_smoke_safety_kills_a_boss_that_outlives_its_enrage() -> void:
 	boss._age = boss.boss_data.enrage_time + WaveDirector.SMOKE_BOSS_GRACE + 0.1
 	d._physics_process(DT)
 	check(boss.is_dead(), "dead after enrage + 120 s")
+	boss.free()  # a real frame deletes the queued boss before the next tick
 	d._physics_process(DT)
-	check(not d.is_running(), "the wave ended")
+	check(not d.is_running(), "the wave ended (the freed boss does not hang it)")
 
 
 func test_the_boss_lives_on_without_the_smoke_safety() -> void:
@@ -1195,6 +1224,17 @@ func test_main_boss_wave_banner_frame_and_end() -> void:
 	main._physics_process(Main.WAVE_END_DELAY + 0.01)
 	check_eq(main.state, Main.State.INTERMISSION, "then the market")
 	check_eq(RunState.bosses_killed, 1, "counted")
+
+
+func test_main_banner_names_the_boss_even_when_it_is_freed() -> void:
+	_run_main(10)
+	_step_director(WaveDirector.BOSS_TELEGRAPH_TIME + 0.1)
+	var boss := main.wave_director.boss
+	boss.kill()
+	boss.free()
+	main.wave_director._physics_process(DT)
+	check_eq(main.state, Main.State.WAVE_END, "ended")
+	check_eq(main.hud.banner_label.text, "Lich Commander Morvain defeated!", "the banner uses the definition")
 
 
 func test_main_normal_wave_banner_is_unchanged() -> void:

@@ -666,9 +666,9 @@ func _on_wave_cleared(n: int) -> void:
 func _wave_cleared_text(n: int) -> String:
 	if n >= RunState.TOTAL_WAVES:
 		return "Victory!"
-	var boss: Boss = wave_director.boss if wave_director != null and wave_director.boss_data != null else null
-	if boss != null and boss.boss_data != null:
-		return "%s defeated!" % boss.boss_data.display_name
+	# (The boss itself may be freed by now: the definition stays.)
+	if wave_director != null and wave_director.boss_data != null:
+		return "%s defeated!" % wave_director.boss_data.display_name
 	return "Wave cleared!"
 
 
