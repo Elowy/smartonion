@@ -70,14 +70,20 @@ const BOTTOM_SLOTS: Array[Items.EquipSlot] = [
 	Items.EquipSlot.RING_1, Items.EquipSlot.RING_2, Items.EquipSlot.MAIN_HAND,
 	Items.EquipSlot.OFF_HAND, Items.EquipSlot.TRINKET_1, Items.EquipSlot.TRINKET_2,
 ]
-const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents"]
+const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents", "Enchanter"]
 const CHARACTER_TAB := 0
 const TRAINER_TAB := 1
 const TALENTS_TAB := 2
-## Tabs that only say "coming soon" (none since M5 opened Talents).
-const LOCKED_TABS: Array[int] = []
+## The Enchanter tab (M6 ENCHANTER): locked until that package builds its body.
+const ENCHANTER_TAB := 3
+## Tabs that only say "coming soon" (the strip shows a padlock); LT / RT skip them and
+## [method set_tab] refuses them. The ENCHANTER package empties this list.
+const LOCKED_TABS: Array[int] = [ENCHANTER_TAB]
 ## --panel-tab values -> tab index (debug_start_tab).
-const TAB_IDS: Dictionary[String, int] = {"character": CHARACTER_TAB, "trainer": TRAINER_TAB, "talents": TALENTS_TAB}
+const TAB_IDS: Dictionary[String, int] = {
+	"character": CHARACTER_TAB, "trainer": TRAINER_TAB, "talents": TALENTS_TAB,
+	"enchanter": ENCHANTER_TAB,
+}
 ## Stat list (two columns, at most MAX_STAT_ROWS rows so the panel never grows): the class's
 ## primary stat, then these, then the other primary stats and every other non-zero stat.
 ## Stamina is shown as Max HP (10 + Stamina).
@@ -488,11 +494,16 @@ func toggle_comparison() -> void:
 	_update_prompts()
 
 
-## LT / RT: the neighbouring tab; a locked one (none since M5) only says "coming soon".
+## LT / RT: the neighbouring tab in the direction of [param step]; locked tabs ([constant
+## LOCKED_TABS]) are skipped, so the cycle only runs over the open ones.
 func switch_tab(step: int) -> void:
-	var target := posmod(active_tab + step, TAB_NAMES.size())
-	if target in LOCKED_TABS:
-		_message("%s: coming soon" % TAB_NAMES[target])
+	var dir := 1 if step >= 0 else -1
+	var target := active_tab
+	for i in TAB_NAMES.size():
+		target = posmod(target + dir, TAB_NAMES.size())
+		if target not in LOCKED_TABS:
+			break
+	if target == active_tab or target in LOCKED_TABS:
 		return
 	set_tab(target)
 
@@ -929,15 +940,17 @@ func _refresh_tabs() -> void:
 		ts.border_width_bottom = 0 if active else 1
 		ts.corner_radius_top_left = 6
 		ts.corner_radius_top_right = 6
-		ts.content_margin_left = 14
-		ts.content_margin_right = 14
+		# A locked tab is tighter: with the padlock and the "Coming soon" note the strip must
+		# stay inside the panel's design width (the active Talents tab is the widest case).
+		var locked := i in LOCKED_TABS
+		ts.content_margin_left = 10 if locked else 14
+		ts.content_margin_right = 10 if locked else 14
 		ts.content_margin_top = 2
 		ts.content_margin_bottom = 3
 		ts.anti_aliasing = true
 		tab.add_theme_stylebox_override(&"panel", ts)
 		var row := UiTheme.hbox(6)
 		tab.add_child(row)
-		var locked := i in LOCKED_TABS
 		if locked:
 			var lock := UiIcon.create(UiIcon.Kind.LOCK, Vector2(16, 16), Color(0.55, 0.5, 0.44))
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -950,7 +963,7 @@ func _refresh_tabs() -> void:
 		_tab_labels.append(l)
 		_tabs_row.add_child(tab)
 	if not LOCKED_TABS.is_empty():
-		var soon := UiTheme.label("Coming soon", &"", 16, Color(0.55, 0.52, 0.48))
+		var soon := UiTheme.label("Coming soon", &"", 14, Color(0.55, 0.52, 0.48))
 		soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_tabs_row.add_child(soon)
 	_tabs_row.add_child(UiTheme.spacer())
