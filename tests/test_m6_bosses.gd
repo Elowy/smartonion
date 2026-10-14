@@ -164,7 +164,7 @@ func test_boss_data_files_are_loaded_by_db() -> void:
 			"Frost Breath: 9 s, 60 deg, 7 m, 1 s, 3x")
 	var v := Db.get_boss(VORTHALAX)
 	check_eq(v.boss_wave, 25, "wave 25")
-	check_eq(v.max_hp, 1200.0, "base HP")
+	check_eq(v.max_hp, 650.0, "base HP")
 	check_eq(v.contact_damage, 4.0, "contact")
 	check_eq(v.abilities.size(), 3, "three abilities")
 	var fields := v.abilities[0]
@@ -1067,6 +1067,36 @@ func _hud() -> Hud:
 	return h
 
 
+func test_hud_enraged_row_is_reserved_and_never_dim() -> void:
+	var hud := _hud()
+	RunState.set_wave(10)
+	var b := _boss()
+	hud.bind_boss(b)
+	var calm_frame := hud.boss_frame.get_combined_minimum_size()
+	var column := hud.boss_frame.get_parent() as Control
+	var calm_column := column.get_combined_minimum_size()
+	check(hud.boss_enraged_label.visible, "the row is laid out while the boss is calm")
+	check(not hud.is_boss_enraged_shown(), "but transparent: nothing shows")
+	check(hud.boss_enraged_label.modulate.a < 0.01, "alpha 0 while calm")
+	b.enrage_level = 1
+	var lowest := 1.0
+	for i in 40:
+		hud._clock = float(i) * 0.05
+		hud._process(0.0)
+		lowest = minf(lowest, hud.boss_enraged_label.modulate.a)
+	check(hud.is_boss_enraged_shown(), "enraged: the line shows")
+	check(lowest >= Hud.ENRAGED_ALPHA_MIN - 0.0001, "the pulse never drops below %.2f (%.3f)" % [Hud.ENRAGED_ALPHA_MIN, lowest])
+	check(Hud.ENRAGED_ALPHA_MIN >= 0.8, "the floor is bright enough to read on the dark plaque")
+	check_eq(hud.boss_frame.get_combined_minimum_size(), calm_frame, "the boss frame does not grow when it enrages")
+	check_eq(column.get_combined_minimum_size(), calm_column,
+		"nor the plaque column: the rows below do not jump")
+	b.enrage_level = 0
+	hud._process(0.0)
+	check(not hud.is_boss_enraged_shown() and hud.boss_enraged_label.visible, "calm again: transparent, row kept")
+	hud.bind_boss(b)
+	check(not hud.is_boss_enraged_shown(), "a new frame starts calm")
+
+
 func test_hud_boss_frame_replaces_the_timer_on_a_boss_wave() -> void:
 	var hud := _hud()
 	RunState.set_wave(9)
@@ -1214,6 +1244,14 @@ func test_main_boss_wave_banner_frame_and_end() -> void:
 	var boss := main.wave_director.boss
 	check(boss != null, "the boss arrived")
 	check_eq(main.hud.banner_label.text, "Lich Commander Morvain", "the arrival banner")
+	# boss_spawned -> hud.bind_boss: the frame follows the boss the director spawned.
+	boss.hp = boss.max_hp * 0.4
+	boss._age = boss.boss_data.enrage_time + 1.0
+	boss._physics_process(DT)
+	main.hud._process(DT)
+	check_eq(main.hud.boss_bar.text, "40%", "the HUD frame shows the new percentage")
+	check_eq(main.hud.boss_phase_shown(), 2, "phase 2 lit")
+	check(main.hud.is_boss_enraged_shown(), "ENRAGED shows after 90 s")
 	_step_director(70.0)
 	check_eq(main.state, Main.State.WAVE, "no timer ended the wave (it lasts past its nominal 60 s)")
 	boss.kill()
@@ -1259,6 +1297,60 @@ func test_main_victory_when_vorthalax_dies_on_wave_25() -> void:
 	check_eq(main.state, Main.State.GAME_OVER, "game over screen")
 	check(main.victory, "victory")
 	check(RunState.victory, "RunState says victory")
+
+
+func test_format_position_has_one_decimal_and_no_float_noise() -> void:
+	check_eq(Main.format_position(Vector3(-4.9, 0.0, -8.400001)), "(-4.9, 0.0, -8.4)", "rounded")
+	check_eq(Main.format_position(Vector3(12.0, 1.26, 0.04)), "(12.0, 1.3, 0.0)", "padded to one decimal")
+
+
+func test_defeat_with_a_living_boss_is_logged_with_its_hp_and_age() -> void:
+	var b := _boss(VORTHALAX, Vector3.ZERO, 25)
+	b.hp = b.max_hp * 0.37
+	b._age = 61.5
+	b.phase = 1
+	var line := Main.boss_standing_text(b, 12)
+	check(line.contains("Vor'thalax, the Burning Tyrant alive after 61.5 s"), "name and age: %s" % line)
+	check(line.contains("37% HP left"), "the HP share: %s" % line)
+	check(line.contains("phase 1, enrage level 0") and line.ends_with("12 downs so far"), "phase, enrage, downs: %s" % line)
+
+
+func test_boss_arrival_log_line_formats_the_position() -> void:
+	var b := _boss(MORVAIN, Vector3(-4.9, 0.0, -8.400001))
+	var line := Main.boss_arrival_text(b, 10, 3)
+	check(line.contains("at (-4.9, 0.0, -8.4):"), "clean coordinates: %s" % line)
+	check(line.begins_with("boss Lich Commander Morvain arrived on wave 10"), "name and wave: %s" % line)
+	check(line.ends_with("3 player(s)"), "players: %s" % line)
+	check(not line.contains("0000"), "no float noise: %s" % line)
+
+
+## The smoke run's wall-clock timeout (s) for [param waves] waves from [param first].
+func _smoke_timeout_seconds(first: int, waves: int) -> float:
+	main.options.start_wave = first
+	main.options.waves = waves
+	main.options.smoke = true
+	main._start_smoke()
+	main._smoke_running = false  # (only the deadline matters here)
+	return float(main._smoke_deadline_msec - main._start_msec) / 1000.0
+
+
+func test_smoke_deadline_allows_a_boss_wave_its_enrage_and_safety_kill() -> void:
+	_run_main(9)
+	main.options.smoke = true  # (the time scale is the smoke one)
+	var scale := main.options.effective_time_scale()
+	var normal := _smoke_timeout_seconds(9, 1)
+	var boss_wave := _smoke_timeout_seconds(10, 1)
+	var expected_gap := (RunState.wave_duration(10) - RunState.wave_duration(9) + Main.SMOKE_BOSS_ALLOWANCE) \
+			/ scale * Main.SMOKE_TIMEOUT_FACTOR
+	check_near(boss_wave - normal, expected_gap, 0.01, "a boss wave adds SMOKE_BOSS_ALLOWANCE to the budget")
+	check(Main.SMOKE_BOSS_ALLOWANCE >= 90.0 + WaveDirector.SMOKE_BOSS_GRACE,
+		"the allowance covers the enrage plus the safety grace")
+	var normal_pair := _smoke_timeout_seconds(8, 2)
+	var expected_pair := (RunState.wave_duration(8) + RunState.wave_duration(9)
+			+ 2.0 * (Main.WAVE_END_DELAY + 0.5 + Main.SMOKE_INTERMISSION_ALLOWANCE)) / scale \
+			* Main.SMOKE_TIMEOUT_FACTOR + Main.SMOKE_TIMEOUT_EXTRA
+	check_near(normal_pair, expected_pair, 0.01, "two normal waves: no boss allowance")
+	main.options.smoke = false
 
 
 func test_main_tells_the_director_about_the_smoke_safety() -> void:

@@ -32,6 +32,10 @@ const BOSS_BAR_HEIGHT := 22.0
 const BOSS_PHASES := 2
 const BOSS_BAR_COLOR := Color(0.84, 0.16, 0.14)
 const PIP_SIZE := 14.0
+## The ENRAGED line pulses between this alpha and 1 (never dim on the dark plaque); the row is
+## always reserved (alpha 0 while calm), so nothing below it jumps when the boss enrages.
+const ENRAGED_ALPHA_MIN := 0.8
+const ENRAGED_PULSE_SPEED := 8.0
 
 var frames: Array[UnitFrame] = []
 var wave_label: Label
@@ -121,9 +125,10 @@ func is_boss_frame_visible() -> bool:
 	return boss_frame != null and boss_frame.visible
 
 
-## The boss frame's "ENRAGED" line is showing.
+## The boss frame's "ENRAGED" line is showing (its row is always reserved, see
+## [constant ENRAGED_ALPHA_MIN]: shown means not transparent).
 func is_boss_enraged_shown() -> bool:
-	return boss_enraged_label != null and boss_enraged_label.visible
+	return boss_enraged_label != null and boss_enraged_label.visible and boss_enraged_label.modulate.a > 0.01
 
 
 ## The phase pip (0-based) lit up last: the boss's current phase (1-based) as shown.
@@ -292,8 +297,9 @@ func _build_boss_frame(col: VBoxContainer) -> void:
 		_boss_pips.append(pip)
 		_light_pip(pip, i == 0)
 	boss_frame.add_child(row)
-	boss_enraged_label = UiTheme.centered_label("ENRAGED", UiTheme.HEADING, 22, UiTheme.RED)
-	boss_enraged_label.visible = false
+	boss_enraged_label = UiTheme.centered_label("ENRAGED", UiTheme.HEADING, 22, UiTheme.RED.lightened(0.3))
+	# Takes its row up front (transparent while calm) so the plaque never grows mid-fight.
+	boss_enraged_label.modulate.a = 0.0
 	boss_frame.add_child(boss_enraged_label)
 	# Sits where the timer sits (the timer hides while the frame shows).
 	col.add_child(boss_frame)
@@ -319,7 +325,7 @@ func _show_boss_frame(title: String) -> void:
 	boss_name_label.text = title
 	boss_frame.visible = true
 	timer_label.visible = false
-	boss_enraged_label.visible = false
+	boss_enraged_label.modulate.a = 0.0
 
 
 ## Follows the bound boss: HP bar (percent), phase pips, ENRAGED (pulsing).
@@ -332,10 +338,11 @@ func _update_boss_frame() -> void:
 		var lit := i < _boss.phase
 		if lit != _boss_pips[i].has_meta(&"lit"):
 			_light_pip(_boss_pips[i], lit)
-	var enraged := _boss.is_boss_enraged()
-	boss_enraged_label.visible = enraged
-	if enraged:
-		boss_enraged_label.modulate.a = 0.75 + 0.25 * sin(_clock * 8.0)
+	if _boss.is_boss_enraged():
+		var pulse := 0.5 + 0.5 * sin(_clock * ENRAGED_PULSE_SPEED)
+		boss_enraged_label.modulate.a = lerpf(ENRAGED_ALPHA_MIN, 1.0, pulse)
+	else:
+		boss_enraged_label.modulate.a = 0.0
 
 
 ## WoW-style XP bar: a thin segmented strip across the whole bottom edge, the team level at

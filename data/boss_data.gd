@@ -17,8 +17,9 @@ extends EnemyData
 ##   [method enrage_damage_at]).
 ## - Reward: [member reward_gold] (the items are the generator's BOSS source, see Boss).
 ##   Vor'thalax's death on wave 25 ends the wave, i.e. the run (Main: the last wave won).
-## - Crowd control (data, [Boss] enforces it): knockback_resist 1 (immune), stun_resist 0.75
-##   (stun lasts x0.25), taunt and fear are ignored, slows land halved.
+## - Crowd control: the data only sets knockback_resist 1 (immune); [Boss] itself enforces the
+##   rest in code (stun lasts x0.25 [constant Boss.STUN_SHARE], slows land halved, taunt and fear
+##   are ignored). Leave stun_resist at 0: Enemy.apply_stun would apply it on top of the x0.25.
 
 ## --boss-hp=X (LaunchOptions.boss_hp): multiplies every boss's max HP. 1 = off. Reset to 1 by
 ## RunState.start_run and re-applied by Main.start_run; [method max_hp_for] reads it.

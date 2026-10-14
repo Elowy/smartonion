@@ -379,6 +379,9 @@ func end_run(p_victory: bool) -> void:
 	_set_state(State.GAME_OVER)
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
+	var boss: Boss = wave_director.boss if wave_director != null and not p_victory else null
+	if is_instance_valid(boss) and not boss.is_dead():
+		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
 		game_over.open(p_victory)
@@ -676,10 +679,29 @@ func _wave_cleared_text(n: int) -> String:
 func _on_boss_spawned(boss: Boss) -> void:
 	if hud != null and boss.boss_data != null:
 		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
-	_log("boss %s arrived on wave %d at %s: %.0f HP, %d player(s)" % [
-		boss.boss_data.display_name if boss.boss_data != null else "?", wave,
-		boss.global_position.snappedf(0.1) if boss.is_inside_tree() else boss.position.snappedf(0.1),
-		boss.max_hp, players.size()])
+	_log(boss_arrival_text(boss, wave, players.size()))
+
+
+## The smoke-log line of a boss's arrival.
+static func boss_arrival_text(boss: Boss, p_wave: int, player_count: int) -> String:
+	return "boss %s arrived on wave %d at %s: %.0f HP, %d player(s)" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", p_wave,
+		format_position(boss.global_position if boss.is_inside_tree() else boss.position),
+		boss.max_hp, player_count]
+
+
+## The smoke-log line of a run that was lost while [param boss] still stood (balance data: how
+## far the party got).
+static func boss_standing_text(boss: Boss, downs: int) -> String:
+	return "defeat with boss %s alive after %.1f s: %.0f%% HP left (phase %d, enrage level %d), %d downs so far" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", boss.age(),
+		boss.hp_ratio() * 100.0, boss.phase, boss.enrage_level, downs]
+
+
+## "(x, y, z)" with one decimal for the smoke / screenshot logs (a Vector3's own text prints
+## float noise such as -8.400001).
+static func format_position(v: Vector3) -> String:
+	return "(%.1f, %.1f, %.1f)" % [v.x, v.y, v.z]
 
 
 ## WaveDirector.boss_defeated (the wave ends on the next tick): the kill time for the smoke log.
@@ -1009,12 +1031,13 @@ func _log_player_screen_positions() -> void:
 		var px := cam.unproject_position(p.global_position + Vector3.UP * 0.6)
 		_log("%s %s at %s -> screen (%d, %d) of %dx%d, camera distance %.1f" % [
 			p.slot.label() if p.slot != null else "?", "alive" if p.is_alive() else "downed",
-			p.global_position.snappedf(0.1), px.x, px.y, size.x, size.y, arena.camera.distance])
+			format_position(p.global_position), px.x, px.y, size.x, size.y, arena.camera.distance])
 	var boss: Boss = wave_director.boss if wave_director != null else null
 	if is_instance_valid(boss) and boss.is_inside_tree():
 		var bp := cam.unproject_position(boss.global_position + Vector3.UP * 1.2)
 		_log("boss %s at %s -> screen (%d, %d), %.0f%% HP, phase %d" % [
-			boss.data.display_name, boss.global_position.snappedf(0.1), bp.x, bp.y, boss.hp_ratio() * 100.0, boss.phase])
+			boss.data.display_name, format_position(boss.global_position), bp.x, bp.y,
+			boss.hp_ratio() * 100.0, boss.phase])
 
 
 func _quit(code: int) -> void:

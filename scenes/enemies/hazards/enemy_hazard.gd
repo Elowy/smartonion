@@ -178,8 +178,8 @@ func hit_hero(hero: Player, amount: float) -> void:
 	LivingPlayers.mark_dirty()
 
 
-## Where a bot standing in the dead centre should run: away from the boss, else towards the
-## arena's middle.
+## Where a bot standing in the dead centre of the hazard should run: towards the arena's middle
+## (up the screen when it stands in the middle itself).
 func _escape_direction(from: Vector3) -> Vector2:
 	var away := Vector2(-from.x, -from.z)
 	if away.length_squared() < 0.0001:
