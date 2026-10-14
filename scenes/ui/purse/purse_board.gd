@@ -138,14 +138,12 @@ static func slot_color(slot_index: int) -> Color:
 	return s.color if s != null else PlayerManager.PLAYER_COLORS[slot_index]
 
 
-## "[Rare Dagger]" for shop items ("[Rare Dagger] (forged)" for an auto-forge), the label as it
-## is for every other spend.
+## "[Rare Dagger]" for shop items and the Black Market offer ("[Rare Dagger] (forged)" for an
+## auto-forge), the label as it is for every other spend (consumables: "Flask of Fury").
 static func spend_label(entry: Dictionary) -> String:
 	var label := String(entry.get("label", ""))
 	var kind := StringName(entry.get("kind", &""))
-	if kind == &"shop":
-		return "[%s]" % label
-	if kind == &"shop_forge":
+	if kind == &"shop" or kind == &"shop_forge" or kind == &"black_market":
 		var forged := " (forged)"
 		if label.ends_with(forged):
 			return "[%s]%s" % [label.trim_suffix(forged), forged]
@@ -174,7 +172,10 @@ static func want_text(want: Dictionary) -> String:
 static func merged_wants(p_shop: Shop, p_wants: Array[Dictionary]) -> Array[Dictionary]:
 	var by_slot: Dictionary[int, Array] = {}
 	if p_shop != null:
-		for o in p_shop.offers:
+		var listed: Array = p_shop.offers.duplicate()
+		if p_shop.black_market != null:
+			listed.append(p_shop.black_market)
+		for o: Shop.Offer in listed:
 			if o == null or o.item == null or o.sold:
 				continue
 			for i in o.pinged_by:
@@ -517,7 +518,7 @@ func _entry_bbcode(entry: Dictionary) -> String:
 	var kind := StringName(entry.get("kind", &""))
 	var label := spend_label(entry)
 	var label_bb := _color(ShopPanel.bb_escape(label), UiTheme.TEXT)
-	if kind == &"shop" or kind == &"shop_forge":
+	if kind == &"shop" or kind == &"shop_forge" or kind == &"black_market":
 		var name := String(entry.get("label", "")).trim_suffix(" (forged)")
 		var item := _offer_item(name, int(entry.get("amount", -1)))
 		if item != null:
@@ -541,7 +542,10 @@ func _offer_item(name: String, price: int) -> ItemInstance:
 	if shop == null:
 		return null
 	var found: ItemInstance = null
-	for o in shop.offers:
+	var listed: Array = shop.offers.duplicate()
+	if shop.black_market != null:
+		listed.append(shop.black_market)
+	for o: Shop.Offer in listed:
 		if o == null or o.item == null or o.item.display_name != name:
 			continue
 		if o.price == price:

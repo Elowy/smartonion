@@ -8,15 +8,27 @@ extends Control
 ## so completing a tier-set bonus counts), a small anvil in the player's colour sitting on the pip of
 ## every player who has a forge partner for the offered weapon (Forge.offer_forge_slots – full
 ## backpack or not, GDD 4.1) and a "SOLD" stamp once bought.
+## M6: the same card, in its WIDE layout and with a gold frame ([member gold_frame]), is the Black
+## Market offer beside the consumables row ([method create_wide]): icon on the left, name and price
+## on the right, the pips below, [constant WIDE_SIZE] big (no type line – the tooltip has it).
 
-const CARD_SIZE := Vector2(124, 212)
-const ICON_SIZE := 64.0
+## Four of these (two rows) + the consumables row must fit the 4-player stall (ShopPanel).
+const CARD_SIZE := Vector2(124, 176)
+## The Black Market card.
+const WIDE_SIZE := Vector2(200, 96)
+const ICON_SIZE := 46.0
+## Two lines of the 16 px bold name.
+const NAME_HEIGHT := 44.0
 const PIP_SIZE := Vector2(24, 18)
 ## The anvil drawn on a usable-by pip (forge partner) – width x height.
 const ANVIL_SIZE := Vector2(22, 13)
 
 var index := -1
 var offer: Shop.Offer
+## The wide Black Market layout (see [method create_wide]).
+var wide := false
+## A gold frame instead of the rarity-coloured one (the Black Market card).
+var gold_frame := false
 var icon: ItemIcon
 var name_label: Label
 var type_label: Label
@@ -27,7 +39,7 @@ var _usable: Dictionary[int, int] = {}
 ## Slot indices with a forge partner for the offered weapon (anvil pips).
 var _forge: Array[int] = []
 var _colors: Dictionary[int, Color] = {}
-var _content: VBoxContainer
+var _content: BoxContainer
 var _overlay: Control
 var _coin: UiIcon
 var _lock: UiIcon
@@ -38,6 +50,20 @@ static func create(p_index: int) -> ShopOfferCard:
 	card.name = "Offer%d" % p_index
 	card.index = p_index
 	card.custom_minimum_size = CARD_SIZE
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card._build()
+	return card
+
+
+## The Black Market card: [constant WIDE_SIZE], icon beside the text, gold frame.
+static func create_wide(p_index: int) -> ShopOfferCard:
+	var card := ShopOfferCard.new()
+	card.name = "BlackMarket"
+	card.index = p_index
+	card.wide = true
+	card.gold_frame = true
+	card.custom_minimum_size = WIDE_SIZE
+	card.size = WIDE_SIZE
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card._build()
 	return card
@@ -67,37 +93,56 @@ static func rarity_color(item: ItemInstance) -> Color:
 
 
 func _build() -> void:
+	var text_width := custom_minimum_size.x - 12.0
 	_content = UiTheme.vbox(2)
 	_content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_content.offset_left = 6
 	_content.offset_right = -6
-	_content.offset_top = 10
-	_content.offset_bottom = -26
+	_content.offset_top = 6
+	# The usable-by pips sit in the bottom strip: the stacked card keeps it free, the wide card
+	# puts its price into the strip's left half instead.
+	_content.offset_bottom = -4 if wide else -26
 	add_child(_content)
 	icon = ItemIcon.create(null, ICON_SIZE)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_content.add_child(icon)
+	if wide:
+		text_width -= ICON_SIZE + 6.0
 	name_label = UiTheme.centered_label("", &"", 16)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.max_lines_visible = 2
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_label.custom_minimum_size = Vector2(CARD_SIZE.x - 12, 44)
+	name_label.custom_minimum_size = Vector2(text_width, NAME_HEIGHT)
 	name_label.add_theme_font_override(&"font", UiTheme.bold_font())
 	name_label.add_theme_constant_override(&"line_spacing", -3)
-	_content.add_child(name_label)
-	type_label = UiTheme.centered_label("", UiTheme.SMALL, 15)
+	type_label = UiTheme.centered_label("", UiTheme.SMALL, 14)
 	type_label.clip_text = true
-	type_label.custom_minimum_size = Vector2(CARD_SIZE.x - 12, 0)
-	_content.add_child(type_label)
+	type_label.custom_minimum_size = Vector2(text_width, 0)
 	var price_row := UiTheme.hbox(5)
-	price_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_coin = UiIcon.create(UiIcon.Kind.COIN, Vector2(20, 20))
+	price_row.alignment = BoxContainer.ALIGNMENT_BEGIN if wide else BoxContainer.ALIGNMENT_CENTER
+	_coin = UiIcon.create(UiIcon.Kind.COIN, Vector2(18, 18))
 	_coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	price_row.add_child(_coin)
-	price_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 22)
+	price_label = UiTheme.label("0", UiTheme.GOLD_LABEL, 20)
 	price_row.add_child(price_label)
-	_content.add_child(price_row)
+	if wide:
+		# [icon | name] on top, the price at the bottom left, the pips at the bottom right.
+		var top := UiTheme.hbox(6)
+		_content.add_child(top)
+		top.add_child(icon)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top.add_child(name_label)
+		type_label.visible = false
+		_content.add_child(type_label)
+		_content.add_child(UiTheme.spacer(true))
+		_content.add_child(price_row)
+	else:
+		_content.add_child(icon)
+		_content.add_child(name_label)
+		_content.add_child(type_label)
+		_content.add_child(price_row)
 
 	_overlay = Control.new()
 	_overlay.name = "Overlay"
@@ -106,7 +151,7 @@ func _build() -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	_lock = UiIcon.create(UiIcon.Kind.LOCK, Vector2(20, 20))
-	_lock.position = Vector2(CARD_SIZE.x - 28, 8)
+	_lock.position = Vector2(custom_minimum_size.x - 28, 8)
 	_lock.visible = false
 	_overlay.add_child(_lock)
 
@@ -218,8 +263,15 @@ func _draw() -> void:
 		var clear := Color(rc, 0.0)
 		draw_polygon(PackedVector2Array([r.position, Vector2(r.end.x, 0), Vector2(r.end.x, r.size.y * 0.55), Vector2(0, r.size.y * 0.55)]),
 			PackedColorArray([glow, glow, clear, clear]))
-	draw_rect(r, Color(rc.darkened(0.35), 0.9 if item != null else 0.5), false, 2.0)
-	draw_rect(r.grow(-3.0), Color(0, 0, 0, 0.5), false, 1.0)
+	if gold_frame:
+		# The Black Market: a gold frame with a warm glow just inside it.
+		var gold := UiTheme.GOLD_BORDER
+		draw_rect(r.grow(-3.0), Color(gold, 0.2), false, 4.0)
+		draw_rect(r, gold, false, 3.0)
+		draw_rect(r.grow(-4.5), Color(0, 0, 0, 0.55), false, 1.0)
+	else:
+		draw_rect(r, Color(rc.darkened(0.35), 0.9 if item != null else 0.5), false, 2.0)
+		draw_rect(r.grow(-3.0), Color(0, 0, 0, 0.5), false, 1.0)
 	# Pip strip.
 	draw_rect(Rect2(3, r.size.y - 25, r.size.x - 6, 22), Color(0, 0, 0, 0.35))
 
@@ -249,7 +301,7 @@ func _draw_overlay() -> void:
 	var keys := _colors.keys()
 	keys.sort()
 	var total := keys.size() * PIP_SIZE.x + maxi(0, keys.size() - 1) * 4.0
-	var x := (size.x - total) * 0.5
+	var x := (size.x - 7.0 - total) if wide else (size.x - total) * 0.5
 	for slot_index: int in keys:
 		var col: Color = _colors[slot_index]
 		var level: int = _usable.get(slot_index, 0)
