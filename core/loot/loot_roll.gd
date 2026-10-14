@@ -131,6 +131,7 @@ static func bot_choice(slot: PlayerSlot, p_item: ItemInstance) -> Choice:
 	var equipment := _equipment_of(slot)
 	if equipment == null or not equipment.has_space() or not equipment.can_equip(p_item):
 		return Choice.GREED
+	# An Artifact of the bot's class is always worth a Need (upgrade_direction says so too).
 	var current := ItemTooltip.equipped_for_compare(p_item, equipment)
 	if ItemTooltip.upgrade_direction(p_item, current, slot.class_data, equipment) > 0:
 		return Choice.NEED

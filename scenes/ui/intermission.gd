@@ -971,7 +971,7 @@ func _bot_make_room(s: PlayerSlot, eq: Equipment) -> void:
 	if eq.has_space():
 		return
 	for item in eq.backpack:
-		if not is_bot_upgrade(item, s, eq) and eq.remove_from_backpack(item):
+		if item.can_sell() and not is_bot_upgrade(item, s, eq) and eq.remove_from_backpack(item):
 			RunState.add_gold(item.sell_value())
 			return
 
