@@ -1,0 +1,68 @@
+[gd_resource type="Resource" script_class="ArtifactData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/artifact_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/dagger.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fangs_of_the_shadow"
+display_name = "Fangs of the Shadow"
+flavor = "Two bites. Nobody remembers the second."
+slot_type = 11
+armor_type = -1
+rarity = 5
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"agility": 8.0,
+&"crit": 4.0,
+&"haste": 4.0
+})
+enchant_ids = Array[StringName]([&"venomous", &"brutal"])
+enchant_ranks = Array[int]([1, 1])
+class_restriction = &"rogue"
+sources = Array[StringName]([&"loot"])
+min_wave = 10
+weight = 0.0
+class_id = &"rogue"
+unlock_waves = Array[int]([3, 6])
+properties = Array[Dictionary]([{
+"effects": [{
+"kind": "script",
+"params": {
+"every": 5
+},
+"requires": {
+"knows": "fan_of_knives"
+},
+"script": "res://scenes/artifacts/rogue_fangs_fan.gd"
+}],
+"name": "Shadow's Bite",
+"needs": "fan_of_knives",
+"text": "Every 5th critical strike throws a free Fan of Knives."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "vanish"
+},
+"mods": {
+"forced_crits_add": 2.0
+},
+"requires": {
+"knows": "vanish"
+}
+}],
+"name": "Hidden Fangs",
+"needs": "vanish",
+"text": "After Vanish your next 3 hits are critical strikes."
+}])
+weapon_color = Color(0.58, 0.42, 0.88, 1)
+pair_weapon = ExtResource("2_weapon")
+pair_name = "Fangs of the Shadow (Off Hand)"
+pair_stats = Dictionary[StringName, float]({
+&"agility": 8.0,
+&"crit": 4.0,
+&"haste": 4.0
+})
+pair_enchant_ids = Array[StringName]([&"zealous", &"mighty"])
+pair_enchant_ranks = Array[int]([1, 1])

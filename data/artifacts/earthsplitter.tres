@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="ArtifactData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/artifact_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/two_hand_axe.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"earthsplitter"
+display_name = "Earthsplitter"
+flavor = "The ground remembers every blow."
+slot_type = 11
+armor_type = -1
+rarity = 5
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"strength": 12.0,
+&"stamina": 6.0,
+&"crit": 5.0,
+&"haste": 5.0
+})
+enchant_ids = Array[StringName]([&"mighty", &"executioners"])
+enchant_ranks = Array[int]([1, 1])
+class_restriction = &"warrior"
+sources = Array[StringName]([&"loot"])
+min_wave = 10
+weight = 0.0
+class_id = &"warrior"
+unlock_waves = Array[int]([3, 6])
+properties = Array[Dictionary]([{
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"quake_duration_add": 3.0,
+"quake_pct_add": 30.0
+},
+"requires": {
+"knows": "whirlwind"
+}
+}],
+"name": "Earthquake",
+"needs": "whirlwind",
+"text": "Whirlwind leaves an earthquake zone behind: it lasts 3 sec and every tick deals 30% weapon damage."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "charge"
+},
+"mods": {
+"shockwave_radius_add": 3.0,
+"shockwave_stun_add": 1.0
+},
+"requires": {
+"knows": "charge"
+}
+}],
+"name": "Shockwave",
+"needs": "charge",
+"text": "Charge ends in a shockwave that stuns every enemy within 3 m for 1 sec."
+}])
+weapon_color = Color(0.86, 0.42, 0.2, 1)

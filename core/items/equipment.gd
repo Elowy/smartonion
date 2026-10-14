@@ -9,6 +9,11 @@ extends RefCounted
 ## trade) refuses the last usable attacking weapon of a hero who has none equipped
 ## (is_last_weapon / equip_disarms; the UI shows NEED_WEAPON). take() is not guarded.
 ## Tier-set pieces worn are counted by [method set_counts] (SetBonuses turns them into bonuses).
+## A pair Artifact (M6, Fangs of the Shadow: ItemInstance.companion) is ONE item of the
+## backpack (its main-hand piece) that equips into the main hand together with its off-hand piece
+## (target_slots = [MAIN_HAND], like a two-hander that also fills the off hand); unequip() of
+## either piece takes the pair back as the one backpack item, and anything that displaces one
+## piece displaces both (displaced_by). The off-hand piece never sits in the backpack.
 
 signal changed
 
@@ -70,6 +75,13 @@ func target_slots(item: ItemInstance) -> Array[Items.EquipSlot]:
 		return []
 	if not item.is_weapon():
 		return Items.equip_slots_for(item.slot_type)
+	if item.pair_off:
+		return []  # only ever equipped with its main-hand piece
+	if item.companion != null:
+		# A pair needs both hands: a class that can wield the off-hand piece too.
+		if class_data == null or not class_data.can_dual_wield() or not class_data.can_use(item.companion.weapon):
+			return []
+		return [Items.EquipSlot.MAIN_HAND]
 	if item.is_off_hand_only():
 		return [Items.EquipSlot.OFF_HAND]
 	if item.is_two_handed():
@@ -107,14 +119,28 @@ func displaced_by(item: ItemInstance, equip_slot: int = -1) -> Array[ItemInstanc
 		return out
 	if slots.has(equip_slot) and slots[equip_slot] != item:
 		out.append(slots[equip_slot])
-	# Two-handers clear the off hand; an off-hand item next to a two-hander clears the main hand.
+	# Two-handers (and pairs) clear the off hand; an off-hand item next to a two-hander clears
+	# the main hand.
 	var off := get_item(Items.EquipSlot.OFF_HAND)
-	if item.is_two_handed() and off != null and off not in out:
+	if (item.is_two_handed() or item.companion != null) and off != null and off not in out \
+			and off != item.companion:
 		out.append(off)
 	if equip_slot == Items.EquipSlot.OFF_HAND:
 		var main := get_item(Items.EquipSlot.MAIN_HAND)
 		if main != null and main.is_two_handed() and main not in out:
 			out.append(main)
+	# The two pieces of a pair always leave together.
+	var i := 0
+	while i < out.size():
+		var gone := out[i]
+		i += 1
+		var partner: ItemInstance = null
+		if gone.companion != null and is_equipped(gone.companion):
+			partner = gone.companion
+		elif gone.pair_off:
+			partner = pair_main_of(gone)
+		if partner != null and partner not in out and partner != item:
+			out.append(partner)
 	return out
 
 
@@ -148,10 +174,12 @@ func equip_disarms(item: ItemInstance, equip_slot: int = -1) -> bool:
 func is_last_weapon(item: ItemInstance) -> bool:
 	if not is_attacking_weapon(item):
 		return false
+	if item.pair_off and pair_main_of(item) != null:
+		item = pair_main_of(item)  # the pair is one weapon
 	var hands: Array[ItemInstance] = [get_item(Items.EquipSlot.MAIN_HAND), get_item(Items.EquipSlot.OFF_HAND)]
 	if item in hands:
 		for held in hands:
-			if held != item and is_attacking_weapon(held):
+			if held != item and held != item.companion and is_attacking_weapon(held):
 				return false
 		return true
 	if is_armed() or not backpack.has(item) or (class_data != null and not item.can_be_used_by(class_data)):
@@ -176,9 +204,15 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 	if equip_disarms(item, equip_slot):
 		return false
 	var displaced := displaced_by(item, equip_slot)
+	# What goes to the backpack: everything but the off-hand piece of a pair (it travels as the
+	# main-hand piece's companion).
+	var to_backpack: Array[ItemInstance] = []
+	for old in displaced:
+		if not old.pair_off:
+			to_backpack.append(old)
 	var in_backpack := backpack.has(item)
 	var free := Items.BACKPACK_SIZE - backpack.size() + (1 if in_backpack else 0)
-	if displaced.size() > free:
+	if to_backpack.size() > free:
 		return false
 	if in_backpack:
 		backpack.erase(item)
@@ -186,8 +220,10 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 		for s in slots.keys():
 			if slots[s] == old:
 				slots.erase(s)
-		backpack.append(old)
+	backpack.append_array(to_backpack)
 	slots[equip_slot] = item
+	if item.companion != null:
+		slots[Items.EquipSlot.OFF_HAND] = item.companion
 	changed.emit()
 	return true
 
@@ -195,10 +231,19 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 ## Moves the item in [param equip_slot] to the backpack. False if empty, no room, or it is the
 ## last equipped attacking weapon (is_last_weapon).
 func unequip(equip_slot: Items.EquipSlot) -> bool:
-	if not slots.has(equip_slot) or not has_space() or is_last_weapon(slots[equip_slot]):
+	if not slots.has(equip_slot):
 		return false
-	backpack.append(slots[equip_slot])
+	var item := slots[equip_slot]
+	if item.pair_off:
+		# Either piece of a pair unequips the pair (as its main-hand piece).
+		var main := pair_main_of(item)
+		if main != null:
+			return unequip(slot_of(main) as Items.EquipSlot)
+	if not has_space() or is_last_weapon(item):
+		return false
+	backpack.append(item)
 	slots.erase(equip_slot)
+	_drop_companion(item)
 	changed.emit()
 	return true
 
@@ -213,9 +258,40 @@ func take(item: ItemInstance) -> bool:
 	for s in slots.keys():
 		if slots[s] == item:
 			slots.erase(s)
+			_drop_companion(item)
 			changed.emit()
 			return true
 	return false
+
+
+## The EquipSlot [param item] sits in (-1 = not equipped).
+func slot_of(item: ItemInstance) -> int:
+	for s in slots:
+		if slots[s] == item:
+			return s
+	return -1
+
+
+## Whether [param item] is in an equipment slot (not in the backpack).
+func is_equipped(item: ItemInstance) -> bool:
+	return item != null and slot_of(item) >= 0
+
+
+## The equipped main-hand piece of the pair whose off-hand piece is [param off] (null when
+## [param off] is no equipped off-hand piece).
+func pair_main_of(off: ItemInstance) -> ItemInstance:
+	var main := get_item(Items.EquipSlot.MAIN_HAND)
+	return main if main != null and off != null and main.companion == off else null
+
+
+## A pair's off-hand piece leaves its slot together with [param main] (it stays attached to
+## the main-hand piece as ItemInstance.companion).
+func _drop_companion(main: ItemInstance) -> void:
+	if main == null or main.companion == null:
+		return
+	var s := slot_of(main.companion)
+	if s >= 0:
+		slots.erase(s)
 
 
 func main_weapon() -> WeaponData:

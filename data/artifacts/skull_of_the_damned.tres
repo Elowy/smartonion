@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="ArtifactData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/artifact_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"skull_of_the_damned"
+display_name = "Skull of the Damned"
+flavor = "It is still screaming. You just got used to it."
+slot_type = 11
+armor_type = -1
+rarity = 5
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 14.0,
+&"crit": 7.0,
+&"haste": 7.0
+})
+enchant_ids = Array[StringName]([&"arcane_touched", &"shadowflame"])
+enchant_ranks = Array[int]([1, 1])
+class_restriction = &"warlock"
+sources = Array[StringName]([&"loot"])
+min_wave = 10
+weight = 0.0
+class_id = &"warlock"
+unlock_waves = Array[int]([3, 6])
+properties = Array[Dictionary]([{
+"effects": [{
+"kind": "script",
+"params": {},
+"script": "res://scenes/artifacts/warlock_second_voidwalker.gd"
+}],
+"name": "Bound Soul",
+"text": "A second, permanent pet fights at your side: a Voidwalker that draws the enemies to itself."
+}, {
+"effects": [{
+"kind": "damage",
+"pct": 25.0,
+"source": "pet"
+}, {
+"kind": "script",
+"params": {
+"pct": 10.0
+},
+"script": "res://scenes/artifacts/warlock_pet_leech.gd"
+}],
+"name": "Soul Siphon",
+"text": "Your pets deal 25% more damage, and you heal for 10% of the damage they deal."
+}])
+weapon_color = Color(0.5, 0.92, 0.3, 1)
