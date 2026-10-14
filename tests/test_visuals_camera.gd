@@ -418,6 +418,56 @@ func test_rig_frames_only_living_goblins_while_a_hero_stands() -> void:
 	check(not g.global_position in rig._player_points(), "and the goblin is never a hard framing point")
 
 
+func _boss_in(arena: Arena, pos: Vector3) -> Boss:
+	var b := Boss.create(Db.get_boss(&"lich_commander_morvain"), 10)
+	arena.entities.add_child(b)
+	b.global_position = pos
+	return b
+
+
+func test_rig_frames_a_living_boss_feet_and_height() -> void:
+	var arena := _arena_in_tree()
+	var rig := arena.camera
+	var hero := _player(Vector3(-6, 0, 4))
+	var b := _boss_in(arena, Vector3(10, 0, -8))
+	var raised := b.global_position + Vector3(0.0, 0.0, -b.model.head_height * CameraRig.BOSS_HEIGHT_SHARE)
+	var pts := rig._goblin_points()
+	check_eq(pts.size(), 2, "a living boss adds its feet and one raised point")
+	check(b.global_position in pts, "the feet are framed")
+	check(raised in pts, "so is the point up its height (screen-up is -Z)")
+	check(raised.z < b.global_position.z, "the raised point lies further up the screen")
+	rig.snap()
+	var aspect := rig._aspect()
+	for p: Vector3 in [b.global_position, raised, hero.global_position]:
+		check(_framed(p, rig.focus, rig.distance, aspect),
+			"%s is framed (focus %s, d %.1f)" % [p, rig.focus, rig.distance])
+	check(not b.global_position in rig._player_points(), "the boss is never a hard framing point")
+	check(rig.get_walk_rect(hero).size.x > 1.0e5, "the boss never limits where the hero may walk")
+
+
+func test_rig_frames_no_dead_or_freed_boss_and_none_without_a_standing_hero() -> void:
+	var arena := _arena_in_tree()
+	var rig := arena.camera
+	var hero := _player(Vector3(0, 0, 0))
+	var b := _boss_in(arena, Vector3(8, 0, 3))
+	check_eq(rig._goblin_points().size(), 2, "alive: framed")
+	b.hp = 0.0
+	check(rig._goblin_points().is_empty(), "dead (hp 0): no longer framed")
+	b.hp = b.max_hp
+	check_eq(rig._goblin_points().size(), 2, "alive again: framed")
+	b.queue_free()
+	check(rig._goblin_points().is_empty(), "queued for deletion: no longer framed")
+	check(CameraRig.boss_points(tree.get_nodes_in_group(&"bosses")).is_empty(),
+		"the static helper agrees: a queued boss adds nothing")
+	b.free()
+	check(rig._goblin_points().is_empty(), "freed: nothing left to frame")
+	var b2 := _boss_in(arena, Vector3(8, 0, 3))
+	hero.alive = false
+	check(rig._goblin_points().is_empty(), "nobody stands: the ghosts' framing stays as it was")
+	hero.alive = true
+	check(b2.global_position in rig._goblin_points(), "a hero stands again: the boss is framed")
+
+
 func test_compute_framing_leans_towards_extras_but_keeps_the_players() -> void:
 	var aspect := 1.0
 	var none: Array[Vector3] = []

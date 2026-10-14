@@ -16,12 +16,14 @@ const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
 const Support := preload("res://tests/test_loot_support.gd")
 const DT := 1.0 / 60.0
 
-## The six wallet spenders of M5 (RunState.try_spend_for kinds, architecture "Shared purse").
+## The wallet spenders (RunState.try_spend_for kinds, architecture "Shared purse"): the six of M5
+## and M6a's Enchanter action (&"enchant", whose Dust part is in RunState.dust_spend_log).
 const SPEND_KINDS: Array[StringName] = [&"shop", &"shop_forge", &"shop_reroll", &"trainer",
-	&"level_reroll", &"talent_reset"]
+	&"level_reroll", &"talent_reset", &"enchant"]
 ## Every game script that pays from the wallet (RunState.try_spend_for). A new spender must
 ## log its spends and be added here (and to the spend test below).
 const SPENDER_FILES: Array[String] = [
+	"res://core/items/enchanter.gd",
 	"res://core/progression/trainer.gd",
 	"res://core/shop/shop.gd",
 	"res://core/talents/talent_state.gd",
@@ -476,6 +478,14 @@ func test_the_spend_log_covers_every_spender() -> void:
 	panel.begin(1, 2, 6, RunState.rng)
 	prices.append(panel.reroll_price())
 	check(panel.try_reroll(), "P2 rerolls the cards")
+	# Enchanter action (P1: an Epic ring in the backpack, Dust in the team pile).
+	RunState.add_dust(40, 0, "fixture")
+	var ring := Support.make_armor(40, ClassData.ArmorType.PLATE, 20, Items.Rarity.EPIC, Items.SlotType.RING)
+	ring.enchants.append(EnchantRoll.new(Db.get_enchant(&"mighty"), 0))
+	ring.buy_price = ItemGenerator.price_for(Items.Rarity.EPIC, 6)
+	warrior.equipment.add_to_backpack(ring)
+	prices.append(Enchanter.gold_price(ring))
+	check(Enchanter.perform(warrior.equipment, 0, ring, Enchanter.Action.EMPOWER, 0).ok, "P1 empowers a ring")
 	var kinds: Array[StringName] = []
 	var who: Array[int] = []
 	var amounts: Array[int] = []
@@ -485,14 +495,14 @@ func test_the_spend_log_covers_every_spender() -> void:
 		who.append(int(e["slot"]))
 		amounts.append(int(e["amount"]))
 		total += int(e["amount"])
-	check_eq(kinds, [&"shop", &"shop_reroll", &"shop_forge", &"trainer", &"talent_reset", &"level_reroll"] as Array[StringName],
+	check_eq(kinds, [&"shop", &"shop_reroll", &"shop_forge", &"trainer", &"talent_reset", &"level_reroll", &"enchant"] as Array[StringName],
 		"one entry per spend, in order")
 	var sorted_kinds := kinds.duplicate()
 	sorted_kinds.sort()
 	var expected_kinds := SPEND_KINDS.duplicate()
 	expected_kinds.sort()
 	check_eq(sorted_kinds, expected_kinds, "every spender kind")
-	check_eq(who, [0, -1, 1, 0, 0, 1] as Array[int], "who paid (the reroll: the team)")
+	check_eq(who, [0, -1, 1, 0, 0, 1, 0] as Array[int], "who paid (the reroll: the team)")
 	check_eq(amounts, prices, "what each cost")
 	check_eq(RunState.gold_spent, total, "the run's gold spent")
 	check_eq(gold - RunState.gold, total, "is exactly what left the wallet")

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"elixir_of_fortune"
+display_name = "Elixir of Fortune"
+kind = 0
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"fortune": 25.0
+}
+}])
+base_price = 10
+icon_id = &"elixir_of_fortune"
+description = "Smells of clover and old coins. Better loot and a luckier stall for one wave."

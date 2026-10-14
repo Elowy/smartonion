@@ -170,6 +170,20 @@ func _select(panel: PlayerPanel, tree_short: String, short: String) -> void:
 	check_eq(panel.talents.selected_id, _id(tree_short, short), "selected %s %s" % [tree_short, short])
 
 
+## Talents -> Character: the Enchanter tab (M6a) sits between them, so it takes two RT.
+func _talents_to_character(panel: PlayerPanel, slot: PlayerSlot) -> void:
+	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "RT from Talents: the Enchanter tab")
+	_tap(panel, slot, PlayerInput.Pad.RT)
+
+
+## Character -> Talents (two LT, over the Enchanter tab).
+func _character_to_talents(panel: PlayerPanel, slot: PlayerSlot) -> void:
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "LT from Character: the Enchanter tab")
+	_tap(panel, slot, PlayerInput.Pad.LT)
+
+
 static func _prompt_texts(spec: Array) -> Array[String]:
 	var out: Array[String] = []
 	for pair: Array in spec:
@@ -403,26 +417,26 @@ func test_character_tab_shows_the_talent_stats() -> void:
 		_tap(panel, slot, PlayerInput.Pad.A)
 	check_eq(s.rank_of(t1a), 3, "three points in Deflection")
 	check_near(hero.stats.get_stat(Stats.DODGE), 6.0, 0.001, "the hero has 6% dodge")
-	_tap(panel, slot, PlayerInput.Pad.RT)
+	_talents_to_character(panel, slot)
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "RT: the Character tab")
 	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 6.0), "the stat list shows the talent dodge")
 	# X takes a point back: the Character tab follows.
-	_tap(panel, slot, PlayerInput.Pad.LT)
+	_character_to_talents(panel, slot)
 	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "LT: back to Talents")
 	_tap(panel, slot, PlayerInput.Pad.X)
 	check_eq(s.rank_of(t1a), 2, "one point taken back")
-	_tap(panel, slot, PlayerInput.Pad.RT)
+	_talents_to_character(panel, slot)
 	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 4.0), "after the take-back")
 	# A change while the Character tab is shown (a bot's spending) updates it at once.
 	s.add(t1a)
 	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 6.0), "rebuilt on the change")
 	# The reset: the Character tab follows.
-	_tap(panel, slot, PlayerInput.Pad.LT)
+	_character_to_talents(panel, slot)
 	panel.talents.select_reset()
 	_tap(panel, slot, PlayerInput.Pad.A)
 	_tap(panel, slot, PlayerInput.Pad.A)
 	check_eq(s.points_spent(), 0, "reset")
-	_tap(panel, slot, PlayerInput.Pad.RT)
+	_talents_to_character(panel, slot)
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "the Character tab again")
 	check_eq(_stat_shown(panel, Stats.DODGE), PlayerPanel._stat_text(Stats.DODGE, 0.0), "after the reset")
 
@@ -898,6 +912,10 @@ func test_talent_tab_is_wired_like_the_trainer() -> void:
 	check_eq(tab.context_text(), "Arms · Tier 1", "context text")
 	check_eq(panel._context_label.text, "Arms · Tier 1", "shown by the panel")
 	_tap(panel, slot, PlayerInput.Pad.RT)
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "RT: the Enchanter tab follows the Talents tab (M6a)")
+	_tap(panel, slot, PlayerInput.Pad.RT)
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "RT wraps to the Character tab when nothing is open")
+	_tap(panel, slot, PlayerInput.Pad.LT)
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "LT: the Enchanter tab")
 	_tap(panel, slot, PlayerInput.Pad.LT)
 	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "LT back to Talents")

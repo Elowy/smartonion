@@ -84,7 +84,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var hit := _pulse()
 	var paladin_chest := p.get_chest_position()
 	for hero in heal_targets(ctx):
-		hero.heal(heal_for(ctx, hero, hit))
+		hero.heal(heal_for(ctx, hero, hit), p.slot_index())
 		Vfx.hit_spark(hero.get_chest_position(), PaladinKit.HOLY_COLOR)
 		if hero != p:
 			ProcVfx.beam(paladin_chest, hero.get_chest_position(), PaladinKit.HOLY_COLOR)

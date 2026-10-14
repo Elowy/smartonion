@@ -1286,8 +1286,8 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	panel.close_menu()
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
 	check(panel.active_tab == PlayerPanel.TALENTS_TAB and panel.talents.visible, "the Talents tab opens")
-	# M6: only the Enchanter tab is locked (until the ENCHANTER package opens it).
-	check_eq(PlayerPanel.LOCKED_TABS, [PlayerPanel.ENCHANTER_TAB] as Array[int], "only the Enchanter tab is locked")
+	# M6a: the Enchanter tab is open, so no tab is locked any more.
+	check_eq(PlayerPanel.LOCKED_TABS, [] as Array[int], "no locked tabs")
 
 
 func test_debug_start_tab_opens_p1_on_talents_once() -> void:

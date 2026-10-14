@@ -24,6 +24,9 @@ extends AbilityEffect
 ##   shield_max     ... at most this % of Max HP in the shield (a second Charge tops it up to
 ##                  the cap, not past it) ...
 ##   shield_duration  ... for this many seconds (ProcSystem shield source &"challenging_charge")
+##   shockwave_radius / shockwave_stun  Artifact (Earthsplitter, "Shockwave"; 0 = off): on landing
+##                  a shockwave stuns every enemy within shockwave_radius metres (Area Size
+##                  scales it) for shockwave_stun seconds (not "power"-scaled; a ring effect)
 ## Rank III: +1 charge (charges_add) – two Charges in a row.
 ##
 ## Challenging Charge taunts are released (Enemy.release_taunt – only taunts still aimed at
@@ -77,6 +80,8 @@ var _taunt := 0.0
 var _shield_pct := 0.0
 var _shield_max := 0.0
 var _shield_duration := 0.0
+var _shock_radius := 0.0
+var _shock_stun := 0.0
 var _school: StringName = &"physical"
 var _start := Vector3.ZERO
 var _hit: Dictionary[int, Enemy] = {}
@@ -163,6 +168,8 @@ func cast(ctx: AbilityContext) -> bool:
 	_shield_pct = maxf(0.0, ctx.num("shield_per_enemy"))
 	_shield_max = maxf(0.0, ctx.num("shield_max", 15.0))
 	_shield_duration = maxf(0.0, ctx.num("shield_duration", 5.0))
+	_shock_radius = maxf(0.0, ctx.num("shockwave_radius")) * CombatMath.area_mult(player.stats)
+	_shock_stun = maxf(0.0, ctx.num("shockwave_stun"))
 	_school = ctx.ability.school
 	_hit.clear()
 	_prune_taunted()
@@ -240,11 +247,22 @@ func _arrive(player: Player) -> void:
 	_challenge(player, victims, stunned)
 	_hit.clear()
 	WarriorChargeVfx.spawn(_start, player.global_position, _stun_radius)
+	_shockwave(player)
 	if _buff_damage > 0.0 and _buff_duration > 0.0:
 		player.damage_mults[BUFF_KEY] = 1.0 + _buff_damage / 100.0
 		_buff_left = _buff_duration
 	if _rage_gain > 0.0:
 		WarriorKit.add_rage(player, _rage_gain)
+
+
+## Earthsplitter's "Shockwave": the landing stuns everything within shockwave_radius.
+func _shockwave(player: Player) -> void:
+	if _shock_radius <= 0.0 or _shock_stun <= 0.0:
+		return
+	for e in WarriorKit.enemies_within(player, _shock_radius):
+		if not e.is_dead():
+			e.apply_stun(_shock_stun)
+	WarriorClapVfx.spawn(player.global_position, _shock_radius)
 
 
 ## A new wave starts without a dash or buff.

@@ -88,6 +88,9 @@ const BOT_TRAIN_RESERVE_RARITY := Items.Rarity.UNCOMMON
 ## that neither the offers nor the Trainer could take).
 const BOT_MAX_REROLLS := 3
 const BOT_REROLL_RESERVE_MULT := 2
+## Smoke / demo bots enchant (from wave 12, before they buy) with at most this share of the purse
+## above [method bot_train_reserve]; the rest stays for the offers and the Trainer.
+const BOT_ENCHANT_PURSE_SHARE := 0.3
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -280,7 +283,23 @@ func _start_loot() -> void:
 	phase = Phase.LOOT
 	_market_root.visible = false
 	loot_screen.show()
-	loot_screen.open(RunState.take_team_loot(), PlayerManager.get_slots())
+	var loot := RunState.take_team_loot()
+	_bots_make_room_for_artifacts(loot)
+	loot_screen.open(loot, PlayerManager.get_slots())
+
+
+## Need puts an item into the backpack, so a bot with a full one could not Need an Artifact of its
+## class (GDD 5.5: the biggest drop of the run must not be lost to clutter): before the roll
+## it sells its first non-upgrade item ([method _bot_make_room]) for every such Artifact in
+## [param loot].
+func _bots_make_room_for_artifacts(loot: Array[ItemInstance]) -> void:
+	for item in loot:
+		if item == null or not item.is_artifact():
+			continue
+		for s in PlayerManager.get_slots():
+			var eq := ShopPanel.equipment_of(s) if s.is_bot() else null
+			if eq != null and not eq.has_space() and item.can_be_used_by(s.class_data):
+				_bot_make_room(s, eq)
 
 
 func _on_loot_finished() -> void:
@@ -755,10 +774,11 @@ func _bots_settled() -> bool:
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
 ## Before buying, every bot forges what it can (Forge.bot_forge_all) and wears the results.
-## Then the bots take the Black Market (_bots_black_market) and consumables (_bots_consumables),
-## train (_bots_train), spend their talent points (_bots_talents), enchant (_bots_enchant) and
-## spend what is left over on rerolls (_bots_reroll). The three M6 passes are empty hooks until
-## their packages fill them in.
+## From wave 12 the bots enchant first (_bots_enchant: a slice of the purse above the Trainer
+## reserve, before the offers take the gold). Then they take the Black Market (_bots_black_market)
+## and consumables (_bots_consumables), train (_bots_train), spend their talent points
+## (_bots_talents) and spend what is left over on rerolls (_bots_reroll). The Black Market and
+## consumables passes (M6 SHOPSINKS) draw nothing from RunState.rng.
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -771,34 +791,154 @@ func _bots_shop() -> void:
 			bot_equip_upgrades(s)
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
+	_bots_enchant()
 	_bots_buy(shoppers)
 	_bots_black_market()
 	_bots_consumables()
 	_bots_train()
 	_bots_talents()
-	_bots_enchant()
 	_bots_reroll(shoppers)
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
 			panels[s.index].refresh()
 
 
-## M6 hook (SHOPSINKS): after the item buying pass the bots take the Black Market offer when it
-## is an upgrade for one of them and affordable above the reserve. Returns the offers bought.
+## The Black Market (M6 SHOPSINKS) is bought when the wallet keeps this many times
+## [method bot_train_reserve] afterwards (a Black Market card costs about three Epic offers).
+const BOT_BLACK_MARKET_RESERVE_MULT := 2
+
+
+## After the item buying pass the bots take the Black Market offer when it is an upgrade for one
+## of them (the bot it improves most, ItemTooltip.item_score; slot order breaks ties) and the wallet
+## keeps [constant BOT_BLACK_MARKET_RESERVE_MULT] x [method bot_train_reserve] afterwards. The buyer
+## wears it at once. Draws nothing from RunState.rng. Returns the offers bought (0 or 1).
 func _bots_black_market() -> int:
-	return 0
+	var stall := shop_panel.shop if shop_panel != null else null
+	if stall == null or not shop_panel.has_black_market():
+		return 0
+	var o := stall.black_market
+	if o == null or o.item == null or o.sold:
+		return 0
+	var keep := BOT_BLACK_MARKET_RESERVE_MULT * bot_train_reserve(cleared_wave, _bot_trainees().size())
+	if RunState.gold - o.price < keep:
+		return 0
+	var buyer: PlayerSlot = null
+	var best_gain := -INF
+	for s in PlayerManager.get_slots():
+		var eq := ShopPanel.equipment_of(s)
+		if not s.is_bot() or eq == null or not is_bot_upgrade(o.item, s, eq):
+			continue
+		var gain := ItemTooltip.item_score(o.item, s.class_data) \
+			- ItemTooltip.item_score(ItemTooltip.equipped_for_compare(o.item, eq), s.class_data)
+		if gain > best_gain:
+			best_gain = gain
+			buyer = s
+	if buyer == null:
+		return 0
+	var buyer_eq := ShopPanel.equipment_of(buyer)
+	_bot_make_room(buyer, buyer_eq)
+	var index := shop_panel.black_market_index()
+	shop_panel.set_cursor(buyer.index, index)
+	if not shop_panel.try_buy(buyer, index):
+		return 0
+	bot_equip_upgrades(buyer)
+	return 1
 
 
-## M6 hook (SHOPSINKS): from wave 6 every bot buys one potion and one food when the wallet keeps
-## the reserve. Returns the consumables bought.
+## Bots start buying consumables (M6 SHOPSINKS) in the market after this wave.
+const BOT_CONSUMABLES_FROM_WAVE := 6
+## What a bot takes from the row first: the best potion (damage first), then the best food.
+const BOT_POTION_PRIORITY: Array[StringName] = [
+	&"flask_of_fury", &"elixir_of_ironskin", &"elixir_of_swiftness", &"elixir_of_fortune"]
+const BOT_FOOD_PRIORITY: Array[StringName] = [
+	&"hearty_onion_stew", &"smoked_boar_ribs", &"spiced_onion_rings"]
+
+
+## From wave [constant BOT_CONSUMABLES_FROM_WAVE] on every bot buys one potion and one food for its
+## own hero (the best of each kind the row offers, BOT_POTION_PRIORITY / BOT_FOOD_PRIORITY) while
+## the wallet keeps [method bot_train_reserve] afterwards. The stock is unlimited and the choice
+## does not depend on the bot, so all bots take the SAME best potion and the SAME best food (the
+## wallet, not the row, limits how many of them can pay). A hero that already holds a pending one
+## of that kind buys no more. Draws nothing from RunState.rng. Returns the consumables bought.
 func _bots_consumables() -> int:
-	return 0
+	var stall := shop_panel.shop if shop_panel != null else null
+	if stall == null or cleared_wave < BOT_CONSUMABLES_FROM_WAVE or stall.consumables.is_empty():
+		return 0
+	var reserve := bot_train_reserve(cleared_wave, _bot_trainees().size())
+	var total := 0
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if not s.is_bot() or hero == null or not is_instance_valid(hero):
+			continue
+		for kind in [ConsumableData.Kind.POTION, ConsumableData.Kind.FOOD]:
+			if Consumables.of_kind(hero.consumables_pending, kind) != null:
+				continue
+			var row_index := bot_consumable_choice(stall, kind)
+			if row_index < 0:
+				continue
+			var card := stall.consumables[row_index]
+			if RunState.gold - card.price < reserve:
+				continue
+			var index := shop_panel.offer_count() + row_index
+			shop_panel.set_cursor(s.index, index)
+			if shop_panel.try_buy(s, index):
+				total += 1
+	return total
 
 
-## M6 hook (ENCHANTER): from wave 12 the bots spend Gold and Dust at the Enchanter on their best
-## weapon when the wallet keeps its reserve. Returns the actions done.
+## Row index of the consumable of [param kind] a bot takes (by the priority lists; -1 = the row
+## has none of that kind).
+static func bot_consumable_choice(p_shop: Shop, kind: ConsumableData.Kind) -> int:
+	if p_shop == null:
+		return -1
+	var order: Array[StringName] = BOT_POTION_PRIORITY if kind == ConsumableData.Kind.POTION else BOT_FOOD_PRIORITY
+	var best := -1
+	var best_rank := order.size()
+	for i in p_shop.consumables.size():
+		var c := p_shop.consumables[i]
+		if c == null or c.data == null or c.data.kind != kind:
+			continue
+		var rank := order.find(c.data.id)
+		if rank < 0:
+			rank = order.size() - 1  # unknown (modded) data: after the listed ones
+		if rank < best_rank or best < 0:
+			best = i
+			best_rank = rank
+	return best
+
+
+## M6 (ENCHANTER): from wave 12 on (the market after it, [constant Enchanter.BOT_FIRST_WAVE]) every
+## bot enchants its best weapon (Enchanter.bot_enchant: Reroll an enchant its class cannot use, else
+## Imbue, else Empower the lowest rank). It runs before the buying pass of [method _bots_shop] with
+## [constant BOT_ENCHANT_PURSE_SHARE] of the gold above [method bot_train_reserve]
+## ([method bot_enchant_budget]), shared out evenly over the bots in slot order like the Trainer's
+## (what a bot leaves unspent stays for the others), and pays the Dust by disenchanting its spare
+## backpack items (bots never Pass in a loot roll, so that is their only Dust). Returns the actions
+## done. No RNG except the Enchanter's own Reroll / Imbue picks (RunState.rng).
 func _bots_enchant() -> int:
-	return 0
+	if cleared_wave < Enchanter.BOT_FIRST_WAVE:
+		return 0
+	var smiths: Array[PlayerSlot] = []
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.equipment != null:
+			smiths.append(s)
+	var pot := bot_enchant_budget(RunState.gold, bot_train_reserve(cleared_wave, smiths.size()))
+	var total := 0
+	for k in smiths.size():
+		var share := floori(float(pot) / float(smiths.size() - k))
+		if share <= 0:
+			break
+		var gold_before := RunState.gold
+		total += Enchanter.bot_enchant(smiths[k], share)
+		pot -= gold_before - RunState.gold
+	return total
+
+
+## Gold the bots may spend on enchanting this round: [constant BOT_ENCHANT_PURSE_SHARE] of the
+## purse [param p_gold] above [param reserve] (0 at or below the reserve).
+static func bot_enchant_budget(p_gold: int, reserve: int) -> int:
+	return floori(maxi(0, p_gold - reserve) * BOT_ENCHANT_PURSE_SHARE)
 
 
 ## The buying passes of [method _bots_shop] over [param p_shoppers] (the list is not changed).
@@ -876,7 +1016,9 @@ func _bot_trainees() -> Array[PlayerSlot]:
 ## and pays it alone, then they all go through the offers again (_bots_buy). At most
 ## [constant BOT_MAX_REROLLS] a round, each only while the wallet keeps
 ## [constant BOT_REROLL_RESERVE_MULT] x [method bot_train_reserve] after paying, and never
-## while a human votes on rerolls (Shop.reroll_cost, RunState.rng). Returns the rerolls bought.
+## while a human votes on rerolls (Shop.reroll_cost, RunState.rng). A reroll also redraws the
+## Black Market offer, which the bots look at again after each one (_bots_black_market). Returns the
+## rerolls bought.
 func _bots_reroll(shoppers: Array[PlayerSlot]) -> int:
 	var stall := shop_panel.shop if shop_panel != null else null
 	if stall == null or shoppers.is_empty() or not shop_panel.voter_indices().is_empty():
@@ -893,6 +1035,7 @@ func _bots_reroll(shoppers: Array[PlayerSlot]) -> int:
 		n += 1
 		bot_rerolled.emit(voter.index, cost)
 		_bots_buy(shoppers)
+		_bots_black_market()  # the reroll redrew the Black Market offer too
 	return n
 
 
@@ -971,7 +1114,7 @@ func _bot_make_room(s: PlayerSlot, eq: Equipment) -> void:
 	if eq.has_space():
 		return
 	for item in eq.backpack:
-		if not is_bot_upgrade(item, s, eq) and eq.remove_from_backpack(item):
+		if item.can_sell() and not is_bot_upgrade(item, s, eq) and eq.remove_from_backpack(item):
 			RunState.add_gold(item.sell_value())
 			return
 
@@ -1025,6 +1168,9 @@ static func drop_shop_pings(shop: Shop, slot_index: int) -> void:
 		var o := shop.offers[i]
 		if o != null and not o.sold and o.pinged_by.has(slot_index):
 			shop.toggle_ping(i, slot_index)
+	var bm := shop.black_market
+	if bm != null and not bm.sold and bm.pinged_by.has(slot_index):
+		shop.toggle_ping(Shop.BLACK_MARKET, slot_index)
 
 
 func _continue() -> void:

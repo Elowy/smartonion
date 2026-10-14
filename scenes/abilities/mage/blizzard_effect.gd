@@ -19,6 +19,9 @@ extends AbilityEffect
 ##     not frozen yet ([method MageFrozen.is_frozen], group order) rolls
 ##     RunState.rng.randf() * 100 < tick_freeze_chance and is frozen for tick_freeze s. These
 ##     are the effect's only RNG draws, made only while the chance is above 0.
+## Artifact hook (Staff of the Frostwyrm, "Frostwyrm's Breath"): nth_cast (0 = off) /
+## nth_radius_bonus (1.0 = +100%): every nth Blizzard of this Mage (a cast that landed; the
+## count is the effect's, it runs through waves) has its radius multiplied by 1 + nth_radius_bonus.
 ## Only casts with one of them get a [Storm] record (numbers copied from the cast's context,
 ## never the context itself), counted down in [method tick]; the centre / radius follow the
 ## area while it exists (Wandering Storm moves it). Kit effects do not tick while the Mage is
@@ -63,6 +66,8 @@ var tick_freezes := 0
 
 ## Instance id of the Mage whose downed_changed is connected (0 = none yet).
 var _downed_hooked_id := 0
+## Blizzards cast while the nth_cast hook was on (Frostwyrm's Breath).
+var _nth_casts := 0
 
 
 func can_cast(ctx: AbilityContext) -> bool:
@@ -74,11 +79,17 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var follow := ctx.flag("follow")
 	var center := ctx.target.global_position if follow else cluster_center(ctx)
-	var area := AbilityArea.spawn(ctx.player, center, ctx.num("radius", DEFAULT_RADIUS),
-			ctx.num("duration", DEFAULT_DURATION), AREA_COLOR)
+	var radius := ctx.num("radius", DEFAULT_RADIUS)
+	var nth := roundi(ctx.num("nth_cast"))
+	var big := nth > 0 and (_nth_casts + 1) % nth == 0
+	if big:
+		radius *= 1.0 + maxf(0.0, ctx.num("nth_radius_bonus"))
+	var area := AbilityArea.spawn(ctx.player, center, radius, ctx.num("duration", DEFAULT_DURATION), AREA_COLOR)
 	if not area.is_inside_tree():
 		area.free()
 		return false
+	if nth > 0:
+		_nth_casts += 1
 	area.school = FROST
 	area.tick_interval = maxf(0.05, ctx.num("tick", DEFAULT_TICK))
 	area.damage_per_tick = tick_damage(ctx)

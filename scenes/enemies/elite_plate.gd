@@ -94,14 +94,19 @@ var bar_width := BAR_SIZE.x
 var _shown_hp := -1.0
 var _shown_shield := -1.0
 var _tinted := false
+## Only the gem, the bubble and the tint (see [method create]).
+var compact := false
 
 
 ## Builds the look of [param p_enemy] (an elite with its model already set up); add it as
-## the enemy's child.
-static func create(p_enemy: Enemy) -> ElitePlate:
+## the enemy's child. [param p_compact] (the lite affixes of the elite wave 20, where every enemy
+## has one): no name, bar or wings – only the affix gem above the head, the shield bubble and the
+## Enraged tint – so a hundred of them stay cheap.
+static func create(p_enemy: Enemy, p_compact: bool = false) -> ElitePlate:
 	var p := ElitePlate.new()
 	p.name = "ElitePlate"
 	p.enemy = p_enemy
+	p.compact = p_compact
 	p._build()
 	p.refresh()
 	return p
@@ -122,7 +127,8 @@ func refresh() -> void:
 	if not is_equal_approx(hp, _shown_hp) or not is_equal_approx(shield, _shown_shield):
 		_shown_hp = hp
 		_shown_shield = shield
-		_update_bar()
+		if not compact:
+			_update_bar()
 	bubble.visible = enemy.shield_hp > 0.0 and not enemy.is_dead()
 	if enemy.is_enraged() and not _tinted:
 		_tint_model()
@@ -153,6 +159,11 @@ func _build() -> void:
 	plate.name = "Plate"
 	plate.position = Vector3(0.0, head + LIFT, 0.0)
 	add_child(plate)
+
+	if compact:
+		_gem = _sprite("Gem", gem_texture(EliteAffixes.color_of(enemy.elite_affix)), PIXEL, PRIORITY + 4)
+		_build_bubble(head)
+		return
 
 	var text := EliteAffixes.display_name(enemy.elite_affix,
 			enemy.data.display_name if enemy.data != null else "")
@@ -208,6 +219,10 @@ func _build() -> void:
 		w.offset = Vector2(left * ss, (BAR_Y - WING_ROOT_INSET.y) * ss)
 		_wings.append(w)
 
+	_build_bubble(head)
+
+
+func _build_bubble(head: float) -> void:
 	bubble = MeshInstance3D.new()
 	bubble.name = "ShieldBubble"
 	bubble.mesh = MeshKit.cached("elite:bubble", func() -> Mesh:

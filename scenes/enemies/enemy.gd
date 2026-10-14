@@ -14,6 +14,16 @@ extends CharacterBody3D
 ##            data.attack_cooldown between lunges.
 ##   RANGED – keep data.preferred_distance, strafe a little, and every data.attack_cooldown
 ##            throw an axe (Projectile, TEAM_ENEMIES) after a short wind-up.
+##   SUPPORT – (M6, Cultist Acolyte) keep data.support_distance_min..max from the nearest hero,
+##            stay near the other enemies, and every data.attack_cooldown channel for
+##            data.support_channel seconds ([SupportBeam]) on the most hurt enemy within
+##            data.support_range: heal it (data.support_heal_pct of its max HP), or when
+##            nobody is hurt shield the strongest one ([method apply_support_shield]). A stun,
+##            a knockback, fear or a taunt interrupts the channel.
+##   BRUTE  – (M6, Flesh Golem) walk at the target like CHASE, and every data.attack_cooldown
+##            show a hook line ([HookLine]) for data.hook_telegraph seconds, then hook the
+##            first hero still in it ([method Player.take_hook]: damage, a Dodge avoids all of
+##            it, and a pull of data.hook_pull metres towards the golem).
 ## With no living player the enemy wanders. Touching a living player (distance <=
 ## radius + Player.RADIUS) deals contact damage, at most once per CONTACT_COOLDOWN.
 ## Damage taken by the enemy is recorded by the attacker side (WeaponRunner / ProcSystem); the
@@ -45,7 +55,9 @@ extends CharacterBody3D
 
 signal died(enemy: Enemy, killer_index: int)
 
-enum AiState { MOVE, WINDUP, LEAP, THROW_WINDUP }
+enum AiState { MOVE, WINDUP, LEAP, THROW_WINDUP, CHANNEL, HOOK }
+## What a SUPPORT channel does to its target.
+enum SupportAction { NONE, HEAL, SHIELD }
 
 const COLLISION_LAYER_ENEMIES := 1 << 2
 ## Enemies collide with the world only (crowd separation: [EnemyGrid]).
@@ -116,10 +128,41 @@ const HEAL_TEXT_SIZE := 0.7
 const ABSORB_TEXT_COLOR := Color(0.62, 0.86, 1.0)
 const ABSORB_TEXT_SIZE := 0.7
 const ABSORB_TEXT_INTERVAL := 0.3
+## An Acolyte's shield: the text over the shielded enemy.
+const SHIELD_TEXT_COLOR := Color(0.74, 0.56, 1.0)
 ## Enraged elites: the "Enrage!" text when it triggers.
 const ENRAGE_TEXT_COLOR := Color(1.0, 0.32, 0.22)
 ## State timers end this close to zero (keeps frame counts exact despite float error).
 const TIMER_EPSILON := 0.0001
+
+## SUPPORT: seconds between two target searches while the channel is ready but nobody needs
+## help / the target is out of reach (the search is a grid query).
+const SUPPORT_RESCAN := 0.25
+## SUPPORT: the "herd" it stays with is the centre of the other enemies within this many
+## metres, refreshed this often (s); within HERD_CLOSE m of it the Acolyte stops closing in.
+const SUPPORT_HERD_RADIUS := 10.0
+const SUPPORT_HERD_RESCAN := 0.4
+const SUPPORT_HERD_CLOSE := 2.5
+## SUPPORT: a running channel holds while the target stays within range + this (m).
+const SUPPORT_LEASH := 1.5
+## SUPPORT: share of attack_cooldown that is left after an interrupted channel, and the pause
+## (s) after the target was lost.
+const SUPPORT_INTERRUPT_RATIO := 0.5
+const SUPPORT_RETRY := 0.5
+## SUPPORT: heights (m) the beam leaves the staff at / lands on the target.
+const SUPPORT_BEAM_FROM := 1.1
+const SUPPORT_BEAM_TO := 0.6
+## SUPPORT: a wall closer than this (m, beyond the radius) deflects the retreat.
+const SUPPORT_WALL_MARGIN := 1.2
+## SUPPORT: speed share while it only drifts towards the herd inside its distance band.
+const SUPPORT_DRIFT_RATIO := 0.8
+## BRUTE: the aim of the hook line follows the hero until this last fraction of the telegraph,
+## then it is locked (the hero has the first part to see it, the rest to sidestep).
+const HOOK_AIM_LOCK := 0.4
+## BRUTE: a hero this much beyond the hook range (m) along the line is still hit.
+const HOOK_REACH_SLACK := 0.5
+## BRUTE: the pull stops this far (m) short of touching the golem.
+const HOOK_STOP_GAP := 0.1
 
 var data: EnemyData
 var wave := 1
@@ -160,6 +203,9 @@ var knockback_velocity := Vector3.ZERO
 
 ## Elite affix (one of EliteAffixes.ALL) or &"" for a normal enemy ([method make_elite]).
 var elite_affix: StringName = &""
+## A "lite" affix (M6, the elite wave 20): the affix effect and look, HP x EliteAffixes.LITE_HP_MULT,
+## but no elite stat block, rewards or elite targeting ([method make_elite] with lite = true).
+var elite_lite := false
 ## Shielding elites: absorb shield left (drained before HP; regrows, see EliteAffixes).
 var shield_hp := 0.0
 ## Per-enemy multipliers (elite affixes): walking speed, contact / lunge / throw cooldowns,
@@ -200,6 +246,24 @@ var _enraged := false
 ## Vampiric: the heroes whose damage_taken this elite listens to (untyped: entries may be
 ## freed heroes, never copied into a Player-typed variable before is_instance_valid).
 var _vampiric_heroes: Array = []
+
+## SUPPORT: the enemy of the running channel and what it gets (SupportAction), the beam, the
+## seconds until the next target search / herd scan and the herd's centre (valid while
+## [member _herd_valid]).
+var _support_target: Enemy
+var _support_action := SupportAction.NONE
+var _support_beam: SupportBeam
+var _support_scan_left := 0.0
+var _herd_scan_left := 0.0
+var _herd_pos := Vector3.ZERO
+var _herd_valid := false
+## The violet bubble of a normal enemy that has been shielded (null before / for elites).
+var _support_bubble: SupportShield
+## BRUTE: how many hooks this enemy has started (bots tell hooks apart by it), the hero the
+## running hook line follows and the line (a child).
+var hook_serial := 0
+var _hook_target: Player
+var _hook_line: HookLine
 
 # Open-field fast path (see OPEN_FIELD_MARGIN): the collider-free interior of this tick.
 static var _open_frame := -1
@@ -245,9 +309,12 @@ static func setup(e: Enemy, p_data: EnemyData, p_wave: int) -> Enemy:
 	e._weave_phase = rng.randf() * TAU
 	e._strafe_sign = 1.0 if rng.randf() < 0.5 else -1.0
 	e._strafe_left = rng.randf_range(STRAFE_SWITCH_MIN, STRAFE_SWITCH_MAX)
-	if p_data.behavior == EnemyData.Behavior.RANGED:
-		# Do not throw the moment it arrives; stagger the throws of a group.
+	if p_data.behavior == EnemyData.Behavior.RANGED or p_data.behavior == EnemyData.Behavior.SUPPORT \
+			or p_data.behavior == EnemyData.Behavior.BRUTE:
+		# Do not throw / channel / hook the moment it arrives; stagger a group.
 		e.attack_cooldown_left = p_data.attack_cooldown * rng.randf_range(0.5, 1.0)
+	if p_data.priority_target:
+		e.add_to_group(&"priority_targets")
 
 	var shape := CollisionShape3D.new()
 	shape.name = "Shape"
@@ -288,7 +355,7 @@ func is_stunned() -> bool:
 ## choice and other targeting. Rewards never key on it (the Loot Goblin overrides it with
 ## true and must not get elite rewards – see [method _death_loot]).
 func is_elite() -> bool:
-	return elite_affix != &"" or is_boss()
+	return (elite_affix != &"" and not elite_lite) or is_boss()
 
 
 ## An Enraged elite that has raged (at or below EliteAffixes.ENRAGE_HP_RATIO, once): more
@@ -359,6 +426,8 @@ func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 		var resist := clampf(data.knockback_resist, 0.0, 1.0) if data != null else 0.0
 		var push := Vector3(knockback.x, 0.0, knockback.z) * KNOCKBACK_VELOCITY_PER_UNIT * (1.0 - resist)
 		knockback_velocity = (knockback_velocity + push).limit_length(MAX_KNOCKBACK_SPEED)
+		if ai_state == AiState.CHANNEL and push != Vector3.ZERO:
+			_cancel_special()  # a knockback breaks an Acolyte's channel
 	if model != null:
 		model.flash_hit()
 	if hp <= 0.0:
@@ -391,6 +460,7 @@ func apply_fear(duration: float, from: Vector3) -> void:
 	fear_left = maxf(fear_left, d)
 	_fear_from = Vector3(from.x, 0.0, from.z)
 	if ai_state != AiState.MOVE:
+		_cancel_special()
 		ai_state = AiState.MOVE
 		state_left = 0.0
 
@@ -406,6 +476,7 @@ func apply_taunt(target: Node3D, duration: float) -> void:
 		return
 	taunt_target = target
 	taunt_left = maxf(taunt_left, duration)
+	_cancel_special()  # chasing the taunter: no channel / hook meanwhile
 
 
 func is_taunted() -> bool:
@@ -474,7 +545,9 @@ func apply_stun(duration: float) -> void:
 	stun_left = maxf(stun_left, d)
 	_move_velocity = Vector3.ZERO
 	if ai_state != AiState.MOVE:
-		# A stun interrupts a wind-up / lunge; the attack comes back sooner than usual.
+		# A stun interrupts a wind-up / lunge / channel / hook; the attack comes back sooner
+		# than usual.
+		_cancel_special()
 		ai_state = AiState.MOVE
 		state_left = 0.0
 		if data != null:
@@ -500,21 +573,27 @@ func despawn() -> void:
 ## PlayerManager's slots right here (heroes that join later are not connected – there is no
 ## drop-in during a wave). Draws nothing from the rng. An enemy is made elite at most once;
 ## an unknown affix is an error.
-func make_elite(affix: StringName) -> void:
+## [param lite] (the elite wave 20, GDD 8): only the affix – its effect and a compact plate
+## (no name, bar or wings) – with HP ×[constant EliteAffixes.LITE_HP_MULT], the normal size, the
+## normal rewards ([method _death_loot]) and no elite targeting ([method is_elite]).
+func make_elite(affix: StringName, lite: bool = false) -> void:
 	if elite_affix != &"" or is_dead():
 		return
 	if affix not in EliteAffixes.ALL:
 		push_error("Enemy.make_elite: unknown affix '%s'" % affix)
 		return
 	elite_affix = affix
-	max_hp *= EliteAffixes.HP_MULT
-	hp *= EliteAffixes.HP_MULT
-	radius *= EliteAffixes.MODEL_SCALE
+	elite_lite = lite
+	var hp_mult := EliteAffixes.LITE_HP_MULT if lite else EliteAffixes.HP_MULT
+	var size_mult := 1.0 if lite else EliteAffixes.MODEL_SCALE
+	max_hp *= hp_mult
+	hp *= hp_mult
+	radius *= size_mult
 	var shape := get_node_or_null(^"Shape") as CollisionShape3D
 	if shape != null and shape.shape is SphereShape3D:
 		(shape.shape as SphereShape3D).radius = radius
 	if model != null:
-		model.scale = Vector3.ONE * EliteAffixes.MODEL_SCALE
+		model.scale = Vector3.ONE * size_mult
 	match affix:
 		EliteAffixes.SHIELDING:
 			_raise_shield()
@@ -524,7 +603,7 @@ func make_elite(affix: StringName) -> void:
 			attack_cooldown_left *= EliteAffixes.FRENZY_COOLDOWN_MULT
 		EliteAffixes.VAMPIRIC:
 			_connect_vampiric()
-	elite_plate = ElitePlate.create(self)
+	elite_plate = ElitePlate.create(self, lite)
 	add_child(elite_plate)
 	EnemyGrid.mark_dirty()  # the radius changed
 
@@ -552,7 +631,9 @@ func _absorb(amount: float) -> float:
 	shield_hp -= absorbed
 	if shield_hp <= 0.0001:
 		shield_hp = 0.0
-		_shield_regrow_left = EliteAffixes.SHIELD_REGROW
+		if elite_affix == EliteAffixes.SHIELDING:
+			# Only the Shielding affix regrows; an Acolyte's shield is gone for good.
+			_shield_regrow_left = EliteAffixes.SHIELD_REGROW
 	if absorbed > 0.0 and _age - _absorb_text_at >= ABSORB_TEXT_INTERVAL:
 		_absorb_text_at = _age
 		var pos := global_position if is_inside_tree() else position
@@ -739,6 +820,7 @@ func _think(delta: float, here: Vector3, feared: bool) -> void:
 		_update_lunge(delta, here)
 	elif _target == null:
 		if ai_state != AiState.MOVE:
+			_cancel_special()
 			ai_state = AiState.MOVE
 			state_left = 0.0
 		_update_wander(delta)
@@ -756,17 +838,397 @@ func _think(delta: float, here: Vector3, feared: bool) -> void:
 				_update_chase(delta, here)
 
 
-## The SUPPORT behaviour's AI step (Cultist Acolyte, M6 ENEMIES): same contract as the other
-## behaviours – a target exists, set the desired walking velocity. Until a package overrides it
-## (a subclass, or this body) it walks like CHASE.
+## The SUPPORT behaviour's AI step (Cultist Acolyte, GDD 8): same contract as the other
+## behaviours – a target exists, set the desired walking velocity. A running channel stands
+## still ([method _update_channel]); otherwise it keeps its distance from the nearest hero and
+## stays with the herd ([method _update_support_move]) and, once attack_cooldown is over and
+## somebody within data.support_range needs it, starts the next channel.
 func _think_support(delta: float, here: Vector3) -> void:
-	_update_chase(delta, here)
+	if ai_state == AiState.CHANNEL:
+		_update_channel(delta, here)
+		return
+	_update_support_move(delta, here)
+	_support_scan_left -= delta
+	if attack_cooldown_left > 0.0 or _support_scan_left > 0.0:
+		return
+	_support_scan_left = SUPPORT_RESCAN
+	_start_channel(here)
 
 
-## The BRUTE behaviour's AI step (Flesh Golem, M6 ENEMIES); falls back to CHASE like
-## [method _think_support].
+## The BRUTE behaviour's AI step (Flesh Golem, GDD 8): the hook telegraph ([method _update_hook])
+## stands still; otherwise it walks at the target like CHASE and, once attack_cooldown is over
+## and a hero is within the hook band, starts the next hook ([method _start_hook]).
 func _think_brute(delta: float, here: Vector3) -> void:
+	if ai_state == AiState.HOOK:
+		_update_hook(delta, here)
+		return
 	_update_chase(delta, here)
+	if attack_cooldown_left <= 0.0:
+		_start_hook(here)
+
+
+## Whether bots (and anything else that picks targets) go for this enemy first: an Acolyte
+## ([member EnemyData.priority_target], GDD 8 "elsődleges célpont"). Dead enemies are none.
+func is_priority_target() -> bool:
+	return data != null and data.priority_target and not is_dead()
+
+
+## While this enemy telegraphs a hook ([constant AiState.HOOK]) and [param pos] (XZ) is inside
+## the line (widened by [param margin] m): the unit direction that leaves the line fastest
+## (sideways, to the side [param pos] is already on), else [constant Vector3.ZERO]. Bots use
+## it to sidestep the Flesh Golem's hook.
+func hook_escape_dir(pos: Vector3, margin: float = 0.0) -> Vector3:
+	if ai_state != AiState.HOOK or data == null:
+		return Vector3.ZERO
+	var rel := WeaponRunner.flat(pos - global_position)
+	var along := rel.dot(_aim_dir)
+	if along < 0.0 or along > data.hook_range_max + HOOK_REACH_SLACK:
+		return Vector3.ZERO
+	var side := Vector3(-_aim_dir.z, 0.0, _aim_dir.x)
+	var offset := rel.dot(side)
+	if absf(offset) > HookLine.HALF_WIDTH + margin:
+		return Vector3.ZERO
+	return side * (-1.0 if offset < 0.0 else 1.0)
+
+
+# --- Support (Cultist Acolyte) --------------------------------------------------------
+
+## Keeps data.support_distance_min..max from the nearest hero: backs off inside the minimum
+## (along the walls, never into them), closes in beyond the maximum (towards the herd when
+## that is nearer to the hero, else towards the hero) and in between drifts to the herd (the
+## other enemies around it) unless that would be inside the minimum.
+func _update_support_move(delta: float, here: Vector3) -> void:
+	var dir := _dir_to_target(here)
+	var dist := sqrt(_target_dist_sq)
+	var speed := walk_speed()
+	_herd_scan_left -= delta
+	if _herd_scan_left <= 0.0:
+		_herd_scan_left = SUPPORT_HERD_RESCAN
+		_scan_herd(here)
+	var desired := Vector3.ZERO
+	if dist < data.support_distance_min:
+		desired = _retreat_direction(dir, here) * speed
+	elif dist > data.support_distance_max:
+		var goal := _target_pos
+		if _herd_valid and WeaponRunner.flat(_herd_pos - _target_pos).length_squared() < _target_dist_sq:
+			goal = _herd_pos
+		var to := WeaponRunner.flat(goal - here)
+		if to.length_squared() > 0.0001:
+			desired = to.normalized() * speed
+	elif _herd_valid:
+		var to_herd := WeaponRunner.flat(_herd_pos - here)
+		var herd_to_hero_sq := WeaponRunner.flat(_herd_pos - _target_pos).length_squared()
+		if to_herd.length_squared() > SUPPORT_HERD_CLOSE * SUPPORT_HERD_CLOSE \
+				and herd_to_hero_sq >= data.support_distance_min * data.support_distance_min:
+			desired = to_herd.normalized() * speed * SUPPORT_DRIFT_RATIO
+	_steer(desired, delta)
+	_facing = dir
+
+
+## The unit direction to back away from a hero that is [param to_hero] (unit) away: straight
+## back, with the components that push into a wall removed; boxed in a corner it runs along a
+## wall instead (the side that keeps the most room).
+func _retreat_direction(to_hero: Vector3, here: Vector3) -> Vector3:
+	var away := -to_hero
+	var arena := Arena.current
+	if arena == null or not is_instance_valid(arena):
+		return away
+	var bounds := arena.get_bounds()
+	var margin := radius + SUPPORT_WALL_MARGIN
+	var perp := Vector3(-away.z, 0.0, away.x) * _strafe_sign
+	var best := Vector3.ZERO
+	var best_score := 0.0
+	for cand: Vector3 in [away, perp, -perp]:
+		var c := cand
+		if (here.x < bounds.position.x + margin and c.x < 0.0) or (here.x > bounds.end.x - margin and c.x > 0.0):
+			c.x = 0.0
+		if (here.z < bounds.position.y + margin and c.z < 0.0) or (here.z > bounds.end.y - margin and c.z > 0.0):
+			c.z = 0.0
+		var len := c.length()
+		if len < 0.0001:
+			continue
+		var score := len * (0.6 + 0.4 * (c / len).dot(away))
+		if score > best_score + 0.0001:
+			best_score = score
+			best = c / len
+	return best
+
+
+## The centre of the other enemies (not Acolytes, not the Loot Goblin) within SUPPORT_HERD_RADIUS.
+func _scan_herd(here: Vector3) -> void:
+	_herd_valid = false
+	var sum := Vector3.ZERO
+	var n := 0
+	var r_sq := SUPPORT_HERD_RADIUS * SUPPORT_HERD_RADIUS
+	for node in EnemyGrid.gather_around(get_tree(), here, SUPPORT_HERD_RADIUS):
+		var e := node as Enemy
+		if e == null or not _is_cult_ally(e) or e.data.behavior == EnemyData.Behavior.SUPPORT:
+			continue
+		var p := e.global_position
+		var dx := p.x - here.x
+		var dz := p.z - here.z
+		if dx * dx + dz * dz > r_sq:
+			continue
+		sum += Vector3(p.x, 0.0, p.z)
+		n += 1
+	if n > 0:
+		_herd_pos = sum / float(n)
+		_herd_valid = true
+
+
+## Whether [param e] is one of the enemies an Acolyte helps: any living enemy but itself and
+## the Loot Goblin (a treasure runner, not part of the cult).
+func _is_cult_ally(e: Enemy) -> bool:
+	return e != self and e.data != null and not e.is_dead() and not e.is_in_group(&"loot_goblins")
+
+
+## Who the next channel is for: the most hurt enemy (lowest HP share) within
+## data.support_range -> [constant SupportAction.HEAL]; with nobody hurt, the strongest one
+## (highest max HP) whose shield is below data.support_shield_pct of its max HP ->
+## [constant SupportAction.SHIELD]; null (and [member _support_action] NONE) when nobody needs
+## anything. Ties go to the first in group order. A boss is never healed (it would be the
+## most hurt one every time), only shielded: the shield tops up to 20%, it never stacks.
+func _pick_support_target(here: Vector3) -> Enemy:
+	_support_action = SupportAction.NONE
+	var range_sq := data.support_range * data.support_range
+	var hurt: Enemy = null
+	var hurt_ratio := INF
+	var strong: Enemy = null
+	var strong_hp := -INF
+	for node in EnemyGrid.gather_around(get_tree(), here, data.support_range):
+		var e := node as Enemy
+		if e == null or not _is_cult_ally(e):
+			continue
+		var p := e.global_position
+		var dx := p.x - here.x
+		var dz := p.z - here.z
+		if dx * dx + dz * dz > range_sq:
+			continue
+		if e.hp < e.max_hp - 0.001 and not e.is_boss():
+			var ratio := e.hp / e.max_hp
+			if ratio < hurt_ratio:
+				hurt_ratio = ratio
+				hurt = e
+		if e.shield_hp < e.max_hp * data.support_shield_pct - 0.001 and e.max_hp > strong_hp:
+			strong_hp = e.max_hp
+			strong = e
+	if hurt != null:
+		_support_action = SupportAction.HEAL
+		return hurt
+	if strong != null and data.support_shield_pct > 0.0:
+		_support_action = SupportAction.SHIELD
+		return strong
+	return null
+
+
+## Starts a channel on whoever [method _pick_support_target] finds (nothing: no channel).
+func _start_channel(here: Vector3) -> void:
+	var target := _pick_support_target(here)
+	if target == null:
+		return
+	_support_target = target
+	ai_state = AiState.CHANNEL
+	state_left = data.support_channel
+	_move_velocity = Vector3.ZERO
+	_support_beam = SupportBeam.create(SupportBeam.HEAL_COLOR if _support_action == SupportAction.HEAL
+			else SupportBeam.SHIELD_COLOR)
+	add_child(_support_beam)
+	_aim_beam(here)
+	if model != null:
+		model.play_channel()
+
+
+## One tick of a running channel: stand still, face and beam the target, and complete after
+## data.support_channel seconds. A target that died / left the reach ends it early.
+func _update_channel(delta: float, here: Vector3) -> void:
+	_move_velocity = Vector3.ZERO
+	var target := _support_target
+	var reach := data.support_range + SUPPORT_LEASH
+	if target == null or not is_instance_valid(target) or target.is_dead() \
+			or not target.is_inside_tree() \
+			or WeaponRunner.flat(target.global_position - here).length_squared() > reach * reach:
+		_cancel_special(0.0)
+		attack_cooldown_left = maxf(attack_cooldown_left, SUPPORT_RETRY)
+		return
+	var to := WeaponRunner.flat(target.global_position - here)
+	if to.length_squared() > 0.0001:
+		_facing = to.normalized()
+	_aim_beam(here)
+	state_left -= delta
+	if state_left <= TIMER_EPSILON:
+		_finish_channel()
+
+
+func _aim_beam(here: Vector3) -> void:
+	if _support_beam == null or not is_instance_valid(_support_beam) or _support_target == null:
+		return
+	_support_beam.set_ends(here + Vector3.UP * SUPPORT_BEAM_FROM,
+			_support_target.global_position + Vector3.UP * SUPPORT_BEAM_TO)
+
+
+## The channel ran its time: heal / shield the target, then wait attack_cooldown.
+func _finish_channel() -> void:
+	var target := _support_target
+	var action := _support_action
+	_clear_channel()
+	ai_state = AiState.MOVE
+	state_left = 0.0
+	attack_cooldown_left = attack_cooldown()
+	if model != null:
+		model.play_attack()
+	if target == null or not is_instance_valid(target) or target.is_dead():
+		return
+	var spot := target.global_position + Vector3.UP * SUPPORT_BEAM_TO
+	match action:
+		SupportAction.HEAL:
+			target.heal(target.max_hp * data.support_heal_pct)
+			Vfx.hit_spark(spot, SupportBeam.HEAL_COLOR)
+		SupportAction.SHIELD:
+			if target.apply_support_shield(data.support_shield_pct):
+				Vfx.floating_text(spot + Vector3.UP * 0.5, "Shield", SHIELD_TEXT_COLOR, ABSORB_TEXT_SIZE)
+			Vfx.hit_spark(spot, SupportBeam.SHIELD_COLOR)
+
+
+## Gives this enemy an absorb shield of [param pct] (a fraction) of its max HP – never more
+## than that: a bigger shield stays, a smaller one is refreshed up to it (no stacking). A
+## normal enemy gets a violet bubble ([SupportShield]); elites show it on their plate.
+## Returns whether the shield grew.
+func apply_support_shield(pct: float) -> bool:
+	if is_dead() or pct <= 0.0:
+		return false
+	var goal := max_hp * pct
+	if shield_hp >= goal - 0.0001:
+		return false
+	shield_hp = goal
+	if elite_plate == null and _support_bubble == null and model != null:
+		_support_bubble = SupportShield.create(self)
+		add_child(_support_bubble)
+	return true
+
+
+func _clear_channel() -> void:
+	if _support_beam != null and is_instance_valid(_support_beam):
+		_support_beam.queue_free()
+	_support_beam = null
+	_support_target = null
+	_support_action = SupportAction.NONE
+
+
+## Ends a running Acolyte channel or Golem hook telegraph early (stun, knockback, fear, taunt,
+## no target, lost target): the beam / line goes, the model's tell stops and the next one
+## comes after [param cooldown_ratio] of attack_cooldown (SUPPORT_INTERRUPT_RATIO: sooner than
+## usual). Does nothing in any other state.
+func _cancel_special(cooldown_ratio: float = SUPPORT_INTERRUPT_RATIO) -> void:
+	if ai_state != AiState.CHANNEL and ai_state != AiState.HOOK:
+		return
+	ai_state = AiState.MOVE
+	state_left = 0.0
+	_clear_channel()
+	_clear_hook()
+	if model != null:
+		model.cancel_windup()
+	if data != null:
+		attack_cooldown_left = maxf(attack_cooldown_left, attack_cooldown() * cooldown_ratio)
+
+
+# --- Brute (Flesh Golem) --------------------------------------------------------------
+
+## Starts the hook telegraph on the nearest visible living hero whose distance is within
+## data.hook_range_min..max (nothing: no hook, it checks again next tick). The line starts
+## aimed at that hero; the aim follows it until the last HOOK_AIM_LOCK of the telegraph.
+func _start_hook(here: Vector3) -> void:
+	var best: Player = null
+	var best_d := INF
+	for i in LivingPlayers.count:
+		if LivingPlayers.stealthed[i] != 0:
+			continue
+		var dx := LivingPlayers.pos_x[i] - here.x
+		var dz := LivingPlayers.pos_z[i] - here.z
+		var d := sqrt(dx * dx + dz * dz)
+		if d < data.hook_range_min or d > data.hook_range_max or d >= best_d:
+			continue
+		if not is_living_player(LivingPlayers.players[i]):
+			continue
+		best_d = d
+		best = LivingPlayers.players[i]
+	if best == null:
+		return
+	_hook_target = best
+	hook_serial += 1
+	ai_state = AiState.HOOK
+	state_left = data.hook_telegraph
+	_aim_dir = WeaponRunner.flat(best.global_position - here).normalized()
+	_facing = _aim_dir
+	_move_velocity = Vector3.ZERO
+	_hook_line = HookLine.create(_aim_dir, data.hook_range_max + HOOK_REACH_SLACK)
+	add_child(_hook_line)
+	if model != null:
+		model.play_windup()
+
+
+## One tick of the hook telegraph: stand still, turn the line after the hero until the aim
+## locks, run the countdown fill, fire at zero.
+func _update_hook(delta: float, here: Vector3) -> void:
+	state_left -= delta
+	_move_velocity = Vector3.ZERO
+	var total := maxf(data.hook_telegraph, TIMER_EPSILON)
+	if state_left > total * HOOK_AIM_LOCK and is_living_player(_hook_target):
+		var to := WeaponRunner.flat(_hook_target.global_position - here)
+		if to.length_squared() > 0.0001:
+			_aim_dir = to.normalized()
+	_facing = _aim_dir
+	if _hook_line != null and is_instance_valid(_hook_line):
+		_hook_line.set_aim(_aim_dir)
+		_hook_line.set_progress(1.0 - state_left / total)
+	if state_left <= TIMER_EPSILON:
+		_fire_hook(here)
+
+
+## The telegraph ran out: the chain flies out along the (locked) line and hooks the FIRST
+## visible living hero whose centre is still inside it (within data.hook_range_max, plus
+## HOOK_REACH_SLACK, of the golem and HookLine.HALF_WIDTH of the line):
+## [method Player.take_hook] with 1 x contact damage (hook_damage_ratio) – a Dodge avoids all
+## of it – then the pull of data.hook_pull metres (less when the hero is nearer than that to
+## touching the golem). Nobody in the line: the hook whiffs. Either way the next one is
+## attack_cooldown away.
+func _fire_hook(here: Vector3) -> void:
+	var line := _hook_line
+	_hook_line = null
+	_hook_target = null
+	ai_state = AiState.MOVE
+	state_left = 0.0
+	attack_cooldown_left = attack_cooldown()
+	var reach := data.hook_range_max + HOOK_REACH_SLACK
+	var victim: Player = null
+	var victim_along := INF
+	for p in cached_players(get_tree()):
+		if not is_living_player(p) or p.is_stealthed():
+			continue
+		var rel := WeaponRunner.flat(p.global_position - here)
+		var along := rel.dot(_aim_dir)
+		if along < 0.0 or along > reach or along >= victim_along:
+			continue
+		if absf(rel.x * _aim_dir.z - rel.z * _aim_dir.x) > HookLine.HALF_WIDTH:
+			continue
+		victim = p
+		victim_along = along
+	if line != null and is_instance_valid(line):
+		line.play_strike(victim_along if victim != null else reach)
+	if model != null:
+		model.play_attack()
+	if victim == null:
+		return
+	var gap := WeaponRunner.flat(here - victim.global_position).length() - (radius + Player.RADIUS) - HOOK_STOP_GAP
+	victim.take_hook(contact_damage * damage_mult * data.hook_damage_ratio, here,
+			clampf(gap, 0.0, data.hook_pull), self)
+	LivingPlayers.mark_dirty()
+
+
+func _clear_hook() -> void:
+	if _hook_line != null and is_instance_valid(_hook_line):
+		_hook_line.queue_free()
+	_hook_line = null
+	_hook_target = null
 
 
 ## Finds the nearest living player and deals contact damage to the first one touched.
@@ -1053,12 +1515,22 @@ func _die(attacker: Node3D) -> void:
 	queue_free()
 
 
-## Virtual (M6): what this enemy leaves behind when it dies – the Plague Ghoul's poison puddle.
-## Called from [method _die] after the loot, while the enemy is still in the tree (its
-## [code]global_position[/code] is the place of death) and before it leaves the world. Empty
-## here; a subclass overrides it.
+## Virtual (M6): what this enemy leaves behind when it dies. Called from [method _die] after the
+## loot, while the enemy is still in the tree (its [code]global_position[/code] is the place of
+## death) and before it leaves the world; not on a wave-end despawn. Data-driven by
+## [member EnemyData.death_effect]: &"poison_puddle" (Plague Ghoul) puts a [PoisonPuddle] of
+## data.death_radius / death_duration / death_tick_interval where it fell, hurting heroes by
+## data.death_damage_ratio × this enemy's contact damage (wave, party size and elite affix
+## included) per tick. Others do nothing; a subclass may override.
 func _on_death_effect() -> void:
-	pass
+	if data == null:
+		return
+	match data.death_effect:
+		&"poison_puddle":
+			var pos := global_position if is_inside_tree() else position
+			PoisonPuddle.spawn(_world_parent(), pos, data.death_radius, data.death_duration,
+					data.death_tick_interval, contact_damage * damage_mult * data.death_damage_ratio,
+					data.death_color)
 
 
 ## What a death leaves at [param pos]: the gold / XP pickup and the item drop roll (GDD 10.1 –
@@ -1070,7 +1542,7 @@ func _on_death_effect() -> void:
 ## follows. Subclasses with their own rewards (the Loot Goblin) replace it.
 func _death_loot(pos: Vector3, attacker: Node3D) -> void:
 	var killer: Node3D = attacker if attacker != null and is_instance_valid(attacker) else null
-	if elite_affix != &"":
+	if elite_affix != &"" and not elite_lite:
 		_drop_pickup(pos, EliteAffixes.GOLD, (data.xp if data != null else 0) * EliteAffixes.XP_MULT)
 		LootDrops.drop_special(ItemGenerator.Source.ELITE, self, killer)
 		var killer_player := killer as Player
@@ -1107,6 +1579,8 @@ func _leave_world() -> void:
 	_disconnect_vampiric()
 	if is_in_group(&"enemies"):
 		remove_from_group(&"enemies")
+	if is_in_group(&"priority_targets"):
+		remove_from_group(&"priority_targets")
 	collision_layer = 0
 	collision_mask = 0
 	velocity = Vector3.ZERO

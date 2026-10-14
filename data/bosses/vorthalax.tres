@@ -1,0 +1,70 @@
+[gd_resource type="Resource" script_class="BossData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://data/boss_data.gd" id="1_boss"]
+[ext_resource type="Script" path="res://data/boss_ability.gd" id="2_ability"]
+
+[sub_resource type="Resource" id="Resource_fire_fields"]
+script = ExtResource("2_ability")
+id = &"fire_fields"
+display_name = "Fire Fields"
+kind = 3
+interval = 8.0
+telegraph = 1.0
+radius = 2.0
+damage_mult = 1.0
+count = 2
+count_p2 = 3
+duration = 8.0
+tick_interval = 1.0
+
+[sub_resource type="Resource" id="Resource_meteor"]
+script = ExtResource("2_ability")
+id = &"meteor"
+display_name = "Meteor"
+kind = 4
+interval = 14.0
+interval_p2 = 10.0
+telegraph = 3.0
+radius = 3.0
+damage_mult = 8.0
+fallback_damage_mult = 4.0
+
+[sub_resource type="Resource" id="Resource_imp_swarm"]
+script = ExtResource("2_ability")
+id = &"imp_swarm"
+display_name = "Imp Swarm"
+kind = 2
+interval = 20.0
+count = 6
+summon_id = &"candlekin"
+
+[resource]
+script = ExtResource("1_boss")
+id = &"vorthalax"
+display_name = "Vor'thalax, the Burning Tyrant"
+behavior = 0
+is_boss = true
+max_hp = 450.0
+contact_damage = 4.0
+move_speed = 2.0
+radius = 1.1
+knockback_resist = 1.0
+first_wave = 25
+spawn_weight = 0.0
+gold = 0
+xp = 60
+model_style = &"demon"
+color = Color(0.52, 0.12, 0.1, 1)
+model_scale = 2.3
+boss_wave = 25
+intro = "Vor'thalax, the Burning Tyrant"
+phase_hp_ratio = 0.5
+phase_cooldown_mult = 1.0
+abilities = Array[ExtResource("2_ability")]([SubResource("Resource_fire_fields"), SubResource("Resource_meteor"), SubResource("Resource_imp_swarm")])
+coop_hp_per_player = 0.75
+enrage_time = 90.0
+enrage_damage_mult = 1.5
+enrage_speed_mult = 1.3
+enrage_step_time = 30.0
+enrage_step_damage = 0.25
+reward_gold = 50

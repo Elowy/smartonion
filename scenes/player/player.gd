@@ -41,6 +41,9 @@ signal wave_began
 ## End of [method end_wave] (the wave's buffs are gone, the market follows): M6 per-wave extras
 ## (artifact growth, consumables clear, …).
 signal wave_ended
+## The hero's consumables changed (bought in the market, applied at the wave start, gone at its
+## end – [member consumables_pending] / [member consumables_active]); the unit frame's icons.
+signal consumables_changed
 
 const RADIUS := 0.45
 ## Height (metres) where projectiles / damage numbers originate.
@@ -59,6 +62,8 @@ const REVIVE_SPEED_PER_EXTRA_REVIVER := 0.5
 const GHOST_SLOW_PCT := 33.0
 const GHOST_SLOW_LINGER := 0.1
 const INVULNERABLE_AFTER_HIT := 0.35
+## Seconds a hook's pull ([method pull_toward]) takes (the Flesh Golem drags a hero in fast).
+const PULL_TIME := 0.22
 
 ## Collision capsule height (the onion is ~1.3 m tall).
 const BODY_HEIGHT := 1.2
@@ -164,6 +169,14 @@ var damage_taken_mults: Dictionary[StringName, float] = {}
 ## Callables returning true to survive a lethal hit at 1 HP (Cheat Death, Last Stand ...);
 ## tried before the item cheat-death procs, which are limited (usually once per wave).
 var death_guards: Array[Callable] = []
+## Percent of the damage this hero's pets deal that heals the hero (Skull of the Damned,
+## warlock_pet_leech.gd; ProcSystem.deal_raw with source &"pet"). 0 = off.
+var pet_leech_pct := 0.0
+## Consumables (M6 SHOPSINKS, [Consumables]): bought in the market, applied by the next wave start
+## (at most one potion + one food) ...
+var consumables_pending: Array[ConsumableData] = []
+## ... and in effect during this wave (gone when it ends).
+var consumables_active: Array[ConsumableData] = []
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -174,6 +187,11 @@ var _attack_look_left := 0.0
 var _text_side := 1.0
 ## XP Gain fraction carried to this hero's next pickup (see xp_with_gain).
 var _xp_carry := 0.0
+## A pull in progress ([method pull_toward], the Flesh Golem's hook): the unit direction, the
+## metres still to go and the speed (m/s).
+var _pull_dir := Vector3.ZERO
+var _pull_left := 0.0
+var _pull_speed := 0.0
 
 
 ## Creates and configures a player for [param p_slot]. Not yet in the tree.
@@ -211,11 +229,14 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.talents = TalentState.create(p.class_data.id if p.class_data != null else &"")
 	p.talents.changed.connect(p._on_talents_changed)
 	p.bonuses.changed.connect(p._on_bonuses_changed)
+	p.wave_began.connect(p._on_wave_began_consumables)
+	p.wave_ended.connect(p._on_wave_ended_consumables)
 	p.abilities.ability_cast.connect(p._on_ability_cast)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons()
 	p.apply_equipment()
 	p.equipment.changed.connect(p.apply_equipment)
+	p.wave_ended.connect(p._on_wave_ended_artifacts)
 	# "P1" nameplate marker above the head (also marks whose ghost it is).
 	p.model.set_tag(p_slot.label() if p_slot != null else "")
 	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
@@ -239,6 +260,16 @@ func max_hp() -> float:
 
 func is_alive() -> bool:
 	return not downed
+
+
+## This hero's slot index, the id the damage meter credits (RunState.record_*); -1 without a slot.
+func slot_index() -> int:
+	return slot.index if slot != null else -1
+
+
+## [method slot_index] of [param p] (-1 for null or a freed hero) – for callers that may hold none.
+static func slot_index_of(p: Player) -> int:
+	return p.slot_index() if p != null and is_instance_valid(p) else -1
 
 
 ## Hidden from enemies (Vanish): still collects pickups and can be healed / revived.
@@ -347,9 +378,11 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		_avoided(&"parry", valid_source)
 		return
 	var amount := raw
+	var blocked := false
 	var block := block_chance()
 	if block > 0.0 and CombatMath.roll_block(block, rng):
 		amount *= 1.0 - CombatMath.block_absorb(stats.get_raw(Stats.BLOCK_VALUE))
+		blocked = true
 		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
 		# Both a full and a partial block count as blocked.
 		_avoided(&"block", valid_source)
@@ -357,11 +390,11 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			invulnerable_left = INVULNERABLE_AFTER_HIT
 			_thorns(attacker, kind)
 			return
-	var dmg := CombatMath.incoming_damage(amount, stats, kind)
-	for m: float in damage_taken_mults.values():
-		dmg *= maxf(0.0, m)
-	if bonuses != null:
-		dmg *= bonuses.damage_taken_mult(kind, valid_source)
+	var dmg := _mitigated(amount, kind, valid_source)
+	if blocked:
+		# What the block saved (the hit without it minus the hit with it) counts as absorbed
+		# (damage meter).
+		RunState.record_absorb(slot_index(), _mitigated(raw, kind, valid_source) - dmg)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
@@ -371,7 +404,10 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			return
 	if dmg >= hp and _prevent_death():
 		dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
+	var hp_before := hp
 	hp = maxf(0.0, hp - dmg)
+	# The damage meter counts the HP the hit really took (no overkill).
+	RunState.record_damage_taken(slot_index(), hp_before - hp)
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:
 		Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
@@ -391,10 +427,24 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		procs.on_struck(valid_source, dmg)
 
 
+## The damage a hit of [param amount] (after dodge / parry / block) does once armour, Versatility,
+## Avoidance, the temporary multipliers and the talent / set entries are applied (before the
+## absorb shields). Pure: take_damage calls it once, and a second time for the unblocked hit
+## when a block happened (the damage meter's "absorbed by block").
+func _mitigated(amount: float, kind: StringName, valid_source: Node3D) -> float:
+	var dmg := CombatMath.incoming_damage(amount, stats, kind)
+	for m: float in damage_taken_mults.values():
+		dmg *= maxf(0.0, m)
+	if bonuses != null:
+		dmg *= bonuses.damage_taken_mult(kind, valid_source)
+	return dmg
+
+
 ## Heals this hero by [param amount] (clamped to max HP; nothing while downed).
-## [param _source_slot] = the slot index of the healer (-1 = unknown / self-sourced): M6's damage
-## meter will credit the effective healing to it (METER package; nothing is recorded yet).
-func heal(amount: float, _source_slot: int = -1) -> void:
+## [param source_slot] = the slot index of the healer (-1 = self-sourced: regen, Leech, a self
+## heal): the damage meter credits the effective healing (the HP really gained, after the max-HP
+## clamp) to it.
+func heal(amount: float, source_slot: int = -1) -> void:
 	if downed or amount <= 0.0:
 		return
 	var before := hp
@@ -402,9 +452,27 @@ func heal(amount: float, _source_slot: int = -1) -> void:
 	var gained := hp - before
 	if gained <= 0.0:
 		return
+	RunState.record_heal(source_slot if source_slot >= 0 else slot_index(), gained)
 	_text_side = -_text_side
 	Vfx.floating_text(self_text_position(_text_side), "+" + _format_amount(gained), HEAL_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	_hp_updated()
+
+
+## Raises HP by [param amount] (clamped to Max HP) without it being a heal: no number, nothing
+## for the damage meter. For the HP a Max HP bonus adds at the wave start (consumables).
+func fill_hp(amount: float) -> void:
+	if downed or amount <= 0.0:
+		return
+	hp = minf(max_hp(), hp + amount)
+	_hp_updated()
+
+
+func _on_wave_began_consumables() -> void:
+	Consumables.apply(self)
+
+
+func _on_wave_ended_consumables() -> void:
+	Consumables.clear(self)
 
 
 ## Called by this player's weapons after each successful hit (leech, on-hit procs). Proc
@@ -476,11 +544,24 @@ func apply_equipment() -> void:
 	var procs_refreshed := false
 	if bonuses != null:
 		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
+		# Awake properties of an equipped Artifact (M6): an own source, so a set change never
+		# touches them. (Skipped without Artifacts: no extra rebuild for ordinary gear.)
+		var artifact_effects := Artifacts.effects_for(equipment)
+		if not artifact_effects.is_empty() or not bonuses.effects_of(Artifacts.SOURCE).is_empty():
+			procs_refreshed = bonuses.set_effects(Artifacts.SOURCE, artifact_effects) or procs_refreshed
 	if procs != null and not procs_refreshed:
 		procs.refresh()
 	refresh_armor_spec()
 	if abilities != null:
 		abilities.invalidate_params()  # item ability mods
+
+
+## Wave ended (wave_ended): every Artifact this hero holds – equipped or in the backpack – grows
+## (Artifacts.grow: +3 Item Level, +4% weapon damage, one more wave end held). The equipment is
+## re-applied when one grew: its properties may have awakened (apply_equipment).
+func _on_wave_ended_artifacts() -> void:
+	if equipment != null and Artifacts.grow(equipment) > 0:
+		equipment.changed.emit()
 
 
 ## Armor Specialization (GDD 5.3): +10% of the primary stat with every other source in place
@@ -605,11 +686,10 @@ static func _merge_mods(out: Dictionary, mods: Dictionary) -> void:
 			out[key] = v
 
 
-## Revives a downed player at [param hp_ratio] of max HP (min 1 HP). [param _reviver_slots] =
+## Revives a downed player at [param hp_ratio] of max HP (min 1 HP). [param reviver_slots] =
 ## the slot indices of the teammates who revived this hero (empty = nobody: the wave start, the
-## Spirit Healer, the smoke runner): M6's damage meter will credit them (METER package;
-## nothing is recorded yet).
-func revive(hp_ratio: float = REVIVE_HP_RATIO, _reviver_slots: Array[int] = []) -> void:
+## Spirit Healer, the smoke runner): the damage meter credits every one of them with a revive.
+func revive(hp_ratio: float = REVIVE_HP_RATIO, reviver_slots: Array[int] = []) -> void:
 	if not downed:
 		return
 	downed = false
@@ -628,6 +708,11 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO, _reviver_slots: Array[int] = []) 
 		model.set_revive_progress(0.0)
 		model.set_downed(false)
 	_hp_updated()
+	var credited: Array[int] = []
+	for r in reviver_slots:
+		if r >= 0 and r not in credited:
+			credited.append(r)
+			RunState.record_revive(r)
 	downed_changed.emit(false)
 
 
@@ -719,7 +804,7 @@ func _update_movement(delta: float) -> void:
 	var rate := ACCELERATION if move.length() > MOVE_DEADZONE else DECELERATION
 	velocity = Vector3(velocity.x, 0.0, velocity.z).move_toward(target, rate * delta)
 	var arena := Arena.current if is_inside_tree() else null
-	var motion := velocity * delta + _separation_motion(delta)
+	var motion := velocity * delta + _separation_motion(delta) + _pull_motion(delta)
 	if arena != null:
 		motion = _clamp_motion_to_arena(arena, motion)
 	# Shared screen (GDD 13): the screen edge of the fully zoomed-out camera is a wall.
@@ -749,6 +834,60 @@ func _update_movement(delta: float) -> void:
 			look = _attack_look_dir
 		model.set_facing(look)
 		model.set_moving(clampf(velocity.length() / maxf(0.01, max_speed), 0.0, 1.0))
+
+
+## An enemy's HOOK (M6, the Flesh Golem): the hit is rolled like any attack (kind
+## [constant CombatMath.KIND_PROJECTILE], ONE Dodge roll – a Dodge avoids the damage and the
+## pull alike; invulnerability, Divine Shield, Charge ... too) and, when it lands, drags this
+## hero [param distance] metres towards [param toward] ([method pull_toward]). Returns whether
+## the hook landed (also when it brought the hero down). A dodged hit leaves no
+## invulnerability behind, every other outcome does ([constant INVULNERABLE_AFTER_HIT]):
+## that tells the two apart without a second roll.
+func take_hook(raw: float, toward: Vector3, distance: float, source: Node3D = null) -> bool:
+	if downed or invulnerable_left > 0.0 or raw <= 0.0:
+		return false
+	take_damage(raw, CombatMath.KIND_PROJECTILE, source)
+	if not downed and invulnerable_left <= 0.0:
+		return false  # dodged
+	pull_toward(toward, distance)
+	return true
+
+
+## Drags this hero up to [param distance] metres in a straight line towards [param point] (XZ),
+## spread over [param duration] seconds, through the normal movement step (so walls and the
+## screen edge still stop it, and the hero's own input still applies). A new pull replaces the
+## running one. Returns the distance it will cover (0 when downed, already at the point or
+## distance <= 0).
+func pull_toward(point: Vector3, distance: float, duration: float = PULL_TIME) -> float:
+	if downed or distance <= 0.0 or duration <= 0.0:
+		return 0.0
+	var here := global_position if is_inside_tree() else position
+	var to := Vector3(point.x - here.x, 0.0, point.z - here.z)
+	var gap := to.length()
+	if gap < 0.01:
+		return 0.0
+	var d := minf(distance, gap)
+	_pull_dir = to / gap
+	_pull_left = d
+	_pull_speed = d / duration
+	return d
+
+
+## True while a pull ([method pull_toward]) is still dragging this hero.
+func is_pulled() -> bool:
+	return _pull_left > 0.0
+
+
+## This tick's share of the running pull (zero without one; a downed hero loses it).
+func _pull_motion(delta: float) -> Vector3:
+	if _pull_left <= 0.0:
+		return Vector3.ZERO
+	if downed:
+		_pull_left = 0.0
+		return Vector3.ZERO
+	var step := minf(_pull_speed * delta, _pull_left)
+	_pull_left -= step
+	return _pull_dir * step
 
 
 ## Gentle push away from teammates standing (almost) on the same spot (see
@@ -893,7 +1032,10 @@ func _update_revive(delta: float) -> void:
 		model.set_revive_progress(ratio, color, seconds)
 	if revive_progress >= REVIVE_TIME - 0.0001:
 		var feet := global_position
-		revive(REVIVE_HP_RATIO)
+		var reviver_slots: Array[int] = []
+		for r in revivers:
+			reviver_slots.append(r.slot_index())
+		revive(REVIVE_HP_RATIO, reviver_slots)
 		Vfx.resurrect_column(feet)
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
 
@@ -964,6 +1106,7 @@ func _update_channelers(revivers: Array[Player]) -> void:
 
 func _go_down() -> void:
 	downed = true
+	RunState.record_down(slot_index())
 	revive_progress = 0.0
 	reviver_count = 0
 	_regen_accum = 0.0

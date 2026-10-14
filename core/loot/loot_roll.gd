@@ -3,7 +3,9 @@ extends RefCounted
 ## One item's Need / Greed / Pass roll (GDD 10.1).
 ## Need: only if the class can use it and the backpack has room; Need beats Greed; highest
 ## 1-100 roll wins, ties re-roll among the tied. Need -> winner's backpack. Greed (no Need) ->
-## sold at Items.GREED_SHARE into the shared wallet. All Pass -> item is lost.
+## sold at Items.GREED_SHARE into the shared wallet. All Pass -> the item is disenchanted into
+## team Arcane Dust (M6 Enchanter.disenchant_lost_item: Common 1 .. Legendary 16; an Artifact is
+## lost as before).
 ##
 ## Flow: create(item) -> choose(slot, choice) per player (UNDECIDED counts as Pass) ->
 ## resolve(rng) -> apply(slots). resolve / apply each work once.
@@ -25,6 +27,8 @@ var rolls: Dictionary[int, int] = {}
 var winner := -1
 ## &"need", &"greed" or &"pass" after resolve().
 var outcome: StringName
+## Arcane Dust the item became (outcome &"pass", set by apply(); 0 otherwise or for an Artifact).
+var dust := 0
 ## Every roll in order, including tie-break rounds: {"slot": int, "roll": int, "round": int}
 ## (round 0 = the first roll) - for the "P2 rolls 87 (Need)" message lines.
 var roll_history: Array[Dictionary] = []
@@ -102,7 +106,8 @@ func resolve(rng: RandomNumberGenerator) -> void:
 		outcome = &"pass"
 
 
-## Applies the outcome: Need -> backpack, Greed -> RunState.add_gold(item.greed_value()).
+## Applies the outcome: Need -> backpack, Greed -> RunState.add_gold(item.greed_value()),
+## Pass (everybody) -> the item's Dust into RunState.arcane_dust ([member dust]).
 func apply(slots: Array[PlayerSlot]) -> void:
 	if not _resolved or _applied or item == null:
 		return
@@ -118,6 +123,8 @@ func apply(slots: Array[PlayerSlot]) -> void:
 				_sell()
 		&"greed":
 			_sell()
+		&"pass":
+			dust = Enchanter.disenchant_lost_item(item)
 
 
 ## What a bot picks: Need if it can use the item, has room and the item is an upgrade, else
@@ -131,6 +138,7 @@ static func bot_choice(slot: PlayerSlot, p_item: ItemInstance) -> Choice:
 	var equipment := _equipment_of(slot)
 	if equipment == null or not equipment.has_space() or not equipment.can_equip(p_item):
 		return Choice.GREED
+	# An Artifact of the bot's class is always worth a Need (upgrade_direction says so too).
 	var current := ItemTooltip.equipped_for_compare(p_item, equipment)
 	if ItemTooltip.upgrade_direction(p_item, current, slot.class_data, equipment) > 0:
 		return Choice.NEED

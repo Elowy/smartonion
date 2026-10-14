@@ -225,6 +225,102 @@ func test_solo_take_sell_leave() -> void:
 	check_eq(finishes, 1, "done")
 
 
+## M6: a real LootRoll everybody passed on is disenchanted; the result line says how much Dust.
+func test_a_passed_item_becomes_dust_and_the_line_says_so() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null  # the screen builds a plain LootRoll
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	var items := _open(2)
+	items[0].rarity = Items.Rarity.EPIC
+	items[1].rarity = Items.Rarity.EPIC
+	_settle()
+	_tap(a, PlayerInput.Pad.B)
+	check_eq(screen.result_text, "Disenchanted [%s] into 8 Dust" % items[0].display_name, "solo leave")
+	check_eq(RunState.arcane_dust, 8, "into the team pile")
+	check(screen.result_label.text.contains("8 Dust"), "the result label shows the Dust: %s" % screen.result_label.text)
+	_step(LootRollScreen.RESULT_TIME + 0.01)
+	_settle()
+	_tap(a, PlayerInput.Pad.A)
+	check_eq(RunState.arcane_dust, 8, "taking an item makes no Dust")
+
+
+func test_everybody_passing_in_a_party_disenchants_too() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	var b := MarketFakes.human_with_hero(world, "pad:b", &"mage")
+	var items := _open(1)
+	items[0].rarity = Items.Rarity.RARE
+	_settle()
+	_tap(a, PlayerInput.Pad.B)
+	_tap(b, PlayerInput.Pad.B)
+	check_eq(screen.result_text, "Everyone passed on [%s] – disenchanted into 4 Dust" % items[0].display_name, "party pass")
+	check_eq(RunState.arcane_dust, 4, "Rare = 4")
+
+
+## Every Label's text below [param node] (the prompt row / the chips).
+func _texts(node: Node) -> Array[String]:
+	var out: Array[String] = []
+	if node is Label:
+		out.append((node as Label).text)
+	for c in node.get_children():
+		out.append_array(_texts(c))
+	return out
+
+
+func test_pass_label_texts() -> void:
+	var epic := MarketFakes.make_item("E", Items.SlotType.NECK, Items.NO_ARMOR, Items.Rarity.EPIC)
+	var artifact := MarketFakes.make_item("A", Items.SlotType.NECK, Items.NO_ARMOR, Items.Rarity.ARTIFACT)
+	check_eq(LootRollScreen.pass_label(true, epic), "Disenchant (8 Dust)", "solo: the Dust is named")
+	check_eq(LootRollScreen.pass_label(true, artifact), "Leave", "solo Artifact: nothing to disenchant")
+	check_eq(LootRollScreen.pass_label(true, null), "Leave", "solo, no item")
+	check_eq(LootRollScreen.pass_label(false, epic), "Pass (all pass: 8 Dust)", "party: all-pass hint")
+	check_eq(LootRollScreen.pass_label(false, artifact), "Pass", "party Artifact: plain Pass")
+	check_eq(LootRollScreen.pass_label(false, null), "Pass", "party, no item")
+
+
+func test_the_solo_b_prompt_follows_the_item() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null
+	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	var items := _items(3)
+	items[0].rarity = Items.Rarity.EPIC
+	items[1].rarity = Items.Rarity.ARTIFACT
+	items[2].rarity = Items.Rarity.UNCOMMON
+	screen.open(items, PlayerManager.get_slots())
+	_settle()
+	var prompt := _texts(screen._legend)
+	check("Disenchant (8 Dust)" in prompt, "the Epic: %s" % [prompt])
+	check(not ("Leave" in prompt), "no Leave for a Dust item")
+	_tap(a, PlayerInput.Pad.B)
+	check(_texts(screen.chips_row).has("Disenchant"), "the chip says what B did: %s" % [_texts(screen.chips_row)])
+	_step(LootRollScreen.RESULT_TIME + 0.01)
+	_settle()
+	prompt = _texts(screen._legend)
+	check("Leave" in prompt, "the Artifact keeps Leave: %s" % [prompt])
+	check(not ("Disenchant (8 Dust)" in prompt), "and no stale Dust text")
+	_tap(a, PlayerInput.Pad.B)
+	check(_texts(screen.chips_row).has("Leave"), "the Artifact chip says Leave: %s" % [_texts(screen.chips_row)])
+	_step(LootRollScreen.RESULT_TIME + 0.01)
+	_settle()
+	prompt = _texts(screen._legend)
+	check("Disenchant (2 Dust)" in prompt, "the Uncommon: %s" % [prompt])
+
+
+func test_the_party_pass_prompt_hints_at_dust() -> void:
+	screen.make_roll = func(_item: ItemInstance) -> LootRoll:
+		return null
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	MarketFakes.human_with_hero(world, "pad:b", &"mage")
+	var items := _items(1)
+	items[0].rarity = Items.Rarity.RARE
+	screen.open(items, PlayerManager.get_slots())
+	_settle()
+	var prompt := _texts(screen._legend)
+	check("Pass (all pass: 4 Dust)" in prompt, "party prompt: %s" % [prompt])
+	check(not ("Leave" in prompt), "no solo text in a party")
+
+
 func test_statistics_are_counted_once() -> void:
 	var a := MarketFakes.human_with_hero(world, "pad:a", &"warrior")
 	var b := MarketFakes.human_with_hero(world, "pad:b", &"mage")

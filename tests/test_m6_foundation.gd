@@ -2,8 +2,9 @@ extends TestCase
 ## M6 P0 foundation hooks (behaviour-neutral): the Arcane Dust wallet, the damage-meter
 ## recorders, the run clock, the boss kind of record_special_kill, the SUPPORT / BRUTE AI
 ## dispatch and death-effect virtuals of Enemy, EnemyData.is_boss / BossData, the Db boss and
-## consumable dirs, ConsumableData, the locked Enchanter tab, the optional parameters of
-## Player.heal / revive, the LootDrops.roll_artifact stub, the Shop / Intermission hooks, the new
+## consumable dirs, ConsumableData, the Enchanter tab's wiring, the optional parameters of
+## Player.heal / revive, the LootDrops.roll_artifact wiring (the ARTIFACTS package made the roll
+## real: its behaviour is tested in test_m6_artifacts_*), the Shop / Intermission hooks, the new
 ## SMOKE_RESULT keys and the --boss-hp / --artifact-chance launch flags.
 
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -254,6 +255,7 @@ func test_start_run_resets_everything_new() -> void:
 	RunState.record_down(0)
 	RunState.tick_run_time(12.0)
 	RunState.record_special_kill(&"boss", 0)
+	RunState.record_hero_result(0, true)
 	RunState.artifacts_dropped = 2
 	RunState.consumables_bought = 3
 	RunState.black_market_bought = 1
@@ -271,7 +273,8 @@ func test_start_run_resets_everything_new() -> void:
 	check(RunState.dust_spend_log.is_empty() and RunState.dust_gain_log.is_empty(), "dust logs")
 	check(RunState.healing_by_player.is_empty() and RunState.absorbed_by_player.is_empty()
 			and RunState.damage_taken_by_player.is_empty() and RunState.revives_by_player.is_empty()
-			and RunState.downs_by_player.is_empty(), "meter dictionaries")
+			and RunState.downs_by_player.is_empty() and RunState.bosses_by_player.is_empty()
+			and RunState.hero_results.is_empty(), "meter dictionaries")
 	check_eq(RunState.run_time, 0.0, "run time")
 	check_eq(RunState.bosses_killed, 0, "bosses")
 	check_eq(RunState.artifacts_dropped, 0, "artifacts")
@@ -340,6 +343,7 @@ func test_smoke_result_has_the_m6_keys() -> void:
 	check_eq(data["dust_earned"], 10, "dust_earned")
 	check_eq(data["dust_spent"], 4, "dust_spent")
 	check_near(float(data["run_time"]), 12.3, 0.001, "run_time (0.1 s resolution)")
+	check(data.has("meter") and data["meter"] is Dictionary, "SMOKE_RESULT has the damage meter")
 
 
 # --- Launch flags ------------------------------------------------------------------------------
@@ -425,9 +429,11 @@ func test_is_boss_comes_from_the_data() -> void:
 	no_data.free()
 
 
-func test_support_and_brute_dispatch_and_fall_back_to_chase() -> void:
+func test_support_and_brute_dispatch_to_their_own_behaviours() -> void:
+	# M6a ENEMIES replaced the P0 chase fallback: SUPPORT keeps its distance (the Acolyte does not
+	# walk up to the hero), BRUTE still walks at the hero between its hooks.
 	_enemy_world()
-	EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
+	var hero := EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
 	var support := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.SUPPORT), Vector3(0.0, 0.0, 0.0))
 	var brute := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.BRUTE), Vector3(0.0, 0.0, 2.0))
 	var chase := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.CHASE), Vector3(0.0, 0.0, -2.0))
@@ -435,26 +441,28 @@ func test_support_and_brute_dispatch_and_fall_back_to_chase() -> void:
 	check(support.support_calls > 0 and support.brute_calls == 0, "SUPPORT goes to _think_support")
 	check(brute.brute_calls > 0 and brute.support_calls == 0, "BRUTE goes to _think_brute")
 	check(chase.support_calls == 0 and chase.brute_calls == 0, "CHASE uses neither")
-	check(support.global_position.x > 0.5, "the SUPPORT fallback walks at the hero (CHASE)")
-	check(brute.global_position.x > 0.5, "the BRUTE fallback walks at the hero (CHASE)")
+	check(EFakes.flat_distance(support.global_position, hero.global_position) > 6.0,
+			"SUPPORT holds its distance instead of chasing: %f" % support.global_position.x)
+	check(brute.global_position.x > 0.5, "BRUTE walks at the hero (CHASE between hooks)")
 	check(chase.global_position.x > 0.5, "CHASE for reference")
 
 
-func test_chase_fallback_moves_like_the_chase_behaviour() -> void:
+func test_brute_walks_like_chase_between_hooks_and_support_does_not() -> void:
 	_enemy_world()
 	EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
 	var base_data := EFakes.enemy_data(EnemyData.Behavior.CHASE)
 	var chaser := EFakes.spawn_enemy(world, base_data, Vector3.ZERO)
 	var support := EFakes.spawn_enemy(world, EFakes.enemy_data(EnemyData.Behavior.SUPPORT), Vector3(0.0, 0.0, 3.0))
 	var brute := EFakes.spawn_enemy(world, EFakes.enemy_data(EnemyData.Behavior.BRUTE), Vector3(0.0, 0.0, -3.0))
-	# Same speed, so the same distance walked in a straight line.
+	# Same speed, so the same distance walked in a straight line (the brute's first hook is
+	# still on cooldown: attack_cooldown 2.5 s, staggered to 1.25 .. 2.5 s).
 	for e: Enemy in [chaser, support, brute]:
 		e.move_speed = 3.0
 	EFakes.step_all([chaser, support, brute] as Array[Node], 1.0)
 	var walked := chaser.global_position.x
 	check(walked > 1.0, "the chaser walked: %f" % walked)
-	check_near(support.global_position.x, walked, 0.35, "SUPPORT walks as far as CHASE")
 	check_near(brute.global_position.x, walked, 0.35, "BRUTE walks as far as CHASE")
+	check(support.global_position.x < walked - 1.0, "SUPPORT does not walk up to the hero like CHASE")
 
 
 func test_on_death_effect_is_called_from_die_before_the_enemy_leaves() -> void:
@@ -513,7 +521,7 @@ func test_db_getters() -> void:
 	# reload() rebuilds both from disk (the injected ones are gone).
 	Db.reload()
 	check(Db.get_boss(&"m6_test_boss") == null and Db.get_consumable(&"m6_test_flask") == null, "reload clears them")
-	check_eq(Db.enemies.size(), 5, "the enemy pool is unchanged")
+	check_eq(Db.enemies.size(), 8, "the enemy pool: the five old ones + the three M6a enemies (no boss)")
 
 
 func test_consumable_data_defaults_and_round_trip() -> void:
@@ -572,15 +580,22 @@ func test_item_instance_counts_enchant_uses() -> void:
 
 # --- Shop / Intermission hooks -----------------------------------------------------------------
 
-func test_shop_has_empty_consumable_and_black_market_slots() -> void:
+func test_shop_keeps_the_consumable_row_and_black_market_next_to_the_offers() -> void:
+	# P0 pinned both as empty; SHOPSINKS fills them (details: test_m6_shopsinks_core.gd). What stays:
+	# they are separate from the item offers, which still follow offer_count.
 	var shop := Shop.new()
-	check(shop.consumables.is_empty(), "no consumables row yet")
-	check(shop.black_market == null, "no Black Market offer yet")
+	check(shop.consumables.is_empty(), "no row before the first round")
+	check(shop.black_market == null, "no Black Market offer before the first round")
 	RunState.set_wave(15)
 	var slot := PlayerManager.join(ScriptedInput.new("m6:shop"), Db.get_class_data(&"warrior"))
-	shop.open_round(15, [slot] as Array[PlayerSlot], RunState.rng)
+	shop.open_round(14, [slot] as Array[PlayerSlot], RunState.rng)
 	check_eq(shop.offers.size(), Shop.offer_count(1), "the offers are unchanged")
-	check(shop.consumables.is_empty() and shop.black_market == null, "open_round leaves them empty")
+	check_eq(shop.consumables.size(), Consumables.ROW_SIZE, "open_round fills the consumables row")
+	check(shop.black_market == null, "wave 14: no Black Market yet")
+	shop.open_round(15, [slot] as Array[PlayerSlot], RunState.rng)
+	check_eq(shop.offers.size(), Shop.offer_count(1), "the offers are still unchanged")
+	check(shop.black_market != null and shop.black_market.item != null, "wave 15: the Black Market offer")
+	check(shop.black_market not in shop.offers, "outside the offers array")
 
 
 func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
@@ -590,17 +605,17 @@ func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
 	nodes.append(im)
 	tree.root.add_child(im)
 	im._bots_shop()
-	check_eq(im.order, [&"buy", &"black_market", &"consumables", &"train", &"talents", &"enchant", &"reroll"] as Array[StringName],
+	check_eq(im.order, [&"enchant", &"buy", &"black_market", &"consumables", &"train", &"talents", &"reroll"] as Array[StringName],
 			"the passes of _bots_shop")
 	var plain := Intermission.create()
 	nodes.append(plain)
 	tree.root.add_child(plain)
-	check_eq(plain._bots_black_market(), 0, "black market stub")
-	check_eq(plain._bots_consumables(), 0, "consumables stub")
-	check_eq(plain._bots_enchant(), 0, "enchant stub")
+	check_eq(plain._bots_black_market(), 0, "no bots, no Black Market purchase")
+	check_eq(plain._bots_consumables(), 0, "no bots, no consumables")
+	check_eq(plain._bots_enchant(), 0, "nothing to enchant without bots (and before wave 12)")
 
 
-# --- PlayerPanel: the locked Enchanter tab -----------------------------------------------------
+# --- PlayerPanel: the Enchanter tab (opened by the ENCHANTER package) --------------------------
 
 func _panel() -> PlayerPanel:
 	var slot := PlayerManager.join(ScriptedInput.new("m6:panel"), Db.get_class_data(&"warrior"))
@@ -623,78 +638,96 @@ func test_enchanter_tab_constants() -> void:
 		check(id in LaunchOptions.PANEL_TABS, "%s is a --panel-tab value" % id)
 	for id in LaunchOptions.PANEL_TABS:
 		check(PlayerPanel.TAB_IDS.has(id), "%s has a tab" % id)
-	check(PlayerPanel.ENCHANTER_TAB in PlayerPanel.LOCKED_TABS, "locked until the ENCHANTER package")
-	check_eq(PlayerPanel.LOCKED_TABS.size(), 1, "and the only locked one")
+	check(PlayerPanel.LOCKED_TABS.is_empty(), "no tab is locked any more: the Enchanter tab is open")
 
 
-func test_lt_rt_never_reach_the_locked_enchanter_tab() -> void:
+func test_lt_rt_cycle_through_all_four_tabs_including_the_enchanter() -> void:
 	var panel := _panel()
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "starts on Character")
 	var seen: Array[int] = []
 	for i in 8:
 		panel.switch_tab(1)
 		seen.append(panel.active_tab)
-	check_eq(seen, [1, 2, 0, 1, 2, 0, 1, 2] as Array[int], "RT cycles Character / Trainer / Talents only")
+	check_eq(seen, [1, 2, 3, 0, 1, 2, 3, 0] as Array[int], "RT cycles Character / Trainer / Talents / Enchanter")
 	seen.clear()
 	for i in 8:
 		panel.switch_tab(-1)
 		seen.append(panel.active_tab)
-	check_eq(seen, [1, 0, 2, 1, 0, 2, 1, 0] as Array[int], "LT too")
-	check(PlayerPanel.ENCHANTER_TAB not in seen, "never the Enchanter")
-	# From the last open tab RT wraps to the first (as with three tabs), LT from the first to the last open one.
-	panel.set_tab(PlayerPanel.TALENTS_TAB)
+	check_eq(seen, [3, 2, 1, 0, 3, 2, 1, 0] as Array[int], "LT the other way")
+	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
 	panel.switch_tab(1)
-	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "Talents + RT = Character")
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "Enchanter + RT wraps to Character")
 	panel.switch_tab(-1)
-	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "Character + LT = Talents")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "Character + LT = Enchanter")
 
 
-func test_set_tab_refuses_the_locked_enchanter_tab() -> void:
+func test_set_tab_and_panel_tab_open_the_enchanter_tab() -> void:
 	var panel := _panel()
 	panel.set_tab(PlayerPanel.TRAINER_TAB)
 	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
-	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "set_tab refuses it")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "set_tab opens it")
+	check(panel.enchanter.visible and not panel.trainer.visible and not panel.talents.visible, "its body shows alone")
+	panel.set_tab(PlayerPanel.CHARACTER_TAB)
+	check(not panel.enchanter.visible, "and hides again")
+	# --panel-tab=enchanter: P1's panel opens on it when the market first shows it.
+	check_eq(panel.slot.index, 0, "the fixture panel is P1's")
 	PlayerPanel.debug_start_tab = "enchanter"
 	panel._debug_tab_done = false
 	panel._apply_debug_start_tab()
 	PlayerPanel.debug_start_tab = ""
-	check(panel.active_tab != PlayerPanel.ENCHANTER_TAB, "--panel-tab=enchanter stays closed too")
-	panel.set_tab(PlayerPanel.CHARACTER_TAB)
-	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "the others still open")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "--panel-tab=enchanter opens P1's panel on it")
 
 
-func test_the_tab_strip_shows_the_padlock_and_fits_the_panel() -> void:
+func test_the_tab_strip_shows_the_dust_and_fits_the_panel() -> void:
 	var panel := _panel()
 	panel.size = PlayerPanel.DESIGN_SIZE
 	panel.refresh()
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
 	check_eq(panel._tab_labels.size(), 4, "four tab labels")
-	check_eq(panel.tab_text(PlayerPanel.ENCHANTER_TAB), "Enchanter", "the label")
-	# The widest case (the active Talents tab with a two-digit label) stays inside the design width.
+	check_eq(panel.tab_text(PlayerPanel.ENCHANTER_TAB), "Enchanter (0)", "the label shows the team's Dust")
+	RunState.add_dust(12, -1, "x")
+	check_eq(panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text, "Enchanter (12)", "relabelled in place on dust_changed")
+	check(panel._tabs_row.find_children("*", "UiIcon", true, false).filter(
+		func(n: Node) -> bool: return (n as UiIcon).kind == UiIcon.Kind.LOCK).is_empty(), "no padlock")
+	for c in panel._tabs_row.get_children():
+		check(not (c is Label and (c as Label).text == "Coming soon"), "no 'Coming soon' note")
+	# The widest cases (the active Talents tab with a two-digit label and a big Dust pile, and the
+	# active Enchanter tab) stay inside the design width.
 	panel._tab_labels[PlayerPanel.TALENTS_TAB].text = "Talents (20)"
+	panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text = "Enchanter (9999)"
 	var strip := panel._tabs_row.get_combined_minimum_size()
 	check(strip.x <= PlayerPanel.DESIGN_SIZE.x, "the tab strip fits: %s" % strip)
+	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
+	panel._tab_labels[PlayerPanel.TALENTS_TAB].text = "Talents (20)"
+	panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text = "Enchanter (9999)"
+	strip = panel._tabs_row.get_combined_minimum_size()
+	check(strip.x <= PlayerPanel.DESIGN_SIZE.x, "also with the Enchanter tab active: %s" % strip)
 	var frame_min := panel.get_child(0).get_combined_minimum_size() as Vector2
 	check(frame_min.x <= PlayerPanel.DESIGN_SIZE.x + 0.5, "the frame fits the design width: %s" % frame_min)
 
 
 # --- Player: optional parameters ---------------------------------------------------------------
 
-func test_heal_and_revive_take_optional_source_slots() -> void:
+func test_heal_and_revive_credit_their_source_slots() -> void:
 	world = Fakes.make_world(tree)
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	p.hp = 1.0
 	p.heal(4.0)
 	check_eq(p.hp, 5.0, "heal(amount) as before")
+	check_eq(RunState.healing_by_player, {0: 4.0} as Dictionary[int, float], "no source: the hero itself")
 	p.heal(3.0, 2)
 	check_eq(p.hp, 8.0, "heal(amount, source_slot)")
-	p.heal(2.0, -1)
-	check_eq(p.hp, 10.0, "heal(amount, -1)")
+	check_eq(RunState.healing_by_player, {0: 4.0, 2: 3.0} as Dictionary[int, float], "the healer (slot 2) is credited")
+	p.heal(50.0, -1)
+	check_eq(p.hp, p.max_hp(), "heal(amount, -1)")
+	check_near(RunState.healing_by_player[0], 4.0 + (p.max_hp() - 8.0), 0.0001, "only the effective part counts")
 	p._go_down()
 	check(p.downed, "down")
+	check_eq(RunState.downs_by_player, {0: 1} as Dictionary[int, int], "the down is recorded")
 	p.revive(0.5, [1, 3] as Array[int])
 	check(not p.downed, "revive(ratio, reviver_slots)")
 	check_near(p.hp, roundf(p.max_hp() * 0.5), 1.0, "at the given ratio")
+	check_eq(RunState.revives_by_player, {1: 1, 3: 1} as Dictionary[int, int], "every reviver is credited")
 	p._go_down()
 	p.revive()
 	check(not p.downed, "revive() as before")
@@ -702,24 +735,32 @@ func test_heal_and_revive_take_optional_source_slots() -> void:
 	p._go_down()
 	p.revive(1.0)
 	check_eq(p.hp, p.max_hp(), "revive(ratio) as before")
+	check_eq(RunState.revives_by_player, {1: 1, 3: 1} as Dictionary[int, int], "no reviver slots: nobody is credited")
+	check_eq(RunState.downs_by_player, {0: 3} as Dictionary[int, int], "three downs")
 	Fakes.free_world(world)
 	world = null
 
 
-# --- LootDrops: the Artifact roll stub ---------------------------------------------------------
+# --- LootDrops: the Artifact roll wiring ------------------------------------------------------
 
 func _probe(source: ItemGenerator.Source, enemy: Node3D, killer: Node3D) -> LootBag:
 	_probe_calls.append([source, enemy, killer])
 	return null
 
 
-func test_roll_artifact_is_a_stub_that_draws_nothing() -> void:
+## (P0 pinned a stub that never rolled; the real roll – test_m6_artifacts_core – only rolls from
+## wave 10 and draws nothing before it, which is what keeps the old seeds comparable.)
+func test_roll_artifact_below_wave_10_draws_nothing_and_drops_nothing() -> void:
 	_enemy_world()
 	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3.ZERO)
+	LootDrops.artifact_chance_override = 1.0  # even a sure drop waits for wave 10
+	RunState.set_wave(9)
 	var before := RunState.rng.state
 	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, e, null) == null, "returns null")
 	check(LootDrops.roll_artifact(ItemGenerator.Source.LOOT, e, null) == null, "for every source")
 	check_eq(RunState.rng.state, before, "no RunState.rng draw (seeded runs stay comparable)")
+	RunState.set_wave(10)
+	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, e, null) != null, "wave 10: the roll is real")
 
 
 func test_drop_special_calls_roll_artifact() -> void:
@@ -756,23 +797,22 @@ func test_on_enemy_killed_calls_roll_artifact_after_the_normal_roll() -> void:
 	check_eq(_probe_calls.size(), 21, "no enemy, no roll")
 
 
-func test_the_artifact_stub_keeps_seeded_drops_identical() -> void:
+func test_the_artifact_roll_keeps_seeded_drops_identical_below_wave_10() -> void:
 	_enemy_world()
 	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3.ZERO)
 	RunState.start_run(1, 99)
 	var plain: Array[bool] = []
 	for i in 40:
 		RunState.loot_drops_this_wave = 0
-		plain.append(LootDrops.on_enemy_killed(e, null) != null)
+		plain.append(LootDrops._roll_normal_drop(e, null) != null)  # the normal roll alone (as before M6)
 	var state_after := RunState.rng.state
 	RunState.start_run(1, 99)
-	var probed: Array[bool] = []
-	LootDrops.artifact_roll_probe = _probe
+	var with_roll: Array[bool] = []
 	for i in 40:
 		RunState.loot_drops_this_wave = 0
-		probed.append(LootDrops.on_enemy_killed(e, null) != null)
-	check_eq(probed, plain, "the same drops")
-	check_eq(RunState.rng.state, state_after, "the same rng state")
+		with_roll.append(LootDrops.on_enemy_killed(e, null) != null)  # normal roll + Artifact roll
+	check_eq(with_roll, plain, "the same drops")
+	check_eq(RunState.rng.state, state_after, "the same rng state: the Artifact roll drew nothing")
 	check(true in plain, "the sample dropped something (seed sanity)")
 
 

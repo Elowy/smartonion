@@ -141,10 +141,16 @@ func tick(delta: float) -> bool:
 
 
 ## Nearest living enemy within the weapon's attack range (null if none) – the same result as
-## [method nearest_enemy] over the whole group, found through the shared [EnemyGrid].
+## [method nearest_enemy] over the whole group, found through the shared [EnemyGrid]. A bot
+## (smoke / demo) shoots a priority target in reach first (the Cultist Acolyte, M6:
+## [method BotInput.priority_enemy]); humans aim at the nearest as always.
 func find_target() -> Enemy:
 	if weapon == null or player == null or not player.is_inside_tree():
 		return null
+	if player.slot != null and player.slot.input is BotInput:
+		var priority := BotInput.priority_enemy(player.get_tree(), player.global_position, weapon.attack_range)
+		if priority != null:
+			return priority
 	return EnemyGrid.nearest(player.get_tree(), player.global_position, weapon.attack_range)
 
 

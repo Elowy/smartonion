@@ -1,6 +1,7 @@
 class_name EnchantRoll
 extends RefCounted
-## One enchantment rolled on an item, with its rank (0 = I, 1 = II, 2 = III).
+## One enchantment rolled on an item, with its rank (0 = I .. 4 = V; the generator stops at
+## III, the Enchanter's Empower reaches IV and V).
 
 var enchant: EnchantData
 var rank := 0
@@ -13,6 +14,11 @@ func _init(p_enchant: EnchantData = null, p_rank: int = 0) -> void:
 
 func mult() -> float:
 	return EnchantData.rank_mult(rank)
+
+
+## "I".."V".
+func rank_label() -> String:
+	return EnchantData.rank_label(rank)
 
 
 ## EQUIP enchants: their stat bonuses at this rank.

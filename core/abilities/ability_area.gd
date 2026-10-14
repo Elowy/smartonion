@@ -106,4 +106,4 @@ func _tick() -> void:
 		for node in tree.get_nodes_in_group(&"players"):
 			var p := node as Player
 			if p != null and p.is_alive() and WeaponRunner.flat(p.global_position - center).length() <= radius:
-				p.heal(heal_per_tick)
+				p.heal(heal_per_tick, Player.slot_index_of(owner_player))

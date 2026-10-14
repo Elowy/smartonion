@@ -25,6 +25,11 @@ extends Node
 ## - Main processes ALWAYS (it drives the dev harness while the tree is paused); the Arena and
 ##   the HUD layer are PAUSABLE, WaveDirector forces PAUSABLE, and the Intermission,
 ##   GameOverScreen and PauseMenu are ALWAYS.
+## - M6 bosses: a boss wave (10, 25) lasts until its boss dies (WaveDirector); the director's
+##   boss_spawned / boss_defeated drive the HUD's boss frame and the banners, the "Wave cleared!"
+##   banner names the boss, and clearing wave 25 – Vor'thalax's death – is the victory
+##   ([method _after_wave_end]). Smoke runs tell the director to kill a boss that outlives its enrage
+##   by WaveDirector.SMOKE_BOSS_GRACE ("SMOKE boss timeout").
 ## - M5: the WaveDirector gets a GoblinSpawner child ([member goblin_spawner]; its
 ##   announcements become HUD banners). A run applies the launch options' test hooks right
 ##   after RunState.start_run (which resets them): GoblinSpawner.chance_override,
@@ -67,6 +72,9 @@ const SMOKE_TIMEOUT_EXTRA := 60.0
 ## Game seconds allowed per intermission of a smoke run (the loot roll shows every item's
 ## result for LootRollScreen.RESULT_TIME).
 const SMOKE_INTERMISSION_ALLOWANCE := 12.0
+## Game seconds a boss wave of a smoke run may take on top of its nominal duration: the enrage
+## (90 s), the safety kill after it (WaveDirector.SMOKE_BOSS_GRACE) and the fight's start.
+const SMOKE_BOSS_ALLOWANCE := 90.0 + WaveDirector.SMOKE_BOSS_GRACE + 30.0
 const DISCONNECT_NOTICE := "%s's controller disconnected – plug it back in to continue"
 
 var options: LaunchOptions
@@ -120,6 +128,10 @@ var _run_frame := -1
 var _start_msec := 0
 var _wave_start_msec := 0
 var _smoke_deadline_msec := 0
+## The "artifact ..." log lines of this run in order: one per Artifact drop and one per hero per
+## wave end for every Artifact it holds (Artifacts.drop_line / held_line; printed with the SMOKE
+## prefix in a smoke run). Cleared by start_run.
+var artifact_lines: Array[String] = []
 ## The smoke harness is running (--smoke): it prints SMOKE_RESULT and quits.
 var _smoke_running := false
 var _smoke_done := false
@@ -159,6 +171,7 @@ func _ready() -> void:
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
+	RunState.artifact_dropped.connect(_on_artifact_dropped)
 	_apply_time_scale(options.effective_time_scale())
 	if options.smoke or options.demo or options.view != "":
 		_clock = PhysicsClock.create()
@@ -232,6 +245,7 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	RunState.start_run(slots.size(), options.run_seed())
+	artifact_lines.clear()
 	# Test hooks (start_run reset the statics to their defaults).
 	GoblinSpawner.chance_override = options.goblin_chance
 	EliteAffixes.rate_mult = options.elite_mult
@@ -263,6 +277,9 @@ func start_run() -> void:
 	wave_director = WaveDirector.create(arena)
 	add_child(wave_director)
 	wave_director.wave_cleared.connect(_on_wave_cleared)
+	wave_director.boss_spawned.connect(_on_boss_spawned)
+	wave_director.boss_defeated.connect(_on_boss_defeated)
+	wave_director.smoke_boss_timeout = options.smoke
 	goblin_spawner = GoblinSpawner.create(wave_director)
 	wave_director.add_child(goblin_spawner)
 	goblin_spawner.announced.connect(_on_announced)
@@ -270,6 +287,8 @@ func start_run() -> void:
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
 	wave_director.wave_timer_changed.connect(hud.set_wave_time)
+	wave_director.boss_spawned.connect(hud.bind_boss)
+	wave_director.wave_cleared.connect(hud.clear_boss)
 	intermission = Intermission.create()
 	intermission.continue_requested.connect(_on_intermission_continue, CONNECT_DEFERRED)
 	intermission.item_bought.connect(_on_item_bought)
@@ -339,6 +358,7 @@ func open_intermission() -> void:
 		var p := slot.player as Player
 		if p != null and is_instance_valid(p):
 			p.end_wave()  # auras / buffs must not show in the market
+			_log_artifacts_held(p)
 	# WaveDirector.stop() swept the ground effects at the clear; this catches the ones that
 	# landed during the "Wave cleared!" pause (bursts, bombs, craters), which would otherwise
 	# wait out the market and come back in the next wave.
@@ -363,9 +383,13 @@ func end_run(p_victory: bool) -> void:
 	if hud != null:
 		hud.hide()
 	RunState.end_run(p_victory)
+	_record_hero_results()
 	_set_state(State.GAME_OVER)
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
+	var boss: Boss = wave_director.boss if wave_director != null and not p_victory else null
+	if is_instance_valid(boss) and not boss.is_dead():
+		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
 		game_over.open(p_victory)
@@ -373,6 +397,16 @@ func end_run(p_victory: bool) -> void:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
 		get_tree().create_timer(DEMO_RESTART_DELAY, true).timeout.connect(_on_demo_restart)
+
+
+## How every hero ended the run (standing or down, the best item), taken now because the heroes are
+## freed when the screen is left: RunState.hero_results, read by the end screen and the run card.
+func _record_hero_results() -> void:
+	for slot in PlayerManager.get_slots():
+		var hero := slot.player as Player
+		var valid := hero != null and is_instance_valid(hero)
+		RunState.record_hero_result(slot.index, valid and hero.is_alive(),
+				RunSummary.best_item(hero.equipment) if valid else null)
 
 
 ## Pause Menu "Quit to Menu": abandons the run.
@@ -644,8 +678,55 @@ func _on_wave_cleared(n: int) -> void:
 		_finish_smoke("completed")
 		return
 	if hud != null:
-		hud.show_banner("Victory!" if n >= RunState.TOTAL_WAVES else "Wave cleared!")
+		hud.show_banner(_wave_cleared_text(n))
 	_set_state(State.WAVE_END)
+
+
+## The banner of a won wave: "Victory!" after the last one, "<Boss> defeated!" after a boss
+## wave, else "Wave cleared!".
+func _wave_cleared_text(n: int) -> String:
+	if n >= RunState.TOTAL_WAVES:
+		return "Victory!"
+	# (The boss itself may be freed by now: the definition stays.)
+	if wave_director != null and wave_director.boss_data != null:
+		return "%s defeated!" % wave_director.boss_data.display_name
+	return "Wave cleared!"
+
+
+## WaveDirector.boss_spawned: the arrival banner.
+func _on_boss_spawned(boss: Boss) -> void:
+	if hud != null and boss.boss_data != null:
+		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
+	_log(boss_arrival_text(boss, wave, players.size()))
+
+
+## The smoke-log line of a boss's arrival.
+static func boss_arrival_text(boss: Boss, p_wave: int, player_count: int) -> String:
+	return "boss %s arrived on wave %d at %s: %.0f HP, %d player(s)" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", p_wave,
+		format_position(boss.global_position if boss.is_inside_tree() else boss.position),
+		boss.max_hp, player_count]
+
+
+## The smoke-log line of a run that was lost while [param boss] still stood (balance data: how
+## far the party got).
+static func boss_standing_text(boss: Boss, downs: int) -> String:
+	return "defeat with boss %s alive after %.1f s: %.0f%% HP left (phase %d, enrage level %d), %d downs so far" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", boss.age(),
+		boss.hp_ratio() * 100.0, boss.phase, boss.enrage_level, downs]
+
+
+## "(x, y, z)" with one decimal for the smoke / screenshot logs (a Vector3's own text prints
+## float noise such as -8.400001).
+static func format_position(v: Vector3) -> String:
+	return "(%.1f, %.1f, %.1f)" % [v.x, v.y, v.z]
+
+
+## WaveDirector.boss_defeated (the wave ends on the next tick): the kill time for the smoke log.
+func _on_boss_defeated(boss: Boss) -> void:
+	_log("boss %s defeated after %.1f s (phase %d, enrage level %d, %d casts): %d / %d standing, %d downs, %d revives so far" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", boss.age(), boss.phase,
+		boss.enrage_level, boss.casts_total, living_player_count(), players.size(), players_downed, revives])
 
 
 func _on_intermission_continue() -> void:
@@ -662,6 +743,26 @@ func _on_intermission_continue() -> void:
 
 func _on_item_bought(_slot_index: int, _item: ItemInstance) -> void:
 	items_bought += 1
+
+
+## RunState.artifact_dropped: the "artifact drop" log line.
+func _on_artifact_dropped(item: ItemInstance, source: StringName) -> void:
+	_log_artifact(Artifacts.drop_line(item, source, RunState.wave))
+
+
+## After [param hero]'s wave end (its Artifacts grew): one "artifact held" line per Artifact it
+## holds, in the hand or in the backpack.
+func _log_artifacts_held(hero: Player) -> void:
+	if hero.equipment == null:
+		return
+	var label := hero.slot.label() if hero.slot != null else "?"
+	for item in Artifacts.held(hero.equipment):
+		_log_artifact(Artifacts.held_line(label, item, wave, hero.equipment.is_equipped(item)))
+
+
+func _log_artifact(text: String) -> void:
+	artifact_lines.append(text)
+	_log(text)
 
 
 func _on_loot_rolled(_roll: LootRoll) -> void:
@@ -807,6 +908,8 @@ func _start_smoke() -> void:
 	var expected := 0.0
 	for w in range(options.start_wave, options.last_wave() + 1):
 		expected += RunState.wave_duration(w) + WAVE_END_DELAY + 0.5 + SMOKE_INTERMISSION_ALLOWANCE
+		if RunState.is_boss_wave(w):
+			expected += SMOKE_BOSS_ALLOWANCE
 	var real := expected / options.effective_time_scale()
 	_smoke_deadline_msec = _start_msec + int((real * SMOKE_TIMEOUT_FACTOR + SMOKE_TIMEOUT_EXTRA) * 1000.0)
 	print("SMOKE start: %d bots, waves %d-%d, seed %d, time scale %.1f, %d physics ticks/s, timeout %.0f s" % [
@@ -820,6 +923,8 @@ func _finish_smoke(result: String) -> void:
 		return
 	_smoke_done = true
 	var data := smoke_result(result)
+	for line in meter_lines(data["meter"]):
+		print("SMOKE meter " + line)
 	print("SMOKE_RESULT " + JSON.stringify(data))
 	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
 
@@ -829,7 +934,8 @@ func _finish_smoke(result: String) -> void:
 ## talent_points_spent (all heroes), talent_resets, set_bonuses (active bonuses of all heroes),
 ## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
 ## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
-## (seconds of wave play, RunState.tick_run_time).
+## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
+## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
@@ -883,6 +989,7 @@ func smoke_result(result: String) -> Dictionary:
 		"dust_earned": RunState.dust_earned,
 		"dust_spent": RunState.dust_spent,
 		"run_time": snappedf(RunState.run_time, 0.1),
+		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
@@ -893,6 +1000,17 @@ func smoke_result(result: String) -> Dictionary:
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
 	return data
+
+
+## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).
+static func meter_lines(meter: Dictionary) -> Array[String]:
+	var lines: Array[String] = []
+	for key: String in meter:
+		var m: Dictionary = meter[key]
+		lines.append("P%d %s: damage %.1f, healing %.1f, absorbed %.1f, taken %.1f, revives %d, downs %d, kills %d, bosses %d" % [
+			int(key) + 1, m.get("class", "?"), m["damage"], m["healing"], m["absorbed"], m["taken"],
+			m["revives"], m["downs"], m["kills"], m["bosses"]])
+	return lines
 
 
 ## Learned abilities (RB / LB and auto-cast slots) over every hero (SMOKE_RESULT).
@@ -933,11 +1051,24 @@ func _force_view() -> void:
 				wave_director.time_left = minf(wave_director.time_left, 0.001)
 		"game_over":
 			end_run(false)
+			_end_screen_extras()
 		"victory":
 			end_run(true)
+			_end_screen_extras()
 		"pause":
 			var slots := PlayerManager.get_slots()
 			pause_game(slots[0] if not slots.is_empty() else null)
+
+
+## --end-page / --save-card on the forced end screen (screenshots of the Damage Meter and the card).
+func _end_screen_extras() -> void:
+	if game_over == null:
+		return
+	if options.end_page != "":
+		game_over.set_page(GameOverScreen.page_from_name(options.end_page))
+	if options.save_card:
+		game_over.card_saved.connect(func(path: String) -> void: print("CARD %s" % path), CONNECT_ONE_SHOT)
+		game_over.save_card()
 
 
 func _take_screenshot() -> void:
@@ -966,7 +1097,13 @@ func _log_player_screen_positions() -> void:
 		var px := cam.unproject_position(p.global_position + Vector3.UP * 0.6)
 		_log("%s %s at %s -> screen (%d, %d) of %dx%d, camera distance %.1f" % [
 			p.slot.label() if p.slot != null else "?", "alive" if p.is_alive() else "downed",
-			p.global_position.snappedf(0.1), px.x, px.y, size.x, size.y, arena.camera.distance])
+			format_position(p.global_position), px.x, px.y, size.x, size.y, arena.camera.distance])
+	var boss: Boss = wave_director.boss if wave_director != null else null
+	if is_instance_valid(boss) and boss.is_inside_tree():
+		var bp := cam.unproject_position(boss.global_position + Vector3.UP * 1.2)
+		_log("boss %s at %s -> screen (%d, %d), %.0f%% HP, phase %d" % [
+			boss.data.display_name, format_position(boss.global_position), bp.x, bp.y,
+			boss.hp_ratio() * 100.0, boss.phase])
 
 
 func _quit(code: int) -> void:

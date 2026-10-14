@@ -217,9 +217,12 @@ class Buff extends RefCounted:
 
 
 ## One absorb shield: [member hp] left for [member left] more seconds. Shields of one
-## [member source] share an entry (&"" = item procs and other anonymous shields).
+## [member source] cast by the same hero share an entry (&"" = item procs and other anonymous
+## shields). [member owner_slot] = the slot index of the hero who cast it (the damage meter credits
+## the damage it soaks to them; -1 = nobody).
 class Shield extends RefCounted:
 	var source: StringName = &""
+	var owner_slot := -1
 	var hp := 0.0
 	var left := 0.0
 
@@ -469,15 +472,19 @@ func end_wave() -> void:
 
 
 ## Adds an absorb shield (shield procs, Word of Glory, Ice Barrier ...): [param amount] HP for
-## up to [param duration] seconds. Shields of one [param source] stack in one entry (the
-## longer timer wins); shields of different sources keep their own timers.
-func add_shield(amount: float, duration: float, source: StringName = &"") -> void:
+## up to [param duration] seconds. Shields of one [param source] from one caster stack in one
+## entry (the longer timer wins); shields of different sources (or casters) keep their own
+## timers. [param owner_slot] = the slot index of the hero who cast it, credited with the damage
+## it absorbs ([method absorb], the damage meter); -1 = this hero's own shield.
+func add_shield(amount: float, duration: float, source: StringName = &"", owner_slot: int = -1) -> void:
 	if amount <= 0.0:
 		return
-	var entry := _shield_entry(source)
+	var caster := owner_slot if owner_slot >= 0 else Player.slot_index_of(player)
+	var entry := _shield_entry(source, caster)
 	if entry == null:
 		entry = Shield.new()
 		entry.source = source
+		entry.owner_slot = caster
 		_shields.append(entry)
 	entry.hp += amount
 	entry.left = maxf(entry.left, duration)
@@ -488,15 +495,18 @@ func clear_shields() -> void:
 	_shields.clear()
 
 
-## Shield HP left from [param source] (0 = none).
+## Shield HP left from [param source], every caster together (0 = none).
 func shield_of(source: StringName) -> float:
-	var entry := _shield_entry(source)
-	return entry.hp if entry != null else 0.0
-
-
-func _shield_entry(source: StringName) -> Shield:
+	var total := 0.0
 	for s in _shields:
 		if s.source == source:
+			total += s.hp
+	return total
+
+
+func _shield_entry(source: StringName, caster: int) -> Shield:
+	for s in _shields:
+		if s.source == source and s.owner_slot == caster:
 			return s
 	return null
 
@@ -516,6 +526,7 @@ func absorb(damage: float) -> float:
 		var taken := minf(s.hp, rest)
 		s.hp -= taken
 		rest -= taken
+		RunState.record_absorb(s.owner_slot, taken)
 		if s.hp <= 0.0001:
 			_shields.remove_at(first)
 	absorbed_total += damage - rest
@@ -564,10 +575,14 @@ func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bo
 		var ratio := target.hp / target.max_hp if target.max_hp > 0.0 else 1.0
 		amount *= CombatMath.target_damage_mult(player.stats, ratio, target.is_elite())
 	var text_pos := target.global_position + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT
+	var dealt := minf(amount, maxf(0.0, target.hp))
 	if player.slot != null:
-		RunState.record_damage(player.slot.index, minf(amount, maxf(0.0, target.hp)))
+		RunState.record_damage(player.slot.index, dealt)
 	target.take_damage(amount, false, player)
 	Vfx.damage_number(null, text_pos, amount, ProcVfx.school_color(school), DAMAGE_TEXT_SIZE)
+	# Pet leech (Skull of the Damned): a share of what a pet dealt heals the hero.
+	if player.pet_leech_pct > 0.0 and source == &"pet":
+		player.heal(dealt * player.pet_leech_pct / 100.0, player.slot.index if player.slot != null else -1)
 	return amount
 
 
@@ -825,7 +840,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			_buff(p)
 		&"heal":
 			var who := _receiver(p)
-			who.heal(_amount_for(p, who))
+			who.heal(_amount_for(p, who), player.slot_index())
 			if p.extra:
 				_label(p, Player.HEAL_TEXT_COLOR, who)
 		&"drain":
@@ -857,7 +872,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			var who := _receiver(p)
 			var into: ProcSystem = self if who == player else who.procs
 			if into != null:
-				into.add_shield(_amount_for(p, who), p.num("duration", DEFAULT_SHIELD_DURATION))
+				into.add_shield(_amount_for(p, who), p.num("duration", DEFAULT_SHIELD_DURATION), &"", player.slot_index())
 			_label(p, SHIELD_COLOR, who)
 		&"reflect":
 			var e := _target_enemy(target, pos)
@@ -874,7 +889,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 				_riders(p, e)
 				var ally := _lowest_ally()
 				ProcVfx.beam(_chest(e), ally.get_chest_position(), color)
-				ally.heal(p.num("heal"))
+				ally.heal(p.num("heal"), player.slot_index())
 		&"resource":
 			if player.abilities == null:
 				return

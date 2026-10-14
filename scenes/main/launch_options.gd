@@ -25,11 +25,15 @@ extends RefCounted
 ##                        RunState.set_start_level, before the heroes spawn)
 ##   --panel-tab=NAME     dev: P1's panel opens on that tab when the market opens – talents,
 ##                        trainer, character, enchanter (PlayerPanel.debug_start_tab, screenshots;
-##                        a locked tab stays closed)
+##                        a locked tab would stay closed)
 ##   --boss-hp=X          M6 smoke / debug hook: multiplies every boss's HP (BossData.hp_mult;
 ##                        default 1)
 ##   --artifact-chance=X  M6 debug hook: overrides the Artifact drop chance of every roll (0..1,
 ##                        LootDrops.artifact_chance_override; default: off, the normal chances)
+##   --end-page=NAME      dev: the page the end screen opens on with --view=game_over / victory –
+##                        summary (default) or meter (the Damage Meter; screenshots)
+##   --save-card          dev: the end screen saves the run card (user://cards/run_<date>.png) as
+##                        soon as --view forces it, prints "CARD <path>" and keeps going (screenshots)
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -75,6 +79,10 @@ var panel_tab := ""
 var boss_hp := 1.0
 ## < 0 = off (the normal Artifact chances); else the chance of every Artifact roll.
 var artifact_chance := -1.0
+## "" = the end screen opens on the Summary page (--end-page; GameOverScreen.PAGE_IDS).
+var end_page := ""
+## --save-card: the forced end screen saves the run card right away.
+var save_card := false
 ## Arguments that were not understood (reported once by Main).
 var unknown: Array[String] = []
 
@@ -135,6 +143,13 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				o.boss_hp = clampf(value.to_float(), MIN_BOSS_HP_MULT, MAX_BOSS_HP_MULT)
 			"--artifact-chance":
 				o.artifact_chance = clampf(value.to_float(), 0.0, 1.0)
+			"--end-page":
+				if value in GameOverScreen.PAGE_IDS:
+					o.end_page = value
+				else:
+					o.unknown.append(arg)
+			"--save-card":
+				o.save_card = true
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):

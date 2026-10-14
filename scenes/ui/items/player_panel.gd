@@ -3,24 +3,29 @@ extends Control
 ## One player's personal between-wave panel (GDD 12), shown in that player's screen corner /
 ## quadrant (DESIGN_SIZE 700x480 on the 1920x1080 canvas; scale it with [member scale]).
 ## Header in the player's colour (Pn, class, Avg. Item Level), tabs Character | Trainer |
-## Talents. Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
+## Talents | Enchanter. Trainer tab = TrainerTab (GDD 6.3: the hero's slotted
 ## abilities, their ranks and the gold for the next one; see scenes/ui/trainer/), same size as
 ## the Character tab; Talents tab = TalentTab (GDD 7, M5; scenes/ui/talents/: the three talent
 ## trees, points, reset), wired the same way – its label shows the hero's free talent points
 ## ("Talents (2)", TalentTab.tab_label, relabelled on TalentTab.points_changed; talent stats come
 ## through stats.set_source, so that signal and showing the Character tab rebuild the stat list).
+## Enchanter tab = EnchanterTab (GDD 5.7, M6a; scenes/ui/enchanter/: the hero's items, their
+## enchants, Reroll / Empower / Imbue for gold + Arcane Dust), wired the same way – its label shows
+## the team's Dust ("Enchanter (12)" with a sparkle, EnchanterTab.tab_label, relabelled on
+## EnchanterTab.label_changed).
 ## Character tab = WoW paper doll – Head, Neck,
 ## Shoulders, Chest, Wrist on the left, Hands, Waist, Legs, Feet on the right, rings, weapons
 ## and trinkets along the bottom, a live onion preview in the middle – next to a compact stat
 ## list and the 10-slot backpack.
 ## Controller (only the PlayerInput passed to handle_input): d-pad / stick moves the
 ## selection, A opens the action menu (backpack: Equip (→ slot for rings / trinkets /
-## dual wield) / Forge (weapons) / Sell / Trade → Pn / Cancel; equipped: Unequip / Forge
-## (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles the comparison in the
-## tooltip, LT / RT switch tabs (the Trainer and Talents tabs take the rest of the input while
-## they are shown; TrainerTab / TalentTab.handle_input – LT / RT stay with the panel unless the
-## tab is modal). Forge (M5): Forge.blocked_reason greys the entry out, Forge.result_text is its
-## detail, Forge.forge does it and the result gets selected.
+## dual wield) / Forge (weapons) / Sell / Disenchant (not for Artifacts) / Trade → Pn / Cancel;
+## equipped: Unequip / Forge (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles
+## the comparison in the tooltip, LT / RT switch tabs (the Trainer, Talents and Enchanter tabs take
+## the rest of the input while they are shown; TrainerTab / TalentTab / EnchanterTab.handle_input –
+## LT / RT stay with the panel unless the tab is modal). Forge (M5): Forge.blocked_reason greys the
+## entry out, Forge.result_text is its detail, Forge.forge does it and the result gets selected.
+## Disenchant (M6a): Enchanter.disenchant turns the item into team Arcane Dust.
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
 ## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
@@ -33,6 +38,8 @@ extends Control
 signal trade_done(item: ItemInstance, to_slot_index: int)
 ## Emitted after an item was sold from the backpack ([param gold] went to RunState).
 signal item_sold(item: ItemInstance, gold: int)
+## Emitted after an item was disenchanted from the backpack ([param dust] went to RunState).
+signal item_disenchanted(item: ItemInstance, dust: int)
 
 const DESIGN_SIZE := Vector2(700, 480)
 const DOLL_ICON := 48.0
@@ -43,6 +50,8 @@ const BAG_GAP := 7.0
 const BAG_COLUMNS := 5
 const BODY_GAP := 12.0
 const MESSAGE_TIME := 2.8
+## Why the Sell entry of an Artifact is greyed out (GDD 5.5).
+const ARTIFACT_NO_SELL := "Artifacts can't be sold"
 ## With [member tooltip_inside] a tooltip taller than the panel shrinks to fit it, but not below
 ## this scale: a still taller one (a set piece with the comparison block) reaches past the
 ## panel's edge towards the middle of the screen instead of becoming unreadable at 720p – as
@@ -74,11 +83,12 @@ const TAB_NAMES: Array[String] = ["Character", "Trainer", "Talents", "Enchanter"
 const CHARACTER_TAB := 0
 const TRAINER_TAB := 1
 const TALENTS_TAB := 2
-## The Enchanter tab (M6 ENCHANTER): locked until that package builds its body.
+## The Enchanter tab (M6a, scenes/ui/enchanter/).
 const ENCHANTER_TAB := 3
 ## Tabs that only say "coming soon" (the strip shows a padlock); LT / RT skip them and
-## [method set_tab] refuses them. The ENCHANTER package empties this list.
-const LOCKED_TABS: Array[int] = [ENCHANTER_TAB]
+## [method set_tab] refuses them. Empty since the Enchanter tab opened (the mechanism stays for
+## the next tab that ships ahead of its body).
+const LOCKED_TABS: Array[int] = []
 ## --panel-tab values -> tab index (debug_start_tab).
 const TAB_IDS: Dictionary[String, int] = {
 	"character": CHARACTER_TAB, "trainer": TRAINER_TAB, "talents": TALENTS_TAB,
@@ -175,8 +185,10 @@ var last_input_consumed := false
 var trainer: TrainerTab
 ## The Talents tab's body (shown while active_tab is TALENTS_TAB).
 var talents: TalentTab
+## The Enchanter tab's body (shown while active_tab is ENCHANTER_TAB).
+var enchanter: EnchanterTab
 
-## Dev only (--panel-tab=talents / trainer / character, screenshots): when the market opens,
+## Dev only (--panel-tab=talents / trainer / enchanter / character, screenshots): when the market opens,
 ## P1's panel switches to that tab once ("" = off).
 static var debug_start_tab := ""
 
@@ -250,6 +262,7 @@ func refresh() -> void:
 		close_menu()
 	trainer.refresh()
 	talents.refresh()
+	enchanter.refresh_if_shown()
 	_refresh_tab_labels()
 	_update_selection()
 	_apply_debug_start_tab()
@@ -263,6 +276,7 @@ func set_input_focus(focused: bool) -> void:
 		close_menu()
 	trainer.set_focused(focused and active_tab == TRAINER_TAB)
 	talents.set_focused(focused and active_tab == TALENTS_TAB)
+	enchanter.set_focused(focused and active_tab == ENCHANTER_TAB)
 	_frame.add_theme_stylebox_override(&"panel", _frame_style(focused))
 	_update_selection()
 
@@ -282,6 +296,9 @@ func handle_input(input: PlayerInput, delta: float = -1.0) -> void:
 		return
 	if active_tab == TALENTS_TAB:
 		_talents_input(input, delta if delta >= 0.0 else get_process_delta_time())
+		return
+	if active_tab == ENCHANTER_TAB:
+		_enchanter_input(input, delta if delta >= 0.0 else get_process_delta_time())
 		return
 	if mode == Mode.MENU:
 		last_input_consumed = input.nav_just_pressed() != Vector2i.ZERO or input.just_pressed(PlayerInput.Pad.A) \
@@ -508,7 +525,8 @@ func switch_tab(step: int) -> void:
 	set_tab(target)
 
 
-## Shows tab [param index] (CHARACTER_TAB, TRAINER_TAB or TALENTS_TAB; locked tabs are refused).
+## Shows tab [param index] (CHARACTER_TAB, TRAINER_TAB, TALENTS_TAB or ENCHANTER_TAB; locked tabs
+## are refused).
 func set_tab(index: int) -> void:
 	if index < 0 or index >= TAB_NAMES.size() or index in LOCKED_TABS or index == active_tab:
 		return
@@ -518,6 +536,7 @@ func set_tab(index: int) -> void:
 	_body.visible = index == CHARACTER_TAB
 	trainer.visible = index == TRAINER_TAB
 	talents.visible = index == TALENTS_TAB
+	enchanter.visible = index == ENCHANTER_TAB
 	_refresh_tabs()
 	if index == CHARACTER_TAB:
 		# Talent points (and other set_source changes) do not fire Equipment.changed.
@@ -526,8 +545,11 @@ func set_tab(index: int) -> void:
 		trainer.refresh()
 	elif index == TALENTS_TAB:
 		talents.refresh()
+	elif index == ENCHANTER_TAB:
+		enchanter.refresh()
 	trainer.set_focused(_focused and index == TRAINER_TAB)
 	talents.set_focused(_focused and index == TALENTS_TAB)
+	enchanter.set_focused(_focused and index == ENCHANTER_TAB)
 	_prompt_key = ""
 	_update_selection()
 
@@ -539,6 +561,22 @@ func _apply_debug_start_tab() -> void:
 		return
 	_debug_tab_done = true
 	set_tab(int(TAB_IDS.get(debug_start_tab, active_tab)))
+
+
+## LT / RT switch tabs unless the Enchanter tab is modal (a hold is running); everything else
+## goes to the Enchanter tab. B counts as used only when it cancelled a hold or stepped back from
+## the enchants to the items.
+func _enchanter_input(input: PlayerInput, delta: float) -> void:
+	if not enchanter.is_modal():
+		if input.just_pressed(PlayerInput.Pad.LT):
+			switch_tab(-1)
+			last_input_consumed = true
+			return
+		if input.just_pressed(PlayerInput.Pad.RT):
+			switch_tab(1)
+			last_input_consumed = true
+			return
+	last_input_consumed = enchanter.handle_input(input, delta)
 
 
 ## LT / RT switch tabs unless the Talents tab is modal (a confirm / hold is open); everything
@@ -597,9 +635,16 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	sell.detail = "+%d gold" % it.sell_value()
 	if last_weapon:
 		_need_weapon(sell)
+	elif not it.can_sell():
+		# An Artifact is never sold (GDD 5.5).
+		sell.enabled = false
+		sell.detail = "Artifact"
+		sell.reason = ARTIFACT_NO_SELL
 	else:
 		sell.action = _do_sell.bind(it)
 	out.append(sell)
+	if Enchanter.can_disenchant(it):
+		out.append(_disenchant_entry(it, last_weapon))
 	if not _teammates().is_empty():
 		var trade := _entry("Trade")
 		trade.detail = "▸"
@@ -646,6 +691,18 @@ func _forge_entry(it: ItemInstance) -> MenuEntry:
 		e.reason = reason
 	else:
 		e.action = _do_forge.bind(it)
+	return e
+
+
+## "Disenchant" (M6, next to Sell): the item becomes team Arcane Dust (Enchanter.dust_for as the
+## detail). Not offered for an Artifact; greyed out for the hero's last weapon like Sell.
+func _disenchant_entry(it: ItemInstance, last_weapon: bool) -> MenuEntry:
+	var e := _entry("Disenchant")
+	e.detail = "+%d Dust" % Enchanter.dust_for(it)
+	if last_weapon:
+		_need_weapon(e)
+	else:
+		e.action = _do_disenchant.bind(it)
 	return e
 
 
@@ -756,6 +813,9 @@ func _do_sell(it: ItemInstance) -> void:
 	var eq := equipment()
 	if not eq.backpack.has(it):
 		return
+	if not it.can_sell():
+		_message(ARTIFACT_NO_SELL, "", UiTheme.RED)
+		return
 	var value := it.sell_value()
 	if not eq.remove_from_backpack(it):
 		_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
@@ -764,6 +824,24 @@ func _do_sell(it: ItemInstance) -> void:
 	close_menu()
 	_message("+%d gold" % value, "", UiTheme.GOLD, true)
 	item_sold.emit(it, value)
+
+
+## Disenchants backpack item [param it] (Enchanter.disenchant): it leaves the backpack and its Dust
+## goes to the team pile; the toast says how much.
+func _do_disenchant(it: ItemInstance) -> void:
+	var eq := equipment()
+	if not eq.backpack.has(it):
+		return
+	var dust := Enchanter.disenchant(eq, it, slot.index if slot != null else -1)
+	if dust <= 0:
+		if eq.is_last_weapon(it):
+			_message(Equipment.NEED_WEAPON, "", UiTheme.RED)
+		else:
+			_message("Cannot be disenchanted", "", UiTheme.RED)
+		return
+	close_menu()
+	_message("+%s" % DustIcon.bbcode(dust), "+%d Dust" % dust, DustIcon.COLOR_BRIGHT)
+	item_disenchanted.emit(it, dust)
 
 
 func _do_trade(it: ItemInstance, mate: PlayerSlot) -> void:
@@ -875,6 +953,12 @@ func _build() -> void:
 	talents.prompts_changed.connect(_on_talents_prompts_changed)
 	talents.points_changed.connect(_on_talent_points_changed)
 	col.add_child(talents)
+	enchanter = EnchanterTab.create(slot)
+	enchanter.visible = false
+	enchanter.message.connect(_on_enchanter_message)
+	enchanter.prompts_changed.connect(_on_enchanter_prompts_changed)
+	enchanter.label_changed.connect(_refresh_tab_labels)
+	col.add_child(enchanter)
 	col.add_child(_build_prompt_row())
 	_layout_cells()
 	_build_menu()
@@ -955,6 +1039,11 @@ func _refresh_tabs() -> void:
 			var lock := UiIcon.create(UiIcon.Kind.LOCK, Vector2(16, 16), Color(0.55, 0.5, 0.44))
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(lock)
+		elif i == ENCHANTER_TAB:
+			# The team's Dust sparkle in front of the label ("Enchanter (12)": the UI font has no ✦).
+			var dust := DustIcon.create(16.0)
+			dust.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(dust)
 		var l := UiTheme.label(tab_text(i), &"", 20 if active else UiTheme.FONT_SMALL,
 			UiTheme.GOLD_BRIGHT if active else (Color(0.55, 0.52, 0.48) if locked else UiTheme.TEXT_DIM.lightened(0.1)))
 		if active:
@@ -980,14 +1069,18 @@ func _refresh_tabs() -> void:
 
 
 ## The label of tab [param index]: its name; the Talents tab adds the free talent points
-## ("Talents (2)", TalentTab.tab_label).
+## ("Talents (2)", TalentTab.tab_label), the Enchanter tab the team's Arcane Dust ("Enchanter (12)",
+## EnchanterTab.tab_label).
 func tab_text(index: int) -> String:
 	if index == TALENTS_TAB and talents != null:
 		return talents.tab_label()
+	if index == ENCHANTER_TAB and enchanter != null:
+		return enchanter.tab_label()
 	return TAB_NAMES[index] if index >= 0 and index < TAB_NAMES.size() else ""
 
 
-## Updates the tab names in place (the free talent points changed; no strip rebuild).
+## Updates the tab names in place (the free talent points or the team's Dust changed; no strip
+## rebuild).
 func _refresh_tab_labels() -> void:
 	for i in _tab_labels.size():
 		var text := tab_text(i)
@@ -1379,6 +1472,9 @@ func _update_prompts() -> void:
 	if active_tab == TALENTS_TAB:
 		_update_tab_prompts("talents", talents.prompt_spec(), talents.context_text())
 		return
+	if active_tab == ENCHANTER_TAB:
+		_update_tab_prompts("enchanter", enchanter.prompt_spec(), enchanter.context_text())
+		return
 	var cell := _cells[selected]
 	var it := selected_item()
 	var key := "%d:%s:%s:%s:%s" % [mode, it != null, cell.bag_index >= 0, comparison, _focused]
@@ -1409,7 +1505,7 @@ func _update_trainer_prompts() -> void:
 	_update_tab_prompts("trainer", trainer.prompt_spec(), trainer.context_text())
 
 
-## The prompt row of the Trainer / Talents tab ([param tab_key]): [param spec] = [button, text]
+## The prompt row of the Trainer / Talents / Enchanter tab ([param tab_key]): [param spec] = [button, text]
 ## pairs (PlayerInput.Pad or TrainerTab.NAV_PROMPT / NAV_PROMPT_SIDEWAYS), [param context] the
 ## text on the left. Rebuilt only when something changed.
 func _update_tab_prompts(tab_key: String, spec: Array, context: String) -> void:
@@ -1453,6 +1549,15 @@ func _on_talents_message(bbcode: String, plain: String, color: Color, coin: bool
 
 func _on_talents_prompts_changed() -> void:
 	if active_tab == TALENTS_TAB and _prompt_holder != null:
+		_update_prompts()
+
+
+func _on_enchanter_message(bbcode: String, plain: String, color: Color, coin: bool) -> void:
+	_message(bbcode, plain, color, coin)
+
+
+func _on_enchanter_prompts_changed() -> void:
+	if active_tab == ENCHANTER_TAB and _prompt_holder != null:
 		_update_prompts()
 
 

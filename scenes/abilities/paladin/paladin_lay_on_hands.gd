@@ -104,9 +104,9 @@ func cast(ctx: AbilityContext) -> bool:
 	var shield_pct := ctx.num("shield_max_hp") * PaladinKit.healing_mult(p)
 	var guard := minf(MAX_GUARD, ctx.num("guard") * power)
 	for hero in targets:
-		hero.heal(heal_for(ctx, hero))
+		hero.heal(heal_for(ctx, hero), p.slot_index())
 		if shield_pct > 0.0 and hero.procs != null:
-			hero.procs.add_shield(hero.max_hp() * shield_pct / 100.0 * power, ctx.num("shield_duration", 8.0))
+			hero.procs.add_shield(hero.max_hp() * shield_pct / 100.0 * power, ctx.num("shield_duration", 8.0), &"", p.slot_index())
 		if guard > 0.0:
 			hero.damage_taken_mults[_key] = 1.0 - guard / 100.0
 			_guarded[hero.get_instance_id()] = hero

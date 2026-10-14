@@ -233,7 +233,14 @@ func test_bots_reroll_a_real_stall_and_buy_the_redraw() -> void:
 	var spent_on_rerolls := 0
 	for r in rerolled:
 		spent_on_rerolls += int(r[1])
-	check_eq(RunState.gold, start - spent_on_rerolls - spent_on_items, "rerolls and items paid from the wallet")
+	# From wave 6 / 15 the bots also take consumables and the Black Market (M6 gold sinks), which
+	# are not offers of the grid: they are in the spend log under their own kinds.
+	var spent_on_sinks := 0
+	for e in RunState.spend_log:
+		if e["kind"] == &"consumable" or e["kind"] == &"black_market":
+			spent_on_sinks += int(e["amount"])
+	check_eq(RunState.gold, start - spent_on_rerolls - spent_on_items - spent_on_sinks,
+		"rerolls, items, consumables and the Black Market paid from the wallet")
 	check(real.reroll_votes.is_empty(), "no bot vote left standing")
 	check(rerolled.size() <= Intermission.BOT_MAX_REROLLS, "within the cap")
 

@@ -153,6 +153,8 @@ static func strike(p: Player, e: Enemy, hit: float, threshold_pct: float, boss_m
 			amount = maxf(amount, e.hp / mult * 1.001 + 0.01)
 	p.procs.deal_raw(e, amount, school, true, &"ability")
 	if execute and is_instance_valid(e) and not e.is_dead() and e.hp > 0.0:
+		# The finishing blow bypasses ProcSystem.deal_raw, so the damage meter hears it here.
+		RunState.record_damage(p.slot_index(), e.hp)
 		e.take_damage(e.hp, false, p)
 	return execute
 
