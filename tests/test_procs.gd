@@ -243,6 +243,18 @@ func test_on_kill_and_when_struck_chances() -> void:
 	check_eq(RunState.gold, n, "+1 gold each")
 
 
+func test_greedy_pays_one_gold_per_proc() -> void:
+	var p := _hero()
+	p.equipment.equip(enchanted(&"greedy"))
+	var corpse := _fake(Vector3(3, 0, 0))
+	for i in 2000:
+		p.procs.on_kill(corpse)
+		p.procs._physics_process(0.6)  # past the 0.5 s internal cooldown
+	var n := p.procs.fire_count(&"greedy")
+	check(n > 60 and n < 150, "~5%% of 2000 kills (%d)" % n)
+	check_eq(RunState.gold, n, "+1 gold per proc (GDD 5.8)")
+
+
 # --- Blocks -----------------------------------------------------------------------------
 
 func test_bolt_scales_with_spell_power_and_school_and_never_chains() -> void:

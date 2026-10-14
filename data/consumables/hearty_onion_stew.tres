@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hearty_onion_stew"
+display_name = "Hearty Onion Stew"
+kind = 1
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"spirit": 5.0
+},
+"stats_pct": {
+"max_hp": 15.0
+}
+}])
+base_price = 10
+icon_id = &"hearty_onion_stew"
+description = "Thick, warm and a little too oniony. More health and a steady regeneration for one wave."

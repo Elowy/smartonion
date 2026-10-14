@@ -196,12 +196,13 @@ func test_director_schedules_elites_at_wave_start() -> void:
 	EliteAffixes.rate_mult = 3.0
 	var d := _director()
 	var state := RunState.rng.state
-	var expected := EliteAffixes.schedule(10, RunState.wave_duration(10), RunState.player_count, RunState.rng)
+	# (Wave 10 is a boss wave since M6 – no elites there – so wave 9.)
+	var expected := EliteAffixes.schedule(9, RunState.wave_duration(9), RunState.player_count, RunState.rng)
 	RunState.rng.state = state
-	d.start_wave(10)
-	check(not expected.is_empty(), "elites expected at wave 10 with rate 3")
+	d.start_wave(9)
+	check(not expected.is_empty(), "elites expected at wave 9 with rate 3")
 	check_eq(d.elite_times(), expected, "the schedule is drawn right at wave start, before the first group pick")
-	check_eq(d.duration, RunState.wave_duration(10), "wave duration")
+	check_eq(d.duration, RunState.wave_duration(9), "wave duration")
 	check_eq(d.elapsed(), 0.0, "nothing elapsed yet")
 	d.stop()
 	check(d.elite_times().is_empty(), "stop() drops the remaining times")

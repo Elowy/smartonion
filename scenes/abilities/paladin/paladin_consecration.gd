@@ -241,7 +241,7 @@ func _bind(p: Player) -> void:
 func _heal_inside(p: Player, tree: SceneTree, center: Vector3, reach: float, heal_pct: float) -> void:
 	var mult := PaladinKit.healing_mult(p)
 	for hero in PaladinKit.living_heroes_around(tree, center, reach):
-		hero.heal(hero.max_hp() * heal_pct / 100.0 * mult)
+		hero.heal(hero.max_hp() * heal_pct / 100.0 * mult, p.slot_index())
 
 
 ## Righteous Fury: every living enemy inside is taunted to the Paladin.

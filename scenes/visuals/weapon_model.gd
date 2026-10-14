@@ -16,6 +16,7 @@ const RARITY_COLORS: Array[Color] = [
 	Color(0.0, 0.44, 0.87),   # rare
 	Color(0.64, 0.21, 0.93),  # epic
 	Color(1.0, 0.5, 0.0),     # legendary
+	Color(1.0, 0.84, 0.4),    # artifact (M6)
 ]
 ## Rarity from which a weapon glows faintly (GDD 13: epic and legendary).
 const GLOW_RARITY := 3

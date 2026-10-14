@@ -88,7 +88,7 @@ func _shock() -> void:
 	var here := player.global_position
 	var who := PaladinKit.lowest_hero(tree, here, _range, true)
 	if who != null and PaladinKit.hp_ratio(who) < _heal_below:
-		who.heal(PaladinKit.heal_amount(player, who, _heal_flat, _heal_max_hp_pct, _heal_sp_scale))
+		who.heal(PaladinKit.heal_amount(player, who, _heal_flat, _heal_max_hp_pct, _heal_sp_scale), player.slot_index())
 		heals += 1
 		_left = interval_now()
 		if who != player:

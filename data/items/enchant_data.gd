@@ -5,8 +5,16 @@ extends Resource
 
 enum Kind { EQUIP, ON_HIT, ON_KILL, WHEN_STRUCK }
 
-## Value multiplier per rank (I, II, III) – GDD 5.7: rank grows with the item's wave.
-const RANK_MULT: Array[float] = [1.0, 1.5, 2.0]
+## Value multiplier per rank (I..V) – GDD 5.7: the starting rank (I..III) follows the item's
+## wave, IV and V come only from the Enchanter's Empower (M6).
+const RANK_MULT: Array[float] = [1.0, 1.5, 2.0, 2.5, 3.0]
+## Highest rank index (V).
+const MAX_RANK := 4
+## Highest rank the generator rolls (III): generated and hand-made items never start above it,
+## Enchanter.empower reaches IV and V.
+const MAX_GENERATED_RANK := 2
+## Display label of every rank index.
+const RANK_LABELS: Array[String] = ["I", "II", "III", "IV", "V"]
 
 @export var id: StringName
 ## Name prefix of the item, e.g. "Blazing".
@@ -46,6 +54,11 @@ const RANK_MULT: Array[float] = [1.0, 1.5, 2.0]
 
 static func rank_mult(rank: int) -> float:
 	return RANK_MULT[clampi(rank, 0, RANK_MULT.size() - 1)]
+
+
+## "I".."V" for a rank index (0..4); out-of-range ranks clamp.
+static func rank_label(rank: int) -> String:
+	return RANK_LABELS[clampi(rank, 0, RANK_LABELS.size() - 1)]
 
 
 func is_proc() -> bool:

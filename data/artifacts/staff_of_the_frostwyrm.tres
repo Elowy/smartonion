@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="ArtifactData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/artifact_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"staff_of_the_frostwyrm"
+display_name = "Staff of the Frostwyrm"
+flavor = "Winter has a long memory and a longer reach."
+slot_type = 11
+armor_type = -1
+rarity = 5
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 14.0,
+&"crit": 7.0,
+&"haste": 7.0
+})
+enchant_ids = Array[StringName]([&"arcane_touched", &"frostbite"])
+enchant_ranks = Array[int]([1, 1])
+class_restriction = &"mage"
+sources = Array[StringName]([&"loot"])
+min_wave = 10
+weight = 0.0
+class_id = &"mage"
+unlock_waves = Array[int]([3, 6])
+properties = Array[Dictionary]([{
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "blizzard"
+},
+"mods": {
+"nth_cast_add": 4.0,
+"nth_radius_bonus_add": 1.0
+},
+"requires": {
+"knows": "blizzard"
+}
+}],
+"name": "Frostwyrm's Breath",
+"needs": "blizzard",
+"short": "Every 4th Blizzard has double the radius.",
+"text": "Every 4th Blizzard has double the radius."
+}, {
+"effects": [{
+"kind": "script",
+"params": {
+"duration": 2.0,
+"radius": 3.0,
+"slow": 40.0
+},
+"script": "res://scenes/artifacts/mage_frost_shards.gd"
+}],
+"name": "Shatterfrost",
+"short": "Slowed or frozen kills burst into frost shards: 40% slow, 2 sec, 3 m.",
+"text": "Enemies you kill while they are slowed or frozen burst into frost shards that slow enemies within 3 m by 40% for 2 sec."
+}])
+weapon_color = Color(0.55, 0.85, 1, 1)

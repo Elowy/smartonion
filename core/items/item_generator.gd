@@ -24,6 +24,9 @@ extends RefCounted
 ## known (&"class_data" bias or &"usable_by"): classes whose own weapon is magic (Mage,
 ## Warlock) mostly roll Spell Power, the others Attack Power (power_enchant_weight); items
 ## for nobody in particular keep both.
+## Artifacts (M6, GDD 5.5): never rolled from the tables – [method generate_artifact] /
+## [method from_artifact] make the class's ArtifactData (called by LootDrops.roll_artifact):
+## rarity Artifact, Item Level 10 + 3 x wave + 25, fixed enchants, no rng draw at all.
 
 enum Source { SHOP, LOOT, ELITE, GOBLIN, BOSS }
 
@@ -95,6 +98,9 @@ const FORTUNE_PER_TIER := 0.01
 const GOBLIN_EPIC_SHARE := 0.25
 ## Boss: Epic+, this share Legendary (GDD 10.1).
 const BOSS_LEGENDARY_SHARE := 0.2
+
+## Artifacts (GDD 5.5): Greed pays this many Epic prices of the wave (not the sell value).
+const ARTIFACT_GREED_MULT := 5.0
 
 ## Enchant counts (GDD 5.2 / 5.7).
 const UNCOMMON_ENCHANT_CHANCE := 0.3
@@ -265,8 +271,9 @@ static func stat_cost(stats: Dictionary) -> float:
 
 
 ## Enchant rank (0 = I, 1 = II, 2 = III) by the item's wave; looted items get one rank more.
+## Never above III (EnchantData.MAX_GENERATED_RANK): IV and V only come from the Enchanter.
 static func enchant_rank(wave: int, looted: bool) -> int:
-	return mini(Items.material_tier(wave) + (1 if looted else 0), EnchantData.RANK_MULT.size() - 1)
+	return mini(Items.material_tier(wave) + (1 if looted else 0), EnchantData.MAX_GENERATED_RANK)
 
 
 ## How many random enchants an item of [param rarity] gets (GDD 5.2 / 5.7).
@@ -323,8 +330,17 @@ static func enchant_fits(enchant: EnchantData, item: ItemInstance) -> bool:
 ##   &"fortune": float
 ##   &"team_classes": Array[ClassData] – the party (LootDrops.team_classes): a tier-set piece
 ##       rolled without &"usable_by" / &"class_data" is for one of these classes
+##   &"rarity" = Items.Rarity.ARTIFACT: the Artifact of the class of &"usable_by" / &"class_data"
+##       (else of the first &"team_classes" class that has one) – [method generate_artifact]; falls
+##       back to a Legendary when no class / Artifact fits
 static func generate(source: Source, wave: int, rng: RandomNumberGenerator, options: Dictionary = {}) -> ItemInstance:
 	wave = maxi(1, wave)
+	if options.has(&"rarity") and int(options[&"rarity"]) >= Items.Rarity.ARTIFACT:
+		var artifact := generate_artifact(_artifact_class_of(options), wave)
+		if artifact != null:
+			return artifact
+		options = options.duplicate()
+		options[&"rarity"] = Items.Rarity.LEGENDARY
 	var looted := source != Source.SHOP
 	var rarity: int
 	if options.has(&"rarity"):
@@ -384,6 +400,33 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 	return _make_from_base(base, rarity, wave, looted, favour, rng, for_class)
 
 
+## The Artifact of [param class_id] as an item of [param wave] (null when the class has none) –
+## see [method from_artifact]. Draws nothing from any rng.
+static func generate_artifact(class_id: StringName, wave: int) -> ItemInstance:
+	var data := Db.artifact_for_class(class_id)
+	return from_artifact(data, wave) if data != null else null
+
+
+## Gold a Greed on an Artifact of [param wave] pays (GDD 5.5: 5 x the Epic price of the wave).
+static func artifact_greed_value(wave: int) -> int:
+	return roundi(price_for(Items.Rarity.EPIC, wave) * ARTIFACT_GREED_MULT)
+
+
+## The class id of a generate() call's options: usable_by, else class_data, else the first
+## team class that has an Artifact ("" = none).
+static func _artifact_class_of(options: Dictionary) -> StringName:
+	var cd := (options.get(&"usable_by") as ClassData)
+	if cd == null:
+		cd = options.get(&"class_data") as ClassData
+	if cd != null:
+		return cd.id
+	for c: Variant in options.get(&"team_classes", []):
+		var team_class := c as ClassData
+		if team_class != null and Db.artifact_for_class(team_class.id) != null:
+			return team_class.id
+	return &""
+
+
 ## A weapon item of [param base] (rarity damage multiplier, bonus stats, enchants).
 static func generate_weapon(base: WeaponData, rarity: int, wave: int, looted: bool, rng: RandomNumberGenerator) -> ItemInstance:
 	return _make_weapon(base, rarity, maxi(1, wave), looted, null, rng)
@@ -417,11 +460,7 @@ static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: Rand
 		item.slot_type = data.slot_type
 		item.armor_type = data.armor_type
 	var mult := tier_multiplier(wave) * (LOOTED_BUDGET_MULT if looted else 1.0)
-	for stat in data.stats:
-		var v := data.stats[stat]
-		if v > 0.0:
-			v = float(roundi(v * mult)) if is_equal_approx(v, roundf(v)) else snappedf(v * mult, 0.5)
-		item.stats[stat] = v
+	item.stats = _scaled_unique_stats(data.stats, mult)
 	var armor := implicit_armor(item.armor_type, item.slot_type, wave)
 	if armor > 0:
 		item.stats[Stats.ARMOR] = item.stats.get(Stats.ARMOR, 0.0) + armor
@@ -430,11 +469,75 @@ static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: Rand
 		if enchant == null:
 			continue
 		var rank := data.enchant_ranks[i] if i < data.enchant_ranks.size() else enchant_rank(wave, false)
-		item.enchants.append(EnchantRoll.new(enchant, rank + (1 if looted else 0)))
-	if data.rarity >= Items.Rarity.LEGENDARY and item.enchants.size() < LEGENDARY_ENCHANTS:
+		item.enchants.append(EnchantRoll.new(enchant,
+				mini(rank + (1 if looted else 0), EnchantData.MAX_GENERATED_RANK)))
+	# (An Artifact keeps exactly its fixed enchants: no top-up, no rng.)
+	if data.rarity == Items.Rarity.LEGENDARY and item.enchants.size() < LEGENDARY_ENCHANTS:
 		_roll_enchants(item, LEGENDARY_ENCHANTS - item.enchants.size(), rng, for_class)
 	item.buy_price = price_for(data.rarity, wave)
 	return item
+
+
+## [param stats] of a hand-made item scaled by [param mult] (positive whole numbers round,
+## fractions snap to 0.5; negative stats stay as designed).
+static func _scaled_unique_stats(stats: Dictionary, mult: float) -> Dictionary[StringName, float]:
+	var out: Dictionary[StringName, float] = {}
+	for stat: StringName in stats:
+		var v := float(stats[stat])
+		if v > 0.0:
+			v = float(roundi(v * mult)) if is_equal_approx(v, roundf(v)) else snappedf(v * mult, 0.5)
+		out[stat] = v
+	return out
+
+
+## The Artifact item of [param data] made at [param wave] (GDD 5.5): rarity Artifact, looted
+## stats (tier and loot bonus like any hand-made item) and fixed enchants, Item Level
+## 10 + 3 x wave + 25 (no Looted +6), the weapon at the Artifact damage multiplier with
+## artifact_base_damage remembered for the growth, the model tint, and – for a pair (Fangs of
+## the Shadow) – the off-hand piece as [member ItemInstance.companion]. No rng draw.
+static func from_artifact(data: ArtifactData, wave: int) -> ItemInstance:
+	if data == null:
+		return null
+	wave = maxi(1, wave)
+	var item := from_unique(data, wave, true, null, Db.get_class_data(data.class_id))
+	if data.class_id != &"":
+		item.class_restriction = data.class_id
+	item.rarity = Items.Rarity.ARTIFACT
+	_finish_artifact_piece(item, data, wave)
+	item.buy_price = artifact_greed_value(wave) * 2
+	if data.is_pair():
+		var off := ItemInstance.new()
+		off.source_id = data.id
+		off.unique = true
+		off.display_name = data.pair_name if data.pair_name != "" else data.display_name
+		off.flavor = data.flavor
+		off.rarity = Items.Rarity.ARTIFACT
+		off.wave = wave
+		off.looted = true
+		off.class_restriction = item.class_restriction
+		off.slot_type = Items.SlotType.WEAPON
+		off.weapon = ItemInstance.scaled_weapon(data.pair_weapon, Items.Rarity.ARTIFACT)
+		off.stats = _scaled_unique_stats(data.pair_stats, tier_multiplier(wave) * LOOTED_BUDGET_MULT)
+		for i in data.pair_enchant_ids.size():
+			var enchant := Db.get_enchant(data.pair_enchant_ids[i])
+			if enchant != null:
+				var rank := data.pair_enchant_ranks[i] if i < data.pair_enchant_ranks.size() else enchant_rank(wave, false)
+				off.enchants.append(EnchantRoll.new(enchant, rank + 1))
+		off.pair_off = true
+		off.buy_price = item.buy_price
+		_finish_artifact_piece(off, data, wave)
+		item.companion = off
+	return item
+
+
+## Item Level, growth baseline and look of one piece of an Artifact.
+static func _finish_artifact_piece(piece: ItemInstance, data: ArtifactData, wave: int) -> void:
+	piece.item_level = Items.item_level(wave, Items.Rarity.ARTIFACT, false)
+	piece.artifact_waves = 0
+	if piece.weapon != null:
+		piece.artifact_base_damage = piece.weapon.base_damage
+		if data.weapon_color.a > 0.0:
+			piece.weapon.color = data.weapon_color
 
 
 static func _make_from_base(base: ItemBase, rarity: int, wave: int, looted: bool,

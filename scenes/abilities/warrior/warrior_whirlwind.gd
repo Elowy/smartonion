@@ -16,6 +16,10 @@ extends AbilityEffect
 ##                  talent "Meat Cleaver" adds 3; not "power"-scaled, Resource Regen applies)
 ##   rage_per_enemy_max  at most this much refund per spin (before Resource Regen; 12)
 ## Rank V "Unrelenting" lowers the Rage cost (cost_add).
+## Artifact (Earthsplitter, "Earthquake"): quake_duration (s, 0 = off) / quake_pct (% weapon
+## damage per tick) / quake_tick (s): the cast also leaves an earthquake zone of the spin's base
+## radius at the hero's feet for quake_duration seconds (an AbilityArea: it ticks weapon damage
+## on every enemy inside and is swept at the wave end like any ground effect).
 ##
 ## Meat Cleaver: a spin never refunds more Rage than this cast paid
 ## (AbilityRunner.last_paid – 0 for a free cast, so a free spin refunds nothing); the Rage
@@ -32,6 +36,8 @@ const DEFAULT_INTERVAL := 0.25
 const DEFAULT_SLOW_DURATION := 1.5
 const SPARK_COLOR := Color(1.0, 0.55, 0.3)
 const DEFAULT_RAGE_PER_ENEMY_MAX := 12.0
+const DEFAULT_QUAKE_TICK := 0.5
+const QUAKE_COLOR := Color(0.78, 0.5, 0.25, 0.4)
 
 var _player: Player
 var _spin := WarriorSpin.new()
@@ -105,7 +111,25 @@ func cast(ctx: AbilityContext) -> bool:
 	_casting = true
 	_spin.start(_player, _player, duration)
 	_casting = false
+	_spawn_quake(ctx)
 	return true
+
+
+## Earthsplitter's "Earthquake": a ground zone at the hero's feet that ticks weapon damage.
+func _spawn_quake(ctx: AbilityContext) -> void:
+	var quake := ctx.num("quake_duration")
+	var pct := ctx.num("quake_pct")
+	if quake <= 0.0 or pct <= 0.0 or not _player.is_inside_tree():
+		return
+	var area := AbilityArea.spawn(_player, _player.global_position, ctx.num("radius", DEFAULT_RADIUS),
+			quake, QUAKE_COLOR)
+	if not area.is_inside_tree():
+		area.free()
+		return
+	area.school = ctx.ability.school
+	area.tick_interval = maxf(0.1, ctx.num("quake_tick", DEFAULT_QUAKE_TICK))
+	area.damage_per_tick = WarriorKit.weapon_damage(_player) * pct / 100.0
+	WarriorClapVfx.spawn(area.global_position, area.radius, true)
 
 
 func tick(_ctx: AbilityContext, delta: float) -> void:

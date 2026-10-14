@@ -11,6 +11,8 @@ extends PanelContainer
 ## Healer's, whichever is further along) and the hint "Go to the Spirit Healer".
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge, icons on the inside.
 ## Learned abilities make the frame wider (towards the screen centre), never taller.
+## M6: the hero's active consumables (flask / elixir, food – Player.consumables_active) show as
+## small ConsumableIcons behind the class name in the name row ([member consumable_icons]).
 
 ## Compact (it sits in a screen corner over the playfield): ~430 x 104 reference px with the
 ## core abilities, up to MAX_WIDTH with every learned slot filled. The height matters most – CameraRig keeps the heroes out of full-width bands at the top / bottom of the
@@ -23,6 +25,8 @@ const MAX_WIDTH := 640.0
 const PORTRAIT_SIZE := 76.0
 ## Ability icon side (the prompt pill hangs AbilityIcon.PROMPT_OVERHANG below it).
 const ABILITY_ICON_SIZE := 42.0
+## Side of the small consumable icons in the name row.
+const CONSUMABLE_ICON_SIZE := 24.0
 ## The HP / resource bars never get narrower than this (learned slots widen the frame instead).
 const BARS_MIN_WIDTH := 214.0
 ## Panel fill opacity – the battlefield shows through a little.
@@ -53,6 +57,8 @@ var resource_bar: UiBar:
 var name_label: Label
 ## Inline holder at the inner end of the name row for secondary pip rows (Combo Points).
 var name_pips: HBoxContainer
+## The small icons of the hero's active consumables, behind the class name.
+var consumable_icons: HBoxContainer
 var downed_overlay: PanelContainer
 var revive_bar: UiBar
 var hint_label: Label
@@ -106,7 +112,11 @@ func _build() -> void:
 	name_pips = UiTheme.hbox(0)
 	name_pips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_pips.alignment = BoxContainer.ALIGNMENT_BEGIN if mirrored else BoxContainer.ALIGNMENT_END
-	var name_parts: Array[Control] = [_player_label, dot, _class_label]
+	consumable_icons = UiTheme.hbox(3)
+	consumable_icons.name = "ConsumableIcons"
+	consumable_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	consumable_icons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var name_parts: Array[Control] = [_player_label, dot, _class_label, consumable_icons]
 	if mirrored:
 		name_parts.push_front(name_pips)
 	else:
@@ -194,6 +204,8 @@ func bind(p: Player) -> void:
 	p.hp_changed.connect(_on_hp_changed)
 	p.downed_changed.connect(_on_downed_changed)
 	p.damage_taken.connect(_on_damage_taken)
+	p.consumables_changed.connect(_refresh_consumables)
+	_refresh_consumables()
 	hp_bar.animated = false
 	_on_hp_changed(p.hp, p.max_hp())
 	hp_bar.animated = true
@@ -219,15 +231,44 @@ func unbind() -> void:
 			player.downed_changed.disconnect(_on_downed_changed)
 		if player.damage_taken.is_connected(_on_damage_taken):
 			player.damage_taken.disconnect(_on_damage_taken)
+		if player.consumables_changed.is_connected(_refresh_consumables):
+			player.consumables_changed.disconnect(_refresh_consumables)
 	player = null
 	_bound = false
 	resource_display.unbind()
 	ability_bar.unbind()
+	_clear_consumables()
 	visible = false
 
 
 func is_downed_shown() -> bool:
 	return downed_overlay.visible
+
+
+## Rebuilds the small consumable icons from the hero's active consumables (potion first).
+func _refresh_consumables() -> void:
+	_clear_consumables()
+	if not is_instance_valid(player):
+		return
+	for data in player.consumables_active:
+		var icon := ConsumableIcon.create(data, CONSUMABLE_ICON_SIZE)
+		icon.name = "Icon_%s" % data.id
+		consumable_icons.add_child(icon)
+
+
+func _clear_consumables() -> void:
+	for c in consumable_icons.get_children():
+		consumable_icons.remove_child(c)
+		c.queue_free()
+
+
+## The consumables whose icons are shown (tests, screenshots).
+func shown_consumables() -> Array[ConsumableData]:
+	var out: Array[ConsumableData] = []
+	for c in consumable_icons.get_children():
+		if c is ConsumableIcon and not c.is_queued_for_deletion():
+			out.append((c as ConsumableIcon).data)
+	return out
 
 
 func _on_hp_changed(hp: float, max_hp: float) -> void:
@@ -270,6 +311,7 @@ func _process(_delta: float) -> void:
 		_bound = false
 		resource_display.unbind()
 		ability_bar.unbind()
+		_clear_consumables()
 		visible = false
 		return
 	if player.downed:

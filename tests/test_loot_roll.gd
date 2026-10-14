@@ -74,8 +74,10 @@ func test_choose_and_all_decided() -> void:
 	check(roll.all_decided([] as Array[int]), "vacuously decided")
 
 
-func test_all_pass_loses_the_item() -> void:
-	var roll := LootRoll.create(_sword())
+func test_all_pass_disenchants_the_item_into_team_dust() -> void:
+	var item := _sword()
+	item.rarity = Items.Rarity.EPIC
+	var roll := LootRoll.create(item)
 	for i in 3:
 		roll.choose(i, LootRoll.Choice.PASS)
 	roll.resolve(rng)
@@ -83,11 +85,53 @@ func test_all_pass_loses_the_item() -> void:
 	check_eq(roll.winner, -1, "no winner")
 	check(roll.rolls.is_empty(), "nobody rolled")
 	var gold := RunState.gold
+	var dust := RunState.arcane_dust
 	roll.apply(slots)
 	check_eq(RunState.gold, gold, "no gold")
+	check_eq(RunState.arcane_dust, dust + 8, "an Epic is 8 Dust for the team")
+	check_eq(roll.dust, 8, "the roll remembers it")
+	check_eq(RunState.dust_earned, 8, "counted as earned")
+	check_eq(int(RunState.dust_gain_log[0]["slot"]), -1, "the team's, not a player's")
 	for s in slots:
 		check(Support.equipment_of(s).backpack.is_empty(), "no backpack gained an item")
 	check_eq(RunState.greed_gold, 0, "no greed gold")
+	roll.apply(slots)
+	check_eq(RunState.arcane_dust, dust + 8, "apply works once")
+
+
+func test_dust_by_rarity_when_everybody_passes() -> void:
+	var want: Array[int] = [1, 2, 4, 8, 16]
+	for r in 5:
+		RunState.start_run(3, 5)
+		var item := _sword()
+		item.rarity = r
+		var roll := LootRoll.create(item)
+		roll.resolve(rng)  # nobody decided: everybody passes
+		roll.apply(slots)
+		check_eq(RunState.arcane_dust, want[r], "%s = %d Dust" % [Items.RARITY_NAMES[r], want[r]])
+
+
+func test_an_artifact_nobody_wants_is_lost_not_disenchanted() -> void:
+	var item := _sword()
+	item.rarity = Items.Rarity.ARTIFACT
+	var roll := LootRoll.create(item)
+	roll.resolve(rng)
+	roll.apply(slots)
+	check_eq(roll.outcome, &"pass", "passed")
+	check_eq(RunState.arcane_dust, 0, "no Dust from an Artifact")
+	check_eq(roll.dust, 0, "none recorded")
+
+
+func test_need_and_greed_make_no_dust() -> void:
+	var needed := LootRoll.create(_sword())
+	needed.choose(0, LootRoll.Choice.NEED)
+	needed.resolve(rng)
+	needed.apply(slots)
+	var sold := LootRoll.create(_sword())
+	sold.choose(1, LootRoll.Choice.GREED)
+	sold.resolve(rng)
+	sold.apply(slots)
+	check_eq(RunState.arcane_dust, 0, "only a pass by everybody disenchants")
 
 
 func test_undecided_counts_as_pass() -> void:

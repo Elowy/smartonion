@@ -10,6 +10,18 @@ extends Control
 ## Forging (GDD 4.1): with a full backpack, buying a weapon the buyer has a forge partner for
 ## forges at once (Shop.BuyResult.FORGED): no "Backpack full", and the log says
 ## "P1 bought and forged [Rare Dagger] – 62 g".
+## M6 (SHOPSINKS): under the item grid sits the consumables row – Consumables.ROW_SIZE compact
+## ConsumableCards (Shop.consumables; unlimited stock, A buys for the player's own hero, a newer
+## potion / food replaces the pending one) – and, from wave 15, the Black Market card (a
+## ShopOfferCard in its wide, gold-framed layout; Shop.black_market) at the right end of that row.
+## The cursor space is one flat list: the item offers 0 .. n - 1, then the consumables, then the
+## Black Market card ([method slot_count], [method card_at]); up / down moves between the grid and
+## the row (to the card nearest in screen x), left / right inside the row. Consumables get a
+## ConsumableTooltip, the Black Market the normal ItemTooltip. X (lock) and R3 (ping) work on the
+## items and the Black Market, not on consumables (unlimited stock: nothing to hold back). The
+## hold-A rule covers every purchase. The row and the cards are laid out in code
+## ([method extras_layout]) so the 4-player stall (10 offers in 5 x 2, the row, the Black Market)
+## fits the 1920 x 1080 canvas, which the 1280 x 720 window shows scaled down.
 ##
 ## Per player (handle_input, called by the Intermission for every slot whose focus is the
 ## shop): d-pad / stick moves the cursor, A buys (hold A for HOLD_TIME when the price is more
@@ -32,6 +44,8 @@ extends Control
 
 ## A purchase went through (also used for bots and the smoke statistics).
 signal item_bought(slot_index: int, item: ItemInstance)
+## A consumable was bought for the hero of [param slot_index] (the Black Market is an item_bought).
+signal consumable_bought(slot_index: int, data: ConsumableData)
 
 const STALL_SIZE := Vector2(704, 800)
 ## Where the stall body starts below the awning (ShopMerchant draws above it).
@@ -42,6 +56,11 @@ const CARD_GAP := 8
 const HOLD_TIME := 1.0
 const HOLD_SHARE := 0.5
 const FEEDBACK_LINES := 3
+const FEEDBACK_LINE_HEIGHT := 22
+## The consumables row under the grid is as wide as the 5-column grid; its Black Market card is
+## ShopOfferCard.WIDE_SIZE.x wide at the right end, the gap above the row is EXTRA_GAP.
+const ROW_WIDTH := MAX_COLUMNS * ShopOfferCard.CARD_SIZE.x + (MAX_COLUMNS - 1) * CARD_GAP
+const EXTRA_GAP := 10
 const FEEDBACK_TIME := 6.0
 const TOOLTIP_GAP := 12.0
 ## Shop tooltips are drawn a little smaller so they cover fewer neighbouring cards; when no
@@ -62,6 +81,10 @@ var tooltip_obstacles: Callable
 ## Offer grid width (5 for 10 offers, 4 for 8 or 4, 3 for 6).
 var columns := MAX_COLUMNS
 var cards: Array[ShopOfferCard] = []
+## The consumables row (Shop.consumables, same order) and the Black Market card (null while the
+## stall has none).
+var consumable_cards: Array[ConsumableCard] = []
+var black_market_card: ShopOfferCard
 
 var _slots: Array[PlayerSlot] = []
 var _cursor: Dictionary[int, int] = {}
@@ -77,6 +100,8 @@ var last_input_consumed := false
 ## Seconds A and X (buy / lock) are ignored for (a press that was meant for the previous screen).
 var _input_lockout := 0.0
 var _tooltips: Dictionary[int, ItemTooltip] = {}
+## The same per player for a hovered consumables card (only one of the two is visible).
+var _cons_tooltips: Dictionary[int, ConsumableTooltip] = {}
 var _tooltip_keys: Dictionary[int, String] = {}
 ## Slot indices, the player who acted last at the end (tooltip priority and draw order).
 var _act_order: Array[int] = []
@@ -94,6 +119,8 @@ var _gold_stale := false
 var _art: ShopMerchant
 var _body: PanelContainer
 var _grid: GridContainer
+## The consumables row under the grid (manual layout: [method extras_layout]).
+var _extras: Control
 var _cursor_layer: Control
 var _gold_label: Label
 var _reroll_label: Label
@@ -130,6 +157,13 @@ static func item_link(item: ItemInstance) -> String:
 	if item == null:
 		return ""
 	return "[color=#%s]%s[/color]" % [ShopOfferCard.rarity_color(item).to_html(false), bb_escape("[%s]" % item.display_name)]
+
+
+## "[Flask of Fury]" in the consumable's kind colour (BBCode).
+static func consumable_link(data: ConsumableData) -> String:
+	if data == null:
+		return ""
+	return "[color=#%s]%s[/color]" % [ConsumableIcon.border_color(data).lightened(0.25).to_html(false), bb_escape("[%s]" % data.display_name)]
 
 
 ## "P2" in the player's colour (BBCode).
@@ -179,6 +213,14 @@ func refresh(slots: Array[PlayerSlot]) -> void:
 			tip.scale = Vector2(TOOLTIP_SCALE, TOOLTIP_SCALE)
 			_tooltip_layer.add_child(tip)
 			_tooltips[s.index] = tip
+		if not _cons_tooltips.has(s.index):
+			var ctip := ConsumableTooltip.create_consumable()
+			ctip.name = "ConsumableTooltip%d" % (s.index + 1)
+			ctip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			ctip.visible = false
+			ctip.scale = Vector2(TOOLTIP_SCALE, TOOLTIP_SCALE)
+			_tooltip_layer.add_child(ctip)
+			_cons_tooltips[s.index] = ctip
 	for i: int in _cursor.keys():
 		if not keep.has(i):
 			_cursor.erase(i)
@@ -191,8 +233,14 @@ func refresh(slots: Array[PlayerSlot]) -> void:
 			_tooltip_keys.erase(i)
 			_tooltip_layer.remove_child(tip)
 			tip.queue_free()
+	for i: int in _cons_tooltips.keys():
+		if not keep.has(i):
+			var ctip := _cons_tooltips[i]
+			_cons_tooltips.erase(i)
+			_tooltip_layer.remove_child(ctip)
+			ctip.queue_free()
 	for i: int in _cursor.keys():
-		_cursor[i] = clampi(_cursor[i], 0, maxi(0, cards.size() - 1))
+		_cursor[i] = clampi(_cursor[i], 0, maxi(0, slot_count() - 1))
 	_tooltip_keys.clear()
 	_watch_equipment()
 	_update_info()
@@ -262,7 +310,7 @@ func cursor_of(slot_index: int) -> int:
 
 
 func set_cursor(slot_index: int, offer_index: int) -> void:
-	_cursor[slot_index] = clampi(offer_index, 0, maxi(0, offer_count() - 1))
+	_cursor[slot_index] = clampi(offer_index, 0, maxi(0, slot_count() - 1))
 	_cursor_layer.queue_redraw()
 
 
@@ -279,14 +327,81 @@ func is_cursor_active(slot_index: int) -> bool:
 	return _active.get(slot_index, true)
 
 
+## Number of item offers (the grid).
 func offer_count() -> int:
 	return shop.offers.size() if shop != null else 0
 
 
+## Number of cards in the consumables row.
+func consumable_count() -> int:
+	return shop.consumables.size() if shop != null else 0
+
+
+func has_black_market() -> bool:
+	return shop != null and shop.black_market != null
+
+
+## Number of positions a cursor can stand on: the offers, the consumables, the Black Market.
+func slot_count() -> int:
+	return offer_count() + consumable_count() + (1 if has_black_market() else 0)
+
+
+## Whether cursor position [param index] is a consumables card.
+func is_consumable_index(index: int) -> bool:
+	return index >= offer_count() and index < offer_count() + consumable_count()
+
+
+## Whether cursor position [param index] is the Black Market card.
+func is_black_market_index(index: int) -> bool:
+	return has_black_market() and index == offer_count() + consumable_count()
+
+
+## The cursor position of the Black Market card (-1 = none).
+func black_market_index() -> int:
+	return offer_count() + consumable_count() if has_black_market() else -1
+
+
+## The index [param index] has in the Shop's own API: an offer's index, the position in the
+## consumables row, or Shop.BLACK_MARKET.
+func shop_index(index: int) -> int:
+	if is_black_market_index(index):
+		return Shop.BLACK_MARKET
+	if is_consumable_index(index):
+		return index - offer_count()
+	return index
+
+
+## The card at cursor position [param index] (null if none).
+func card_at(index: int) -> Control:
+	if index < 0:
+		return null
+	if index < cards.size():
+		return cards[index]
+	var j := index - cards.size()
+	if j < consumable_cards.size():
+		return consumable_cards[j]
+	if j == consumable_cards.size() and black_market_card != null:
+		return black_market_card
+	return null
+
+
+## The offer at cursor position [param index]: an item offer or the Black Market offer (null for
+## a consumables card and out of range).
 func offer_at(index: int) -> Shop.Offer:
-	if shop == null or index < 0 or index >= shop.offers.size():
+	if shop == null:
+		return null
+	if is_black_market_index(index):
+		return shop.black_market
+	if index < 0 or index >= shop.offers.size():
 		return null
 	return shop.offers[index]
+
+
+## The consumables card at cursor position [param index] (null if it is not one).
+func consumable_at(index: int) -> Shop.ConsumableOffer:
+	if shop == null or not is_consumable_index(index):
+		return null
+	return shop.consumable_at(index - offer_count())
 
 
 ## GDD 10: buying something that takes more than half the wallet needs A held for a second.
@@ -303,6 +418,16 @@ func hold_progress(slot_index: int) -> float:
 
 ## Why [param slot] cannot buy offer [param index] right now ("" = it can).
 func buy_block_reason(slot: PlayerSlot, index: int) -> String:
+	if is_consumable_index(index):
+		var c := consumable_at(index)
+		if c == null or c.data == null:
+			return "Nothing there"
+		if RunState.gold < c.price:
+			return "Not enough gold"
+		var hero := slot.player as Player if slot != null else null
+		if hero == null or not is_instance_valid(hero):
+			return "No hero to carry it"
+		return ""
 	var o := offer_at(index)
 	if o == null or o.item == null:
 		return "Nothing there"
@@ -313,7 +438,7 @@ func buy_block_reason(slot: PlayerSlot, index: int) -> String:
 	var eq := equipment_of(slot)
 	if eq == null:
 		return "No hero to carry it"
-	if not eq.has_space() and not shop.forges_on_buy(index, slot):
+	if not eq.has_space() and not shop.forges_on_buy(shop_index(index), slot):
 		return "Backpack full"
 	return ""
 
@@ -321,6 +446,8 @@ func buy_block_reason(slot: PlayerSlot, index: int) -> String:
 ## Buys offer [param index] for [param slot] (no hold check) with feedback. True on success.
 ## An auto-forge (full backpack, Shop.last_forged) reports and emits the forged weapon.
 func try_buy(slot: PlayerSlot, index: int) -> bool:
+	if is_consumable_index(index):
+		return try_buy_consumable(slot, index)
 	var reason := buy_block_reason(slot, index)
 	if reason != "":
 		_say_to(slot, reason)
@@ -328,18 +455,46 @@ func try_buy(slot: PlayerSlot, index: int) -> bool:
 	var o := offer_at(index)
 	var item := o.item
 	var price := o.price
-	if not shop.buy(index, slot):
+	var black_market := is_black_market_index(index)
+	if not shop.buy(shop_index(index), slot):
 		_say_to(slot, "The goblin refuses the deal")
 		return false
 	var forged := shop.last_forged
+	var where := " at the Black Market" if black_market else ""
 	if forged != null:
-		_say("%s bought and forged %s – %s g" % [player_tag(slot), item_link(forged), UiTheme.format_int(price)],
-			"%s bought and forged [%s] – %d g" % [slot.label(), forged.display_name, price])
+		_say("%s bought and forged %s%s – %s g" % [player_tag(slot), item_link(forged), where, UiTheme.format_int(price)],
+			"%s bought and forged [%s]%s – %d g" % [slot.label(), forged.display_name, where, price])
 		item = forged
 	else:
-		_say("%s bought %s – %s g" % [player_tag(slot), item_link(item), UiTheme.format_int(price)],
-			"%s bought [%s] – %d g" % [slot.label(), item.display_name, price])
+		_say("%s bought %s%s – %s g" % [player_tag(slot), item_link(item), where, UiTheme.format_int(price)],
+			"%s bought [%s]%s – %d g" % [slot.label(), item.display_name, where, price])
 	item_bought.emit(slot.index, item)
+	_update_cards()
+	return true
+
+
+## Buys the consumables card at cursor position [param index] for [param slot]'s hero (no hold
+## check) with feedback ("P2 bought [Flask of Fury] – 14 g", plus "(replaces [X])" when it pushed
+## a pending one out). True on success.
+func try_buy_consumable(slot: PlayerSlot, index: int) -> bool:
+	var reason := buy_block_reason(slot, index)
+	if reason != "":
+		_say_to(slot, reason)
+		return false
+	var c := consumable_at(index)
+	var data := c.data
+	var price := c.price
+	if not shop.buy_consumable(shop_index(index), slot):
+		_say_to(slot, "The goblin refuses the deal")
+		return false
+	var replaced := shop.last_replaced
+	var bb := "%s bought %s – %s g" % [player_tag(slot), consumable_link(data), UiTheme.format_int(price)]
+	var plain := "%s bought [%s] – %d g" % [slot.label(), data.display_name, price]
+	if replaced != null:
+		bb += " (replaces %s)" % consumable_link(replaced)
+		plain += " (replaces [%s])" % replaced.display_name
+	_say(bb, plain)
+	consumable_bought.emit(slot.index, data)
 	_update_cards()
 	return true
 
@@ -427,8 +582,8 @@ func _build() -> void:
 	var style := UiTheme.stone_style(UiTheme.GOLD_BORDER, Color(0.15, 0.1, 0.065, 0.97))
 	style.content_margin_left = 16
 	style.content_margin_right = 16
-	style.content_margin_top = 26
-	style.content_margin_bottom = 12
+	style.content_margin_top = 22
+	style.content_margin_bottom = 8
 	style.inner_shadow = 18
 	_body.add_theme_stylebox_override(&"panel", style.rebuild())
 	_body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -436,7 +591,7 @@ func _build() -> void:
 	_body.offset_right = -10
 	_body.offset_top = BODY_TOP
 	add_child(_body)
-	var col := UiTheme.vbox(8)
+	var col := UiTheme.vbox(6)
 	_body.add_child(col)
 
 	# Shared gold (left) and the reroll vote (right).
@@ -470,22 +625,35 @@ func _build() -> void:
 	cs.fill = Color(0.06, 0.045, 0.035, 0.9)
 	cs.content_margin_left = 10
 	cs.content_margin_right = 10
-	cs.content_margin_top = 12
-	cs.content_margin_bottom = 12
+	cs.content_margin_top = 10
+	cs.content_margin_bottom = 10
 	counter.add_theme_stylebox_override(&"panel", cs.rebuild())
 	counter.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(counter)
 	var stack := MarginContainer.new()
 	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	counter.add_child(stack)
+	# The offer grid with the consumables row (and the Black Market card) under it.
+	var content := UiTheme.vbox(EXTRA_GAP)
+	content.name = "Content"
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	content.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	stack.add_child(content)
 	_grid = GridContainer.new()
 	_grid.name = "Offers"
 	_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_grid.add_theme_constant_override(&"h_separation", CARD_GAP)
-	_grid.add_theme_constant_override(&"v_separation", 12)
+	_grid.add_theme_constant_override(&"v_separation", 10)
 	_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	stack.add_child(_grid)
+	content.add_child(_grid)
+	_extras = Control.new()
+	_extras.name = "Extras"
+	_extras.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_extras.custom_minimum_size = Vector2(ROW_WIDTH, ConsumableCard.HEIGHT)
+	_extras.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_extras.visible = false
+	content.add_child(_extras)
 	_cursor_layer = Control.new()
 	_cursor_layer.name = "Cursors"
 	_cursor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -494,7 +662,7 @@ func _build() -> void:
 
 	# Feedback / spending log.
 	var log_box := UiTheme.vbox(0)
-	log_box.custom_minimum_size = Vector2(0, FEEDBACK_LINES * 25)
+	log_box.custom_minimum_size = Vector2(0, FEEDBACK_LINES * FEEDBACK_LINE_HEIGHT)
 	col.add_child(log_box)
 	for i in FEEDBACK_LINES:
 		var l := RichTextLabel.new()
@@ -504,7 +672,7 @@ func _build() -> void:
 		l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		l.add_theme_font_size_override(&"normal_font_size", 19)
-		l.custom_minimum_size = Vector2(0, 25)
+		l.custom_minimum_size = Vector2(0, FEEDBACK_LINE_HEIGHT)
 		log_box.add_child(l)
 		_feedback_labels.append(l)
 
@@ -572,6 +740,7 @@ func _rebuild_cards() -> void:
 		cards.append(c)
 	for i in n:
 		cards[i].set_offer(shop.offers[i], _slots)
+	_rebuild_extras()
 	_holds.clear()
 	_tooltip_keys.clear()
 	_cursor_layer.queue_redraw()
@@ -579,7 +748,7 @@ func _rebuild_cards() -> void:
 
 ## Price colours, locks, pings, sold stamps (and new items after a reroll).
 func _update_cards() -> void:
-	if offer_count() != cards.size():
+	if offer_count() != cards.size() or _extras_changed():
 		_rebuild_cards()
 		return
 	for i in cards.size():
@@ -588,7 +757,85 @@ func _update_cards() -> void:
 			cards[i].set_offer(o, _slots)
 		else:
 			cards[i].update_state()
+	_update_extras()
 	_cursor_layer.queue_redraw()
+
+
+## Where the consumables row's cards ([param k] of them, local to the row) and the Black Market
+## card ([param black_market], last) sit: the Black Market card at the right end of the
+## ROW_WIDTH-wide row, the consumables cards evenly sharing the rest ([param k] = 0: just the
+## Black Market card). Pure geometry, so cursors and tests do not depend on a layout pass.
+static func extras_layout(k: int, black_market: bool) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var h := ConsumableCard.HEIGHT
+	if k > 0:
+		var avail := ROW_WIDTH - ((ShopOfferCard.WIDE_SIZE.x + CARD_GAP) if black_market else 0.0)
+		var w := floorf((avail - (k - 1) * CARD_GAP) / k)
+		for j in k:
+			out.append(Rect2(j * (w + CARD_GAP), 0.0, w, h))
+	if black_market:
+		out.append(Rect2(ROW_WIDTH - ShopOfferCard.WIDE_SIZE.x, 0.0, ShopOfferCard.WIDE_SIZE.x, ShopOfferCard.WIDE_SIZE.y))
+	return out
+
+
+## Whether the number of consumables cards or the Black Market's presence differs from the cards.
+func _extras_changed() -> bool:
+	return consumable_count() != consumable_cards.size() or has_black_market() != (black_market_card != null)
+
+
+## Builds / drops the consumables cards and the Black Market card to match the Shop, places them
+## ([method extras_layout]) and shows the row only when it holds something.
+func _rebuild_extras() -> void:
+	if _extras == null:
+		return
+	var k := consumable_count()
+	var bm := has_black_market()
+	_extras.visible = k > 0 or bm
+	var rects := extras_layout(k, bm)
+	while consumable_cards.size() > k:
+		var c: ConsumableCard = consumable_cards.pop_back()
+		_extras.remove_child(c)
+		c.queue_free()
+	while consumable_cards.size() < k:
+		var c := ConsumableCard.create(consumable_cards.size(), rects[consumable_cards.size()].size.x)
+		_extras.add_child(c)
+		consumable_cards.append(c)
+	for j in k:
+		_place(consumable_cards[j], rects[j])
+		consumable_cards[j].set_offer(shop.consumables[j])
+	if not bm and black_market_card != null:
+		_extras.remove_child(black_market_card)
+		black_market_card.queue_free()
+		black_market_card = null
+	if bm:
+		if black_market_card == null:
+			black_market_card = ShopOfferCard.create_wide(offer_count() + k)
+			_extras.add_child(black_market_card)
+		black_market_card.index = offer_count() + k
+		_place(black_market_card, rects[k])
+		black_market_card.set_offer(shop.black_market, _slots)
+
+
+static func _place(card: Control, rect: Rect2) -> void:
+	card.position = rect.position
+	card.custom_minimum_size = rect.size
+	card.size = rect.size
+
+
+## Prices, holders and new contents of the consumables row and the Black Market card.
+func _update_extras() -> void:
+	for j in consumable_cards.size():
+		var o := shop.consumables[j]
+		if consumable_cards[j].offer != o:
+			consumable_cards[j].set_offer(o)
+		else:
+			consumable_cards[j].update_state()
+	if black_market_card != null:
+		var bm := shop.black_market
+		if black_market_card.offer != bm or (bm != null and black_market_card.icon.item != bm.item):
+			black_market_card.set_offer(bm, _slots)
+		else:
+			black_market_card.update_state()
 
 
 func _on_shop_changed() -> void:
@@ -606,7 +853,12 @@ func _on_shop_rerolled(_count: int) -> void:
 ## True while the offer at the hold's cursor position is still the item (and price) the hold
 ## started on.
 func _hold_matches_offer(hold: Dictionary) -> bool:
-	var o := offer_at(int(hold["offer"]))
+	var index := int(hold["offer"])
+	if is_consumable_index(index):
+		var c := consumable_at(index)
+		return c != null and c.data != null and String(c.data.id).hash() == int(hold["uid"]) \
+			and c.price == int(hold["price"])
+	var o := offer_at(index)
 	return o != null and o.item != null and not o.sold and o.item.uid == int(hold["uid"]) \
 		and o.price == int(hold["price"])
 
@@ -626,6 +878,10 @@ func _on_gold_changed(_gold: int, _delta: int) -> void:
 	_gold_stale = false
 	for c in cards:
 		c.update_state()
+	for c in consumable_cards:
+		c.update_state()
+	if black_market_card != null:
+		black_market_card.update_state()
 	_update_info()
 
 
@@ -690,38 +946,109 @@ func _start_cursor(slot_index: int) -> int:
 
 func _move_cursor(slot_index: int, dir: Vector2i) -> void:
 	var n := offer_count()
-	if n <= 0:
+	var total := slot_count()
+	if total <= 0:
 		return
 	var cols := maxi(1, columns)
-	var cur := clampi(cursor_of(slot_index), 0, n - 1)
-	var col := cur % cols
-	var row := cur / cols
-	if dir.x != 0:
-		var nc := col + dir.x
-		if nc >= 0 and nc < cols and row * cols + nc < n:
-			cur = row * cols + nc
-	if dir.y != 0:
-		var nr := row + dir.y
-		if nr >= 0 and nr * cols < n:
-			cur = mini(nr * cols + col, n - 1)
+	var cur := clampi(cursor_of(slot_index), 0, total - 1)
+	if cur >= n:
+		cur = _move_in_extras(cur, dir)
+	else:
+		var col := cur % cols
+		var row := cur / cols
+		if dir.x != 0:
+			var nc := col + dir.x
+			if nc >= 0 and nc < cols and row * cols + nc < n:
+				cur = row * cols + nc
+		if dir.y != 0:
+			var nr := row + dir.y
+			if nr >= 0 and nr * cols < n:
+				cur = mini(nr * cols + col, n - 1)
+			elif dir.y > 0 and total > n:
+				# Below the last grid row: the consumables card (or the Black Market card) nearest in x.
+				cur = n + _nearest_extra(_grid_card_x(col))
 	if cur != cursor_of(slot_index):
 		_holds.erase(slot_index)
 	set_cursor(slot_index, cur)
+
+
+## Left / right inside the consumables row (the Black Market card is its last position), up back
+## into the last grid row at the card nearest in x. Down stays.
+func _move_in_extras(cur: int, dir: Vector2i) -> int:
+	var n := offer_count()
+	var total := slot_count()
+	if dir.x != 0:
+		return clampi(cur + dir.x, n, total - 1)
+	if dir.y < 0 and n > 0:
+		var cols := maxi(1, columns)
+		var last_row := (n - 1) / cols
+		var x := _extra_x(cur - n)
+		var best := n - 1
+		var best_d := INF
+		for c in cols:
+			var idx := last_row * cols + c
+			if idx >= n:
+				break
+			var d := absf(_grid_card_x(c) - x)
+			if d < best_d:
+				best_d = d
+				best = idx
+		return best
+	return cur
+
+
+## Centre x of grid column [param col] relative to the stall's middle (the grid is centred).
+func _grid_card_x(col: int) -> float:
+	var cols := maxi(1, columns)
+	var step := ShopOfferCard.CARD_SIZE.x + CARD_GAP
+	return (col - (cols - 1) * 0.5) * step
+
+
+## Centre x of the extras position [param j] (0 .. consumables - 1, then the Black Market) relative
+## to the row's middle ([method extras_layout]).
+func _extra_x(j: int) -> float:
+	var rects := extras_layout(consumable_count(), has_black_market())
+	if j < 0 or j >= rects.size():
+		return 0.0
+	return rects[j].get_center().x - ROW_WIDTH * 0.5
+
+
+## The extras position (0-based, see [method _extra_x]) nearest to the x of a grid card.
+func _nearest_extra(x: float) -> int:
+	var best := 0
+	var best_d := INF
+	for j in extras_layout(consumable_count(), has_black_market()).size():
+		var d := absf(_extra_x(j) - x)
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
 
 
 # --- Actions ------------------------------------------------------------------------
 
 func _press_buy(slot: PlayerSlot) -> void:
 	var index := cursor_of(slot.index)
-	var o := offer_at(index)
-	if o == null or o.item == null:
-		return
+	var price := 0
+	var uid := 0
+	if is_consumable_index(index):
+		var c := consumable_at(index)
+		if c == null or c.data == null:
+			return
+		price = c.price
+		uid = String(c.data.id).hash()
+	else:
+		var o := offer_at(index)
+		if o == null or o.item == null:
+			return
+		price = o.price
+		uid = o.item.uid
 	var reason := buy_block_reason(slot, index)
 	if reason != "":
 		_say_to(slot, reason)
 		return
-	if needs_hold(o.price):
-		_holds[slot.index] = {"offer": index, "time": 0.0, "uid": o.item.uid, "price": o.price}
+	if needs_hold(price):
+		_holds[slot.index] = {"offer": index, "time": 0.0, "uid": uid, "price": price}
 		return
 	try_buy(slot, index)
 
@@ -731,7 +1058,7 @@ func _toggle_lock(slot: PlayerSlot) -> void:
 	var o := offer_at(index)
 	if o == null or o.item == null or o.sold:
 		return
-	shop.toggle_lock(index, slot.index)
+	shop.toggle_lock(shop_index(index), slot.index)
 	if o.locked_by >= 0:
 		_say("%s locked %s for the next round" % [player_tag(slot), item_link(o.item)],
 			"%s locked [%s]" % [slot.label(), o.item.display_name])
@@ -742,7 +1069,7 @@ func _toggle_ping(slot: PlayerSlot) -> void:
 	var o := offer_at(index)
 	if o == null or o.item == null or o.sold:
 		return
-	shop.toggle_ping(index, slot.index)
+	shop.toggle_ping(shop_index(index), slot.index)
 	if slot.index in o.pinged_by:
 		_say("%s wants: %s – %s g" % [player_tag(slot), item_link(o.item), UiTheme.format_int(o.price)],
 			"%s wants: [%s] – %d g" % [slot.label(), o.item.display_name, o.price])
@@ -787,6 +1114,8 @@ func _process(delta: float) -> void:
 		_cards_dirty = false
 		for i in cards.size():
 			cards[i].set_offer(shop.offers[i] if i < offer_count() else null, _slots)
+		if black_market_card != null:
+			black_market_card.set_offer(shop.black_market, _slots)
 	var expired := false
 	for f in _feedback:
 		f["age"] = float(f["age"]) + delta
@@ -817,6 +1146,14 @@ func _update_tooltips() -> void:
 		var tip: ItemTooltip = _tooltips.get(s.index)
 		if tip == null:
 			continue
+		var ctip: ConsumableTooltip = _cons_tooltips.get(s.index)
+		var c := consumable_at(cursor_of(s.index)) if is_cursor_active(s.index) and not is_unplugged(s) else null
+		if ctip != null:
+			if c != null and c.data != null:
+				_show_consumable_tooltip(s, ctip, c)
+				tip.visible = false
+				continue
+			ctip.visible = false
 		var o := offer_at(cursor_of(s.index))
 		var show := is_cursor_active(s.index) and not is_unplugged(s) and o != null and o.item != null \
 			and not o.sold
@@ -838,6 +1175,30 @@ func _update_tooltips() -> void:
 	layout_tooltips()
 
 
+## Fills and shows [param ctip] for the hovered consumables card [param c] of [param s].
+func _show_consumable_tooltip(s: PlayerSlot, ctip: ConsumableTooltip, c: Shop.ConsumableOffer) -> void:
+	var hero := s.player as Player
+	var replaced: ConsumableData = null
+	if hero != null and is_instance_valid(hero):
+		replaced = Consumables.of_kind(hero.consumables_pending, c.data.kind)
+	var key := "c:%s:%d:%s:%s" % [c.data.id, c.price, replaced.id if replaced != null else "", RunState.gold >= c.price]
+	if _tooltip_keys.get(s.index, "") != key:
+		_tooltip_keys[s.index] = key
+		ctip.owner_tag = "P%d" % (s.index + 1)
+		ctip.owner_color = s.color
+		ctip.show_consumable(c.data, c.price, replaced)
+		ctip.layout_now()
+	ctip.visible = true
+
+
+## The tooltip [param slot_index] currently shows (the item tooltip, or the consumable one).
+func _shown_tooltip(slot_index: int) -> ItemTooltip:
+	var ctip: ConsumableTooltip = _cons_tooltips.get(slot_index)
+	if ctip != null and ctip.visible:
+		return ctip
+	return _tooltips.get(slot_index)
+
+
 ## Places every visible tooltip at the first free candidate spot, largest scale first. The
 ## player who acted last is placed first (the one browsing gets the best, full-size spot);
 ## the others take what is left. A corner panel's tooltip that reaches into a free band
@@ -857,12 +1218,13 @@ func layout_tooltips() -> void:
 		if s not in order:
 			order.append(s)
 	for s in order:
-		var tip: ItemTooltip = _tooltips.get(s.index)
+		var tip := _shown_tooltip(s.index)
 		var index := cursor_of(s.index)
-		if tip == null or not tip.visible or index < 0 or index >= cards.size():
+		var card_node := card_at(index)
+		if tip == null or not tip.visible or card_node == null:
 			continue
 		var raw := tip.get_combined_minimum_size().max(tip.size)
-		var card := cards[index].get_global_rect()
+		var card := card_node.get_global_rect()
 		var best := Rect2()
 		var best_scale := TOOLTIP_SCALES[-1]
 		var best_overlap := INF
@@ -914,6 +1276,9 @@ func _candidates(tsize: Vector2, card: Rect2, index: int, slot_index: int, areas
 	var stall := areas[0]
 	# < 0: left half of the grid, 0: middle column, > 0: right half.
 	var side := (index % maxi(1, columns)) * 2 - (columns - 1)
+	if index >= offer_count():
+		# The consumables row / Black Market card: left or right by where it sits on the stall.
+		side = roundi(card.get_center().x - stall.get_center().x)
 	var right_first := side < 0 or (side == 0 and slot_index % 2 == 0)
 	var top_row := index < columns
 	var y_row := card.position.y if top_row else card.end.y - tsize.y
@@ -976,6 +1341,9 @@ func _raise_tooltip(slot_index: int) -> void:
 	var tip: ItemTooltip = _tooltips.get(slot_index)
 	if tip != null and tip.get_parent() == _tooltip_layer:
 		_tooltip_layer.move_child(tip, -1)
+	var ctip: ConsumableTooltip = _cons_tooltips.get(slot_index)
+	if ctip != null and ctip.get_parent() == _tooltip_layer:
+		_tooltip_layer.move_child(ctip, -1)
 
 
 # --- Drawing ------------------------------------------------------------------------
@@ -1003,7 +1371,7 @@ func _draw_cursors() -> void:
 	var per_card: Dictionary[int, Array] = {}
 	for s in _slots:
 		var idx := cursor_of(s.index)
-		if idx < 0 or idx >= cards.size() or is_unplugged(s):
+		if idx < 0 or idx >= slot_count() or is_unplugged(s):
 			continue
 		if not per_card.has(idx):
 			per_card[idx] = []
@@ -1011,7 +1379,9 @@ func _draw_cursors() -> void:
 	var font := UiTheme.bold_font()
 	var pulse := 0.5 + 0.5 * sin(_t * 5.0)
 	for idx: int in per_card:
-		var card := cards[idx]
+		var card := card_at(idx)
+		if card == null:
+			continue
 		var r := Rect2(card.global_position - origin, card.size)
 		var list: Array = per_card[idx]
 		# Inactive cursors (focus on the own panel) first, so the active ones draw on top.
@@ -1032,12 +1402,14 @@ func _draw_cursors() -> void:
 			_draw_corner_tag(layer, rr, s, col, font)
 	for slot_index: int in _holds:
 		var idx := cursor_of(slot_index)
-		if idx < 0 or idx >= cards.size():
+		var card := card_at(idx)
+		if card == null:
 			continue
-		var card := cards[idx]
 		var s := PlayerManager.get_slot(slot_index)
 		var col := s.color.lightened(0.2) if s != null else UiTheme.GOLD
-		var c := card.global_position - origin + Vector2(card.size.x * 0.5, 10.0 + ShopOfferCard.ICON_SIZE * 0.5)
+		# The ring sits on the card's picture.
+		var icon_node: Control = (card as ShopOfferCard).icon if card is ShopOfferCard else (card as ConsumableCard).icon
+		var c := icon_node.global_position - origin + icon_node.custom_minimum_size * 0.5
 		var progress := hold_progress(slot_index)
 		layer.draw_circle(c, 46.0, Color(0, 0, 0, 0.45))
 		layer.draw_arc(c, 42.0, 0.0, TAU, 48, Color(0, 0, 0, 0.7), 8.0, true)
