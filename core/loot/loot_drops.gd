@@ -67,7 +67,7 @@ static func _roll_normal_drop(enemy: Node3D, killer: Node3D) -> LootBag:
 	return drop_item(generate_item(killer), Vector3(at.x, 0.0, at.z), enemy)
 
 
-## The Artifact roll of a kill (GDD 5.6, M6 ARTIFACTS): [param source] is the generator source
+## The Artifact roll of a kill (M6 ARTIFACTS): [param source] is the generator source
 ## of the kill (LOOT for a normal enemy, ELITE / GOBLIN / BOSS for the special ones), [param
 ## enemy] the victim, [param killer] the Player who killed it (or null). Returns the Artifact's
 ## LootBag, or null when none dropped. A STUB until the ARTIFACTS package: it never rolls (no

@@ -102,7 +102,9 @@ func test_smoke_result_has_the_item_statistics() -> void:
 	RunState.need_wins_by_player[1] = 1
 	RunState.greed_gold = 37
 	var data := main.smoke_result("completed")
-	for key in ["result", "waves_completed", "kills", "gold", "errors", "perf", "items_bought", "items_looted", "need_wins", "greed_gold"]:
+	for key in ["result", "waves_completed", "kills", "gold", "errors", "perf", "items_bought", "items_looted", "need_wins", "greed_gold",
+			"bosses_killed", "artifacts_dropped", "consumables_bought", "black_market_bought", "enchants_done",
+			"dust_earned", "dust_spent", "run_time"]:
 		check(data.has(key), "SMOKE_RESULT has %s" % key)
 	check_eq(data["items_bought"], 2, "bought")
 	check_eq(data["items_looted"], 1, "looted")

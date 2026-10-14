@@ -1230,7 +1230,9 @@ func test_main_applies_the_m5_options_and_wires_the_spawner() -> void:
 	check_eq(main.hud.banner_label.text, "A Loot Goblin appeared!", "announcements become banners")
 	var data := main.smoke_result("completed")
 	for key in ["elites_spawned", "elites_killed", "goblins_spawned", "goblins_killed", "goblins_escaped",
-			"weapons_forged", "talent_points_spent", "talent_resets", "set_bonuses", "gold_spent"]:
+			"weapons_forged", "talent_points_spent", "talent_resets", "set_bonuses", "gold_spent",
+			"bosses_killed", "artifacts_dropped", "consumables_bought", "black_market_bought",
+			"enchants_done", "dust_earned", "dust_spent", "run_time"]:
 		check(data.has(key), "SMOKE_RESULT has %s" % key)
 	check_eq(data["talent_points_spent"], 0, "no talents spent")
 	main.start_run()
@@ -1284,7 +1286,8 @@ func test_player_panel_forge_entry_and_talents_tab() -> void:
 	panel.close_menu()
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
 	check(panel.active_tab == PlayerPanel.TALENTS_TAB and panel.talents.visible, "the Talents tab opens")
-	check(PlayerPanel.LOCKED_TABS.is_empty(), "no locked tabs")
+	# M6: only the Enchanter tab is locked (until the ENCHANTER package opens it).
+	check_eq(PlayerPanel.LOCKED_TABS, [PlayerPanel.ENCHANTER_TAB] as Array[int], "only the Enchanter tab is locked")
 
 
 func test_debug_start_tab_opens_p1_on_talents_once() -> void:
