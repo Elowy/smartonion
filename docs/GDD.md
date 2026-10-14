@@ -426,7 +426,7 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 | Common | ×1,0 | – |
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
-| Epic | ×2,2 | +2 stat (a „+10% támadási sebesség” az M6 item-tartalom passzában jön, M5-ben nincs) |
+| Epic | ×2,2 | +2 stat (a „+10% támadási sebesség” az M6b item-tartalom passzában jön, M5-ben nincs) |
 | Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – 10 kézzel tervezett hatás, fegyvertípusonként egy (pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
 
 **Korlátok:**
@@ -1778,7 +1778,7 @@ sebzés 4)
 **Item-loot:** lásd **10.1** (Need / Greed / Pass).
 
 **Gold felhasználása (mind a közös kasszából):** item vásárlás (bolt), **ability rangemelés
-(Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset; M6-tól az Enchanter, a
+(Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset; M6a-tól az Enchanter, a
 fogyóeszközök és a Black Market is (16.1, „Goldsinkek”).
 
 **Bolt**
@@ -1948,7 +1948,8 @@ indulnak.
   - portré, zöld HP-sáv,
   - erőforrás-sáv kaszt-színnel (Rage piros, Mana kék, Energy sárga, Holy Power arany pipek, Soul Shard lila pipek),
   - ability-sáv: 2 alap + 2 tanult aktív + 4 auto-cast ikon, cooldown-animációval és
-    rang-jelzéssel (I–V).
+    rang-jelzéssel (I–V),
+  - az aktív fogyóeszközök (16.1) kis ikonjai.
 - **A hősök feje fölött:** névtábla („P1” + gyémánt a játékos színében) és alatta egy kis
   életerő-csík. A csík fix képernyőméretű, és a tömegen át is látszik.
   - Színe a HP szerint változik: zöld → sárga (50%) → piros.
@@ -1956,7 +1957,9 @@ indulnak.
     rajzolódik.
   - Szellemként a csík eltűnik; ilyenkor a cast bar és a Spirit Healer jelzései adnak
     információt.
-- **Felül középen:** hullám száma, visszaszámláló, csapat-kassza.
+- **Felül középen:** hullám száma, visszaszámláló, csapat-kassza. Boss-hullámon a
+  visszaszámláló helyén a **boss-keret** áll: a boss neve, HP-sávja, fázis-pipek és
+  „ENRAGED” felirat (8. fejezet).
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).
 
@@ -1978,15 +1981,24 @@ indulnak.
 - **Elrendezés:**
   - **Középen:** a **közös bolt** (goblin kereskedő standja) a játékosok színes kurzoraival,
     felül a reroll-szavazás pipái.
+    - Az item-ajánlatok alatt áll a **fogyóeszköz-sor** (4 kompakt kártya), mellette jobbra, a
+      15. hullámtól a **Black Market** arany keretes kártyája (16.1).
+    - 4 játékosnál a pult nőhet, a kártyák kisebbek lehetnek, hogy az 5×2-es item-rács, a
+      fogyóeszköz-sor és a Black Market 1920×1080-ban és 1280×720-ban is átfedés nélkül elférjen.
   - **A sarkokban:** 1–4 **személyes panel**, játékosonként egy.
   - LB/RB-vel lehet váltani a bolti kurzor és a saját panel között.
-- **Személyes fülek:** **Trainer | Talents | Character**.
+- **Személyes fülek:** **Trainer | Talents | Character | Enchanter** (az Enchanter a 4. fül).
 - **Trainer fül:** a megtanult abilityk listája, a jelenlegi rang, a következő rang
   hatása, ára és egy „Train” gomb. A Rank V-nél a 2 specializáció közül lehet választani.
 - **Talents fül:** WoW-szerű elrendezés – a 3 fa egymás mellett, tierenként sorokban.
   - Kontrollerrel rácsban lehet lépkedni; „A” = pont elköltése, „X” = az utolsó hullám óta
     elköltött pont visszavétele, „Y” = a következő rang előnézete (lásd 7.3).
   - Felül a szabad pontok száma, alul a „Reset Talents” gomb és az ára.
+- **Enchanter fül** (M6a): a címkéje a csapat Dustját mutatja: „Enchanter (12✦)”.
+  - Először az itemet választod (előbb a felszereltek, utána a backpack), majd a műveletet:
+    **Reroll**, **Empower** (V. rangig) vagy **Imbue** (5.7).
+  - Mindegyik mellett az ára látszik goldban és Dustban; az ár az item minden használatával
+    duplázódik. A költésre a szokásos nyomva tartás vonatkozik (10. fejezet).
 - **Kovácsolás:** a Character fülön a fegyvert kiválasztva (A) egy műveletmenü jelenik meg:
   Equip / Forge / Sell / Disenchant / Trade / Cancel. A Forge csak akkor aktív, ha van azonos
   párja; különben szürke, és kiírja az okát (lásd 4.1). A **Disenchant** a Sell mellett áll, és
@@ -2001,9 +2013,46 @@ indulnak.
   - fehér stat-sorok,
   - **zöld enchant-sorok** („Equip: …”, „Chance on hit: …”, „On kill: …”, „When struck: …”),
   - set-bónuszok (szürkén, ha nem aktív),
+  - Artifactnál a két különleges tulajdonság: a még zárt tulajdonság alatt „Awakens in N
+    waves”, a nem tanult abilityhez kötött szürkén „(needs X)” (5.5),
   - legalul az összehasonlítás a felvett itemmel (+zöld / −piros).
 - **Indulás:** a „Ready” jelzés után indul a következő hullám, ha mindenki kész van
   (vagy 60 mp-es időkorlát után, beállításokban kikapcsolható).
+
+**Győzelem / Vereség képernyő** (M6a)
+
+A menet végén (Győzelem: Vor'thalax halála a 25. hullámon; Vereség: mindenki elesett) a képernyő
+két oldalból áll, amik között váltani lehet:
+
+- **Summary:** az eddigi összegzés (eredmény, elért hullám, loot-statisztika – 10.1) a menet
+  **idejével** kiegészítve (a hullámidők összege).
+- **Damage Meter:** WoW-szerű sávok statonként, hősönként, a kaszt színében:
+  - **Damage** – kiosztott sebzés (az Execute-tal együtt),
+  - **Healing** – tényleges gyógyítás, a gyógyítónak írva; a regeneráció és a Leech
+    önmagára gyógyításnak számít,
+  - **Absorbed** – a játékos által rakott pajzsok elnyelt sebzése (bárkin) és a saját blokkja
+    által elnyelt sebzés,
+  - **Taken** – elszenvedett sebzés (a mitigáció után),
+  - **Revives** – a társ felélesztésének befejezése (minden felélesztőnek jár) és a Word of Glory
+    felélesztései; a hullámkezdéskori feléledés és a Spirit Healer nem számít,
+  - **Downs** – elesések; **Kills** – ölések; **Bosses** – legyőzött bossok.
+- **Awards** (csak co-opban): a díjat az kapja, aki az adott statban a legjobb; döntetlennél a
+  kisebb sorszámú játékos.
+
+  | Díj | Ki kapja |
+  |---|---|
+  | **Most Damage** | a legtöbb kiosztott sebzés |
+  | **Most Healing** | a legtöbb gyógyítás |
+  | **Most Absorbed** | a legtöbb elnyelt sebzés |
+  | **Guardian Angel** | a legtöbb felélesztés |
+  | **Floor Inspector** | a legtöbb elesés |
+  | **Exterminator** | a legtöbb ölés |
+  | **Untouchable** | a legkevesebb elszenvedett sebzés a menet végén élő hősök között |
+
+- **Run kártya:** a végképernyőn a „**Save card**” felirat (X) egy **1200×630**-as képet
+  renderel: cím, mód, győzelem / vereség és az elért hullám, az idő, valamint hősönként a
+  portré, a kaszt, a legjobb item és a díj. A kép PNG-ként a
+  `user://cards/run_<yyyy-mm-dd_hh-mm-ss>.png` fájlba kerül, és a képernyő kiírja: „Saved to …”.
 
 ---
 
@@ -2060,7 +2109,10 @@ indulnak.
   A hagyma-hősök és a „komoly” szörnyek közti kontraszt a humor forrása.
 - **UI-téma:** sötét kő és arany keretek, pergamen tooltip, ritkaság-színek a WoW
   konvenciója szerint.
-- **Arénák (MVP: 1):** *Elwynn-szerű erdei tisztás*. Később: havas dombok, sivatag, démoni pusztaság.
+- **Arénák:** menetenként **5 környezet** egyike, a menet elején sorsolva, a menet végéig
+  megmaradva (16.1): **temető, mocsár, vulkán, jégbarlang, erdei rom**. Mindegyiknek saját
+  veszélyei vannak (tartalom: M6b, látvány: M7). Az MVP-ben egyetlen aréna van: egy erdei
+  tisztás.
 
 ---
 
@@ -2084,7 +2136,7 @@ indulnak.
   belső cooldown, rangonkénti értékek, megengedett slotok, iskola.
 - `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
 - `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
-- `SetData`, `EnemyData`, `WaveData`, `BossData`, `DifficultyData`.
+- `SetData`, `EnemyData`, `WaveData`, `BossData`, `ConsumableData`, `DifficultyData`.
 
 **Fő rendszerek**
 
@@ -2110,7 +2162,7 @@ indulnak.
 
 ```
 /project.godot
-/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ waves/ difficulties/
+/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ bosses/ consumables/ waves/ difficulties/
 /scenes/      main/ arena/ player/ enemies/ ui/
 /scripts/     systems/ abilities/ ai/
 /assets/      models/ textures/ icons/ audio/ fonts/
@@ -2357,7 +2409,10 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 
 ## 18. Nyitott kérdések
 
-Jelenleg nincs nyitott kérdés.
+Tervezési kérdés jelenleg nincs nyitva. Az M6-ra átvitt **hangolási** kérdések (a kasztok közti
+szórás és a késői kassza) a 9. fejezetben vannak („Nyitott kérdések M6-ra”); az ütemezésük a 16.
+fejezet **M6a** és **M6b** listáiban található: a késői kasszát az M6a goldsinkjei célozzák, a
+kasztok közti szórást az M6b végleges balansza kezeli.
 
 ### Lezárt döntések
 
@@ -2383,4 +2438,7 @@ Jelenleg nincs nyitott kérdés.
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
 | Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |
 | Bolt | Közös bolt, saját kurzorokkal; reroll csak akkor, ha minden játékos megszavazta |
-| Hullámhossz | A 10. hullám felett +10 mp hullámonként (25. hullám = 210 mp) |
+| Hullámhossz | A 10. hullám felett +10 mp hullámonként (25. hullám = 210 mp); a boss-hullámot (10., 25.) a boss halála zárja |
+| M6 felosztása | M6a (rendszerek: ellenségek, bossok, Artifactok, Enchanter, goldsinkek, Damage Meter) és M6b (módok, környezetek, események, Dungeon-portál, tartalom-csomagok, végleges balansz) – 16. fejezet |
+| Arcane Dust | A csapat második közös pénzneme; Disenchantból és a mindenki által Passolt itemekből jön, az Enchanter költi (5.7) |
+| Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
