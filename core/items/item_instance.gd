@@ -34,6 +34,9 @@ var flavor := ""
 var set_id: StringName
 ## Shop price at the wave it was generated (sell / greed values derive from it).
 var buy_price := 0
+## Enchanter actions done on this item (M6 ENCHANTER): the n-th action costs 2^n times the
+## base price. The one counter the Enchanter mutates (together with [member enchants]).
+var enchant_uses := 0
 
 
 func _init() -> void:

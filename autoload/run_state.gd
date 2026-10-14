@@ -7,6 +7,9 @@ extends Node
 ## - M5: the spend log of the shared wallet (try_spend_for: who spent what this round), the
 ##   players' "wants" (Trainer pings), elite / goblin / forge / talent-reset counters, the
 ##   special-kill record and the run serial that per-run statics compare against.
+## - M6 foundation: Arcane Dust (the second team currency, [method add_dust] /
+##   [method try_spend_dust_for]), the damage-meter record (per-slot healing, absorbed, damage
+##   taken, revives, downs + [member run_time]), boss / artifact / consumable / enchant counters.
 
 signal run_started
 signal run_ended(victory: bool)
@@ -20,9 +23,12 @@ signal team_loot_changed
 signal spent(entry: Dictionary)
 ## [member wants] changed (toggle_want / clear_want / begin_spend_round).
 signal wants_changed
-## An elite or the Loot Goblin died ([param kind] &"elite" / &"goblin"; M6 adds &"boss");
+## An elite, the Loot Goblin or a boss died ([param kind] &"elite" / &"goblin" / &"boss");
 ## [param killer_index] = the killer's slot index (-1 = none).
 signal special_killed(kind: StringName, killer_index: int)
+## Arcane Dust (the team's second currency) changed by [param delta] (add_dust,
+## try_spend_dust_for; start_run emits it with delta 0).
+signal dust_changed(dust: int, delta: int)
 
 const TOTAL_WAVES := 25
 const BOSS_WAVES: Array[int] = [10, 25]
@@ -92,6 +98,49 @@ var talent_resets := 0
 ## themselves when it changed.
 var run_serial := 0
 
+# M6: Arcane Dust, the second shared currency (GDD 5.7). Earned by disenchanting items, spent
+# at the Enchanter. Gold's spend log and Dust's are separate: the purse board lists gold.
+## The team's Arcane Dust.
+var arcane_dust := 0
+## Dust added through [method add_dust] this run.
+var dust_earned := 0
+## Dust spent through [method try_spend_dust_for] this run.
+var dust_spent := 0
+## Every Dust spend of this round, oldest first (same entry shape as [member spend_log]);
+## cleared by [method begin_spend_round].
+var dust_spend_log: Array[Dictionary] = []
+## Every Dust gain of this round, oldest first: {"slot": int (-1 = the team), "label": String,
+## "amount": int, "wave": int}; cleared by [method begin_spend_round].
+var dust_gain_log: Array[Dictionary] = []
+
+# M6 damage meter (per player slot index, like kills_by_player / damage_by_player): written
+# by the recorders below, read by the end screen. Wired in by the METER package.
+## Effective healing done (credited to the healer; regen / leech count as self-healing).
+var healing_by_player: Dictionary[int, float] = {}
+## Damage absorbed by the shields a player cast (on anyone) and their own block.
+var absorbed_by_player: Dictionary[int, float] = {}
+## Damage a player took (after mitigation).
+var damage_taken_by_player: Dictionary[int, float] = {}
+## Revives a player took part in (teammate channel, Word of Glory).
+var revives_by_player: Dictionary[int, int] = {}
+## Times a player went down.
+var downs_by_player: Dictionary[int, int] = {}
+## Seconds of wave play this run ([method tick_run_time]; the market, the loot roll and pauses
+## do not count).
+var run_time := 0.0
+
+# M6 counters (SMOKE_RESULT, end screen).
+var bosses_killed := 0
+var artifacts_dropped := 0
+var consumables_bought := 0
+var black_market_bought := 0
+var enchants_done := 0
+## Artifact drop pity: the extra chance added to the next boss's Artifact roll, grown by every
+## boss without a drop and reset on a drop (ARTIFACTS package).
+var artifact_pity := 0.0
+## Classes that already dropped their Artifact this run (max one per class, ARTIFACTS package).
+var artifact_classes: Array[StringName] = []
+
 
 func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	active = true
@@ -126,13 +175,34 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	goblins_escaped = 0
 	weapons_forged = 0
 	talent_resets = 0
+	arcane_dust = 0
+	dust_earned = 0
+	dust_spent = 0
+	dust_spend_log.clear()
+	dust_gain_log.clear()
+	healing_by_player.clear()
+	absorbed_by_player.clear()
+	damage_taken_by_player.clear()
+	revives_by_player.clear()
+	downs_by_player.clear()
+	run_time = 0.0
+	bosses_killed = 0
+	artifacts_dropped = 0
+	consumables_bought = 0
+	black_market_bought = 0
+	enchants_done = 0
+	artifact_pity = 0.0
+	artifact_classes.clear()
 	run_serial += 1
-	# Launch-option statics back to their defaults (Main applies --elite-mult / --goblin-chance
-	# after this; tests that change them restore them).
+	# Launch-option statics back to their defaults (Main applies --elite-mult / --goblin-chance /
+	# --boss-hp / --artifact-chance after this; tests that change them restore them).
 	EliteAffixes.rate_mult = 1.0
 	GoblinSpawner.chance_override = -1.0
+	BossData.hp_mult = 1.0
+	LootDrops.artifact_chance_override = -1.0
 	run_started.emit()
 	gold_changed.emit(gold, 0)
+	dust_changed.emit(arcane_dust, 0)
 	xp_changed.emit(xp, xp_to_next_level())
 
 
@@ -219,8 +289,11 @@ func try_spend(amount: int) -> bool:
 ## [method try_spend] that also logs who spent what (GDD 10, the purse board): player slot
 ## [param slot_index] (-1 = the team, e.g. a stall reroll), [param kind] (&"shop",
 ## &"shop_forge", &"shop_reroll", &"trainer", &"level_reroll", &"talent_reset") and a display
-## [param label] ("Rare Dagger", "Fireball Rank III"). On success the entry goes to
-## [member spend_log], the amount to [member gold_spent], and [signal spent] fires.
+## [param label] ("Rare Dagger", "Fireball Rank III"). M6 adds the kinds &"consumable" (a
+## consumables-row card), &"black_market" (the Black Market offer) and &"enchant" (an Enchanter
+## action; its Dust part goes through [method try_spend_dust_for] with the same kind). On
+## success the entry goes to [member spend_log], the amount to [member gold_spent], and
+## [signal spent] fires.
 func try_spend_for(amount: int, slot_index: int, kind: StringName, label: String) -> bool:
 	if not try_spend(amount):
 		return false
@@ -231,9 +304,43 @@ func try_spend_for(amount: int, slot_index: int, kind: StringName, label: String
 	return true
 
 
-## A new market round (Intermission.open): clears this round's spend log and the wants.
+## Adds [param amount] Arcane Dust to the team's pile (Disenchant, an item nobody wanted),
+## earned by player slot [param slot_index] (-1 = the team) for [param label] ("Epic Sword").
+## Non-positive amounts do nothing. Emits [signal dust_changed].
+func add_dust(amount: int, slot_index: int = -1, label: String = "") -> void:
+	if amount <= 0:
+		return
+	arcane_dust += amount
+	dust_earned += amount
+	dust_gain_log.append({"slot": slot_index, "label": label, "amount": amount, "wave": wave})
+	dust_changed.emit(arcane_dust, amount)
+
+
+func can_afford_dust(amount: int) -> bool:
+	return arcane_dust >= amount
+
+
+## Spends [param amount] Arcane Dust for player slot [param slot_index] (-1 = the team) on
+## [param kind] (&"enchant") with a display [param label]; the Dust twin of
+## [method try_spend_for]. Returns false (and changes nothing) if the pile is too small or the
+## amount is negative. On success the entry goes to [member dust_spend_log], the amount to
+## [member dust_spent], and [signal dust_changed] fires.
+func try_spend_dust_for(amount: int, slot_index: int, kind: StringName, label: String) -> bool:
+	if amount < 0 or arcane_dust < amount:
+		return false
+	arcane_dust -= amount
+	dust_spent += amount
+	var entry := {"slot": slot_index, "kind": kind, "label": label, "amount": amount, "wave": wave}
+	dust_spend_log.append(entry)
+	dust_changed.emit(arcane_dust, -amount)
+	return true
+
+
+## A new market round (Intermission.open): clears this round's spend logs and the wants.
 func begin_spend_round() -> void:
 	spend_log.clear()
+	dust_spend_log.clear()
+	dust_gain_log.clear()
 	if not wants.is_empty():
 		wants.clear()
 		wants_changed.emit()
@@ -329,15 +436,57 @@ func record_damage(player_index: int, amount: float) -> void:
 		damage_by_player[player_index] = damage_by_player.get(player_index, 0.0) + amount
 
 
-## An elite (&"elite") or the Loot Goblin (&"goblin") died, killed by slot [param killer_index]
-## (-1 = none): counts it and emits [signal special_killed] (meta statistics, M6 bosses).
+## An elite (&"elite"), the Loot Goblin (&"goblin") or a boss (&"boss") died, killed by slot
+## [param killer_index] (-1 = none): counts it and emits [signal special_killed] (meta
+## statistics).
 func record_special_kill(kind: StringName, killer_index: int) -> void:
 	match kind:
 		&"elite":
 			elites_killed += 1
 		&"goblin":
 			goblins_killed += 1
+		&"boss":
+			bosses_killed += 1
 	special_killed.emit(kind, killer_index)
+
+
+# M6 damage-meter recorders (the METER package calls them; a slot index < 0 = nobody, ignored).
+
+## [param amount] HP healed by slot [param player_index] (the effective gain, after the max-HP clamp).
+func record_heal(player_index: int, amount: float) -> void:
+	if player_index >= 0 and amount > 0.0:
+		healing_by_player[player_index] = healing_by_player.get(player_index, 0.0) + amount
+
+
+## [param amount] damage absorbed by a shield / block of slot [param player_index].
+func record_absorb(player_index: int, amount: float) -> void:
+	if player_index >= 0 and amount > 0.0:
+		absorbed_by_player[player_index] = absorbed_by_player.get(player_index, 0.0) + amount
+
+
+## [param amount] damage slot [param player_index] took after mitigation.
+func record_damage_taken(player_index: int, amount: float) -> void:
+	if player_index >= 0 and amount > 0.0:
+		damage_taken_by_player[player_index] = damage_taken_by_player.get(player_index, 0.0) + amount
+
+
+## Slot [param player_index] took part in a revive (credited to every reviver).
+func record_revive(player_index: int) -> void:
+	if player_index >= 0:
+		revives_by_player[player_index] = revives_by_player.get(player_index, 0) + 1
+
+
+## Slot [param player_index] went down.
+func record_down(player_index: int) -> void:
+	if player_index >= 0:
+		downs_by_player[player_index] = downs_by_player.get(player_index, 0) + 1
+
+
+## Adds [param delta] seconds of wave play to [member run_time] (Main, state WAVE, every
+## physics tick; non-positive values are ignored).
+func tick_run_time(delta: float) -> void:
+	if delta > 0.0:
+		run_time += delta
 
 
 # --- Wave / co-op scaling (GDD 9) -------------------------------------------

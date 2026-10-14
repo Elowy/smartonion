@@ -6,11 +6,18 @@ extends Resource
 ## SWARM: like CHASE but faster and weaker, spawns in big groups.
 ## LUNGE: chase, and when close wind up briefly then leap forward.
 ## RANGED: keep preferred_distance and throw projectiles.
-enum Behavior { CHASE, SWARM, LUNGE, RANGED }
+## SUPPORT (M6): keeps its distance and buffs other enemies (Cultist Acolyte; Enemy._think_support).
+## BRUTE (M6): slow heavy hitter with a special move (Flesh Golem; Enemy._think_brute).
+## SUPPORT and BRUTE are appended so the stored values of the others stay the same; until their
+## packages fill in the AI they walk like CHASE.
+enum Behavior { CHASE, SWARM, LUNGE, RANGED, SUPPORT, BRUTE }
 
 @export var id: StringName
 @export var display_name: String
 @export var behavior: Behavior = Behavior.CHASE
+## A boss (M6, [BossData]): Enemy.is_boss() reads it. Execute, Mirror Image and the other
+## "not on bosses" rules key on it.
+@export var is_boss := false
 
 @export_group("Stats")
 ## Max HP at wave 1 (before co-op scaling).

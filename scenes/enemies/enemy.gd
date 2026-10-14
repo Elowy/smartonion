@@ -298,9 +298,9 @@ func is_enraged() -> bool:
 
 
 ## Bosses only (a boss is also [method is_elite]): immune to instant kills such as Execute.
-## No bosses until M5 / M6.
+## True when the enemy's data says so ([member EnemyData.is_boss], a [BossData]).
 func is_boss() -> bool:
-	return false
+	return data != null and data.is_boss
 
 
 ## Walking slower than normal: [method apply_slow]'s slow or the ghost slow.
@@ -748,8 +748,25 @@ func _think(delta: float, here: Vector3, feared: bool) -> void:
 				_update_lunge(delta, here)
 			EnemyData.Behavior.RANGED:
 				_update_ranged(delta, here)
+			EnemyData.Behavior.SUPPORT:
+				_think_support(delta, here)
+			EnemyData.Behavior.BRUTE:
+				_think_brute(delta, here)
 			_:
 				_update_chase(delta, here)
+
+
+## The SUPPORT behaviour's AI step (Cultist Acolyte, M6 ENEMIES): same contract as the other
+## behaviours – a target exists, set the desired walking velocity. Until a package overrides it
+## (a subclass, or this body) it walks like CHASE.
+func _think_support(delta: float, here: Vector3) -> void:
+	_update_chase(delta, here)
+
+
+## The BRUTE behaviour's AI step (Flesh Golem, M6 ENEMIES); falls back to CHASE like
+## [method _think_support].
+func _think_brute(delta: float, here: Vector3) -> void:
+	_update_chase(delta, here)
 
 
 ## Finds the nearest living player and deals contact damage to the first one touched.
@@ -1026,6 +1043,7 @@ func _die(attacker: Node3D) -> void:
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
 	_death_loot(pos, attacker)
+	_on_death_effect()
 	_leave_world()
 	died.emit(self, killer_index)
 	# On-kill effects of the killing hero (Life on Kill, on-kill procs) – after the enemy left
@@ -1033,6 +1051,14 @@ func _die(attacker: Node3D) -> void:
 	if killer != null and is_instance_valid(killer):
 		killer.notify_kill(self)
 	queue_free()
+
+
+## Virtual (M6): what this enemy leaves behind when it dies – the Plague Ghoul's poison puddle.
+## Called from [method _die] after the loot, while the enemy is still in the tree (its
+## [code]global_position[/code] is the place of death) and before it leaves the world. Empty
+## here; a subclass overrides it.
+func _on_death_effect() -> void:
+	pass
 
 
 ## What a death leaves at [param pos]: the gold / XP pickup and the item drop roll (GDD 10.1 –

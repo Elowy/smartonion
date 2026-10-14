@@ -24,7 +24,12 @@ extends RefCounted
 ##   --start-level=N      M5 test hook: team level at run start (talent points from 10;
 ##                        RunState.set_start_level, before the heroes spawn)
 ##   --panel-tab=NAME     dev: P1's panel opens on that tab when the market opens – talents,
-##                        trainer, character (PlayerPanel.debug_start_tab, screenshots)
+##                        trainer, character, enchanter (PlayerPanel.debug_start_tab, screenshots;
+##                        a locked tab stays closed)
+##   --boss-hp=X          M6 smoke / debug hook: multiplies every boss's HP (BossData.hp_mult;
+##                        default 1)
+##   --artifact-chance=X  M6 debug hook: overrides the Artifact drop chance of every roll (0..1,
+##                        LootDrops.artifact_chance_override; default: off, the normal chances)
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -36,9 +41,12 @@ const DEFAULT_SHOT_TIME := 8.0
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
 const VIEWS: Array[String] = ["menu", "lobby", "game", "intermission", "game_over", "victory", "pause"]
 ## --panel-tab values (PlayerPanel.TAB_IDS).
-const PANEL_TABS: Array[String] = ["character", "trainer", "talents"]
+const PANEL_TABS: Array[String] = ["character", "trainer", "talents", "enchanter"]
 ## --start-level ceiling (far beyond a full run).
 const MAX_START_LEVEL := 99
+## --boss-hp range (a boss with ~0 HP or an unkillable one is no test).
+const MIN_BOSS_HP_MULT := 0.01
+const MAX_BOSS_HP_MULT := 100.0
 
 var smoke := false
 var demo := false
@@ -63,6 +71,10 @@ var elite_mult := 1.0
 var start_level := 1
 ## "" = the panels open on the Character tab.
 var panel_tab := ""
+## Boss HP multiplier (--boss-hp), 1 = the normal HP.
+var boss_hp := 1.0
+## < 0 = off (the normal Artifact chances); else the chance of every Artifact roll.
+var artifact_chance := -1.0
 ## Arguments that were not understood (reported once by Main).
 var unknown: Array[String] = []
 
@@ -119,6 +131,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.panel_tab = value
 				else:
 					o.unknown.append(arg)
+			"--boss-hp":
+				o.boss_hp = clampf(value.to_float(), MIN_BOSS_HP_MULT, MAX_BOSS_HP_MULT)
+			"--artifact-chance":
+				o.artifact_chance = clampf(value.to_float(), 0.0, 1.0)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):

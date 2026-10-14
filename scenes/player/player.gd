@@ -383,7 +383,10 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		procs.on_struck(valid_source, dmg)
 
 
-func heal(amount: float) -> void:
+## Heals this hero by [param amount] (clamped to max HP; nothing while downed).
+## [param _source_slot] = the slot index of the healer (-1 = unknown / self-sourced): M6's damage
+## meter will credit the effective healing to it (METER package; nothing is recorded yet).
+func heal(amount: float, _source_slot: int = -1) -> void:
 	if downed or amount <= 0.0:
 		return
 	var before := hp
@@ -594,8 +597,11 @@ static func _merge_mods(out: Dictionary, mods: Dictionary) -> void:
 			out[key] = v
 
 
-## Revives a downed player at [param hp_ratio] of max HP (min 1 HP).
-func revive(hp_ratio: float = REVIVE_HP_RATIO) -> void:
+## Revives a downed player at [param hp_ratio] of max HP (min 1 HP). [param _reviver_slots] =
+## the slot indices of the teammates who revived this hero (empty = nobody: the wave start, the
+## Spirit Healer, the smoke runner): M6's damage meter will credit them (METER package;
+## nothing is recorded yet).
+func revive(hp_ratio: float = REVIVE_HP_RATIO, _reviver_slots: Array[int] = []) -> void:
 	if not downed:
 		return
 	downed = false
