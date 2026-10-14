@@ -224,6 +224,26 @@ func test_each_effect_does_what_the_card_says() -> void:
 	check_near(hero.bonuses.damage_taken_mult(&"melee", null), 1.0, 0.0001, "gone")
 
 
+func test_a_percentage_stat_cannot_hurt_a_hero_with_negative_armor() -> void:
+	# Items carry designed negative stats: "+30% Armor" of a negative Armor must not make it worse.
+	var hero := _hero(&"mage")
+	hero.stats.set_source(&"item:test", {Stats.ARMOR: -60.0})
+	var armor := hero.stats.get_stat(Stats.ARMOR)
+	check(armor < 0.0, "the hero's Armor is negative (%.1f)" % armor)
+	var entries := Consumables.resolve_effects(_c(&"elixir_of_ironskin"), hero)
+	var stats: Dictionary = entries[0]["stats"]
+	check(float(stats.get(Stats.ARMOR, 0.0)) >= 0.0, "the resolved Armor bonus is not negative (%s)" % stats)
+	Consumables.give(hero, _c(&"elixir_of_ironskin"))
+	hero.begin_wave()
+	check(hero.stats.get_stat(Stats.ARMOR) >= armor, "Armor %.1f -> %.1f: the Elixir cannot make it worse" % [armor, hero.stats.get_stat(Stats.ARMOR)])
+	check_eq(hero.stats.get_stat(Stats.ARMOR), armor, "a negative base gives no bonus at all")
+	hero.end_wave()
+	check_eq(hero.stats.get_stat(Stats.ARMOR), armor, "Armor back")
+	# The Stew's Max HP share is still a share of a positive number.
+	var hp_entries := Consumables.resolve_effects(_c(&"hearty_onion_stew"), hero)
+	check(float((hp_entries[0]["stats"] as Dictionary).get(Stats.STAMINA, 0.0)) > 0.0, "Max HP percentage still helps")
+
+
 func test_a_downed_hero_gets_the_effect_but_only_the_extra_max_hp_as_hp() -> void:
 	var hero := _hero()
 	hero.stats.set_source(&"item:test", {Stats.STAMINA: 90.0})

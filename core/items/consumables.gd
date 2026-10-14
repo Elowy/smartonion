@@ -17,7 +17,8 @@ extends RefCounted
 ## Effects are BonusVocabulary entries (damage / damage_taken / stats ...). One extension: a
 ## "stats_pct" dictionary on a "stats" entry gives stats as a share of the hero's current value
 ## ({"armor": 30.0} = +30% of the Armor the hero has, {"max_hp": 15.0} = Stamina worth 15% of the
-## Max HP); [method resolve_effects] turns it into plain "stats" before the engine sees it.
+## Max HP); [method resolve_effects] turns it into plain "stats" before the engine sees it. The
+## base is clamped to >= 0: a percentage stat can only help (negative Armor stays as it is).
 ## Prices: base price x the shop price multiplier of the cleared wave (ItemGenerator.price_for).
 ## No RNG in here except the row draw, which takes the rng it is given.
 
@@ -148,6 +149,9 @@ static func resolve_effects(data: ConsumableData, player: Player) -> Array[Dicti
 			for key: Variant in pct:
 				var stat := _stat_of(String(key))
 				var base := player.max_hp() if String(key) == "max_hp" else player.stats.get_stat(stat)
+				# A percentage can only help: negative Armor (items carry designed negative
+				# stats) is not made worse by "+30% Armor".
+				base = maxf(0.0, base)
 				var add := snappedf(base * float(pct[key]) / 100.0, PCT_STEP)
 				stats[stat] = float(stats.get(stat, 0.0)) + add
 			e["stats"] = stats
