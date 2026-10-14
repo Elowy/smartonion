@@ -111,15 +111,15 @@ func _hero_card(h: Dictionary) -> Control:
 	var item_color := UiTheme.TEXT_DIM
 	if rarity >= 0:
 		item_color = UiTheme.RARITY_COLORS[clampi(rarity, 0, UiTheme.RARITY_COLORS.size() - 1)]
-	var item := UiTheme.centered_label(String(h.get("item_name", "")) if rarity >= 0 else "None", UiTheme.GOLD_LABEL, 21, item_color)
+	var item := UiTheme.centered_label(String(h.get("item_name", "")) if rarity >= 0 else "None", UiTheme.GOLD_LABEL, 20, item_color)
 	item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	item.max_lines_visible = 2  # a long name ends in "..." instead of pushing the card
+	item.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	item.custom_minimum_size = Vector2(HERO_WIDTH - 36.0, ITEM_NAME_HEIGHT)
 	col.add_child(item)
 	col.add_child(UiTheme.centered_label(String(h.get("item_line", "")), UiTheme.SMALL, 17))
 	var award_text := String(h.get("award_line", ""))
 	var award := UiTheme.centered_label(award_text if award_text != "" else " ", UiTheme.GOLD_LABEL, 24)
 	col.add_child(award)
-	var stat := UiTheme.centered_label(String(h.get("stat_line", "")), UiTheme.SMALL, 17)
-	stat.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(stat)
+	col.add_child(UiTheme.centered_label(String(h.get("stat_line", "")), UiTheme.SMALL, 17))
 	return panel

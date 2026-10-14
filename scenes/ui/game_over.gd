@@ -35,6 +35,8 @@ var time_value: Label
 var rows_box: VBoxContainer
 ## The page shown (Page.SUMMARY / Page.METER).
 var page := Page.SUMMARY
+## The framed panel in the middle (tests measure it).
+var panel: PanelContainer
 var summary_page: Control
 var meter_page: MeterPage
 ## The line under the prompts ("Saved to ..." after X).
@@ -143,7 +145,7 @@ func _build() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
-	var panel := UiTheme.panel()
+	panel = UiTheme.panel()
 	var style := UiTheme.stone_style()
 	style.content_margin_left = 48
 	style.content_margin_right = 48

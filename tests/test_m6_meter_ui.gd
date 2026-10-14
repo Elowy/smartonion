@@ -206,7 +206,7 @@ func test_the_formatters() -> void:
 	check_eq(RunSummary.format_amount(9999.0), "9,999", "below 10k: whole numbers")
 	check_eq(RunSummary.format_amount(12345.0), "12.3k", "from 10k: k")
 	check_eq(RunSummary.format_amount(1250000.0), "1.25M", "from a million: M")
-	check_eq(RunSummary.format_value(&"kills", 1234.0), "1,234", "a count is never shortened")
+	check_eq(RunSummary.format_value(&"kills", 12345.0), "12,345", "a count is never shortened")
 	check_eq(RunSummary.format_value(&"damage", 12345.0), "12.3k", "an amount is")
 	check_eq(RunSummary.format_time(0.0), "0:00", "no time")
 	check_eq(RunSummary.format_time(59.6), "1:00", "rounded to the second")
@@ -398,6 +398,58 @@ func test_the_meter_page_has_a_sorted_bar_per_hero_and_stat_in_class_colours() -
 	check_eq(page.totals[&"revives"].text, "1", "a count total")
 
 
+func test_a_meter_bar_fills_in_proportion_with_a_minimum_and_a_dimmed_zero() -> void:
+	var bar := MeterBar.create()
+	bar.setup("P1 Warrior", "5", 0.5, Color.RED, Color.BLUE)
+	var inner := 300.0 - 2.0 - MeterBar.SWATCH_WIDTH
+	check_near(bar.fill_width(300.0), inner * 0.5, 0.001, "half the best value: half the trough")
+	bar.setup("P1 Warrior", "1", 0.0001, Color.RED, Color.BLUE)
+	check_near(bar.fill_width(300.0), MeterBar.MIN_FILL, 0.001, "a tiny value still shows a sliver")
+	bar.setup("P1 Warrior", "0", 0.0, Color.RED, Color.BLUE, true)
+	check_eq(bar.fill_width(300.0), 0.0, "nothing: no fill")
+	bar.setup("P1 Warrior", "9", 1.0, Color.RED, Color.BLUE, true)
+	check_eq(bar.fill_width(300.0), 0.0, "a dimmed bar is never filled")
+	bar.setup("P1 Warrior", "9", 7.5, Color.RED, Color.BLUE)
+	check_eq(bar.ratio, 1.0, "the ratio is clamped")
+	check_near(bar.fill_width(300.0), inner, 0.001, "to the whole trough")
+	bar.free()
+
+
+func test_the_worst_case_meter_page_fits_the_screen() -> void:
+	# Four heroes and every award won (two rows of chips), the largest numbers.
+	_humans([&"warrior", &"mage", &"paladin", &"rogue"] as Array[StringName])
+	var dmg := [1250000.0, 480000.0, 210000.0, 330000.0]
+	var heal := [2000.0, 91234.0, 15000.0, 0.0]
+	var absorb := [0.0, 0.0, 61234.5, 120.0]
+	var revives := [1, 2, 4, 0]
+	var downs := [2, 0, 1, 5]
+	var kills := [900, 2100, 650, 3100]
+	for i in 4:
+		RunState.record_damage(i, dmg[i])
+		RunState.record_heal(i, heal[i])
+		RunState.record_absorb(i, absorb[i])
+		RunState.record_damage_taken(i, 100.0 * i)
+		for _r in revives[i]:
+			RunState.record_revive(i)
+		for _d in downs[i]:
+			RunState.record_down(i)
+		for _k in kills[i]:
+			RunState.record_kill(i)
+	RunState.record_hero_result(0, true)
+	RunState.record_hero_result(1, true)
+	RunState.record_hero_result(2, true)
+	RunState.record_hero_result(3, true)
+	var screen := _screen()
+	screen.open(true)
+	check_eq(screen.meter_page.awards_grid.get_child_count(), RunSummary.AWARDS.size(), "all seven awards were won")
+	for page in GameOverScreen.PAGE_NAMES.size():
+		screen.set_page(page as GameOverScreen.Page)
+		var need := screen.panel.get_combined_minimum_size()
+		check(need.y <= 1080.0 - 40.0, "page %d: the panel needs %s px of the 1080" % [page, need.y])
+		check(need.x <= 1920.0 - 40.0, "page %d: and %s px of the 1920 width" % [page, need.x])
+	check_eq(screen.panel.get_combined_minimum_size().x, 1140.0, "the panel keeps its width")
+
+
 func test_awards_show_in_co_op_only() -> void:
 	_humans([&"warrior", &"mage"] as Array[StringName])
 	RunState.record_damage(1, 50.0)
@@ -457,12 +509,12 @@ func test_the_card_model_is_a_pure_function_of_the_summary() -> void:
 	check_eq(p1["item_rarity"], Items.Rarity.EPIC, "rarity")
 	check_eq(p1["item_line"], "Item level 41", "level line")
 	check_eq(p1["award"], "", "P1 won nothing")
-	check_eq(p1["stat_line"], "Damage 100", "damage only: a zero healing is left out")
+	check_eq(p1["stat_line"], "Dmg 100", "damage only: a zero healing is left out")
 	var p2: Dictionary = heroes[1]
 	check_eq(p2["award"], "Most Damage", "P2's first award")
 	check_eq(p2["more_awards"], 3, "and three more")
 	check_eq(p2["award_line"], "Most Damage +3", "the line")
-	check_eq(p2["stat_line"], "Damage 300   Healing 50", "damage and healing")
+	check_eq(p2["stat_line"], "Dmg 300   Heal 50", "damage and healing")
 	var p3: Dictionary = heroes[2]
 	check_eq(p3["alive"], false, "P3 fell")
 	check_eq(p3["item_line"], "No gear", "no item")

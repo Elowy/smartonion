@@ -12,6 +12,8 @@ const DIR := "user://cards"
 const GAME_TITLE := "SmartOnion"
 ## Heroes on a card (a party has at most four).
 const MAX_HEROES := 4
+## The stats on a hero's last line, with the short names that fit the card.
+const STAT_SHORT := {&"damage": "Dmg", &"healing": "Heal"}
 
 
 ## The card's content: {"title", "result" ("Victory" / "Defeat"), "victory", "mode", "waves_text"
@@ -46,10 +48,10 @@ static func _hero_model(h: Dictionary) -> Dictionary:
 	var award := RunSummary.award_name(awards[0]) if not awards.is_empty() else ""
 	var stats: Dictionary = h.get("stats", {})
 	var stat_parts: Array[String] = []
-	for id: StringName in [&"damage", &"healing"]:
+	for id: StringName in STAT_SHORT:
 		var v := float(stats.get(id, 0.0))
 		if v > 0.0:
-			stat_parts.append("%s %s" % [RunSummary.STAT_LABELS[id], RunSummary.format_amount(v)])
+			stat_parts.append("%s %s" % [STAT_SHORT[id], RunSummary.format_amount(v)])
 	return {
 		"label": h.get("label", "?"),
 		"class_name": h.get("class_name", "?"),
