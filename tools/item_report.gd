@@ -175,7 +175,7 @@ func _print_enchants(items: Array[ItemInstance]) -> void:
 			print("%-10s avg %.2f  with enchant %.1f%%  max %d" % [Items.RARITY_NAMES[r],
 				float(total) / n, 100.0 * with_any / n, max_count])
 	var by_id := {}
-	var ranks: Array[int] = [0, 0, 0]
+	var ranks: Array[int] = [0, 0, 0, 0, 0]
 	for item in items:
 		for roll in item.enchants:
 			by_id[roll.enchant.id] = by_id.get(roll.enchant.id, 0) + 1
@@ -189,7 +189,7 @@ func _print_enchants(items: Array[ItemInstance]) -> void:
 	for id in ids:
 		parts.append("%s %d" % [id, by_id[id]])
 	print("By enchant: %s" % ", ".join(parts))
-	print("Ranks I/II/III: %d / %d / %d\n" % ranks)
+	print("Ranks I/II/III/IV/V: %d / %d / %d / %d / %d\n" % ranks)
 
 
 func _print_uniques(items: Array[ItemInstance]) -> void:
@@ -250,7 +250,7 @@ func _print_samples(items: Array[ItemInstance]) -> void:
 			stats.append("%s %s" % [Stats.format_value(stat, item.all_stats()[stat]), Stats.display_name(stat)])
 		var enchants: PackedStringArray = []
 		for roll in item.enchants:
-			enchants.append("%s %s" % [roll.enchant.id, ["I", "II", "III"][roll.rank]])
+			enchants.append("%s %s" % [roll.enchant.id, roll.rank_label()])
 		print("[%s] %s (ilvl %d, w%d%s, %dg): %s%s%s" % [item.rarity_name(), item.display_name,
 			item.item_level, item.wave, ", Looted" if item.looted else "", item.buy_price,
 			", ".join(stats), (" | " + ", ".join(enchants)) if not enchants.is_empty() else "",
