@@ -259,14 +259,18 @@ func test_boss_create_uses_the_boss_hp_rule_and_party_damage() -> void:
 func test_boss_crowd_control_rules() -> void:
 	var b := _boss()
 	var hero := _hero(Vector3(20, 0, 0))
-	# Knockback: the hit lands, the push does not (also a direct write, like the Warrior's).
-	var hp := b.hp
-	b.take_damage(10.0, false, null, Vector3(5.0, 0.0, 0.0))
-	check_eq(b.hp, hp - 10.0, "the damage lands")
-	check_eq(b.knockback_velocity, Vector3.ZERO, "no knockback")
-	b.knockback_velocity = Vector3(6.0, 0.0, 0.0)
-	b._physics_process(DT)
-	check_eq(b.knockback_velocity, Vector3.ZERO, "a direct push is cleared too")
+	# Knockback: the hit lands, the push does not (also a direct write, like the Warrior's). A boss
+	# whose data has no knockback_resist is immune all the same.
+	var plain := _lone_boss(_ability(BossAbility.Kind.FROST_CIRCLES), Vector3(0, 0, 12))
+	check_eq(plain.data.knockback_resist, 0.0, "(this one's data has no resistance)")
+	for boss: Boss in [b, plain]:
+		var hp := boss.hp
+		boss.take_damage(10.0, false, null, Vector3(5.0, 0.0, 0.0))
+		check_eq(boss.hp, hp - 10.0, "the damage lands")
+		check_eq(boss.knockback_velocity, Vector3.ZERO, "no knockback")
+		boss.knockback_velocity = Vector3(6.0, 0.0, 0.0)
+		boss._physics_process(DT)
+		check_eq(boss.knockback_velocity, Vector3.ZERO, "a direct push is cleared too")
 	# Stun: a quarter of the time.
 	b.apply_stun(2.0)
 	check_near(b.stun_left, 0.5, 0.0001, "a 2 s stun lasts 0.5 s")
