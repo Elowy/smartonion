@@ -255,6 +255,7 @@ func test_start_run_resets_everything_new() -> void:
 	RunState.record_down(0)
 	RunState.tick_run_time(12.0)
 	RunState.record_special_kill(&"boss", 0)
+	RunState.record_hero_result(0, true)
 	RunState.artifacts_dropped = 2
 	RunState.consumables_bought = 3
 	RunState.black_market_bought = 1
@@ -272,7 +273,8 @@ func test_start_run_resets_everything_new() -> void:
 	check(RunState.dust_spend_log.is_empty() and RunState.dust_gain_log.is_empty(), "dust logs")
 	check(RunState.healing_by_player.is_empty() and RunState.absorbed_by_player.is_empty()
 			and RunState.damage_taken_by_player.is_empty() and RunState.revives_by_player.is_empty()
-			and RunState.downs_by_player.is_empty(), "meter dictionaries")
+			and RunState.downs_by_player.is_empty() and RunState.bosses_by_player.is_empty()
+			and RunState.hero_results.is_empty(), "meter dictionaries")
 	check_eq(RunState.run_time, 0.0, "run time")
 	check_eq(RunState.bosses_killed, 0, "bosses")
 	check_eq(RunState.artifacts_dropped, 0, "artifacts")
@@ -341,6 +343,7 @@ func test_smoke_result_has_the_m6_keys() -> void:
 	check_eq(data["dust_earned"], 10, "dust_earned")
 	check_eq(data["dust_spent"], 4, "dust_spent")
 	check_near(float(data["run_time"]), 12.3, 0.001, "run_time (0.1 s resolution)")
+	check(data.has("meter") and data["meter"] is Dictionary, "SMOKE_RESULT has the damage meter")
 
 
 # --- Launch flags ------------------------------------------------------------------------------
@@ -705,21 +708,26 @@ func test_the_tab_strip_shows_the_dust_and_fits_the_panel() -> void:
 
 # --- Player: optional parameters ---------------------------------------------------------------
 
-func test_heal_and_revive_take_optional_source_slots() -> void:
+func test_heal_and_revive_credit_their_source_slots() -> void:
 	world = Fakes.make_world(tree)
 	var p := Fakes.spawn_player(world, 0, &"warrior")
 	p.hp = 1.0
 	p.heal(4.0)
 	check_eq(p.hp, 5.0, "heal(amount) as before")
+	check_eq(RunState.healing_by_player, {0: 4.0} as Dictionary[int, float], "no source: the hero itself")
 	p.heal(3.0, 2)
 	check_eq(p.hp, 8.0, "heal(amount, source_slot)")
-	p.heal(2.0, -1)
-	check_eq(p.hp, 10.0, "heal(amount, -1)")
+	check_eq(RunState.healing_by_player, {0: 4.0, 2: 3.0} as Dictionary[int, float], "the healer (slot 2) is credited")
+	p.heal(50.0, -1)
+	check_eq(p.hp, p.max_hp(), "heal(amount, -1)")
+	check_near(RunState.healing_by_player[0], 4.0 + (p.max_hp() - 8.0), 0.0001, "only the effective part counts")
 	p._go_down()
 	check(p.downed, "down")
+	check_eq(RunState.downs_by_player, {0: 1} as Dictionary[int, int], "the down is recorded")
 	p.revive(0.5, [1, 3] as Array[int])
 	check(not p.downed, "revive(ratio, reviver_slots)")
 	check_near(p.hp, roundf(p.max_hp() * 0.5), 1.0, "at the given ratio")
+	check_eq(RunState.revives_by_player, {1: 1, 3: 1} as Dictionary[int, int], "every reviver is credited")
 	p._go_down()
 	p.revive()
 	check(not p.downed, "revive() as before")
@@ -727,6 +735,8 @@ func test_heal_and_revive_take_optional_source_slots() -> void:
 	p._go_down()
 	p.revive(1.0)
 	check_eq(p.hp, p.max_hp(), "revive(ratio) as before")
+	check_eq(RunState.revives_by_player, {1: 1, 3: 1} as Dictionary[int, int], "no reviver slots: nobody is credited")
+	check_eq(RunState.downs_by_player, {0: 3} as Dictionary[int, int], "three downs")
 	Fakes.free_world(world)
 	world = null
 

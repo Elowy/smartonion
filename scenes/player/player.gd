@@ -262,6 +262,16 @@ func is_alive() -> bool:
 	return not downed
 
 
+## This hero's slot index, the id the damage meter credits (RunState.record_*); -1 without a slot.
+func slot_index() -> int:
+	return slot.index if slot != null else -1
+
+
+## [method slot_index] of [param p] (-1 for null or a freed hero) – for callers that may hold none.
+static func slot_index_of(p: Player) -> int:
+	return p.slot_index() if p != null and is_instance_valid(p) else -1
+
+
 ## Hidden from enemies (Vanish): still collects pickups and can be healed / revived.
 func is_stealthed() -> bool:
 	return stealth_left > 0.0
@@ -368,9 +378,11 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		_avoided(&"parry", valid_source)
 		return
 	var amount := raw
+	var blocked := false
 	var block := block_chance()
 	if block > 0.0 and CombatMath.roll_block(block, rng):
 		amount *= 1.0 - CombatMath.block_absorb(stats.get_raw(Stats.BLOCK_VALUE))
+		blocked = true
 		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
 		# Both a full and a partial block count as blocked.
 		_avoided(&"block", valid_source)
@@ -378,11 +390,11 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			invulnerable_left = INVULNERABLE_AFTER_HIT
 			_thorns(attacker, kind)
 			return
-	var dmg := CombatMath.incoming_damage(amount, stats, kind)
-	for m: float in damage_taken_mults.values():
-		dmg *= maxf(0.0, m)
-	if bonuses != null:
-		dmg *= bonuses.damage_taken_mult(kind, valid_source)
+	var dmg := _mitigated(amount, kind, valid_source)
+	if blocked:
+		# What the block saved (the hit without it minus the hit with it) counts as absorbed
+		# (damage meter).
+		RunState.record_absorb(slot_index(), _mitigated(raw, kind, valid_source) - dmg)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
@@ -392,7 +404,10 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 			return
 	if dmg >= hp and _prevent_death():
 		dmg = maxf(0.0, hp - minf(hp, 1.0))  # survive at (up to) 1 HP
+	var hp_before := hp
 	hp = maxf(0.0, hp - dmg)
+	# The damage meter counts the HP the hit really took (no overkill).
+	RunState.record_damage_taken(slot_index(), hp_before - hp)
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:
 		Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
@@ -412,10 +427,24 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		procs.on_struck(valid_source, dmg)
 
 
+## The damage a hit of [param amount] (after dodge / parry / block) does once armour, Versatility,
+## Avoidance, the temporary multipliers and the talent / set entries are applied (before the
+## absorb shields). Pure: take_damage calls it once, and a second time for the unblocked hit
+## when a block happened (the damage meter's "absorbed by block").
+func _mitigated(amount: float, kind: StringName, valid_source: Node3D) -> float:
+	var dmg := CombatMath.incoming_damage(amount, stats, kind)
+	for m: float in damage_taken_mults.values():
+		dmg *= maxf(0.0, m)
+	if bonuses != null:
+		dmg *= bonuses.damage_taken_mult(kind, valid_source)
+	return dmg
+
+
 ## Heals this hero by [param amount] (clamped to max HP; nothing while downed).
-## [param _source_slot] = the slot index of the healer (-1 = unknown / self-sourced): M6's damage
-## meter will credit the effective healing to it (METER package; nothing is recorded yet).
-func heal(amount: float, _source_slot: int = -1) -> void:
+## [param source_slot] = the slot index of the healer (-1 = self-sourced: regen, Leech, a self
+## heal): the damage meter credits the effective healing (the HP really gained, after the max-HP
+## clamp) to it.
+func heal(amount: float, source_slot: int = -1) -> void:
 	if downed or amount <= 0.0:
 		return
 	var before := hp
@@ -423,6 +452,7 @@ func heal(amount: float, _source_slot: int = -1) -> void:
 	var gained := hp - before
 	if gained <= 0.0:
 		return
+	RunState.record_heal(source_slot if source_slot >= 0 else slot_index(), gained)
 	_text_side = -_text_side
 	Vfx.floating_text(self_text_position(_text_side), "+" + _format_amount(gained), HEAL_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
 	_hp_updated()
@@ -656,11 +686,10 @@ static func _merge_mods(out: Dictionary, mods: Dictionary) -> void:
 			out[key] = v
 
 
-## Revives a downed player at [param hp_ratio] of max HP (min 1 HP). [param _reviver_slots] =
+## Revives a downed player at [param hp_ratio] of max HP (min 1 HP). [param reviver_slots] =
 ## the slot indices of the teammates who revived this hero (empty = nobody: the wave start, the
-## Spirit Healer, the smoke runner): M6's damage meter will credit them (METER package;
-## nothing is recorded yet).
-func revive(hp_ratio: float = REVIVE_HP_RATIO, _reviver_slots: Array[int] = []) -> void:
+## Spirit Healer, the smoke runner): the damage meter credits every one of them with a revive.
+func revive(hp_ratio: float = REVIVE_HP_RATIO, reviver_slots: Array[int] = []) -> void:
 	if not downed:
 		return
 	downed = false
@@ -679,6 +708,11 @@ func revive(hp_ratio: float = REVIVE_HP_RATIO, _reviver_slots: Array[int] = []) 
 		model.set_revive_progress(0.0)
 		model.set_downed(false)
 	_hp_updated()
+	var credited: Array[int] = []
+	for r in reviver_slots:
+		if r >= 0 and r not in credited:
+			credited.append(r)
+			RunState.record_revive(r)
 	downed_changed.emit(false)
 
 
@@ -998,7 +1032,10 @@ func _update_revive(delta: float) -> void:
 		model.set_revive_progress(ratio, color, seconds)
 	if revive_progress >= REVIVE_TIME - 0.0001:
 		var feet := global_position
-		revive(REVIVE_HP_RATIO)
+		var reviver_slots: Array[int] = []
+		for r in revivers:
+			reviver_slots.append(r.slot_index())
+		revive(REVIVE_HP_RATIO, reviver_slots)
 		Vfx.resurrect_column(feet)
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
 
@@ -1069,6 +1106,7 @@ func _update_channelers(revivers: Array[Player]) -> void:
 
 func _go_down() -> void:
 	downed = true
+	RunState.record_down(slot_index())
 	revive_progress = 0.0
 	reviver_count = 0
 	_regen_accum = 0.0

@@ -128,6 +128,11 @@ var damage_taken_by_player: Dictionary[int, float] = {}
 var revives_by_player: Dictionary[int, int] = {}
 ## Times a player went down.
 var downs_by_player: Dictionary[int, int] = {}
+## Bosses a player landed the killing blow on ([method record_special_kill] &"boss").
+var bosses_by_player: Dictionary[int, int] = {}
+## How each hero ended the run, filled by [method record_hero_result] when the run is over (the
+## heroes are freed afterwards): slot index -> {"alive": bool, "best_item": ItemInstance or null}.
+var hero_results: Dictionary[int, Dictionary] = {}
 ## Seconds of wave play this run ([method tick_run_time]; the market, the loot roll and pauses
 ## do not count).
 var run_time := 0.0
@@ -188,6 +193,8 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 	damage_taken_by_player.clear()
 	revives_by_player.clear()
 	downs_by_player.clear()
+	bosses_by_player.clear()
+	hero_results.clear()
 	run_time = 0.0
 	bosses_killed = 0
 	artifacts_dropped = 0
@@ -450,6 +457,8 @@ func record_special_kill(kind: StringName, killer_index: int) -> void:
 			goblins_killed += 1
 		&"boss":
 			bosses_killed += 1
+			if killer_index >= 0:
+				bosses_by_player[killer_index] = bosses_by_player.get(killer_index, 0) + 1
 	special_killed.emit(kind, killer_index)
 
 
@@ -483,6 +492,14 @@ func record_revive(player_index: int) -> void:
 func record_down(player_index: int) -> void:
 	if player_index >= 0:
 		downs_by_player[player_index] = downs_by_player.get(player_index, 0) + 1
+
+
+## How slot [param player_index]'s hero ended the run: [param alive] (standing, not downed) and its
+## [param best_item] (an [ItemInstance], null = none; see RunSummary.best_item). Main records it
+## for every hero when the run ends, before the end screen opens.
+func record_hero_result(player_index: int, alive: bool, best_item: ItemInstance = null) -> void:
+	if player_index >= 0:
+		hero_results[player_index] = {"alive": alive, "best_item": best_item}
 
 
 ## Adds [param delta] seconds of wave play to [member run_time] (Main, state WAVE, every

@@ -175,7 +175,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var downed := revive_target(ctx)
 	if downed != null:
 		var feet := downed.global_position
-		downed.revive(revive_ratio(ctx))
+		downed.revive(revive_ratio(ctx), [paladin.slot_index()] as Array[int])
 		if downed.downed:
 			return false
 		grant_shield(ctx, downed)
@@ -192,10 +192,10 @@ func cast(ctx: AbilityContext) -> bool:
 		if not _is_hurt(p):
 			continue
 		var amount := heal_amount(ctx, paladin, p)
-		p.heal(amount)
+		p.heal(amount, paladin.slot_index())
 		grant_shield(ctx, p)
 		if shield_share > 0.0 and p.procs != null:
-			p.procs.add_shield(amount * shield_share / 100.0, ctx.num("shield_duration", 8.0))
+			p.procs.add_shield(amount * shield_share / 100.0, ctx.num("shield_duration", 8.0), &"", paladin.slot_index())
 		Vfx.hit_spark(p.get_chest_position(), HOLY_COLOR)
 		if p != paladin:
 			ProcVfx.beam(paladin.get_chest_position(), p.get_chest_position(), HOLY_COLOR)
@@ -212,7 +212,9 @@ static func grant_shield(ctx: AbilityContext, who: Player) -> void:
 	var want := who.max_hp() * pct / 100.0
 	var missing := want - who.procs.shield_of(ARTIFACT_SHIELD)
 	if missing > 0.0:
-		who.procs.add_shield(missing, ctx.num("shield_duration", 8.0), ARTIFACT_SHIELD)
+		# The Paladin cast it: the damage meter credits what it absorbs to the Paladin (METER).
+		var caster := ctx.player.slot_index() if ctx.player != null else -1
+		who.procs.add_shield(missing, ctx.num("shield_duration", 8.0), ARTIFACT_SHIELD, caster)
 		Vfx.explosion(who.global_position + Vector3.UP * 0.1, 1.0, ProcSystem.SHIELD_COLOR)
 
 

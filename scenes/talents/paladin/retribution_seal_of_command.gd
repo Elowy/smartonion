@@ -86,5 +86,5 @@ func _seal(e: Enemy, amount: float) -> void:
 		return
 	var who := PaladinKit.lowest_hero(player.get_tree(), player.global_position, _heal_range, true)
 	if who != null:
-		who.heal(who.max_hp() * _heal_pct / 100.0 * PaladinKit.healing_mult(player))
+		who.heal(who.max_hp() * _heal_pct / 100.0 * PaladinKit.healing_mult(player), player.slot_index())
 		Vfx.hit_spark(who.get_chest_position(), PaladinKit.HOLY_COLOR)
