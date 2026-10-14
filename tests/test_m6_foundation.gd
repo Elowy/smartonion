@@ -2,7 +2,7 @@ extends TestCase
 ## M6 P0 foundation hooks (behaviour-neutral): the Arcane Dust wallet, the damage-meter
 ## recorders, the run clock, the boss kind of record_special_kill, the SUPPORT / BRUTE AI
 ## dispatch and death-effect virtuals of Enemy, EnemyData.is_boss / BossData, the Db boss and
-## consumable dirs, ConsumableData, the locked Enchanter tab, the optional parameters of
+## consumable dirs, ConsumableData, the Enchanter tab's wiring, the optional parameters of
 ## Player.heal / revive, the LootDrops.roll_artifact wiring (the ARTIFACTS package made the roll
 ## real: its behaviour is tested in test_m6_artifacts_*), the Shop / Intermission hooks, the new
 ## SMOKE_RESULT keys and the --boss-hp / --artifact-chance launch flags.
@@ -595,17 +595,17 @@ func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
 	nodes.append(im)
 	tree.root.add_child(im)
 	im._bots_shop()
-	check_eq(im.order, [&"buy", &"black_market", &"consumables", &"train", &"talents", &"enchant", &"reroll"] as Array[StringName],
+	check_eq(im.order, [&"enchant", &"buy", &"black_market", &"consumables", &"train", &"talents", &"reroll"] as Array[StringName],
 			"the passes of _bots_shop")
 	var plain := Intermission.create()
 	nodes.append(plain)
 	tree.root.add_child(plain)
 	check_eq(plain._bots_black_market(), 0, "black market stub")
 	check_eq(plain._bots_consumables(), 0, "consumables stub")
-	check_eq(plain._bots_enchant(), 0, "enchant stub")
+	check_eq(plain._bots_enchant(), 0, "nothing to enchant without bots (and before wave 12)")
 
 
-# --- PlayerPanel: the locked Enchanter tab -----------------------------------------------------
+# --- PlayerPanel: the Enchanter tab (opened by the ENCHANTER package) --------------------------
 
 func _panel() -> PlayerPanel:
 	var slot := PlayerManager.join(ScriptedInput.new("m6:panel"), Db.get_class_data(&"warrior"))
@@ -628,57 +628,70 @@ func test_enchanter_tab_constants() -> void:
 		check(id in LaunchOptions.PANEL_TABS, "%s is a --panel-tab value" % id)
 	for id in LaunchOptions.PANEL_TABS:
 		check(PlayerPanel.TAB_IDS.has(id), "%s has a tab" % id)
-	check(PlayerPanel.ENCHANTER_TAB in PlayerPanel.LOCKED_TABS, "locked until the ENCHANTER package")
-	check_eq(PlayerPanel.LOCKED_TABS.size(), 1, "and the only locked one")
+	check(PlayerPanel.LOCKED_TABS.is_empty(), "no tab is locked any more: the Enchanter tab is open")
 
 
-func test_lt_rt_never_reach_the_locked_enchanter_tab() -> void:
+func test_lt_rt_cycle_through_all_four_tabs_including_the_enchanter() -> void:
 	var panel := _panel()
 	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "starts on Character")
 	var seen: Array[int] = []
 	for i in 8:
 		panel.switch_tab(1)
 		seen.append(panel.active_tab)
-	check_eq(seen, [1, 2, 0, 1, 2, 0, 1, 2] as Array[int], "RT cycles Character / Trainer / Talents only")
+	check_eq(seen, [1, 2, 3, 0, 1, 2, 3, 0] as Array[int], "RT cycles Character / Trainer / Talents / Enchanter")
 	seen.clear()
 	for i in 8:
 		panel.switch_tab(-1)
 		seen.append(panel.active_tab)
-	check_eq(seen, [1, 0, 2, 1, 0, 2, 1, 0] as Array[int], "LT too")
-	check(PlayerPanel.ENCHANTER_TAB not in seen, "never the Enchanter")
-	# From the last open tab RT wraps to the first (as with three tabs), LT from the first to the last open one.
-	panel.set_tab(PlayerPanel.TALENTS_TAB)
+	check_eq(seen, [3, 2, 1, 0, 3, 2, 1, 0] as Array[int], "LT the other way")
+	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
 	panel.switch_tab(1)
-	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "Talents + RT = Character")
+	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "Enchanter + RT wraps to Character")
 	panel.switch_tab(-1)
-	check_eq(panel.active_tab, PlayerPanel.TALENTS_TAB, "Character + LT = Talents")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "Character + LT = Enchanter")
 
 
-func test_set_tab_refuses_the_locked_enchanter_tab() -> void:
+func test_set_tab_and_panel_tab_open_the_enchanter_tab() -> void:
 	var panel := _panel()
 	panel.set_tab(PlayerPanel.TRAINER_TAB)
 	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
-	check_eq(panel.active_tab, PlayerPanel.TRAINER_TAB, "set_tab refuses it")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "set_tab opens it")
+	check(panel.enchanter.visible and not panel.trainer.visible and not panel.talents.visible, "its body shows alone")
+	panel.set_tab(PlayerPanel.CHARACTER_TAB)
+	check(not panel.enchanter.visible, "and hides again")
+	# --panel-tab=enchanter: P1's panel opens on it when the market first shows it.
+	check_eq(panel.slot.index, 0, "the fixture panel is P1's")
 	PlayerPanel.debug_start_tab = "enchanter"
 	panel._debug_tab_done = false
 	panel._apply_debug_start_tab()
 	PlayerPanel.debug_start_tab = ""
-	check(panel.active_tab != PlayerPanel.ENCHANTER_TAB, "--panel-tab=enchanter stays closed too")
-	panel.set_tab(PlayerPanel.CHARACTER_TAB)
-	check_eq(panel.active_tab, PlayerPanel.CHARACTER_TAB, "the others still open")
+	check_eq(panel.active_tab, PlayerPanel.ENCHANTER_TAB, "--panel-tab=enchanter opens P1's panel on it")
 
 
-func test_the_tab_strip_shows_the_padlock_and_fits_the_panel() -> void:
+func test_the_tab_strip_shows_the_dust_and_fits_the_panel() -> void:
 	var panel := _panel()
 	panel.size = PlayerPanel.DESIGN_SIZE
 	panel.refresh()
 	panel.set_tab(PlayerPanel.TALENTS_TAB)
 	check_eq(panel._tab_labels.size(), 4, "four tab labels")
-	check_eq(panel.tab_text(PlayerPanel.ENCHANTER_TAB), "Enchanter", "the label")
-	# The widest case (the active Talents tab with a two-digit label) stays inside the design width.
+	check_eq(panel.tab_text(PlayerPanel.ENCHANTER_TAB), "Enchanter (0)", "the label shows the team's Dust")
+	RunState.add_dust(12, -1, "x")
+	check_eq(panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text, "Enchanter (12)", "relabelled in place on dust_changed")
+	check(panel._tabs_row.find_children("*", "UiIcon", true, false).filter(
+		func(n: Node) -> bool: return (n as UiIcon).kind == UiIcon.Kind.LOCK).is_empty(), "no padlock")
+	for c in panel._tabs_row.get_children():
+		check(not (c is Label and (c as Label).text == "Coming soon"), "no 'Coming soon' note")
+	# The widest cases (the active Talents tab with a two-digit label and a big Dust pile, and the
+	# active Enchanter tab) stay inside the design width.
 	panel._tab_labels[PlayerPanel.TALENTS_TAB].text = "Talents (20)"
+	panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text = "Enchanter (9999)"
 	var strip := panel._tabs_row.get_combined_minimum_size()
 	check(strip.x <= PlayerPanel.DESIGN_SIZE.x, "the tab strip fits: %s" % strip)
+	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
+	panel._tab_labels[PlayerPanel.TALENTS_TAB].text = "Talents (20)"
+	panel._tab_labels[PlayerPanel.ENCHANTER_TAB].text = "Enchanter (9999)"
+	strip = panel._tabs_row.get_combined_minimum_size()
+	check(strip.x <= PlayerPanel.DESIGN_SIZE.x, "also with the Enchanter tab active: %s" % strip)
 	var frame_min := panel.get_child(0).get_combined_minimum_size() as Vector2
 	check(frame_min.x <= PlayerPanel.DESIGN_SIZE.x + 0.5, "the frame fits the design width: %s" % frame_min)
 

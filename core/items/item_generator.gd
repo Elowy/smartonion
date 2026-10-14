@@ -271,8 +271,9 @@ static func stat_cost(stats: Dictionary) -> float:
 
 
 ## Enchant rank (0 = I, 1 = II, 2 = III) by the item's wave; looted items get one rank more.
+## Never above III (EnchantData.MAX_GENERATED_RANK): IV and V only come from the Enchanter.
 static func enchant_rank(wave: int, looted: bool) -> int:
-	return mini(Items.material_tier(wave) + (1 if looted else 0), EnchantData.RANK_MULT.size() - 1)
+	return mini(Items.material_tier(wave) + (1 if looted else 0), EnchantData.MAX_GENERATED_RANK)
 
 
 ## How many random enchants an item of [param rarity] gets (GDD 5.2 / 5.7).
@@ -468,7 +469,8 @@ static func from_unique(data: UniqueItemData, wave: int, looted: bool, rng: Rand
 		if enchant == null:
 			continue
 		var rank := data.enchant_ranks[i] if i < data.enchant_ranks.size() else enchant_rank(wave, false)
-		item.enchants.append(EnchantRoll.new(enchant, rank + (1 if looted else 0)))
+		item.enchants.append(EnchantRoll.new(enchant,
+				mini(rank + (1 if looted else 0), EnchantData.MAX_GENERATED_RANK)))
 	# (An Artifact keeps exactly its fixed enchants: no top-up, no rng.)
 	if data.rarity == Items.Rarity.LEGENDARY and item.enchants.size() < LEGENDARY_ENCHANTS:
 		_roll_enchants(item, LEGENDARY_ENCHANTS - item.enchants.size(), rng, for_class)
