@@ -676,8 +676,10 @@ func _wave_cleared_text(n: int) -> String:
 func _on_boss_spawned(boss: Boss) -> void:
 	if hud != null and boss.boss_data != null:
 		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
-	_log("boss %s arrived on wave %d: %.0f HP, %d player(s)" % [
-		boss.boss_data.display_name if boss.boss_data != null else "?", wave, boss.max_hp, players.size()])
+	_log("boss %s arrived on wave %d at %s: %.0f HP, %d player(s)" % [
+		boss.boss_data.display_name if boss.boss_data != null else "?", wave,
+		boss.global_position.snappedf(0.1) if boss.is_inside_tree() else boss.position.snappedf(0.1),
+		boss.max_hp, players.size()])
 
 
 ## WaveDirector.boss_defeated (the wave ends on the next tick): the kill time for the smoke log.
@@ -1008,6 +1010,11 @@ func _log_player_screen_positions() -> void:
 		_log("%s %s at %s -> screen (%d, %d) of %dx%d, camera distance %.1f" % [
 			p.slot.label() if p.slot != null else "?", "alive" if p.is_alive() else "downed",
 			p.global_position.snappedf(0.1), px.x, px.y, size.x, size.y, arena.camera.distance])
+	var boss: Boss = wave_director.boss if wave_director != null else null
+	if is_instance_valid(boss) and boss.is_inside_tree():
+		var bp := cam.unproject_position(boss.global_position + Vector3.UP * 1.2)
+		_log("boss %s at %s -> screen (%d, %d), %.0f%% HP, phase %d" % [
+			boss.data.display_name, boss.global_position.snappedf(0.1), bp.x, bp.y, boss.hp_ratio() * 100.0, boss.phase])
 
 
 func _quit(code: int) -> void:

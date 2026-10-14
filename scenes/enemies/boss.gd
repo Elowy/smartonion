@@ -69,6 +69,7 @@ var casts_total := 0
 ## x(1 + 0.75 (players - 1)), --boss-hp), not Enemy.setup's co-op factor.
 static func create(p_data: EnemyData, p_wave: int) -> Boss:
 	var b := setup(Boss.new(), p_data, p_wave) as Boss
+	b.add_to_group(&"bosses")  # (the camera frames it, CameraRig.boss_points)
 	b.boss_data = p_data as BossData
 	if b.boss_data != null:
 		b.max_hp = b.boss_data.max_hp_for(b.wave, RunState.player_count)
