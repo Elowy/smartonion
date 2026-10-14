@@ -14,6 +14,10 @@ const ABILITY_DIR := "res://data/abilities/"
 const TALENT_DIR := "res://data/talents/"
 ## data/sets/<set_id>.tres (SetData, M5).
 const SET_DIR := "res://data/sets/"
+## data/bosses/<boss_id>.tres (BossData, M6; may be empty until the BOSSES package).
+const BOSS_DIR := "res://data/bosses/"
+## data/consumables/<id>.tres (ConsumableData, M6; may be empty until the SHOPSINKS package).
+const CONSUMABLE_DIR := "res://data/consumables/"
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -32,6 +36,11 @@ var talent_trees: Dictionary[StringName, TalentTreeData] = {}
 var talents: Dictionary[StringName, TalentData] = {}
 ## Every tier set, by id (M5).
 var sets: Dictionary[StringName, SetData] = {}
+## Every boss, by id (M6). Separate from [member enemies]: the wave director's random pool
+## (eligible_enemies) never sees a boss.
+var bosses: Dictionary[StringName, BossData] = {}
+## Every shop consumable, by id (M6).
+var consumables: Dictionary[StringName, ConsumableData] = {}
 var class_ids: Array[StringName] = []
 
 
@@ -81,6 +90,14 @@ func reload() -> void:
 	for res in _load_dir(SET_DIR):
 		if res is SetData:
 			sets[res.id] = res
+	bosses.clear()
+	for res in _load_dir(BOSS_DIR):
+		if res is BossData:
+			bosses[res.id] = res
+	consumables.clear()
+	for res in _load_dir(CONSUMABLE_DIR):
+		if res is ConsumableData:
+			consumables[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -157,6 +174,14 @@ func get_weapon(id: StringName) -> WeaponData:
 
 func get_enemy(id: StringName) -> EnemyData:
 	return enemies.get(id)
+
+
+func get_boss(id: StringName) -> BossData:
+	return bosses.get(id)
+
+
+func get_consumable(id: StringName) -> ConsumableData:
+	return consumables.get(id)
 
 
 func get_enchant(id: StringName) -> EnchantData:
