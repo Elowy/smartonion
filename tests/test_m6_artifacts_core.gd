@@ -155,6 +155,7 @@ func test_making_an_artifact_draws_nothing() -> void:
 func test_artifact_is_never_sold_forged_or_disenchanted() -> void:
 	var item := _artifact(&"warrior")
 	check(not item.can_sell(), "can_sell is false")
+	check(not item.can_disenchant(), "and so is can_disenchant (the Enchanter asks)")
 	check(_artifact(&"warrior").is_artifact(), "still an Artifact")
 	var eq := _equipment(&"warrior")
 	eq.backpack.append(item)
@@ -162,7 +163,7 @@ func test_artifact_is_never_sold_forged_or_disenchanted() -> void:
 	check(not Forge.is_forgeable(item), "not forgeable")
 	check(_equipment(&"warrior").backpack.is_empty(), "fresh equipment is empty")
 	var plain := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)
-	check(plain.can_sell(), "an ordinary Epic sells")
+	check(plain.can_sell() and plain.can_disenchant(), "an ordinary Epic sells and disenchants")
 
 
 func test_greed_pays_five_times_the_epic_price_of_the_wave() -> void:

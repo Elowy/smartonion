@@ -147,6 +147,12 @@ func can_sell() -> bool:
 	return not is_artifact()
 
 
+## Whether the Enchanter may disenchant it into Arcane Dust (GDD 5.5: an Artifact never; the
+## ENCHANTER package's menu entry and its auto-disenchant of an all-Passed item ask this).
+func can_disenchant() -> bool:
+	return not is_artifact()
+
+
 ## Gold for the shared wallet when the item goes to Greed (GDD 10.1). An Artifact pays 5 times
 ## the Epic price of the wave it dropped on (GDD 5.5: about 770 gold at wave 10).
 func greed_value() -> int:
