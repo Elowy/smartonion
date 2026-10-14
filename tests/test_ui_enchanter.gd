@@ -283,6 +283,35 @@ func test_the_tab_follows_the_equipment() -> void:
 	check_eq(tab.items.size(), 1, "and a sold one goes")
 
 
+func test_a_hidden_tab_only_rebuilds_when_shown() -> void:
+	var slot := _hero()
+	var helm := _item(Items.Rarity.EPIC, Items.SlotType.HEAD, [&"mighty"])
+	_dress(slot, {Items.EquipSlot.HEAD: helm})
+	var panel := _panel(slot, false)
+	var tab := panel.enchanter
+	check(tab.items.is_empty(), "never shown: nothing built yet")
+	_eq(slot).add_to_backpack(_item(Items.Rarity.RARE, Items.SlotType.CHEST, [&"brutal"]))
+	check(tab.items.is_empty(), "equipment changes do not rebuild a hidden tab")
+	check(tab._stale, "they only mark it stale")
+	panel.set_tab(PlayerPanel.ENCHANTER_TAB)
+	check_eq(tab.items.size(), 2, "showing it builds it")
+	check(not tab._stale, "and clears the mark")
+
+
+func test_the_cursor_stays_visible_on_a_dimmed_icon() -> void:
+	var slot := _hero()
+	var chest := _item(Items.Rarity.COMMON, Items.SlotType.CHEST)
+	var helm := _item(Items.Rarity.EPIC, Items.SlotType.HEAD, [&"mighty"])
+	_dress(slot, {Items.EquipSlot.HEAD: helm}, [chest])
+	var panel := _panel(slot)
+	var tab := panel.enchanter
+	check(tab.cells[1].modulate.a < 0.6, "the Common chest is dimmed while nobody looks at it")
+	tab.select_item(1)
+	check(tab.cells[1].selected and tab.cells[1].modulate.a > 0.9, "the selected icon is bright even when dimmed otherwise")
+	tab.select_item(0)
+	check(tab.cells[1].modulate.a < 0.6, "and dims again when the cursor leaves")
+
+
 func test_an_empty_hero_has_an_empty_tab() -> void:
 	var slot := _hero()
 	_dress(slot, {})
@@ -418,7 +447,7 @@ func test_a_empowers_and_pays_gold_and_dust() -> void:
 	check_eq(tab.focus, EnchanterTab.Focus.ROWS, "still in the enchants")
 	check_eq(tab.detail_gold.text, "96", "the next price doubled")
 	check_eq(tab.detail_dust.text, "16", "Dust too")
-	check_eq(tab.detail_uses.text, "Used 1 x", "uses shown")
+	check_eq(tab.detail_uses.text, "Used 1x", "uses shown")
 	check_near((slot.player as Player).stats.get_raw(Stats.ATTACK_POWER), 9.0, 0.001, "the hero's Attack Power follows (6 x 1.5)")
 
 
@@ -688,6 +717,7 @@ func test_the_tab_fits_the_panel() -> void:
 	for i in positions.size():
 		var item := _item(Items.Rarity.EPIC, Items.SlotType.RING, [&"blazing", &"mighty"], 4,
 			"An Extremely Long Item Name For Testing %d" % i)
+		item.enchant_uses = 12
 		worn[positions[i]] = item
 	var bag: Array[ItemInstance] = []
 	for i in Items.BACKPACK_SIZE:
@@ -724,6 +754,11 @@ func test_the_tab_fits_the_panel() -> void:
 	check(detail.get_global_rect().encloses(tab._price_row.get_global_rect().grow(-0.5)),
 		"the price row inside the detail: %s / %s" % [tab._price_row.get_global_rect(), detail.get_global_rect()])
 	check(tab._price_row.get_global_rect().end.y <= detail.get_global_rect().end.y + 0.5, "price row above the bottom")
+	# "Used 12x" and a five-digit gold / four-digit Dust price show whole in the price row.
+	check_eq(tab.detail_uses.text, "Used 12x", "the uses")
+	var uses_font := tab.detail_uses.get_theme_font_size(&"font_size")
+	check(tab.detail_uses.get_theme_default_font().get_string_size(tab.detail_uses.text, HORIZONTAL_ALIGNMENT_LEFT, -1, uses_font).x
+		<= tab.detail_uses.size.x + 0.5, "the uses text is not clipped: %s" % tab.detail_uses.size)
 	# The widest texts: a 4-digit gold and a 3-digit Dust price fit the price row.
 	check(tab._price_row.get_combined_minimum_size().x <= detail.size.x, "the price row fits its width")
 	# In the enchants: both preview lines and rows stay inside the detail.

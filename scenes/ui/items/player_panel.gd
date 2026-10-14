@@ -20,11 +20,12 @@ extends Control
 ## Controller (only the PlayerInput passed to handle_input): d-pad / stick moves the
 ## selection, A opens the action menu (backpack: Equip (→ slot for rings / trinkets /
 ## dual wield) / Forge (weapons) / Sell / Disenchant (not for Artifacts) / Trade → Pn / Cancel;
-## equipped: Unequip / Forge (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles the comparison in the
-## tooltip, LT / RT switch tabs (the Trainer, Talents and Enchanter tabs take the rest of the
-## input while they are shown; TrainerTab / TalentTab / EnchanterTab.handle_input – LT / RT stay
-## with the panel unless the tab is modal). Forge (M5): Forge.blocked_reason greys the entry out, Forge.result_text is its
-## detail, Forge.forge does it and the result gets selected.
+## equipped: Unequip / Forge (weapons) / Cancel), X opens it on Sell, B closes menus, Y toggles
+## the comparison in the tooltip, LT / RT switch tabs (the Trainer, Talents and Enchanter tabs take
+## the rest of the input while they are shown; TrainerTab / TalentTab / EnchanterTab.handle_input –
+## LT / RT stay with the panel unless the tab is modal). Forge (M5): Forge.blocked_reason greys the
+## entry out, Forge.result_text is its detail, Forge.forge does it and the result gets selected.
+## Disenchant (M6a): Enchanter.disenchant turns the item into team Arcane Dust.
 ## Sell gives Items.SELL_SHARE of the price to the shared wallet. Trade moves a backpack item
 ## into a teammate's backpack (needs free space); the teammate's panel says "P1 gave you X".
 ## Equip shows what else it pushes out ("Replaces Bow" for an off-hand item next to a
@@ -259,7 +260,7 @@ func refresh() -> void:
 		close_menu()
 	trainer.refresh()
 	talents.refresh()
-	enchanter.refresh()
+	enchanter.refresh_if_shown()
 	_refresh_tab_labels()
 	_update_selection()
 	_apply_debug_start_tab()

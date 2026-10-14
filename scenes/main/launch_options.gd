@@ -25,7 +25,7 @@ extends RefCounted
 ##                        RunState.set_start_level, before the heroes spawn)
 ##   --panel-tab=NAME     dev: P1's panel opens on that tab when the market opens – talents,
 ##                        trainer, character, enchanter (PlayerPanel.debug_start_tab, screenshots;
-##                        a locked tab stays closed)
+##                        a locked tab would stay closed)
 ##   --boss-hp=X          M6 smoke / debug hook: multiplies every boss's HP (BossData.hp_mult;
 ##                        default 1)
 ##   --artifact-chance=X  M6 debug hook: overrides the Artifact drop chance of every roll (0..1,

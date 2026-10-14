@@ -90,8 +90,16 @@ var _dust_icon: DustIcon
 ## An item icon of the grid: the ItemIcon plus the enchant pips under it (filled = an enchant,
 ## hollow = a free slot) and a dimmed look when the Enchanter has nothing to do with the item.
 class Cell extends ItemIcon:
+	## Alpha of an icon the Enchanter has nothing to do with (the selected one stays bright).
+	const DIM_ALPHA := 0.42
 	var enchants := 0
 	var free_slots := 0
+	## Whether the Enchanter can do anything with the item (Enchanter.is_enchantable).
+	var enchantable := true
+
+	## Dimmed unless enchantable or selected: the cursor must stay visible on every icon.
+	func refresh_alpha() -> void:
+		modulate.a = 1.0 if enchantable or selected else DIM_ALPHA
 
 	func set_pips(p_enchants: int, p_free: int) -> void:
 		if p_enchants != enchants or p_free != free_slots:
@@ -238,6 +246,14 @@ func refresh() -> void:
 	if not _hold.is_empty() and not _hold_still_valid():
 		_hold.clear()
 	_update_selection()
+
+
+## The panel's refresh on every Equipment.changed: rebuilds now when the tab is on screen, else only
+## marks it stale (up to 25 icons are rebuilt per call; the Intermission keeps hidden panels
+## through the whole wave) – showing the tab refreshes it (PlayerPanel.set_tab, _catch_up). True
+## when it refreshed.
+func refresh_if_shown() -> bool:
+	return _refresh_if_shown()
 
 
 ## Whether this tab receives its player's input (selection outline, no hold without it).
@@ -536,8 +552,11 @@ func _build_detail() -> Control:
 	detail_dust = UiTheme.label("", &"", 20, DustIcon.COLOR_BRIGHT)
 	detail_dust.add_theme_font_override(&"font", UiTheme.bold_font())
 	_price_row.add_child(detail_dust)
-	_price_row.add_child(UiTheme.spacer())
+	# "Used 2x" takes the room the price leaves, right-aligned (a spacer would squeeze it to its
+	# minimum width).
 	detail_uses = UiTheme.label("", &"", DETAIL_FONT - 1, UiTheme.TEXT_DIM)
+	detail_uses.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_uses.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	detail_uses.clip_text = true
 	detail_uses.custom_minimum_size.x = 40
 	_price_row.add_child(detail_uses)
@@ -593,8 +612,8 @@ func _make_cell(item: ItemInstance) -> Cell:
 	cell.custom_minimum_size = Vector2(CELL, CELL)
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.item = item
-	var can := Enchanter.is_enchantable(item)
-	cell.modulate = Color(1, 1, 1, 1.0 if can else 0.42)
+	cell.enchantable = Enchanter.is_enchantable(item)
+	cell.refresh_alpha()
 	var free := 0
 	if item.rarity >= Items.Rarity.UNCOMMON and item.rarity < Items.Rarity.ARTIFACT:
 		free = maxi(0, Enchanter.max_enchants(item.rarity) - item.enchants.size())
@@ -631,6 +650,7 @@ func _update_selection() -> void:
 	for i in cells.size():
 		var on := _focused and i == selected
 		cells[i].set_selected(on, _accent() if focus == Focus.ITEMS else _accent().darkened(0.45))
+		cells[i].refresh_alpha()
 	for i in rows.size():
 		rows[i].set_selected(_focused and focus == Focus.ROWS and i == row_selected, _accent())
 	_update_hold_visual()
@@ -711,7 +731,7 @@ func _update_detail() -> void:
 	detail_dust.add_theme_color_override(&"font_color",
 		DustIcon.COLOR_BRIGHT if RunState.can_afford_dust(dust) else UiTheme.RED)
 	_dust_icon.set_dim(not RunState.can_afford_dust(dust))
-	detail_uses.text = "Used %d x" % item.enchant_uses if item.enchant_uses > 0 else "Unused"
+	detail_uses.text = "Used %dx" % item.enchant_uses if item.enchant_uses > 0 else "Unused"
 	# The hint under the rows: why nothing can be done, or what the tab does; while the enchants
 	# have the focus the two lines under the price take over.
 	detail_hint.visible = focus == Focus.ITEMS or rows.is_empty()
