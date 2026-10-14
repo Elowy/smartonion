@@ -87,7 +87,7 @@ class Outcome:
 
 ## Dust a Disenchant of [param item] gives (0 for nothing / an Artifact).
 static func dust_for(item: ItemInstance) -> int:
-	if item == null or item.rarity >= Items.Rarity.ARTIFACT:
+	if item == null or not item.can_disenchant():
 		return 0
 	return DUST_BY_RARITY[clampi(item.rarity, 0, DUST_BY_RARITY.size() - 1)]
 

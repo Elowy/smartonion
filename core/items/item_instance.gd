@@ -147,8 +147,9 @@ func can_sell() -> bool:
 	return not is_artifact()
 
 
-## Whether the Enchanter may disenchant it into Arcane Dust (GDD 5.5: an Artifact never; the
-## ENCHANTER package's menu entry and its auto-disenchant of an all-Passed item ask this).
+## Whether the Enchanter may disenchant it into Arcane Dust (GDD 5.5: an Artifact never). The one
+## rule: Enchanter.disenchant_blocked_reason / dust_for (the Disenchant menu entry, the bots and the
+## auto-disenchant of an all-Passed item) ask this.
 func can_disenchant() -> bool:
 	return not is_artifact()
 

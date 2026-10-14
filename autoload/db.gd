@@ -14,9 +14,9 @@ const ABILITY_DIR := "res://data/abilities/"
 const TALENT_DIR := "res://data/talents/"
 ## data/sets/<set_id>.tres (SetData, M5).
 const SET_DIR := "res://data/sets/"
-## data/bosses/<boss_id>.tres (BossData, M6; may be empty until the BOSSES package).
+## data/bosses/<boss_id>.tres (BossData, M6: Lich Commander Morvain, Vor'thalax).
 const BOSS_DIR := "res://data/bosses/"
-## data/consumables/<id>.tres (ConsumableData, M6; may be empty until the SHOPSINKS package).
+## data/consumables/<id>.tres (ConsumableData, M6: the seven flasks, elixirs and foods).
 const CONSUMABLE_DIR := "res://data/consumables/"
 ## data/artifacts/<id>.tres (ArtifactData, M6 ARTIFACTS: one weapon per class).
 const ARTIFACT_DIR := "res://data/artifacts/"
