@@ -90,8 +90,10 @@ static func unique_path(dir: String, name: String) -> String:
 
 ## Lays the card for [param card_model] out in a SubViewport under [param host] (which must be in
 ## the tree), waits for it to draw and returns the pixels; null when nothing was rendered (the
-## headless dummy renderer). Await it.
+## headless dummy renderer draws nothing, so it returns at once). Await it.
 static func render(host: Node, card_model: Dictionary) -> Image:
+	if DisplayServer.get_name() == "headless":
+		return null
 	var viewport := SubViewport.new()
 	viewport.name = "RunCardViewport"
 	viewport.size = SIZE

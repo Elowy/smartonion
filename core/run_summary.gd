@@ -114,14 +114,15 @@ static func collect(p_victory: bool) -> Dictionary:
 
 
 ## {slot index as String: {stat id: value}} of every joined hero – the SMOKE_RESULT "meter" entry
-## (JSON keys are strings). Damage, healing, absorbed and taken are rounded to whole points.
+## (JSON keys are strings). Damage, healing, absorbed and taken are rounded to 0.1, the counts are
+## whole numbers.
 static func meter_dict() -> Dictionary:
 	var out := {}
 	for slot in PlayerManager.get_slots():
 		var stats := stats_of(slot.index)
 		var line := {}
 		for id in STAT_IDS:
-			line[String(id)] = int(roundf(stats[id]))
+			line[String(id)] = int(stats[id]) if id in COUNT_STATS else snappedf(stats[id], 0.1)
 		line["class"] = String(slot.class_data.id) if slot.class_data != null else ""
 		out[str(slot.index)] = line
 	return out
@@ -230,9 +231,9 @@ static func class_color(data: ClassData) -> Color:
 	c.a = 1.0
 	var lum := c.get_luminance()
 	if lum < MIN_CLASS_LUMINANCE:
-		c = c.lightened(clampf((MIN_CLASS_LUMINANCE - lum) * 2.5, 0.0, 0.6))
+		c = c.lightened((MIN_CLASS_LUMINANCE - lum) / (1.0 - lum))  # towards white, exactly to the floor
 	elif lum > MAX_CLASS_LUMINANCE:
-		c = c.darkened(clampf((lum - MAX_CLASS_LUMINANCE) * 1.2, 0.0, 0.5))
+		c = c.darkened(1.0 - MAX_CLASS_LUMINANCE / lum)  # scaled down, exactly to the ceiling
 	return c
 
 

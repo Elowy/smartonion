@@ -915,7 +915,7 @@ static func meter_lines(meter: Dictionary) -> Array[String]:
 	var lines: Array[String] = []
 	for key: String in meter:
 		var m: Dictionary = meter[key]
-		lines.append("P%d %s: damage %d, healing %d, absorbed %d, taken %d, revives %d, downs %d, kills %d, bosses %d" % [
+		lines.append("P%d %s: damage %.1f, healing %.1f, absorbed %.1f, taken %.1f, revives %d, downs %d, kills %d, bosses %d" % [
 			int(key) + 1, m.get("class", "?"), m["damage"], m["healing"], m["absorbed"], m["taken"],
 			m["revives"], m["downs"], m["kills"], m["bosses"]])
 	return lines
