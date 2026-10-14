@@ -6,7 +6,7 @@ extends Node3D
 ## (hidden when the shield is gone) until the enemy leaves; polls the enemy every rendered
 ## frame, changes no gameplay state and never touches RunState.rng.
 
-const COLOR := Color(0.62, 0.38, 1.0)
+const COLOR := Color(0.72, 0.3, 1.0)
 const RADIUS_MULT := 1.35
 const MIN_RADIUS := 0.55
 
