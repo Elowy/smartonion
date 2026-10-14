@@ -11,6 +11,9 @@ extends Control
 ## M6: the same card, in its WIDE layout and with a gold frame ([member gold_frame]), is the Black
 ## Market offer beside the consumables row ([method create_wide]): icon on the left, name and price
 ## on the right, the pips below, [constant WIDE_SIZE] big (no type line – the tooltip has it).
+## The wide card keeps its overlays off the content: the name stops short of the lock badge
+## ([constant NAME_LOCK_RESERVE]) and the "P2 wants" tags sit in the band under the name, right of
+## the icon ([method ping_tags]), never on the icon.
 
 ## Four of these (two rows) + the consumables row must fit the 4-player stall (ShopPanel).
 const CARD_SIZE := Vector2(124, 176)
@@ -22,6 +25,20 @@ const NAME_HEIGHT := 44.0
 const PIP_SIZE := Vector2(24, 18)
 ## The anvil drawn on a usable-by pip (forge partner) – width x height.
 const ANVIL_SIZE := Vector2(22, 13)
+## The padlock badge: radius of its dark disc and its top-left corner measured from the card's
+## top-right corner (the disc is centred on the 20 px padlock).
+const LOCK_BADGE_RADIUS := 14.0
+const LOCK_OFFSET := Vector2(28, 8)
+## Wide card: width taken off the name label so a locked card's padlock never covers the name
+## (the badge disc is 2 * LOCK_BADGE_RADIUS wide).
+const NAME_LOCK_RESERVE := 28.0
+## Ping tags: height of a tag, gap between tags and the padding left / right of the text.
+const PING_TAG_HEIGHT := 20.0
+const PING_TAG_GAP := 3.0
+const PING_TAG_PAD := 12.0
+## Wide card: the tag row (its height, and the x it starts at so it clears the price).
+const WIDE_PING_HEIGHT := 18.0
+const WIDE_PING_X := 66.0
 
 var index := -1
 var offer: Shop.Offer
@@ -108,7 +125,7 @@ func _build() -> void:
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if wide:
-		text_width -= ICON_SIZE + 6.0
+		text_width -= ICON_SIZE + 6.0 + NAME_LOCK_RESERVE
 	name_label = UiTheme.centered_label("", &"", 16)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.max_lines_visible = 2
@@ -131,7 +148,8 @@ func _build() -> void:
 		var top := UiTheme.hbox(6)
 		_content.add_child(top)
 		top.add_child(icon)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# Not expanding: the label keeps its width and leaves the lock's column free.
+		name_label.size_flags_horizontal = Control.SIZE_FILL
 		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		top.add_child(name_label)
 		type_label.visible = false
@@ -151,7 +169,7 @@ func _build() -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	_lock = UiIcon.create(UiIcon.Kind.LOCK, Vector2(20, 20))
-	_lock.position = Vector2(custom_minimum_size.x - 28, 8)
+	_lock.position = Vector2(custom_minimum_size.x - LOCK_OFFSET.x, LOCK_OFFSET.y)
 	_lock.visible = false
 	_overlay.add_child(_lock)
 
@@ -220,6 +238,48 @@ func anvil_slots() -> Array[int]:
 	return out
 
 
+## The padlock badge's disc in the card's coordinates (what the lock covers when it is shown).
+func lock_badge_rect() -> Rect2:
+	var center := _lock.position + _lock.size * 0.5
+	return Rect2(center - Vector2.ONE * LOCK_BADGE_RADIUS, Vector2.ONE * (2.0 * LOCK_BADGE_RADIUS))
+
+
+## The "P2 wants" tags of the offer's pings, in the card's coordinates:
+## [{"slot": int, "text": String, "rect": Rect2}] in ping order.
+##   - stacked card: a column from the top left corner (below the cursor corner tags);
+##   - wide card: one row in the band under the name, right of the icon ([constant WIDE_PING_X]),
+##     with the short "P2" text when the full "P2 wants" tags would not fit the row.
+func ping_tags() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if offer == null:
+		return out
+	var font := UiTheme.bold_font()
+	if not wide:
+		var y := 14.0
+		for slot_index in offer.pinged_by:
+			var text := "P%d wants" % (slot_index + 1)
+			var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + PING_TAG_PAD
+			out.append({"slot": slot_index, "text": text, "rect": Rect2(4, y, w, PING_TAG_HEIGHT)})
+			y += PING_TAG_HEIGHT + PING_TAG_GAP
+		return out
+	var x0 := WIDE_PING_X
+	var y0 := 6.0 + ICON_SIZE
+	var limit := custom_minimum_size.x - 6.0
+	var short := false
+	for _attempt in 2:
+		out.clear()
+		var x := x0
+		for slot_index in offer.pinged_by:
+			var text := ("P%d" if short else "P%d wants") % (slot_index + 1)
+			var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + PING_TAG_PAD
+			out.append({"slot": slot_index, "text": text, "rect": Rect2(x, y0, w, WIDE_PING_HEIGHT)})
+			x += w + PING_TAG_GAP
+		if out.is_empty() or x - PING_TAG_GAP <= limit:
+			break
+		short = true
+	return out
+
+
 ## A small anvil (pointed horn to the left, flat face, waist, flared foot) centred on
 ## [param center], [param box] wide and high: a dark rim, then [param color], then a highlight
 ## along the face (readable on a pip of the same colour).
@@ -283,20 +343,18 @@ func _draw_overlay() -> void:
 	var font := UiTheme.bold_font()
 	# Lock badge background (the UiIcon padlock sits on it).
 	if _lock.visible:
-		ci.draw_circle(_lock.position + _lock.size * 0.5, 14.0, Color(0.05, 0.04, 0.03, 0.9))
-		ci.draw_arc(_lock.position + _lock.size * 0.5, 14.0, 0.0, TAU, 24, _lock.color, 2.0, true)
-	# "P2 wants" tags (below the cursor corner tags).
-	var y := 14.0
-	for slot_index in offer.pinged_by:
-		var col: Color = _colors.get(slot_index, Color.WHITE)
-		var text := "P%d wants" % (slot_index + 1)
-		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 12.0
-		var tag := Rect2(4, y, w, 20)
+		ci.draw_circle(_lock.position + _lock.size * 0.5, LOCK_BADGE_RADIUS, Color(0.05, 0.04, 0.03, 0.9))
+		ci.draw_arc(_lock.position + _lock.size * 0.5, LOCK_BADGE_RADIUS, 0.0, TAU, 24, _lock.color, 2.0, true)
+	# "P2 wants" tags (the stacked card: below the cursor corner tags; the wide one: see ping_tags).
+	for entry in ping_tags():
+		var col: Color = _colors.get(entry["slot"], Color.WHITE)
+		var tag: Rect2 = entry["rect"]
+		var text: String = entry["text"]
+		var base := Vector2(tag.position.x + 6, tag.position.y + tag.size.y - 5.0)
 		ci.draw_rect(tag, Color(col.darkened(0.55), 0.92))
 		ci.draw_rect(tag, col, false, 2.0)
-		ci.draw_string_outline(font, Vector2(tag.position.x + 6, y + 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 4, UiTheme.OUTLINE)
-		ci.draw_string(font, Vector2(tag.position.x + 6, y + 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
-		y += 23.0
+		ci.draw_string_outline(font, base, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 4, UiTheme.OUTLINE)
+		ci.draw_string(font, base, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 	# Usable-by pips, one per player in slot order.
 	var keys := _colors.keys()
 	keys.sort()

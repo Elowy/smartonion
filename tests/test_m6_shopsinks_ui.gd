@@ -384,6 +384,80 @@ func test_x_and_r3_work_on_the_black_market_but_not_on_consumables() -> void:
 	check(shop.black_market.locked_by == 0, "nothing changed")
 
 
+## [param node]'s rectangle in [param card]'s coordinates (after a layout pass).
+func _local(card: Control, node: Control) -> Rect2:
+	return Rect2(node.get_global_rect().position - card.get_global_rect().position, node.size)
+
+
+func test_the_black_market_lock_badge_does_not_cover_the_name() -> void:
+	_open(16)
+	var card := panel.black_market_card
+	var slots := PlayerManager.get_slots()
+	for display in ["Ring", "Stormforged Dreadplate of the Eternal Vigil"]:
+		card.offer.item.display_name = display
+		card.set_offer(card.offer, slots)
+		shop.black_market.locked_by = 0
+		panel.refresh(slots)
+		_layout(panel)
+		check(card._lock.visible, "locked")
+		var badge := card.lock_badge_rect()
+		var name_rect := _local(card, card.name_label)
+		check(badge.size.x > 0.0 and Rect2(Vector2.ZERO, card.size).encloses(badge), "the badge is on the card: %s" % badge)
+		check(not name_rect.intersects(badge), "the name %s does not reach the padlock %s (%s)" % [name_rect, badge, display])
+		check(name_rect.end.x <= badge.position.x, "the name ends left of the badge")
+		check(not _local(card, card.icon).intersects(badge), "the icon is clear of the badge")
+		shop.black_market.locked_by = -1
+		panel.refresh(slots)
+		_layout(panel)
+		check(not card._lock.visible, "unlocked")
+		check(not _local(card, card.name_label).intersects(badge), "the width stays reserved while unlocked (no re-wrap)")
+
+
+func test_black_market_ping_tags_stay_off_the_icon_and_the_name() -> void:
+	_open(16)
+	var card := panel.black_market_card
+	var slots := PlayerManager.get_slots()
+	card.offer.item.display_name = "Stormforged Dreadplate of the Eternal Vigil"
+	shop.black_market.locked_by = 0
+	var card_rect := Rect2(Vector2.ZERO, card.size)
+	var pips_top := card.size.y - 23.0
+	for n in [1, 2, 3, 4]:
+		shop.black_market.pinged_by.clear()
+		for slot_index in n:
+			shop.black_market.pinged_by.append(slot_index)
+		panel.refresh(slots)
+		_layout(panel)
+		var tags := card.ping_tags()
+		check_eq(tags.size(), n, "%d tags" % n)
+		var covered: Array[Rect2] = [_local(card, card.icon), _local(card, card.name_label), card.lock_badge_rect(),
+				_local(card, card._coin), _local(card, card.price_label)]
+		var seen: Array[Rect2] = []
+		for entry in tags:
+			var r: Rect2 = entry["rect"]
+			check(card_rect.encloses(r), "%d pings: %s is inside the card" % [n, r])
+			check(r.position.x >= card.icon.size.x + 6.0, "%d pings: %s starts right of the icon" % [n, r])
+			check(r.end.y <= pips_top, "%d pings: %s is above the pip strip" % [n, r])
+			for c in covered:
+				check(not r.intersects(c), "%d pings: %s covers %s" % [n, r, c])
+			for other in seen:
+				check(not r.intersects(other), "%d pings: tags overlap each other" % n)
+			seen.append(r)
+		check_eq(tags[0]["text"], "P1 wants" if n == 1 else "P1", "%d pings: the full text only while it fits" % n)
+		var last: Rect2 = tags[n - 1]["rect"]
+		check(last.end.x <= card.size.x - 6.0 + 0.01, "%d pings: the row fits the card (ends at %.1f)" % [n, last.end.x])
+	# The stacked card keeps its column under the cursor corner tags.
+	var stacked := panel.cards[0]
+	shop.offers[0].pinged_by.clear()
+	shop.offers[0].pinged_by.append(0)
+	shop.offers[0].pinged_by.append(1)
+	panel.refresh(slots)
+	var column := stacked.ping_tags()
+	check_eq(column.size(), 2, "two stacked tags")
+	check_eq((column[0]["rect"] as Rect2).position, Vector2(4, 14), "the first tag, as before")
+	check_eq((column[1]["rect"] as Rect2).position, Vector2(4, 37), "the second one below it")
+	check_eq(column[1]["text"], "P2 wants", "the full text")
+
+
 # --- Tooltips ----------------------------------------------------------------------------------
 
 func test_a_consumable_gets_its_own_tooltip_and_the_black_market_the_item_tooltip() -> void:
