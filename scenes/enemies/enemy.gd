@@ -288,7 +288,7 @@ func is_stunned() -> bool:
 ## choice and other targeting. Rewards never key on it (the Loot Goblin overrides it with
 ## true and must not get elite rewards – see [method _death_loot]).
 func is_elite() -> bool:
-	return elite_affix != &""
+	return elite_affix != &"" or is_boss()
 
 
 ## An Enraged elite that has raged (at or below EliteAffixes.ENRAGE_HP_RATIO, once): more

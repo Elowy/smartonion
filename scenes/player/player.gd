@@ -35,6 +35,12 @@ signal damage_taken(amount: float, source: Node3D)
 signal hit_dealt(damage: float, target: Node3D)
 ## Emitted from notify_kill() when this player landed the killing blow (weapon, proc, thorns).
 signal enemy_killed(enemy: Node3D)
+## End of [method begin_wave] (everything reset for the new wave): M6 per-wave extras hook in
+## here (consumables apply, …) instead of editing begin_wave.
+signal wave_began
+## End of [method end_wave] (the wave's buffs are gone, the market follows): M6 per-wave extras
+## (artifact growth, consumables clear, …).
+signal wave_ended
 
 const RADIUS := 0.45
 ## Height (metres) where projectiles / damage numbers originate.
@@ -276,6 +282,7 @@ func end_wave() -> void:
 	if procs != null:
 		procs.end_wave()
 	refresh_armor_spec()
+	wave_ended.emit()
 
 
 ## Wave start: living players heal to full; downed players come back at 50% HP (GDD 1). The
@@ -312,6 +319,7 @@ func begin_wave() -> void:
 		procs.after_wave_start()
 	if bonuses != null:
 		bonuses.begin_wave()
+	wave_began.emit()
 
 
 ## Called by enemies / enemy projectiles. Rolls dodge, parry (melee: negates the hit and

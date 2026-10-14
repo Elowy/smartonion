@@ -407,7 +407,9 @@ func test_is_boss_comes_from_the_data() -> void:
 		check(not Db.enemies[id].is_boss, "%s is no boss" % id)
 	var flagged := EFakes.enemy_data()
 	flagged.is_boss = true
-	check(EFakes.spawn_enemy(world, flagged, Vector3(2, 0, 0)).is_boss(), "is_boss = true on the data")
+	var flagged_enemy := EFakes.spawn_enemy(world, flagged, Vector3(2, 0, 0))
+	check(flagged_enemy.is_boss(), "is_boss = true on the data")
+	check(flagged_enemy.is_elite() and not e.is_elite(), "a boss counts as an elite (Slayer, targeting)")
 	var boss := BossData.new()
 	boss.id = &"test_boss"
 	check(boss.is_boss, "BossData is a boss by default")
@@ -772,3 +774,16 @@ func test_the_artifact_stub_keeps_seeded_drops_identical() -> void:
 	check_eq(probed, plain, "the same drops")
 	check_eq(RunState.rng.state, state_after, "the same rng state")
 	check(true in plain, "the sample dropped something (seed sanity)")
+
+
+func test_player_reports_wave_begin_and_end() -> void:
+	world = Fakes.make_world(tree)
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	var seen: Array[String] = []
+	p.wave_began.connect(func() -> void: seen.append("began"))
+	p.wave_ended.connect(func() -> void: seen.append("ended"))
+	p.end_wave()
+	p.begin_wave()
+	check_eq(seen, ["ended", "began"], "end_wave / begin_wave emit wave_ended / wave_began")
+	Fakes.free_world(world)
+	world = null
