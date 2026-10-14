@@ -795,10 +795,28 @@ func _bots_consumables() -> int:
 	return 0
 
 
-## M6 hook (ENCHANTER): from wave 12 the bots spend Gold and Dust at the Enchanter on their best
-## weapon when the wallet keeps its reserve. Returns the actions done.
+## M6 (ENCHANTER): from wave 12 on (the market after it, [constant Enchanter.BOT_FIRST_WAVE]) every
+## bot enchants its best weapon (Enchanter.bot_enchant: Reroll an enchant its class cannot use, else
+## Imbue, else Empower the lowest rank) with the gold above [method bot_train_reserve] – shared out
+## evenly over the bots in slot order like the Trainer's – and pays the Dust by disenchanting its
+## spare backpack items (bots never Pass in a loot roll, so that is their only Dust). Returns the
+## actions done. No RNG except the Enchanter's own Reroll / Imbue picks (RunState.rng).
 func _bots_enchant() -> int:
-	return 0
+	if cleared_wave < Enchanter.BOT_FIRST_WAVE:
+		return 0
+	var smiths: Array[PlayerSlot] = []
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.equipment != null:
+			smiths.append(s)
+	var reserve := bot_train_reserve(cleared_wave, smiths.size())
+	var total := 0
+	for k in smiths.size():
+		var share := floori(float(RunState.gold - reserve) / float(smiths.size() - k))
+		if share <= 0:
+			break
+		total += Enchanter.bot_enchant(smiths[k], share)
+	return total
 
 
 ## The buying passes of [method _bots_shop] over [param p_shoppers] (the list is not changed).

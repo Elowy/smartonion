@@ -597,7 +597,7 @@ func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
 	tree.root.add_child(plain)
 	check_eq(plain._bots_black_market(), 0, "black market stub")
 	check_eq(plain._bots_consumables(), 0, "consumables stub")
-	check_eq(plain._bots_enchant(), 0, "enchant stub")
+	check_eq(plain._bots_enchant(), 0, "nothing to enchant without bots (and before wave 12)")
 
 
 # --- PlayerPanel: the Enchanter tab (opened by the ENCHANTER package) --------------------------

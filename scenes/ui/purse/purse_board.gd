@@ -3,7 +3,8 @@ extends PanelContainer
 ## The purse board (GDD 10 "Coordination tools", M5) in the Intermission header: the shared
 ## wallet and what the team does with it, so a shared purse does not end in chaos.
 ##
-##   wallet – the coin and the shared gold ([member gold_value]); under it the ready pips (one
+##   wallet – the coin and the shared gold ([member gold_value]) with the team's Arcane Dust (M6a:
+##            the sparkle and [member dust_value], right of the gold, violet); under it the ready pips (one
 ##            diamond per joined player in their colour, filled once that player is ready – the
 ##            GDD's "ready state next to the wallet") and "2/4 ready".
 ##   Spent  – this round's spend ticker (RunState.spend_log, newest first): who, what, how much
@@ -28,10 +29,16 @@ extends PanelContainer
 ## (RunState.begin_spend_round clears the log without a signal). The per-frame check of the
 ## players compares the last seen index / colour / ready flag field by field (no strings). No RNG.
 
-## The board's design width (the stall's width; fits between the two top corner panels).
-const WIDTH := 712.0
-const WALLET_WIDTH := 96.0
-const CAPTION_WIDTH := 52.0
+## The board's design width (a little wider than the stall: the Dust next to the gold needs the room;
+## still fits between the two top corner panels, 732 px apart at 1920 x 1080).
+const WIDTH := 722.0
+## Wide enough for the gold and the team's Dust side by side (a coin, a five-digit gold and a
+## sparkle with a three-digit Dust fit; the text column takes what is left).
+const WALLET_WIDTH := 124.0
+## The wallet's two numbers: the gold row's font sizes.
+const GOLD_FONT := 20
+const DUST_FONT := 17
+const CAPTION_WIDTH := 45.0
 const TEXT_FONT := 16
 const CAPTION_FONT := 15
 ## Height of one text line and how far neighbouring lines overlap (the font's line box has
@@ -49,13 +56,16 @@ const EMPTY_WANTS := "None – ping an offer or a Trainer rank (R3 / Tab)"
 const TEAM := "Team"
 ## Layout: the board's side margins, the gaps around the rule after the wallet, the rule's width
 ## and the gap between the captions and the lines.
-const MARGIN_X := 10.0
-const RULE_GAP := 8.0
+const MARGIN_X := 7.0
+const RULE_GAP := 6.0
 const RULE_WIDTH := 2.0
-const CAPTION_GAP := 6.0
+const CAPTION_GAP := 5.0
 
 ## The shared gold (the Intermission's gold_value).
 var gold_value: Label
+## The team's Arcane Dust, right of the gold ([method refresh_dust]).
+var dust_value: Label
+var dust_icon: DustIcon
 var pips: ReadyPips
 ## "2/4 ready".
 var ready_label: Label
@@ -287,12 +297,22 @@ func set_shop(p_shop: Shop) -> void:
 func refresh() -> void:
 	_dirty = false
 	refresh_gold()
+	refresh_dust()
 	var used := _fill_ticker()
 	_fill_wants(ROWS - used)
 
 
 func refresh_gold() -> void:
 	gold_value.text = UiTheme.format_int(RunState.gold)
+
+
+## The team's Arcane Dust next to the gold (RunState.dust_changed calls it while the board is in
+## the tree); the sparkle dims at 0.
+func refresh_dust() -> void:
+	dust_value.text = UiTheme.format_int(RunState.arcane_dust)
+	dust_icon.set_dim(RunState.arcane_dust <= 0)
+	dust_value.add_theme_color_override(&"font_color",
+		DustIcon.COLOR_BRIGHT if RunState.arcane_dust > 0 else UiTheme.TEXT_DIM)
 
 
 ## Called every MARKET frame: the pips follow [param slots]' ready flags (redrawn only when one
@@ -355,14 +375,21 @@ func _build() -> void:
 	wallet.custom_minimum_size.x = WALLET_WIDTH
 	wallet.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(wallet)
-	var gold_row := UiTheme.hbox(6)
+	var gold_row := UiTheme.hbox(3)
 	wallet.add_child(gold_row)
-	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(22, 22))
+	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(19, 19))
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(coin)
-	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, 23, UiTheme.GOLD)
+	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, GOLD_FONT, UiTheme.GOLD)
 	gold_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(gold_value)
+	gold_row.add_child(UiTheme.spacer())
+	dust_icon = DustIcon.create(16.0)
+	dust_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_row.add_child(dust_icon)
+	dust_value = UiTheme.label("0", UiTheme.GOLD_LABEL, DUST_FONT, DustIcon.COLOR_BRIGHT)
+	dust_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_row.add_child(dust_value)
 	pips = ReadyPips.new()
 	pips.name = "ReadyPips"
 	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -570,11 +597,17 @@ func _mark_dirty(_a: Variant = null) -> void:
 	_dirty = true
 
 
+func _on_dust_changed(_dust: int, _delta: int) -> void:
+	refresh_dust()
+
+
 func _enter_tree() -> void:
 	if not RunState.spent.is_connected(_mark_dirty):
 		RunState.spent.connect(_mark_dirty)
 	if not RunState.wants_changed.is_connected(_mark_dirty):
 		RunState.wants_changed.connect(_mark_dirty)
+	if not RunState.dust_changed.is_connected(_on_dust_changed):
+		RunState.dust_changed.connect(_on_dust_changed)
 	if shop != null and not shop.changed.is_connected(_mark_dirty):
 		shop.changed.connect(_mark_dirty)
 
@@ -584,5 +617,7 @@ func _exit_tree() -> void:
 		RunState.spent.disconnect(_mark_dirty)
 	if RunState.wants_changed.is_connected(_mark_dirty):
 		RunState.wants_changed.disconnect(_mark_dirty)
+	if RunState.dust_changed.is_connected(_on_dust_changed):
+		RunState.dust_changed.disconnect(_on_dust_changed)
 	if shop != null and shop.changed.is_connected(_mark_dirty):
 		shop.changed.disconnect(_mark_dirty)

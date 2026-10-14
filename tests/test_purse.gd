@@ -548,7 +548,7 @@ func test_header_and_chips_clear_the_stall_and_the_panels() -> void:
 		var p := screen.panels[i]
 		var r := p.get_global_rect()
 		var visual := Rect2(r.position, r.size * p.scale)
-		check(not visual.intersects(head), "P%d's panel and the header" % (i + 1))
+		check(not visual.intersects(head), "P%d's panel and the header (%s / %s)" % [i + 1, visual, head])
 		check(not visual.intersects(chips), "P%d's panel and the chips (%s / %s)" % [i + 1, visual, chips])
 	for l in screen.purse_board.ticker_labels:
 		check_eq(l.get_global_rect().size.x, PurseBoard.text_column_width(), "the ticker lines keep their width")
