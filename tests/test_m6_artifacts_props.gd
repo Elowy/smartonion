@@ -315,6 +315,36 @@ func test_a_frozen_kill_also_bursts() -> void:
 	check(neighbour.is_slowed(), "frost shards from a frozen kill")
 
 
+## The shipped numbers of the Staff of the Frostwyrm's Shatterfrost (GDD 5.5: slow enemies within
+## 3 m by 40% for 2 sec) – read from the .tres, not from a test-made effect.
+func test_the_shipped_frost_shard_data_is_3_m_40_percent_2_sec() -> void:
+	var data := Db.get_artifact(&"staff_of_the_frostwyrm")
+	check(data != null and data.properties.size() == 2, "the shipped Staff of the Frostwyrm")
+	var entry: Dictionary = (data.properties[1]["effects"] as Array)[0]
+	check_eq(entry.get("kind"), "script", "a script effect")
+	check_eq(entry.get("script"), "res://scenes/artifacts/mage_frost_shards.gd", "the frost shards script")
+	var params: Dictionary = entry.get("params", {})
+	check_near(float(params.get("radius", 0.0)), 3.0, 0.0001, "radius 3 m")
+	check_near(float(params.get("slow", 0.0)), 40.0, 0.0001, "slow 40%")
+	check_near(float(params.get("duration", 0.0)), 2.0, 0.0001, "duration 2 sec")
+	check("within 3 m by 40% for 2 sec" in str(data.properties[1]["text"]), "and the tooltip text says the same")
+
+
+## The 3 m of the shipped data, felt in the world: the burst reaches an enemy 2.7 m from the
+## corpse and stops short of one 3.5 m away.
+func test_the_frost_shards_reach_3_m_from_the_corpse() -> void:
+	var p := _hero(&"mage", 6)
+	var victim := _real(Vector3(10.0, 0.0, 0.0))
+	var inside := _real(Vector3(12.7, 0.0, 0.0))
+	var outside := _real(Vector3(13.5, 0.0, 0.0))
+	victim.apply_slow(30.0, 3.0)
+	p.notify_kill(victim)
+	check(inside.is_slowed(), "2.7 m from the corpse: slowed")
+	check_near(inside.slow_pct, 40.0, 0.001, "by 40%")
+	check_near(inside.slow_left, 2.0, 0.01, "for 2 sec")
+	check(not outside.is_slowed(), "3.5 m from the corpse: not")
+
+
 func test_frost_shards_wait_for_the_second_property() -> void:
 	var p := _hero(&"mage", 3)
 	var victim := _real(Vector3(10.0, 0.0, 0.0))
