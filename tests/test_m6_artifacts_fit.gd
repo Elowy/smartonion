@@ -1,16 +1,19 @@
 extends TestCase
 ## M6 ARTIFACTS on the loot roll window: an Artifact's tooltip (735-855 px at its normal width,
-## far taller than any other item) is fitted into the room between the frame's divider and the
+## far taller than any other item) is fitted into the room between the title block and the
 ## player chips (LootRollScreen.tooltip_room: wider first, scaled last) so at 1920 x 1080 with
-## four players the frame stays on screen, clear of the chips, and the winner line – even a
-## two-line Greed result – stays clear of them; and the green "Looted" tag an Artifact does not
-## earn (its Item Level has no Looted bonus) is hidden in the tooltip and the info row.
+## four players the frame stays on screen, below the "Loot Roll" title and its subtitle and clear
+## of the chips, and the winner line – even a two-line Greed result – stays clear of them; and the
+## green "Looted" tag an Artifact does not earn (its Item Level has no Looted bonus) is hidden in
+## the tooltip and the info row.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
-## The smallest scale an Artifact tooltip may be shown at in the roll window (about 12 px body
-## text in a 1280 x 720 window).
-const READABLE_FIT := 0.85
+## The smallest scale an Artifact tooltip may be shown at in the roll window (about 13 px body
+## text at 1920 x 1080). It was 0.85 while the frame could cover the title block; keeping the
+## frame below the title costs the tallest Artifact (Skull of the Damned, 676 px at 600 wide) a
+## scale of about 0.74.
+const READABLE_FIT := 0.7
 const VIEW := Rect2(0.0, 0.0, 1920.0, 1080.0)
 const TEAM: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue"]
 
@@ -84,6 +87,8 @@ func _check_frame(what: String) -> void:
 	var tip := _drawn(screen.tooltip)
 	check(frame.grow(0.5).encloses(tip), "%s: the tooltip is inside the frame %s / %s" % [what, tip, frame])
 	check(screen.name_label.get_global_rect().position.y >= frame.position.y, "%s: the item name is inside the frame" % what)
+	var title_end := maxf(screen.title_label.get_global_rect().end.y, screen.subtitle_label.get_global_rect().end.y)
+	check(frame.position.y >= title_end, "%s: the frame starts below the title block (%.1f / %.1f)" % [what, frame.position.y, title_end])
 
 
 func test_every_artifact_fits_the_roll_window_while_choosing() -> void:
@@ -199,10 +204,83 @@ func test_the_room_comes_from_the_screen_height() -> void:
 	_async = true
 	await _open(_artifact(&"warrior"))
 	var normal := screen.tooltip_room()
-	# 1080 high: frame at most 2 x (chips top - gap - centre) tall, less its own chrome and the result reserve.
-	check(normal > 500.0 and normal < 700.0, "room %.0f at 1080 high" % normal)
+	# 1080 high: the frame fills the band between the title block and the chips, less its own chrome
+	# and the result reserve.
+	check(normal > 400.0 and normal < 700.0, "room %.0f at 1080 high" % normal)
 	screen.size = Vector2(1920.0, 1380.0)
 	check(screen.tooltip_room() > normal + 200.0, "a taller screen gives more room (%.0f)" % screen.tooltip_room())
+	finished.emit()
+
+
+# --- The frame stays below the title block ----------------------------------------------------
+
+## The title block's bottom edge and the frame's top edge, as drawn.
+func _title_end() -> float:
+	return maxf(screen.title_label.get_global_rect().end.y, screen.subtitle_label.get_global_rect().end.y)
+
+
+## "Loot Roll" and its subtitle are centred above the frame, which is as wide as they are: a tall
+## tooltip (every Artifact) must not push the frame up over them (LootRollScreen.tooltip_room
+## reserves the title block's height; the middle row is centred in the band below it).
+func test_the_frame_stays_below_the_title_block_for_every_artifact() -> void:
+	_async = true
+	var seen := 0
+	for item in _artifacts():
+		await _open(item)
+		var what := item.display_name
+		check_eq(screen.slots.size(), 4, "%s: four players" % what)
+		check_eq(screen.title_label.text, "Loot Roll", "%s: the party title" % what)
+		var frame := screen.frame.get_global_rect()
+		var title_end := _title_end()
+		check(title_end > 100.0, "%s: the title block is really measured (ends at %.1f)" % [what, title_end])
+		check(frame.position.y >= title_end + LootRollScreen.FRAME_TITLE_GAP - 0.5,
+				"%s: frame top %.1f is clear of the title block (%.1f + gap)" % [what, frame.position.y, title_end])
+		var tip := _drawn(screen.tooltip)
+		check(tip.position.y >= title_end, "%s: so is the tooltip (%.1f)" % [what, tip.position.y])
+		check(frame.end.y <= screen.chips_row.get_global_rect().position.y - LootRollScreen.FRAME_CHIPS_GAP + 0.5,
+				"%s: and the chips still have their gap (%.1f)" % [what, frame.end.y])
+		seen += 1
+	check_eq(seen, 5, "all five Artifacts")
+	finished.emit()
+
+
+## The same with the two-line Greed result that makes the frame grow (it is centred, so it grows
+## both ways): the title block stays uncovered.
+func test_the_frame_stays_below_the_title_block_with_a_greed_result() -> void:
+	_async = true
+	for item in _artifacts():
+		await _open(item)
+		var what := item.display_name
+		for s in PlayerManager.get_slots():
+			screen._choose(s, LootRoll.Choice.GREED if s.index == 2 else LootRoll.Choice.PASS)
+		screen._process(0.0)
+		await tree.process_frame
+		await tree.process_frame
+		check(screen.result_label.visible, "%s: the result shows" % what)
+		var frame_top := screen.frame.get_global_rect().position.y
+		check(frame_top >= _title_end(), "%s: frame top %.1f below the title block (%.1f)" % [what, frame_top, _title_end()])
+	finished.emit()
+
+
+## A solo hero gets the "Loot" title and its own subtitle; a tall tooltip clears them as well.
+func test_the_frame_stays_below_the_title_block_for_a_solo_hero() -> void:
+	_async = true
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)
+	UiFakes.reset_players()
+	RunState.start_run(1, 12)
+	RunState.set_wave(10)
+	world = MarketFakes.make_world(tree)
+	MarketFakes.human_with_hero(world, "pad:0", &"warrior")
+	screen = LootRollScreen.create()
+	tree.root.add_child(screen)
+	for item in _artifacts():
+		await _open(item)
+		var what := item.display_name
+		check_eq(screen.title_label.text, "Loot", "%s: the solo title" % what)
+		var frame := screen.frame.get_global_rect()
+		check(frame.position.y >= _title_end(), "%s: frame top %.1f below the title block (%.1f)" % [what, frame.position.y, _title_end()])
+		_check_frame(what + " (solo)")
 	finished.emit()
 
 

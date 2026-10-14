@@ -29,13 +29,15 @@ const ITEM_INPUT_DELAY := 0.25
 const LOG_LINES := 16
 const QUEUE_SHOWN := 7
 const CHIP_SIZE := Vector2(290, 96)
-## The window's middle row (queue, frame, log) is centred this far above the screen's middle.
-const MIDDLE_OFFSET := -70.0
+## Top of the title block ("Loot Roll" and its subtitle) below the screen's top edge.
+const TITLE_TOP := 22.0
 ## Gap below the player chips row to the screen's bottom edge.
 const BOTTOM_MARGIN := 24.0
-## The item frame keeps this far from the screen's top edge and from the chips (its stone border
-## would otherwise touch them).
+## The item frame keeps this far from the screen's top edge, below the title block and above the
+## chips (its stone border would otherwise touch them). The window's middle row (queue, frame,
+## log) is centred in the band between those limits ([method frame_band]).
 const FRAME_TOP_MARGIN := 8.0
+const FRAME_TITLE_GAP := 8.0
 const FRAME_CHIPS_GAP := 8.0
 ## Room kept in the frame for a winner line of two lines (a long Greed result wraps): the frame
 ## grows by that when the timer bar gives way to the result.
@@ -100,6 +102,8 @@ var _legend_pass := ""
 var _legend_built := false
 var _queue_box: VBoxContainer
 var _backdrop: TextureRect
+var _top: VBoxContainer
+var _middle: HBoxContainer
 var _bottom: VBoxContainer
 var _tip_holder: CenterContainer
 ## Holds the (scaled) tooltip at the size it is drawn at, so the frame measures that.
@@ -475,10 +479,11 @@ func _build() -> void:
 	add_child(_backdrop)
 
 	var top := UiTheme.vbox(0)
+	_top = top
 	top.anchor_left = 0.5
 	top.anchor_right = 0.5
 	top.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top.offset_top = 22
+	top.offset_top = TITLE_TOP
 	add_child(top)
 	title_label = UiTheme.centered_label("Loot Roll", UiTheme.TITLE, 60)
 	top.add_child(title_label)
@@ -486,13 +491,12 @@ func _build() -> void:
 	top.add_child(subtitle_label)
 
 	var middle := UiTheme.hbox(26)
+	_middle = middle
 	middle.alignment = BoxContainer.ALIGNMENT_CENTER
 	middle.anchor_right = 1.0
 	middle.anchor_top = 0.5
 	middle.anchor_bottom = 0.5
 	middle.grow_vertical = Control.GROW_DIRECTION_BOTH
-	middle.offset_top = MIDDLE_OFFSET
-	middle.offset_bottom = MIDDLE_OFFSET
 	add_child(middle)
 	middle.add_child(_build_queue())
 	middle.add_child(_build_frame())
@@ -674,17 +678,38 @@ func _fill_item() -> void:
 	_fill_queue()
 
 
-## The tallest the item tooltip may be so the frame stays on screen and clear of the player chips
-## (at the 1920 x 1080 design size; the winner line's room included): the frame is centred on the
-## middle row's line, between FRAME_TOP_MARGIN and FRAME_CHIPS_GAP above the chips; what is not
-## the tooltip (head, dividers, timer bar, margins) is measured, not assumed.
-func tooltip_room() -> float:
+## The vertical band (top, bottom in screen pixels at the current height) the item frame may fill:
+## FRAME_TITLE_GAP below the title block (title and subtitle, as laid out now – the frame is as wide
+## as the title, so it must not cover it) and FRAME_CHIPS_GAP above the player chips; never above
+## FRAME_TOP_MARGIN.
+func frame_band() -> Vector2:
 	var view_h := size.y
 	if view_h <= 0.0:
 		view_h = get_viewport_rect().size.y if is_inside_tree() else float(ProjectSettings.get_setting("display/window/size/viewport_height", 1080))
-	var centre := view_h * 0.5 + MIDDLE_OFFSET
+	var title_bottom := _top.offset_top + _top.get_combined_minimum_size().y
 	var chips_top := view_h - BOTTOM_MARGIN - _bottom.get_combined_minimum_size().y
-	var frame_h := 2.0 * minf(centre - FRAME_TOP_MARGIN, chips_top - FRAME_CHIPS_GAP - centre)
+	return Vector2(maxf(FRAME_TOP_MARGIN, title_bottom + FRAME_TITLE_GAP), chips_top - FRAME_CHIPS_GAP)
+
+
+## Centres the middle row (queue, frame, log) in [method frame_band], so the frame has the most
+## room under the title and above the chips.
+func _centre_middle_row() -> void:
+	var view_h := size.y
+	if view_h <= 0.0:
+		view_h = get_viewport_rect().size.y if is_inside_tree() else float(ProjectSettings.get_setting("display/window/size/viewport_height", 1080))
+	var band := frame_band()
+	var offset := (band.x + band.y) * 0.5 - view_h * 0.5
+	_middle.offset_top = offset
+	_middle.offset_bottom = offset
+
+
+## The tallest the item tooltip may be so the frame stays on screen, below the title block and
+## clear of the player chips (at the 1920 x 1080 design size; the winner line's room included):
+## the frame fills [method frame_band] at most; what is not the tooltip (head, dividers, timer
+## bar, margins) is measured, not assumed.
+func tooltip_room() -> float:
+	var band := frame_band()
+	var frame_h := band.y - band.x
 	var chrome := frame.get_combined_minimum_size().y - _tip_holder.get_combined_minimum_size().y
 	return frame_h - chrome - RESULT_RESERVE
 
@@ -693,6 +718,7 @@ func tooltip_room() -> float:
 ## (TOOLTIP_WIDTHS: fewer wrapped lines), and only when even the widest is too tall it is scaled
 ## down (not below MIN_TOOLTIP_FIT). The holder takes the size it is drawn at.
 func _fit_tooltip() -> void:
+	_centre_middle_row()
 	var room := tooltip_room()
 	var height := 0.0
 	for width in TOOLTIP_WIDTHS:
