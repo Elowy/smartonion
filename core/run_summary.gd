@@ -132,6 +132,20 @@ static func meter_dict() -> Dictionary:
 	return out
 
 
+## {source id: {wave as String: damage}} – the SMOKE_RESULT "taken_by_source" entry, the heroes'
+## damage taken (RunState.damage_taken_by_source) by what dealt it, rounded to 0.1. Balance
+## diagnostics: it tells which enemy type is eating the party.
+static func source_damage_dict() -> Dictionary:
+	var out := {}
+	for source in RunState.damage_taken_by_source:
+		var per_wave: Dictionary = RunState.damage_taken_by_source[source]
+		var line := {}
+		for w in per_wave:
+			line[str(w)] = snappedf(float(per_wave[w]), 0.1)
+		out[String(source)] = line
+	return out
+
+
 # --- Pure model -------------------------------------------------------------------------------
 
 ## Fills in the derived fields of [param run] (the run totals: victory, waves_cleared,

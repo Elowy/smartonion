@@ -182,6 +182,9 @@ var healing_by_player: Dictionary[int, float] = {}
 var absorbed_by_player: Dictionary[int, float] = {}
 ## Damage a player took (after mitigation).
 var damage_taken_by_player: Dictionary[int, float] = {}
+## Balance diagnostics: the same damage by what dealt it, {source id (an EnemyData id,
+## &"environment" for the poison puddles, ...): {wave: float}} (see [method record_damage_taken]).
+var damage_taken_by_source: Dictionary = {}
 ## Revives a player took part in (teammate channel, Word of Glory).
 var revives_by_player: Dictionary[int, int] = {}
 ## Times a player went down.
@@ -322,6 +325,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	healing_by_player.clear()
 	absorbed_by_player.clear()
 	damage_taken_by_player.clear()
+	damage_taken_by_source.clear()
 	revives_by_player.clear()
 	downs_by_player.clear()
 	bosses_by_player.clear()
@@ -785,10 +789,16 @@ func record_absorb(player_index: int, amount: float) -> void:
 		absorbed_by_player[player_index] = absorbed_by_player.get(player_index, 0.0) + amount
 
 
-## [param amount] damage slot [param player_index] took after mitigation.
-func record_damage_taken(player_index: int, amount: float) -> void:
+## [param amount] damage slot [param player_index] took after mitigation. With a
+## [param source_id] (the dealer: an enemy's data id, &"environment" ...) it is also added to
+## [member damage_taken_by_source] under the current wave (balance diagnostics, SMOKE_RESULT).
+func record_damage_taken(player_index: int, amount: float, source_id: StringName = &"") -> void:
 	if player_index >= 0 and amount > 0.0:
 		damage_taken_by_player[player_index] = damage_taken_by_player.get(player_index, 0.0) + amount
+		if source_id != &"":
+			var per_wave: Dictionary = damage_taken_by_source.get(source_id, {})
+			per_wave[wave] = float(per_wave.get(wave, 0.0)) + amount
+			damage_taken_by_source[source_id] = per_wave
 
 
 ## Slot [param player_index] took part in a revive (credited to every reviver).

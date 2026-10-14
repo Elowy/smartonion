@@ -1268,7 +1268,8 @@ func _finish_smoke(result: String) -> void:
 ## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
 ## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
 ## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
-## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict). M6b keys:
+## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict),
+## taken_by_source ({source id: {wave: damage taken}}, RunSummary.source_damage_dict). M6b keys:
 ## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
 ## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
 ## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
@@ -1341,6 +1342,7 @@ func smoke_result(result: String) -> Dictionary:
 		"dungeon_rooms_cleared": RunState.dungeon_rooms_cleared,
 		"dungeon_time": snappedf(RunState.dungeon_time, 0.1),
 		"meter": RunSummary.meter_dict(),
+		"taken_by_source": RunSummary.source_damage_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
