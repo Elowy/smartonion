@@ -235,6 +235,8 @@ func start_run() -> void:
 	# Test hooks (start_run reset the statics to their defaults).
 	GoblinSpawner.chance_override = options.goblin_chance
 	EliteAffixes.rate_mult = options.elite_mult
+	BossData.hp_mult = options.boss_hp
+	LootDrops.artifact_chance_override = options.artifact_chance
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
@@ -469,6 +471,8 @@ func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
 	_state_time += delta
+	if state == State.WAVE:
+		RunState.tick_run_time(delta)
 	if state == State.WAVE_END and _state_time >= WAVE_END_DELAY:
 		_after_wave_end()
 
@@ -823,7 +827,9 @@ func _finish_smoke(result: String) -> void:
 ## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line"). M5 keys: elites_spawned,
 ## elites_killed, goblins_spawned, goblins_killed, goblins_escaped, weapons_forged,
 ## talent_points_spent (all heroes), talent_resets, set_bonuses (active bonuses of all heroes),
-## gold_spent (RunState.try_spend_for).
+## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
+## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
+## (seconds of wave play, RunState.tick_run_time).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
@@ -869,6 +875,14 @@ func smoke_result(result: String) -> Dictionary:
 		"talent_resets": RunState.talent_resets,
 		"set_bonuses": set_bonuses,
 		"gold_spent": RunState.gold_spent,
+		"bosses_killed": RunState.bosses_killed,
+		"artifacts_dropped": RunState.artifacts_dropped,
+		"consumables_bought": RunState.consumables_bought,
+		"black_market_bought": RunState.black_market_bought,
+		"enchants_done": RunState.enchants_done,
+		"dust_earned": RunState.dust_earned,
+		"dust_spent": RunState.dust_spent,
+		"run_time": snappedf(RunState.run_time, 0.1),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),
