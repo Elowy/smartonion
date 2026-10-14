@@ -15,6 +15,14 @@ extends ScriptedInput
 ##   no rescue panic); with no other enemy within CROWD_RADIUS and HP at or above
 ##   RETREAT_HP_RATIO a living bot chases the nearest goblin within ENGAGE_DISTANCE up to its
 ##   keep distance (melee: inside its reach, ranged: KITE_DISTANCE). No RNG.
+## - Priority targets (M6, GDD 8 "elsődleges célpont"): a living, healthy bot with fewer than
+##   CROWD_COUNT enemies around goes for the nearest Cultist Acolyte within
+##   PRIORITY_ENGAGE_DISTANCE (chases it up to its keep distance), and its weapons shoot an
+##   Acolyte in reach before the nearest enemy ([method priority_enemy], used by
+##   WeaponRunner.find_target). No RNG.
+## - Flesh Golem hook (M6): a living bot standing in a telegraphed hook line sidesteps out of
+##   it – for HOOK_DODGE_CHANCE of the hooks (decided once per hook with the bot's own RNG; the
+##   others catch it like a human who looked away).
 
 ## Ranged bots keep this far (m) from enemies.
 const KITE_DISTANCE := 6.0
@@ -55,11 +63,22 @@ const RESCUE_MAX_THREATS := 2
 const RESCUE_MIN_HP_RATIO := 0.35
 ## Steering weight of a goblin chase (loot pickups weigh 1.5, a melee engage 1.2).
 const GOBLIN_CHASE_WEIGHT := 2.0
+## A priority target (Cultist Acolyte) within this distance (m) is chased, with this weight.
+const PRIORITY_ENGAGE_DISTANCE := 14.0
+const PRIORITY_CHASE_WEIGHT := 1.8
+## Share of the Flesh Golem's hooks a bot sidesteps, and how far (m) beyond the line's edge
+## it counts as being in the line.
+const HOOK_DODGE_CHANCE := 0.6
+const HOOK_DODGE_MARGIN := 0.8
 
 var body: Node3D
 var _wander := Vector2.ZERO
 var _wander_timer := 0.0
 var _rng := RandomNumberGenerator.new()
+## The hook (golem instance id, Enemy.hook_serial) the bot last decided about, and the decision.
+var _hook_owner := 0
+var _hook_serial := -1
+var _hook_dodges := false
 
 
 func _init(p_key: String = "bot", p_seed: int = 0) -> void:
@@ -85,6 +104,9 @@ func think(delta: float) -> void:
 	var crowd := 0
 	var goblin_dist := INF
 	var to_goblin := Vector2.ZERO
+	var priority_dist := INF
+	var to_priority := Vector2.ZERO
+	var hook_escape := Vector2.ZERO
 	for e in tree.get_nodes_in_group(&"enemies"):
 		var n := e as Node3D
 		if n == null:
@@ -99,6 +121,15 @@ func think(delta: float) -> void:
 				goblin_dist = dist
 				to_goblin = -d / dist
 			continue
+		var enemy := n as Enemy
+		if enemy != null:
+			if enemy.is_priority_target() and dist < priority_dist:
+				priority_dist = dist
+				to_priority = -d / dist
+			if enemy.ai_state == Enemy.AiState.HOOK:
+				var out := enemy.hook_escape_dir(body.global_position, HOOK_DODGE_MARGIN)
+				if out != Vector3.ZERO and _wants_dodge(enemy):
+					hook_escape += Vector2(out.x, out.z)
 		enemies.append(d)
 		if dist < CROWD_RADIUS:
 			crowd += 1
@@ -123,6 +154,10 @@ func think(delta: float) -> void:
 			var gap := to_healer.length()
 			move = to_healer / gap if gap > HEALER_STOP_DISTANCE else Vector2.ZERO
 			return
+	# A living bot inside a golem's telegraphed hook line steps out of it first.
+	if alive and hook_escape != Vector2.ZERO:
+		move = hook_escape.normalized()
+		return
 	# Living bots go to downed teammates close by, ghosts (no healer) to living ones (GDD 1).
 	var buddy := _nearest_teammate(pos, not alive, RESCUE_RANGE if alive else HELP_RANGE)
 	if buddy.is_finite() and alive and not _safe_rescue(pos, buddy, enemies):
@@ -139,6 +174,11 @@ func think(delta: float) -> void:
 			return
 	if alive and melee and nearest_enemy > keep and nearest_enemy < ENGAGE_DISTANCE:
 		steer += to_nearest * 1.2
+	if alive and priority_dist < PRIORITY_ENGAGE_DISTANCE and crowd < CROWD_COUNT \
+			and _hp_ratio() >= RETREAT_HP_RATIO:
+		var priority_keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE)
+		if priority_dist > priority_keep:
+			steer += to_priority * PRIORITY_CHASE_WEIGHT
 	if alive and crowd == 0 and _hp_ratio() >= RETREAT_HP_RATIO and goblin_dist < ENGAGE_DISTANCE:
 		var chase_keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE)
 		if goblin_dist > chase_keep:
@@ -163,6 +203,36 @@ func think(delta: float) -> void:
 		_wander = Vector2.from_angle(_rng.randf() * TAU) * 0.6
 	steer += _wander
 	move = steer.normalized() if steer.length() > 0.05 else Vector2.ZERO
+
+
+## The nearest living priority target (Cultist Acolyte) whose centre is within [param reach] m of
+## [param pos] (XZ); null when there is none. Allocation-free when no Acolyte is alive.
+static func priority_enemy(tree: SceneTree, pos: Vector3, reach: float) -> Enemy:
+	if tree == null or tree.get_node_count_in_group(&"priority_targets") == 0:
+		return null
+	var best: Enemy = null
+	var best_d := reach * reach
+	for node in tree.get_nodes_in_group(&"priority_targets"):
+		var e := node as Enemy
+		if e == null or not e.is_inside_tree() or not e.is_priority_target():
+			continue
+		var dx := e.global_position.x - pos.x
+		var dz := e.global_position.z - pos.z
+		var d := dx * dx + dz * dz
+		if d <= best_d and (best == null or d < best_d):
+			best_d = d
+			best = e
+	return best
+
+
+## Whether the bot sidesteps [param golem]'s current hook (decided once per hook).
+func _wants_dodge(golem: Enemy) -> bool:
+	var id := golem.get_instance_id()
+	if id != _hook_owner or golem.hook_serial != _hook_serial:
+		_hook_owner = id
+		_hook_serial = golem.hook_serial
+		_hook_dodges = _rng.randf() < HOOK_DODGE_CHANCE
+	return _hook_dodges
 
 
 static func _is_alive(node: Node) -> bool:

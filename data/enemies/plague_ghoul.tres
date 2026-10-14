@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"plague_ghoul"
+display_name = "Plague Ghoul"
+behavior = 0
+max_hp = 7.0
+contact_damage = 2.0
+move_speed = 2.1
+radius = 0.5
+death_effect = &"poison_puddle"
+death_radius = 1.6
+death_duration = 3.0
+death_tick_interval = 0.5
+death_damage_ratio = 0.5
+death_color = Color(0.36, 0.78, 0.2, 1)
+first_wave = 7
+spawn_weight = 0.6
+group_min = 2
+group_max = 3
+gold = 1
+xp = 2
+model_style = &"ghoul"
+color = Color(0.56, 0.66, 0.44, 1)
+model_scale = 1.0

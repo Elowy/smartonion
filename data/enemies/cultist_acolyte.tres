@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cultist_acolyte"
+display_name = "Cultist Acolyte"
+behavior = 4
+max_hp = 6.0
+contact_damage = 1.0
+move_speed = 2.3
+radius = 0.45
+attack_cooldown = 4.0
+support_distance_min = 6.0
+support_distance_max = 9.0
+support_range = 7.0
+support_channel = 0.6
+support_heal_pct = 0.25
+support_shield_pct = 0.2
+priority_target = true
+first_wave = 9
+spawn_weight = 0.35
+group_min = 1
+group_max = 1
+gold = 2
+xp = 3
+model_style = &"cultist"
+color = Color(0.46, 0.24, 0.6, 1)
+model_scale = 1.0
