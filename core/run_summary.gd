@@ -157,7 +157,7 @@ static func build(run: Dictionary, heroes: Array) -> Dictionary:
 
 ## Who wins which award: {slot index: Array[StringName] of award ids (AWARDS order)}. Co-op only
 ## (fewer than MIN_HEROES_FOR_AWARDS heroes: nothing). The best value wins; a tie goes to the lower
-## slot; a "most" award needs a value above 0; Untouchable (the least damage taken) is only for the
+## slot; a "most" award needs a shown value above 0 ([method shown_value]); Untouchable (the least damage taken) is only for the
 ## heroes standing at the end (nobody left standing: nobody wins it).
 static func awards_for(heroes: Array) -> Dictionary:
 	var out := {}
@@ -173,7 +173,7 @@ static func awards_for(heroes: Array) -> Dictionary:
 			if least and not bool(h.get("alive", true)):
 				continue
 			var value := float((h.get("stats", {}) as Dictionary).get(stat, 0.0))
-			if not least and value <= 0.0:
+			if not least and shown_value(value) <= 0.0:  # a 0.4 reads "0": no award for that
 				continue
 			var better := winner < 0 or (value < best if least else value > best)
 			if better:  # strict: a tie keeps the lower slot
@@ -254,11 +254,20 @@ static func format_value(stat_id: StringName, value: float) -> String:
 
 
 static func format_amount(value: float) -> String:
-	if value >= 1000000.0:
-		return "%.2fM" % (value / 1000000.0)
 	if value >= 10000.0:
-		return "%.1fk" % (value / 1000.0)
+		var thousands := "%.1f" % (value / 1000.0)
+		# 999,960 rounds to "1000.0k": from there on it is a million.
+		if value < 1000000.0 and thousands != "1000.0":
+			return thousands + "k"
+		return "%.2fM" % (value / 1000000.0)
 	return UiTheme.format_int(int(roundf(value)))
+
+
+## What the meter shows for [param value] as a number: amounts and counts are whole numbers (from
+## 10,000 on they are shortened, but never below 10,000), so anything under 0.5 reads "0". The awards
+## ("a most award needs a value above 0") and the dimmed bars go by this, not by the raw value.
+static func shown_value(value: float) -> float:
+	return roundf(value)
 
 
 ## 754 s -> "12:34", 3725 s -> "1:02:05".

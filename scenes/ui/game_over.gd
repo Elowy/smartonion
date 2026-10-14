@@ -21,8 +21,8 @@ enum Page { SUMMARY, METER }
 const PAGE_NAMES: Array[String] = ["Summary", "Damage Meter"]
 ## --end-page values (LaunchOptions).
 const PAGE_IDS: Array[String] = ["summary", "meter"]
-## Both pages sit in a box of this height, so the panel does not jump when the page changes.
-const PAGE_HEIGHT := 470.0
+## The longest "Saved to ..." line (characters): a longer path keeps its end (folder + file name).
+const MAX_STATUS_CHARS := 72
 
 var victory := false
 var title_label: Label
@@ -39,6 +39,8 @@ var page := Page.SUMMARY
 var panel: PanelContainer
 var summary_page: Control
 var meter_page: MeterPage
+## Holds both pages; as tall as the taller one (see [method _fit_pages]).
+var page_box: MarginContainer
 ## The line under the prompts ("Saved to ..." after X).
 var status_label: Label
 ## The tab labels, one per page.
@@ -123,8 +125,25 @@ func save_card() -> void:
 	if path == "":
 		_set_status("The card could not be saved.", UiTheme.RED)
 	else:
-		_set_status("Saved to %s" % ProjectSettings.globalize_path(path), UiTheme.GREEN)
+		var full := ProjectSettings.globalize_path(path)
+		print("Run card saved to ", full)
+		_set_status(saved_text(full), UiTheme.GREEN)
 	card_saved.emit(path)
+
+
+## "Saved to <path>" for the status line. A path longer than [constant MAX_STATUS_CHARS] loses its
+## beginning, at a folder boundary ("Saved to .../SmartOnion/cards/run_2026-10-14_15-20-11.png"): the
+## line never gets wider than the panel, whatever the platform's user folder is (the full path goes
+## to the log).
+static func saved_text(full_path: String) -> String:
+	var room := MAX_STATUS_CHARS - "Saved to ".length()
+	if full_path.length() <= room:
+		return "Saved to %s" % full_path
+	var tail := full_path.right(room - 3)  # 3 = the dots
+	var cut := tail.find("/")
+	if cut >= 0 and cut < tail.length() - 1:
+		tail = tail.substr(cut)
+	return "Saved to ...%s" % tail
 
 
 func _set_status(text: String, color: Color = UiTheme.TEXT_DIM) -> void:
@@ -165,14 +184,15 @@ func _build() -> void:
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
 
-	# Both pages share one box (the tallest sets the size): the panel keeps its place when switching.
-	var stack := MarginContainer.new()
-	stack.custom_minimum_size = Vector2(0, PAGE_HEIGHT)
-	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(stack)
+	# Both pages share one box, as tall as the taller one ([method _fit_pages]): the panel keeps its
+	# size and the title its place when switching pages.
+	page_box = MarginContainer.new()
+	page_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(page_box)
 
 	summary_page = UiTheme.vbox(12)
-	stack.add_child(summary_page)
+	summary_page.size_flags_vertical = Control.SIZE_SHRINK_CENTER  # the shorter page floats in the middle
+	page_box.add_child(summary_page)
 	var stats := UiTheme.hbox(12)
 	stats.alignment = BoxContainer.ALIGNMENT_CENTER
 	summary_page.add_child(stats)
@@ -192,15 +212,18 @@ func _build() -> void:
 	tcol.add_child(rows_box)
 
 	meter_page = MeterPage.create()
-	stack.add_child(meter_page)
+	page_box.add_child(meter_page)
 
 	_prompt = UiTheme.prompt_row([
-		[UiGlyph.pad(PlayerInput.Pad.LB), UiGlyph.pad(PlayerInput.Pad.RB), "Page"],
+		[UiGlyph.pad(PlayerInput.Pad.LB), UiGlyph.pad(PlayerInput.Pad.RB), "/", UiGlyph.key("Q"), UiGlyph.key("E"),
+			"/", UiGlyph.nav(), "Page"],
 		[UiGlyph.pad(PlayerInput.Pad.X), "/", UiGlyph.key("R"), "Save card"],
 		[UiGlyph.pad(PlayerInput.Pad.A), "/", UiGlyph.key("Enter"), "Back to Lobby"]],
 		UiTheme.FONT_LARGE - 4, UiTheme.TEXT)
 	col.add_child(_prompt)
 	status_label = UiTheme.centered_label(" ", UiTheme.DIM, UiTheme.FONT_BODY)
+	# One line, whatever the text: too long ends in "..." instead of widening / growing the panel.
+	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(status_label)
 	visible = false
 
@@ -285,6 +308,14 @@ func _fill() -> void:
 		rows_box.add_child(_player_row(s, s.index == best and slots.size() > 1))
 	if slots.is_empty():
 		rows_box.add_child(UiTheme.centered_label("No heroes", UiTheme.DIM))
+	_fit_pages()
+
+
+## Sizes [member page_box] to the taller page (the Damage Meter grows by a second row of Awards, the
+## Summary by more hero rows ...). Hidden pages still know their minimum size.
+func _fit_pages() -> void:
+	page_box.custom_minimum_size = Vector2(0.0, maxf(summary_page.get_combined_minimum_size().y,
+			meter_page.get_combined_minimum_size().y))
 
 
 func _player_row(s: PlayerSlot, mvp: bool) -> Control:

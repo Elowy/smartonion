@@ -415,8 +415,8 @@ func test_a_meter_bar_fills_in_proportion_with_a_minimum_and_a_dimmed_zero() -> 
 	bar.free()
 
 
-func test_the_worst_case_meter_page_fits_the_screen() -> void:
-	# Four heroes and every award won (two rows of chips), the largest numbers.
+## Four heroes and every award won (two rows of chips), the largest numbers.
+func _record_worst_case_run() -> void:
 	_humans([&"warrior", &"mage", &"paladin", &"rogue"] as Array[StringName])
 	var dmg := [1250000.0, 480000.0, 210000.0, 330000.0]
 	var heal := [2000.0, 91234.0, 15000.0, 0.0]
@@ -439,6 +439,10 @@ func test_the_worst_case_meter_page_fits_the_screen() -> void:
 	RunState.record_hero_result(1, true)
 	RunState.record_hero_result(2, true)
 	RunState.record_hero_result(3, true)
+
+
+func test_the_worst_case_meter_page_fits_the_screen() -> void:
+	_record_worst_case_run()
 	var screen := _screen()
 	screen.open(true)
 	check_eq(screen.meter_page.awards_grid.get_child_count(), RunSummary.AWARDS.size(), "all seven awards were won")
@@ -521,7 +525,7 @@ func test_the_card_model_is_a_pure_function_of_the_summary() -> void:
 	check_eq(p3["item_rarity"], -1, "no rarity")
 	var defeat := RunCard.model(_summary_for_card(false))
 	check_eq(defeat["result"], "Defeat", "defeat")
-	check_eq(defeat["waves_text"], "11 / 25 waves", "waves cleared")
+	check_eq(defeat["waves_text"], "Fell on wave 12", "a defeat names the wave the party fell on")
 
 
 func test_the_card_shows_at_most_four_heroes() -> void:
@@ -590,3 +594,193 @@ func test_rendering_without_a_renderer_returns_nothing() -> void:
 		check(host.get_child_count() == 0, "and leaves nothing behind")
 	await tree.process_frame
 	finished.emit()
+
+
+# --- Fix-ups after the review: page height, status line, prompt, formats, centring, defeat card -----
+
+## Every UiGlyph below [param node].
+func _glyphs(node: Node) -> Array[UiGlyph]:
+	var out: Array[UiGlyph] = []
+	for c in node.get_children():
+		if c is UiGlyph:
+			out.append(c as UiGlyph)
+		out.append_array(_glyphs(c))
+	return out
+
+
+func test_both_pages_make_the_panel_equally_tall_with_seven_awards() -> void:
+	_record_worst_case_run()
+	var screen := _screen()
+	screen.open(true)
+	check_eq(screen.meter_page.awards_grid.get_child_count(), 7, "all seven awards: two rows of chips")
+	screen.set_page(GameOverScreen.Page.SUMMARY)
+	var summary_height := screen.panel.get_combined_minimum_size().y
+	screen.set_page(GameOverScreen.Page.METER)
+	var meter_height := screen.panel.get_combined_minimum_size().y
+	check_near(summary_height, meter_height, 0.5,
+			"the panel keeps its height when the page turns (Summary %s, Damage Meter %s)" % [summary_height, meter_height])
+	check(meter_height > 900.0, "and it is the tall one: it holds the two award rows (%s)" % meter_height)
+
+
+func test_the_panel_height_is_equal_on_both_pages_for_every_number_of_awards() -> void:
+	for heroes in [1, 2, 3, 4]:
+		UiFakes.reset_players()
+		RunState.start_run(4, 7)
+		var classes: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue"]
+		_humans(classes.slice(0, heroes))
+		for i in heroes:
+			RunState.record_damage(i, 100.0 * (i + 1))
+			if i % 2 == 0:
+				RunState.record_heal(i, 10.0 * (i + 1))
+		var screen := _screen()
+		screen.open(true)
+		screen.set_page(GameOverScreen.Page.SUMMARY)
+		var a := screen.panel.get_combined_minimum_size().y
+		screen.set_page(GameOverScreen.Page.METER)
+		var b := screen.panel.get_combined_minimum_size().y
+		check_near(a, b, 0.5, "%d hero(es): Summary %s / Damage Meter %s" % [heroes, a, b])
+
+
+func test_the_summary_page_is_centred_in_the_page_box() -> void:
+	_async = true
+	_record_worst_case_run()
+	var screen := _screen()
+	screen.open(true)
+	await tree.process_frame
+	await tree.process_frame
+	var box := screen.page_box
+	var page := screen.summary_page
+	var top := page.position.y
+	var bottom := box.size.y - page.position.y - page.size.y
+	check(box.size.y - page.size.y > 60.0, "the Summary is the shorter page (%s of %s px)" % [page.size.y, box.size.y])
+	check(top > 20.0, "there is room above the content (%s px)" % top)
+	check_near(top, bottom, 1.0, "as much above (%s px) as below (%s px): no dead block under the table" % [top, bottom])
+	finished.emit()
+
+
+func test_the_page_prompt_shows_the_keyboard_keys_too() -> void:
+	var screen := _screen()
+	var caps: Array[String] = []
+	var navs := 0
+	var pills: Array[String] = []
+	for g in _glyphs(screen._prompt):
+		match g.style:
+			UiGlyph.Style.KEY:
+				caps.append(g.text)
+			UiGlyph.Style.NAV:
+				navs += 1
+			UiGlyph.Style.PILL:
+				pills.append(g.text)
+	check("Q" in caps and "E" in caps, "Q / E turn the page: %s" % [caps])
+	check("R" in caps and "Enter" in caps, "the other prompts keep their keys: %s" % [caps])
+	check_eq(navs, 1, "and the arrows (stick / arrow keys)")
+	check("LB" in pills and "RB" in pills, "next to the pad glyphs: %s" % [pills])
+
+
+func _path_of(length: int) -> String:
+	var tail := "/cards/run_2026-10-14_15-20-11.png"
+	var head := "C:/Users/"
+	var path := head + "n".repeat(length - head.length() - tail.length()) + tail
+	check_eq(path.length(), length, "a %d character path" % length)
+	return path
+
+
+func test_a_long_saved_path_is_shortened_to_its_end() -> void:
+	var path := _path_of(114)
+	var text := GameOverScreen.saved_text(path)
+	check(text.length() <= GameOverScreen.MAX_STATUS_CHARS, "at most %d characters (%d)" % [GameOverScreen.MAX_STATUS_CHARS, text.length()])
+	check(text.begins_with("Saved to ..."), "it says where the cut is: %s" % text)
+	check(text.ends_with("/cards/run_2026-10-14_15-20-11.png"), "folder and file name stay: %s" % text)
+	check_eq(text, "Saved to .../cards/run_2026-10-14_15-20-11.png", "cut at a folder boundary, not in the middle of a name")
+	check_eq(GameOverScreen.saved_text("/home/me/cards/run_x.png"), "Saved to /home/me/cards/run_x.png", "a short path stays whole")
+	var edge := "/".repeat(1) + "a".repeat(GameOverScreen.MAX_STATUS_CHARS - "Saved to ".length() - 1)
+	check_eq(GameOverScreen.saved_text(edge), "Saved to " + edge, "exactly as long as fits: whole")
+
+
+func test_a_114_character_path_does_not_resize_the_panel() -> void:
+	_async = true
+	_humans([&"warrior", &"mage"] as Array[StringName])
+	var screen := _screen()
+	screen.open(true)
+	await tree.process_frame
+	await tree.process_frame
+	var before_min := screen.panel.get_combined_minimum_size()
+	var before_size := screen.panel.size
+	var path := _path_of(114)
+	# The line the screen shows after X ...
+	screen._set_status(GameOverScreen.saved_text(path), UiTheme.GREEN)
+	await tree.process_frame
+	await tree.process_frame
+	check_eq(screen.panel.get_combined_minimum_size(), before_min, "shortened: the panel needs the same room")
+	check_eq(screen.panel.size, before_size, "and keeps its size")
+	var font := screen.status_label.get_theme_font(&"font")
+	var width := font.get_string_size(screen.status_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			screen.status_label.get_theme_font_size(&"font_size")).x
+	check(width <= screen.status_label.size.x, "the whole line fits its label (%s of %s px)" % [width, screen.status_label.size.x])
+	# ... and even the unshortened text could not push the panel (the label ends in "...").
+	screen._set_status("Saved to " + path, UiTheme.GREEN)
+	await tree.process_frame
+	await tree.process_frame
+	check_eq(screen.panel.get_combined_minimum_size(), before_min, "the unshortened path: still the same room")
+	check_eq(screen.panel.size, before_size, "and the same size")
+	finished.emit()
+
+
+func test_a_thousand_k_is_shown_as_a_million() -> void:
+	check_eq(RunSummary.format_amount(999960.0), "1.00M", "999,960 would round to 1000.0k")
+	check_eq(RunSummary.format_amount(999950.0), "1.00M", "999.95k is 1000.0k at one decimal")
+	check_eq(RunSummary.format_amount(999949.0), "999.9k", "just below: still k")
+	check_eq(RunSummary.format_amount(1000000.0), "1.00M", "a million")
+	check_eq(RunSummary.format_amount(9999.0), "9,999", "nothing else moved")
+	check_eq(RunSummary.format_amount(10000.0), "10.0k", "the k starts at 10,000")
+	check_eq(RunSummary.format_value(&"damage", 999960.0), "1.00M", "an amount stat")
+	check_eq(RunSummary.format_value(&"kills", 999960.0), "999,960", "a count is never shortened")
+
+
+func test_awards_and_dimmed_bars_go_by_the_value_the_meter_shows() -> void:
+	check_eq(RunSummary.shown_value(0.4), 0.0, "0.4 reads 0")
+	check_eq(RunSummary.shown_value(0.6), 1.0, "0.6 reads 1")
+	var scratch := RunSummary.awards_for([_hero(0, {&"healing": 0.4}), _hero(1, {&"healing": 0.2})])
+	var healer := false
+	for ids: Array in scratch.values():
+		healer = healer or &"most_healing" in ids
+	check(not healer, "healing that reads 0 wins no Most Healing: %s" % scratch)
+	var real := RunSummary.awards_for([_hero(0, {&"healing": 0.4}), _hero(1, {&"healing": 0.6})])
+	check(&"most_healing" in real.get(1, []), "0.6 reads 1: P2 wins it (%s)" % real)
+	# The meter dims exactly those bars.
+	_humans([&"warrior", &"mage"] as Array[StringName])
+	RunState.record_heal(0, 0.4)
+	RunState.record_heal(1, 0.6)
+	var screen := _screen()
+	screen.open(true)
+	var bars := screen.meter_page.rows[&"healing"].get_children()
+	check_eq((bars[0] as MeterBar).value_text, "1", "P2 first: reads 1")
+	check(not (bars[0] as MeterBar).dimmed, "and is not dimmed")
+	check_eq((bars[1] as MeterBar).value_text, "0", "P1: reads 0")
+	check((bars[1] as MeterBar).dimmed, "and is dimmed like every other 0")
+	check(screen.meter_page.awards_grid.get_node_or_null("Award_most_healing") != null, "the award chip is P2's")
+	# The run card leaves a "0" out of the hero's line as well.
+	var card := RunCard.model(RunSummary.collect(true))
+	check_eq((card["heroes"] as Array)[0]["stat_line"], "", "P1: a healing that reads 0 is left out")
+	check_eq((card["heroes"] as Array)[1]["stat_line"], "Heal 1", "P2: reads 1")
+
+
+func test_a_defeat_card_says_on_which_wave_the_party_fell() -> void:
+	var run := {"victory": false, "waves_cleared": 6, "wave": 7, "total_waves": 25}
+	check_eq(RunCard.model(RunSummary.build(run, _four_heroes()))["waves_text"], "Fell on wave 7", "the wave of the run")
+	run.erase("wave")
+	check_eq(RunCard.model(RunSummary.build(run, _four_heroes()))["waves_text"], "Fell on wave 7", "or the one after the last cleared")
+	run["victory"] = true
+	run["waves_cleared"] = 25
+	check_eq(RunCard.model(RunSummary.build(run, _four_heroes()))["waves_text"], "25 / 25 waves", "a victory still counts the waves")
+	# From the real run: dying on wave 12 is "Fell on wave 12".
+	_humans([&"warrior", &"mage"] as Array[StringName])
+	RunState.set_wave(12)
+	check_eq(RunCard.model(RunSummary.collect(false))["waves_text"], "Fell on wave 12", "collect: the current wave")
+	# And the card shows it.
+	var view := RunCardView.create(RunCard.model(_summary_for_card(false)))
+	_add(view)
+	var texts: Array[String] = []
+	for l in view.find_children("*", "Label", true, false):
+		texts.append((l as Label).text)
+	check("Fell on wave 12" in texts, "the picture says so: %s" % [texts])

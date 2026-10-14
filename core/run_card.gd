@@ -17,13 +17,17 @@ const STAT_SHORT := {&"damage": "Dmg", &"healing": "Heal"}
 
 
 ## The card's content: {"title", "result" ("Victory" / "Defeat"), "victory", "mode", "waves_text"
-## ("25 / 25 waves"), "time_text", "heroes": [{"label", "class_name", "class_id",
+## ("25 / 25 waves"; on a defeat "Fell on wave 12"), "time_text", "heroes": [{"label", "class_name", "class_id",
 ## "color" (player), "class_color", "alive", "item_name", "item_rarity", "item_level", "item_line",
 ## "award" (the hero's first award, "" = none), "more_awards" (how many further awards), "award_line",
 ## "stat_line"}]}. [param summary] = RunSummary.collect / build.
 static func model(summary: Dictionary) -> Dictionary:
 	var victory := bool(summary.get("victory", false))
-	var waves_text := "%d / %d waves" % [int(summary.get("waves_cleared", 0)), int(summary.get("total_waves", 0))]
+	var cleared := int(summary.get("waves_cleared", 0))
+	var total := int(summary.get("total_waves", 0))
+	var waves_text := "%d / %d waves" % [cleared, total]
+	if not victory:  # the wave that ended the run (the one after the last cleared)
+		waves_text = "Fell on wave %d" % clampi(int(summary.get("wave", cleared + 1)), 1, maxi(total, 1))
 	var time_text := String(summary.get("time_text", RunSummary.format_time(float(summary.get("time", 0.0)))))
 	var mode := String(summary.get("mode", "Normal"))
 	var heroes: Array[Dictionary] = []
@@ -50,7 +54,7 @@ static func _hero_model(h: Dictionary) -> Dictionary:
 	var stat_parts: Array[String] = []
 	for id: StringName in STAT_SHORT:
 		var v := float(stats.get(id, 0.0))
-		if v > 0.0:
+		if RunSummary.shown_value(v) > 0.0:
 			stat_parts.append("%s %s" % [STAT_SHORT[id], RunSummary.format_amount(v)])
 	return {
 		"label": h.get("label", "?"),

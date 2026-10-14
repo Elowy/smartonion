@@ -81,7 +81,7 @@ func fill(summary: Dictionary) -> void:
 			var v := float((h["stats"] as Dictionary).get(id, 0.0))
 			var bar := MeterBar.create(BAR_HEIGHT, UiTheme.FONT_SMALL)
 			bar.setup("%s %s" % [h["label"], h["class_name"]], RunSummary.format_value(id, v),
-					v / best if best > 0.0 else 0.0, h["class_color"], h["color"], v <= 0.0)
+					v / best if best > 0.0 else 0.0, h["class_color"], h["color"], RunSummary.shown_value(v) <= 0.0)
 			box.add_child(bar)
 		if heroes.is_empty():
 			box.add_child(UiTheme.centered_label("No heroes", UiTheme.DIM))
