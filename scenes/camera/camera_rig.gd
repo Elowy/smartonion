@@ -11,13 +11,17 @@ extends Node3D
 ## point ([method goblin_points], the extras of [method compute_framing]): the camera zooms
 ## out (at most MAX_DISTANCE) to show it, but the players always win – when the goblin does
 ## not fit with them (a narrow screen), the view only leans towards it, and it never limits
-## where a player may walk ([method get_walk_rect]).
+## where a player may walk ([method get_walk_rect]). M6: a living boss (group &"bosses", [Boss])
+## is framed the same way ([method boss_points], also an "extra"), so its telegraphs and the
+## adds it raises stay in sight.
 ##
 ## The rig node sits at the look-at point on the ground; [member camera] is offset back and
 ## up along the pitch. Framing math is static (see [method compute_framing]) and unit tested.
 
 const PITCH_DEG := 57.0
 const FOV := 40.0
+## A framed boss also keeps this share of its height (m up the screen) in view ([method boss_points]).
+const BOSS_HEIGHT_SHARE := 0.6
 const MIN_DISTANCE := 19.5
 const MAX_DISTANCE := 36.0
 ## Metres (ground) kept between the outermost players and the screen edge, per side: the HUD
@@ -201,21 +205,24 @@ func _anchor_points(living: Array[Node3D], ghosts: Array[Node3D]) -> Array[Vecto
 	return out
 
 
-## The soft framing points of the tree's Loot Goblins ([method goblin_points]); empty while
-## nobody stands (the ghosts' fallback framing stays as it was).
+## The soft framing points of the tree's Loot Goblins ([method goblin_points]) and bosses
+## ([method boss_points]); empty while nobody stands (the ghosts' fallback framing stays as it was).
 func _goblin_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	if not is_inside_tree():
 		return out
 	var goblins := get_tree().get_nodes_in_group(&"loot_goblins")
-	if goblins.is_empty():
+	var bosses := get_tree().get_nodes_in_group(&"bosses")
+	if goblins.is_empty() and bosses.is_empty():
 		return out
 	var living: Array[Node3D] = []
 	var ghosts: Array[Node3D] = []
 	_split_players(living, ghosts)
 	if living.is_empty():
 		return out
-	return goblin_points(goblins)
+	out = goblin_points(goblins)
+	out.append_array(boss_points(bosses))
+	return out
 
 
 ## Ground positions of the [param goblins] the camera frames: LootGoblins in the tree that
@@ -229,6 +236,21 @@ static func goblin_points(goblins: Array[Node]) -> Array[Vector3]:
 				or g.has_escaped():
 			continue
 		out.append(g.global_position)
+	return out
+
+
+## Ground points of the [param bosses] the camera frames: [Boss]es in the tree that are not
+## dead, each as its feet and a point [constant BOSS_HEIGHT_SHARE] of its height further up the
+## screen (-Z), so the whole tall figure stays under the HUD plaque, not only its feet.
+static func boss_points(bosses: Array[Node]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for node in bosses:
+		var b := node as Boss
+		if b == null or not b.is_inside_tree() or b.is_queued_for_deletion() or b.is_dead():
+			continue
+		out.append(b.global_position)
+		var height := b.model.head_height if b.model != null else 2.0
+		out.append(b.global_position + Vector3(0.0, 0.0, -height * BOSS_HEIGHT_SHARE))
 	return out
 
 
