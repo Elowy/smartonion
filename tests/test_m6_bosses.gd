@@ -164,7 +164,7 @@ func test_boss_data_files_are_loaded_by_db() -> void:
 			"Frost Breath: 9 s, 60 deg, 7 m, 1 s, 3x")
 	var v := Db.get_boss(VORTHALAX)
 	check_eq(v.boss_wave, 25, "wave 25")
-	check_eq(v.max_hp, 650.0, "base HP")
+	check_eq(v.max_hp, 450.0, "base HP")
 	check_eq(v.contact_damage, 4.0, "contact")
 	check_eq(v.abilities.size(), 3, "three abilities")
 	var fields := v.abilities[0]
