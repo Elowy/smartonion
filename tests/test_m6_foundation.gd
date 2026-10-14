@@ -425,9 +425,11 @@ func test_is_boss_comes_from_the_data() -> void:
 	no_data.free()
 
 
-func test_support_and_brute_dispatch_and_fall_back_to_chase() -> void:
+func test_support_and_brute_dispatch_to_their_own_behaviours() -> void:
+	# M6a ENEMIES replaced the P0 chase fallback: SUPPORT keeps its distance (the Acolyte does not
+	# walk up to the hero), BRUTE still walks at the hero between its hooks.
 	_enemy_world()
-	EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
+	var hero := EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
 	var support := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.SUPPORT), Vector3(0.0, 0.0, 0.0))
 	var brute := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.BRUTE), Vector3(0.0, 0.0, 2.0))
 	var chase := _spawn_probe(EFakes.enemy_data(EnemyData.Behavior.CHASE), Vector3(0.0, 0.0, -2.0))
@@ -435,26 +437,28 @@ func test_support_and_brute_dispatch_and_fall_back_to_chase() -> void:
 	check(support.support_calls > 0 and support.brute_calls == 0, "SUPPORT goes to _think_support")
 	check(brute.brute_calls > 0 and brute.support_calls == 0, "BRUTE goes to _think_brute")
 	check(chase.support_calls == 0 and chase.brute_calls == 0, "CHASE uses neither")
-	check(support.global_position.x > 0.5, "the SUPPORT fallback walks at the hero (CHASE)")
-	check(brute.global_position.x > 0.5, "the BRUTE fallback walks at the hero (CHASE)")
+	check(EFakes.flat_distance(support.global_position, hero.global_position) > 6.0,
+			"SUPPORT holds its distance instead of chasing: %f" % support.global_position.x)
+	check(brute.global_position.x > 0.5, "BRUTE walks at the hero (CHASE between hooks)")
 	check(chase.global_position.x > 0.5, "CHASE for reference")
 
 
-func test_chase_fallback_moves_like_the_chase_behaviour() -> void:
+func test_brute_walks_like_chase_between_hooks_and_support_does_not() -> void:
 	_enemy_world()
 	EFakes.spawn_player(world, Vector3(8.0, 0.0, 0.0))
 	var base_data := EFakes.enemy_data(EnemyData.Behavior.CHASE)
 	var chaser := EFakes.spawn_enemy(world, base_data, Vector3.ZERO)
 	var support := EFakes.spawn_enemy(world, EFakes.enemy_data(EnemyData.Behavior.SUPPORT), Vector3(0.0, 0.0, 3.0))
 	var brute := EFakes.spawn_enemy(world, EFakes.enemy_data(EnemyData.Behavior.BRUTE), Vector3(0.0, 0.0, -3.0))
-	# Same speed, so the same distance walked in a straight line.
+	# Same speed, so the same distance walked in a straight line (the brute's first hook is
+	# still on cooldown: attack_cooldown 2.5 s, staggered to 1.25 .. 2.5 s).
 	for e: Enemy in [chaser, support, brute]:
 		e.move_speed = 3.0
 	EFakes.step_all([chaser, support, brute] as Array[Node], 1.0)
 	var walked := chaser.global_position.x
 	check(walked > 1.0, "the chaser walked: %f" % walked)
-	check_near(support.global_position.x, walked, 0.35, "SUPPORT walks as far as CHASE")
 	check_near(brute.global_position.x, walked, 0.35, "BRUTE walks as far as CHASE")
+	check(support.global_position.x < walked - 1.0, "SUPPORT does not walk up to the hero like CHASE")
 
 
 func test_on_death_effect_is_called_from_die_before_the_enemy_leaves() -> void:
@@ -513,7 +517,7 @@ func test_db_getters() -> void:
 	# reload() rebuilds both from disk (the injected ones are gone).
 	Db.reload()
 	check(Db.get_boss(&"m6_test_boss") == null and Db.get_consumable(&"m6_test_flask") == null, "reload clears them")
-	check_eq(Db.enemies.size(), 5, "the enemy pool is unchanged")
+	check_eq(Db.enemies.size(), 8, "the enemy pool: the five old ones + the three M6a enemies (no boss)")
 
 
 func test_consumable_data_defaults_and_round_trip() -> void:

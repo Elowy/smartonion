@@ -24,6 +24,15 @@ class FakePlayer extends Player:
 		fake_kinds.append(kind)
 		fake_sources.append(source)
 
+	## The Flesh Golem's hook (M6): records {raw, toward, distance, source}; lands unless
+	## [member fake_hook_dodges].
+	var fake_hooks: Array[Dictionary] = []
+	var fake_hook_dodges := false
+
+	func take_hook(raw: float, toward: Vector3, distance: float, source: Node3D = null) -> bool:
+		fake_hooks.append({"raw": raw, "toward": toward, "distance": distance, "source": source})
+		return not fake_hook_dodges
+
 
 ## A bare Arena (no level geometry) with an entities root. Optional scripted
 ## random_point() results make spawn-point tests exact.

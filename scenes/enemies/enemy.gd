@@ -839,12 +839,11 @@ func _think_support(delta: float, here: Vector3) -> void:
 		_update_channel(delta, here)
 		return
 	_update_support_move(delta, here)
-	if attack_cooldown_left > 0.0:
-		return
 	_support_scan_left -= delta
-	if _support_scan_left <= 0.0:
-		_support_scan_left = SUPPORT_RESCAN
-		_start_channel(here)
+	if attack_cooldown_left > 0.0 or _support_scan_left > 0.0:
+		return
+	_support_scan_left = SUPPORT_RESCAN
+	_start_channel(here)
 
 
 ## The BRUTE behaviour's AI step (Flesh Golem, GDD 8): the hook telegraph ([method _update_hook])
