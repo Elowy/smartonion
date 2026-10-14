@@ -669,46 +669,60 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 #### Artifact fegyverek (kasztonként 1)
 
 Az Artifact **ritka, véletlen loot** – senki nem kapja meg automatikusan. Ha leesik, az
-a menet legnagyobb pillanata.
+a menet legnagyobb pillanata. (M6a: az öt jelenlegi kasztnak; a Hunter és a Shaman Artifactja
+az M8-cal jön.)
 
 **Honnan eshet (a 10. hullámtól)**
 
+Az Artifact-dobás **ölésenként** történik, a normál loot-dobás után, és csak a 10. hullámtól.
+
 | Forrás | Esély |
 |---|---|
-| Boss (10. és 25. hullám) | 15% minden boss-lootra |
+| Boss (10. és 25. hullám) | 15% – **bossonként egyszer** (nem a boss-loot itemenként), plusz pech-védelem |
 | Loot Goblin | 5% |
 | Elit | 2% |
 | Normál ellenség | 0,05% (a „jackpot”) |
 
-A Fortune minden esélyt növel.
+- **Fortune:** a gyilkos Fortune-ja minden esélyt szoroz: × (1 + Fortune%).
+- **Pech-védelem:** minden boss után, ami nem dobott Artifactot, a boss-esély +5
+  százalékponttal nő. Amint leesik egy Artifact, a pech-védelem nullázódik.
 
 **Melyik kaszté:**
 - 80% eséllyel a csapatban lévő egyik kaszté, 20% eséllyel bármelyiké.
-- Ha senki nem tudja használni, Greed esetén nagyon sok goldot ér.
+- Egy menetben kasztonként legfeljebb **1 Artifact** eshet: az a kaszt, amelyiké már leesett,
+  kimarad a sorsolásból; ha mindegyiké leesett, nincs több Artifact-drop.
 
-**Need:** csak a megfelelő kasztú játékos nyomhat rá Needet; a többieknek csak Greed vagy Pass
-választható. Egyébként a szokásos Need / Greed / Pass dobás dönt (10.1).
+**A dobás:** a leesett Artifact a szokásos **Need / Greed / Pass** dobásra megy (10.1).
+- **Need:** csak a megfelelő kasztú játékos nyomhat rá Needet; a többieknek csak Greed vagy Pass
+  választható.
+- **Greed:** nem az eladási árat, hanem az adott hullám **Epic árának 5-szörösét** adja a közös
+  kasszába (pl. a 10. hullámon kb. 770 gold). Így akkor is nagy jutalom, ha senki nem tudja
+  használni.
 
-**Korlátok:**
-- Egy menetben kasztonként legfeljebb 1 Artifact eshet.
-- **Pech-védelem:** minden boss után, ami nem dobott Artifactot, +5% esély.
+**Az item:**
+- **Ritkasága Artifact:** nem adható el, nem kovácsolható és nem Disenchantolható.
+- **Item Level:** a felvétel hullámán `10 + 3 × hullám + 25` (5.6.1), így akkor is értelmes,
+  ha későn esik le.
+- **Fejlődés:** minden hullám végén, amíg a hősnél van (felszerelve vagy a backpackben is),
+  **+3 Item Level** és **+4% fegyversebzés**.
+- **Slot:** Main Hand fegyver; a kétkezes változatok mindkét slotot foglalják.
+  - **Kivétel – *Fangs of the Shadow*:** egy **pár**, egy Main Hand és egy Off Hand tőr. A két
+    tőr együtt vehető fel és le, és **egyetlen Artifactnak** számít (a kasztonkénti limitnél
+    is).
+- **Két különleges tulajdonság:** az elsőt a felvétel után **3**, a másodikat **6 hullámvéggel**
+  kapja meg. Addig a tooltip kiírja, mikor nyílik meg („Awakens in N waves”).
+- **Ha az abilityt nem tanulta meg:** az a tulajdonság, amelyhez a hős még nem tanulta meg a
+  szükséges abilityt, szürkén látszik, a hiányzó ability nevével („(needs Whirlwind)”).
 
-**Fejlődés:**
-- Main Hand fegyver; a kétkezes változatok mindkét slotot foglalják.
-- Akkor is értelmes, ha későn esik le: a megszerzés hullámához illő Item Levellel érkezik.
-- Utána minden hullám végén **fejlődik** (+statok).
-- A felvétele után **3 hullámmal** az első, **6 hullámmal** a második különleges
-  tulajdonsága nyílik meg.
-
-| Kaszt | Artifact | Hatás |
-|---|---|---|
-| Warrior | *Earthsplitter* (2H Axe) | A Whirlwind földrengést hagy maga után |
-| Mage | *Staff of the Frostwyrm* (Staff) | A Blizzard minden 4. alkalommal dupla méretű |
-| Paladin | *Dawnbreaker* (Mace) | A Consecration gyógyítja a benne álló társakat |
-| Rogue | *Fangs of the Shadow* (2 tőr, mindkét slot) | Minden 5. krit ingyen Fan of Knives-t lő |
-| Warlock | *Skull of the Damned* (Staff) | Egy második pet: Voidwalker (tank) |
-| Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad |
-| Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz |
+| Kaszt | Artifact | 1. tulajdonság (3 hullámvég után) | 2. tulajdonság (6 hullámvég után) |
+|---|---|---|---|
+| Warrior | *Earthsplitter* (2H Axe) | A Whirlwind **földrengés-zónát** hagy maga után: 3 mp-ig áll, tickenként a fegyversebzés 30%-át sebzi | A Charge becsapódása **lökéshullámmal** végződik: a 3 m-en belüli ellenségeket 1 mp-re elkábítja |
+| Mage | *Staff of the Frostwyrm* (Staff) | Minden 4. Blizzard **dupla sugarú** | A lassított vagy fagyott ellenség, amit megölsz, **jégszilánkokra** robban: a 3 m-en belüli ellenségek 40%-kal lassulnak 2 mp-re |
+| Paladin | *Dawnbreaker* (Mace) | A Consecration **gyógyítja a benne álló társakat** (másodpercenként a Max HP 2%-át) | A Word of Glory a célpontot a Max HP-ja 15%-ának megfelelő **pajzzsal** is védi |
+| Rogue | *Fangs of the Shadow* (tőr-pár: Main Hand + Off Hand) | Minden 5. krit **ingyen Fan of Knives**-t lő | A Vanish után a következő **3 találat krit** |
+| Warlock | *Skull of the Damned* (Staff) | Állandó **második pet**: egy Voidwalker (a Summon Voidwalker petje), ami magára vonja az ellenségeket | A petek **+25% sebzést** okoznak, és sebzésük 10%-át a Warlock gyógyulásként kapja |
+| Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad | az M8-cal készül |
+| Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz | az M8-cal készül |
 
 #### Kaszt-specifikus itemek
 
@@ -764,7 +778,7 @@ A többi 10 a fejlesztés közben készül el, ugyanígy: kasztonként 4.
   | Rare | +8 |
   | Epic | +13 |
   | Legendary | +20 |
-  | Artifact | +25, és felvétel után hullámonként nő |
+  | Artifact | +25, és felvétel után minden hullám végén +3 (lásd 5.5) |
 
 - **Karakterpanel:** a statlista tetején a felszerelés átlagos ilvl-je is látszik
   („Avg. Item Level 64”).
@@ -1778,7 +1792,7 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Elit | garantált 1 | Rare+ |
 | Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
 | Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
-| Artifact (ritka) | lásd 5.5: boss 15%, goblin 5%, elit 2%, normál 0,05% – a 10. hullámtól | Artifact |
+| Artifact (ritka) | lásd 5.5: boss 15% (bossonként egyszer), goblin 5%, elit 2%, normál 0,05% – a 10. hullámtól | Artifact |
 
 **A földön**
 
