@@ -170,6 +170,9 @@ func test_greed_pays_five_times_the_epic_price_of_the_wave() -> void:
 		var item := _artifact(&"mage", wave)
 		check_eq(item.greed_value(), roundi(ItemGenerator.price_for(Items.Rarity.EPIC, wave) * 5.0), "wave %d" % wave)
 	check_eq(_artifact(&"mage", 10).greed_value(), 775, "about 770 gold on wave 10 (GDD)")
+	var odd := _artifact(&"mage", 10)
+	odd.buy_price = 1
+	check_eq(odd.greed_value(), 775, "independent of the stored buy price: it is the Epic price of the wave x5")
 	var epic := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 10)
 	epic.buy_price = ItemGenerator.price_for(Items.Rarity.EPIC, 10)
 	check_eq(epic.greed_value(), roundi(epic.buy_price * Items.GREED_SHARE), "other items keep the old share")
