@@ -32,12 +32,22 @@ extends PanelContainer
 ## The board's design width (a little wider than the stall: the Dust next to the gold needs the room;
 ## still fits between the two top corner panels, 732 px apart at 1920 x 1080).
 const WIDTH := 722.0
-## Wide enough for the gold and the team's Dust side by side (a coin, a five-digit gold and a
-## sparkle with a three-digit Dust fit; the text column takes what is left).
+## Wide enough for the gold and the team's Dust side by side (a coin, a gold and a sparkle with
+## a Dust of up to three digits fit at the full font size at normal values and, shrunk by
+## [method _fit_wallet], at five-digit gold; the text column takes what is left).
 const WALLET_WIDTH := 124.0
 ## The wallet's two numbers: the gold row's font sizes.
 const GOLD_FONT := 20
 const DUST_FONT := 17
+## The gold row's fixed parts: the coin, the sparkle and the gap between its five children.
+const COIN_SIZE := 19.0
+const SPARKLE_SIZE := 16.0
+const ROW_GAP := 3
+## Font sizes (gold, Dust) of the wallet row, largest first ([method _fit_wallet]): a five-digit gold
+## with a three-digit Dust does not fit WALLET_WIDTH at the first pair, so the numbers shrink.
+const WALLET_FONTS: Array[Vector2i] = [
+	Vector2i(GOLD_FONT, DUST_FONT), Vector2i(18, 15), Vector2i(17, 14), Vector2i(16, 13), Vector2i(15, 12), Vector2i(14, 11),
+]
 const CAPTION_WIDTH := 45.0
 const TEXT_FONT := 16
 const CAPTION_FONT := 15
@@ -243,6 +253,26 @@ static func more_text(n: int) -> String:
 	return "+%d more" % n
 
 
+## The team's Dust as the wallet shows it: whole numbers below 1,000, then "1.2k" (rounded down, one
+## decimal; "1k" for a full thousand), "12k" from 10,000 and "1.2M" from a million – the wallet
+## column is only [constant WALLET_WIDTH] wide.
+static func dust_text(amount: int) -> String:
+	if amount < 1000:
+		return str(amount)
+	if amount < 10000:
+		return _tenths(floori(amount / 100.0), "k")
+	if amount < 1000000:
+		return "%dk" % floori(amount / 1000.0)
+	return _tenths(floori(amount / 100000.0), "M")
+
+
+## [param tenths] / 10 with one decimal ("12" -> "1.2"), "1" instead of "1.0", then [param unit].
+static func _tenths(tenths: int, unit: String) -> String:
+	if tenths % 10 == 0:
+		return "%d%s" % [floori(tenths / 10.0), unit]
+	return "%d.%d%s" % [floori(tenths / 10.0), tenths % 10, unit]
+
+
 # --- Queries --------------------------------------------------------------------------------
 
 ## The ticker as plain text, one string per shown line (empty round: the "nothing spent" line).
@@ -304,15 +334,38 @@ func refresh() -> void:
 
 func refresh_gold() -> void:
 	gold_value.text = UiTheme.format_int(RunState.gold)
+	_fit_wallet()
 
 
-## The team's Arcane Dust next to the gold (RunState.dust_changed calls it while the board is in
-## the tree); the sparkle dims at 0.
+## The team's Arcane Dust next to the gold ([method dust_text]: "1.2k" from 1,000; RunState.dust_changed
+## calls it while the board is in the tree); the sparkle dims at 0.
 func refresh_dust() -> void:
-	dust_value.text = UiTheme.format_int(RunState.arcane_dust)
+	dust_value.text = dust_text(RunState.arcane_dust)
 	dust_icon.set_dim(RunState.arcane_dust <= 0)
 	dust_value.add_theme_color_override(&"font_color",
 		DustIcon.COLOR_BRIGHT if RunState.arcane_dust > 0 else UiTheme.TEXT_DIM)
+	_fit_wallet()
+
+
+## Keeps the gold row inside [constant WALLET_WIDTH]: the first of [constant WALLET_FONTS] (largest
+## first) whose coin + gold + sparkle + Dust row fits is used – normal values keep the full sizes,
+## a five-digit gold with a three-digit Dust shrinks both numbers a little.
+func _fit_wallet() -> void:
+	var fixed := COIN_SIZE + SPARKLE_SIZE + 4.0 * ROW_GAP
+	var chosen: Vector2i = WALLET_FONTS[WALLET_FONTS.size() - 1]
+	for pair in WALLET_FONTS:
+		if fixed + _text_width_of(gold_value, pair.x) + _text_width_of(dust_value, pair.y) <= WALLET_WIDTH:
+			chosen = pair
+			break
+	if gold_value.get_theme_font_size(&"font_size") != chosen.x:
+		gold_value.add_theme_font_size_override(&"font_size", chosen.x)
+	if dust_value.get_theme_font_size(&"font_size") != chosen.y:
+		dust_value.add_theme_font_size_override(&"font_size", chosen.y)
+
+
+## Width of [param label]'s text at [param font_size] in the label's own font.
+static func _text_width_of(label: Label, font_size: int) -> float:
+	return label.get_theme_font(&"font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 
 ## Called every MARKET frame: the pips follow [param slots]' ready flags (redrawn only when one
@@ -375,16 +428,16 @@ func _build() -> void:
 	wallet.custom_minimum_size.x = WALLET_WIDTH
 	wallet.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(wallet)
-	var gold_row := UiTheme.hbox(3)
+	var gold_row := UiTheme.hbox(ROW_GAP)
 	wallet.add_child(gold_row)
-	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(19, 19))
+	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(COIN_SIZE, COIN_SIZE))
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(coin)
 	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, GOLD_FONT, UiTheme.GOLD)
 	gold_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(gold_value)
 	gold_row.add_child(UiTheme.spacer())
-	dust_icon = DustIcon.create(16.0)
+	dust_icon = DustIcon.create(SPARKLE_SIZE)
 	dust_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(dust_icon)
 	dust_value = UiTheme.label("0", UiTheme.GOLD_LABEL, DUST_FONT, DustIcon.COLOR_BRIGHT)

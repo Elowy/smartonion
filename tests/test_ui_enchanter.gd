@@ -852,10 +852,62 @@ func test_the_purse_board_shows_the_dust_next_to_the_gold() -> void:
 	RunState.try_spend_dust_for(7, 0, &"enchant", "x")
 	check_eq(board.dust_value.text, "30", "and a spend")
 	RunState.add_dust(1234, -1, "x")
-	check_eq(board.dust_value.text, "1,264", "thousands separated like the gold")
+	check_eq(board.dust_value.text, "1.2k", "from 1,000 Dust the wallet abbreviates")
 	var handler := board._on_dust_changed
 	UiFakes.free_node(board)
 	check(not RunState.dust_changed.is_connected(handler), "disconnected when the board leaves the tree")
+
+
+func test_the_wallet_abbreviates_a_big_dust_pile() -> void:
+	var cases := {
+		0: "0", 7: "7", 999: "999", 1000: "1k", 1099: "1k", 1100: "1.1k", 1264: "1.2k", 1999: "1.9k",
+		9999: "9.9k", 10000: "10k", 12345: "12k", 99999: "99k", 999999: "999k", 1000000: "1M", 1250000: "1.2M",
+	}
+	for amount: int in cases:
+		check_eq(PurseBoard.dust_text(amount), cases[amount], "%d Dust" % amount)
+	var board := PurseBoard.create()
+	tree.root.add_child(board)
+	RunState.add_dust(2500, -1, "x")
+	board.refresh()
+	check_eq(board.dust_value.text, "2.5k", "the board shows it")
+	check_eq(board.gold_value.text, "0", "the gold keeps its separators and digits")
+	UiFakes.free_node(board)
+
+
+## The wallet column holds the coin, the gold, the sparkle and the Dust in WALLET_WIDTH: at normal
+## values with the full font sizes, at five-digit gold and three-digit Dust with smaller ones.
+func test_the_wallet_stays_within_its_column_at_five_digit_gold_and_three_digit_dust() -> void:
+	var board := PurseBoard.create()
+	tree.root.add_child(board)
+	var wallet := board.gold_value.get_parent().get_parent() as Control
+	var gold_row := board.gold_value.get_parent() as Control
+	RunState.add_gold(2650)
+	RunState.add_dust(37, -1, "x")
+	board.refresh()
+	check(gold_row.get_combined_minimum_size().x <= PurseBoard.WALLET_WIDTH, "normal values fit: %.1f" % gold_row.get_combined_minimum_size().x)
+	var board_width := board.get_combined_minimum_size().x
+	check_eq(board.gold_value.get_theme_font_size(&"font_size"), PurseBoard.GOLD_FONT, "the gold keeps its size")
+	check_eq(board.dust_value.get_theme_font_size(&"font_size"), PurseBoard.DUST_FONT, "the Dust keeps its size")
+	for pair: Vector2i in [Vector2i(99999, 999), Vector2i(12345, 345), Vector2i(10000, 888)]:
+		RunState.start_run(1, 7)
+		RunState.add_gold(pair.x)
+		RunState.add_dust(pair.y, -1, "x")
+		board.refresh()
+		check_eq(board.gold_value.text, UiTheme.format_int(pair.x), "%d gold" % pair.x)
+		check_eq(board.dust_value.text, str(pair.y), "%d Dust" % pair.y)
+		var need := gold_row.get_combined_minimum_size().x
+		check(need <= PurseBoard.WALLET_WIDTH + 0.01, "%d gold + %d Dust: the row needs %.1f of %.1f px" % [pair.x, pair.y, need, PurseBoard.WALLET_WIDTH])
+		check(wallet.get_combined_minimum_size().x <= PurseBoard.WALLET_WIDTH + 0.01, "the wallet column keeps its width: %.1f" % wallet.get_combined_minimum_size().x)
+		check(board.gold_value.get_theme_font_size(&"font_size") < PurseBoard.GOLD_FONT, "the gold shrank")
+		check_near(board.get_combined_minimum_size().x, board_width, 0.01, "the board does not grow (%d gold, %d Dust)" % [pair.x, pair.y])
+	# Back to normal values: the full sizes return.
+	RunState.start_run(1, 7)
+	RunState.add_gold(300)
+	RunState.add_dust(5, -1, "x")
+	board.refresh()
+	check_eq(board.gold_value.get_theme_font_size(&"font_size"), PurseBoard.GOLD_FONT, "the full gold size is back")
+	check_eq(board.dust_value.get_theme_font_size(&"font_size"), PurseBoard.DUST_FONT, "the full Dust size is back")
+	UiFakes.free_node(board)
 
 
 func test_the_ticker_lists_an_enchanter_action_with_its_dust() -> void:
