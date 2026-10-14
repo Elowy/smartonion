@@ -878,6 +878,13 @@ func _bot_smith(spares: int) -> Array:
 	tree.root.add_child(screen)
 	MarketFakes.bot_with_hero(world, "bot:smith", &"warrior")
 	var slot := PlayerManager.get_slot(0)
+	var weapon := _dress_smith(slot, spares)
+	RunState.wave = 12
+	return [screen, slot, weapon, world]
+
+
+## Gives [param slot]'s hero the smith's gear (see [method _bot_smith]); returns its sword.
+func _dress_smith(slot: PlayerSlot, spares: int) -> ItemInstance:
 	var eq := _eq(slot)
 	var weapon := Support.make_weapon(&"sword", Items.Rarity.EPIC)
 	weapon.wave = 12
@@ -888,8 +895,7 @@ func _bot_smith(spares: int) -> Array:
 	eq.slots[Items.EquipSlot.CHEST] = Support.make_armor(500, ClassData.ArmorType.PLATE, 20, Items.Rarity.EPIC, Items.SlotType.CHEST)
 	for i in spares:
 		eq.backpack.append(Support.make_armor(1, ClassData.ArmorType.CLOTH, 20, Items.Rarity.EPIC, Items.SlotType.CHEST))
-	RunState.wave = 12
-	return [screen, slot, weapon, world]
+	return weapon
 
 
 func _free_smith(parts: Array) -> void:
@@ -903,7 +909,10 @@ func test_bots_enchant_from_wave_12_with_the_gold_above_their_reserve() -> void:
 	var slot: PlayerSlot = parts[1]
 	var weapon: ItemInstance = parts[2]
 	var reserve := Intermission.bot_train_reserve(12, 1)
-	RunState.add_gold(reserve + 500)
+	# A surplus whose slice (BOT_ENCHANT_PURSE_SHARE) pays both actions: price + 2 x price (and a
+	# coin for the rounding of the doubled price).
+	var price := Enchanter.gold_price(weapon)
+	RunState.add_gold(reserve + _surplus_for_pot(3 * price + 4))
 	screen.cleared_wave = 11
 	check_eq(screen._bots_enchant(), 0, "not before wave 12")
 	check_eq(RunState.enchants_done, 0, "nothing done")
@@ -922,6 +931,114 @@ func test_bots_enchant_from_wave_12_with_the_gold_above_their_reserve() -> void:
 	for e: Dictionary in RunState.spend_log:
 		check_eq(e["kind"], &"enchant", "logged as enchant")
 	_free_smith(parts)
+
+
+## The purse above the reserve whose Intermission.bot_enchant_budget is [param pot] (or a coin more).
+func _surplus_for_pot(pot: int) -> int:
+	var surplus := ceili(float(pot) / Intermission.BOT_ENCHANT_PURSE_SHARE)
+	while floori(surplus * Intermission.BOT_ENCHANT_PURSE_SHARE) < pot:
+		surplus += 1
+	return surplus
+
+
+func test_the_bot_enchant_budget_is_a_slice_of_the_purse_above_the_reserve() -> void:
+	check_eq(Intermission.bot_enchant_budget(1000, 400), 180, "30% of 600")
+	check_eq(Intermission.bot_enchant_budget(400, 400), 0, "at the reserve")
+	check_eq(Intermission.bot_enchant_budget(300, 400), 0, "below the reserve")
+	check_eq(Intermission.bot_enchant_budget(401, 400), 0, "rounded down")
+	check_eq(Intermission.BOT_ENCHANT_PURSE_SHARE, 0.3, "the lead designer's 30%")
+
+
+func test_bots_enchant_with_a_slice_of_the_surplus_only() -> void:
+	var parts := _bot_smith(3)
+	var screen: Intermission = parts[0]
+	var weapon: ItemInstance = parts[2]
+	var reserve := Intermission.bot_train_reserve(12, 1)
+	var price := Enchanter.gold_price(weapon)
+	# The slice buys the first action (price) but not the second (2 x price); the whole surplus
+	# (more than 6 x price) would pay both.
+	var surplus := floori(float(2 * price - 1) / Intermission.BOT_ENCHANT_PURSE_SHARE)
+	var pot := Intermission.bot_enchant_budget(reserve + surplus, reserve)
+	check(pot >= price and pot < 2 * price, "fixture: the slice %d is in [%d, %d)" % [pot, price, 2 * price])
+	check(surplus >= 3 * price, "fixture: the whole surplus %d pays both actions" % surplus)
+	RunState.add_gold(reserve + surplus)
+	screen.cleared_wave = 12
+	check_eq(screen._bots_enchant(), 1, "one action only")
+	check_eq(weapon.enchant_uses, 1, "on the sword")
+	check_eq(RunState.gold, reserve + surplus - price, "at most the slice was spent")
+	_free_smith(parts)
+
+
+func test_bots_share_the_enchant_pot_evenly() -> void:
+	var parts := _bot_smith(3)
+	var screen: Intermission = parts[0]
+	var world: Node3D = parts[3]
+	var weapons: Array[ItemInstance] = [parts[2]]
+	for k in 2:
+		var slot := MarketFakes.bot_with_hero(world, "bot:smith%d" % (k + 2), &"warrior")
+		weapons.append(_dress_smith(slot, 3))
+	var reserve := Intermission.bot_train_reserve(12, 3)
+	var price := Enchanter.gold_price(weapons[0])
+	# A pot for one action each plus change: the first bot with the whole pot would take two
+	# actions (price + 2 x price) and leave the others nothing.
+	var surplus := _surplus_for_pot(3 * price + 10)
+	RunState.add_gold(reserve + surplus)
+	screen.cleared_wave = 12
+	check_eq(screen._bots_enchant(), 3, "three actions")
+	for k in 3:
+		check_eq(weapons[k].enchant_uses, 1, "smith %d did exactly one action" % k)
+	_free_smith(parts)
+
+
+func test_a_pot_for_one_action_waits_for_the_bot_that_can_pay_it() -> void:
+	var parts := _bot_smith(3)
+	var screen: Intermission = parts[0]
+	var world: Node3D = parts[3]
+	var slot2 := MarketFakes.bot_with_hero(world, "bot:smith2", &"warrior")
+	var weapons: Array[ItemInstance] = [parts[2], _dress_smith(slot2, 3)]
+	var reserve := Intermission.bot_train_reserve(12, 2)
+	var price := Enchanter.gold_price(weapons[0])
+	# The pot covers one action, half of it (the even share) covers none: the first bot leaves its
+	# share to the next one instead of taking the whole surplus.
+	var surplus := _surplus_for_pot(price + 5)
+	var pot := Intermission.bot_enchant_budget(reserve + surplus, reserve)
+	check(pot >= price and pot / 2 < price, "fixture: pot %d, price %d" % [pot, price])
+	RunState.add_gold(reserve + surplus)
+	screen.cleared_wave = 12
+	check_eq(screen._bots_enchant(), 1, "one action")
+	check_eq(weapons[0].enchant_uses, 0, "the first bot did not take the surplus")
+	check_eq(weapons[1].enchant_uses, 1, "the last bot could pay it")
+	check_eq(RunState.gold, reserve + surplus - price, "only the price was spent")
+	_free_smith(parts)
+
+
+func test_bots_enchant_before_they_buy() -> void:
+	var world := MarketFakes.make_world(tree)
+	var slot := MarketFakes.bot_with_hero(world, "bot:smith", &"warrior")
+	_dress_smith(slot, 0)
+	RunState.wave = 12
+	var stall := MarketFakes.FakeShop.new()
+	RunState.shop = stall
+	# An Epic helm (the head slot is empty: an upgrade) that costs the whole surplus: bought
+	# first it would leave the Enchanter nothing; the slice taken first puts it out of reach.
+	var reserve := Intermission.bot_train_reserve(12, 1)
+	var helm := Support.make_armor(100, ClassData.ArmorType.PLATE, 20, Items.Rarity.EPIC, Items.SlotType.HEAD)
+	var items: Array[ItemInstance] = [helm]
+	stall.stock(items, [600] as Array[int])
+	RunState.add_gold(reserve + 600)
+	RunState.add_dust(100, -1, "fixture")
+	var screen := Intermission.create()
+	tree.root.add_child(screen)
+	screen.bot_shopping = true
+	screen.open(12, 0)
+	for i in 3:
+		MarketFakes.poll_all(DT)
+		screen._process(DT)
+	check(RunState.enchants_done > 0, "the bot enchanted: %d" % RunState.enchants_done)
+	check_eq(stall.buy_calls.size(), 0, "the helm was out of reach by then")
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)
+	RunState.shop = Shop.new()
 
 
 func test_bots_enchant_nothing_when_the_wallet_is_at_the_reserve() -> void:

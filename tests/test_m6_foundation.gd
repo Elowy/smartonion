@@ -590,7 +590,7 @@ func test_bot_shopping_calls_the_m6_hooks_in_order() -> void:
 	nodes.append(im)
 	tree.root.add_child(im)
 	im._bots_shop()
-	check_eq(im.order, [&"buy", &"black_market", &"consumables", &"train", &"talents", &"enchant", &"reroll"] as Array[StringName],
+	check_eq(im.order, [&"enchant", &"buy", &"black_market", &"consumables", &"train", &"talents", &"reroll"] as Array[StringName],
 			"the passes of _bots_shop")
 	var plain := Intermission.create()
 	nodes.append(plain)

@@ -88,6 +88,9 @@ const BOT_TRAIN_RESERVE_RARITY := Items.Rarity.UNCOMMON
 ## that neither the offers nor the Trainer could take).
 const BOT_MAX_REROLLS := 3
 const BOT_REROLL_RESERVE_MULT := 2
+## Smoke / demo bots enchant (from wave 12, before they buy) with at most this share of the purse
+## above [method bot_train_reserve]; the rest stays for the offers and the Trainer.
+const BOT_ENCHANT_PURSE_SHARE := 0.3
 
 ## Setting (GDD 12: "can be switched off in the settings"; the settings menu comes later):
 ## seconds until the next wave starts by itself; 0 or less = wait for everyone's Ready.
@@ -755,10 +758,11 @@ func _bots_settled() -> bool:
 ## one buy per bot per pass so the shared wallet is spread over the team – and wears it at
 ## once. A bot stops when nothing affordable is an upgrade or a bought item could not be worn.
 ## Before buying, every bot forges what it can (Forge.bot_forge_all) and wears the results.
-## Then the bots take the Black Market (_bots_black_market) and consumables (_bots_consumables),
-## train (_bots_train), spend their talent points (_bots_talents), enchant (_bots_enchant) and
-## spend what is left over on rerolls (_bots_reroll). The three M6 passes are empty hooks until
-## their packages fill them in.
+## From wave 12 the bots enchant first (_bots_enchant: a slice of the purse above the Trainer
+## reserve, before the offers take the gold). Then they take the Black Market (_bots_black_market)
+## and consumables (_bots_consumables), train (_bots_train), spend their talent points
+## (_bots_talents) and spend what is left over on rerolls (_bots_reroll). The Black Market and
+## consumables passes are empty hooks until their package fills them in.
 ## RunState.rng keeps smoke runs reproducible.
 func _bots_shop() -> void:
 	_bots_shopped = true
@@ -771,12 +775,12 @@ func _bots_shop() -> void:
 			bot_equip_upgrades(s)
 		if RunState.rng.randf() < bot_buy_chance:
 			shoppers.append(s)
+	_bots_enchant()
 	_bots_buy(shoppers)
 	_bots_black_market()
 	_bots_consumables()
 	_bots_train()
 	_bots_talents()
-	_bots_enchant()
 	_bots_reroll(shoppers)
 	for s in PlayerManager.get_slots():
 		if s.is_bot() and panels.has(s.index):
@@ -797,10 +801,12 @@ func _bots_consumables() -> int:
 
 ## M6 (ENCHANTER): from wave 12 on (the market after it, [constant Enchanter.BOT_FIRST_WAVE]) every
 ## bot enchants its best weapon (Enchanter.bot_enchant: Reroll an enchant its class cannot use, else
-## Imbue, else Empower the lowest rank) with the gold above [method bot_train_reserve] – shared out
-## evenly over the bots in slot order like the Trainer's – and pays the Dust by disenchanting its
-## spare backpack items (bots never Pass in a loot roll, so that is their only Dust). Returns the
-## actions done. No RNG except the Enchanter's own Reroll / Imbue picks (RunState.rng).
+## Imbue, else Empower the lowest rank). It runs before the buying pass of [method _bots_shop] with
+## [constant BOT_ENCHANT_PURSE_SHARE] of the gold above [method bot_train_reserve]
+## ([method bot_enchant_budget]), shared out evenly over the bots in slot order like the Trainer's
+## (what a bot leaves unspent stays for the others), and pays the Dust by disenchanting its spare
+## backpack items (bots never Pass in a loot roll, so that is their only Dust). Returns the actions
+## done. No RNG except the Enchanter's own Reroll / Imbue picks (RunState.rng).
 func _bots_enchant() -> int:
 	if cleared_wave < Enchanter.BOT_FIRST_WAVE:
 		return 0
@@ -809,14 +815,22 @@ func _bots_enchant() -> int:
 		var hero := s.player as Player
 		if s.is_bot() and hero != null and is_instance_valid(hero) and hero.equipment != null:
 			smiths.append(s)
-	var reserve := bot_train_reserve(cleared_wave, smiths.size())
+	var pot := bot_enchant_budget(RunState.gold, bot_train_reserve(cleared_wave, smiths.size()))
 	var total := 0
 	for k in smiths.size():
-		var share := floori(float(RunState.gold - reserve) / float(smiths.size() - k))
+		var share := floori(float(pot) / float(smiths.size() - k))
 		if share <= 0:
 			break
+		var gold_before := RunState.gold
 		total += Enchanter.bot_enchant(smiths[k], share)
+		pot -= gold_before - RunState.gold
 	return total
+
+
+## Gold the bots may spend on enchanting this round: [constant BOT_ENCHANT_PURSE_SHARE] of the
+## purse [param p_gold] above [param reserve] (0 at or below the reserve).
+static func bot_enchant_budget(p_gold: int, reserve: int) -> int:
+	return floori(maxi(0, p_gold - reserve) * BOT_ENCHANT_PURSE_SHARE)
 
 
 ## The buying passes of [method _bots_shop] over [param p_shoppers] (the list is not changed).
