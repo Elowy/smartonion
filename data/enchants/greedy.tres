@@ -14,7 +14,7 @@ weight = 0.8
 equip_stats = Dictionary[StringName, float]({})
 effect = &"gold"
 params = {
-"amount": 2.0
+"amount": 1.0
 }
 ppm = 0.0
 chance = 5.0
