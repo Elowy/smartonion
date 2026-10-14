@@ -266,7 +266,8 @@ static func stat_delta(p_item: ItemInstance, equipped: ItemInstance) -> Dictiona
 
 ## Damage per second of a weapon item (0 for armour and passive off-hands). With
 ## [param primary] the weapon's scaling on that stat counts [param primary_value] points.
-static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_value: float = 0.0) -> float:
+static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_value: float = 0.0,
+		with_companion: bool = true) -> float:
 	if p_item is EquippedPair:
 		var total := 0.0
 		for part in (p_item as EquippedPair).parts:
@@ -279,7 +280,7 @@ static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_
 	if primary != &"":
 		dmg += float(w.scaling.get(primary, 0.0)) * primary_value
 	var dps := dmg / maxf(0.08, w.cooldown)
-	if p_item.companion != null:
+	if with_companion and p_item.companion != null:
 		dps += weapon_dps(p_item.companion, primary, primary_value)
 	return dps
 
@@ -652,7 +653,8 @@ func _viewer_hero() -> Player:
 func _weapon_lines(w: WeaponData) -> void:
 	if w.attacks():
 		_pair("%s Damage" % fmt_number(w.base_damage), "Speed %.2f" % w.cooldown, WHITE, WHITE)
-		_line("(%s damage per second)" % fmt_number(weapon_dps(item), 1), WHITE)
+		# (This weapon alone: the pair's other dagger has its own tooltip, the comparison counts both.)
+		_line("(%s damage per second)" % fmt_number(weapon_dps(item, &"", 0.0, false), 1), WHITE)
 		var parts := PackedStringArray()
 		for stat: StringName in _ordered(w.scaling.keys()):
 			parts.append("%s %d%%" % [Stats.display_name(stat), roundi(float(w.scaling[stat]) * 100.0)])

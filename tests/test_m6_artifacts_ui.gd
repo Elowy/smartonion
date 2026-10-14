@@ -151,6 +151,7 @@ func test_the_pair_tooltips_name_each_other() -> void:
 	var main := _lines(_tooltip(fangs, Db.get_class_data(&"rogue")))
 	check("A pair: it equips together with Fangs of the Shadow (Off Hand)" in main, "the main piece names its partner")
 	check("Shadow's Bite" in main and "Hidden Fangs" in main, "the properties are on the main piece")
+	check("(24 damage per second)" in main and "(48 damage" not in main, "the DPS line is this dagger's alone")
 	var off := _lines(_tooltip(fangs.companion, Db.get_class_data(&"rogue")))
 	check("Off-hand piece of a pair" in off, "the off piece says what it is")
 	check("Shadow's Bite" not in off, "without repeating the properties")
