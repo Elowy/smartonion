@@ -636,6 +636,40 @@ func test_bot_enchant_spends_within_its_budget_and_disenchants_spares() -> void:
 	check(RunState.gold_spent <= 400, "inside the budget: %d" % RunState.gold_spent)
 
 
+## A warrior in plate with the spare cloth pieces of [param rarities] (HEAD, CHEST, LEGS in turn) in
+## the backpack; returns them in the same order.
+func _spares_of(s: PlayerSlot, rarities: Array[int]) -> Array[ItemInstance]:
+	var eq := _eq(s)
+	var types: Array[Items.SlotType] = [Items.SlotType.HEAD, Items.SlotType.CHEST, Items.SlotType.LEGS]
+	var equip_slots: Array[Items.EquipSlot] = [Items.EquipSlot.HEAD, Items.EquipSlot.CHEST, Items.EquipSlot.LEGS]
+	var out: Array[ItemInstance] = []
+	for i in rarities.size():
+		eq.slots[equip_slots[i]] = Support.make_armor(500, ClassData.ArmorType.PLATE, 20, Items.Rarity.EPIC, types[i])
+		var spare := Support.make_armor(1, ClassData.ArmorType.CLOTH, 20, rarities[i], types[i])
+		eq.add_to_backpack(spare)
+		out.append(spare)
+	return out
+
+
+func test_bots_throw_away_the_spare_with_the_least_dust_first() -> void:
+	var s := _slot(&"warrior")
+	var eq := _eq(s)
+	# Epic 8, Rare 4, Uncommon 2 Dust, listed so that the biggest one comes first in the backpack.
+	var spares := _spares_of(s, [Items.Rarity.EPIC, Items.Rarity.RARE, Items.Rarity.UNCOMMON])
+	var epic := spares[0]
+	var rare := spares[1]
+	var uncommon := spares[2]
+	for item in spares:
+		check(Enchanter.is_spare(item, s, eq), "%s is a spare" % item.display_name)
+	check_eq(Enchanter.bot_disenchant_spare(s, eq, 2), 2, "2 Dust: just the Uncommon")
+	check(not eq.backpack.has(uncommon) and eq.backpack.has(rare) and eq.backpack.has(epic), "the Uncommon went first")
+	check_eq(Enchanter.bot_disenchant_spare(s, eq, 3), 4, "3 more Dust: the Rare (4), not the Epic (8)")
+	check(not eq.backpack.has(rare) and eq.backpack.has(epic), "then the Rare; the Epic is left")
+	check_eq(RunState.arcane_dust, 6, "the Dust went to the team")
+	check_eq(Enchanter.bot_disenchant_spare(s, eq, 100), 8, "a big shortfall takes the rest")
+	check(eq.backpack.is_empty(), "everything spare is gone")
+
+
 func test_bots_keep_upgrades_and_the_last_weapon() -> void:
 	var s := _slot(&"warrior")
 	var eq := _eq(s)
