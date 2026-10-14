@@ -8,9 +8,10 @@ extends Node3D
 ## per tick is a fraction of the ghoul's contact damage at its wave.
 ##
 ## At most [constant MAX_ALIVE] puddles live at once: spawning the next one frees the oldest.
-## In the groups &"enemy_hazards" (the hazards of enemies; tests, bots) and &"ability_areas"
-## (the groups WaveDirector.stop() and Main.open_intermission() sweep, so a puddle never
-## survives its wave into the market or the next wave). Parent: the arena's entity root.
+## In the groups &"enemy_hazards" (the hazards of enemies: WaveDirector.stop() frees the group,
+## and the bots read [method hazard_push] to step out of a puddle like out of a boss's circle)
+## and &"ability_areas" (the group Main.open_intermission() sweeps too), so a puddle never
+## survives its wave into the market or the next wave. Parent: the arena's entity root.
 ## Damage is KIND_AOE without a source (Avoidance, Armor, Dodge and Block count as for any
 ## ground effect; nothing "struck" it, so no Thorns / Retribution). No RNG.
 
@@ -132,6 +133,22 @@ func covers(pos: Vector3) -> bool:
 	var dx := pos.x - global_position.x
 	var dz := pos.z - global_position.z
 	return dx * dx + dz * dz <= radius * radius
+
+
+## Whether standing in it can still hurt: until it is gone (expired, pushed out by a newer one)
+## and while it deals damage at all. The same query as [method EnemyHazard.is_dangerous].
+func is_dangerous() -> bool:
+	return not _gone and not is_queued_for_deletion() and age < duration and damage_per_tick > 0.0
+
+
+## The bots' steering out of the puddle ([method EnemyHazard.hazard_push]'s contract, read by
+## BotInput through the group &"enemy_hazards"): 1..2 long inside radius + [param margin],
+## radially away from the middle, zero outside or when it is harmless. Only the arena's heroes
+## are hurt, so nothing else uses it.
+func hazard_push(from: Vector3, margin: float = EnemyHazard.BOT_MARGIN) -> Vector2:
+	if not is_dangerous() or not is_inside_tree():
+		return Vector2.ZERO
+	return EnemyHazard.circle_push(global_position, radius, from, margin)
 
 
 ## One tick: every living hero whose centre is inside takes [member damage_per_tick].

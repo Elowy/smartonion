@@ -96,12 +96,21 @@ func contains(p: Vector3, margin: float = 0.0) -> bool:
 func hazard_push(from: Vector3, margin: float = BOT_MARGIN) -> Vector2:
 	if not is_dangerous():
 		return Vector2.ZERO
-	var d := Vector2(from.x - global_position.x, from.z - global_position.z)
+	return circle_push(global_position, radius, from, margin)
+
+
+## The bots' push out of a circle ([param center], [param radius]) for a hero at [param from]:
+## 1..2 long inside radius + [param margin], radially away from the middle (towards the arena's
+## centre when [param from] is the middle itself), zero outside. The one rule of [method
+## hazard_push] for every circular hazard, also the poison puddle ([method
+## PoisonPuddle.hazard_push]).
+static func circle_push(center: Vector3, radius: float, from: Vector3, margin: float = BOT_MARGIN) -> Vector2:
+	var d := Vector2(from.x - center.x, from.z - center.z)
 	var reach := radius + margin
 	var dist := d.length()
 	if dist >= reach:
 		return Vector2.ZERO
-	var dir := d / dist if dist > 0.01 else _escape_direction(from)
+	var dir := d / dist if dist > 0.01 else escape_direction(from)
 	return dir * (1.0 + (reach - dist) / reach)
 
 
@@ -180,7 +189,7 @@ func hit_hero(hero: Player, amount: float) -> void:
 
 ## Where a bot standing in the dead centre of the hazard should run: towards the arena's middle
 ## (up the screen when it stands in the middle itself).
-func _escape_direction(from: Vector3) -> Vector2:
+static func escape_direction(from: Vector3) -> Vector2:
 	var away := Vector2(-from.x, -from.z)
 	if away.length_squared() < 0.0001:
 		return Vector2.UP

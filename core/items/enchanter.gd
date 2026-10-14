@@ -100,7 +100,7 @@ static func can_disenchant(item: ItemInstance) -> bool:
 static func disenchant_blocked_reason(item: ItemInstance) -> String:
 	if item == null:
 		return REASON_NO_ITEM
-	if item.rarity >= Items.Rarity.ARTIFACT:
+	if not item.can_disenchant():  # the one rule of the item (ARTIFACTS: an Artifact never)
 		return "Artifacts cannot be disenchanted"
 	return ""
 
