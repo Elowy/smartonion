@@ -38,7 +38,7 @@
 Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
   → [ Hullám (harc) → Loot roll (Need / Greed / Pass) → Szintlépés (ability / stat)
       → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25
-  → Győzelem / Vereség képernyő (statisztikák)
+  → Győzelem / Vereség képernyő (összegzés, Damage Meter, díjak, run kártya)
 ```
 
 - **Egy menet = 25 hullám.**
@@ -46,13 +46,16 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
   - **1–10. hullám:** `20 + 5 × (hullám − 1)` másodperc, legfeljebb 60 mp (a 9–10. hullám 60 mp).
   - **A 10. hullám felett hullámonként +10 mp:** 11. = 70 mp, 15. = 110 mp, 20. = 160 mp,
     25. = 210 mp.
-  - Egy teljes menet így kb. **42 perc** harc, plusz a hullámok közötti idő.
-- **Különleges hullámok:**
-  - **10.** – boss-hullám (mini-raid boss),
-  - **20.** – elit-hullám (minden ellenség elit-affixet kap),
-  - **25.** – végső boss.
+  - Egy teljes menet így kb. **42 perc** harc (a két boss-hullámot a képlet szerinti hosszal
+    számolva; valójában a boss legyőzése dönt), plusz a hullámok közötti idő.
+- **Különleges hullámok** (részletek: 8. fejezet):
+  - **10.** – boss-hullám: Lich Commander Morvain (mini-raid boss),
+  - **20.** – elit-hullám (minden ellenség elit-affixet kap, de csak ×1,5 HP-val),
+  - **25.** – végső boss: Vor'thalax, the Burning Tyrant; a halála a menet győzelme.
 
-  A boss-hullám addig tart, amíg a boss él (nincs időkorlát, de 90 mp után Enrage).
+  A boss-hullámon a fenti hullámhossz nem érvényes: a hullám **a boss halálával ér véget**
+  (nincs időkorlát, de 90 mp után Enrage). Közben a normál ellenségek a szokásos spawn-ráta
+  50%-ával tovább érkeznek.
 - Hullám közben a karakterek **automatikusan támadnak** a fegyvereikkel a legközelebbi
   ellenségre; a játékos **mozog** és **képességeket** használ.
 - A hullám végén a földön maradt gold és XP automatikusan begyűjtődik.
@@ -1425,6 +1428,44 @@ A fajok WoW-hangulatúak, de saját nevűek.
 | **Cultist Acolyte** | Kultista | Gyógyítja / pajzsolja a többieket, elsődleges célpont | 9. hullámtól |
 | **Flesh Golem** | Varrott óriás | Lassú, sok HP, időnként maga felé húz | 12. hullámtól |
 
+**A három új ellenség (M6a) – kiinduló értékek**
+
+A számok a hullám- és co-op-növekedés előtti alapértékek (9. fejezet); a balanszolás során
+változnak. Az érintéses sebzés az ellenség alap-sebzése, a gold és az XP a normál (nem elit)
+jutalom.
+
+| | Plague Ghoul | Cultist Acolyte | Flesh Golem |
+|---|---|---|---|
+| Megjelenik | 7. hullámtól | 9. hullámtól | 12. hullámtól |
+| Viselkedés | üldöző (Chase) | támogató (Support) | brute |
+| Alap HP | 7 | 6 | 40 |
+| Érintéses sebzés | 2 | 1 | 4 |
+| Sebesség (m/s) | 2,1 | 2,3 | 1,5 |
+| Spawn-súly | 0,6 | 0,35 | 0,25 |
+| Csoportméret | 2–3 | 1 | 1 |
+| Gold / XP | 1 / 2 | 2 / 3 | 4 / 5 |
+
+- **Plague Ghoul** (sugár 0,5 m): úgy üldöz, mint a Skeleton Grunt.
+  - Halálakor **méregtócsát** hagy: 1,6 m sugarú, 3 mp-ig áll, másodpercenként kétszer sebez,
+    tickenként a Ghoul akkori (a hullám szerint skálázott) érintéses sebzésének felét.
+  - **Csak a hősöket** bántja. Zöld, figyelmeztető jel nincs.
+  - Egyszerre legfeljebb **12 tócsa** él; a 13.-nál a legrégebbi eltűnik.
+- **Cultist Acolyte:** új, **támogató** viselkedés.
+  - A legközelebbi hőstől 6–9 m-re tartja a távolságot, és a többi ellenség közelében marad.
+  - **4 mp-enként 0,6 mp-es csatornázást** végez (lila sugár). A kábítás, a hátralökés és a
+    fear megszakítja.
+  - Célpontja a 7 m-en belüli **legsebesültebb ellenség**: a Max HP-ja **25%-át** gyógyítja.
+    Ha nincs sebesült, a hatótávon belüli **legerősebb ellenségre** a Max HP-ja **20%-ának**
+    megfelelő pajzsot tesz.
+  - A pajzs nem halmozódik, csak frissül: a bossokon sem megy 20% fölé.
+  - **Elsődleges célpont:** a botok előnyben részesítik.
+- **Flesh Golem** (sugár 0,9 m, ×1,6 méret): új, **brute** viselkedés – lassú, sok HP.
+  - Hátralökés-ellenállás 80%, kábítás-ellenállás 50%.
+  - **6 mp-enként**, ha egy hős 4–9 m-re van, **0,8 mp-es figyelmeztető vonalat** húz
+    (horog), majd a vonalban még álló hőst **3 m-t maga felé húz**. A horog sebzése 1×
+    érintéses sebzés.
+  - A **Dodge** kikerülheti a horgot (ugyanaz a dobás, mint a többi támadásnál).
+
 **Elitek**
 
 - **Mikor:** az 5. hullámtól, véletlenszerűen.
@@ -1432,7 +1473,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
     A tört rész az esély még egy elitre.
   - Egy játékossal az 5. hullámban 0,4, a 15.-ben 1,0, a 25.-ben 1,6; 4 játékossal ennek
     2,05-szöröse.
-  - A 10., 20. és 25. hullám M6-ig normál hullámként viselkedik.
+  - A 20. hullám elit-hullám (lásd lent), a 10. és a 25. boss-hullám (lásd „Bossok”).
 - **Melyik ellenség:** a hullám 15–70%-a közé sorsolt időpontok után a következő csoport első
   tagja lesz elit (bármilyen típus); egy időpont egy elitet ad. Az elitek beleszámítanak a
   pályán lévő ellenségek számába.
@@ -1456,7 +1497,12 @@ A fajok WoW-hangulatúak, de saját nevűek.
   - A hullám végén eltűnő (meg nem ölt) elit nem ad semmit.
 - **Kivégzés:** az Execute az eliteket is azonnal megöli a küszöb alatt; a Slayer stat hat
   rájuk.
-- **20. hullám – elit-hullám** (minden ellenség affixet kap): M6.
+- **20. hullám – elit-hullám** (M6a): a hullám minden ellensége kap egy véletlen elit-affixet.
+  - Az **affix hatása és megjelenése** ugyanaz, mint az eliteknél (Shielding, Enraged,
+    Frenzied, Vampiric), de az ellenség csak **×1,5 HP-t** kap (nem ×3-at), és a **jutalma
+    normál** (nincs elit-gold, ×5 XP és garantált item).
+  - Az igazi elitek (3× HP, elit-jutalom) várható száma ezen a hullámon a **kétszeres**.
+  - Nincs boss, és Loot Goblin sem jön (lásd lent).
 
 **Loot Goblin** (ritka, különleges ellenség)
 
@@ -1499,26 +1545,62 @@ A fajok WoW-hangulatúak, de saját nevűek.
 - **Co-op:** a csapatnak össze kell hangolnia, hogy körbezárják (pl. Frost Nova,
   Hammer of Justice, Charge, Blizzard lassítása).
 
-**Bossok**
+**Bossok** (M6a)
 
-- **10. hullám – Lich Commander Morvain**
-  - Jégkörök a földön: „ne állj benne”.
-  - Csontváz-idézés.
-  - Kúp alakú fagylehelet: „szóródjatok szét”.
-  - 50% HP-nál fázisváltás.
-- **20. hullám – Elit-hullám:** nincs boss, de minden ellenség elit-affixet kap, és több
-  elit is jön.
-- **25. hullám – Vor'thalax, the Burning Tyrant** (démon, végső boss)
-  - Tűzmezők.
-  - Meteor, amit **meg kell osztani**: minél többen állnak a jelölt körben, annál kisebb a sebzés (co-op mechanika).
-  - Add-hullámok.
-  - Enrage 90 mp után.
+Boss-hullám a **10.** és a **25.** hullám. A számok kiinduló értékek, a balanszolás során
+változnak. Közös szabályok:
+
+- **A boss az időzítő helyett:** a hullám a **boss halálával ér véget** (nincs időkorlát). A
+  pályán maradt ellenségek ilyenkor eltűnnek, a földön lévő gold, XP és loot a szokásos módon
+  begyűjtődik, mint egy normál hullám végén.
+- **Add-ok:** a normál spawn a szokásos ráta **50%-ával** folytatódik.
+- **Enrage 90 mp-nél:** a boss sebzése ×1,5, sebessége +30%. Ezután minden további 30 mp-enként
+  a sebzés-szorzó +0,25-tel nő (×1,75, ×2,0 …).
+- **HUD:** a hullám-időzítő helyén **boss-keret** áll: név, HP-sáv, fázis-pipek és „ENRAGED”
+  felirat (12. fejezet).
+- **Boss HP:** `alap HP × az adott hullám szokásos ellenség-HP-szorzója × (1 + 0,75 ×
+  (játékosok − 1))`. A co-op szorzó a boss saját szorzója (9. fejezet), nem a normál +20%
+  játékosonként.
+- **Boss sebzés:** `alap érintéses sebzés × az adott hullám szokásos sebzés-szorzója × a
+  csapatlétszám-sebzésszorzó` (9. fejezet). Az alábbi „N× érintéses” az így kapott érintéses
+  sebzés N-szerese.
+- **Jutalom:** 50 gold, játékosonként 1 Epic+ item (20% eséllyel Legendary, 10.1) és
+  Artifact-dobás (5.5). A legyőzött bossok száma a Damage Meter statisztikájába is bekerül
+  (12. fejezet).
+
+**10. hullám – Lich Commander Morvain** (alap HP 450, érintéses sebzés 3)
+
+- **Kinézet:** nagy csontváz-mágus, jeges korona, bot.
+- **Frost Circles** – 7 mp-enként minden élő hős alatt egy 2,2 m sugarú jégkör jelenik meg; 1,2
+  mp figyelmeztetés után lecsap: 2× érintéses sebzés és 2 mp-re 40% lassítás. „Ne állj benne.”
+- **Raise Dead** – 12 mp-enként 4 Skeleton Gruntot idéz (a 2. fázisban +2, vagyis 6-ot).
+- **Frost Breath** – 9 mp-enként 60°-os, 7 m hosszú kúp a legközelebbi hős felé; 1 mp
+  figyelmeztetés, 3× érintéses sebzés. „Szóródjatok szét.”
+- **2. fázis** 50% HP-nál: minden cooldown ×0,7 (gyakoribb támadások).
+
+**20. hullám – Elit-hullám:** nincs boss, de minden ellenség elit-affixet kap, és az igazi
+elitek is kétszer annyian jönnek (lásd „Elitek”).
+
+**25. hullám – Vor'thalax, the Burning Tyrant** (démon, végső boss; alap HP 1200, érintéses
+sebzés 4)
+
+- **Kinézet:** szarvas démon, izzó tűzfény.
+- **Fire Fields** – 8 mp-enként 2 égő folt (2 m sugarú) jelenik meg a hősök pozícióján; 1 mp
+  figyelmeztetés után 8 mp-ig áll, és másodpercenként 1× érintéses sebzést okoz.
+- **Meteor** – 14 mp-enként egy véletlen hős alatt 3 m sugarú jelölt kör jelenik meg; 3 mp
+  figyelmeztetés után csapódik be. A teljes sebzés **8× érintéses**, ami **egyenlően oszlik el**
+  a körben állók között: minél többen állnak bent, annál kisebb a rájuk jutó rész (co-op
+  mechanika). Ha senki nem áll a körben, minden élő hős 4× érintéses sebzést kap.
+- **Imp Swarm** – 20 mp-enként 6 Candlekin („imp”) érkezik.
+- **2. fázis** 50% HP-nál: a Fire Fields 3 foltot hoz, a Meteor 10 mp-enként jön.
+- **Győzelem:** Vor'thalax halála a 25. hullámon a menet győzelme – nem az időzítő lejárta.
 
 ---
 
 ## 9. Hullámok és skálázás
 
 - **25 hullám**; a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
+  A két boss-hullámot (10., 25.) a boss halála zárja, nem az időzítő (8. fejezet, „Bossok”).
 
 - **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
   - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
@@ -1538,14 +1620,15 @@ A fajok WoW-hangulatúak, de saját nevűek.
 
   A sebzést ezen felül a csapatlétszám-szorzó is szorozza (lásd lent). Ez az M5 utáni
   ideiglenes hangolás (talentekkel, setekkel, elitekkel, Loot Goblinnal); a végleges egyensúly
-  M6-ban jön. Korábban (M4) +8% volt a kamatozó sebzés, még korábban +12% HP és +8% sebzés,
+  az M6b-ben jön. Korábban (M4) +8% volt a kamatozó sebzés, még korábban +12% HP és +8% sebzés,
   kamatozás nélkül.
 - **Spawn:** a spawnpontok a pálya szélén és véletlen belső pontokon vannak, 1 mp-es
   figyelmeztető jellel (piros rúna a földön), mint a Brotatóban.
 - **Co-op skálázás:** minden további játékos után
   - +60% ellenségszám,
   - +20% ellenség-HP,
-  - a boss HP-ja ×(1 + 0,75 × (játékosok − 1)).
+  - a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) – ez a boss saját szorzója, a normál +20%
+    helyett (az alap boss-HP-t és a sebzést a 8. fejezet adja).
 - **Spawn-ráta:** `(0,9 + 0,08 × (h − 1))` ellenség / mp egy játékosra, co-opban szorozva az
   ellenségszám-szorzóval. Egy 4 fős teljes menet kb. 15 000 ellenség. Mivel minden ellenség
   goldot és XP-t ad, a szám lassan nő; a késői nehézséget a HP- és sebzés-skálázás adja.
@@ -1559,7 +1642,7 @@ A fajok WoW-hangulatúak, de saját nevűek.
     esett el, és a késői hullámok nyomása több seeden gyenge volt; ×1,0-val 5 próbából kettő
     már a 17–18. hullámon elesett.
   - Az ellenség HP-ja, száma és a gazdaság nem változik.
-  - Ideiglenes hangolás M5 után; a végleges egyensúly M6-ban jön.
+  - Ideiglenes hangolás M5 után; a végleges egyensúly az M6b-ben jön.
   - **M5 mérés (botok, 25 hullám):** 4 fő: 8 seedből 7 végigért, 1 csapat a 20. hullámon
     esett el, az első elesések a 5–22. hullámon, a 20–25. hullámon erős a nyomás. 2 fő: 6
     próbából 5 végigért, 1 a 23. hullámon esett el. 1 fő: 13 próbából 6 végigért, a többi a
@@ -1567,6 +1650,9 @@ A fajok WoW-hangulatúak, de saját nevűek.
   - **Nyitott kérdések M6-ra:** egyedül nagy a kasztok közti szórás (a Warrior egyedül a
     15–19. hullámon hal meg, a Paladin és a Warlock végigér), és a késői kassza gyakran 2000
     gold fölött van.
+    - A késői kasszát az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market; 16.1)
+      célozzák.
+    - A kasztok közti szórás a végleges 25 hullámos balansz (**M6b**, 16. fejezet) feladata.
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
