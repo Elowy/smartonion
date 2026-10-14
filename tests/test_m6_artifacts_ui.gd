@@ -1,0 +1,452 @@
+extends TestCase
+## M6 ARTIFACTS on screen and for the bots: the tooltip (golden properties, "Awakens in N waves",
+## "(needs Whirlwind)", no sell price, the pair notes), the greyed Sell entry of the character
+## panel, the compare / upgrade rules and what bots do with an Artifact (Need, equip, never sell).
+
+const UiFakes := preload("res://tests/ui_fakes.gd")
+const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
+
+var players: Array[Player] = []
+var panels: Array[PlayerPanel] = []
+var tips: Array[ItemTooltip] = []
+
+
+func before_each() -> void:
+	UiFakes.reset_players()
+	RunState.start_run(2, 9)
+	RunState.set_wave(10)
+	players.clear()
+	panels.clear()
+	tips.clear()
+
+
+func after_each() -> void:
+	for t in tips:
+		UiFakes.free_node(t)
+	for panel in panels:
+		UiFakes.free_node(panel)
+	for p in players:
+		if is_instance_valid(p):
+			p.free()
+	tips.clear()
+	panels.clear()
+	players.clear()
+	UiFakes.reset_players()
+
+
+func _join(class_id: StringName) -> PlayerSlot:
+	var input := ScriptedInput.new("art_ui:%d" % PlayerManager.count())
+	var slot := PlayerManager.join(input, Db.get_class_data(class_id))
+	players.append(Player.create(slot))
+	return slot
+
+
+func _eq(slot: PlayerSlot) -> Equipment:
+	return (slot.player as Player).equipment
+
+
+func _artifact(class_id: StringName, waves: int = 0) -> ItemInstance:
+	var item := ItemGenerator.generate_artifact(class_id, 10)
+	item.artifact_waves = waves
+	if item.companion != null:
+		item.companion.artifact_waves = waves
+	return item
+
+
+func _tooltip(item: ItemInstance, viewer: ClassData = null, viewer_eq: Equipment = null) -> ItemTooltip:
+	var t := ItemTooltip.create()
+	tree.root.add_child(t)
+	t.viewer_equipment = viewer_eq
+	t.show_item(item, viewer)
+	tips.append(t)
+	return t
+
+
+func _panel(slot: PlayerSlot) -> PlayerPanel:
+	var panel := PlayerPanel.create(slot)
+	tree.root.add_child(panel)
+	panel.set_input_focus(true)
+	panels.append(panel)
+	return panel
+
+
+func _tap(panel: PlayerPanel, slot: PlayerSlot, button: PlayerInput.Pad) -> void:
+	var input := slot.input as ScriptedInput
+	input.press(button)
+	input.poll(1.0 / 60.0)
+	panel.handle_input(input)
+	input.release(button)
+	input.poll(0.0)
+	panel.handle_input(input)
+
+
+func _lines(t: ItemTooltip) -> String:
+	return "\n".join(t.line_texts())
+
+
+# --- Tooltip ----------------------------------------------------------------------------
+
+func test_a_fresh_artifact_tooltip_says_when_each_property_awakens() -> void:
+	var t := _tooltip(_artifact(&"warrior"), Db.get_class_data(&"warrior"))
+	var text := _lines(t)
+	check("Earthsplitter" in text, "the name")
+	check("Artifact" not in text.split("\n")[0], "(the rarity is the colour of the name)")
+	check("Item Level %d" % (10 + 30 + 25) in text, "Item Level 10 + 3 x wave + 25")
+	check("Earthquake" in text and "Awakens in 3 waves" in text, "property 1: awakens in 3 waves")
+	check("Shockwave" in text and "Awakens in 6 waves" in text, "property 2: awakens in 6 waves")
+	check("Whirlwind leaves an earthquake zone" in text, "the text is shown too")
+	check("Sell Price" not in text, "an Artifact has no sell price")
+
+
+func test_the_tooltip_counts_the_waves_down() -> void:
+	var item := _artifact(&"warrior", 2)
+	var text := _lines(_tooltip(item, Db.get_class_data(&"warrior")))
+	check("Awakens in 1 wave" in text and "Awakens in 1 waves" not in text, "1 wave left: singular")
+	check("Awakens in 4 waves" in text, "4 waves left for property 2")
+
+
+func test_awake_properties_are_golden_and_asleep_ones_dim() -> void:
+	var asleep := _tooltip(_artifact(&"warrior", 0), Db.get_class_data(&"warrior"))
+	var name_asleep := asleep.find_line("Earthquake", true)
+	check(name_asleep != null, "the title line")
+	var awake := _tooltip(_artifact(&"warrior", 3), Db.get_class_data(&"warrior"))
+	var name_awake := awake.find_line("Earthquake", true)
+	check(name_awake.get_theme_color(&"font_color") == ItemTooltip.ARTIFACT_GOLD, "awake: gold")
+	check(name_asleep.get_theme_color(&"font_color") == ItemTooltip.ARTIFACT_ASLEEP, "asleep: dim")
+	check(awake.find_line("Awakens in 3 waves") != null, "property 2 still waits: it says so")
+	check(awake.find_line("Awakens in 6 waves") == null, "(property 1 is awake: no waiting line for it)")
+	var both := _tooltip(_artifact(&"warrior", 6), Db.get_class_data(&"warrior"))
+	check(both.find_line("Awakens in") == null, "nothing left to wait for after six")
+	check(both.find_line("Shockwave", true).get_theme_color(&"font_color") == ItemTooltip.ARTIFACT_GOLD, "both gold")
+
+
+func test_a_missing_ability_greys_the_property_with_its_name() -> void:
+	var warrior := _join(&"warrior")
+	var mage := _join(&"mage")
+	var item := _artifact(&"warrior", 6)
+	var for_mage := _tooltip(item, Db.get_class_data(&"mage"), _eq(mage))
+	check(for_mage.find_line("(needs Whirlwind)") != null, "(needs Whirlwind) for a hero without it")
+	check(for_mage.find_line("(needs Charge)") != null, "(needs Charge)")
+	var grey := for_mage.find_line("Earthquake", true)
+	check(grey.get_theme_color(&"font_color") == ItemTooltip.DIM, "greyed")
+	var for_warrior := _tooltip(item, Db.get_class_data(&"warrior"), _eq(warrior))
+	check(for_warrior.find_line("(needs") == null, "the Warrior knows both abilities")
+	check(for_warrior.find_line("Earthquake", true).get_theme_color(&"font_color") == ItemTooltip.ARTIFACT_GOLD, "gold")
+
+
+func test_the_tooltip_without_a_viewer_never_greys() -> void:
+	var t := _tooltip(_artifact(&"warrior", 6))
+	check(t.find_line("(needs") == null, "no hero to ask: nothing is missing")
+
+
+func test_ordinary_items_keep_their_sell_price_and_have_no_artifact_lines() -> void:
+	var sword := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)
+	sword.buy_price = 100
+	var text := _lines(_tooltip(sword, Db.get_class_data(&"warrior")))
+	check("Sell Price" in text, "sold for 35")
+	check("Awakens" not in text, "no property lines")
+
+
+func test_the_pair_tooltips_name_each_other() -> void:
+	var fangs := _artifact(&"rogue")
+	var main := _lines(_tooltip(fangs, Db.get_class_data(&"rogue")))
+	check("A pair: it equips together with Fangs of the Shadow (Off Hand)" in main, "the main piece names its partner")
+	check("Shadow's Bite" in main and "Hidden Fangs" in main, "the properties are on the main piece")
+	check("(24 damage per second)" in main and "(48 damage" not in main, "the DPS line is this dagger's alone")
+	var off := _lines(_tooltip(fangs.companion, Db.get_class_data(&"rogue")))
+	check("Off-hand piece of a pair" in off, "the off piece says what it is")
+	check("Shadow's Bite" not in off, "without repeating the properties")
+	check("Sell Price" not in off, "no sell price either")
+
+
+func test_the_weapon_lines_show_the_grown_damage() -> void:
+	var item := _artifact(&"warrior")
+	var before := _lines(_tooltip(item, Db.get_class_data(&"warrior")))
+	Artifacts.grow_item(item)
+	var after := _lines(_tooltip(item, Db.get_class_data(&"warrior")))
+	check(before != after, "the tooltip changes with the growth")
+	check("Item Level %d" % (65 + 3) in after, "Item Level +3")
+
+
+# --- The compact tooltip of a viewer (player panels, shop) ---------------------------------
+
+## A hero's tooltip of [param item] ([member ItemTooltip.viewer_equipment] set) against [param worn]
+## (the comparison block; may be null).
+func _viewer_tooltip(slot: PlayerSlot, item: ItemInstance, worn: ItemInstance = null) -> ItemTooltip:
+	var t := ItemTooltip.create()
+	tree.root.add_child(t)
+	t.viewer_equipment = _eq(slot)
+	t.show_item(item, slot.class_data, worn)
+	tips.append(t)
+	return t
+
+
+func test_a_viewers_tooltip_shows_the_short_property_text() -> void:
+	var slot := _join(&"warrior")
+	var item := _artifact(&"warrior", 3)
+	var data := Artifacts.data_of(item)
+	var viewer := _lines(_viewer_tooltip(slot, item))
+	var plain := _lines(_tooltip(item, slot.class_data))
+	for i in 2:
+		var p := data.properties[i]
+		check(str(p["short"]) in viewer, "the short text of property %d for a viewer" % (i + 1))
+		check(str(p["text"]) not in viewer, "not its full text")
+		check(str(p["text"]) in plain, "the full text without a viewer (the loot roll)")
+		check(str(p["short"]) not in plain, "not the short one")
+	check("Earthquake" in viewer and "Awakens in 3 waves" in viewer, "names and the waiting line stay")
+
+
+func test_the_compact_artifact_block_drops_flavor_scaling_and_the_own_class_line() -> void:
+	var slot := _join(&"warrior")
+	var item := _artifact(&"warrior")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	check(viewer.compact_artifact() and not plain.compact_artifact(), "compact only with a viewer's equipment")
+	check(plain.find_line("The ground remembers every blow") != null, "the flavor text shows in the roll window")
+	check(viewer.find_line("The ground remembers every blow") == null, "but not in the compact block")
+	check(plain.find_line("Scales with") != null and viewer.find_line("Scales with") == null, "the Scales with line too")
+	check(plain.find_line("Classes: Warrior", true) != null, "the class line shows without a viewer")
+	check(viewer.find_line("Classes:") == null, "the hero's own class line is left out")
+	# Someone else's class keeps the red line even in the compact block.
+	var mage := _join(&"mage")
+	var other := _viewer_tooltip(mage, item)
+	var red := other.find_line("Classes: Warrior", true)
+	check(red != null and red.get_theme_color(&"font_color") == ItemTooltip.UNUSABLE_RED, "a viewer of another class still sees it, red")
+	check(viewer.find_line("Item Level", false) != null and viewer.find_line("Damage") != null, "the rest stays")
+
+
+func test_the_compact_artifact_tooltip_is_much_shorter() -> void:
+	var slot := _join(&"warlock")
+	var item := _artifact(&"warlock")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	viewer.layout_now()
+	plain.layout_now()
+	var short := viewer.get_combined_minimum_size().y
+	var full := plain.get_combined_minimum_size().y
+	check(short <= full - 150.0, "compact %.0f px against %.0f px" % [short, full])
+
+
+func test_the_compact_artifact_block_packs_its_lines_closer() -> void:
+	var slot := _join(&"mage")
+	var item := _artifact(&"mage")
+	var viewer := _viewer_tooltip(slot, item)
+	var plain := _tooltip(item, slot.class_data)
+	check_eq(viewer._box.get_theme_constant(&"separation"), ItemTooltip.COMPACT_ARTIFACT_SEPARATION, "compact: packed")
+	check_eq(plain._box.get_theme_constant(&"separation"), ItemTooltip.LINE_SEPARATION, "the loot roll's tooltip: the normal gap")
+	# Showing an ordinary item in the same tooltip restores the normal gap.
+	var ring := MarketFakes.make_item("Band", Items.SlotType.RING)
+	viewer.show_item(ring, slot.class_data)
+	check_eq(viewer._box.get_theme_constant(&"separation"), ItemTooltip.LINE_SEPARATION, "back to normal for a ring")
+
+
+func test_the_compact_comparison_block_flows_its_differences() -> void:
+	var slot := _join(&"rogue")
+	var item := _artifact(&"rogue")
+	var worn := ItemGenerator.generate_weapon(Db.get_weapon(&"dagger"), Items.Rarity.EPIC, 10, true, RandomNumberGenerator.new())
+	var viewer := _viewer_tooltip(slot, item, worn)
+	var plain := ItemTooltip.create()
+	tree.root.add_child(plain)
+	plain.show_item(item, slot.class_data, worn)
+	tips.append(plain)
+	var dps := viewer.find_line("Damage per second")
+	check(dps != null and dps.get_parent() is HFlowContainer, "the compact differences sit in a flow: %s" % viewer.line_texts())
+	var plain_dps := plain.find_line("Damage per second")
+	check(plain_dps != null and not (plain_dps.get_parent() is HFlowContainer), "one row each without a viewer")
+	var delta_texts := PackedStringArray()
+	for l in dps.get_parent().get_children():
+		delta_texts.append((l as Label).text)
+	check(delta_texts.size() >= 3, "the stat differences share that flow: %s" % delta_texts)
+	check(viewer.find_line("If you replace this item:") != null and viewer.find_line("Equipped:") != null, "the heading and the worn item stay")
+
+
+func test_an_ordinary_set_piece_or_item_keeps_its_full_layout_for_a_viewer() -> void:
+	var slot := _join(&"warrior")
+	var sword := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)
+	sword.flavor = "A plain old blade."
+	var worn := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.RARE, 5)
+	var t := _viewer_tooltip(slot, sword, worn)
+	check(not t.compact_artifact(), "not an Artifact")
+	check(t.find_line("Scales with") != null, "Scales with stays for a sword")
+	check(t.find_line("A plain old blade.") != null or t.find_line("\"A plain old blade.\"") != null, "the flavor stays")
+	var dps := t.find_line("Damage per second")
+	check(dps == null or not (dps.get_parent() is HFlowContainer), "one row per difference")
+
+
+# --- The panel --------------------------------------------------------------------------
+
+func test_the_sell_entry_of_an_artifact_is_greyed_out() -> void:
+	var slot := _join(&"warrior")
+	var panel := _panel(slot)
+	var item := _artifact(&"warrior")
+	_eq(slot).add_to_backpack(item)
+	panel.select_backpack(0)
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(panel.is_menu_open(), "the menu opens")
+	check("Sell" in panel.menu_labels(), "the entry is listed")
+	check(not panel.menu_entry_enabled("Sell"), "greyed out")
+	check_eq(panel.menu_entry_detail("Sell"), "Artifact", "says why")
+	check(panel.menu_entry_enabled("Equip"), "Equip works")
+	check_eq(panel.menu_entry_detail("Forge"), "", "(the Forge entry is blocked by its own reason)")
+	check(not panel.menu_entry_enabled("Forge"), "no Forge for an Artifact")
+
+
+func test_selling_an_artifact_is_refused_even_when_forced() -> void:
+	var slot := _join(&"warrior")
+	var panel := _panel(slot)
+	var item := _artifact(&"warrior")
+	_eq(slot).add_to_backpack(item)
+	var gold := RunState.gold
+	panel._do_sell(item)
+	check(item in _eq(slot).backpack, "still in the backpack")
+	check_eq(RunState.gold, gold, "no gold")
+	check_eq(panel.last_message, PlayerPanel.ARTIFACT_NO_SELL, "the reason as the toast")
+
+
+func test_the_x_sell_shortcut_cannot_sell_an_artifact() -> void:
+	var slot := _join(&"warrior")
+	var panel := _panel(slot)
+	var item := _artifact(&"warrior")
+	_eq(slot).add_to_backpack(item)
+	panel.select_backpack(0)
+	_tap(panel, slot, PlayerInput.Pad.X)
+	_tap(panel, slot, PlayerInput.Pad.A)
+	check(item in _eq(slot).backpack, "X then A does not sell it")
+	check_eq(RunState.gold, 0, "no gold")
+
+
+func test_the_pair_equips_from_the_menu_and_its_off_piece_is_selected_with_the_slot() -> void:
+	var slot := _join(&"rogue")
+	var panel := _panel(slot)
+	var fangs := _artifact(&"rogue")
+	_eq(slot).add_to_backpack(fangs)
+	panel.select_backpack(0)
+	_tap(panel, slot, PlayerInput.Pad.A)
+	_tap(panel, slot, PlayerInput.Pad.A)  # Equip (the only slot: no choice menu)
+	check(_eq(slot).get_item(Items.EquipSlot.MAIN_HAND) == fangs, "main hand")
+	check(_eq(slot).get_item(Items.EquipSlot.OFF_HAND) == fangs.companion, "off hand")
+	check(fangs not in _eq(slot).backpack, "out of the backpack")
+
+
+# --- Compare / upgrade rules -------------------------------------------------------------
+
+func test_an_artifact_always_beats_what_it_replaces_and_is_never_replaced() -> void:
+	var warrior := Db.get_class_data(&"warrior")
+	var eq := Equipment.new(warrior)
+	eq.equip_starting_weapons()
+	var artifact := _artifact(&"warrior")
+	var legendary := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe"), Items.Rarity.LEGENDARY, 25)
+	legendary.stats = {Stats.STRENGTH: 90.0, Stats.CRIT: 40.0}
+	eq.slots[Items.EquipSlot.MAIN_HAND] = legendary
+	var current := ItemTooltip.equipped_for_compare(artifact, eq)
+	check_eq(ItemTooltip.upgrade_direction(artifact, current, warrior, eq), 1, "an Artifact replaces even a monster Legendary")
+	eq.slots[Items.EquipSlot.MAIN_HAND] = artifact
+	var other := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe"), Items.Rarity.LEGENDARY, 25)
+	other.stats = {Stats.STRENGTH: 900.0}
+	var there := ItemTooltip.equipped_for_compare(other, eq)
+	check_eq(ItemTooltip.upgrade_direction(other, there, warrior, eq), -1, "and is never swapped for ordinary gear")
+	check_eq(ItemTooltip.upgrade_direction(artifact, null, Db.get_class_data(&"mage")), -1, "another class cannot use it")
+
+
+func test_a_pair_is_compared_and_scored_as_both_pieces() -> void:
+	var fangs := _artifact(&"rogue")
+	var single_stats := ItemTooltip.total_stats(fangs.companion)
+	var both := ItemTooltip.total_stats(fangs)
+	for stat in single_stats:
+		check(both.get(stat, 0.0) >= single_stats[stat] + fangs.stats.get(stat, 0.0) - 0.001, "%s counts both pieces" % stat)
+	check_near(ItemTooltip.weapon_dps(fangs), ItemTooltip.weapon_dps(fangs.companion) * 2.0, ItemTooltip.weapon_dps(fangs) * 0.05,
+			"the DPS of both daggers")
+	var eq := Equipment.new(Db.get_class_data(&"rogue"))
+	eq.equip_starting_weapons()
+	var pair := ItemTooltip.equipped_for_compare(fangs, eq)
+	check(pair is ItemTooltip.EquippedPair, "compared with both starting daggers, like a two-hander")
+
+
+# --- Bots -------------------------------------------------------------------------------
+
+func test_a_bot_equips_its_artifact_over_better_looking_gear() -> void:
+	var slot := _join(&"warrior")
+	var eq := _eq(slot)
+	var artifact := _artifact(&"warrior")
+	var legendary := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe"), Items.Rarity.LEGENDARY, 25)
+	legendary.stats = {Stats.STRENGTH: 90.0, Stats.CRIT: 40.0}
+	eq.add_to_backpack(legendary)
+	eq.add_to_backpack(artifact)
+	check(Intermission.is_bot_upgrade(artifact, slot, eq), "an upgrade")
+	Intermission.bot_equip_upgrades(slot)
+	check(eq.get_item(Items.EquipSlot.MAIN_HAND) == artifact, "the Artifact is in the main hand")
+	check(legendary in eq.backpack, "the Legendary waits in the backpack: it never swaps back")
+
+
+func test_a_bot_never_sells_an_artifact_to_make_room() -> void:
+	var slot := _join(&"mage")
+	var eq := _eq(slot)
+	var foreign := _artifact(&"warrior")  # not usable by a Mage: "not an upgrade"
+	eq.add_to_backpack(foreign)
+	for i in Items.BACKPACK_SIZE - 1:
+		var junk := ItemInstance.from_weapon(Db.get_weapon(&"wand"), Items.Rarity.COMMON, 1)
+		junk.buy_price = 5
+		eq.add_to_backpack(junk)
+	check(not eq.has_space(), "a full backpack")
+	check(not Intermission.is_bot_upgrade(foreign, slot, eq), "not an upgrade for a Mage")
+	var screen := Intermission.new()
+	var gold := RunState.gold
+	screen._bot_make_room(slot, eq)
+	screen.free()
+	check(foreign in eq.backpack, "the Artifact stays")
+	check(eq.has_space(), "a junk item was sold instead")
+	check(RunState.gold > gold, "for gold")
+
+
+func _join_bot(class_id: StringName) -> PlayerSlot:
+	var slot := PlayerManager.add_bot(class_id)
+	players.append(Player.create(slot))
+	return slot
+
+
+func test_a_bot_with_a_full_backpack_makes_room_for_its_artifact_before_the_roll() -> void:
+	var warrior := _join_bot(&"warrior")
+	var mage := _join_bot(&"mage")
+	var eq := _eq(warrior)
+	var mage_eq := _eq(mage)
+	for target in [eq, mage_eq]:
+		for i in Items.BACKPACK_SIZE:
+			var junk := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe" if target == mage_eq else &"wand"), Items.Rarity.COMMON, 1)
+			junk.buy_price = 5
+			target.add_to_backpack(junk)
+		check(not target.has_space(), "a full backpack")
+	var item := _artifact(&"warrior")
+	var screen := Intermission.new()
+	var gold := RunState.gold
+	var loot: Array[ItemInstance] = [item]
+	screen._bots_make_room_for_artifacts(loot)
+	screen.free()
+	check(eq.has_space(), "the Warrior's bot sold a junk item")
+	check(not mage_eq.has_space(), "the Mage's backpack is left alone (it cannot use the Artifact)")
+	check(RunState.gold > gold, "for gold")
+	check(LootRoll.create(item).can_need(warrior), "so the Warrior can Need it")
+	var ordinary: Array[ItemInstance] = [ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)]
+	var before := RunState.gold
+	var other := Intermission.new()
+	other._bots_make_room_for_artifacts(ordinary)
+	other.free()
+	check_eq(RunState.gold, before, "ordinary loot never makes a bot sell")
+
+
+func test_the_loot_phase_makes_room_for_the_bots_artifact() -> void:
+	var world := MarketFakes.make_world(tree)
+	RunState.shop = MarketFakes.FakeShop.new()
+	var warrior := MarketFakes.bot_with_hero(world, "bot:w", &"warrior")
+	var eq := _eq(warrior)
+	for i in Items.BACKPACK_SIZE:
+		var junk := ItemInstance.from_weapon(Db.get_weapon(&"wand"), Items.Rarity.COMMON, 1)
+		junk.buy_price = 5
+		eq.add_to_backpack(junk)
+	RunState.add_team_loot(_artifact(&"warrior"))
+	var screen := Intermission.create()
+	tree.root.add_child(screen)
+	screen.open(10, 0)
+	check_eq(screen.phase, Intermission.Phase.LOOT, "the loot roll opened")
+	check(eq.has_space(), "the bot sold a junk item before the roll")
+	UiFakes.free_node(screen)
+	UiFakes.free_node(world)

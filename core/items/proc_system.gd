@@ -564,10 +564,14 @@ func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bo
 		var ratio := target.hp / target.max_hp if target.max_hp > 0.0 else 1.0
 		amount *= CombatMath.target_damage_mult(player.stats, ratio, target.is_elite())
 	var text_pos := target.global_position + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT
+	var dealt := minf(amount, maxf(0.0, target.hp))
 	if player.slot != null:
-		RunState.record_damage(player.slot.index, minf(amount, maxf(0.0, target.hp)))
+		RunState.record_damage(player.slot.index, dealt)
 	target.take_damage(amount, false, player)
 	Vfx.damage_number(null, text_pos, amount, ProcVfx.school_color(school), DAMAGE_TEXT_SIZE)
+	# Pet leech (Skull of the Damned): a share of what a pet dealt heals the hero.
+	if player.pet_leech_pct > 0.0 and source == &"pet":
+		player.heal(dealt * player.pet_leech_pct / 100.0, player.slot.index if player.slot != null else -1)
 	return amount
 
 

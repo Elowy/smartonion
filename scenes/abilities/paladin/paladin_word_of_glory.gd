@@ -16,6 +16,9 @@ extends AbilityEffect
 ## Bulwark": every healed hero also gets an absorb shield worth that % of the heal); "cost" is
 ## seeded from AbilityData.cost (Libram of Devotion: cost_add -1). Heals x the caster's Healing
 ## Done (PaladinKit.heal_amount); the revive HP is not.
+## Artifact (Dawnbreaker, "Dawn's Embrace"): shield_max_hp_pct (% of the target's max HP, 0 =
+## off): every hero this cast heals or raises is also shielded for that much (shield_duration;
+## a source of its own that tops up to the amount, never stacks past it).
 ##
 ## M5 – Divine Verdict (Retribution modifier, "verdict_pct_add"): verdict_pct (% weapon damage,
 ## 0 = off), verdict_sp_scale (x Spell Power), verdict_range (m). With verdict_pct > 0 the cast
@@ -28,6 +31,8 @@ extends AbilityEffect
 ## only while no teammate is downed anywhere (the Holy Power waits for a revive).
 
 const HOLY_COLOR := Color(1.0, 0.88, 0.45)
+## ProcSystem shield source of Dawn's Embrace (the Dawnbreaker Artifact).
+const ARTIFACT_SHIELD := &"dawn_embrace"
 ## Bots heal when a hero in range is below this share of max HP.
 const AUTO_HEAL_RATIO := 0.5
 ## Divine Verdict: a hero in range below this share of max HP is healed instead.
@@ -173,6 +178,7 @@ func cast(ctx: AbilityContext) -> bool:
 		downed.revive(revive_ratio(ctx))
 		if downed.downed:
 			return false
+		grant_shield(ctx, downed)
 		Vfx.resurrect_column(feet)
 		Vfx.floating_text(downed.get_chest_position() + Vector3.UP * 0.6, "Resurrected!", Player.HEAL_TEXT_COLOR, 1.2)
 		ProcVfx.beam(paladin.get_chest_position(), downed.get_chest_position(), HOLY_COLOR)
@@ -187,6 +193,7 @@ func cast(ctx: AbilityContext) -> bool:
 			continue
 		var amount := heal_amount(ctx, paladin, p)
 		p.heal(amount)
+		grant_shield(ctx, p)
 		if shield_share > 0.0 and p.procs != null:
 			p.procs.add_shield(amount * shield_share / 100.0, ctx.num("shield_duration", 8.0))
 		Vfx.hit_spark(p.get_chest_position(), HOLY_COLOR)
@@ -194,6 +201,19 @@ func cast(ctx: AbilityContext) -> bool:
 			ProcVfx.beam(paladin.get_chest_position(), p.get_chest_position(), HOLY_COLOR)
 		healed = true
 	return healed
+
+
+## Dawn's Embrace: [param who] gets an absorb shield of shield_max_hp_pct % of their max HP
+## (topped up to that amount: a second cast adds nothing while it is still there).
+static func grant_shield(ctx: AbilityContext, who: Player) -> void:
+	var pct := ctx.num("shield_max_hp_pct")
+	if pct <= 0.0 or who == null or who.procs == null:
+		return
+	var want := who.max_hp() * pct / 100.0
+	var missing := want - who.procs.shield_of(ARTIFACT_SHIELD)
+	if missing > 0.0:
+		who.procs.add_shield(missing, ctx.num("shield_duration", 8.0), ARTIFACT_SHIELD)
+		Vfx.explosion(who.global_position + Vector3.UP * 0.1, 1.0, ProcSystem.SHIELD_COLOR)
 
 
 ## Bots: always raise a downed teammate in range; heal when a hero in range is below half HP;

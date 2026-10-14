@@ -3,7 +3,8 @@ extends TestCase
 ## recorders, the run clock, the boss kind of record_special_kill, the SUPPORT / BRUTE AI
 ## dispatch and death-effect virtuals of Enemy, EnemyData.is_boss / BossData, the Db boss and
 ## consumable dirs, ConsumableData, the locked Enchanter tab, the optional parameters of
-## Player.heal / revive, the LootDrops.roll_artifact stub, the Shop / Intermission hooks, the new
+## Player.heal / revive, the LootDrops.roll_artifact wiring (the ARTIFACTS package made the roll
+## real: its behaviour is tested in test_m6_artifacts_*), the Shop / Intermission hooks, the new
 ## SMOKE_RESULT keys and the --boss-hp / --artifact-chance launch flags.
 
 const EFakes := preload("res://tests/enemies_fakes.gd")
@@ -710,20 +711,26 @@ func test_heal_and_revive_take_optional_source_slots() -> void:
 	world = null
 
 
-# --- LootDrops: the Artifact roll stub ---------------------------------------------------------
+# --- LootDrops: the Artifact roll wiring ------------------------------------------------------
 
 func _probe(source: ItemGenerator.Source, enemy: Node3D, killer: Node3D) -> LootBag:
 	_probe_calls.append([source, enemy, killer])
 	return null
 
 
-func test_roll_artifact_is_a_stub_that_draws_nothing() -> void:
+## (P0 pinned a stub that never rolled; the real roll – test_m6_artifacts_core – only rolls from
+## wave 10 and draws nothing before it, which is what keeps the old seeds comparable.)
+func test_roll_artifact_below_wave_10_draws_nothing_and_drops_nothing() -> void:
 	_enemy_world()
 	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3.ZERO)
+	LootDrops.artifact_chance_override = 1.0  # even a sure drop waits for wave 10
+	RunState.set_wave(9)
 	var before := RunState.rng.state
 	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, e, null) == null, "returns null")
 	check(LootDrops.roll_artifact(ItemGenerator.Source.LOOT, e, null) == null, "for every source")
 	check_eq(RunState.rng.state, before, "no RunState.rng draw (seeded runs stay comparable)")
+	RunState.set_wave(10)
+	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, e, null) != null, "wave 10: the roll is real")
 
 
 func test_drop_special_calls_roll_artifact() -> void:
@@ -760,23 +767,22 @@ func test_on_enemy_killed_calls_roll_artifact_after_the_normal_roll() -> void:
 	check_eq(_probe_calls.size(), 21, "no enemy, no roll")
 
 
-func test_the_artifact_stub_keeps_seeded_drops_identical() -> void:
+func test_the_artifact_roll_keeps_seeded_drops_identical_below_wave_10() -> void:
 	_enemy_world()
 	var e := EFakes.spawn_enemy(world, EFakes.enemy_data(), Vector3.ZERO)
 	RunState.start_run(1, 99)
 	var plain: Array[bool] = []
 	for i in 40:
 		RunState.loot_drops_this_wave = 0
-		plain.append(LootDrops.on_enemy_killed(e, null) != null)
+		plain.append(LootDrops._roll_normal_drop(e, null) != null)  # the normal roll alone (as before M6)
 	var state_after := RunState.rng.state
 	RunState.start_run(1, 99)
-	var probed: Array[bool] = []
-	LootDrops.artifact_roll_probe = _probe
+	var with_roll: Array[bool] = []
 	for i in 40:
 		RunState.loot_drops_this_wave = 0
-		probed.append(LootDrops.on_enemy_killed(e, null) != null)
-	check_eq(probed, plain, "the same drops")
-	check_eq(RunState.rng.state, state_after, "the same rng state")
+		with_roll.append(LootDrops.on_enemy_killed(e, null) != null)  # normal roll + Artifact roll
+	check_eq(with_roll, plain, "the same drops")
+	check_eq(RunState.rng.state, state_after, "the same rng state: the Artifact roll drew nothing")
 	check(true in plain, "the sample dropped something (seed sanity)")
 
 

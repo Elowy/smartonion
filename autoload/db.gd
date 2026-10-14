@@ -18,6 +18,8 @@ const SET_DIR := "res://data/sets/"
 const BOSS_DIR := "res://data/bosses/"
 ## data/consumables/<id>.tres (ConsumableData, M6; may be empty until the SHOPSINKS package).
 const CONSUMABLE_DIR := "res://data/consumables/"
+## data/artifacts/<id>.tres (ArtifactData, M6 ARTIFACTS: one weapon per class).
+const ARTIFACT_DIR := "res://data/artifacts/"
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -39,6 +41,9 @@ var sets: Dictionary[StringName, SetData] = {}
 ## Every boss, by id (M6). Separate from [member enemies]: the wave director's random pool
 ## (eligible_enemies) never sees a boss.
 var bosses: Dictionary[StringName, BossData] = {}
+## Every class Artifact, by id (M6). Separate from [member uniques]: the normal item pools
+## never see them (LootDrops.roll_artifact / ItemGenerator.generate_artifact make them).
+var artifacts: Dictionary[StringName, ArtifactData] = {}
 ## Every shop consumable, by id (M6).
 var consumables: Dictionary[StringName, ConsumableData] = {}
 var class_ids: Array[StringName] = []
@@ -94,6 +99,10 @@ func reload() -> void:
 	for res in _load_dir(BOSS_DIR):
 		if res is BossData:
 			bosses[res.id] = res
+	artifacts.clear()
+	for res in _load_dir(ARTIFACT_DIR):
+		if res is ArtifactData:
+			artifacts[res.id] = res
 	consumables.clear()
 	for res in _load_dir(CONSUMABLE_DIR):
 		if res is ConsumableData:
@@ -182,6 +191,30 @@ func get_boss(id: StringName) -> BossData:
 
 func get_consumable(id: StringName) -> ConsumableData:
 	return consumables.get(id)
+
+
+func get_artifact(id: StringName) -> ArtifactData:
+	return artifacts.get(id)
+
+
+## The Artifact of [param class_id] (null when the class has none). One per class; the first by
+## id wins when a data error lists two.
+func artifact_for_class(class_id: StringName) -> ArtifactData:
+	var best: ArtifactData = null
+	for id in artifacts:
+		var a := artifacts[id]
+		if a.class_id == class_id and is_unlocked(a.id) and (best == null or String(a.id) < String(best.id)):
+			best = a
+	return best
+
+
+## The class ids that have an Artifact, in lobby order (class_ids).
+func artifact_classes() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for cid in class_ids:
+		if artifact_for_class(cid) != null:
+			out.append(cid)
+	return out
 
 
 func get_enchant(id: StringName) -> EnchantData:

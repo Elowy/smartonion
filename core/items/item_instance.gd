@@ -37,6 +37,19 @@ var buy_price := 0
 ## Enchanter actions done on this item (M6 ENCHANTER): the n-th action costs 2^n times the
 ## base price. The one counter the Enchanter mutates (together with [member enchants]).
 var enchant_uses := 0
+## Artifacts (M6, rarity ARTIFACT): wave ends this item was held by a hero (equipped or in the
+## backpack) – drives the +3 Item Level / +4% weapon damage growth and when its two properties
+## awaken (ArtifactData.unlock_waves). See Artifacts.
+var artifact_waves := 0
+## The weapon's base damage when the Artifact was made; growth is linear on it
+## (base x (1 + 4% x artifact_waves)), so it never compounds or drifts.
+var artifact_base_damage := 0.0
+## Fangs of the Shadow (a pair): on the main-hand piece, its off-hand piece. The two equip and
+## unequip together (Equipment) and count as ONE Artifact; the off-hand piece only exists in the
+## OFF_HAND slot or as this reference (never alone in a backpack).
+var companion: ItemInstance
+## True for the off-hand piece of a pair (see [member companion]).
+var pair_off := false
 
 
 func _init() -> void:
@@ -68,7 +81,7 @@ func can_be_used_by(class_data: ClassData) -> bool:
 	if class_restriction != &"" and class_restriction != class_data.id:
 		return false
 	if is_weapon():
-		return class_data.can_use(weapon)
+		return class_data.can_use(weapon) and (companion == null or class_data.can_use(companion.weapon))
 	if armor_type != Items.NO_ARMOR and armor_type > class_data.armor_type:
 		return false
 	return true
@@ -124,8 +137,27 @@ func sell_value() -> int:
 	return maxi(1, roundi(buy_price * Items.SELL_SHARE))
 
 
-## Gold for the shared wallet when the item goes to Greed (GDD 10.1).
+## An Artifact (M6): never sold, forged or disenchanted; grows while held (Artifacts).
+func is_artifact() -> bool:
+	return rarity >= Items.Rarity.ARTIFACT
+
+
+## Whether the Sell entry / bots may sell it (GDD 5.5: an Artifact never).
+func can_sell() -> bool:
+	return not is_artifact()
+
+
+## Whether the Enchanter may disenchant it into Arcane Dust (GDD 5.5: an Artifact never; the
+## ENCHANTER package's menu entry and its auto-disenchant of an all-Passed item ask this).
+func can_disenchant() -> bool:
+	return not is_artifact()
+
+
+## Gold for the shared wallet when the item goes to Greed (GDD 10.1). An Artifact pays 5 times
+## the Epic price of the wave it dropped on (GDD 5.5: about 770 gold at wave 10).
 func greed_value() -> int:
+	if is_artifact():
+		return ItemGenerator.artifact_greed_value(wave)
 	return maxi(1, roundi(buy_price * Items.GREED_SHARE))
 
 

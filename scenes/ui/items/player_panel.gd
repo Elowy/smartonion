@@ -43,6 +43,8 @@ const BAG_GAP := 7.0
 const BAG_COLUMNS := 5
 const BODY_GAP := 12.0
 const MESSAGE_TIME := 2.8
+## Why the Sell entry of an Artifact is greyed out (GDD 5.5).
+const ARTIFACT_NO_SELL := "Artifacts can't be sold"
 ## With [member tooltip_inside] a tooltip taller than the panel shrinks to fit it, but not below
 ## this scale: a still taller one (a set piece with the comparison block) reaches past the
 ## panel's edge towards the middle of the screen instead of becoming unreadable at 720p – as
@@ -597,6 +599,11 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	sell.detail = "+%d gold" % it.sell_value()
 	if last_weapon:
 		_need_weapon(sell)
+	elif not it.can_sell():
+		# An Artifact is never sold (GDD 5.5).
+		sell.enabled = false
+		sell.detail = "Artifact"
+		sell.reason = ARTIFACT_NO_SELL
 	else:
 		sell.action = _do_sell.bind(it)
 	out.append(sell)
@@ -755,6 +762,9 @@ func _do_forge(it: ItemInstance) -> void:
 func _do_sell(it: ItemInstance) -> void:
 	var eq := equipment()
 	if not eq.backpack.has(it):
+		return
+	if not it.can_sell():
+		_message(ARTIFACT_NO_SELL, "", UiTheme.RED)
 		return
 	var value := it.sell_value()
 	if not eq.remove_from_backpack(it):

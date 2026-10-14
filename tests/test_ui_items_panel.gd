@@ -609,6 +609,73 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 	finished.emit()
 
 
+## Every Artifact's tooltip (M6, five classes, asleep and fully awake) in each corner of the
+## 4-player market layout at 1920 x 1080, with and without the comparison block against a worn
+## Epic weapon of the same type: the compact property text of a viewer's tooltip keeps it at a readable
+## scale (ARTIFACT_READABLE_FIT, below the set pieces' 0.9: an Artifact has two property blocks),
+## on screen and clear of the column's other panel.
+func test_artifact_tooltips_fit_the_4_player_panels() -> void:
+	_async = true
+	_root_size = tree.root.size
+	tree.root.size = Vector2i(1920, 1080)
+	await tree.process_frame
+	const ARTIFACT_READABLE_FIT := 0.85
+	var s := Intermission.panel_scale(PlayerPanel.DESIGN_SIZE)
+	var shown := PlayerPanel.DESIGN_SIZE * s
+	var m := Intermission.MARGIN
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var checked := 0
+	for data: ArtifactData in Db.artifacts.values():
+		var slot := _join(data.class_id)
+		var eq := _eq(slot)
+		var panel := _panel(slot)
+		panel.tooltip_inside = true
+		panel.scale = Vector2(s, s)
+		var view := panel.get_viewport_rect()
+		var corners: Array[Vector2] = [Vector2(m, m), Vector2(view.end.x - m - shown.x, m),
+			Vector2(m, view.end.y - m - shown.y), Vector2(view.end.x - m - shown.x, view.end.y - m - shown.y)]
+		var mates: Array[Rect2] = [Rect2(corners[2], shown), Rect2(corners[3], shown), Rect2(corners[0], shown),
+			Rect2(corners[1], shown)]
+		for waves in [0, 6]:
+			var item := ItemGenerator.generate_artifact(data.class_id, 10)
+			item.artifact_waves = waves
+			if item.companion != null:
+				item.companion.artifact_waves = waves
+			# A worn Epic weapon of the same type (a pair: both hands) where the Artifact goes.
+			eq.slots.clear()
+			for target in eq.target_slots(item):
+				var base := data.pair_weapon if target == Items.EquipSlot.OFF_HAND and data.is_pair() else data.weapon
+				eq.slots[target] = ItemGenerator.generate_weapon(base, Items.Rarity.EPIC, 10, true, rng)
+			eq.backpack.clear()
+			eq.add_to_backpack(item)
+			panel.select_backpack(0)
+			for comparison in [false, true]:
+				if panel.comparison != comparison:
+					panel.toggle_comparison()
+				check(panel.tooltip.visible and panel.tooltip.item == item, "%s shown" % item.display_name)
+				check_eq(panel.tooltip.comparison_visible, comparison, "%s: the comparison block follows the toggle" % item.display_name)
+				await tree.process_frame
+				await tree.process_frame
+				for c in corners.size():
+					panel.position = corners[c]
+					panel._place_tooltip()
+					var what := "%s (%d waves, comparison %s, corner %d)" % [item.display_name, waves, comparison, c + 1]
+					var tip := panel.tooltip.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.tooltip.size)
+					check(panel.tooltip.scale.y >= ARTIFACT_READABLE_FIT,
+						"%s: readable scale %.3f (tooltip %.0f px tall)" % [what, panel.tooltip.scale.y, panel.tooltip.size.y])
+					check(view.grow(-3.0).encloses(tip), "%s: on screen %s" % [what, tip])
+					check(not tip.intersects(mates[c]), "%s: clear of the column's other panel %s / %s" % [what, tip, mates[c]])
+					checked += 1
+		panels.erase(panel)
+		UiFakes.free_node(panel)
+		players.erase(slot.player)
+		(slot.player as Player).free()
+		UiFakes.reset_players()
+	check_eq(checked, 5 * 2 * 2 * 4, "five Artifacts x asleep / awake x comparison on / off x four corners")
+	finished.emit()
+
+
 func test_inside_tooltip_is_scaled_to_fit_the_panel() -> void:
 	var slot := _join(&"warrior")
 	_eq(slot).add_to_backpack(_helm("Iron Helm", ClassData.ArmorType.PLATE, 3))

@@ -128,6 +128,10 @@ var _run_frame := -1
 var _start_msec := 0
 var _wave_start_msec := 0
 var _smoke_deadline_msec := 0
+## The "artifact ..." log lines of this run in order: one per Artifact drop and one per hero per
+## wave end for every Artifact it holds (Artifacts.drop_line / held_line; printed with the SMOKE
+## prefix in a smoke run). Cleared by start_run.
+var artifact_lines: Array[String] = []
 ## The smoke harness is running (--smoke): it prints SMOKE_RESULT and quits.
 var _smoke_running := false
 var _smoke_done := false
@@ -167,6 +171,7 @@ func _ready() -> void:
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
+	RunState.artifact_dropped.connect(_on_artifact_dropped)
 	_apply_time_scale(options.effective_time_scale())
 	if options.smoke or options.demo or options.view != "":
 		_clock = PhysicsClock.create()
@@ -240,6 +245,7 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	RunState.start_run(slots.size(), options.run_seed())
+	artifact_lines.clear()
 	# Test hooks (start_run reset the statics to their defaults).
 	GoblinSpawner.chance_override = options.goblin_chance
 	EliteAffixes.rate_mult = options.elite_mult
@@ -352,6 +358,7 @@ func open_intermission() -> void:
 		var p := slot.player as Player
 		if p != null and is_instance_valid(p):
 			p.end_wave()  # auras / buffs must not show in the market
+			_log_artifacts_held(p)
 	# WaveDirector.stop() swept the ground effects at the clear; this catches the ones that
 	# landed during the "Wave cleared!" pause (bursts, bombs, craters), which would otherwise
 	# wait out the market and come back in the next wave.
@@ -725,6 +732,26 @@ func _on_intermission_continue() -> void:
 
 func _on_item_bought(_slot_index: int, _item: ItemInstance) -> void:
 	items_bought += 1
+
+
+## RunState.artifact_dropped: the "artifact drop" log line.
+func _on_artifact_dropped(item: ItemInstance, source: StringName) -> void:
+	_log_artifact(Artifacts.drop_line(item, source, RunState.wave))
+
+
+## After [param hero]'s wave end (its Artifacts grew): one "artifact held" line per Artifact it
+## holds, in the hand or in the backpack.
+func _log_artifacts_held(hero: Player) -> void:
+	if hero.equipment == null:
+		return
+	var label := hero.slot.label() if hero.slot != null else "?"
+	for item in Artifacts.held(hero.equipment):
+		_log_artifact(Artifacts.held_line(label, item, wave, hero.equipment.is_equipped(item)))
+
+
+func _log_artifact(text: String) -> void:
+	artifact_lines.append(text)
+	_log(text)
 
 
 func _on_loot_rolled(_roll: LootRoll) -> void:

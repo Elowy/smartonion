@@ -166,6 +166,9 @@ var damage_taken_mults: Dictionary[StringName, float] = {}
 ## Callables returning true to survive a lethal hit at 1 HP (Cheat Death, Last Stand ...);
 ## tried before the item cheat-death procs, which are limited (usually once per wave).
 var death_guards: Array[Callable] = []
+## Percent of the damage this hero's pets deal that heals the hero (Skull of the Damned,
+## warlock_pet_leech.gd; ProcSystem.deal_raw with source &"pet"). 0 = off.
+var pet_leech_pct := 0.0
 
 var _regen_accum := 0.0
 ## Teammates whose model currently channels a revive beam to this player.
@@ -223,6 +226,7 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.equipment.equip_starting_weapons()
 	p.apply_equipment()
 	p.equipment.changed.connect(p.apply_equipment)
+	p.wave_ended.connect(p._on_wave_ended_artifacts)
 	# "P1" nameplate marker above the head (also marks whose ghost it is).
 	p.model.set_tag(p_slot.label() if p_slot != null else "")
 	# TEMPORARY (until the M4 level-up cards): the team level's flat bonus, also for heroes
@@ -483,11 +487,24 @@ func apply_equipment() -> void:
 	var procs_refreshed := false
 	if bonuses != null:
 		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
+		# Awake properties of an equipped Artifact (M6): an own source, so a set change never
+		# touches them. (Skipped without Artifacts: no extra rebuild for ordinary gear.)
+		var artifact_effects := Artifacts.effects_for(equipment)
+		if not artifact_effects.is_empty() or not bonuses.effects_of(Artifacts.SOURCE).is_empty():
+			procs_refreshed = bonuses.set_effects(Artifacts.SOURCE, artifact_effects) or procs_refreshed
 	if procs != null and not procs_refreshed:
 		procs.refresh()
 	refresh_armor_spec()
 	if abilities != null:
 		abilities.invalidate_params()  # item ability mods
+
+
+## Wave ended (wave_ended): every Artifact this hero holds – equipped or in the backpack – grows
+## (Artifacts.grow: +3 Item Level, +4% weapon damage, one more wave end held). The equipment is
+## re-applied when one grew: its properties may have awakened (apply_equipment).
+func _on_wave_ended_artifacts() -> void:
+	if equipment != null and Artifacts.grow(equipment) > 0:
+		equipment.changed.emit()
 
 
 ## Armor Specialization (GDD 5.3): +10% of the primary stat with every other source in place
