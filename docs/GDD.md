@@ -1641,7 +1641,8 @@ A fajok WoW-hangulatúak, de saját nevűek.
 **Item-loot:** lásd **10.1** (Need / Greed / Pass).
 
 **Gold felhasználása (mind a közös kasszából):** item vásárlás (bolt), **ability rangemelés
-(Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset.
+(Trainer, 6.3)**, szintlépési reroll, bolti reroll, talent-reset; M6-tól az Enchanter, a
+fogyóeszközök és a Black Market is (16.1, „Goldsinkek”).
 
 **Bolt**
 
@@ -2017,6 +2018,7 @@ kerülnek a megfelelő fejezetbe.
 | **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, ranglistával | M6 |
 | **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | M6 |
 | **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | M6 |
+| **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | M6 |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
 
 **Dungeon-portál (M6)**
@@ -2033,6 +2035,36 @@ kerülnek a megfelelő fejezetbe.
   Artifact-esély is.
 - **Bukás** (mindenki elesett): a dungeon véget ér, a csapat elveszíti a közös kassza
   **50%-át**, és a menet a következő hullámmal folytatódik (a hullám elején mindenki feléled).
+
+**Goldsinkek (M6)**
+
+- **Miért:** az M5-ös mérésekben a késői kassza gyakran 2000 gold fölött van, egyedül már a
+  19–21. hullámtól gyűlik a gold, mert a késői hullámokban nincs mire érdemes költeni. A cél
+  nem adó, hanem döntés: a felesleges gold kis, de valódi erővé váljon.
+- **Enchanter** (az 5.7 „Enchanting” pontjának kibontása):
+  - A Passolt vagy eladott itemekből Disenchanttal *Arcane Dust* lesz.
+  - Az **Enchanter** fülön (a Trainer mellett) Dustért és goldért egy item enchantja
+    **újragörgethető**, vagy a **rangja emelhető**.
+  - Az ár itemenként minden használattal **duplázódik**, így ez a fő, felső korlát nélküli
+    sink: mindig van mire költeni, de csökkenő hozammal.
+- **Fogyóeszközök** (Flask / Elixir / étel):
+  - A boltban **saját, +1 sorban** jelennek meg, az item-ajánlatok alatt, így a bolt
+    item-kínálata nem csökken.
+  - Csak a vásárló hősre hatnak, és **csak a következő hullámra**. Hősönként hullámonként
+    legfeljebb 1 Flask / Elixir és 1 étel lehet aktív (egy újabb lecseréli a régit).
+  - Az ár a hullámmal nő (a bolti árszorzóval), a sor a bolti rerollal együtt frissül.
+  - Példák (saját nevek): *Flask of Fury* (+sebzés), *Elixir of Ironskin* (+Armor),
+    *Elixir of Swiftness* (+Haste / mozgás), *Hearty Onion Stew* (+Max HP és Regen).
+  - Minden körben visszatérő, kis költés, egyedül és co-opban is.
+- **Black Market** (a 15. hullámtól):
+  - Egy drága **extra ajánlat** a boltban, saját helyen – nem vesz el egy item-ajánlatot sem.
+  - Tartalma: garantált tier set-darab a csapat egyik kasztjának (lehetőleg hiányzó darab),
+    vagy egy maximális statú, 2 enchantos Epic. A bolt Legendaryt továbbra sem árul (10).
+  - Ára kb. a normál Epic ár 3×-osa, így egyszerre nagy összeget visz el.
+- **Repair rendszer: nem lesz.**
+  - Adó, nem döntés.
+  - Egyedül (ahol a legtöbb gold gyűlik) az első elesés vereség, így ott szinte nem hatna.
+  - A bajban lévő csapatot büntetné tovább (több elesés → nagyobb számla → gyengébb csapat).
 - **Szerepek:** a kasztok úgy működnek, mint a menetben; külön tank / healer / DPS
   hangsúly nincs.
 - **Később (M10, ha az M6-os változat bevált):** külön Dungeon mód a főmenüből, egymásba
