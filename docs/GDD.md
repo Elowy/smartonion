@@ -3,8 +3,9 @@
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
 > fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
-> Státusz: **tervezés** – kód még nincs. Ez a dokumentum a fejlesztés alapja; minden
-> szám kiinduló érték, a balanszolás során változni fog.
+> Státusz: **M0–M6a kész** (a 16. fejezet szerint; az M6b és a későbbi mérföldkövek még
+> tervezés). Ez a dokumentum a fejlesztés alapja; minden szám kiinduló érték, a balanszolás
+> során változni fog.
 
 ---
 
@@ -2510,7 +2511,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 
 **Az M6 két részben jön**
 
-- **M6a** – a rendszerek:
+- **M6a** – a rendszerek (**kész**):
   - alapok: Arcane Dust a közös kasszában, menet-statisztikák hősönként (sebzés, gyógyítás,
     elnyelés, kapott sebzés, felélesztés, elesés, ölés),
   - a három új ellenség: Plague Ghoul, Cultist Acolyte, Flesh Golem (8. fejezet),
@@ -2519,7 +2520,9 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - az Artifactok az öt jelenlegi kasztnak (5.5),
   - az Enchanter és az Arcane Dust (5.7),
   - a goldsinkek: a fogyóeszköz-sor és a Black Market (16.1),
-  - a Damage Meter, a díjak és a run kártya (12. fejezet).
+  - a Damage Meter, a díjak és a run kártya (12. fejezet),
+  - egy előzetes balansz-kör a természetes bot-futásokon (a Flesh Golem és Vor'thalax
+    hangolása, 9. fejezet „M6a mérés”).
 - **M6b** – a tartalom és a módok:
   - játékmódok: Végtelen mód, Hardcore mód, módválasztó képernyő, helyi ranglista,
   - az 5 aréna-környezet saját veszélyekkel és a sorsoló animáció,
@@ -2538,15 +2541,15 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
 | Ötlet | Mit jelent | Mérföldkő |
 |---|---|---|
 | **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
-| **Sebzésmérő és díjak** | WoW-szerű damage meter a menet végén (sebzés, gyógyítás, elnyelt sebzés, kapott sebzés, felélesztések, elesések, ölések) és díjak: „Most Damage”, „Guardian Angel”, „Floor Inspector” stb. – részletek: 12. fejezet | **M6a** |
-| **Menet végi összefoglaló kártya** | Megosztható kép („Save card”): kasztok, elért hullám, idő, legjobb itemek, díjak – részletek: 12. fejezet | **M6a** |
+| **Sebzésmérő és díjak** | WoW-szerű damage meter a menet végén (sebzés, gyógyítás, elnyelt sebzés, kapott sebzés, felélesztések, elesések, ölések) és díjak: „Most Damage”, „Guardian Angel”, „Floor Inspector” stb. – részletek: 12. fejezet | **Kész (M6a)** |
+| **Menet végi összefoglaló kártya** | Megosztható kép („Save card”): kasztok, elért hullám, idő, legjobb itemek, díjak – részletek: 12. fejezet | **Kész (M6a)** |
 | **Véletlen környezet menetenként** | 5 féle aréna-környezet: temető, mocsár, vulkán, jégbarlang, erdei rom – saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **M6b** (tartalom), M7 (látvány) |
 | **Hullám közbeni események** | Őrzött kincsesláda, megvédendő totem, elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **M6b** |
 | **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | **M6b** |
 | **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, helyi ranglistával | **M6b** |
 | **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **M6b** |
 | **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **M6b** |
-| **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **M6a** |
+| **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
 
 **Dungeon-portál (M6b)**
@@ -2578,7 +2581,7 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
   - A Character fül item-menüjében a **Disenchant** (a Sell mellett) *Arcane Dustot* ad
     (Common 1 … Legendary 16); a loot-dobáson mindenki által Passolt item is magától Dust
     lesz. Az Artifact nem Disenchantolható.
-  - Az **Enchanter** fülön (a 4. személyes fül, a címkéjén a Dust: „Enchanter (12✦)”) Dustért
+  - Az **Enchanter** fülön (a 4. személyes fül, a címkéjén a Dust: „Enchanter (12)”) Dustért
     és goldért egy item enchantja **újrasorsolható** (Reroll), **rangja emelhető** (Empower,
     V. rangig), vagy az enchant-hiányos item új enchantot kap (Imbue).
   - Az ár (gold: a bolti ár 25%-a; Dust: a ritkaság értéke) itemenként minden használattal
@@ -2586,14 +2589,24 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
     csökkenő hozammal.
 - **Fogyóeszközök** (Flask / Elixir / étel):
   - A boltban **saját, +1 sorban** jelennek meg, az item-ajánlatok alatt: **4 kompakt kártya**,
-    a készletből véletlenszerűen húzva, mind **különböző**. A sor a bolti rerollal és minden
-    körben frissül. A bolt item-kínálata nem csökken.
-  - **Korlátlan készlet:** minden hős a *saját* fogyóeszközét veszi, a vevő kapja.
+    a készletből véletlenszerűen húzva, mind **különböző**. A bolt item-kínálata nem csökken.
+  - **A sor a bolt saját oldalsó RNG-jéből húz** (a futás magjából és egy sóból számolt külön
+    generátor), ezért az **item-ajánlatok ugyanazok maradnak**, mint a fogyóeszközök nélkül: egy
+    magolt futás item-kínálata nem változik. A sor a körrel és **minden bolti rerollal**
+    újrahúzódik; ha minden item-ajánlat zárolt vagy pingelt, a sor akkor sem indít rerollt
+    egyedül, de ha a reroll lefut, a sor is cserélődik.
+  - **Korlátlan készlet:** minden hős a *saját* fogyóeszközét veszi, a vevő kapja. Nincs lock és
+    nincs ping a kártyákon (nincs mit visszatartani). Az A itt is a tartós nyomás szabályát
+    követi (ár > a kassza fele → 1 mp tartás).
   - **Függő szabály:** hősönként legfeljebb 1 főzet (Flask / Elixir) és 1 étel várhat a
-    következő hullámra; egy újabb a függőben lévőt lecseréli (visszatérítés nincs).
-  - A hatás a **következő hullám elején** lép életbe, és a hullám végén megszűnik. A hős unit
-    frame-jén kis ikonok mutatják az aktív fogyóeszközöket.
-  - **Ár:** alapár × a bolti árszorzó (`1 + 0,08 × (hullám − 1)`, 10. fejezet).
+    következő hullámra; egy újabb (azonos fajtájú) a függőben lévőt lecseréli (visszatérítés
+    nincs). A tooltip piros „Replaces: …” sora és a bolt visszajelző sora is megmondja, mit
+    szorít ki.
+  - A hatás a **következő hullám elején** lép életbe, és a hullám végén megszűnik (a boltban
+    sosem látszik lejárt hatás). A hős unit frame-jén kis ikonok mutatják az aktív
+    fogyóeszközöket.
+  - **Ár:** alapár × a bolti árszorzó (`1 + 0,08 × (hullám − 1)`, 10. fejezet), egész goldra
+    kerekítve, legalább 1; a „hullám” a bolt hulláma (a kiürített hullám).
   - Kiinduló készlet (a számok a balanszolás során változnak):
 
     | Név | Fajta | Hatás | Alapár |
@@ -2606,22 +2619,49 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
     | *Spiced Onion Rings* | Étel | +5% Crit | 10 g |
     | *Smoked Boar Ribs* | Étel | −8% elszenvedett sebzés | 12 g |
 
+  - **A százalékos hatások:** a „+30% Armor” és a „+15% Max HP” a hős aktuális értékének
+    százaléka, **a hullám elején számolva** (0,1-re kerekítve; a Max HP Staminaként érkezik). A
+    százalék alapja legalább 0: negatív Armor-ral (az itemek tervezett negatív statjai, pl. a
+    Mage Armor −2) az Elixir of Ironskin nem ront, csak nem segít – egy százalékos
+    fogyóeszköz csak segíthet.
+  - **Hearty Onion Stew:** a hozzáadott Max HP-t azonnal feltölti, de nem gyógyítja teljesen a
+    hőst, és nem számít gyógyításnak a statisztikában. Aki a hullám elején 50%-kal feltámad,
+    50% régi Max HP-val + az új résszel indul (a feltámadás ára az étellel nem szűnik meg); az
+    élő hősök az új teljes Max HP-n indulnak.
   - Minden körben visszatérő, kis költés, egyedül és co-opban is.
 - **Black Market** (a 15. hullámtól):
-  - Egy drága **extra ajánlat** a boltban, saját helyen – arany keretes kártya a
-    fogyóeszköz-sor jobb oldalán –, nem vesz el egy item-ajánlatot sem.
-  - Tartalma: **40% eséllyel** egy **maximális statdobású Epic** (a legjobb stat-roll, 2
-    enchanttal), egyébként garantált tier set-darab a csapat egyik kasztjának (lehetőleg olyan
-    darab, ami valakinek a setjéből még hiányzik). A bolt Legendaryt továbbra sem árul (10).
-  - Ára az adott hullám Epic árának **3-szorosa** (a 15. hullámon kb. 570 gold), így egyszerre
-    nagy összeget visz el.
-  - Zárolható (lock), pingelhető és rerollozható, mint a többi ajánlat.
+  - Egy drága **extra ajánlat** a boltban, saját helyen – arany keretes, széles kártya (ikon,
+    név, ár, a „ki tudja használni” pipák) a fogyóeszköz-sor jobb oldalán –, nem vesz el egy
+    item-ajánlatot sem.
+  - Tartalma: **40% eséllyel** egy **maximális statdobású Epic**, egyébként garantált tier
+    set-darab a csapat egyik kasztjának. A bolt Legendaryt továbbra sem árul (10).
+    - A **max-roll Epic** a generátor loot-költségvetésével készül (+25% stat, egy enchant-rankkal
+      több, +6 Item Level, „Looted” jelzés), 2 enchanttal, a csapat egy kasztjára (nem kézzel
+      készített és nem set-darab).
+    - A **set-darab** olyan, amilyet a bolt is árulna az adott hullámon (Item Level 68 a 15.
+      hullámon, nem 74): **nem „looted”**, a loot-költségvetés csak a max-roll Epicé. A csapat
+      kasztjai közül a hiányzó darabot választja (a kaszt hősei közül valamelyik sem viseli és
+      nem hordja a hátizsákban; a hiányzók közül egyenletesen húz, ha nincs hiányzó, bármelyik
+      elérhető darab jön). Ha a csapatnak nincs elérhető set-darabja (a 6. hullám előtt, vagy
+      set nélküli kaszt), max-roll Epic lesz.
+  - Ára az adott hullám Epic árának **3-szorosa** (a 15. hullámon 573 gold), így egyszerre
+    nagy összeget visz el. Az item saját értéke (eladás / Greed) a szokásos Epic ár.
+  - Zárolható (lock), pingelhető és rerollozható, mint a többi ajánlat: a lock átviszi a
+    következő körre, a ping kihagyja a rerollból, a reroll újrahúzza; **egyedül a Black Market
+    is elég ahhoz, hogy a reroll lefusson**. A Black Market ugyanabból az oldalsó RNG-ből húz,
+    mint a fogyóeszköz-sor.
 - **Botok:**
-  - A 6. hullámtól hősönként 1 főzetet és 1 ételt vesznek, ha a közös kasszában a botok
-    tartaléka megmarad.
-  - A Black Marketet megveszik, ha valamelyik botnak fejlesztés, és a tartalék után is
-    megengedhető.
-  - Az Enchanterre a 12. hullámtól költenek (5.7).
+  - A 6. hullám utáni piactól minden bot a saját hősének venne 1 főzetet és 1 ételt, ha a
+    vásárlás után a közös kasszában a botok tartaléka megmarad. A választás nem függ a bottól
+    (korlátlan a készlet), ezért **minden bot ugyanazt a legjobb főzetet és ugyanazt a legjobb
+    ételt veszi** (főzet: Fury > Ironskin > Swiftness > Fortune; étel: Stew > Ribs > Rings); csak
+    a kassza szab határt, hányan tudnak fizetni.
+  - A Black Marketet az a bot veszi meg, akinek a legtöbbet javít (ha egyáltalán fejlesztés), ha
+    utána a tartalék **kétszerese** marad; azonnal felveszi. A bot-reroll után újra megnézik, mert
+    a reroll a Black Marketet is újrahúzza.
+  - Az Enchanterre a 12. hullám utáni piactól költenek (5.7).
+  - **A bot-piac sorrendje:** felszerelés / kovácsolás → enchant → vásárlás → Black Market →
+    fogyóeszközök → Trainer → talentek → reroll.
 - **Repair rendszer: nem lesz.**
   - Adó, nem döntés.
   - Egyedül (ahol a legtöbb gold gyűlik) az első elesés vereség, így ott szinte nem hatna.
@@ -2723,10 +2763,11 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 
 ## 18. Nyitott kérdések
 
-Tervezési kérdés jelenleg nincs nyitva. Az M6-ra átvitt **hangolási** kérdések (a kasztok közti
-szórás és a késői kassza) a 9. fejezetben vannak („Nyitott kérdések M6-ra”); az ütemezésük a 16.
-fejezet **M6a** és **M6b** listáiban található: a késői kasszát az M6a goldsinkjei célozzák, a
-kasztok közti szórást az M6b végleges balansza kezeli.
+Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a hős-HP és az
+ellenség-sebzés viszonya a késői hullámokon, a Vor'thalax-harc kaszt-függése, a duók és a szóló
+hősök nyomása, a kasztok közti szórás) a 9. fejezetben vannak („Nyitott kérdések M6b-re”); az
+ütemezésük a 16. fejezet **M6b** listájában található: ezeket az M6b végleges balansza kezeli. A
+késői kasszát az M6a goldsinkjei célozták (16.1).
 
 ### Lezárt döntések
 
@@ -2756,3 +2797,5 @@ kasztok közti szórást az M6b végleges balansza kezeli.
 | M6 felosztása | M6a (rendszerek: ellenségek, bossok, Artifactok, Enchanter, goldsinkek, Damage Meter) és M6b (módok, környezetek, események, Dungeon-portál, tartalom-csomagok, végleges balansz) – 16. fejezet |
 | Arcane Dust | A csapat második közös pénzneme; Disenchantból és a mindenki által Passolt itemekből jön, az Enchanter költi (5.7) |
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
+| Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1–4 játékosnál ≈ 2,6–2,9 menetenként (5.5) |
+| Vor'thalax | Alap HP 450, érintéses sebzés 1,5, a boss HP-ja ×(1 + 2 × (játékosok − 1)); a Flesh Golem érintéses sebzése 2,5 (8. fejezet) |
