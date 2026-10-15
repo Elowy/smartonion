@@ -902,6 +902,9 @@ III ×2, IV ×2,5, V ×3 (az egész értékű statok, pl. „+1 Pierce”, lefel
 | Frozen Ward | When struck | 10% eséllyel Frost Nova körülötted | 10%, 8 mp ICD |
 | Retribution | When struck | 6 Holy sebzés a támadónak | 100%, 0,5 mp ICD |
 
+A rang szorzója a gold-procnál (Greedy) a gold tört részét átviszi a következő procra, így a
+II. rang procjonként átlagban 1,5 goldot ad.
+
 **Enchanting – Arcane Dust és az Enchanter (M6a):**
 
 Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kassza-táblán látszik
@@ -1575,32 +1578,75 @@ jutalom.
 | Megjelenik | 7. hullámtól | 9. hullámtól | 12. hullámtól |
 | Viselkedés | üldöző (Chase) | támogató (Support) | brute |
 | Alap HP | 7 | 6 | 40 |
-| Érintéses sebzés | 2 | 1 | 4 |
+| Érintéses sebzés | 2 | 1 | 2,5 |
 | Sebesség (m/s) | 2,1 | 2,3 | 1,5 |
 | Spawn-súly | 0,6 | 0,35 | 0,25 |
 | Csoportméret | 2–3 | 1 | 1 |
 | Gold / XP | 1 / 2 | 2 / 3 | 4 / 5 |
 
+A Flesh Golem eredetileg 4 érintéses sebzéssel a hősök teljes sebzésbevitelének ~38%-át okozta
+a 10. hullámtól (a spawnolt ellenségek ~2%-ából), ezért 2,5-re csökkent; így a részesedése ~27%
+(9. fejezet, „M6a mérés”).
+
 - **Plague Ghoul** (sugár 0,5 m): úgy üldöz, mint a Skeleton Grunt.
-  - Halálakor **méregtócsát** hagy: 1,6 m sugarú, 3 mp-ig áll, másodpercenként kétszer sebez,
-    tickenként a Ghoul akkori (a hullám szerint skálázott) érintéses sebzésének felét.
-  - **Csak a hősöket** bántja. Zöld, figyelmeztető jel nincs.
-  - Egyszerre legfeljebb **12 tócsa** él; a 13.-nál a legrégebbi eltűnik.
+  - Halálakor **méregtócsát** hagy ott, ahol meghalt (ha a hullám vége tünteti el, nem
+    keletkezik): 1,6 m sugarú, 3 mp-ig áll, **0,5 mp-enként** sebez – az első tick 0,5 mp-cel a
+    halál után esik, így a mellette álló hős még kiléphet. Tickenként a Ghoul akkori (a hullám
+    szerint skálázott) érintéses sebzésének felét okozza, a csapatméret-szorzóval és az
+    elit-affix sebzésszorzójával együtt.
+  - **Csak a hősöket** bántja (az ellenségeket nem), az élő hősöket, akiknek a **középpontja** a
+    körben van. AoE-sebzésnek számít: az Armor, az Avoidance, a Dodge és a Block érvényes rá;
+    nincs forrása, ezért a Thorns / Retribution nem sül el.
+  - Zöld korong világos peremmel és buborékokkal; figyelmeztető jel nincs.
+  - Egyszerre legfeljebb **12 tócsa** él; a 13.-nál a legrégebbi (kor szerint, döntetlennél a
+    korábban létrejött) eltűnik. A hullám vége minden tócsát eltávolít.
+  - A botok a tócsát **veszélyzónának** tekintik, és kikerülik (lásd „Bossok”, veszélyzónák).
 - **Cultist Acolyte:** új, **támogató** viselkedés.
-  - A legközelebbi hőstől 6–9 m-re tartja a távolságot, és a többi ellenség közelében marad.
-  - **4 mp-enként 0,6 mp-es csatornázást** végez (lila sugár). A kábítás, a hátralökés és a
-    fear megszakítja.
-  - Célpontja a 7 m-en belüli **legsebesültebb ellenség**: a Max HP-ja **25%-át** gyógyítja.
-    Ha nincs sebesült, a hatótávon belüli **legerősebb ellenségre** a Max HP-ja **20%-ának**
-    megfelelő pajzsot tesz.
-  - A pajzs nem halmozódik, csak frissül: a bossokon sem megy 20% fölé.
-  - **Elsődleges célpont:** a botok előnyben részesítik.
+  - **Távolság:** a legközelebbi látható hőstől 6 m alatt **hátrál** (a falak mentén, falnak nem
+    megy; sarokban a fal mentén fut), 9 m fölött **közelít** (a csorda felé, ha az közelebb van a
+    hőshöz nála, különben a hős felé); a 6–9 m-es sávban a **csorda** (a 10 m-en belüli többi
+    ellenség közepe) felé sodródik, ha az nincs 6 m-en belül a hőstől. Így a többi ellenség
+    közelében marad.
+  - **Csatornázás:** 4 mp-enként (induláskor 2–4 mp késleltetéssel, csoportonként szétszórva)
+    **0,6 mp-es** csatornázást végez; közben **áll**, lila sugár köti össze a célponttal.
+  - **Célpont:** a 7 m-en belüli **legkisebb HP-arányú**, sebesült ellenség: a Max HP-ja
+    **25%-át** gyógyítja (a gyógyuláscsökkentés hat rá). Ha nincs sebesült, a hatótávon belüli
+    **legnagyobb Max HP-jú** ellenségre, akinek a pajzsa még 20% alatt van, a Max HP-ja
+    **20%-ának** megfelelő pajzsot tesz. Más ellenségeket segít (más Acolyte-ot is), saját magát
+    és a Loot Goblint nem.
+  - **A pajzs nem halmozódik, csak frissül:** a nagyobb pajzs megmarad, a kisebb 20%-ra frissül;
+    a bossokon sem megy 20% fölé. Az Acolyte pajzsa elfogyva **nem nő vissza** (csak a
+    Shielding elit affix regenerál). Nem elit ellenségen lila buborék, az eliten a névtáblán
+    látszik.
+  - **A bosst sosem gyógyítja** (az mindig a legsebesültebb lenne, és minden Acolyte rajta
+    tartaná); a boss melletti sebesült add-ot továbbra is gyógyítja.
+  - **Megszakítás:** a kábítás, a hátralökés (bármilyen, a találat sebzése nem), a fear és a
+    taunt. Megszakítás után a következő csatornázás a cooldown **felénél** jön. Ha a cél meghal
+    vagy 7 + 1,5 m-nél messzebb kerül, a csatornázás 0,5 mp szünettel véget ér; ha nincs élő
+    hős, szintén.
+  - **Elsődleges célpont:** a botok 14 m-en belül az Acolyte felé mennek (ha egészségesek és
+    kevesebb mint 4 ellenség van körülöttük), és a fegyverük a lőtávon belüli Acolyte-ot
+    választja a legközelebbi helyett. Az emberi játékos fegyvere továbbra is a legközelebbit
+    veszi célba.
 - **Flesh Golem** (sugár 0,9 m, ×1,6 méret): új, **brute** viselkedés – lassú, sok HP.
   - Hátralökés-ellenállás 80%, kábítás-ellenállás 50%.
-  - **6 mp-enként**, ha egy hős 4–9 m-re van, **0,8 mp-es figyelmeztető vonalat** húz
-    (horog), majd a vonalban még álló hőst **3 m-t maga felé húz**. A horog sebzése 1×
-    érintéses sebzés.
-  - A **Dodge** kikerülheti a horgot (ugyanaz a dobás, mint a többi támadásnál).
+  - **Horog:** 6 mp-enként (induláskor 3–6 mp), ha egy **látható** (nem Vanish-olt) hős 4–9 m-re
+    van, a golem megáll, és **0,8 mp-es piros sávot** (1,2 m széles, 9,5 m hosszú) húz; a célzás
+    a hőst követi a telegraph első 60%-ában, az utolsó **40%-ban zárolva** van. A kijelzőn a sáv
+    kitöltődik (visszaszámlálás).
+  - **Találat:** lejártakor a **vonalban még álló legközelebbi hőst** (a közepe a sávon belül)
+    találja: **1× érintéses sebzés** (lövedék típusú, az Avoidance érvényes), majd **3 m-es húzás**
+    a golem felé (0,22 mp alatt; a falak és a képernyőszél megállítják; nem húz a golem testéig:
+    a golem sugara + a hős sugara + 0,1 m marad). A hős mögött állót nem viszi el.
+  - A **Dodge** egyetlen dobással (mint bármelyik támadás) kikerüli a sebzést ÉS a húzást; a
+    sérthetetlen hős (Divine Shield, Charge, i-frame) immunis. Aki a zárolás után kilép a
+    sávból, kikerüli; a cooldown ilyenkor is elmegy.
+  - **Megszakítás:** a kábítás (50% ellenállás: a felezett idő), a fear és a taunt. A hátralökés
+    nem szakítja meg (80% ellenállás). Megszakítás után a cooldown fele. Ha az egyetlen látható
+    hős Vanish-ol a telegraph alatt, a golem eldobja a hurkot (cooldown fele); ha van másik
+    látható hős, a telegraph fut tovább, de a láncot a Vanish-olt hős már nem találja.
+  - **Botok:** a hős-botok a hurkok **60%-át** kikerülik (a bot saját RNG-jével, **golemenként és
+    hurkonként** egyszer döntenek), a többit elszenvedik – mint egy ember, aki nem figyelt.
 
 **Elitek**
 
@@ -1634,11 +1680,16 @@ jutalom.
 - **Kivégzés:** az Execute az eliteket is azonnal megöli a küszöb alatt; a Slayer stat hat
   rájuk.
 - **20. hullám – elit-hullám** (M6a): a hullám minden ellensége kap egy véletlen elit-affixet.
-  - Az **affix hatása és megjelenése** ugyanaz, mint az eliteknél (Shielding, Enraged,
-    Frenzied, Vampiric), de az ellenség csak **×1,5 HP-t** kap (nem ×3-at), és a **jutalma
-    normál** (nincs elit-gold, ×5 XP és garantált item).
+  - Az **affix hatása** ugyanaz, mint az eliteknél (Shielding, Enraged, Frenzied, Vampiric),
+    de az ellenség csak **×1,5 HP-t** kap (nem ×3-at), és a **jutalma normál** (nincs
+    elit-gold, ×5 XP és garantált item).
+  - A **megjelenése kompakt** („lite”): csak az affix-drágakő a fej fölött, a Shielding-buborék
+    és az Enraged árnyalat; nincs névtábla, HP-sáv és szárny, és nincs méretnövelés (a ×1,3 az
+    igazi eliteké). Nem számít elitnek: a Slayer és az Execute elit-prioritása nem hat rájuk.
   - Az igazi elitek (3× HP, elit-jutalom) várható száma ezen a hullámon a **kétszeres**.
   - Nincs boss, és Loot Goblin sem jön (lásd lent).
+  - A botoknál a 20. hullám tisztán kiugrik (4 fő: 5,4 elesés / menet a 20. hullámon, 0,8 a
+    19.-en és a 21.-en; 2 fő: 2,4 / 0,0), de nem fal (9. fejezet, „M6a mérés”).
 
 **Loot Goblin** (ritka, különleges ellenség)
 
@@ -1688,27 +1739,60 @@ változnak. Közös szabályok:
 
 - **A boss az időzítő helyett:** a hullám a **boss halálával ér véget** (nincs időkorlát). A
   pályán maradt ellenségek ilyenkor eltűnnek, a földön lévő gold, XP és loot a szokásos módon
-  begyűjtődik, mint egy normál hullám végén.
-- **Add-ok:** a normál spawn a szokásos ráta **50%-ával** folytatódik.
-- **Enrage 90 mp-nél:** a boss sebzése ×1,5, sebessége +30%. Ezután minden további 30 mp-enként
-  a sebzés-szorzó +0,25-tel nő (×1,75, ×2,0 …).
-- **HUD:** a hullám-időzítő helyén **boss-keret** áll: név, HP-sáv, fázis-pipek és „ENRAGED”
-  felirat (12. fejezet).
-- **Boss HP:** `alap HP × az adott hullám szokásos ellenség-HP-szorzója × (1 + 0,75 ×
-  (játékosok − 1))`. A co-op szorzó a boss saját szorzója (9. fejezet), nem a normál +20%
-  játékosonként.
+  begyűjtődik, mint egy normál hullám végén. A piac fejléce a boss-hullám előtt ezért nem ír
+  másodpercet: „Next up: Wave 10 of 25 – Boss wave! (ends when the boss falls)” (ugyanígy a
+  25. hullámra); a többi hullám fejléce változatlan („Next up: Wave 4 of 25  ·  60 seconds”, az
+  elit 20. hullámé „… seconds  –  Elite wave!”).
+- **Érkezés:** a boss-hullám elején a pályán egy 2,6 m sugarú piros rúna jelenik meg a
+  hősöktől legalább 10 m-re (lehetőleg a képernyőn), és **2 mp múlva** megérkezik a boss. A
+  HUD-on ekkor a neve piros szalagként jelenik meg; a boss-keret (teli HP-sáv) a hullám 1.
+  másodpercétől a helyén van.
+- **Add-ok:** a normál spawn a szokásos ráta **50%-ával** folytatódik. Boss-hullámon **nincs
+  elit és nincs Loot Goblin** (a boss az elit).
+- **A boss nem mozdítható és nem irányítható:** hátralökésre immunis, a kábítás időtartama
+  ×0,25, a lassítások fele erősséggel hatnak (a szellem-lassítás is), a taunt és a fear nem hat
+  rá. Az Execute nem ölheti meg azonnal (dupla sebzést kap), a Mirror Image nem csalja el.
+- **Kamera:** az élő bosst a kamera is keretezi (a Loot Goblinhoz hasonlóan „puha” pont; a
+  hősök mindig elsőbbséget kapnak), a magas alakja is belefér a HUD alá.
+- **Enrage 90 mp-nél** (a boss megérkezésétől számítva): a boss sebzése ×1,5, sebessége +30%.
+  Ezután minden további 30 mp-enként a sebzés-szorzó +0,25-tel nő (×1,75, ×2,0 …). A boss
+  **minden támadása** (érintés és mezők) ezt a szorzót használja.
+- **2. fázis** 50% HP-nál: a boss cooldownjai rövidülnek; a futó cooldownok megtartják az
+  előrehaladásukat az új (rövidebb) intervallumon.
+- **HUD:** a hullám-időzítő helyén **boss-keret** áll: név, HP-sáv, két fázis-pip és „ENRAGED”
+  felirat (12. fejezet). Az „ENRAGED” pulzáló, világos piros; a sora **mindig le van foglalva**
+  (nyugodt bossnál átlátszó), így a keret nem ugrik meg, amikor a boss dühöngeni kezd.
+- **Boss HP:** `alap HP × az adott hullám szokásos ellenség-HP-szorzója × (1 + k × (játékosok −
+  1))`, ahol a co-op szorzó a boss saját szorzója (9. fejezet), nem a normál +20% játékosonként:
+  **Morvain k = 0,75** (×1 / ×1,75 / ×2,5 / ×3,25), **Vor'thalax k = 2,0** (×1 / ×3 / ×5 / ×7; a
+  csapat sebzése gyorsabban nő a létszámnál: itemek, Artifactok, fókusz).
 - **Boss sebzés:** `alap érintéses sebzés × az adott hullám szokásos sebzés-szorzója × a
   csapatlétszám-sebzésszorzó` (9. fejezet). Az alábbi „N× érintéses” az így kapott érintéses
   sebzés N-szerese.
-- **Jutalom:** 50 gold, játékosonként 1 Epic+ item (20% eséllyel Legendary, 10.1) és
-  Artifact-dobás (5.5). A legyőzött bossok száma a Damage Meter statisztikájába is bekerül
-  (12. fejezet).
+- **Jutalom:** 50 gold és XP (Morvain 30, Vor'thalax 60); **játékosonként 1** Epic+ item (20%
+  eséllyel Legendary, 10.1), mind a boss halálának helye körül egy körben; a Need / Greed /
+  Pass dobás a hullám végén. A gyilkos itemje az első; **egyetlen Artifact-dobás** jár a bossért
+  (a gyilkos Fortune-jével, 5.5), nem hősönként egy. A boss-item nem számít a normál drop
+  hullámlimitjébe. A legyőzött bossok száma a Damage Meter „Bosses” statjába is bekerül: a
+  boss halálos ütését adó hős kapja (12. fejezet), a boss HP-ja (túlütés nélkül) pedig a hősök
+  sebzésébe.
+- **Győzelem:** Vor'thalax halála a 25. hullámon: „Victory!” szalag, 1,6 mp, majd a győzelmi
+  képernyő. A másik boss-hullám végén a szalag „<Boss neve> defeated!”.
+- **Veszélyzónák és a botok:** a boss köreit, kúpját, mezőit, meteorjait és a Plague Ghoul
+  tócsáját a botok veszélyzónának tekintik: a sugarán + 0,9 m-en belül kifelé tolják magukat
+  (a közepéből a pálya közepe felé; ártalmatlan vagy lejárt zóna nem tol). A Meteor körébe a
+  bot-csapat beáll (a sebzés megoszlik), a magányos hős kilép belőle (4× kap 8× helyett). A
+  hullám vége minden ellenség-veszélyzónát eltüntet.
+- **Fejlesztői biztosíték (csak `--smoke`):** ha egy boss a saját enrage-e után 120 mp-pel még
+  él (tehát 210 mp-nél), meghal („SMOKE boss timeout” sor), hogy a futás mindig véget érjen.
+  Egy lezárt smoke-futás tehát nem bizonyítja, hogy a boss legyőzhető.
 
 **10. hullám – Lich Commander Morvain** (alap HP 450, érintéses sebzés 3)
 
 - **Kinézet:** nagy csontváz-mágus, jeges korona, bot.
 - **Frost Circles** – 7 mp-enként minden élő hős alatt egy 2,2 m sugarú jégkör jelenik meg; 1,2
-  mp figyelmeztetés után lecsap: 2× érintéses sebzés és 2 mp-re 40% lassítás. „Ne állj benne.”
+  mp figyelmeztetés után lecsap: 2× érintéses sebzés és 2 mp-re 40% lassítás (a hős
+  mozgássebessége csökken, időzített buff; a hullám végén megszűnik). „Ne állj benne.”
 - **Raise Dead** – 12 mp-enként 4 Skeleton Gruntot idéz (a 2. fázisban +2, vagyis 6-ot).
 - **Frost Breath** – 9 mp-enként 60°-os, 7 m hosszú kúp a legközelebbi hős felé; 1 mp
   figyelmeztetés, 3× érintéses sebzés. „Szóródjatok szét.”
@@ -1717,12 +1801,14 @@ változnak. Közös szabályok:
 **20. hullám – Elit-hullám:** nincs boss, de minden ellenség elit-affixet kap, és az igazi
 elitek is kétszer annyian jönnek (lásd „Elitek”).
 
-**25. hullám – Vor'thalax, the Burning Tyrant** (démon, végső boss; alap HP 1200, érintéses
-sebzés 4)
+**25. hullám – Vor'thalax, the Burning Tyrant** (démon, végső boss; alap HP 450, érintéses
+sebzés 1,5)
 
 - **Kinézet:** szarvas démon, izzó tűzfény.
 - **Fire Fields** – 8 mp-enként 2 égő folt (2 m sugarú) jelenik meg a hősök pozícióján; 1 mp
-  figyelmeztetés után 8 mp-ig áll, és másodpercenként 1× érintéses sebzést okoz.
+  figyelmeztetés után 8 mp-ig áll, és másodpercenként 1× érintéses sebzést okoz. Az első tick
+  a gyulladás pillanatában esik (a jelzés alatt ki lehet lépni), utána másodpercenként (8 mp =
+  8 tick). Ha több a folt, mint a hős, a többlet a hős mellé (2,6 m-re) kerül.
 - **Meteor** – 14 mp-enként egy véletlen hős alatt 3 m sugarú jelölt kör jelenik meg; 3 mp
   figyelmeztetés után csapódik be. A teljes sebzés **8× érintéses**, ami **egyenlően oszlik el**
   a körben állók között: minél többen állnak bent, annál kisebb a rájuk jutó rész (co-op
@@ -1730,6 +1816,15 @@ sebzés 4)
 - **Imp Swarm** – 20 mp-enként 6 Candlekin („imp”) érkezik.
 - **2. fázis** 50% HP-nál: a Fire Fields 3 foltot hoz, a Meteor 10 mp-enként jön.
 - **Győzelem:** Vor'thalax halála a 25. hullámon a menet győzelme – nem az időzítő lejárta.
+- **Alap HP 450, érintés 1,5, k = 2:** a korábbi 1200-as alap HP elírás volt: a természetes
+  (nem szintre állított) botok 210 mp alatt csak a HP 38–67%-át vitték le vele. A 25.
+  hullámon a hősök 60–110 HP-júak és az ellenség-sebzés ×45, ezért a boss minden területi
+  támadása és érintése egy lövésre megöli a törékeny hőst; ezért a boss érintéses sebzése 1,5
+  (eredetileg 4), és a HP-ja a létszámmal meredekebben nő, mint Morvainé (k = 2: a csapat
+  sebzése gyorsabban nő a létszámnál).
+- **Mért (botok) kill-idők:** 4 fő 36–102 s (medián 80 s), 2 fő 43–108 s, 1 fő a Rogue 9–20 s,
+  a Mage 64 s, a Paladin nem győzi le (DPS < 1k/s a bossra). A harc ideje erősen kaszt-függő
+  (a bot-csapat DPS-e a bossra 0,8k–23k/s): a végső balansz az M6b-é (9. fejezet).
 
 ---
 
