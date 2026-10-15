@@ -1971,15 +1971,20 @@ sebzés 1,5)
   - A Reset Talents-nél ehhez még egy megerősítő A is kell.
   - Rerollnál nincs nyomva tartás: a bolti reroll közös szavazás, a szintlépési reroll pedig
     kicsi összeg.
-- **Kassza-tábla (Purse board):** a képernyő tetején, a kassza mellett. A gold mellett itt látszik
-  a csapat **Arcane Dust** készlete is (5.7). Három része van:
+- **Kassza-tábla (Purse board):** a képernyő tetején, a kassza mellett. A gold **jobb oldalán**
+  itt látszik a csapat **Arcane Dust** készlete is (5.7): ibolya csillag-ikon és a szám (0-nál
+  az ikon halvány; 1000 fölött rövidítve: „1.2k”, „12k”, „1.2M”, lefelé kerekítve). Ha a gold és
+  a Dust együtt nem fér a pénztárca-oszlopba (pl. ötjegyű gold és háromjegyű Dust), a két szám
+  betűmérete lépésenként kisebb lesz, az oszlop nem nő. Három része van:
   - **Ready-pipek:** minden játékosnak egy rombusz a színében, kitöltve, ha kész.
   - **Költésnapló** (csak ez a kör, a legújabb elöl, legfeljebb két sor, utána „+N more”): ki,
     mit, mennyiért. Pl. „*P1 [Rare Dagger] 62 · P2 Fireball Rank III 45 · Team Stall reroll
     12*”.
     - Minden költés benne van: bolti vásárlás, automatikus kovácsolás, bolti reroll
       („Team”), Trainer-rang, szintlépési reroll, talent-reset, valamint M6a-tól a
-      fogyóeszköz, a Black Market és az Enchanter-művelet (a gold mellett a Dust-költség is).
+      fogyóeszköz (sima név), a Black Market (az item neve szögletes zárójelben, mint a bolti
+      itemeké) és az Enchanter-művelet (a gold mellett a Dust-költség is a feliratban:
+      „*P1 Empower Blazing (8 Dust) 48*”).
     - Az eladás és a Greed bevétele nem.
   - **Kívánságsor:** a bolti és a Trainer-pingek összesítve. Ha a költésnapló csak egy sort
     foglal, a kívánságsor a felszabadult második sort is használja.
@@ -2051,12 +2056,13 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Elit | garantált 1 | Rare+ |
 | Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
 | Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
-| Artifact (ritka) | lásd 5.5: boss 15% (bossonként egyszer), goblin 5%, elit 2%, normál 0,05% – a 10. hullámtól | Artifact |
+| Artifact (ritka) | lásd 5.5: boss 15% (bossonként egyszer), goblin 5%, elit 2%, normál 0,05% ÷ játékosszám – a 10. hullámtól | Artifact |
 
 **A földön**
 
 - Az item **lootzsákként** esik le, a ritkaság színében világító fénynyalábbal
-  (fehér, zöld, kék, lila, narancs), így messziről is látszik, ha valami jó esett.
+  (fehér, zöld, kék, lila, narancs; az Artifacté arany), így messziről is látszik, ha valami
+  jó esett.
 - Bármelyik játékos felveheti, ha rálép. Ilyenkor a zsák a HUD-on lévő
   „**Team Loot**” számlálóba repül.
 - Amit senki nem vett fel, a hullám végén automatikusan begyűjtődik. A loot nem vész el.
@@ -2075,6 +2081,9 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
    | X | **Greed** (érme ikon) | „Adjuk el” – ha az item Greedre megy, **azonnal eladódik** |
    | B | **Pass** | Nem vesz részt a dobásban |
 
+   - **A B-gomb felirata** követi az aktuális itemet: csapatban „Pass (all pass: 8 Dust)” –
+     utalás, hogy ha mindenki passzol, az item Dust lesz (Artifactnál sima „Pass”); szólóban
+     „Disenchant (8 Dust)” (Artifactnál „Leave”).
    - **Időkorlát:** 15 mp; aki nem dönt, az Passnak számít.
    - **Rejtett döntések:** a döntések a végéig rejtve maradnak; csak egy pipa jelzi, ki döntött már.
 3. **Need feltétele:**
@@ -2094,11 +2103,14 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
      belőle a csapat közös készletébe (ritkaságtól függően 1 / 2 / 4 / 8 / 16, lásd 5.7). Az
      Artifact kivétel: azt nem lehet Disenchantolni. A kovácsoláshoz nem kell anyag (4.1).
 5. **Eredmény:** WoW-stílusú üzenetsor, pl.:
-   „*P2 rolls 87 (Need) for [Stormcaller]*” → „*P2 wins [Stormcaller]*”.
+   „*P2 rolls 87 (Need) for [Stormcaller]*” → „*P2 wins [Stormcaller]*”. Ha mindenki Passolt:
+   „*Everyone passed on [X] – disenchanted into 8 Dust*” (szólóban „*Disenchanted [X] into 8
+   Dust*”); az Artifactnál (nem Disenchantolható) a régi szöveg marad („Left … behind” /
+   „Everyone passed on …”).
 
 **Különleges esetek**
 
-- **Egy játékos:** nincs dobás, csak Take (A) / Sell (X) / Leave (B).
+- **Egy játékos:** nincs dobás, csak Take (A) / Sell (X) / Disenchant (B; Artifactnál Leave).
 - **Botok:** Need, ha használni tudják és fejlesztés nekik, különben Greed.
 - **Gyorsítás:** minden játékos egy gombbal (Y) **„Greed all remaining”**-et is választhat;
   ekkor a hátralévő itemekre automatikusan Greedet dob.
