@@ -1818,7 +1818,7 @@ sebzés 1,5)
 - **2. fázis** 50% HP-nál: a Fire Fields 3 foltot hoz, a Meteor 10 mp-enként jön.
 - **Győzelem:** Vor'thalax halála a 25. hullámon a menet győzelme – nem az időzítő lejárta.
 - **Alap HP 450, érintés 1,5, k = 2:** a korábbi 1200-as alap HP elírás volt: a természetes
-  (nem szintre állított) botok 210 mp alatt csak a HP 38–67%-át vitték le vele. A 25.
+  (nem szintre állított) botok 210 mp alatt a HP-nak csak a 33–62%-át vitték le vele (38–67% maradt). A 25.
   hullámon a hősök 60–110 HP-júak és az ellenség-sebzés ×45, ezért a boss minden területi
   támadása és érintése egy lövésre megöli a törékeny hőst; ezért a boss érintéses sebzése 1,5
   (eredetileg 4), és a HP-ja a létszámmal meredekebben nő, mint Morvainé (k = 2: a csapat

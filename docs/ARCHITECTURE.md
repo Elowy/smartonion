@@ -1875,8 +1875,9 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
 - `data/bosses/lich_commander_morvain.tres` (wave 10: base HP 450, contact 3, speed 1.9, radius 0.8,
   scale 2.1, model `lich`, Frost Circles 7 s / Raise Dead 12 s (4, 6) / Frost Breath 9 s, cooldowns
   ×0.7 in phase 2, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25 by party size) and
-  `data/bosses/vorthalax.tres` (wave 25: base HP 450 (the plan's 1200 was never reachable, see "Balance data
-  points"), contact 1.5 (4.0 before the balance pass), `coop_hp_per_player` 2.0 (0.75 before) = x1 / x3 / x5 / x7,
+  `data/bosses/vorthalax.tres` (wave 25: base HP 450 (the GDD's earlier 1200 left 38-67% of the HP after the 210 s
+  smoke safety, see "Boss-fight data points"), contact 1.5 (4.0 before the balance pass), `coop_hp_per_player` 2.0
+  (0.75 before) = x1 / x3 / x5 / x7,
   speed 2.0, radius 1.1, scale 2.3, model `demon`, Fire Fields 8 s (2, 3) / Meteor 14 s (10 s) / Imp Swarm 20 s
   (6 Candlekin)). Bosses live in `Db.bosses`, never in `Db.enemies`.
 
@@ -2578,7 +2579,6 @@ bit-identical per seed.
 
 #### The merged M6a head (before the balance pass and the fixes)
 
-
 Validation of the merged M6a (six feature branches merged plus three integration commits, before the balance pass
 and the fixes). All runs `--fixed-fps 60` (bit-identical for the same seed), headless, GL Compatibility.
 
@@ -2587,8 +2587,8 @@ and the fixes). All runs `--fixed-fps 60` (bit-identical for the same seed), hea
 `ProcSystem.shield_hp is read-only` test.
 
 **Seed-5 smoke** (`--smoke --waves=6 --seed=5`): exit 0, 0 errors, 0 warnings, 587 kills, 2 goblins, 211.9 s game
-time (195.1 s run time), level 7. The pre-M6 base gave 595 kills / 0 goblins / 215.9 s game time: the difference comes only from
-the enemy data fixes (Marsh Gurgler group 4-6, Greedy 5% / +1 gold; they shift the RNG stream); every other
+time (195.1 s run time), level 7. The pre-M6 base gave 595 kills / 0 goblins / 215.9 s game time: the difference
+comes only from the enemy data fixes (Marsh Gurgler group 4-6, Greedy 5% / +1 gold; they shift the RNG stream); every other
 feature alone was identical to the base, and the enemies alone gave exactly these 587 / 195.1 s.
 
 **Natural 25-wave runs** (`--smoke --waves=25 --allow-defeat`, bots only, nothing set up):
@@ -2612,8 +2612,8 @@ For comparison the pre-M6 base (M5 gameplay) plays the 2-player seed-21 run to t
 downs, gold at the last shop 1,876 (nothing to spend it on), no consumables / Dust. The M6 sinks work: the purse is
 emptied by consumables, enchants and the Black Market (gold at the last shop 41-307).
 
-**What kills the bots** (before the balance pass; a debug copy printed every hit by source, the numbers equal the runs above): the **Flesh Golem**
-is the biggest damage dealer from wave 12 on: 42% (4 players) / 50% (1) / 37% (2) of all damage taken in waves 10-19
+**What kills the bots** (before the balance pass; a debug copy printed every hit by source, the numbers equal the
+runs above): the **Flesh Golem** is the biggest damage dealer from wave 12 on: 42% (4 players) / 50% (1) / 37% (2) of all damage taken in waves 10-19
 (hook + melee), then the Troll Axethrower (25-32%); 7 of the 10 downs of waves 10-19 and 11 of the 14 downs of wave 20 in
 the 4-player run came from golem hits (wave 19 alone: 6 downs). **Wave 20** (every enemy carries an elite affix, HP x1.5)
 is a wall for the smoke bots at every party size: golems with Shielding / Vampiric affixes and enraged / frenzied
@@ -2625,7 +2625,6 @@ avoidance is not what loses the run.
 **Boss kill times** are in the table (Morvain 52-93 s, 1-4 players); Vor'thalax was never reached naturally in these
 three runs, his numbers are the leveled-up experiments of the boss-fight data below (450 base HP); the balance pass
 ran him naturally.
-
 
 #### After the follow-ups (two branches on the merged head, validated separately)
 
@@ -2640,7 +2639,6 @@ ran him naturally.
 - The combination of the two (and the 4p / 2p matrix on it) is not measured yet.
 
 #### Boss-fight data points (before the balance pass: contact 4, `coop_hp_per_player` 0.75; `--fixed-fps 60`, natural runs from wave 1)
-
 
 Command: `godot --headless --fixed-fps 60 --path . -- --smoke --waves=25 [--allow-defeat] --seed=S
 --players=N` (the 3 / 1 player runs use the first N classes: warrior, mage, paladin).
@@ -2678,7 +2676,9 @@ copy or `--boss-hp` was used, which also scales Morvain):
 
 ### M6a tests
 
-The M6a tests (each new behaviour has a test that fails without it; the new tests were mutation-checked, e.g. deleting `and hazard == Vector2.ZERO` in the rescue stand, the `_bots_black_market()` call in `_bots_reroll`, or the `_damage_source_id` argument fails a test):
+The M6a tests (each new behaviour has a test that fails without it; the new tests were mutation-checked, e.g.
+deleting `and hazard == Vector2.ZERO` in the rescue stand, the `_bots_black_market()` call in `_bots_reroll` or the
+`_damage_source_id` argument fails a test):
 
 | File | Covers |
 |---|---|
@@ -2691,4 +2691,4 @@ The M6a tests (each new behaviour has a test that fails without it; the new test
 | `tests/test_m6_meter.gd`, `_credit.gd`, `_ui.gd` | the recorders, the caster credit at every heal / shield / revive call site through the real code, the end screen, the awards, the run card |
 | `tests/test_m6_followup.gd` | the follow-up fixes: the market header names no seconds before a boss wave (waves 10 and 25, the other waves keep their line, the open market screen), `Enchanter.best_weapon` skipping Artifacts and `bot_target` (the weapon, else the best Epic+ armour / off-hand; the Fangs pair counts as two Artifacts; a bot holding an Artifact enchants its armour; a bot with a normal weapon still enchants the weapon first), the rescue stand beside a downed teammate (`test_a_bot_beside_a_downed_teammate_*`: stands still without a hazard, leaves a puddle / a boss circle it stands in, ignores a far one), a bot reroll that redraws an affordable Black Market upgrade buys it |
 | `tests/test_m6_balance.gd` | 7 tests: `record_damage_taken` keeps source and wave, `start_run` clears it, a hit on a hero is booked under the golem / `environment`, the `taken_by_source` format, the golem pins (contact 2.5, hook still 1 x, a duo's wave-14 hit < 16 raw), the Vor'thalax pins (contact 1.5, k = 2, x1 / x3 / x5 / x7, Morvain unchanged, a duo's meteor share < 170 raw), `Main.heroes_defence_text`; `test_m6_enemies.gd` (golem contact) and `test_m6_bosses.gd` (Vor'thalax contact) were updated |
-| `tests/test_m6_integration.gd` | the cross-package contracts of 2.8: the puddle as a bot hazard and `WaveDirector.stop()`, the Acolyte beside a real boss, a boss kill in the meter, one Artifact roll per boss, Dawn's Embrace credit, consumable / Black Market / enchant spends in the purse board, Artifacts never sold / disenchanted / enchanted / dusted, the Enchanter tab greying them |
+| `tests/test_m6_integration.gd` | the "Cross-system contracts" above: the puddle as a bot hazard and `WaveDirector.stop()`, the Acolyte beside a real boss, a boss kill in the meter, one Artifact roll per boss, Dawn's Embrace credit, consumable / Black Market / enchant spends in the purse board, Artifacts never sold / disenchanted / enchanted / dusted, the Enchanter tab greying them |
