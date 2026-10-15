@@ -1858,8 +1858,11 @@ sebzés 1,5)
 - **Co-op skálázás:** minden további játékos után
   - +60% ellenségszám,
   - +20% ellenség-HP,
-  - a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) – ez a boss saját szorzója, a normál +20%
-    helyett (az alap boss-HP-t és a sebzést a 8. fejezet adja).
+  - a boss HP-ja ×(1 + k × (játékosok − 1)) – ez a boss saját szorzója, a normál +20%
+    helyett (Morvain k = 0,75, Vor'thalax k = 2; az alap boss-HP-t és a sebzést a 8. fejezet
+    adja),
+  - az Artifact normál ölésből eső esélye osztva a játékosszámmal (5.5), mert az ölések
+    száma a csapattal nő.
 - **Spawn-ráta:** `(0,9 + 0,08 × (h − 1))` ellenség / mp egy játékosra, co-opban szorozva az
   ellenségszám-szorzóval. Egy 4 fős teljes menet kb. 15 000 ellenség. Mivel minden ellenség
   goldot és XP-t ad, a szám lassan nő; a késői nehézséget a HP- és sebzés-skálázás adja.
@@ -1878,12 +1881,48 @@ sebzés 1,5)
     esett el, az első elesések a 5–22. hullámon, a 20–25. hullámon erős a nyomás. 2 fő: 6
     próbából 5 végigért, 1 a 23. hullámon esett el. 1 fő: 13 próbából 6 végigért, a többi a
     8–24. hullámon halt meg.
-  - **Nyitott kérdések M6-ra:** egyedül nagy a kasztok közti szórás (a Warrior egyedül a
-    15–19. hullámon hal meg, a Paladin és a Warlock végigér), és a késői kassza gyakran 2000
-    gold fölött van.
-    - A késői kasszát az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market; 16.1)
-      célozzák.
-    - A kasztok közti szórás a végleges 25 hullámos balansz (**M6b**, 16. fejezet) feladata.
+  - **M6a mérés (botok, 25 hullám, 19 futás: 4 fő 5 seed, 2 fő 5, 1 fő 9; a golem
+    puhítása és a Vor'thalax-hangolás után):**
+    - 4 fő: **5-ből 4 végigért** (a vesztes a végső boss ellen bukott, 166 mp-nél, 29% HP
+      maradt rajta). Az első elesések a 8–18. hullámon; a 15–19. hullámon menetenként átlag 2,8
+      (7,0 volt a golem puhítása előtt), a 20–24. hullámon 3–21. A 20. hullám kiugrik (5,4
+      elesés / menet a 20.-on, 0,8 a 19.-en és a 21.-en).
+    - 2 fő: **5-ből 3 végigért** (1 volt); a golem puhítása előtt 5-ből 2 duó a 14. hullámon
+      halt meg. A vesztesek: 1 a 20. hullámon, 1 a végső boss ellen.
+    - 1 fő: a medián halálhullám 25 (24 volt); 9-ből 2 valódi győzelem (mindkettő Rogue), 2
+      Paladin-menet él a bossal, de nem tudja megölni (smoke-biztosíték 210 mp-nél), a halálok a
+      7., 20., 22., 23. és 25. hullám. Az egyedüli hős első elesése a menet vége, ezért az
+      egyes seedek nagyon zajosak.
+    - **Morvain** (a hangolás nem érintette): medián kill-idő 63 s (4 fő), 55 s (2 fő), 59 s
+      (1 fő). **Vor'thalax:** lásd 8. fejezet.
+    - A golem aránya a kapott sebzésből a 10. hullámtól 38% → 27%; az Axethrower lett a
+      legnagyobb egyedi forrás a legtöbb 4 fős menetben.
+    - A késői kassza: a 4 fős menetekben az utolsó piacon 150–320 gold marad (az M6a előtt
+      2000 fölött), a szóló és duó menetekben a szórás nagy (50–4 800 gold).
+    - Egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a smoke-biztosíték ölte meg):
+      a mátrix olvasásakor a „TIMEOUT” sorokat külön kell számolni.
+  - **Nyitott kérdések M6b-re:**
+    - A hősök HP-ja a 25. hullámon 60–110, az ellenség-sebzés ×45: a végső boss, a 20. hullám
+      és a golem horga a Mage-et és a Rogue-ot minden szorzótól függetlenül egy lövéssel öli.
+      A hős-HP és az ellenség-sebzési görbe viszonya (egy hős-HP-növekedési tag szintenként
+      vagy Item Level-enként) a végső balansz feladata.
+    - A Vor'thalax-harc osztályfüggő (a bot-csapat DPS-e a bossra 0,8k–23k/s: a Paladin / Warrior
+      bot csak nagyon lassan sebzi); a 4 fős medián (80 s) a 90–180 s-os cél alatt van. Lehetséges
+      lépés: a 4 fős szorzó ×7 → ×8–9 (k = 2,4), de a gyengébb csapatok már a határon vannak.
+    - A duók és a szóló hősök 10–19. hullámai szinte elesés nélkül telnek (a golem puhítása
+      óta), a duó nem tud éleszteni (az 5 duóból 2 elbukott); a csapatlétszám-sebzésszorzóhoz
+      (fent) szándékosan nem nyúltunk.
+    - A számok a `4aa2c3e` + a balansz-commitok állapotán mértek: az Artifact-kínálat osztása
+      (5.5) és az Artifactot viselő bot Enchanter-szabálya (5.7) a késői erőt módosítja, ezért a
+      4 és 2 fős mátrixot az összefésült fejen újra kell futtatni (kevesebb Artifact kevesebb
+      késői fegyversebzést jelent).
+    - Egy adat-módosítás is átrendezi az RNG-t (egy szóló Mage a 24. helyett a 20. hullámon
+      halt meg): az egyes seedek párjai zajosak, a következtetések az összesítésre épülnek.
+    - A kasztok közti szórás a végleges 25 hullámos balansz (**M6b**, 16. fejezet) feladata:
+      egyedül a Warrior a 7., 22. és 23. hullámon halt meg, a Rogue mindkét seeden végigért.
+      A késői kasszát az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market; 16.1)
+      célozták.
+
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
 
