@@ -2204,6 +2204,15 @@ indulnak.
 - **Játékos-chipek:** alul 1–4 chip a játékosok színével. Mindegyiken látszik az upgrade-nyíl,
   a döntés állapota (pipa), majd a végén a dobás eredménye (kocka, érme vagy Pass ikon és a szám).
 - **Jobb oldal:** üzenetsor a dobásokról, és egy „Items: 2 / 5” számláló.
+- **Az item-keret** (és a tooltipje) mindig a „Loot Roll” cím és az alcíme alatt marad, a
+  játékos-chipek felett. Egy magas tooltip (minden Artifact) ezért kisebb léptékben látszik: a
+  legmagasabb Artifact, a Skull of the Damned ≈ 0,74-szeres, a többi ≈ 0,78–0,82 méretben
+  (1920×1080-on ≈ 13 px törzsszöveg). A tooltip először **szélesebb** lesz (360 → 480 → 600 px,
+  kevesebb töréssort ad), és csak ha ez sem elég, kicsinyedik (legfeljebb 0,5-ig). Egy kétsoros
+  Greed-eredménysor helye (48 px) mindig le van foglalva, így az eredménysor nem csúszik a
+  chipek alá. A hétköznapi itemek tooltipje változatlan.
+- Az Artifacton nincs zöld „Looted” felirat (nincs Looted +6 Item Level), a loot roll tooltipje
+  (nincs néző hős) a teljes szöveget mutatja.
 
 **Hullám utáni képernyő**
 
@@ -2212,13 +2221,29 @@ indulnak.
   2. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
   3. közös bolt + személyes panelek egyszerre,
   4. Ready.
+- **Fejléc:** a következő hullám sora: „Next up: Wave 4 of 25  ·  60 seconds”; a boss-hullám
+  előtt másodperc nélkül („Next up: Wave 10 of 25 – Boss wave! (ends when the boss falls)”, 8.
+  fejezet), az elit 20. hullám előtt „… seconds  –  Elite wave!” (piros).
 - **Elrendezés:**
   - **Középen:** a **közös bolt** (goblin kereskedő standja) a játékosok színes kurzoraival,
     felül a reroll-szavazás pipái.
     - Az item-ajánlatok alatt áll a **fogyóeszköz-sor** (4 kompakt kártya), mellette jobbra, a
-      15. hullámtól a **Black Market** arany keretes kártyája (16.1).
-    - 4 játékosnál a pult nőhet, a kártyák kisebbek lehetnek, hogy az 5×2-es item-rács, a
-      fogyóeszköz-sor és a Black Market 1920×1080-ban és 1280×720-ban is átfedés nélkül elférjen.
+      15. hullámtól a **Black Market** arany keretes, széles kártyája (16.1).
+    - A pult mérete 4 játékosnál sem nő: az item-kártya kisebb (124×176 px a korábbi 124×212
+      helyett), így az 5×2-es item-rács, a fogyóeszköz-sor és a Black Market átfedés nélkül
+      elfér az 1920×1080-as vásznon (az 1280×720-as ablak ugyanazt a vásznat kicsinyítve
+      mutatja). A fogyóeszköz-sor 96 px magas és 652 px széles (az 5 oszlopos rács
+      szélessége): Black Markettel 4 × 105 px és a 200 px széles Black Market kártya, nélküle
+      4 × 157 px.
+    - A Black Market kártyán a lakat nem takarja a nevet, a ping-címkék („P2 wants”) nem takarják
+      az ikont: az ikontól jobbra, a név alatt jönnek, és ha a teljes sor nem fér ki, a rövid
+      „P2” szöveget kapják.
+    - A fogyóeszköz-kártya: ikon, ár (piros, ha nincs rá fedezet), név (kék: főzet, narancs:
+      étel). Nincs játékosjelölő a kártyán: ki mit vett, azt a költésnapló mutatja, a hullám
+      alatt pedig a hős unit frame-jén a kis ikonok.
+    - **Kurzor:** a pozíciók egyetlen listában vannak: az item-ajánlatok, utánuk a
+      fogyóeszközök, a legvégén a Black Market. Fel / le a rács és a sor között megy (a
+      képernyőn x-ben legközelebbi kártyára), balra / jobbra a soron belül.
   - **A sarkokban:** 1–4 **személyes panel**, játékosonként egy.
   - LB/RB-vel lehet váltani a bolti kurzor és a saját panel között.
 - **Személyes fülek:** **Trainer | Talents | Character | Enchanter** (az Enchanter a 4. fül).
@@ -2228,50 +2253,94 @@ indulnak.
   - Kontrollerrel rácsban lehet lépkedni; „A” = pont elköltése, „X” = az utolsó hullám óta
     elköltött pont visszavétele, „Y” = a következő rang előnézete (lásd 7.3).
   - Felül a szabad pontok száma, alul a „Reset Talents” gomb és az ára.
-- **Enchanter fül** (M6a): a címkéje a csapat Dustját mutatja: „Enchanter (12✦)”.
-  - Először az itemet választod (előbb a felszereltek, utána a backpack), majd a műveletet:
-    **Reroll**, **Empower** (V. rangig) vagy **Imbue** (5.7).
-  - Mindegyik mellett az ára látszik goldban és Dustban; az ár az item minden használatával
-    duplázódik. A költésre a szokásos nyomva tartás vonatkozik (10. fejezet).
+- **Enchanter fül** (M6a): a címkéje a csapat Dustját mutatja: „Enchanter (12)” – a Dustot a
+  szám előtt egy rajzolt csillag-ikon jelzi (az UI-font nem tartalmazza a „✦” karaktert).
+  - **Items:** bal oldalon az itemek **ikon-rácsban** (5 oszlop; fent a felszereltek –
+    slot-sorrendben –, alatta a backpack); az ikon alatt apró pöttyök: egy tele pötty
+    enchantonként, üres karika a szabad helyért. Ami az Enchantertől nem kaphat semmit (Common,
+    Artifact, mindenre tiltott), halvány.
+  - **Részletek:** jobb oldalon az item neve, fajtája (ritkaság, slot, Item Level, Equipped /
+    Backpack), az enchantjai (rang I–V + név + zöld szöveg az adott rangon) és a következő
+    művelet ára (gold + Dust, pirosan, ha nincs rá fedezet; a sor jobb szélén „Used 2x” /
+    „Unused”). Az ár az item minden használatával duplázódik, a költésre a szokásos nyomva
+    tartás vonatkozik (5.7, 10. fejezet).
+  - **Irányítás:** nyilak az itemek közt; **A** vagy a rács jobb széléről a **jobbra** belép az
+    enchantokba; ott fel / le választ, **A = Empower** (az Imbue soron **Imbue**), **X =
+    Reroll**, **B** vagy **balra** vissza az itemekhez. A kiválasztott soron a zöld / piros
+    előnézet megmutatja, mit ad az Empower (a következő rang szövegével) és mit a Reroll, vagy
+    miért nem megy („Already Rank V”). A B az itemek között nem „felhasznált”, így a piac a
+    Ready-t továbbra is vissza tudja venni.
 - **Kovácsolás:** a Character fülön a fegyvert kiválasztva (A) egy műveletmenü jelenik meg:
   Equip / Forge / Sell / Disenchant / Trade / Cancel. A Forge csak akkor aktív, ha van azonos
   párja; különben szürke, és kiírja az okát (lásd 4.1). A **Disenchant** a Sell mellett áll, és
-  Arcane Dustot ad (5.7); az Artifactnál nincs. A boltban üllő-pip jelzi a kovácsolható
-  ajánlatot annak a játékosnak a színében, akinek van hozzá párja.
+  Arcane Dustot ad („+8 Dust”; 5.7), az utolsó fegyvernél szürke („Last weapon”); az Artifactnál
+  nincs. A boltban üllő-pip jelzi a kovácsolható ajánlatot annak a játékosnak a színében,
+  akinek van hozzá párja.
 - **Character fül:** WoW-szerű karakterpanel – bal oldalon a páncélslotok, jobb oldalon az
   ékszerek és trinketek, alul a fegyverek, középen a karakter 3D modellje, alatta a statlista.
 - **Backpack:** 10 hely a panel alján.
 - **Tooltip:** pergamen / sötét keretes WoW-tooltip, felülről lefelé:
-  - a ritkasághoz illő színű név, alatta „Looted”, slot, páncéltípus, a fegyvernél
-    sebzés és sebesség,
+  - a ritkasághoz illő színű név, alatta „Looted” (az Artifactnak nincs), slot, páncéltípus, a
+    fegyvernél sebzés és sebesség,
   - fehér stat-sorok,
   - **zöld enchant-sorok** („Equip: …”, „Chance on hit: …”, „On kill: …”, „When struck: …”),
   - set-bónuszok (szürkén, ha nem aktív),
   - Artifactnál a két különleges tulajdonság: a még zárt tulajdonság alatt „Awakens in N
     waves”, a nem tanult abilityhez kötött szürkén „(needs X)” (5.5),
   - legalul az összehasonlítás a felvett itemmel (+zöld / −piros).
+
+  Az **Artifact tooltipje kompakt**, ha egy hőshöz kötött (játékos-panel, bolt): a tulajdonságok
+  rövid szöveggel (legfeljebb 72 karakter), nincs flavor szöveg, nincs „Scales with” sor, nincs
+  „Classes:” sor a saját kasztnál, a sorok szorosabban állnak, és az összehasonlítás
+  eltéréseit egy törő sor mutatja. A sarokpanelekben így az Artifact tooltipje olvasható
+  léptékben marad (≥ 0,85, négy sarokban, 1920×1080-on).
 - **Indulás:** a „Ready” jelzés után indul a következő hullám, ha mindenki kész van
   (vagy 60 mp-es időkorlát után, beállításokban kikapcsolható).
 
 **Győzelem / Vereség képernyő** (M6a)
 
 A menet végén (Győzelem: Vor'thalax halála a 25. hullámon; Vereség: mindenki elesett) a képernyő
-két oldalból áll, amik között váltani lehet:
+két oldalból áll, amik között váltani lehet. A képernyő mindig a Summaryn nyílik meg.
 
-- **Summary:** az eddigi összegzés (eredmény, elért hullám, loot-statisztika – 10.1) a menet
-  **idejével** kiegészítve (a hullámidők összege).
-- **Damage Meter:** WoW-szerű sávok statonként, hősönként, a kaszt színében:
-  - **Damage** – kiosztott sebzés (az Execute-tal együtt),
-  - **Healing** – tényleges gyógyítás, a gyógyítónak írva; a regeneráció és a Leech
-    önmagára gyógyításnak számít,
-  - **Absorbed** – a játékos által rakott pajzsok elnyelt sebzése (bárkin) és a saját blokkja
-    által elnyelt sebzés,
-  - **Taken** – elszenvedett sebzés (a mitigáció után),
-  - **Revives** – a társ felélesztésének befejezése (minden felélesztőnek jár) és a Word of Glory
-    felélesztései; a hullámkezdéskori feléledés és a Spirit Healer nem számít,
-  - **Downs** – elesések; **Kills** – ölések; **Bosses** – legyőzött bossok.
-- **Awards** (csak co-opban): a díjat az kapja, aki az adott statban a legjobb; döntetlennél a
-  kisebb sorszámú játékos.
+- **Oldalváltás:** bármelyik játékos **LB / RB** gombja (billentyűzeten **Q / E**) vagy a
+  **bal / jobb** irány lapoz a Summary és a Damage Meter között; a végeken nincs körbefordulás.
+  A botok és a megnyitáskor még nyomva tartott kar / gomb nem lapoz. Az **X** (billentyűzeten
+  **R**) a Run kártyát menti, az **A / START** kilép – mindhárom a megnyitás utáni 1 másodperces
+  késleltetés után működik. A prompt sor a billentyűzetes gombokat is mutatja: „LB RB / Q E / ◀ ▶
+  Page”, „Save card” (X / R), „Back to Lobby” (A / Enter).
+- **Panel mérete:** a Summary és a Damage Meter **ugyanolyan magas** panelben ül (a magasabbik
+  oldal szabja meg, 7 díjnál a Damage Meter két díjsorával), így lapozáskor sem a cím, sem a
+  panel nem mozdul; a rövidebb oldal (Summary) **függőlegesen középre** kerül.
+- **Summary:** az eddigi összegzés (eredmény, elért hullám, loot-statisztika – 10.1) a négy
+  csempe mellé ötödikként a **menet idejével** kiegészítve (a hullámidők összege, `m:ss`, egy
+  óra felett `h:mm:ss`; a hullám utáni loot roll, a piac és a szünetek nem számítanak). A hős-tábla
+  (hős, kaszt, ölések, sebzés) változatlan.
+- **Damage Meter:** WoW-szerű sávok, 4 × 2 rács, statonként egy panel, benne hősönként egy sáv a
+  kaszt színében (az onion bőrszíne, úgy korrigálva, hogy a szöveg olvasható maradjon; a bal
+  szélén a játékos színe). A legtöbbet elérő van felül (döntetlennél a kisebb sorszámú), a sáv
+  hossza az adott stat legjobb értékéhez viszonyított arány; a 0 érték üres, halvány sáv. A panel
+  fejléce a csapat összegét mutatja (több hősnél). Az értékek 10 000-től „12.3k”, egymilliótól
+  „1.25M” alakúak (a „999 960” nem „1000.0k”, hanem „1.00M”), a számlálók mindig egész számok.
+  A „legtöbb” díjakhoz és a halvány sávhoz a **kijelzett**, egészre kerekített érték számít: a
+  0,4 gyógyítás „0”-t mutat, ezért nem kap Most Healing díjat. Az oldalak:
+  - **Damage** – kiosztott sebzés (az Execute-tal együtt; a túlütés nem számít),
+  - **Healing** – a ténylegesen megkapott HP (a max HP-n túli rész nem), a gyógyítónak írva; a
+    regeneráció, a Leech, a Life on Kill és a saját gyógyítás önmagára számít,
+  - **Absorbed** – a játékos által rakott pajzsok (pajzs-procok, Word of Glory, Lay on Hands,
+    Holy Shield, Ice Barrier, Charge-pajzs, a Dawnbreaker pajzsa …) által a pajzs
+    **tulajdonosának** írt elnyelt sebzés – bárkin –, valamint a saját blokk megmentette rész
+    (a blokk nélküli és a blokkolt találat különbsége, a mitigáció után); a le nem járt, el nem
+    használt pajzs nem számít,
+  - **Taken** – a ténylegesen levont HP (a mitigáció és a pajzsok után, a túlütés nélkül); a
+    kitért, hárított és a sérthetetlenség alatti ütés nem számít,
+  - **Revives** – a csapattárs-csatornázás befejezésekor **minden** ott álló felélesztő kap egyet;
+    a Word of Glory felélesztése a varázslót illeti; a hullámkezdéskori feléledés, a Spirit
+    Healer és a smoke „mindenki feláll” nem számít,
+  - **Downs** – elesések; **Kills** – ölések; **Bosses** – a boss halálos ütését adó játékos.
+- **Awards** (csak co-opban, legalább 2 hősnél): a díjat az kapja, aki az adott statban a
+  legjobb; döntetlennél a kisebb sorszámú játékos. A „legtöbb” díjakhoz **0-nál nagyobb** érték
+  kell (ha senki sem gyógyított, nincs Most Healing). Egy hős több díjat is kaphat. A díjak a
+  Damage Meter oldal alján, díjanként egy csempén látszanak (a díj neve, alatta a nyertes).
 
   | Díj | Ki kapja |
   |---|---|
@@ -2281,12 +2350,23 @@ két oldalból áll, amik között váltani lehet:
   | **Guardian Angel** | a legtöbb felélesztés |
   | **Floor Inspector** | a legtöbb elesés |
   | **Exterminator** | a legtöbb ölés |
-  | **Untouchable** | a legkevesebb elszenvedett sebzés a menet végén élő hősök között |
+  | **Untouchable** | a legkevesebb elszenvedett sebzés a menet végén **élő** hősök között (ha mindenki elesett, nincs ilyen díj; ha a legkevesebb mindenkinél 0, a kisebb sorszámú kapja) |
 
-- **Run kártya:** a végképernyőn a „**Save card**” felirat (X) egy **1200×630**-as képet
-  renderel: cím, mód, győzelem / vereség és az elért hullám, az idő, valamint hősönként a
-  portré, a kaszt, a legjobb item és a díj. A kép PNG-ként a
-  `user://cards/run_<yyyy-mm-dd_hh-mm-ss>.png` fájlba kerül, és a képernyő kiírja: „Saved to …”.
+- **Legjobb item** (a kártyához): a hős viselt és hátizsákban lévő itemei közül a legmagasabb
+  ritkaságú, azon belül a legnagyobb item level, azon belül a legdrágább; egyenlőségnél a viselt,
+  illetve a korábbi. A menet végén rögzítjük (a hősök a képernyő elhagyásakor felszabadulnak).
+- **Run kártya:** a végképernyőn a „**Save card**” felirat (X / R) egy **1200×630**-as képet
+  renderel: fent a játék címe és a mód („Normal mode”; a mód a `RunState.difficulty`-ből jön),
+  alatta a **VICTORY / DEFEAT** felirat, jobbra az elért hullámok („25 / 25 waves”; vereségnél
+  „Fell on wave N”, ahol N a hullám, amelyen a csapat elbukott) és az idő; alatta hősönként
+  (legfeljebb négy) egy kártya: portré (az elesett hősé szürke), `P1 Warrior`, a legjobb item
+  (a ritkaság színével, item level), a hős első díja (`+N`, ha több is van) és a Damage /
+  Healing sor. A kép PNG-ként a `user://cards/run_<yyyy-mm-dd_hh-mm-ss>.png` fájlba kerül (ha
+  ugyanabban a másodpercben másodszor mentenek, `_2`, `_3` … toldalék kerül rá).
+  - A képernyő egy sorban kiírja, hová mentett („Saved to …”): a hosszú útvonal elejét „…”-ra
+    rövidíti mappahatáron (a fájlnév és az utolsó mappák maradnak, pl. „Saved to
+    …/SmartOnion/cards/run_2026-10-14_15-20-11.png”), így a panel nem szélesedik; a teljes
+    útvonal a naplóba kerül. Hiba esetén „The card could not be saved.”.
 
 ---
 
