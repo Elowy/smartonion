@@ -1623,3 +1623,1045 @@ Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identic
   corpses skipped, 67% speed and ground covered, leaving the circle, a moving ghost, revive
   directly and through a channelling teammate, several ghosts without stacking, other slows
   kept, the goblin slowed, an enraged elite immune, no RNG and repeatable positions).
+
+## M6a: bosses, new enemies, Artifacts, Enchanter, consumables, damage meter
+
+```
+core/items/       artifacts.gd (Artifacts), enchanter.gd (Enchanter), consumables.gd (Consumables)
+core/shop/        black_market.gd (BlackMarket)
+core/             run_summary.gd (RunSummary), run_card.gd (RunCard)
+data/             boss_data.gd + boss_ability.gd (BossData, BossAbility), consumable_data.gd,
+                  items/artifact_data.gd; bosses/ consumables/ artifacts/ (.tres, loaded by Db)
+scenes/enemies/   boss.gd (Boss), poison_puddle.gd, hook_line.gd, support_beam.gd, support_shield.gd;
+                  hazards/ (EnemyHazard, FrostCircle, FrostBreath, FireField, MeteorStrike)
+scenes/artifacts/ TalentEffect scripts of the Artifact properties
+scenes/visuals/   boss_model.gd (BossModel)
+scenes/ui/        meter_page.gd, meter_bar.gd, run_card_view.gd; enchanter/ (EnchanterTab, EnchanterRow,
+                  DustIcon); shop/ consumable_card.gd, consumable_icon.gd, consumable_tooltip.gd
+```
+
+- Built as a foundation plus six features (enemies, bosses, Artifacts, Enchanter, consumables / Black Market,
+  damage meter), merged, reviewed; a balance pass and a set of fixes followed. The sections below follow the
+  features; "Cross-system contracts" lists what holds between them, "Balance pass" and "Validation and balance
+  data points" the numbers.
+- Out of scope: M6b (modes, environments, events, the Dungeon portal, content packs, the final balance), GDD 16.
+
+### Foundation hooks
+
+The shared hooks the M6a features are built on (behaviour-neutral on their own: a seeded
+`--fixed-fps 60 --smoke --waves=6 --seed=5` gave the pre-M6 numbers); what each feature does with them is in its
+own section below.
+
+#### RunState (autoload/run_state.gd)
+
+- **Arcane Dust** (the second team currency, GDD 5.7): `arcane_dust` (the pile), `dust_earned`,
+  `dust_spent` (run totals), `add_dust(amount, slot_index := -1, label := "")` (non-positive does nothing),
+  `can_afford_dust(amount)`, `try_spend_dust_for(amount, slot_index, kind, label) -> bool` (false and no
+  change if too poor / negative). Signal `dust_changed(dust, delta)` fires on every change (and once with
+  delta 0 from `start_run`). Dust has its own logs, **separate from the gold `spend_log`**:
+  `dust_spend_log` (`{slot, kind, label, amount, wave}`) and `dust_gain_log` (`{slot, label, amount,
+  wave}`), both cleared by `begin_spend_round()`. The purse board lists the gold log only; an Enchanter
+  action carries its Dust cost in the gold entry's label ("Empower Blazing (8 Dust)").
+- **Spend kinds** of `try_spend_for` (the Spent ticker shows every one): `&"shop"`, `&"shop_forge"`,
+  `&"shop_reroll"`, `&"trainer"`, `&"level_reroll"`, `&"talent_reset"`, and the M6 kinds `&"consumable"`,
+  `&"black_market"`, `&"enchant"`. An Enchanter action pays gold with `try_spend_for(..., &"enchant", ...)`
+  and Dust with `try_spend_dust_for(..., &"enchant", ...)`; both are checked affordable before either is spent.
+- **Damage meter record** (per player slot index, like `kills_by_player`): `healing_by_player`,
+  `absorbed_by_player`, `damage_taken_by_player` (float), `revives_by_player`, `downs_by_player`,
+  `bosses_by_player` (int) and the recorders `record_heal / record_absorb / record_damage_taken /
+  record_revive / record_down` (a slot index < 0 and non-positive amounts are ignored); the callers are listed in
+  "Damage meter, end screen, run card".
+- **Damage by source** (balance diagnostics, no gameplay): `damage_taken_by_source: Dictionary` =
+  `{source id: {wave: float}}`, cleared by `start_run`; `record_damage_taken(player_index, amount, source_id :=
+  &"")` adds to it under the current wave when `source_id` is given (see "Balance pass").
+- **Run clock**: `run_time: float`, `tick_run_time(delta)`. `Main._physics_process` ticks it while
+  `state == State.WAVE` and the tree is not paused, i.e. the sum of the wave times ("Wave cleared!", the
+  loot roll, the market and pauses do not count).
+- **Counters**: `bosses_killed` (`record_special_kill(&"boss", slot)` counts it and emits `special_killed`
+  like elite / goblin), `artifacts_dropped`, `consumables_bought`, `black_market_bought`, `enchants_done`,
+  `artifact_pity: float`, `artifact_classes: Array[StringName]`, signal `artifact_dropped(item, source)`.
+- All of the above are reset by `start_run`, which also resets the launch statics (`BossData.hp_mult = 1.0`,
+  `LootDrops.artifact_chance_override = -1.0`) next to the existing `EliteAffixes.rate_mult` /
+  `GoblinSpawner.chance_override`; `Main.start_run` re-applies them from `LaunchOptions` afterwards.
+
+#### Enemies, Db, data
+
+- `EnemyData.is_boss := false`; `Enemy.is_boss()` = `data != null and data.is_boss` (the Loot Goblin overrides
+  it with `false`). Execute / Mirror Image / Word of Glory / `PlayerBonuses` "boss" conditions read it.
+- `EnemyData.Behavior` = `CHASE, SWARM, LUNGE, RANGED, SUPPORT, BRUTE` (the two new values are appended: the
+  stored ints of the existing `.tres` files are unchanged). `Enemy._think` dispatches them to
+  `_think_support` / `_think_brute` (both implemented by the enemies below; the foundation default was `_update_chase`).
+- `Enemy._on_death_effect()` (virtual): called from `_die` after `_death_loot` and **before
+  `_leave_world()`**, i.e. while the enemy is still in the tree (`global_position` is the place of death).
+  Not called by `despawn()` (wave end), only by real deaths (`take_damage`, `kill()`); it runs for every
+  enemy including the goblin and bosses.
+- `BossData extends EnemyData` (`is_boss` true by default); static `BossData.hp_mult` is the `--boss-hp`
+  multiplier. `Db.BOSS_DIR = res://data/bosses/` -> `Db.bosses` / `get_boss(id)`;
+  `Db.CONSUMABLE_DIR = res://data/consumables/` -> `Db.consumables` / `get_consumable(id)`;
+  `Db.ARTIFACT_DIR = res://data/artifacts/` -> `Db.artifacts` / `get_artifact` / `artifact_for_class` /
+  `artifact_classes()`. **Bosses are not in `Db.enemies`** (the wave director's random pool never sees them)
+  and **Artifacts are not in `Db.uniques`**.
+- `ConsumableData` (`data/consumable_data.gd`): `id`, `display_name`, `kind` (`POTION` / `FOOD`),
+  `effects: Array[Dictionary]` (BonusVocabulary entries), `base_price`, `icon_id`, `description`.
+
+#### Shop, Intermission, PlayerPanel
+
+- `Shop.consumables` and `Shop.black_market` live next to `offers` but are **not part of `offers`** (that array
+  drives `offer_count`, the usable-per-player maths, the reroll positions and the card grid).
+- `Intermission._bots_shop` order (final): equip upgrades / forge -> `_bots_enchant` (from wave 12, a slice of
+  the purse above the Trainer reserve) -> `_bots_buy` -> `_bots_black_market` (from wave 15) ->
+  `_bots_consumables` (from wave 6) -> `_bots_train` -> `_bots_talents` -> `_bots_reroll`. Each new pass is
+  free to draw from `RunState.rng` only when it does something; the Black Market and consumables passes draw
+  nothing, the Enchanter pass draws one `randf` per Reroll / Imbue.
+- `PlayerPanel.ENCHANTER_TAB = 3` (in `TAB_NAMES`, `TAB_IDS`, `LaunchOptions.PANEL_TABS`). The `LOCKED_TABS`
+  mechanism (padlock + "Coming soon", `switch_tab` skips locked tabs, `set_tab` / `--panel-tab` refuse them) is
+  kept, **empty** since the Enchanter tab is open.
+- **Market header**: `Intermission.next_wave_text(next: int) -> String` (static) builds the "what comes next" line
+  of the MARKET header: `"The final battle is won"` after the last wave; for `RunState.is_boss_wave(next)` the
+  boss line `"Next up: Wave 10 of 25 – Boss wave! (ends when the boss falls)"` (no seconds, no `·`: a boss wave has
+  no timer); otherwise `"Next up: Wave N of 25  ·  S seconds"` plus `"  –  Elite wave!"` on the elite wave. `_fill()`
+  uses it; the header colour is red for boss / elite waves.
+
+#### Items, Player, Loot
+
+- `ItemInstance.enchant_uses := 0` (Enchanter actions done on the item; the price doubles with each); forged
+  items are new instances (0).
+- `Player.heal(amount, source_slot := -1)` and `Player.revive(hp_ratio, reviver_slots: Array[int] = [])`
+  are the credit points of the damage meter (see "Damage meter, end screen, run card").
+- `LootDrops.roll_artifact(source, enemy, killer)` is called **from `drop_special`** (ELITE / GOBLIN / BOSS,
+  after the item bag) and **from `on_enemy_killed`** (LOOT, after the normal roll, also when the wave cap or
+  the chance roll produced no item bag). An elite kill calls it twice and a boss kill once per hero; the real
+  roll counts one kill once (see "Artifacts"). `on_enemy_killed` still returns only the normal item bag (the
+  normal-roll body is `_roll_normal_drop`). Test hook: `LootDrops.artifact_roll_probe` (called with
+  `source, enemy, killer`, return value used as the bag); `LootDrops.artifact_chance_override`
+  (`--artifact-chance`, -1 = off).
+
+#### Main, SMOKE_RESULT, command line
+
+- SMOKE_RESULT keys added in M6: `bosses_killed artifacts_dropped consumables_bought black_market_bought
+  enchants_done dust_earned dust_spent run_time` (`run_time` at 0.1 s), the damage meter's `meter` (per slot) and
+  the balance pass's `taken_by_source` (see "Balance pass"). Key presence is asserted in
+  `tests/test_m5_foundation.gd`, `test_main_m2_flow.gd` and `test_m6_foundation.gd`.
+- Launch flags: `--boss-hp=X` (multiplies boss HP, `BossData.hp_mult`, clamped 0.01..100, default 1),
+  `--artifact-chance=X` (overrides every Artifact roll's chance, clamped 0..1, default -1 = off; 0 = never, not
+  off), `--panel-tab=enchanter`, the end screen's `--end-page=summary|meter` and `--save-card`. `--waves=N` is a
+  **count**: `--start-wave=9 --waves=2` plays waves 9 and 10; `--start-wave=24 --waves=25` plays 24 and 25.
+- New smoke log lines: `SMOKE boss <name> arrived / defeated ...`, `SMOKE boss timeout ...`, `SMOKE defeat with
+  boss ...` (bosses), `SMOKE artifact drop: ...` / `SMOKE artifact held: ...` (Artifacts), `SMOKE meter P1 ...`
+  (damage meter), `SMOKE heroes: ...` (balance, a second line at every boss arrival).
+
+### Enemies: Plague Ghoul, Cultist Acolyte, Flesh Golem
+
+New enemy types are pure data plus the behaviours below:
+
+| id | behavior | wave | notes |
+|---|---|---|---|
+| `plague_ghoul` | CHASE | 7 | `death_effect = &"poison_puddle"` |
+| `cultist_acolyte` | SUPPORT | 9 | `priority_target = true`, `attack_cooldown` = channel period |
+| `flesh_golem` | BRUTE | 12 | `attack_cooldown` = hook period, `contact_damage` 2.5 (4.0 before the balance pass), hook = 1 x contact |
+
+`EnemyData` gained three export groups, all read by `Enemy` (no per-type subclass; the behaviour
+follows the data, so `Enemy.create(data, wave)` stays the one factory):
+- **Death effect:** `death_effect` (`&""` / `&"poison_puddle"`), `death_radius`, `death_duration`,
+  `death_tick_interval`, `death_damage_ratio` (fraction of the dead enemy's contact damage per
+  tick), `death_color`. `Enemy._on_death_effect()` (the foundation hook) builds a `PoisonPuddle`.
+- **Support:** `support_distance_min/max`, `support_range`, `support_channel`, `support_heal_pct`,
+  `support_shield_pct`, `priority_target`.
+- **Brute:** `hook_range_min/max`, `hook_telegraph`, `hook_pull`, `hook_damage_ratio`.
+
+`Enemy.AiState` gained `CHANNEL` and `HOOK` (appended); `Enemy.SupportAction { NONE, HEAL, SHIELD }`.
+`Enemy.create` / `setup` draw one extra `RunState.rng` value for SUPPORT and BRUTE (the staggered
+first cooldown, like RANGED) and join `priority_targets` for `priority_target` data.
+
+**Support (`_think_support`)**: `_update_support_move` (distance band, herd centroid from
+`EnemyGrid.gather_around`, wall-aware retreat), `_pick_support_target` (heal = lowest HP share among non-bosses, else
+shield = highest max HP below the shield goal - a boss can get that shield; grid query, group order
+breaks ties),
+`_start_channel` / `_update_channel` / `_finish_channel`. `apply_support_shield(pct)` is the no-stack
+shield (raises `shield_hp` to `max_hp * pct` at most; a normal enemy gets a `SupportShield` bubble,
+an elite shows it on its `ElitePlate`). **`Enemy._absorb` only starts the regrow timer for the
+Shielding affix** (before, any broken `shield_hp` regrew like an elite's).
+`_cancel_special(cooldown_ratio)` ends a channel / hook telegraph (called from `apply_stun`,
+`apply_fear`, `apply_taunt`, the no-target wander branch of `_think` and, for CHANNEL only, a
+knockback in `take_damage`); it leaves `attack_cooldown_left >= attack_cooldown() * ratio`.
+`SUPPORT_*` constants hold the tuning that is not in the data (rescan 0.25 s, herd radius 10 m,
+leash 1.5 m, retry 0.5 s ...).
+
+**Brute (`_think_brute`)**: walks like CHASE; `_start_hook` (nearest visible living hero in the
+band) -> `ai_state = HOOK`, a `HookLine` child; `_update_hook` (stands still, the aim follows the
+hero until the last `HOOK_AIM_LOCK` = 40 % of the telegraph); `_fire_hook` (first visible living hero
+whose centre is within `HookLine.HALF_WIDTH` = 0.6 m of the line and `hook_range_max + 0.5` m along
+it -> `Player.take_hook`, pull limited by `HOOK_STOP_GAP`). `Enemy.hook_serial` counts hooks;
+`Enemy.hook_escape_dir(pos, margin)` is the sidestep direction bots use.
+
+**New nodes (scenes/enemies/):**
+- `PoisonPuddle` (`class_name`, groups `enemy_hazards` and `ability_areas`): `spawn(parent, centre,
+  radius, duration, tick, damage, colour)`, cap `MAX_ALIVE` = 12 (oldest by age, then by serial),
+  `alive(tree)`, ticks heroes whose centre is inside with `KIND_AOE` and no source. Being in
+  `ability_areas` is deliberate: `WaveDirector.stop()` and `Main.open_intermission()` already
+  sweep that group, so no hazard outlives its wave without touching those files (the group is
+  read by those two sweeps and by tests). The puddle is also an `enemy_hazards` node that answers the
+  bots' `hazard_push(from)` (see "Cross-system contracts"); the bosses' hazards are swept through
+  `enemy_hazards` by `WaveDirector.stop()`.
+- `SupportBeam` (world-space beam + landing orb), `HookLine` (telegraph band shader + strike
+  chain; `HALF_WIDTH` is the gameplay width too), `SupportShield` (violet bubble of a shielded
+  normal enemy). All visual only, children of the enemy, freed with it.
+
+**Player (scenes/player/player.gd):** `take_hook(raw, toward, distance, source) -> bool` (one Dodge
+roll like `take_damage` with `KIND_PROJECTILE`; invulnerable / downed heroes are immune; a dodged
+hit leaves no `invulnerable_left`, every other outcome does - that is how it tells a dodge from a
+hit without a second roll), `pull_toward(point, distance, duration = PULL_TIME)` (a drag through
+`_update_movement`, so walls / the screen edge still stop it; `_pull_motion` is the only line added
+to the movement step), `is_pulled()`.
+
+**Bots (core/input/bot_input.gd, scenes/player/weapon_runner.gd):** `BotInput.priority_enemy(tree,
+pos, reach)` (O(1) without an Acolyte alive: group `priority_targets`), used by
+`WeaponRunner.find_target()` **for bots only** (3 lines); chase of a priority target within 14 m
+when healthy and not crowded; hook sidestep with `HOOK_DODGE_CHANCE` 0.6 (decided once per golem and hook by the
+bot's own RNG: `_hook_serials` / `_hook_dodges` are dictionaries keyed by the golem's instance id,
+pruned in `think()` when the golem is gone or no longer in `HOOK`).
+
+**EnemyModel:** styles `ghoul`, `cultist`, `golem` (+ Glow parts: ghoul boil, cultist orb);
+`play_windup(color)`, `play_channel()` (violet tell), `cancel_windup()`.
+
+### Bosses, boss waves, elite wave 20, hazards, HUD
+
+#### Data (`data/boss_data.gd`, `data/boss_ability.gd`, `data/bosses/*.tres`)
+
+- `BossData extends EnemyData` (`is_boss = true`; `max_hp` / `contact_damage` are the base values,
+  the usual wave growth applies). Fields: `boss_wave`, `intro`, `phase_hp_ratio` (0.5),
+  `phase_cooldown_mult`, `abilities: Array[BossAbility]`, `coop_hp_per_player` (per boss: Morvain 0.75,
+  Vor'thalax 2.0; the default of the field is 0.75), enrage
+  (`enrage_time` 90, `enrage_damage_mult` 1.5, `enrage_speed_mult` 1.3, `enrage_step_time` 30,
+  `enrage_step_damage` 0.25), `reward_gold` (50). Helpers: `BossData.for_wave(w)` (Db lookup by
+  `boss_wave`, lowest id on a tie, null = the wave is a normal one), `max_hp_for(wave, players)` =
+  `hp_at_wave × (1 + coop_hp_per_player (n − 1)) × BossData.hp_mult` (`--boss-hp`), `enrage_level_at(age)`,
+  `enrage_damage_at(level)`, `intro_text()`. Crowd control is data + `Boss`: `knockback_resist = 1`
+  in the files, the stun / slow / taunt / fear rules are constants of `Boss`.
+- `BossAbility extends Resource` (a sub-resource of the .tres): `kind` (`FROST_CIRCLES`,
+  `FROST_BREATH`, `SUMMON`, `FIRE_FIELDS`, `METEOR`), `interval`, `interval_p2` (0 = interval ×
+  `phase_cooldown_mult`), `first_delay` (0 = 60% of the interval), `telegraph`, `radius`, `angle`,
+  `range`, `damage_mult` (× the boss's contact damage; the shared TOTAL for the meteor),
+  `fallback_damage_mult`, `count` / `count_p2`, `duration`, `tick_interval`, `slow_pct`,
+  `slow_time`, `summon_id`. A new boss is a new .tres with other numbers; a new ability kind is a
+  `Kind` value, a `_cast_*` in `Boss` and (if it lays something down) an `EnemyHazard` subclass.
+- `data/bosses/lich_commander_morvain.tres` (wave 10: base HP 450, contact 3, speed 1.9, radius 0.8,
+  scale 2.1, model `lich`, Frost Circles 7 s / Raise Dead 12 s (4, 6) / Frost Breath 9 s, cooldowns
+  ×0.7 in phase 2, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25 by party size) and
+  `data/bosses/vorthalax.tres` (wave 25: base HP 450 (the plan's 1200 was never reachable, see "Balance data
+  points"), contact 1.5 (4.0 before the balance pass), `coop_hp_per_player` 2.0 (0.75 before) = x1 / x3 / x5 / x7,
+  speed 2.0, radius 1.1, scale 2.3, model `demon`, Fire Fields 8 s (2, 3) / Meteor 14 s (10 s) / Imp Swarm 20 s
+  (6 Candlekin)). Bosses live in `Db.bosses`, never in `Db.enemies`.
+
+#### Boss (`scenes/enemies/boss.gd`, `class_name Boss extends Enemy`)
+
+- `Boss.create(data, wave)` (same signature as `Enemy.create`): `Enemy.setup`, group `&"bosses"`,
+  max HP from `BossData.max_hp_for` (the boss co-op rule, not `coop_hp_mult`), one
+  `AbilityState {ability, left, casts}` per ability (first cast after `first_cast_delay()`), and its
+  own `BossModel` (replaces the placeholder `EnemyModel` `setup` built). Contact damage = base ×
+  wave growth × `RunState.coop_damage_mult()` (as every enemy).
+- It walks like CHASE and runs an ability scheduler in `_physics_process` (after `Enemy`'s): enrage
+  (`enrage_level` from `_age`; sets `Enemy.damage_mult` / `speed_mult`, which contact hits and
+  `damage_of(mult)` read), phase (`phase` 1 → 2 once at `phase_hp_ratio`; running timers keep their
+  progress at the new interval), abilities (timers do not run while stunned; no target → retry
+  after 0.5 s). Signals `phase_changed(phase)`, `enrage_changed(level)`, `ability_cast(ability)`.
+  `age()`, `hp_ratio()`, `is_boss_enraged()` for the HUD / director.
+- Crowd control: `take_damage` drops the knockback, `_apply_movement` clears direct
+  `knockback_velocity` writes (Warrior kit), `apply_stun` ×0.25, `apply_slow` ×0.5, `walk_speed()`
+  compensates so the ghost slow also lands halved, `apply_taunt` / `apply_fear` do nothing.
+- Death (`_death_loot`): `reward_gold` + `data.xp` pickup, one `LootDrops.drop_special(Source.BOSS,
+  self, hero)` per joined player (killer first, items on a 1.2 m ring around the corpse; without
+  joined slots `RunState.player_count` drops), `RunState.record_special_kill(&"boss", killer)`.
+  No `LootDrops.on_enemy_killed`: the Artifact roll is made by the BOSS-source `drop_special` calls
+  only (the Artifact roll dedupes per enemy); the killer's call is first.
+- Casts: Frost Circles = one `FrostCircle` under every living hero; Frost Breath = a `FrostBreath`
+  from the boss towards the nearest hero; Summon = `WaveDirector.summon(...)`; Fire Fields =
+  `count_at(phase)` `FireField`s on distinct heroes (Fisher-Yates on `RunState.rng`; extras 2.6 m
+  from a hero); Meteor = one `MeteorStrike` on a random living hero (`RunState.rng`).
+
+#### Hazards (`scenes/enemies/hazards/`)
+
+- `EnemyHazard` (Node3D, group `&"enemy_hazards"`, constant `EnemyHazard.GROUP`): stages
+  TELEGRAPH → ACTIVE → DONE (fade, then `queue_free`); `telegraph_time`, `radius`, `damage` (fixed
+  when laid down), `source` (the boss). API: `is_telegraphing()`, `telegraph_left()`,
+  `is_dangerous()`, `contains(point, margin)`, `hazard_push(from, margin) -> Vector2` (the bots'
+  steering: out of the shape, 1–2 long inside, zero outside / when harmless), `living_heroes()`,
+  `heroes_in_circle()`, `hit_hero(hero, amount)` (`Player.take_damage(amount, KIND_AOE, boss)`, so
+  Avoidance / Dodge / absorbs apply). Marker visuals: ground ring quads (`Mats.ring`) and a flat
+  sector mesh (`MeshKit.add_arc`); no physics bodies.
+- `FrostCircle` (radius 2.2, 1.2 s, 2× contact, chill 40% / 2 s as a `GeneralBuff` under
+  `FrostCircle.CHILL_KEY`), `FrostBreath` (60° / 7 m cone, locked direction, 1 s, 3×), `FireField`
+  (r 2, 1 s then 8 s, tick 1× per second, the first tick at ignition), `MeteorStrike` (r 3, 3 s,
+  falling meteor mesh in the last 1.1 s; total 8× split among the heroes inside, 4× each when nobody
+  is inside; `hazard_push` pulls bots in when ≥ 2 heroes live).
+- Other packages' hazards: the Plague Ghoul's `PoisonPuddle` joins `enemy_hazards` (freed by
+  `WaveDirector.stop()`) and implements `is_dangerous()` / `hazard_push(from)` through the shared statics
+  `EnemyHazard.circle_push` / `escape_direction`, so the bots avoid it like a boss circle.
+
+#### WaveDirector (`scenes/waves/wave_director.gd`)
+
+- Boss wave = `RunState.is_boss_wave(w)` and a `BossData` for it in Db (else a normal timed wave).
+  `start_wave`: `boss_data`, `time_left = BOSS_WAVE_TIME` (1e6: nobody reaches it, harness hooks that
+  set `time_left = 0` still end the wave), no elite schedule, `_emit_timer` silent; after the opening
+  group the boss's point is drawn (`find_boss_point`: `BOSS_MIN_PLAYER_DISTANCE` 10 m, on screen if
+  possible) and a rune shown; `BOSS_TELEGRAPH_TIME` 2 s later `_spawn_boss` (`Boss.create`,
+  `boss.director = self`, signals `boss_spawned(boss)` and `enemy_spawned`). Spawn rate ×
+  `BOSS_ADD_RATE_MULT` 0.5. `boss.died` → `boss_defeated(boss)` and the wave finishes on the next
+  tick (`_finish_wave`: `stop()` despawns the rest, banks pickups / loot bags, emits `wave_cleared`).
+  Gotcha: a boss freed by `queue_free()` compares equal to `null` in GDScript, so the director tracks
+  the arrival with `_boss_arrived` / `_boss_dead` and checks `is_instance_valid(boss)` first (a smoke
+  safety kill is processed by the director itself, the free happens before the next tick; hero kills
+  happen earlier in the same tick). Main's "<Boss> defeated!" banner reads `wave_director.boss_data`,
+  not the (possibly freed) boss.
+- `summon(data, count, center, scatter) -> Array[Enemy]`: adds on a ring, capped by `MAX_ENEMIES`,
+  counted in `spawned_this_wave`, announced through `enemy_spawned`; only `Enemy.setup` draws rng.
+- `stop()` also frees the group `enemy_hazards` and clears the `boss_chill` buff of every hero.
+- Smoke safety: `smoke_boss_timeout` (Main sets it from `options.smoke`): a boss older than
+  `enrage_time + SMOKE_BOSS_GRACE` (120 s) is `kill()`ed and `SMOKE boss timeout: ...` printed (no
+  warning / error, so the run result stays clean). `Main` adds `SMOKE_BOSS_ALLOWANCE` per boss wave to
+  the smoke deadline.
+- RunState.rng order of a boss wave start: eligible list → (no elite schedule) → first group pick →
+  `wave_started` (GoblinSpawner draws nothing on a boss wave) → opening group → the boss point.
+  Normal waves (1–9, 11–19, 21–24) draw exactly what they drew before: seeded smoke runs are
+  unchanged up to wave 9.
+- **Elite wave 20** (`RunState.is_elite_wave`): `_spawn_group` gives every enemy that is not a due
+  real elite `make_elite(roll_affix(rng), true)` (one rng draw each); `EliteAffixes.expected_count`
+  ×`ELITE_WAVE_COUNT_MULT` (2) on that wave.
+
+#### Elites (`enemy.gd`, `elite_affixes.gd`, `elite_plate.gd`) – the lite affix
+
+- `Enemy.make_elite(affix, lite := false)`: `lite` = affix state without the elite block: HP ×
+  `EliteAffixes.LITE_HP_MULT` (1.5), no size change, `elite_lite = true`, `ElitePlate.create(self,
+  true)`. `Enemy.is_elite()` is false for a lite enemy (Slayer / Execute targeting), `_death_loot`
+  gives it the normal rewards (the elite block is keyed on `elite_affix != &"" and not
+  elite_lite`). `ElitePlate` has a `compact` mode: affix gem sprite + shield bubble + enrage tint
+  only. Both edits in `enemy.gd` are small optional-parameter changes in `make_elite` / `is_elite` /
+  `_death_loot`.
+
+#### HUD, Main, camera, bots
+
+- `Hud`: `boss_frame` (VBox inside the top plaque, in the timer's place; name, `UiBar` HP in
+  percent, two phase pips, pulsing ENRAGED), `bind_boss(boss)`, `clear_boss(_wave := 0)`; the
+  ENRAGED row is always laid out (alpha 0 while calm, `Hud.ENRAGED_ALPHA_MIN` 0.8 .. 1 pulse when
+  enraged, colour `UiTheme.RED.lightened(0.3)`), so the plaque never grows mid-fight and
+  `is_boss_enraged_shown()` means "visible and not transparent"; the
+  frame shows from the start of a boss wave (`_on_wave_changed` + `BossData.for_wave`), the timer
+  label hides meanwhile. Main connects `boss_spawned → hud.bind_boss`, `wave_cleared → hud.clear_boss`.
+- `Main`: arrival banner (`intro_text`, red), `"<Boss> defeated!"` / `"Victory!"` banners
+  (`_wave_cleared_text`), log lines `boss <name> arrived on wave N at (x, z): HP` and `boss <name>
+  defeated after S s (phase, enrage level, casts): standing, downs, revives`, and for a run lost
+  while a boss lives `defeat with boss <name> alive after S s: P% HP left (phase, enrage level), N
+  downs so far` (`Main.boss_arrival_text`, `Main.boss_standing_text`); positions are formatted by
+  `Main.format_position` ("(x, y, z)", one decimal, also for the player / boss lines of the screenshot
+  harness, no `-8.400001` noise). Victory is unchanged: `wave >= TOTAL_WAVES` after the
+  wave-cleared pause, which now means Vor'thalax's death.
+- `CameraRig.boss_points(bosses)`: a living `Boss` (group `bosses`) adds two soft framing points
+  (feet, and 0.6 × its model height up the screen) next to the Loot Goblins' (without it the boss sat
+  off-screen / under the HUD plaque); the heroes keep priority like they do over the goblins.
+- `BotInput._hazard_steer(pos)` (`core/input/bot_input.gd`): sum of `hazard_push` of every
+  `enemy_hazards` node, weight `HAZARD_WEIGHT` 5, only for living bots; also ends a rescue stand
+  inside a hazard.
+- `BossModel extends EnemyModel` (`scenes/visuals/boss_model.gd`, styles `lich` and `demon`): same
+  contract and animation as `EnemyModel`, its own `boss_parts`; `Boss.create` swaps it in.
+
+### Artifacts
+
+#### Data and loading
+- `data/items/artifact_data.gd`: `class_name ArtifactData extends UniqueItemData` – `class_id`,
+  `unlock_waves` ([3, 6]), `properties: Array[Dictionary]` (`name`, `text`, optional `needs`
+  ability id, `effects`: BonusVocabulary entries), `weapon_color`, and the pair fields
+  (`pair_weapon`, `pair_name`, `pair_stats`, `pair_enchant_ids/ranks`). `rarity = 5`,
+  `class_restriction = class_id`, `sources = [loot]`, `weight = 0`.
+- `data/artifacts/*.tres` (5): earthsplitter, staff_of_the_frostwyrm, dawnbreaker,
+  fangs_of_the_shadow, skull_of_the_damned. `Db.ARTIFACT_DIR` / `Db.artifacts` /
+  `Db.get_artifact(id)` / `Db.artifact_for_class(class_id)` / `Db.artifact_classes()`.
+  **Artifacts are not in `Db.uniques`** (the 63 hand-made items and every pool are unchanged);
+  a new Artifact = a `.tres` in `data/artifacts/` (+ its class).
+- `Artifacts.validate(data)` is the content check (class, weapon usable, 2 properties, valid
+  vocabulary entries per `BonusVocabulary.validate`, enchants exist) – tested for all five.
+
+#### Items
+- `ItemInstance`: `artifact_waves` (wave ends held), `artifact_base_damage` (growth baseline),
+  `companion` (a pair's off-hand piece, on the main piece), `pair_off` (this is the off piece),
+  `is_artifact()`, `can_sell()`, `can_disenchant()` (**ask it** for the Disenchant
+  entry and the all-Passed auto-disenchant), `greed_value()` = `ItemGenerator.artifact_greed_value`
+  (5 x the Epic price of `item.wave`) for an Artifact.
+- `ItemGenerator.from_artifact(data, wave)` / `generate_artifact(class_id, wave)` (no rng draw),
+  `artifact_greed_value(wave)`; `generate(..., {rarity = ARTIFACT, usable_by | class_data |
+  team_classes})` returns the class Artifact (a Legendary when none fits). `from_unique` now tops
+  up random enchants only for rarity LEGENDARY (was `>=`), `_scaled_unique_stats` extracted.
+- `Artifacts` (core/items/artifacts.gd): `grow(equipment)` / `grow_item`, `held`, `awake_count`,
+  `is_awake`, `waves_left`, `property_rows(item, hero)` (tooltip rows with state
+  AWAKE / ASLEEP / NEEDS_ABILITY), `effects_for(equipment)` (entries of the awake properties of the
+  EQUIPPED Artifacts, tagged `id = "artifact:<id>:<index>"`), `SOURCE = &"artifact"`.
+- `Equipment` pair rules: `target_slots(pair main) = [MAIN_HAND]` (needs `can_dual_wield` and the
+  off weapon's proficiency; the off piece alone has no slot), `displaced_by` pulls both pieces of a
+  displaced pair, `equip` puts only the main piece (never the off piece) back into the backpack and
+  fills OFF_HAND with the companion, `unequip` / `take` / `is_last_weapon` treat the pair as one;
+  new helpers `slot_of`, `is_equipped`, `pair_main_of`.
+
+#### Drops (core/loot/loot_drops.gd)
+- `roll_artifact(source, enemy, killer)`: only from wave 10; **one roll per enemy instance** (meta
+  `artifact_rolled`, set when a roll is made); source = `kill_artifact_source` (highest of the call's
+  source and BOSS if `enemy.is_boss()` / GOBLIN if `enemy is LootGoblin`; ELITE only from the
+  call); `artifact_chance(source, killer)`; `pick_artifact_class(rng)`; `artifact_candidates`.
+  Chances (`ARTIFACT_CHANCE_*`): boss 0.15 + `RunState.artifact_pity`, goblin 0.05, elite 0.02, normal
+  `normal_chance()`, each x (1 + killer Fortune / 100), clamped to 1. **`ARTIFACT_CHANCE_NORMAL` (0.0005) is the SOLO
+  rate; `LootDrops.normal_chance()` = it / `max(1, RunState.player_count)`** (1 player 0.05%, 2 0.025%, 4 0.0125%):
+  the normal kills per wave grow with the party (spawn x `1 + 0.6 (n − 1)`), the bosses / goblins / elites barely,
+  so the expected hits per 25-wave run stay ≈ 2.6–2.9 for 1–4 players (before: 2.9 / 4.3 / 7.1, and 84% of the 4p
+  runs collected all five). The boss / goblin / elite chances, `ARTIFACT_PITY_STEP`, the 80 / 20 class rule and
+  `artifact_chance_override` are untouched (the override is not divided). A hit appends to `RunState.artifact_classes`, `artifacts_dropped += 1`, `artifact_pity = 0`,
+  spawns the bag (`_place_bag`, not counted against the wave cap; `RunState.add_team_loot` when
+  there is no arena). A missed BOSS roll adds `ARTIFACT_PITY_STEP` to `RunState.artifact_pity`.
+- **RNG draw order** (only when a roll is really made): chance `randf`; on a hit the 80/20
+  `randf`, then `randi_range` among more than one candidate class. Nothing is drawn below wave 10,
+  with chance 0, for an already-rolled enemy, or when every class got its Artifact.
+- `artifact_roll_probe` (test hook) still short-circuits the roll (call sites observable);
+  `artifact_chance_override` (`--artifact-chance`) replaces every chance (clamped 0..1).
+
+#### Hero hooks
+- `Player.create` connects `wave_ended` -> `_on_wave_ended_artifacts` (grow; emit
+  `equipment.changed` when something grew so properties awaken). `Player.apply_equipment` sets the
+  `&"artifact"` PlayerBonuses source from `Artifacts.effects_for` (skipped, no extra rebuild, for
+  ordinary gear). `Player.pet_leech_pct` + `ProcSystem.deal_raw` (source `&"pet"`): heals the
+  hero for that % of the pet damage dealt (uses `Player.heal(amount, slot)`).
+- Ability params added with neutral defaults (so `BonusVocabulary.validate` accepts the mods):
+  whirlwind `quake_duration / quake_pct / quake_tick`; charge `shockwave_radius / shockwave_stun`;
+  blizzard `nth_cast / nth_radius_bonus`; word_of_glory `shield_max_hp_pct`. The effect scripts read
+  them (`WarriorWhirlwind._spawn_quake`, `WarriorCharge._shockwave`, `BlizzardEffect.cast`,
+  `PaladinWordOfGlory.grant_shield`). The Consecration heal (`heal_max_hp_pct`) and Vanish
+  (`forced_crits`) are pure data (existing params).
+- TalentEffect scripts (`scenes/artifacts/`): `ArtifactMageFrostShards` (on_kill),
+  `ArtifactRogueFangsFan` (on_hit, `RogueFanOfKnives.throw_free`), `ArtifactWarlockSecondVoidwalker`
+  (tick; `WarlockVoidwalker.spawn` with the Summon Voidwalker params of the hero, ward off),
+  `ArtifactWarlockPetLeech` (sets `pet_leech_pct`). The +25% pet damage is a plain `damage`
+  entry (`source: pet`).
+
+#### UI / bots
+- `ItemTooltip`: `_artifact_block` (pair note, property rows: awake gold `ARTIFACT_GOLD`, asleep
+  `ARTIFACT_ASLEEP` + "Awakens in N wave(s)", `DIM` + "(needs X)" – the viewing hero is found through
+  `viewer_equipment`, else the first hero of `viewer`'s class), no "Sell Price" for an Artifact, the
+  pair counted in `total_stats` / `weapon_dps(..., with_companion)` / `equipped_for_compare`;
+  `upgrade_direction`: a usable Artifact is always +1, an equipped Artifact is never replaced by an
+  ordinary item (bots, loot-roll badge).
+- `PlayerPanel`: Sell greyed ("Artifact" / `ARTIFACT_NO_SELL`) + `_do_sell` guard. `Intermission`:
+  `_bot_make_room` never sells an Artifact; `_bots_make_room_for_artifacts(loot)` (called by
+  `_start_loot`) makes room in the backpack of a bot whose class can use an Artifact in the loot.
+  `LootRoll.bot_choice` needs the Artifact through `upgrade_direction`.
+- `WeaponModel.RARITY_COLORS` has a 6th (gold) entry; the weapon colour of an Artifact comes from
+  `ArtifactData.weapon_color` (the item's private weapon copy).
+
+#### Known gaps
+
+- A human with a full backpack cannot Need an Artifact ("Backpack full") – they must make room or
+  Greed (775-ish gold); only bots auto-make room. No HUD banner on a drop (floating text + beam).
+- A smoke run ends right after its last wave without that wave's `end_wave`, so a 7-wave run from
+  wave 10 shows property 1 (wave 13) but property 2 (6th wave end) needs `--waves=8` or more.
+- Hunter / Shaman Artifacts (M8) need their own `.tres` (+ `Galestrike Longbow` / `Fist of the
+  Ancestors` properties); `Db.artifact_classes()` picks them up automatically.
+
+
+#### Loot roll window, compact tooltip, smoke log
+
+- `data/items/artifact_data.gd`: each property dictionary gets a `"short"` text (<= `Artifacts
+  .SHORT_TEXT_MAX` = 72 chars) next to `"text"`; `Artifacts.validate` requires it;
+  `Artifacts.property_rows` rows carry `"short"` (falls back to the full text).
+- `ItemTooltip`: `shows_looted_tag(item)` (static; false for an Artifact – tooltip and
+  `LootRollScreen` info row), `compact_artifact()` (an Artifact with `viewer_equipment`: short
+  property text, no flavor / "Scales with" / own-class line, `COMPACT_ARTIFACT_SEPARATION` instead of
+  `LINE_SEPARATION`, comparison differences in an `HFlowContainer` via `_delta_flow`).
+- `LootRollScreen`: new public `frame`, `tooltip_fit`, `tooltip_room()`; `_fit_tooltip()` (called from
+  `_fill_item`): tooltip widths `TOOLTIP_WIDTHS` (360 / 480 / 600) first, then a scale
+  (`MIN_TOOLTIP_FIT` 0.5); the tooltip sits in a `_tip_box` Control sized to the scaled tooltip inside
+  the `CenterContainer`. **The frame stays below the title block:** `frame_band() -> Vector2` = (top,
+  bottom) in screen pixels, `max(FRAME_TOP_MARGIN, title_block_bottom + FRAME_TITLE_GAP)` to `chips_top -
+  FRAME_CHIPS_GAP` (`TITLE_TOP` 22; the title block is measured from the `_top` vbox, so a subtitle change is
+  picked up); `_centre_middle_row()` (called from `_fit_tooltip`) puts the middle row (queue, frame, log) on the
+  middle of that band, and `tooltip_room()` is the band height minus the measured frame chrome and the
+  two-line result reserve (`RESULT_RESERVE`, plus `BOTTOM_MARGIN`). (`MIDDLE_OFFSET` is gone: the old fixed
+  centre let a tall frame cover the "Loot Roll" title and subtitle.) At 1920x1080 with 4 players the title
+  block ends at y = 136 and the room is about 503 px (was 618); the five Artifact tooltips are 585–676 px tall at
+  their widest width, so they show at a fit of 0.74–0.82 (was 0.91–1.0). Not done: hiding the title while the
+  tooltip is tall (would give a bigger scale).
+- Smoke log: `RunState.artifact_dropped(item, source: StringName)` (emitted by
+  `LootDrops.roll_artifact` on a hit, `ItemGenerator.SOURCE_IDS`); `Main.artifact_lines` (cleared by
+  `start_run`), `Main._on_artifact_dropped`, `Main._log_artifacts_held(hero)` (called from
+  `open_intermission` after each hero's `end_wave`, i.e. after growth); line builders
+  `Artifacts.drop_line` / `Artifacts.held_line`. The last wave of a smoke run has no wave end, so no
+  `held` line for it.
+- Tests: `test_m6_artifacts_fit` (roll window layout, Looted tag; `READABLE_FIT` 0.7, `_check_frame` also asserts
+  "frame top >= title block bottom"; `test_the_frame_stays_below_the_title_block_for_every_artifact` (five
+  Artifacts, 4 players), `..._with_a_greed_result` (the two-line result grows the frame both ways), `..._for_a_solo_hero`),
+  `test_m6_artifacts_log` (smoke log),
+  `test_ui_items_panel.test_artifact_tooltips_fit_the_4_player_panels` (corner panels),
+  compact block tests in `test_m6_artifacts_ui`, short text tests in `test_m6_artifacts_core`,
+  Shatterfrost data / reach tests in `test_m6_artifacts_props`.
+
+### Enchanter and Arcane Dust
+
+#### Rules: `core/items/enchanter.gd` (`Enchanter`, pure statics + the spending)
+
+- `enum Action { REROLL, EMPOWER, IMBUE }`. Constants: `GOLD_SHARE 0.25`, `DUST_BY_RARITY [1,2,4,8,16]`
+  (Artifact: none), `MAX_ENCHANTS [0,1,1,2,2,0]` per rarity, `MAX_DOUBLINGS 24`, `SPEND_KIND &"enchant"`,
+  `BOT_FIRST_WAVE 12`, `BOT_MAX_ACTIONS 2`, the `REASON_*` strings shown by the UI.
+- Dust from items: `dust_for(item)`, `can_disenchant` / `disenchant_blocked_reason`,
+  `disenchant(eq, item, slot_index)` (a **backpack** item leaves through `Equipment.remove_from_backpack`, so
+  the last-weapon guard applies; Dust to `RunState.add_dust`), `disenchant_lost_item(item)` (LootRoll: an item
+  nobody wanted, no backpack involved).
+- Prices: `multiplier(item)` = 2^`ItemInstance.enchant_uses` (capped), `gold_price(item, wave = -1)`
+  (= `ItemGenerator.price_for(rarity, RunState.wave)` x 25% x multiplier, `roundi`, min 1), `dust_price(item)`,
+  `price_text`, `afford_reason(item)`. The price is the same for every action on the item.
+- Rules: `blocked_reason(item, action, index)` (rule only, wallet ignored), `is_enchantable`, `can_imbue`,
+  `reroll_pool` / `imbue_pool` (every `Db.enchants` entry with weight > 0 that `ItemGenerator.enchant_fits` the
+  item and the item does not carry), `pick(pool, rng, for_class)` (the generator's weighted pick incl.
+  `power_enchant_weight`).
+- `perform(eq, slot_index, item, action, index = -1, rng = null) -> Enchanter.Outcome`: checks ownership, the rule
+  and **both** wallets before paying anything, decides the change (the only random draw: one `randf()` of
+  `rng`, default `RunState.rng`, for Reroll / Imbue; Empower and prices draw nothing), then
+  `RunState.try_spend_for(gold, slot, &"enchant", "<verb> <prefix> (<dust> Dust)")` and
+  `try_spend_dust_for(dust, slot, &"enchant", "<verb> <prefix>")`, mutates the item (Reroll keeps the rank, Empower
+  `rank += 1` up to `EnchantData.MAX_RANK`, Imbue appends at `ItemGenerator.enchant_rank(item.wave, item.looted)`),
+  `enchant_uses += 1`, `RunState.enchants_done += 1`, `refresh_name` and finally `eq.changed.emit()` (so
+  `Player.apply_equipment` rebuilds stats and procs, and every panel refreshes). A refused action changes and spends
+  nothing and draws nothing. `Outcome` carries `ok, reason, action, item, index, before, after, gold, dust, label`.
+- `refresh_name(item, old_prefix)`: a generated item's name starts with its first enchant prefix ("Blazing ..."); it
+  is swapped after a change. Hand-made (`unique`) items, Forge-made Legendaries (`unique_effect`) and names that do
+  not start with the old prefix stay as they are.
+- Bots:
+  - `best_weapon(eq)`: the best attacking weapon; **skips Artifacts** (rarity >= ARTIFACT) and returns null when only
+    Artifacts are in hand (the Fangs pair counts as two).
+  - `bot_target(eq) -> ItemInstance`: `best_weapon(eq)`, else the best equipped non-Artifact item of rarity >=
+    `BOT_FALLBACK_MIN_RARITY` (EPIC) that is not an attacking weapon (armour, jewellery, a shield / tome) and for which
+    `bot_plan(item, eq.class_data)` is not empty (rarity, then Item Level, then the lower `EquipSlot`); null if none.
+  - `bot_plan(item, class)`: Reroll an off-class power enchant, else Imbue, else Empower the lowest rank (`{}` for an
+    Artifact). `bot_enchant(slot, gold_budget, rng)` works on `bot_target` (it used `best_weapon`, so a bot wearing an
+    Artifact weapon spent nothing at all).
+  - `bot_disenchant_spare(slot, eq, dust_needed)`, `is_spare` (not an upgrade by the same test bots buy and Need with,
+    never the last weapon). The pick is deterministic: no RNG change.
+
+#### `EnchantData` / generator
+
+- `RANK_MULT [1, 1.5, 2, 2.5, 3]`, `MAX_RANK 4`, `RANK_LABELS` / `rank_label(rank)` ("I".."V"),
+  `MAX_GENERATED_RANK 2`. `ItemGenerator.enchant_rank` and `from_unique` cap at `MAX_GENERATED_RANK`, so the
+  generated content is unchanged (a seeded run draws the same items); `EnchantRoll.rank_label()`;
+  `tools/item_report.gd` prints I-V.
+
+#### Loot roll
+
+- `LootRoll.apply` outcome `&"pass"`: `dust = Enchanter.disenchant_lost_item(item)` (new field `LootRoll.dust`, 0 for an
+  Artifact). `LootRollScreen` result line / log: solo "Disenchanted [X] into 8 Dust", party "Everyone passed on [X] –
+  disenchanted into 8 Dust" (the old texts when `dust == 0`). The B prompt follows the current item
+  (`LootRollScreen.pass_label(solo, item)`, the legend is rebuilt per item when the text changes): solo
+  "Disenchant (8 Dust)" ("Leave" for an Artifact), party "Pass (all pass: 8 Dust)" ("Pass" for an Artifact); the
+  revealed solo chip says "Disenchant" when `roll.dust > 0`.
+
+#### UI (`scenes/ui/enchanter/`)
+
+- `EnchanterTab` (the Trainer / Talents tab contract): `create(slot)`, `refresh()`, `set_focused`, `handle_input(input,
+  delta) -> bool` (true = a press was used; B only counts while it cancels a hold or steps back from the enchants),
+  `prompt_spec()`, `context_text()`, `is_modal()` (a hold runs), `tab_label()` ("Enchanter (12)"), signals
+  `message`, `prompts_changed`, `label_changed` (team Dust changed, the panel relabels the tab). `Focus { ITEMS, ROWS }`.
+  Items = equipped (slot order) then backpack; grid positions `grid_pos(i)` / `index_at(col, row)`; `rows` =
+  one `EnchanterRow` per enchant + the Imbue row while a slot is free. Hold-to-confirm: `needs_hold(gold_price)`
+  (`> RunState.gold * ShopPanel.HOLD_SHARE`), `ShopPanel.HOLD_TIME`; the button (A / X) must stay down; moving, B,
+  letting go or a wallet change that makes the action unaffordable cancel it. While hidden, wallet changes only mark
+  it stale (refresh when shown); the PlayerPanel's `refresh()` (on `Equipment.changed`) calls `refresh_if_shown()` (a hidden tab
+  is only marked stale: it rebuilds up to 25 icons) and `set_tab` / `_catch_up` rebuild it when it is shown. An icon the
+  Enchanter cannot use is dimmed except under the cursor (`Cell.refresh_alpha`).
+- `EnchanterRow` (rank numeral, name, tooltip text at that rank, selection / hold fill), `DustIcon` (the drawn sparkle;
+  `COLOR`, `COLOR_BRIGHT`, `text(n)`, `bbcode(n)`).
+- `PlayerPanel`: `LOCKED_TABS = []` (mechanism kept), `enchanter: EnchanterTab`, `_enchanter_input` (LT / RT switch unless
+  modal), `tab_text(ENCHANTER_TAB)`, the tab strip draws a `DustIcon` before the label, prompts via `_update_tab_prompts`,
+  signal `item_disenchanted(item, dust)`; the backpack menu is `Equip / Forge / Sell / Disenchant / Trade / Cancel`
+  (`_disenchant_entry`, detail "+8 Dust", greyed "Last weapon" for the last weapon, absent for an Artifact).
+- `PurseBoard`: `dust_value`, `dust_icon`, `refresh_dust()` (connected to `RunState.dust_changed` while in the tree),
+  `WIDTH 722`, `WALLET_WIDTH 124`, margins trimmed (`MARGIN_X 7`, `RULE_GAP 6`, `CAPTION_WIDTH 45`, `CAPTION_GAP 5`) so
+  `text_column_width()` is still 520 and the board's height (74) is unchanged. `dust_text(n)` abbreviates from 1,000
+  ("1.2k", "12k", "1.2M"); `_fit_wallet()` (called by `refresh_gold` / `refresh_dust`) picks the first of `WALLET_FONTS`
+  (20/17, 18/15, 17/14, ...) whose coin + gold + sparkle + Dust row fits `WALLET_WIDTH` (measured with the labels' own
+  font), so 99,999 gold + 999 Dust stays inside the column.
+- `Intermission._bots_enchant()`: market after wave >= 12 (`cleared_wave`), called **first** in `_bots_shop` (after the
+  equip / forge loop, before `_bots_buy`). The pot is `bot_enchant_budget(RunState.gold, bot_train_reserve(cleared_wave,
+  bots))` = `BOT_ENCHANT_PURSE_SHARE` (0.3) of the purse above the Trainer reserve, computed once; bot k of n gets
+  `pot / (n - k)` (floored) and the gold it spent leaves the pot, so an unspent share stays for the later bots (the
+  Trainer's even split); `Enchanter.bot_enchant` per bot (target: the best attacking weapon, else the best
+  non-Artifact Epic+ armour / off-hand, see "Bots" above).
+
+### Consumables and the Black Market
+
+**Data and rules**
+- `data/consumables/*.tres` = the seven `ConsumableData` (Flask of Fury, Elixir of Ironskin /
+  Swiftness / Fortune, Hearty Onion Stew, Spiced Onion Rings, Smoked Boar Ribs; icon id = id).
+  Effects are BonusVocabulary entries with **one extension**: a `stats_pct` dictionary on a `stats`
+  entry (`{"armor": 30.0}`, `{"max_hp": 15.0}` = Stamina) is resolved by
+  `Consumables.resolve_effects(data, player)` into plain `stats` against the hero's *current* values
+  (rounded to 0.1) before the engine sees it. `BonusVocabulary.validate` accepts the resolved entries.
+- `core/items/consumables.gd` (`class_name Consumables`, pure statics): `price(data, wave)` (base x
+  `1 + 0.08 (wave - 1)`), `pool()` (id order, by String: a StringName sorts by address), `roll_row(rng,
+  count = ROW_SIZE)`, `queue(pending, data)` (the one-potion-one-food rule, returns the replaced one),
+  `give(player, data)`, `apply(player)` / `clear(player)`, `resolve_effects`, `effect_lines`,
+  `summary`, `kind_name`, `of_kind`. `resolve_effects` takes the percentage of `max(0, base)`: a
+  `stats_pct` stat can only help (negative Armor stays as it is; Max HP is always >= 1).
+- `Player`: `consumables_pending` / `consumables_active` (`Array[ConsumableData]`), signal
+  `consumables_changed`, `fill_hp(amount)` (HP up without a heal: no number, nothing for the meter).
+  `Player.create` connects `wave_began` -> `Consumables.apply` (pending -> active, one
+  `PlayerBonuses.set_effects(&"consumable", entries)`, Max HP gain filled) and `wave_ended` ->
+  `Consumables.clear` (source emptied). Nothing else clears it: the market never shows an expired buff.
+  The effects survive `Player.apply_equipment` rebuilds (they are a normal bonus source).
+
+**Shop (core/shop/shop.gd, core/shop/black_market.gd)**
+- `Shop.consumables: Array[Shop.ConsumableOffer]` (`data`, `price`; unlimited stock: no sold / lock /
+  ping), `Shop.black_market: Shop.Offer` (null before `BlackMarket.FIRST_WAVE` = 15), both next to
+  (not in) `offers`. `consumable_at`, `buy_consumable` / `try_buy_consumable(index, slot) -> BuyResult`
+  (OK / INVALID_OFFER / NO_PLAYER / NOT_ENOUGH_GOLD; spend kind `&"consumable"`;
+  `RunState.consumables_bought`; `last_replaced`; signal `consumable_bought`).
+- The Black Market offer is addressed by the index `Shop.BLACK_MARKET` (= -2) in `offer_at`,
+  `try_buy` (spend kind `&"black_market"`, also for the forged variant; `RunState.black_market_bought`),
+  `toggle_lock`, `toggle_ping`, `forges_on_buy`. `black_market_rerollable()`; `reroll_ready` is true
+  when an item offer **or** the Black Market could change; a reroll redraws the row always and the
+  Black Market when it is rerollable; a locked unsold Black Market offer survives `open_round`.
+- **Side rng**: `Shop._side(base)` seeds a private rng once from `base.seed ^ SIDE_RNG_SALT` (base = the
+  rng the first `open_round` gets, i.e. `RunState.rng`); the row and `BlackMarket.roll` draw only from
+  it, so the item offers of a seeded run and the state of `RunState.rng` do not change
+  (`test_the_row_does_not_touch_the_item_offers_or_the_main_rng`, `PlainShop` in the test).
+- `BlackMarket` (pure): `is_open`, `price` (3 x `ItemGenerator.price_for(EPIC, wave)`), `roll(wave,
+  slots, rng)`: one `randf` against `MAX_ROLL_CHANCE` (0.4) first, then the set piece
+  (`set_piece_candidates`: team classes in slot order, pieces in set order, "missing" = not worn and not
+  carried by a hero of the class) or the max-roll Epic (`ItemGenerator.generate(LOOT, ...,
+  {rarity: EPIC, usable_by, class_data})`, rejecting hand-made items and set pieces until two enchants,
+  at most `MAX_ROLL_TRIES`). The item's `buy_price` stays the normal Epic price. Set pieces are
+  `ItemGenerator.from_unique(..., looted = false, ...)`: the loot budget (+25% stats, +1 enchant rank,
+  +6 item level, the "Looted" tag) belongs to the max-roll Epic only.
+
+**UI**
+- `ShopPanel`: the cursor space is one flat list - item offers `0 .. n-1`, the consumables, the Black
+  Market card (`slot_count`, `card_at`, `is_consumable_index`, `is_black_market_index`,
+  `black_market_index`, `shop_index`, `consumable_at`, `offer_at` also for the Black Market). `cards`
+  stays the item cards; `consumable_cards: Array[ConsumableCard]`, `black_market_card: ShopOfferCard`.
+  The grid and the row live in one VBox in the counter; the row (`_extras`) is laid out by code
+  (`ShopPanel.extras_layout(k, black_market)`, pure geometry, `ROW_WIDTH` 652) and hidden while
+  the shop has no row and no Black Market (a `FakeShop` stall keeps its old shape). `try_buy(slot, index)`
+  is the one entry for items, the Black Market and consumables (`try_buy_consumable`, signal
+  `consumable_bought(slot_index, data)`; the Black Market is an `item_bought`). Holds carry a content key
+  (item uid / consumable id hash) and the price; a reroll cancels them. X / R3 act on items and the Black
+  Market only. Navigation: down from the last grid row and up from the row go to the card nearest in x
+  (`_grid_card_x`, `_extra_x`), left / right inside the row.
+- `ShopOfferCard` wide layout (Black Market): `NAME_LOCK_RESERVE` (28) is taken off the name label's
+  width (the label no longer expands), so the padlock badge (`lock_badge_rect()`, radius
+  `LOCK_BADGE_RADIUS`) never covers the name; `ping_tags() -> Array[Dictionary]` ({slot, text, rect}) is
+  the one place that lays out the "P2 wants" tags (stacked card: column from (4, 14); wide card: one row
+  at x >= `WIDE_PING_X` (66), y = 6 + `ICON_SIZE`, short "P2" text when the full row does not fit) and
+  the overlay draws exactly those rects.
+- `ConsumableCard` (96 high, flexible width), `ConsumableIcon` (procedural: round flask, vial, conical
+  flask, bowl, rings, ribs; border blue for potions / orange for food), `ConsumableTooltip extends
+  ItemTooltip` (so `layout_tooltips` places it like an item tooltip; a second tooltip per player,
+  `_cons_tooltips`, `_shown_tooltip`), `ShopOfferCard.create_wide` (200x96, `gold_frame`, price at the
+  bottom left, pips bottom right). `ShopOfferCard.CARD_SIZE` 124x176, `ICON_SIZE` 46, `NAME_HEIGHT` 44
+  (two lines of the 16 px bold name need 44).
+- Stall budget at 1920x1080 (counter 496 px; content 488 px): 2 x 176 + 10 (grid gap) + 10 (row gap)
+  + 96 (row) + margins; body margins 22 / 8, column gap 6, log lines 22 px. `STALL_SIZE` is unchanged
+  (the vertical room between the purse board and the ready chips is fixed).
+- `UnitFrame`: `consumable_icons` (24 px `ConsumableIcon`s of `player.consumables_active` behind the class
+  name, `shown_consumables()`), refreshed on `consumables_changed`.
+- `PurseBoard`: `spend_label` brackets `&"black_market"` items like shop items, `merged_wants` and
+  `_offer_item` include the Black Market offer; `Intermission.drop_shop_pings` drops its ping too.
+
+**Bots (Intermission)**
+- `_bots_consumables()` (from `cleared_wave >= BOT_CONSUMABLES_FROM_WAVE` = 6): per bot slot, potion then
+  food (`bot_consumable_choice(shop, kind)`: `BOT_POTION_PRIORITY` / `BOT_FOOD_PRIORITY`), only while
+  `gold - price >= bot_train_reserve`, never when the hero already holds a pending one of that kind;
+  buys through `ShopPanel.try_buy` (feedback log included). The stock is unlimited and the choice does
+  not depend on the bot, so all bots take the same best potion and the same best food. `_bots_black_market()`: the bot with the
+  best `ItemTooltip.item_score` gain for whom the offer is an upgrade buys it when `gold - price >=
+  BOT_BLACK_MARKET_RESERVE_MULT (2) x bot_train_reserve`, makes room, wears it. Neither draws from
+  `RunState.rng`.
+
+### Damage meter, end screen, run card
+
+#### RunState (autoload/run_state.gd)
+
+- New: `bosses_by_player: Dictionary[int, int]` (`record_special_kill(&"boss", killer)` counts it for the killer next to
+  `bosses_killed`), `hero_results: Dictionary[int, Dictionary]` (slot index -> `{"alive": bool, "best_item":
+  ItemInstance or null}`) and `record_hero_result(slot_index, alive, best_item := null)`. Both are reset by
+  `start_run`. `Main.end_run` fills `hero_results` for every joined slot **before** the end screen opens (heroes are
+  freed when the screen is left; `RunSummary.hero_entry` falls back to the live hero when no result was recorded).
+- The foundation recorders (`record_heal / record_absorb / record_damage_taken / record_revive / record_down`) now have their
+  callers (below).
+
+#### Recording (who calls what)
+
+- `Player.slot_index() -> int` (-1 without a slot) and `static Player.slot_index_of(p) -> int` (-1 for null / freed) are the
+  id the meter credits.
+- `Player.heal(amount, source_slot := -1)`: the **effective** gain (after the max-HP clamp, nothing while downed) goes to
+  `RunState.record_heal(source_slot, ...)`; `-1` = the hero itself (regen, Leech, Life on Kill, self heals). **Every call
+  site that heals someone else passes the caster's `slot_index()`**: Word of Glory, Lay on Hands, Divine Storm,
+  Light's Hammer (Consecration), Holy Shock, Seal of Command, Unbreakable's ally heal, item `heal` / `smite_heal` procs,
+  `AbilityArea` heals (`owner_player`), the bandage's heal ticks (`GeneralBuff.set_heal(total, ticks, interval,
+  source_slot := -1)` stores `heal_source`). New healing effects (e.g. Dawnbreaker's Consecration heal) must
+  pass the caster the same way, otherwise the target is credited.
+- `Player.revive(hp_ratio, reviver_slots: Array[int] = [])`: records one revive for every distinct slot of
+  `reviver_slots` after the revive happened (a hero that is not down records nothing). Callers: the teammate channel
+  (`_update_revive` passes the living teammates inside the circle at the moment it completes), Word of Glory (the
+  caster); the wave start, the Spirit Healer and the smoke runner pass none.
+- `Player._go_down` -> `record_down`. `Player.take_damage`: `record_damage_taken(slot, hp_before - hp,
+  _damage_source_id(attacker))` (HP really lost, no overkill, after armour / mults / shields / cheat-death; the source
+  id is for the balance diagnostics, see "Balance pass"); a blocked hit records
+  `record_absorb(slot, mitigated(raw) - mitigated(blocked))`. The mitigation chain moved into `Player._mitigated(amount,
+  kind, source)` (pure) so it can be evaluated for the unblocked hit too.
+- `ProcSystem.Shield` has `owner_slot`; `add_shield(amount, duration, source := &"", owner_slot := -1)` (-1 = the
+  receiving hero's own slot). An entry is identified by `(source, owner_slot)`: shields of one source from different
+  casters keep separate entries (and timers); `shield_of(source)` sums the casters. `absorb()` calls
+  `record_absorb(s.owner_slot, taken)` for every shield that soaked something. Casters of other heroes' shields
+  pass `slot_index()` (Word of Glory, Lay on Hands, Holy Shield, the `shield` proc).
+- `WarriorExecute.strike`: the finishing blow `e.take_damage(e.hp, ...)` records `RunState.record_damage` first.
+
+#### RunSummary (core/run_summary.gd) – the pure model
+
+- `STAT_IDS` (damage, healing, absorbed, taken, revives, downs, kills, bosses), `STAT_LABELS`, `COUNT_STATS`, `AWARDS`
+  (id, name, stat, rule `&"most"` / `&"least_alive"`), `MIN_HEROES_FOR_AWARDS = 2`.
+- Reading the run: `stats_of(slot)`, `hero_entry(slot)`, `collect(victory)` (RunState + PlayerManager),
+  `meter_dict()`. Pure: `build(run, heroes)` (adds `heroes[].awards`, `awards` [{id, name, slot}], `coop`, `time_text`),
+  `awards_for(heroes)`, `rank(heroes, stat)`, `best_item(equipment)`, `class_color(data)` (onion colour with the
+  luminance clamped to 0.28..0.58), `mode_label`, `format_value / format_amount / format_time`.
+  `format_amount` moves to the "M" form as soon as the k form would read "1000.0k" (999,950 and up).
+  `shown_value(v)` = `roundf(v)` is the number the meter shows: the "most" awards (value above 0), the dimmed
+  zero bars (`MeterPage`) and the card's stat line (`RunCard`) all go by it, not by the raw value (0.4 reads "0").
+- Hero entry: `{slot, label, color, class_id, class_name, class_color, alive, best_item, stats{id: float}}`.
+
+#### End screen (scenes/ui/game_over.gd, meter_page.gd, meter_bar.gd)
+
+- `GameOverScreen`: pages `Page.SUMMARY` / `Page.METER` (`page`, `set_page`, `switch_page(step)` – no wrap,
+  `page_from_name`), a tab strip, both pages in one `page_box` (MarginContainer) that `_fit_pages()` sizes to the taller of the two
+  pages after every `_fill()` (hidden pages still know their minimum size), so the panel keeps its height when the
+  page turns (the old fixed `PAGE_HEIGHT` is gone; with 7 awards the Damage Meter was 87 px taller than the box).
+  `summary_page` has `SIZE_SHRINK_CENTER`, so the shorter page floats in the middle of the box. `time_value`,
+  `meter_page: MeterPage`, `status_label` (one line, `OVERRUN_TRIM_ELLIPSIS`: its text never widens or grows the panel).
+  The page prompt row shows the pad glyphs and the keyboard keys (Q / E, the nav arrows) like the other two prompts. Input (after `INPUT_DELAY`, per slot, **bots skipped** because a bot's
+  last stick push is a navigation edge): LB / RB or `nav_just_pressed().x` -> page, X -> `save_card()`, A / START ->
+  `back_to_menu_requested` as before. `open()` swallows the human inputs (a stick still held from the fight does not
+  turn the page) and always starts on the Summary.
+- `MeterPage` builds one panel per stat (`rows[stat]`, `totals[stat]`) with a `MeterBar` per hero (`rank` order, class
+  colour fill, player colour swatch, 0 = empty dimmed bar) and the Awards grid (hidden unless `summary.coop`).
+- `GameOverScreen.save_card()` (coroutine): `RunCard.render` -> `RunCard.save_png` -> the status line
+  `GameOverScreen.saved_text(absolute path)` ("Saved to <path>"; longer than `MAX_STATUS_CHARS` = 72 characters it
+  becomes "Saved to ...<last folders>/<file name>", cut at a folder boundary; the full path is printed to the log) +
+  signal `card_saved(path)` ("" = failed). `waves_cleared()` stays the one place that decides the waves cleared
+  (`RunSummary.collect` calls it; the M6b modes edit it for Endless).
+
+#### Run card (core/run_card.gd, scenes/ui/run_card_view.gd)
+
+- `RunCard.model(summary) -> Dictionary` is pure (title, result, victory, mode, waves_text ("N / 25 waves"; on a defeat
+  "Fell on wave N", N = `summary.wave`, else cleared + 1), time_text, up to 4
+  `heroes` with label, class, colours, item line, award line, stat line); `RunCardView.create(model)` lays it out as
+  Controls (1200 x 630, shared theme); `RunCard.render(host, model)` puts the view into a `SubViewport`
+  (UPDATE_ONCE), awaits two `frame_post_draw` and returns the `Image` (null on the headless dummy renderer: it returns
+  at once); `RunCard.save_png(image, datetime := {})` writes `user://cards/run_<yyyy-mm-dd_hh-mm-ss>.png`
+  (`file_name`, `unique_path` add `_2`, `_3` for the same second). Pixels are verified by the xvfb screenshots, not in
+  headless tests.
+
+#### Command line / SMOKE
+
+- `--end-page=summary|meter` (the page `--view=game_over|victory` opens on) and `--save-card` (saves the card as soon as
+  the view is forced; prints `CARD <path>`): `LaunchOptions.end_page / save_card`, `Main._end_screen_extras()`.
+- SMOKE_RESULT `meter`: `{ "<slot index>": {damage, healing, absorbed, taken (0.1 resolution), revives, downs, kills,
+  bosses, class} }` (`RunSummary.meter_dict()`); the log prints one `SMOKE meter P1 warrior: damage ..., healing ...`
+  line per hero before `SMOKE_RESULT` (`Main.meter_lines`).
+
+### Cross-system contracts
+
+The rules that hold between the features (found and pinned by `tests/test_m6_integration.gd`; the sections above
+describe each side).
+
+1. **Enemy ground hazards.** Everything an enemy lays on the ground that hurts heroes joins the group
+   `&"enemy_hazards"` (`EnemyHazard.GROUP`). `WaveDirector.stop()` frees the whole group at the wave end
+   (the bosses' circles / cones / fields / meteors and the Plague Ghoul's `PoisonPuddle` alike; the puddle is
+   also in `&"ability_areas"`, which `Main.open_intermission()` sweeps for what lands during the "Wave
+   cleared!" pause). `BotInput._hazard_steer` sums `hazard_push(from)` of every node in the group that has
+   the method (weight `HAZARD_WEIGHT` 5, living bots only). An `EnemyHazard` gets `hazard_push` for free; the
+   `PoisonPuddle` (a plain Node3D with its own lifecycle) implements `is_dangerous()` and `hazard_push()`
+   itself, both through the shared statics `EnemyHazard.circle_push(centre, radius, from, margin)` and
+   `EnemyHazard.escape_direction(from)`, so a bot leaves a puddle exactly like a boss circle (1..2 long
+   inside radius + `BOT_MARGIN`, towards the arena's centre from the dead middle). A harmless (damage 0),
+   expired or removed puddle pushes nothing.
+2. **One Artifact roll per kill.** `LootDrops.roll_artifact` is called once per hero by the boss's
+   `drop_special(BOSS, ...)` calls (the killer first, so his Fortune counts), once more by an elite's
+   `on_enemy_killed`; the enemy meta `artifact_rolled` makes only the first call roll. A boss kill therefore
+   drops at most ONE Artifact (never one per hero) and a missed boss roll adds ONE `ARTIFACT_PITY_STEP`.
+   `kill_artifact_source` uses BOSS whatever source the call names. A boss's four-hero loot is
+   `heroes.size()` items plus the optional Artifact bag. The normal-kill chance is divided by the party size
+   (`LootDrops.normal_chance()`), the other sources are not.
+3. **Boss and the Acolyte.** `Enemy._pick_support_target` never heals an enemy with `is_boss()` (the boss is
+   always the most hurt one); the Acolyte may only top its shield up to 20% of max HP (refresh, no stacking).
+   An injured add beside a boss is healed instead.
+4. **Credit of new healing / shielding.** Any new effect that heals or shields someone else passes the caster:
+   `Player.heal(amount, caster.slot_index())`, `ProcSystem.add_shield(amount, duration, source, caster_slot)`.
+   Dawn's Embrace (`PaladinWordOfGlory.grant_shield`, source `&"dawn_embrace"`) is credited to the casting
+   Paladin; the Dawnbreaker heal of the Consecration mod goes through the existing, already credited code.
+   `shield_of(source)` sums the casters, so the 15% top-up rule holds across casters.
+5. **Artifacts and the economy.** An Artifact is never sold (`ItemInstance.can_sell()`: the Sell entry is greyed
+   "Artifact", bots never sell one), forged (`Forge.REASON_ARTIFACT`), disenchanted
+   (`ItemInstance.can_disenchant()` is the one rule; `Enchanter.disenchant_blocked_reason` asks it, the menu
+   has no Disenchant entry), turned into Dust by an all-Pass (`Enchanter.disenchant_lost_item` = 0), or
+   enchanted (`Enchanter.REASON_ARTIFACT` for Reroll / Empower / Imbue; `MAX_ENCHANTS[ARTIFACT] = 0`). It
+   keeps its two fixed enchants. The Enchanter tab lists an Artifact **greyed** (`Cell.enchantable` false),
+   shows no enchant rows and says "Artifacts cannot be changed". A bot that wears an Artifact weapon enchants its
+   best non-Artifact Epic+ armour / off-hand instead (`Enchanter.best_weapon` skips Artifacts, `Enchanter.bot_target`
+   is the fallback; `bot_plan` still returns nothing for an Artifact).
+6. **Purse board.** Every wallet spend goes through `RunState.try_spend_for`, so the Spent ticker shows the
+   M6 kinds without any board code: `&"consumable"` (plain name), `&"black_market"` (`[Item]` in brackets, like
+   shop items) and `&"enchant"` (label "Empower Blazing (8 Dust)"); their Dust part is on
+   `RunState.dust_spend_log`.
+7. **Damage meter.** A boss killed through `WeaponRunner.apply_hit` / `ProcSystem.deal_raw` is credited like
+   any enemy (damage = the HP it really had left, no overkill) and `record_special_kill(&"boss", slot)` fills
+   `bosses_by_player` for the killer; `RunSummary` / the SMOKE `meter` entry show both.
+8. **Bot market order** (final): equip / forge, enchant (30% of the purse above the Trainer reserve, from wave
+   12), buy, Black Market (from wave 15), consumables (from wave 6), Trainer, talents, reroll. A bot's hook
+   sidestep (Flesh Golem) ends its `think()` early, before the rescue and loot steering; the hazard push is not
+   mixed into it (a hook is a 0.8 s event).
+9. **Determinism.** See "Determinism (M6a draw points)" below.
+
+### Balance pass (levers, diagnostics, results)
+
+Done on top of the merged M6a head (`4aa2c3e`), bots only: `godot --headless --fixed-fps 60 --path . -- --smoke
+--waves=25 --allow-defeat --players=N --classes=... --seed=S`, two Godot processes at a time (the same build and
+seed are bit-identical). Raw numbers: GDD chapter 9, "M6a mérés".
+
+- **Method.** Baseline = the M6a head plus the diagnostics commit (no gameplay change). The matrix: 4p warrior /
+  mage / paladin / rogue seeds 3 / 21 / 55 / 7, 2p warrior + mage seed 21 and paladin + rogue seed 34, 1p paladin 21 /
+  mage 34 / warrior 7 / rogue 13, plus nine extra seeds (4p 5; 2p wm 5, wm 8, pr 8; 1p warrior 8, warrior 21, mage 7,
+  paladin 13, rogue 34): 19 configurations, because one run per configuration is mostly noise (a solo hero's first
+  down is the run). Three tuning rounds: round 1 the golem and the first Vor'thalax numbers, rounds 2 and 3
+  Vor'thalax only (a change that touches only Vor'thalax cannot change a run before wave 25 - checked: identical
+  downs per wave - so those rounds re-ran only the runs that reached wave 25). "TIMEOUT" = the smoke safety killed
+  the boss 210 s after its arrival: the run is `completed`, but the boss was NOT beaten.
+- **Baseline findings.**
+  - Natural parties finished more often than the review feared: 4p 4 of 5 (the lost one: seed 5, wave 20), 2p 1 of
+    5 (two duos died on wave 14, two lost to the final boss within 12-17 s), 1p 1 of 9 (three lost to the final
+    boss, the rest died on waves 7-24; the M5 base also lost solo heroes on waves 8, 19 and 24 on the same seeds, so
+    the early solo deaths are not an M6a regression).
+  - **Flesh Golem = 38% of all damage taken from wave 10 on** (19 runs; 20-53% per run in waves 10-19) from ~2% of
+    the spawned enemies. Axethrower 20-35%, Gurglers 10-20%, the rest < 8% each (Vor'thalax' own hits 6-12% of waves
+    20+ in 4p). A wave-14 golem hit on a duo's warrior: 24.4 raw, 11.9 after armour, on a 43.7 HP hero.
+  - **Wave 20 is a spike, not a wall**: 4p downs per run on wave 20 5.4 (2.0 / 2.4 on 18 / 19, 0.2 on 21); 2p 0.7. The
+    one wipe (4p seed 5) already had 9 downs on 15-19.
+  - **Vor'thalax died too fast for a full party and killed small parties at once**: 4p kills in 29 / 41 / 45 / 50 s
+    (HP x3.25) at 3-7 downs each; the duos that did not win died 11.7 s and 17.3 s after its arrival, a solo mage
+    25.7 s. At wave 25 the heroes have **59-109 HP** (wave 10: 16-56; mage 59-104, warrior 65-105, paladin 71-109,
+    rogue 60-84) and the damage curve is x45: every hazard or contact hit one-shots a squishy hero (a wave-25
+    meteor shared by a duo was 435 raw per hero). Solo DPS on the boss spans 0.8k/s (paladin) to 23k/s (rogue).
+- **Levers (old -> new):**
+
+  | Lever | Old | New | Why |
+  |---|---|---|---|
+  | `data/enemies/flesh_golem.tres` `contact_damage` | 4.0 | **2.5** | 38% of the damage taken from 2% of the enemies; the hook (1 x contact) follows. Before it 2 of 5 duos died on wave 14 and 4p seed 5 wiped on 20; after it neither does (golem share 28% in waves 10-19, 26% from 20). |
+  | `data/bosses/vorthalax.tres` `coop_hp_per_player` | 0.75 | **2.0** | Boss HP x1 / x3 / x5 / x7 by party size (was x1 / x1.75 / x2.5 / x3.25): party DPS grows faster than the party (items, 5 Artifacts, focus). A first try at +300% (x10 at 4p, a 110 s fight) wiped 3 of 4 full parties and every duo, so it went back to +200%. |
+  | `data/bosses/vorthalax.tres` `contact_damage` | 4.0 | **1.5** | Every hazard of the boss is a multiple of it (Fire Fields 1x, Meteor 8x / 4x, contact). Not on the agreed lever list: the fight's length is bounded by how long a party survives, and at 4 / 2 it one-shot most heroes. 4 -> 2 in round 2, 2 -> 1.5 in round 3. |
+  | Morvain, the wave-20 rule, the puddle, the Acolyte heal, `COOP_DAMAGE_MULTS`, the golem's cooldown / spawn weight | - | **unchanged** | Morvain kills 19-97 s (medians 63 s 4p / 55 s 2p / 59 s 1p; target 40-90 s). Wave 20 is a clear spike once the golem is soft. Puddles are 3-6% of the damage, the Acolyte's heal does not show in the data. The duo / solo mid-game is already thin after the golem nerf (0 downs on 10-19), so the damage table stays. |
+
+- **Diagnostics added** (no gameplay): `RunState.damage_taken_by_source` (`{source id: {wave: float}}`, cleared by
+  `start_run`) fed by `record_damage_taken(player_index, amount, source_id := &"")`; `Player.take_damage` passes
+  `_damage_source_id(attacker)` = the attacker's `EnemyData.id` (a boss's hazards carry the boss as `source`, so they
+  book under the boss id; an add books under its own id) or `&"environment"` for a hit without an enemy (the poison
+  puddle) - dodged / parried / blocked-away / absorbed damage is not booked (it is HP taken). SMOKE_RESULT
+  `taken_by_source` = `RunSummary.source_damage_dict()`: `{source id: {"wave": damage rounded to 0.1}}` (string
+  keys; the analysis scripts sum it per wave band). A boss arrival prints a second smoke line `SMOKE heroes: P1
+  warrior 98 HP (takes 32% of a raw hit), ...` (`Main.heroes_defence_text`; HP = `Stats.max_hp`, "takes" =
+  `CombatMath.incoming_damage(100, ...)` for a melee hit, i.e. after Armor, Versatility, Avoidance).
+- **Results** (19 runs; before -> after):
+
+  | Target | Measured |
+  |---|---|
+  | 4p: no downs on waves 1-4 | 0 in every run (0) |
+  | 4p: occasional downs from ~8-13, regular from ~15 | first downs on waves 8 / 10 / 12 / 16 / 18 (8 / 10 / 12 / 13 / 14); downs on 15-19 per run 2.8 (7.0) |
+  | 4p: most seeds clear 25, wipes <= ~1 in 4 and not before ~18 | 4 of 5 clear (4 of 5); the loss is the final boss (166 s, 29% HP left, 46 downs in the run); waves 20-24 downs per run 3 / 5 / 12 / 12 / 21 (11 / 21 / 11 / 7 / 14) |
+  | 2p: most seeds reach 20+, <= ~1 in 3 wipe | all 5 reach wave 20; 3 of 5 clear (1 of 5; two died on wave 14 before); losses: wave 20 (wm seed 8) and the final boss (wm seed 5, 28 s) |
+  | 1p: median death wave ~20+, >= 1 of ~4 clears | median death wave 25 (24); 2 real clears (both rogue) + 2 TIMEOUT "clears" (paladin) of 9 (1 clear); deaths on waves 7 / 20 / 22 / 23 / 25 |
+  | Morvain ~40-90 s | medians 63 s (4p) / 55 s (2p) / 59 s (1p), unchanged |
+  | Vor'thalax ~90-180 s | 4p 36 / 64 / 97 / 102 s (29 / 41 / 45 / 50 s), median 80 s; 2p 43 / 58 / 108 s (58 s); 1p rogue 9 / 20 s, solo mage 64 s (lost, 35% HP left), solo paladin never (TIMEOUT at 210 s, alive, 0 downs) |
+  | Wave 20 a spike, not a wall | 4p 5.4 downs per run on wave 20 vs 0.8 on 19 and 21 (before 5.4 vs 2.4 / 0.2); 2p 2.4 vs 0.0; no wipe on it except 2p wm seed 8 (2 downs = a duo wipe) |
+
+  Requested matrix (before -> after; downs 1-4 / 5-9 / 10-14 / 15-19 / 20-25 in `downs`):
+
+  | run | before | after |
+  |---|---|---|
+  | 4p s3 | clear, downs 0/0/4/3/15, Vor 29 s | clear, 0/0/0/2/3, Vor 64 s |
+  | 4p s21 | clear, 0/0/3/20/24, Vor 41 s | clear, 0/0/1/1/5, Vor 102 s |
+  | 4p s55 | clear, 0/0/2/2/15, Vor 45 s | clear, 0/0/0/4/14, Vor 36 s |
+  | 4p s7 | clear, 0/0/1/1/14, Vor 50 s | lost to the boss at 166 s (29% HP left), 0/0/1/2/43 |
+  | 4p s5 (extra) | wiped on wave 20 | clear, Vor 97 s |
+  | 2p wm s21 | died on wave 14 | clear, Vor 108 s |
+  | 2p pr s34 | clear, Vor 58 s | clear, Vor 58 s, 0 downs |
+  | 2p wm s5 (extra) | died on wave 14 | lost to the boss at 28 s |
+  | 2p wm s8 (extra) | lost to the boss at 12 s | died on wave 20 |
+  | 2p pr s8 (extra) | lost to the boss at 17 s | clear, Vor 43 s |
+  | 1p paladin s21 | lost to the boss (197 s) | TIMEOUT |
+  | 1p mage s34 | lost to the boss (26 s) | lost to the boss (64 s) |
+  | 1p warrior s7 | died on wave 7 | died on wave 7 (the M5 base also lost solo heroes on 8 / 19 / 24 on these seeds) |
+  | 1p rogue s13 | clear, Vor 9 s | clear, Vor 20 s |
+
+  Golem share of the damage taken: waves 10-19 38% -> 28%, waves 20-25 38% -> 26% (the Axethrower is now the biggest
+  single source in most 4p runs).
+- **Open problems** (for the M6b final balance):
+  - Vor'thalax is a class lottery: DPS on the boss spans 0.8k/s (a solo paladin never kills it) to 23k/s (rogue). One
+    duo (warrior + mage) lost 28 s into the fight with 74% HP left, a full party with a weak seed (4p seed 7, 46 downs
+    in the run) lost at 166 s with 29% left. If the 4p median (80 s) should reach 90-180 s: 4p x7 -> x8-9
+    (`coop_hp_per_player` 2.0 -> 2.4), but the weaker parties are at the edge already; or lower the Paladin / Warrior
+    bot's boss targeting.
+  - Hero HP vs the damage curve at wave 25 (60-110 HP, hits x45): the final boss, wave 20 and the golem's hook one-shot
+    the mage / rogue whatever the multiplier is; a hero-HP growth term (per level, per Item Level) is the principled fix.
+  - Duos and solo heroes have almost no mid-game pressure after the golem nerf (0 downs on waves 10-19 in 1p / 2p),
+    while a solo first down on waves 7-23 ends the run (1p warrior seed 7 dies on wave 7 on the M5 base too).
+    `COOP_DAMAGE_MULTS` was deliberately not touched.
+  - Re-run the 4p / 2p matrix on the head with the supply fix (fewer Artifacts in 4p / 2p: less late weapon damage)
+    and the bot Enchanter fix: these numbers are on `4aa2c3e` plus the balance commits only.
+  - A smoke "clear" does not prove the boss is beatable (2 solo paladin runs): count the `TIMEOUT` lines when
+    reading a matrix.
+  - Single-seed before / after pairs are noisy (one data-only change moved 1p mage seed 7 from wave 24 to wave 20);
+    the conclusions rest on the totals.
+
+### Determinism (M6a draw points)
+
+Everything goes through `RunState.rng` or a private rng seeded from the run seed; `--fixed-fps 60` smokes stay
+bit-identical per seed.
+
+- The seeded `--fixed-fps 60 --smoke --waves=6 --seed=5` differs from the pre-M6 base only through the enemy data fixes
+  (Marsh Gurgler group 4-6, Greedy 5% / +1 gold, which shift the RNG stream): 587 kills, 2 goblins, 195.1 s run time
+  instead of 595 kills / 0 goblins; every other feature alone was identical to the base. The follow-ups (the Artifact
+  threshold, the bot Enchanter target, the market header, the loot roll layout, the golem / Vor'thalax numbers and the
+  diagnostics) change nothing in those six waves: same 587 kills.
+- Boss wave start: eligible list -> (no elite schedule) -> first group pick -> `wave_started` (the GoblinSpawner draws
+  nothing on a boss wave) -> opening group -> the boss point. Waves 1-9, 11-19 and 21-24 draw what they drew before.
+  Wave 20: one affix draw per enemy that is not a due real elite (`roll_affix`).
+- Enemy `create` / `setup`: one extra draw for SUPPORT and BRUTE (the staggered first cooldown, like RANGED). The
+  Fire Fields (Fisher-Yates over the heroes) and the Meteor target draw from `RunState.rng`; the puddle, the
+  hook line, the hazards' pushes, the boss model and the HUD draw nothing; a bot's hook dodge uses the bot's own rng.
+- Artifact roll: only when a roll is really made (from wave 10, not for an already rolled enemy, chance above 0, a
+  class still free): the chance `randf`, on a hit the 80 / 20 `randf`, then a `randi_range` among more than one
+  class. The normal-kill threshold changed with the party size, not the draw order.
+- Shop: the consumables row and the Black Market draw only from `Shop._side` (seeded from the run seed and
+  `SIDE_RNG_SALT`), so the item offers of a seeded run and `RunState.rng` do not move.
+- Enchanter: one `randf()` per Reroll / Imbue (`Enchanter.pick`), Empower and the prices draw nothing; the bot target
+  pick (`bot_target`) is deterministic; no change before wave 12.
+- Bots: the consumables and Black Market passes draw nothing; the golem hook dodge is decided once per golem and hook
+  by the bot's own rng.
+- Meter, end screen, run card: no RNG.
+
+### Validation and balance data points
+
+#### The merged M6a head (before the balance pass and the fixes)
+
+
+Validation of the merged M6a (six feature branches merged plus three integration commits, before the balance pass
+and the fixes). All runs `--fixed-fps 60` (bit-identical for the same seed), headless, GL Compatibility.
+
+**Suite.** 2183 passed, 0 failed (after each merge: bosses 1765, enemies 1832, Artifacts 1943 + 1 fixed, Enchanter
+2025, shop sinks 2081, meter 2165, integration tests +18). The one `ERROR` line in the log is the intentional
+`ProcSystem.shield_hp is read-only` test.
+
+**Seed-5 smoke** (`--smoke --waves=6 --seed=5`): exit 0, 0 errors, 0 warnings, 587 kills, 2 goblins, 211.9 s game
+time (195.1 s run time), level 7. The pre-M6 base gave 595 kills / 0 goblins / 215.9 s game time: the difference comes only from
+the enemy data fixes (Marsh Gurgler group 4-6, Greedy 5% / +1 gold; they shift the RNG stream); every other
+feature alone was identical to the base, and the enemies alone gave exactly these 587 / 195.1 s.
+
+**Natural 25-wave runs** (`--smoke --waves=25 --allow-defeat`, bots only, nothing set up):
+
+| | 4 players, seed 5 | 2 players, seed 21 | 1 player, seed 8 |
+|---|---|---|---|
+| Result | defeat on wave 20 (the party was wiped there), waves 1-19 cleared | defeat on wave 14 (both heroes down within 5 s), waves 1-13 cleared | defeat on wave 20, waves 1-19 cleared |
+| Morvain (wave 10) | 18,214 HP, killed after 52.2 s (phase 2, enrage 0, 19 casts), 2 downs / 2 revives | 9,807 HP, killed after 72.4 s, 0 downs | 5,604 HP, killed after 93.0 s (enrage level 1), 0 downs |
+| Vor'thalax (wave 25) | not reached | not reached | not reached |
+| Downs, waves 1-9 / 10-19 / 20+ | 2 / 10 / 14 (26 in all, 22 revives) | 0 / 2 / 0 | 0 / 0 / 1 |
+| Artifacts | 5 (every class once): Skull (warlock, wave 10, boss), Staff (mage, 11, elite), Dawnbreaker (paladin, 17, elite), Earthsplitter (warrior, 19, elite), Fangs (rogue, 19, loot) | 1: Earthsplitter (wave 14, loot) | 0 |
+| Consumables / Black Market / enchants | 64 / 1 / 12 | 14 / 0 / 4 | 21 / 0 / 7 |
+| Dust earned / spent | 119 / 116 | 29 / 24 | 63 / 62 |
+| Gold at the last shop (after wave 19 / 13 / 19) | 307 | 41 | 191 |
+| Gold spent, Greed gold | 13,043, 3,377 | 2,789, 738 | 4,475, 881 |
+| Items bought / looted / forged | 96 / 109 / 10 | 38 / 36 / 1 | 22 / 38 / 2 |
+| Run time (game / real) | 1,492.9 s / 460 s | 744.3 s / 100 s | 1,528.6 s / 144 s |
+| Errors / warnings | 0 / 0 | 0 / 0 | 0 / 0 |
+
+For comparison the pre-M6 base (M5 gameplay) plays the 2-player seed-21 run to the end: completed, 25 waves, 16
+downs, gold at the last shop 1,876 (nothing to spend it on), no consumables / Dust. The M6 sinks work: the purse is
+emptied by consumables, enchants and the Black Market (gold at the last shop 41-307).
+
+**What kills the bots** (before the balance pass; a debug copy printed every hit by source, the numbers equal the runs above): the **Flesh Golem**
+is the biggest damage dealer from wave 12 on: 42% (4 players) / 50% (1) / 37% (2) of all damage taken in waves 10-19
+(hook + melee), then the Troll Axethrower (25-32%); 7 of the 10 downs of waves 10-19 and 11 of the 14 downs of wave 20 in
+the 4-player run came from golem hits (wave 19 alone: 6 downs). **Wave 20** (every enemy carries an elite affix, HP x1.5)
+is a wall for the smoke bots at every party size: golems with Shielding / Vampiric affixes and enraged / frenzied
+axethrowers. The 2-player party loses at wave 14 because nobody is left to revive. Sourceless ground damage (the poison puddles)
+is 4-6% of the damage taken; Morvain's own attacks are 5% (1 player) to 13% (2 players) of waves 10-19.
+Disabling the bots' puddle avoidance on the 2-player seed made it worse (defeat on wave 12, Morvain 169.6 s): the
+avoidance is not what loses the run.
+
+**Boss kill times** are in the table (Morvain 52-93 s, 1-4 players); Vor'thalax was never reached naturally in these
+three runs, his numbers are the leveled-up experiments of the boss-fight data below (450 base HP); the balance pass
+ran him naturally.
+
+
+#### After the follow-ups (two branches on the merged head, validated separately)
+
+- **Fixes** (market header, bot Enchanter target, Artifact supply, two pinned clauses, loot roll frame): full suite
+  2198 passed, 0 failed (baseline 2183, +15); `--fixed-fps 60 --smoke --waves=6 --seed=5` exit 0, 0 errors, 0 warnings,
+  587 kills, 2 goblins. Artifact supply runs (start level 40, `--boss-hp=0.05`, seed 5, 0 errors / warnings): the 1p
+  run completed with 4,671 kills and 5 Artifacts, the 4p run completed with 13,101 kills and 4 Artifacts; the 2p run
+  was defeated on wave 20, so the 2p row of the GDD 5.5 supply table is an interpolation, not a completed run. The
+  expected Artifacts per 25-wave run (Fortune 0) are in GDD 5.5 (≈ 2.8 / 2.5 / 2.6 for 1 / 2 / 4 players).
+- **Balance pass:** full suite 2190 passed, 0 failed (+7 over 2183); the same seed-5 smoke, identical to the M6a head
+  (587 kills, 0 errors, 0 warnings). The 19-run matrix is in "Balance pass".
+- The combination of the two (and the 4p / 2p matrix on it) is not measured yet.
+
+#### Boss-fight data points (before the balance pass: contact 4, `coop_hp_per_player` 0.75; `--fixed-fps 60`, natural runs from wave 1)
+
+
+Command: `godot --headless --fixed-fps 60 --path . -- --smoke --waves=25 [--allow-defeat] --seed=S
+--players=N` (the 3 / 1 player runs use the first N classes: warrior, mage, paladin).
+Wave-25 downs = downs at the end minus the cumulative downs after wave 24.
+
+Vor'thalax before the balance pass (base HP 450, contact 4; boss HP = base x wave growth x (1 + 0.75 (n - 1))):
+
+| Players, seed | Boss HP | `--allow-defeat` (natural defeat ends the run) | Smoke default (a wipe revives everybody) |
+|---|---|---|---|
+| 4, seed 9 | 670,754 | killed after 118.5 s, 4 / 4 standing, 17 wave-25 downs, no wipe | same (no wipe) |
+| 3, seed 6 | 515,965 | party wiped at 154.3 s with 2% HP left (26 downs) | killed after 156.5 s, 1 wipe, 27 downs, 2 / 3 standing |
+| 1, seed 4 | 206,386 | the lone bot dies on wave 13 (before any boss) | killed after 199.7 s, 17 wipes, 17 downs |
+
+Other base HPs tried (same seeds, same history up to wave 25; the data was edited in a scratch
+copy or `--boss-hp` was used, which also scales Morvain):
+
+- 4 / seed 9: base 1200: 38% HP left at 210 s (safety kill); 650: the party wipes at 134.7 s with
+  21% left (18 downs); 450: kill 118.5 s; 420: kill 94.8 s (1 / 4 standing, 13 downs); `--boss-hp=0.55`
+  (base 358): the party wipes at 49 s with 48% left.
+- 3 / seed 6: base 1200: 55% left at 210 s; 450: wipe at 154 s, 2% left; 420: wipe at 148 s, 20% left;
+  360: wipe at 131 s, 19% left (18 downs). The 3-player party keeps wiping around 130-155 s (enrage
+  level 2-3), so even 360 does not give a kill without revives; its DPS is only ~2.6-3.3k / s.
+- 1 / seed 4 (smoke revives): base 1200: 67% left at 210 s; 450: kill 199.7 s; 250: kill 130 s (4 wipes).
+- Bot team damage against Vor'thalax at wave 25: ~0.9k / s (1 bot), ~3k / s (3), ~6k / s (4), i.e.
+  faster than the boss co-op HP factor (1 : 2.5 : 3.25), so one base HP cannot give 120-150 s at every
+  party size: 450 fits 4 players (118 s) and is about right for 3 (156 s with one revive); the lone bot
+  needs ~200 s (and 17 revives). Lowering `coop_hp_per_player` (or the boss damage) is the lever if
+  solo / duo should be shorter; the base HP stays tuned to the 4-bot smoke (the balance pass then raised k to 2.0 and
+  cut the contact damage to 1.5, see "Balance pass").
+- Morvain (wave 10, 18,214 HP with 4 players): killed after 51-56 s, 1-2 downs; 3 players (14,011 HP)
+  43 s, 0 downs; 1 player (5,604 HP) 57-92 s, 0 downs (enrage level 1 at 90 s).
+- `--start-wave=9 --start-level=12` / `--start-wave=24 --start-level=24` heroes have NO gear and no
+  abilities (0 kills in wave 24): they cannot kill a boss; those runs end through the smoke safety
+  kill (and complete with exit 0).
+
+### M6a tests
+
+The M6a tests (each new behaviour has a test that fails without it; the new tests were mutation-checked, e.g. deleting `and hazard == Vector2.ZERO` in the rescue stand, the `_bots_black_market()` call in `_bots_reroll`, or the `_damage_source_id` argument fails a test):
+
+| File | Covers |
+|---|---|
+| `tests/test_m6_foundation.gd` | the foundation hooks: Dust wallet, meter recorders and credit, run clock, boss kind of `record_special_kill`, SUPPORT / BRUTE dispatch, death-effect virtual, `BossData`, the Db dirs, `ConsumableData`, the Enchanter tab, the `roll_artifact` wiring, the bot-pass order, the SMOKE keys and the launch flags |
+| `tests/test_m6_enemies.gd`, `test_m6_enemies_player.gd` | the three enemies' data, the puddle, the Acolyte (distance, heal / shield, interruptions, priority target, never heals a boss), the golem's hook, `take_hook` / `pull_toward` on real heroes, the bots' hook dodge per golem |
+| `tests/test_m6_bosses.gd` | boss data and rules, the scheduler, the hazards, rewards, director boss waves, smoke safety, elite wave 20 / lite affix, the HUD frame, the bots' hazard steering, Main's boss flow and victory; `test_visuals_camera.gd`: boss framing |
+| `tests/test_m6_artifacts_core.gd`, `_props.gd`, `_ui.gd`, `_fit.gd`, `_log.gd` | the five Artifacts: data and validation, growth / awakening, the pair rule, drops (one roll per kill; `test_chances_by_source_and_fortune` for the 2-player run, `test_normal_kill_chance_is_divided_by_the_party_size` for 1-4 players), Need / Greed, the ten properties on real heroes, tooltips, the loot roll window fit (`READABLE_FIT` 0.7; the frame below the title block for every Artifact, with a two-line Greed result and for a solo hero), the corner-panel fit, the smoke log |
+| `tests/test_enchanter.gd`, `test_ui_enchanter.gd`, `test_loot_roll.gd`, `test_ui_market_loot.gd` | ranks I-V, Dust, Disenchant, prices, Reroll / Empower / Imbue, the tab, the hold rule, the purse board Dust, the loot roll Pass -> Dust and the B prompts, the bots' Enchanter pass |
+| `tests/test_m6_shopsinks_core.gd`, `_ui.gd` | the seven consumables, the stall row and the Black Market (side rng, prices, set pieces), the layout at 1920x1080 and 1280x720, the bots |
+| `tests/test_m6_meter.gd`, `_credit.gd`, `_ui.gd` | the recorders, the caster credit at every heal / shield / revive call site through the real code, the end screen, the awards, the run card |
+| `tests/test_m6_followup.gd` | the follow-up fixes: the market header names no seconds before a boss wave (waves 10 and 25, the other waves keep their line, the open market screen), `Enchanter.best_weapon` skipping Artifacts and `bot_target` (the weapon, else the best Epic+ armour / off-hand; the Fangs pair counts as two Artifacts; a bot holding an Artifact enchants its armour; a bot with a normal weapon still enchants the weapon first), the rescue stand beside a downed teammate (`test_a_bot_beside_a_downed_teammate_*`: stands still without a hazard, leaves a puddle / a boss circle it stands in, ignores a far one), a bot reroll that redraws an affordable Black Market upgrade buys it |
+| `tests/test_m6_balance.gd` | 7 tests: `record_damage_taken` keeps source and wave, `start_run` clears it, a hit on a hero is booked under the golem / `environment`, the `taken_by_source` format, the golem pins (contact 2.5, hook still 1 x, a duo's wave-14 hit < 16 raw), the Vor'thalax pins (contact 1.5, k = 2, x1 / x3 / x5 / x7, Morvain unchanged, a duo's meteor share < 170 raw), `Main.heroes_defence_text`; `test_m6_enemies.gd` (golem contact) and `test_m6_bosses.gd` (Vor'thalax contact) were updated |
+| `tests/test_m6_integration.gd` | the cross-package contracts of 2.8: the puddle as a bot hazard and `WaveDirector.stop()`, the Acolyte beside a real boss, a boss kill in the meter, one Artifact roll per boss, Dawn's Embrace credit, consumable / Black Market / enchant spends in the purse board, Artifacts never sold / disenchanted / enchanted / dusted, the Enchanter tab greying them |
