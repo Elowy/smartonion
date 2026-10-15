@@ -681,48 +681,98 @@ Az Artifact-dobás **ölésenként** történik, a normál loot-dobás után, é
 | Boss (10. és 25. hullám) | 15% – **bossonként egyszer** (nem a boss-loot itemenként), plusz pech-védelem |
 | Loot Goblin | 5% |
 | Elit | 2% |
-| Normál ellenség | 0,05% (a „jackpot”) |
+| Normál ellenség | **0,05% ÷ játékosszám** (a „jackpot”): 1 fő 0,05%, 2 fő 0,025%, 3 fő 0,0167%, 4 fő 0,0125% |
 
-- **Fortune:** a gyilkos Fortune-ja minden esélyt szoroz: × (1 + Fortune%).
-- **Pech-védelem:** minden boss után, ami nem dobott Artifactot, a boss-esély +5
-  százalékponttal nő. Amint leesik egy Artifact, a pech-védelem nullázódik.
+- **Egy ölés = egy dobás.** Egy elit ölése két hívást csinál (elit, majd normál loot), egy boss
+  ölése hősönként egyet: csak az első számít. A dobás forrása a kill legmagasabb forrása:
+  **boss > Loot Goblin > elit > normál ellenség**, akkor is, ha a hívás alacsonyabbat mond. A
+  boss halála így mindig egyetlen dobás (a gyilkos Fortune-jével), nem hősönként egy.
+- **Fortune:** a gyilkos Fortune-ja minden esélyt szoroz: × (1 + Fortune%) (pl. Fortune 100
+  megduplázza); az esély legfeljebb 100%.
+- **Miért osztjuk a normál esélyt a játékosszámmal:** a hullámonkénti ölések száma a
+  csapattal nő (spawn-szorzó `1 + 0,6 × (n − 1)`, 9. fejezet), a bossok, a goblinok és az
+  elitek száma alig. Osztás nélkül egy 4 fős csapat menetenként átlag 7,1 találatot kapott
+  volna (a szóló hős 2,9-et), és a menetek ≈ 84%-ában mind az öt kaszté leesett. Az osztással a
+  normál ölésekből várt találat a csapatmérettől alig függ.
+- **Pech-védelem:** csak egy ténylegesen lefutott, de mellément **boss-dobás** növeli (+5
+  százalékpont a következő boss-esélyhez; egy boss egyetlen lépés); bármelyik Artifact-drop
+  nullázza. A többi forrást nem érinti.
+- **Várható Artifact egy teljes (25 hullámos) menetben** (Fortune 0, számított érték; a
+  40. szintű bot-futások – 1 fő 5, 4 fő 4 Artifact – egyeznek vele):
+
+  | Játékosok | Normál ölés (10–25. hullám) | Várt találat: normál / elit / boss / goblin | Összesen | Várt Artifact (max. 5) | Osztás nélkül |
+  |---|---|---|---|---|---|
+  | 1 | ≈ 4 220 | 2,11 / 0,39 / 0,32 / 0,05 | 2,9 | 2,8 | 2,9 → 2,8 |
+  | 2 | ≈ 6 760 | 1,69 / 0,53 / 0,32 / 0,05 | 2,6 | 2,5 | 4,3 → 3,8 |
+  | 4 | ≈ 11 830 | 1,48 / 0,81 / 0,32 / 0,05 | 2,7 | 2,6 | 7,1 → 4,7 |
+
+  Mind az öt Artifact leesésének esélye 1 / 2 / 4 játékosnál ≈ 16% / 12% / 13% (osztás nélkül
+  16% / 43% / 84%). A számítás: a 10–25. hullám ölései (a két boss, az elitek és a goblinok
+  nélkül; a 20. hullám „lite” elitjei normál dobást adnak), az elitek `EliteAffixes.
+  expected_count` szerint, a boss 15% (a 25. hullámon + pech ≈ 0,32 találat), a goblin ≈ 1 ölés
+  menetenként; a várt Artifact a Poisson-eloszlású találat és az 5-ös kasztlimit minimuma.
+- Debug: `--artifact-chance=X` minden dobás esélyét X-re állítja (osztás és Fortune nélkül; a
+  10. hullám és a kasztszabály marad); 0 = soha.
 
 **Melyik kaszté:**
-- 80% eséllyel a csapatban lévő egyik kaszté, 20% eséllyel bármelyiké.
+- 80% eséllyel a csapatban lévő, még Artifact nélküli kasztok egyikéé (ha már nincs ilyen:
+  bármely még szabad kaszté), 20% eséllyel bármely még szabad kaszté.
 - Egy menetben kasztonként legfeljebb **1 Artifact** eshet: az a kaszt, amelyiké már leesett,
-  kimarad a sorsolásból; ha mindegyiké leesett, nincs több Artifact-drop.
+  kimarad a sorsolásból; ha mindegyiké leesett, nincs több Artifact-drop (és sorsolás sem).
 
-**A dobás:** a leesett Artifact a szokásos **Need / Greed / Pass** dobásra megy (10.1).
+**A dobás:** a leesett Artifact aranyszínű lootzsákban esik (9 m-es fénynyaláb, „Artifact!”
+felirat), nem számít a normál drop hullámlimitjébe, és a szokásos **Need / Greed / Pass**
+dobásra megy (10.1).
 - **Need:** csak a megfelelő kasztú játékos nyomhat rá Needet; a többieknek csak Greed vagy Pass
-  választható.
+  választható. Teli backpackkel a Need nem megy („Backpack full”): helyet kell csinálni, vagy
+  Greedet választani.
 - **Greed:** nem az eladási árat, hanem az adott hullám **Epic árának 5-szörösét** adja a közös
-  kasszába (pl. a 10. hullámon kb. 770 gold). Így akkor is nagy jutalom, ha senki nem tudja
+  kasszába (pl. a 10. hullámon 775 gold). Így akkor is nagy jutalom, ha senki nem tudja
   használni.
 
 **Az item:**
-- **Ritkasága Artifact:** nem adható el, nem kovácsolható és nem Disenchantolható.
-- **Item Level:** a felvétel hullámán `10 + 3 × hullám + 25` (5.6.1), így akkor is értelmes,
+- **Ritkasága Artifact:** nem adható el (a Sell sor szürke, „Artifact”), nem kovácsolható
+  („Artifacts grow on their own”), nem Disenchantolható (a „mindenki Pass” után sem lesz belőle
+  Dust), és az Enchanter sem módosítja (5.7): a két fix enchantja marad. Átadható (Trade).
+- **Statok:** kézzel tervezettek (a hullám anyagszintjével és a loot-bónusszal skálázva),
+  2 fix enchant (III. rang), a fegyver alapsebzése a Legendary szorzóval (×3). Nincs „Looted”
+  +6 Item Level, és a tooltipben nincs eladási ár.
+- **Item Level:** a leesés hullámán `10 + 3 × hullám + 25` (5.6.1), így akkor is értelmes,
   ha későn esik le.
 - **Fejlődés:** minden hullám végén, amíg a hősnél van (felszerelve vagy a backpackben is),
-  **+3 Item Level** és **+4% fegyversebzés**.
+  **+3 Item Level** és az **alapsebzés (a felvételkori) 4%-a** hozzáadódik – lineárisan, nem
+  kamatosan: n hullámvég után `alapsebzés × (1 + 0,04 × n)`.
 - **Slot:** Main Hand fegyver; a kétkezes változatok mindkét slotot foglalják.
-  - **Kivétel – *Fangs of the Shadow*:** egy **pár**, egy Main Hand és egy Off Hand tőr. A két
-    tőr együtt vehető fel és le, és **egyetlen Artifactnak** számít (a kasztonkénti limitnél
-    is).
+  - **Kivétel – *Fangs of the Shadow*:** egy **pár**, egy Main Hand és egy Off Hand tőr, egyetlen
+    backpack-helyen. Felvételkor mindkét kéz betelik (a kiszorított két tőr a backpackbe
+    megy); bármelyik tőr kiszorítása (vagy másik fegyver felvétele) az egész párt kiveszi, és
+    **egyetlen** backpack-itemként jön vissza. A pár egy fegyvernek számít az „utolsó fegyver”
+    védelemnél (nem Unequip-olható, csak lecserélhető), és **egyetlen Artifactnak** számít (a
+    kasztonkénti limitnél, a növekedésnél és a tulajdonságoknál is).
 - **Két különleges tulajdonság:** az elsőt a felvétel után **3**, a másodikat **6 hullámvéggel**
-  kapja meg. Addig a tooltip kiírja, mikor nyílik meg („Awakens in N waves”).
+  kapja meg; **csak felszerelve aktívak** (a backpackben lévő Artifact csak nő). Addig a
+  tooltip kiírja, mikor nyílik meg („Awakens in N waves”).
 - **Ha az abilityt nem tanulta meg:** az a tulajdonság, amelyhez a hős még nem tanulta meg a
-  szükséges abilityt, szürkén látszik, a hiányzó ability nevével („(needs Whirlwind)”).
+  szükséges abilityt, szürkén látszik, a hiányzó ability nevével („(needs Whirlwind)”). Az M6a
+  mind a 10 tulajdonsága alap-abilityre épül, ezért a szürke állapot ma csak egy másik kaszt
+  nézőjének tooltipjében látszik.
+- **Tooltip:** arany cím + szöveg (ébren), halvány cím + „Awakens in N waves” (alszik), szürke
+  cím + „(needs X)” (hiányzó ability). Az Artifact mindig upgrade a botoknak, és sima felszerelés
+  sosem váltja le.
 
 | Kaszt | Artifact | 1. tulajdonság (3 hullámvég után) | 2. tulajdonság (6 hullámvég után) |
 |---|---|---|---|
-| Warrior | *Earthsplitter* (2H Axe) | A Whirlwind **földrengés-zónát** hagy maga után: 3 mp-ig áll, tickenként a fegyversebzés 30%-át sebzi | A Charge becsapódása **lökéshullámmal** végződik: a 3 m-en belüli ellenségeket 1 mp-re elkábítja |
-| Mage | *Staff of the Frostwyrm* (Staff) | Minden 4. Blizzard **dupla sugarú** | A lassított vagy fagyott ellenség, amit megölsz, **jégszilánkokra** robban: a 3 m-en belüli ellenségek 40%-kal lassulnak 2 mp-re |
-| Paladin | *Dawnbreaker* (Mace) | A Consecration **gyógyítja a benne álló társakat** (másodpercenként a Max HP 2%-át) | A Word of Glory a célpontot a Max HP-ja 15%-ának megfelelő **pajzzsal** is védi |
-| Rogue | *Fangs of the Shadow* (tőr-pár: Main Hand + Off Hand) | Minden 5. krit **ingyen Fan of Knives**-t lő | A Vanish után a következő **3 találat krit** |
-| Warlock | *Skull of the Damned* (Staff) | Állandó **második pet**: egy Voidwalker (a Summon Voidwalker petje), ami magára vonja az ellenségeket | A petek **+25% sebzést** okoznak, és sebzésük 10%-át a Warlock gyógyulásként kapja |
+| Warrior | *Earthsplitter* (2H Axe) | A Whirlwind elindulásakor a hős lábánál **földrengés-zóna** keletkezik (a Whirlwind alapsugara, 3 mp, 0,5 mp-es tickek, tickenként a fegyversebzés 30%-a) | A Charge becsapódása **lökéshullámmal** végződik: a 3 m-en belüli ellenségeket 1 mp-re elkábítja (az Area Size növeli a sugarat) |
+| Mage | *Staff of the Frostwyrm* (Staff) | Minden 4. Blizzard (a hős számlálója, a hullámokon át megy) **dupla sugarú** | A lassított vagy fagyott ellenség, amit megölsz, **jégszilánkokra** robban: a 3 m-en belüli ellenségek 40%-kal lassulnak 2 mp-re |
+| Paladin | *Dawnbreaker* (Mace) | A Consecration **gyógyítja a benne álló hősöket** (a Paladint is): 0,5 mp-enként a Max HP 1%-át (= 2%/mp) | A Word of Glory a gyógyított / feltámasztott hőst a Max HP-ja 15%-ának megfelelő **pajzzsal** is védi (nem halmozódik 15% fölé) |
+| Rogue | *Fangs of the Shadow* (tőr-pár: Main Hand + Off Hand) | Minden 5. krit támadás **ingyen Fan of Knives**-t lő (támadásonként csak az első találat számít; Combo Pointot használ el, Energiát nem) | A Vanish után a következő **3 találat krit** |
+| Warlock | *Skull of the Damned* (Staff) | Állandó **második pet**: egy Voidwalker (a Summon Voidwalker paramétereivel, Shared Pain pajzs nélkül; a hullám első tickjén jön, a hullám végén és a hős elestekor elmegy), ami magára vonja az ellenségeket | A petek **+25% sebzést** okoznak, és sebzésük 10%-át a Warlock gyógyulásként kapja |
 | Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad | az M8-cal készül |
 | Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz | az M8-cal készül |
+
+**Botok:** a bot Needeli a saját kasztja Artifactját, felveszi, sosem adja el; ha a backpackje
+tele van, a loot-dobás előtt eladja az első nem-upgrade itemét (ha minden upgrade, Greedel).
+Artifact-fegyverrel az Enchantert a páncéljára használja (5.7).
 
 #### Kaszt-specifikus itemek
 
