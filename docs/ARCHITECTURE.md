@@ -5,33 +5,37 @@ controllers / keyboard, pick a class, and fight 25 waves of enemies with auto-at
 weapons, collecting gold (shared wallet) and XP (shared level). Between waves a simple
 "ready up" screen. Later milestones have their own sections below: M2 items, loot and the
 shop; M3 class resources, abilities and Mastery; M4 level-up cards, ranks and the Trainer; M5
-talents, tier sets, forging, elites, the Loot Goblin and the shared-purse tools.
+talents, tier sets, forging, elites, the Loot Goblin and the shared-purse tools; M6a the two
+bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter.
 
 ## Layout
 
 ```
 autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state)
 core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
-            items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5)
+            items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
+            run_summary.gd, run_card.gd (M6a)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
-            talents/ sets/ forge/ (M5)
+            talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a)
 scenes/
   main/     Main – game flow state machine                         [integration]
   arena/    Arena – battlefield, walls, entities root               [visuals]
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
-  visuals/  Mats, OnionModel, EnemyModel, WeaponModel               [visuals]
+  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a)  [visuals]
   vfx/      Vfx – fire-and-forget effects                           [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
   talents/  per-class TalentEffect scripts (M5)
-  enemies/  Enemy; EliteAffixes, ElitePlate, LootGoblin, GoblinPortal (M5)  [enemies]
+  artifacts/  TalentEffect scripts of the Artifact properties (M6a)
+  enemies/  Enemy; EliteAffixes, ElitePlate, LootGoblin, GoblinPortal (M5); Boss, PoisonPuddle,
+            HookLine, hazards/ (M6a)                                 [enemies]
   pickups/  Pickup, LootBag (M2)                                     [enemies]
   waves/    WaveDirector; GoblinSpawner (M5)                         [enemies]
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
-            GameOverScreen, PauseMenu; items/ shop/ loot/ (M2), level_up/ trainer/ (M4),
-            talents/ purse/ (M5)
+            GameOverScreen (+ MeterPage), PauseMenu; items/ shop/ loot/ (M2), level_up/ trainer/ (M4),
+            talents/ purse/ (M5), enchanter/ (M6a)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
             test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
 ```
@@ -79,6 +83,8 @@ the new screen never sees the button press that closed the old one.
    hook), `hud.bind_players(players)`, `wave_timer_changed → hud.set_wave_time`. Every wave:
    players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
    return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
+   - Waves 10 and 25 are **boss waves** (M6a): `start_wave` makes no timer and, 2 s after a rune on the ground,
+     spawns the `Boss`; the wave ends with its death (see "Bosses, boss waves, elite wave 20, hazards, HUD").
    - A player at 0 HP is **downed**: a ghost that moves at full speed
      (`Player.GHOST_SPEED_MULT` = 1) and that enemies ignore.
    - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
@@ -112,7 +118,7 @@ the new screen never sees the button press that closed the old one.
      (1 s). Everybody downed at once → GAME_OVER (defeat). Solo: downed = defeat.
 4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
-   move) → if n == 25 → GAME_OVER (victory), else **INTERMISSION** (tree paused,
+   move) → if n == 25 (Vor'thalax's death, M6a) → GAME_OVER (victory), else **INTERMISSION** (tree paused,
    `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
    `Intermission.open(n, RunState.pending_level_ups)`: loot roll → level-up cards (when levels
    were gained) → market; players ready with START, bots and unplugged
@@ -120,8 +126,9 @@ the new screen never sees the button press that closed the old one.
    `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
    everyone is ready) → `pending_level_ups = 0` (the cards resolved them) → wave n+1.
 5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
-   `GameOverScreen.open(victory)`. A / START → **LOBBY with the same players** (ready again);
-   the main menu only through the lobby's Back.
+   `GameOverScreen.open(victory)` (M6a: two pages, Summary and Damage Meter, awards and the run card, see "Damage
+   meter, end screen, run card"; `Main.end_run` records every hero's result first). A / START → **LOBBY with the
+   same players** (ready again); the main menu only through the lobby's Back.
 6. START on any player's device during WAVE / WAVE_END → PauseMenu (`get_tree().paused`).
    The menu ignores navigation until the stick has been neutral once (`PlayerInput.nav_held()`),
    so a stick held during play cannot move the selection. Resume unpauses; "Quit to Menu"
@@ -176,6 +183,8 @@ the new screen never sees the button press that closed the old one.
   - `party` = `RunState.COOP_DAMAGE_MULTS[players - 1]` = 0.45 / 0.6 / 0.75 / 0.95 for 1–4
     players (M4: 0.35 / 0.45 / 0.6 / 0.8): small parties have fewer rescuers (solo: the first
     down is defeat) and more enemies per head.
+  - Bosses (M6a) take their HP from `BossData.max_hp_for(wave, players)` = `hp_at_wave × (1 + coop_hp_per_player
+    (n − 1))` (Morvain 0.75, Vor'thalax 2.0) instead of `coop_hp_mult`; their damage is the usual growth × `party`.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -217,9 +226,12 @@ the new screen never sees the button press that closed the old one.
   the group appears.
 - At most `MAX_ENEMIES` alive. When the timer ends: remaining enemies `despawn()` (no loot),
   pickups `collect_to_bank()`, `wave_cleared` emitted.
-- Waves 10 / 20 / 25 (boss / elite; `RunState.is_boss_wave` / `is_elite_wave`) are regular
-  waves until milestone M6. M5 adds elites from wave 5 (on those waves too) and the Loot
-  Goblin (never on them) – see "Elites" and "Loot Goblin" in the M5 section.
+- Waves 10 and 25 are **boss waves** (`RunState.is_boss_wave` and a `BossData` for the wave in `Db.bosses`): the
+  timer is replaced by the boss, the wave ends when it dies, the normal spawn runs at half rate (adds), and there
+  are no elites and no Loot Goblin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
+  lite affix (HP ×1.5, normal rewards) and the real elites come twice as often. Details: "Bosses, boss waves,
+  elite wave 20, hazards, HUD" in the M6a chapter. M5 adds elites from wave 5 and the Loot Goblin (never on waves
+  10 / 20 / 25) – see "Elites" and "Loot Goblin" in the M5 section.
 
 ## Command line (Main)
 
@@ -227,7 +239,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 
 | Flag | Meaning |
 |---|---|
-| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. |
+| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable. |
 | `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
 | `--classes=a,b,...` | Bot classes in join order (cycled; unknown ids warn and are skipped), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
@@ -239,7 +251,11 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--goblin-chance=X` | M5 test hook: Loot Goblin chance per eligible wave, 0..1 (`GoblinSpawner.chance_override`; default: the normal chance). |
 | `--elite-mult=X` | M5 test hook: multiplies the expected elites per wave (`EliteAffixes.rate_mult`, ≥ 0). |
 | `--start-level=N` | M5 test hook: team level at run start (1..99; `RunState.set_start_level` after `RunState.start_run`, before the heroes spawn – talent points from level 10, no pending level-ups). |
-| `--panel-tab=NAME` | Dev: when the market first opens, P1's PlayerPanel switches to `talents`, `trainer` or `character` (`PlayerPanel.debug_start_tab`, screenshots of the Talents tab). |
+| `--panel-tab=NAME` | Dev: when the market first opens, P1's PlayerPanel switches to `talents`, `trainer`, `character` or `enchanter` (`PlayerPanel.debug_start_tab`, screenshots of the Talents tab). |
+| `--boss-hp=X` | M6a test hook: multiplies boss HP (`BossData.hp_mult`, clamped 0.01..100, default 1; it scales Morvain too). |
+| `--artifact-chance=X` | M6a test hook: replaces the chance of every Artifact roll (`LootDrops.artifact_chance_override`, 0..1; 0 = never, default off; from wave 10 and the class rule still apply). |
+| `--end-page=NAME` | M6a dev: the page `--view=game_over` / `victory` opens on, `summary` or `meter`. |
+| `--save-card` | M6a dev: saves the run card (needs a display) as soon as the end view is forced; prints `CARD <path>`. |
 
 `SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `first_wave`,
 `last_wave`, `players`, `seed`, `kills`, `gold`,
@@ -254,7 +270,9 @@ is the slowest tick of the last second). M2 and M4 add the keys listed in their 
 adds `elites_spawned`, `elites_killed`, `goblins_spawned`, `goblins_killed`, `goblins_escaped`,
 `weapons_forged` (RunState counters), `talent_points_spent` (Σ `TalentState.points_spent()`
 over the heroes), `talent_resets`, `set_bonuses` (Σ `SetBonuses.active_count`) and
-`gold_spent` (every `RunState.try_spend_for`). Each cleared wave also prints a
+`gold_spent` (every `RunState.try_spend_for`). M6a adds `bosses_killed`, `artifacts_dropped`,
+`consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time`, `meter`
+(per slot) and `taken_by_source` (see the M6a chapter). Each cleared wave also prints a
 `SMOKE wave n cleared ...` line (M5: `elites killed/spawned, goblin spawned/killed/escaped`),
 and each closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1
 (R bot rerolls so far)`.
@@ -263,8 +281,10 @@ crowded), avoid walls, stay near the team and run to downed teammates within
 `BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
 and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
 a living teammate instead. A Loot Goblin is never a threat to them; they chase it when nothing
-else is close (M5, "Loot Goblin"). Between waves bots equip, forge, buy, train, spend talent
-points and reroll (M2, M4, M5 sections).
+else is close (M5, "Loot Goblin"). M6a: they sidestep the Flesh Golem's hook, leave boss hazards and poison
+puddles (`BotInput._hazard_steer`) and prioritise the Cultist Acolyte. Between waves bots equip, forge, buy,
+train, spend talent points and reroll (M2, M4, M5 sections), and from M6a also enchant, buy consumables and the
+Black Market (M6a chapter).
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
 `PlayerManager._physics_process` once per unpaused physics tick (`process_physics_priority`
 -1000, before the heroes move); `poll()` only handles per-frame button / nav edges. Main
@@ -453,6 +473,10 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
 - `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
   3D scene show through the dark vignette backdrop.
+- M6a UI additions (details in the M6a chapter): the HUD plaque shows a boss frame instead of the timer on boss
+  waves, `UnitFrame` the active consumables; the market has the consumables row, the Black Market card and the
+  Enchanter tab (`PlayerPanel` tab 4); the loot roll's B button reads Disenchant / Pass (all pass: Dust); the
+  `GameOverScreen` pages between the Summary and the Damage Meter on LB / RB (Q / E) and saves the run card on X (R).
 - Screenshots: `docs/screenshots/ui_lobby.png`, `docs/screenshots/ui_hud.png`
   (`--resolution 1920x1080 -- --demo --seed=3 --start-wave=10 --shot-time=18`).
 
@@ -871,7 +895,7 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   - `Player.death_guards`: Callables tried *before* the limited item cheat-death procs, so a
     free or recharging guard such as Last Stand or Cheat Death never uses one up.
   - Also `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)` and
-    `Enemy.is_boss()` (false until bosses exist).
+    `Enemy.is_boss()` (true for `Boss`, M6a).
 - **Kit helpers** (per class folder; all damage through `ProcSystem.deal_raw` with sources
   `&"ability"`, `&"dot"`, `&"pet"`):
   - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Bladestorm / Ravager), `WarriorFx`
@@ -1309,15 +1333,18 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
 - **Spend log**: every wallet spend of game code goes through `RunState.try_spend_for(amount,
   slot_index, kind, label)` – kinds `&"shop"` ("Rare Dagger"), `&"shop_forge"` ("Rare Dagger
   (forged)"), `&"shop_reroll"` (slot −1, "Stall reroll"), `&"trainer"` ("Fireball Rank III"),
-  `&"level_reroll"`, `&"talent_reset"` ("Reset Talents"). Entries `{slot, kind, label, amount,
+  `&"level_reroll"`, `&"talent_reset"` ("Reset Talents"); M6a adds `&"consumable"`, `&"black_market"` and
+  `&"enchant"`. Entries `{slot, kind, label, amount,
   wave}` go to `RunState.spend_log` (this round), the amount to `gold_spent` (run), signal
   `spent`. `Intermission.open` starts a round (`begin_spend_round()`: log and wants cleared).
   Selling and Greed gold are income, never logged; plain `try_spend` stays for tests.
 - **Wants**: `RunState.wants` (`toggle_want` / `clear_want` / `has_want`, `wants_changed`)
   holds the Trainer pings; shop pings stay on `Shop.Offer.pinged_by`.
-- **PurseBoard** (`Intermission.purse_board`, 712 px, in the MARKET header under the title and
-  "Next up: Wave N of 25 · S seconds · Level L +k this wave"):
-  - wallet (`gold_value`, also `Intermission.gold_value`), `ReadyPips` (a diamond per joined
+- **PurseBoard** (`Intermission.purse_board`, 722 px since M6a, in the MARKET header under the title and
+  "Next up: Wave N of 25 · S seconds · Level L +k this wave" – no seconds before a boss wave,
+  `Intermission.next_wave_text`):
+  - wallet (`gold_value`, also `Intermission.gold_value`; M6a: the Arcane Dust `dust_value` to its right),
+    `ReadyPips` (a diamond per joined
     player, filled while ready) and "2/4 ready";
   - **Spent**: the round's log newest first, at most `TICKER_LINES` 2 lines + "+N more"
     (`entry_text`: "P1 [Rare Dagger] 62 · Team Stall reroll 12", shop items in their rarity
@@ -1485,7 +1512,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
     despawn.
 - **Rewards** branch on `elite_affix` in `_death_loot`: `GOLD` gold and XP ×5,
   `LootDrops.drop_special(ItemGenerator.Source.ELITE, …)` (guaranteed Rare+, killer's Fortune,
-  not counted against `loot_drops_this_wave`; M6's Artifact roll goes here too),
+  not counted against `loot_drops_this_wave`; the M6a Artifact roll is made here too),
   `RunState.record_special_kill(&"elite", slot)`, then the normal drop roll. Every generated
   drop passes `&"team_classes"`. A despawned elite gives nothing.
 - **Look** (`ElitePlate`, a visual-only child, never draws): "<Affix> <Enemy name>" in silver
