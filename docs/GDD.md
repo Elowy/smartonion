@@ -850,8 +850,9 @@ ranggal erősebbek, és a lootolt Uncommon itemeken mindig van 1 enchant.
 
 **Rangok:** minden enchantnak I–V. rangja van. Az **induló rang** az item hullámszintje
 szerint I–III. (I: 1–8., II: 9–16., III: 17. hullámtól; a lootolt itemeké eggyel magasabb, de
-legfeljebb III.), a IV. és az V. rangot csak az **Empower** adja (lásd lent). A rang növeli az
-értékét vagy a proc sebzését: I ×1, II ×1,5, III ×2, IV ×2,5, V ×3.
+legfeljebb III.; ez a kézzel tervezett itemekre is igaz), a IV. és az V. rangot csak az
+**Empower** adja (lásd lent). A rang növeli az értékét vagy a proc sebzését: I ×1, II ×1,5,
+III ×2, IV ×2,5, V ×3 (az egész értékű statok, pl. „+1 Pierce”, lefelé kerekítve).
 
 **Proc-szabályok (WoW-szerűen):**
 
@@ -907,10 +908,12 @@ Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kas
 (10. fejezet), és bárki költheti.
 
 - **Honnan jön a Dust:**
-  - **Disenchant:** a Character fül item-menüjében (a Sell mellett) az item Dustra bontható –
-    az **Artifact kivételével**. A Dust a ritkaságtól függ (lásd a táblát).
+  - **Disenchant:** a Character fül item-menüjében (a Sell mellett) a **backpackben** lévő item
+    Dustra bontható. Felszerelt itemet előbb le kell venni (Unequip). A hős utolsó fegyverét
+    ugyanúgy nem lehet Disenchantolni, mint eladni („Last weapon”, „You need a weapon”). Az
+    **Artifactnál** a menüpont nincs is ott.
   - **Automatikus Disenchant:** ha egy loot-dobás itemére **mindenki Passt** nyom, az item
-    magától Dust lesz (10.1).
+    magától Dust lesz (10.1) – az Artifact kivételével.
   - Az eladás továbbra is csak gold (a vételár 35%-a), abból nem lesz Dust.
 
   | Ritkaság | Dust |
@@ -922,22 +925,57 @@ Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kas
   | Legendary | 16 |
 
 - **Az Enchanter fül** (a 4. személyes fül; a címkéje a csapat Dustját mutatja: „Enchanter
-  (12✦)”): kiválasztod az itemet (előbb a felszereltek, utána a backpack), majd egy műveletet:
-  - **Reroll:** az item egy enchantját újrasorsolja – új véletlen enchant, ami a slotra illik,
-    **ugyanazon a rangon**.
-  - **Empower:** egy enchant rangját +1-gyel emeli, **V. rangig**.
+  (12)”, a szám előtt a Dust rajzolt csillag-ikonjával): kiválasztod az itemet (előbb a
+  felszereltek, utána a backpack), majd egy műveletet:
+  - **Reroll:** az item egy enchantját újrasorsolja – új véletlen enchant, ami a slotra illik
+    (a generátor szabályai: slot, fajta, minimális ritkaság, lövedékes fegyver), **ugyanazon a
+    rangon** (a IV. és az V. is marad). A sorsolás **súlyozott, mint a generátornál**: az
+    Attack Power / Spell Power enchant a hős kasztjához igazodik (a Mage inkább Spell Powert
+    kap). **Nem lehet olyan, amilyen az itemen már van** – a lecserélt enchant sem –, tehát a
+    Reroll mindig változtat.
+  - **Empower:** egy enchant rangját +1-gyel emeli, **V. rangig**. A IV. és az V. rangot csak
+    ez adja.
   - **Imbue:** az Uncommon vagy magasabb ritkaságú item, amelyen kevesebb enchant van, mint
-    amennyit a ritkasága megenged (5.2), kap egy új enchantot.
-- **Ár** (mindkét művelet goldot **és** Dustot kér):
-  - **gold** = az item bolti árának **25%-a** az aktuális hullámon × 2^használat,
+    amennyit a ritkasága megenged, kap egy új enchantot az item **induló rangján** (I–III, az
+    item hullámszintje és a „Looted” jelző szerint, mint a generáltaknál). Hány enchant fér
+    az itemre: **Common 0, Uncommon 1, Rare 1, Epic 2, Legendary 2** (Artifact 0). Common
+    itemre Imbue nincs („Common items hold no enchants”).
+  - Az **Artifact nem módosítható** (Reroll / Empower / Imbue elutasítva; a két fix enchantja
+    marad): az Enchanter fülön halványan szerepel, enchant-sorok nélkül, „Artifacts cannot be
+    changed” felirattal.
+- **Ár** (mindhárom művelet goldot **és** Dustot kér):
+  - **gold** = az item bolti árának **25%-a** az **aktuális hullámon** (nem az item
+    hullámán) × 2^használat, kerekítve, legalább 1,
   - **Dust** = a ritkaság Dust-értéke × 2^használat.
-  - A használatok száma **itemenként** számít: ugyanazon az itemen minden újabb művelet
+  - A használatok száma **itemenként** számít, és a Reroll, az Empower és az Imbue is egy
+    használat (az elutasított művelet nem számít): ugyanazon az itemen minden újabb művelet
     kétszer annyiba kerül, mint az előző. Így ez a fő, felső korlát nélküli sink (16.1).
   - Példa: egy Epic item a 15. hullámon (bolti ár kb. 191 gold): az 1. művelet kb. 48 gold és
     8 Dust, a 2. kb. 96 gold és 16 Dust, a 3. kb. 191 gold és 32 Dust.
-  - A gold-költségre a szokásos **nyomva tartás** vonatkozik (10. fejezet).
-- **Botok:** a 12. hullámtól a legjobb fegyverükre költenek az Enchanteren, ha a közös
-  kasszában a botok tartaléka fölött marad gold.
+  - A művelet mindkét pénztárcát ellenőrzi, mielőtt bármelyikből levonna; a gold-ár a költésnaplóban
+    a Dust-költséggel együtt jelenik meg („Empower Blazing (8 Dust)”).
+- **Nyomva tartás:** a szabály (10. fejezet) a **gold-részre** vonatkozik, a Dust külön
+  készletből megy. Ha a gold-ár a kassza több mint 50%-a, az A (Empower / Imbue) vagy az X
+  (Reroll) gombot 1 mp-ig nyomva kell tartani. Elengedés, mozgás vagy B megszakítja; ha közben
+  a kassza vagy a Dust úgy változik, hogy a művelet már nem fizethető, a nyomva tartás magától
+  elmarad.
+- **Botok:** a 12. hullám utáni piactól a legjobb **támadó fegyverükre** költenek az
+  Enchanteren, a vásárlási kör **előtt**.
+  - **Keret:** a Trainer tartaléka fölötti gold **30%-a**, a botok között egyenlően elosztva
+    (amit egy bot nem tud elkölteni, az a következő botnál marad; az utolsó bot a megmaradt
+    egészet kapja), legfeljebb 2 művelet / bot / kör. A maradék gold az offereknek, a
+    Trainernek és a rerollnak jut (a bot-piac sorrendje: 16.1).
+  - **Sorrend:** **Reroll** egy olyan enchantra, amit a kasztja nem tud használni (Attack Power
+    egy varázsló kasztnál és fordítva) → **Imbue**, ha van szabad hely → **Empower** a
+    legalacsonyabb rangú enchantra.
+  - **Artifact-fegyver:** az Artifact nem enchantolható, ezért az Artifactot viselő bot a
+    legjobb viselt, nem-Artifact **Epic+ páncél- / ékszerdarabját vagy nem támadó off-handjét**
+    enchantolja (magasabb ritkaság, aztán Item Level, aztán az alacsonyabb slot) – azt is csak,
+    ha van még mit tenni rajta. A Fangs of the Shadow párosa két Artifactnak számít, így a
+    Rogue bot is a páncéljára vált. A normál fegyverrel rendelkező bot a fegyverét választja.
+  - **Dust-szerzés:** mivel a botok sosem Passolnak (a loot-dobáson Need / Greed), a Dustot úgy
+    szerzik, hogy a **felesleges backpack-itemeket** (amik nekik nem fejlesztések; a legkisebb
+    Dustú előbb) Disenchantolják, de csak annyit, amennyi a következő művelethez kell.
 
 ### 5.8 Tartalomcél – „sok item”
 
