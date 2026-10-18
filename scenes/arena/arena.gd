@@ -286,10 +286,10 @@ func _build_environment() -> void:
 
 
 ## The decoration around the playable rectangle for [member environment]'s decor set
-## (EnvironmentData.decor_id). Only the forest exists so far: the ENV package adds a branch per set
-## here (a `match` on the id, the forest as the default for every id it does not know).
+## (EnvironmentData.decor_id): [method ArenaThemes.build] picks the set (cemetery, swamp, volcano,
+## ice_cave) and builds the forest ([method ArenaDecor.build]) for every id it does not know.
 func _build_decor(rng: RandomNumberGenerator) -> Node3D:
-	return ArenaDecor.build(self, rng)
+	return ArenaThemes.build(self, rng)
 
 
 func _build_ground(rng: RandomNumberGenerator) -> void:

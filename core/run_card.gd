@@ -17,7 +17,8 @@ const STAT_SHORT := {&"damage": "Dmg", &"healing": "Heal"}
 
 
 ## The card's content: {"title", "result" ("Victory" / "Defeat"), "victory", "mode", "waves_text"
-## ("25 / 25 waves"; on a defeat "Fell on wave 12"), "time_text", "heroes": [{"label", "class_name", "class_id",
+## ("25 / 25 waves"; on a defeat "Fell on wave 12"), "environment" (the arena's display name, "" = none),
+## "time_text", "heroes": [{"label", "class_name", "class_id",
 ## "color" (player), "class_color", "alive", "item_name", "item_rarity", "item_level", "item_line",
 ## "award" (the hero's first award, "" = none), "more_awards" (how many further awards), "award_line",
 ## "stat_line"}]}. [param summary] = RunSummary.collect / build.
@@ -31,6 +32,7 @@ static func model(summary: Dictionary) -> Dictionary:
 		waves_text = "Fell on wave %d" % (clampi(fell, 1, total) if total > 0 else maxi(fell, 1))
 	var time_text := String(summary.get("time_text", RunSummary.format_time(float(summary.get("time", 0.0)))))
 	var mode := String(summary.get("mode", "Normal"))
+	var environment := String(summary.get("environment", ""))
 	var heroes: Array[Dictionary] = []
 	for h: Dictionary in summary.get("heroes", []):
 		if heroes.size() >= MAX_HEROES:
@@ -41,6 +43,7 @@ static func model(summary: Dictionary) -> Dictionary:
 		"result": "Victory" if victory else "Defeat",
 		"victory": victory,
 		"mode": mode,
+		"environment": environment,
 		"waves_text": waves_text,
 		"time_text": time_text,
 		"heroes": heroes,

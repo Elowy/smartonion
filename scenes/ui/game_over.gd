@@ -30,6 +30,9 @@ const MAX_STATUS_CHARS := 72
 var victory := false
 var title_label: Label
 var subtitle_label: Label
+## The arena of the run (M6b ENV): "Arena: Cemetery", in the environment's colour, at the left of the tab
+## row (it costs no height: the worst-case meter page has 40 px to spare).
+var environment_label: Label
 var waves_value: Label
 var kills_value: Label
 var gold_value: Label
@@ -165,6 +168,19 @@ static func saved_text(full_path: String) -> String:
 	return "Saved to ...%s" % tail
 
 
+## The arena label of the end screen: "Arena: Cemetery" ("" for an id nobody knows).
+static func environment_text(id: StringName) -> String:
+	var env := Db.get_environment(id)
+	return "Arena: %s" % env.display_name if env != null else ""
+
+
+func _fill_environment() -> void:
+	environment_label.text = environment_text(RunState.environment)
+	var env := Db.get_environment(RunState.environment)
+	environment_label.add_theme_color_override(&"font_color",
+			env.card_color.lerp(Color.WHITE, 0.25) if env != null else UiTheme.TEXT_DIM)
+
+
 func _set_status(text: String, color: Color = UiTheme.TEXT_DIM) -> void:
 	if status_label == null:
 		return
@@ -267,6 +283,14 @@ func _build() -> void:
 
 ## "LB  Summary | Damage Meter | Leaderboard  RB": the active page's name is gold.
 func _build_tabs() -> Control:
+	# [arena | tabs | nothing]: the two outer cells share the free width equally, so the tabs stay centred.
+	var outer := UiTheme.hbox(0)
+	environment_label = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_BODY)
+	environment_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	environment_label.size_flags_stretch_ratio = 1.0
+	environment_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	environment_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	outer.add_child(environment_label)
 	var row := UiTheme.hbox(28)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(UiGlyph.pad(PlayerInput.Pad.LB, 26.0))
@@ -275,7 +299,11 @@ func _build_tabs() -> Control:
 		tab_labels.append(tab)
 		row.add_child(tab)
 	row.add_child(UiGlyph.pad(PlayerInput.Pad.RB, 26.0))
-	return row
+	outer.add_child(row)
+	var right := UiTheme.spacer()
+	right.size_flags_stretch_ratio = 1.0
+	outer.add_child(right)
+	return outer
 
 
 func _stat_tile(parent: Control, caption: String, icon: Control) -> Label:
@@ -324,6 +352,7 @@ func _fill() -> void:
 		title_label.text = "Defeat"
 		title_label.add_theme_color_override(&"font_color", UiTheme.RED)
 		subtitle_label.text = "The party was peeled on wave %d. Dry your tears and try again." % maxi(RunState.wave, 1)
+	_fill_environment()
 	waves_value.text = RunState.count_text(waves_cleared(victory))
 	kills_value.text = UiTheme.format_int(RunState.kills)
 	gold_value.text = UiTheme.format_int(RunState.gold_earned)

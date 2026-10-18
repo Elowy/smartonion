@@ -57,7 +57,10 @@ func _build() -> void:
 	var title := UiTheme.label(String(card_model.get("title", RunCard.GAME_TITLE)).to_upper(), UiTheme.GOLD_LABEL, 30)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	top.add_child(UiTheme.label("%s mode" % card_model.get("mode", "Normal"), UiTheme.DIM, 26))
+	var mode_line := "%s mode" % card_model.get("mode", "Normal")
+	if String(card_model.get("environment", "")) != "":
+		mode_line += "  ·  %s" % card_model["environment"]
+	top.add_child(UiTheme.label(mode_line, UiTheme.DIM, 26))
 
 	var headline := UiTheme.hbox(24)
 	col.add_child(headline)

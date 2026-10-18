@@ -427,12 +427,42 @@ func sub_rng(salt: int) -> RandomNumberGenerator:
 
 
 ## The environment of a run that was started without one (start_run calls it after run_seed and
-## environment_rng are set). The ENV package replaces the body; it draws from [member environment_rng]
-## only, never from [member rng]. Until then it returns the Forest Ruin without drawing.
+## environment_rng are set): ONE draw from [member environment_rng] ([method pick_environment]), never
+## from [member rng] – so the roll is a function of the run seed alone and
+## [method environment_for_seed] tells it before the run exists (the "Rolling the arena..." screen).
+## [member environment_roller] replaces the body when set (tests).
 func roll_environment() -> StringName:
 	if environment_roller.is_valid():
 		return environment_roller.call() as StringName
-	return DEFAULT_ENVIRONMENT
+	return pick_environment(environment_rng)
+
+
+## The environment a run with seed [param seed_value] rolls (what [method roll_environment] returns
+## for it): the first draw of a generator seeded like environment_rng.
+static func environment_for_seed(seed_value: int) -> StringName:
+	var r := RandomNumberGenerator.new()
+	r.seed = derived_seed(seed_value, SALT_ENVIRONMENT)
+	return pick_environment(r)
+
+
+## One weighted draw (by EnvironmentData.roll_weight; a weight of 0 never wins) over
+## Db.environment_ids, in that order. The default environment when nothing can be drawn.
+static func pick_environment(r: RandomNumberGenerator) -> StringName:
+	var ids: Array[StringName] = []
+	var total := 0.0
+	for id in Db.environment_ids:
+		var env := Db.get_environment(id)
+		if env != null and env.roll_weight > 0.0:
+			ids.append(id)
+			total += env.roll_weight
+	if ids.is_empty():
+		return DEFAULT_ENVIRONMENT
+	var pick := r.randf() * total
+	for id in ids:
+		pick -= Db.get_environment(id).roll_weight
+		if pick < 0.0:
+			return id
+	return ids[ids.size() - 1]
 
 
 # --- Shared wallet -----------------------------------------------------------

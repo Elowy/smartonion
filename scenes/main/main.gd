@@ -95,6 +95,9 @@ var wave_director: WaveDirector
 var goblin_spawner: GoblinSpawner
 ## Child of the WaveDirector (M6b): the mid-wave event slot (EVENTS package).
 var event_spawner: EventSpawner
+## Child of the WaveDirector (M6b): the arena environment's hazard director (ENV package; a Forest Ruin
+## run has one too, with nothing to do).
+var environment_hazards: EnvironmentHazards
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -133,6 +136,10 @@ var run_classes: Array[StringName] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
+## The "Rolling the arena..." screen while it is up (M6b ENV), the run seed it fixed (-1 = none yet)
+## and the environment it landed on.
+var roll_screen: EnvironmentRollScreen
+var _roll_seed := -1
 var _layers: Dictionary[int, CanvasLayer] = {}
 var _state_time := 0.0
 var _disconnected: Dictionary[int, bool] = {}
@@ -205,6 +212,8 @@ func _ready() -> void:
 			_add_bots()
 			if PlayerManager.count() >= 2:
 				PlayerManager.get_slot(0).ready = true
+			if options.view == "roll":
+				begin_roll()
 		_:
 			go_to_menu()
 
@@ -263,7 +272,8 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
-	RunState.start_run(slots.size(), options.run_seed(), options.mode, options.hardcore, _environment_id())
+	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id())
+	_roll_seed = -1
 	artifact_lines.clear()
 	run_classes.clear()
 	for slot in slots:
@@ -312,6 +322,8 @@ func start_run() -> void:
 	event_spawner = EventSpawner.create(wave_director)
 	wave_director.add_child(event_spawner)
 	event_spawner.announced.connect(_on_announced)
+	environment_hazards = EnvironmentHazards.create(wave_director, Db.environment_or_default(RunState.environment))
+	wave_director.add_child(environment_hazards)
 
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
@@ -391,6 +403,48 @@ func _environment_id() -> StringName:
 	if options.environment != &"" and Db.get_environment(options.environment) != null:
 		return options.environment
 	return &""
+
+
+## The seed of the next run: the one the roll screen fixed (it showed the environment of that seed),
+## else the launch options' (-1 = a random one).
+func _run_seed() -> int:
+	return _roll_seed if _roll_seed >= 0 else options.run_seed()
+
+
+## Whether a run started from the lobby plays the "Rolling the arena..." screen first: not in smoke,
+## demo, screenshot and forced-view runs, and not while a test switched it off
+## (EnvironmentRollScreen.enabled).
+func plays_roll_screen() -> bool:
+	return EnvironmentRollScreen.enabled and not (options.smoke or options.demo or options.view != "")
+
+
+## Opens the "Rolling the arena..." screen over the lobby: fixes the run's seed (the launch seed, else a
+## random one), shows the environment that seed rolls (--env wins) and starts the run when the reel has
+## come to rest and held. The run then rolls the same environment on its own (RunState.start_run with an
+## empty environment draws the same value from environment_rng), so the screen never decides anything.
+func begin_roll() -> void:
+	if roll_screen != null and is_instance_valid(roll_screen):
+		return
+	_roll_seed = options.run_seed()
+	if _roll_seed < 0:
+		_roll_seed = int(randi() & 0x7FFFFFFF)
+	var winner := _environment_id()
+	if winner == &"":
+		winner = RunState.environment_for_seed(_roll_seed)
+	roll_screen = EnvironmentRollScreen.create(winner)
+	roll_screen.finished.connect(_on_roll_finished, CONNECT_DEFERRED)
+	_layers[LAYER_MENU].add_child(roll_screen)
+
+
+func _on_roll_finished(_environment_id_rolled: StringName) -> void:
+	_free_roll_screen()
+	if state == State.LOBBY and options.view == "":
+		start_run()
+
+
+func _free_roll_screen() -> void:
+	_free_node(roll_screen)
+	roll_screen = null
 
 
 ## True when a finished run goes into the leaderboard file (Leaderboard.record_run): not in smoke,
@@ -704,6 +758,7 @@ func _teardown_run() -> void:
 	wave_director = null
 	goblin_spawner = null  # freed with the director
 	event_spawner = null
+	environment_hazards = null  # (freed with the director)
 	arena = null
 	players.clear()
 	_disconnected.clear()
@@ -723,6 +778,7 @@ func _free_main_menu() -> void:
 func _free_lobby() -> void:
 	_free_node(lobby)
 	lobby = null
+	_free_roll_screen()
 
 
 static func _free_node(node: Variant) -> void:
@@ -755,7 +811,11 @@ func _on_menu_quit() -> void:
 
 
 func _on_lobby_start() -> void:
-	if state == State.LOBBY:
+	if state != State.LOBBY:
+		return
+	if plays_roll_screen():
+		begin_roll()
+	else:
 		start_run()
 
 
@@ -1105,6 +1165,7 @@ func smoke_result(result: String) -> Dictionary:
 		"dungeons_entered": RunState.dungeons_entered,
 		"dungeons_completed": RunState.dungeons_completed,
 		"dungeons_failed": RunState.dungeons_failed,
+		"hazards": environment_hazards.stats() if environment_hazards != null else {},
 		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
