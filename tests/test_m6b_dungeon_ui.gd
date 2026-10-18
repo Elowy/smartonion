@@ -754,11 +754,27 @@ func test_quitting_during_the_dungeon_frees_everything() -> void:
 	main.dungeon._physics_process(Dungeon.INTRO_TIME + 1.5)
 	var d := main.dungeon
 	var arena := main.arena
+	# quit_to_menu only queue_frees the run's parts. This test is synchronous (no idle frame runs),
+	# so they would stay alive, with what they reference (the cached EnvironmentData, the Db
+	# resources), for the rest of the suite. Capture the parts and everything under them before the
+	# quit, then free the parts here: a node that is still valid afterwards is an orphan left behind.
+	var parts: Array[Node] = [main.pause_menu, main.game_over, main.intermission, main.hud,
+			main.dungeon, main.wave_director, main.arena]
+	var owned: Array[Node] = []
+	for part in parts:
+		if is_instance_valid(part):
+			owned.append(part)
+			owned.append_array(part.find_children("*", "Node", true, false))
 	main.quit_to_menu()
 	check(main.dungeon == null and main.arena == null, "gone")
 	check(d.get_parent() == null or d.is_queued_for_deletion(), "the dungeon node is freed")
 	check(arena.is_queued_for_deletion() or not is_instance_valid(arena), "so is the arena")
 	check_eq(main.state, Main.State.MENU, "the menu")
+	for part in parts:
+		UiFakes.free_node(part)
+	for i in owned.size():
+		check(not is_instance_valid(owned[i]), "node %d of the run is freed" % i)
+	check(not is_instance_valid(d) and not is_instance_valid(arena), "the dungeon and the arena are freed")
 
 
 func test_downs_in_the_wave_feed_the_bots_rule() -> void:
