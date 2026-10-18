@@ -2524,8 +2524,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - az Enchanter és az Arcane Dust (5.7),
   - a goldsinkek: a fogyóeszköz-sor és a Black Market (16.1),
   - a Damage Meter, a díjak és a run kártya (12. fejezet),
-  - egy előzetes balansz-kör a természetes bot-futásokon (a Flesh Golem és Vor'thalax
-    hangolása, 9. fejezet „M6a mérés”).
+  - balansz-kör **nincs**: az új tartalom a játékot nehezebbé tette, a hangolás egyszer, az
+    M6b végén készül (9. fejezet).
 - **M6b** – a tartalom és a módok:
   - játékmódok: Végtelen mód, Hardcore mód, módválasztó képernyő, helyi ranglista,
   - az 5 aréna-környezet saját veszélyekkel és a sorsoló animáció,
@@ -2534,7 +2534,10 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - a tartalom-csomagok (5.8): fegyver-alaptípusok +3 (a Crossbow, a Polearm és a Fist Weapon
     az M8-cal jön), páncél- és ékszer-alaptípusok, utótagok, 50 enchant, névvel ellátott és
     kaszt-specifikus itemek, 30 trinket, 25 legendary,
-  - a végleges 25 hullámos balansz (Normal).
+  - a végleges 25 hullámos balansz (Normal), **egyszer, a legvégén**, az összes M6b-s
+    tartalommal együtt. A nyitott pontok (9. fejezet, „Nyitott kérdések M6b-re”): a Flesh
+    Golem sebzése, a 20. hullám elit-hulláma, Vor'thalax kill-ideje létszám szerint, a szóló
+    és duó hősök túlélése, az Artifact-kínálat (÷ játékosszám, 5.5).
 
 ### 16.1 Jóváhagyott ötletek (backlog)
 
@@ -2553,6 +2556,7 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
 | **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **M6b** |
 | **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **M6b** |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
+| **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
 
 **Dungeon-portál (M6b)**
@@ -2766,9 +2770,10 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 
 ## 18. Nyitott kérdések
 
-Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a hős-HP és az
-ellenség-sebzés viszonya a késői hullámokon, a Vor'thalax-harc kaszt-függése, a duók és a szóló
-hősök nyomása, a kasztok közti szórás) a 9. fejezetben vannak („Nyitott kérdések M6b-re”); az
+Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a Flesh Golem
+sebzése, a 20. hullám, Vor'thalax kill-ideje létszám szerint, a duók és a szóló hősök
+túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon, a
+kasztok közti szórás) a 9. fejezetben vannak („Nyitott kérdések M6b-re”); az
 ütemezésük a 16. fejezet **M6b** listájában található: ezeket az M6b végleges balansza kezeli. A
 késői kasszát az M6a goldsinkjei célozták (16.1).
 
@@ -2801,4 +2806,4 @@ késői kasszát az M6a goldsinkjei célozták (16.1).
 | Arcane Dust | A csapat második közös pénzneme; Disenchantból és a mindenki által Passolt itemekből jön, az Enchanter költi (5.7) |
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
 | Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
-| Vor'thalax | Alap HP 450, érintéses sebzés 1,5, a boss HP-ja ×(1 + 2 × (játékosok − 1)); a Flesh Golem érintéses sebzése 2,5 (8. fejezet) |
+| Vor'thalax | Alap HP 450 (az 1200 elírás volt), érintéses sebzés 4, a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) mint Morvainé; a Flesh Golem érintéses sebzése 4 – a végső balansz az M6b végén, egyszer (8., 9. fejezet) |
