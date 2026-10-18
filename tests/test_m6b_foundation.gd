@@ -303,6 +303,52 @@ func test_normal_victory_banner() -> void:
 	check_eq(main._wave_cleared_text(24), "Wave cleared!", "an ordinary wave")
 
 
+func test_an_endless_wave_has_the_wave_banner_never_the_final_one() -> void:
+	var opts := LaunchOptions.new()
+	opts.mode = RunState.MODE_ENDLESS
+	_run_with_bots(1, opts)
+	main.start_wave(26)
+	check_eq(main.hud.banner_label.text, "Wave 26", "endless wave 26 has no final wave")
+	main.start_wave(25)
+	check_eq(main.hud.banner_label.text, "Wave 25", "endless wave 25 is not final either")
+
+
+func test_a_normal_run_names_its_last_wave_final() -> void:
+	_run_with_bots(1)
+	main.start_wave(24)
+	check_eq(main.hud.banner_label.text, "Wave 24", "an ordinary wave")
+	main.start_wave(25)
+	check_eq(main.hud.banner_label.text, "Final Wave", "normal wave 25 is the final one")
+
+
+## The smoke path of a wave that clears (_smoke_done keeps the smoke result from quitting the runner).
+func test_an_endless_smoke_run_never_wins_at_25_or_later() -> void:
+	var opts := LaunchOptions.new()
+	opts.mode = RunState.MODE_ENDLESS
+	opts.start_wave = 25
+	opts.waves = 1
+	_run_with_bots(1, opts)
+	main._smoke_running = true
+	main._smoke_done = true
+	for w in [25, 26]:
+		main.start_wave(w)
+		main._on_wave_cleared(w)
+		check(not RunState.victory, "endless wave %d clears without a victory" % w)
+	check(RunState.active and main.state != Main.State.GAME_OVER, "the endless run goes on")
+
+
+func test_a_normal_smoke_run_wins_at_25() -> void:
+	var opts := LaunchOptions.new()
+	opts.start_wave = 25
+	opts.waves = 1
+	_run_with_bots(1, opts)
+	main._smoke_running = true
+	main._smoke_done = true
+	main.start_wave(25)
+	main._on_wave_cleared(25)
+	check(RunState.victory, "normal wave 25 is the victory of a smoke run too")
+
+
 # --- Run settings, reset per run --------------------------------------------------------------
 
 func test_start_run_takes_mode_hardcore_and_environment() -> void:
