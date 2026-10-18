@@ -319,3 +319,23 @@ func test_class_item_tooltip_shows_the_equip_line() -> void:
 					"%s: the Equip line is green" % id)
 		tip.get_parent().remove_child(tip)
 		tip.free()
+
+
+# --- Item effects checked on the ability (not only the params) ----------------------------------
+
+func test_girdle_of_lasting_grace_shortens_lay_on_hands_at_rank_one() -> void:
+	# An unconditional cooldown mod: it works without the Rank III shield (shield_max_hp).
+	var p := _fresh_hero(&"paladin")
+	var ability := Db.get_ability(&"lay_on_hands")
+	check(p.abilities.learn(ability) >= 0, "Lay on Hands learned")
+	check_eq(p.abilities.rank_of(&"lay_on_hands"), 1, "Rank I")
+	var before := p.abilities.cooldown_of(ability)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var item := ItemGenerator.from_unique(Db.get_unique(&"girdle_of_lasting_grace"), 5, false, rng,
+			Db.get_class_data(&"paladin"))
+	check(p.equipment.equip(item), "the girdle is worn")
+	check_near(float(p.abilities.params_at_rank(ability, 1)["cooldown"]), 50.0, 0.001,
+			"Rank I: the cooldown param is 60 - 10")
+	check_near(p.abilities.cooldown_of(ability), before - 10.0, 0.001,
+			"the hero waits 10 sec less")
