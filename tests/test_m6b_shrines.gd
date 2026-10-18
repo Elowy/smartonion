@@ -16,12 +16,19 @@ var nodes: Array[Node] = []
 var screen: ShrineScreen
 var intermission: Intermission
 var _resolved: Array[Array] = []
+## Set by the layout tests that await frames (the runner waits for [signal finished] then).
+var _async := false
 
 
 var _base_chance_before := 0.0
 
 
+func is_async() -> bool:
+	return _async
+
+
 func before_each() -> void:
+	_async = false
 	UiFakes.reset_players()
 	RunState.start_run(1, SEED)
 	tree.paused = false
@@ -187,7 +194,7 @@ func test_card_texts_come_from_the_numbers() -> void:
 	check_eq(Shrines.boon_lines(_shrine(&"greed")), ["+30% gold from pickups"] as Array[String], "greed boon")
 	check_eq(Shrines.bane_lines(_shrine(&"greed")), ["Enemies deal +20% damage"] as Array[String], "greed bane")
 	check_eq(Shrines.boon_lines(_shrine(&"haste")), ["+15% haste"] as Array[String], "haste boon")
-	check_eq(Shrines.bane_lines(_shrine(&"haste")), ["Enemies move +15% faster"] as Array[String], "haste bane")
+	check_eq(Shrines.bane_lines(_shrine(&"haste")), ["Enemies move 15% faster"] as Array[String], "haste bane: one sign, the direction")
 	check_eq(Shrines.boon_lines(_shrine(&"learning")), ["+50% XP from pickups"] as Array[String], "learning boon")
 	check_eq(Shrines.bane_lines(_shrine(&"learning")), ["Enemies have +25% HP"] as Array[String], "learning bane")
 	check_eq(Shrines.boon_lines(_shrine(&"blood")), ["+20% damage"] as Array[String], "blood boon")
@@ -201,9 +208,34 @@ func test_card_texts_come_from_the_numbers() -> void:
 	copy.enemy_damage_pct = 12.5
 	check_eq(Shrines.boon_lines(copy), ["+45% gold from pickups"] as Array[String], "the text follows the number")
 	check_eq(Shrines.bane_lines(copy), ["Enemies deal +12.5% damage"] as Array[String], "also with a fraction")
+	var slower := _shrine(&"haste").duplicate() as ShrineData
+	slower.enemy_speed_pct = -20.0
+	check_eq(Shrines.boon_lines(slower), ["+15% haste", "Enemies move 20% slower"] as Array[String], "a slowing shrine: the direction says slower")
+	check_eq(Shrines.bane_lines(slower), [] as Array[String], "and it is a boon, not a bane")
 	check_eq(Shrines.duration_text(_shrine(&"greed")), "Lasts the next 3 waves", "timed duration")
 	check_eq(Shrines.duration_text(_shrine(&"fortune")), "Takes effect at once", "instant")
-	check_eq(Shrines.effect_text(&"greed", 1), "Shrine of Greed (1 wave left)", "effect text")
+
+
+func test_effect_text_is_the_one_line_of_the_wave_banner() -> void:
+	check_eq(Shrines.effect_text(&"greed", 1), "Shrine of Greed: +30% gold, enemies +20% damage · 1 wave left", "one wave")
+	check_eq(Shrines.effect_text(&"greed", 2), "Shrine of Greed: +30% gold, enemies +20% damage · 2 waves left", "two waves")
+	check_eq(Shrines.effect_text(&"haste", 3), "Shrine of Haste: +15% haste, enemies 15% faster · 3 waves left", "haste: the speed bane")
+	check_eq(Shrines.effect_text(&"learning", 3), "Shrine of Learning: +50% XP, enemies +25% HP · 3 waves left", "learning")
+	check_eq(Shrines.effect_text(&"blood", 2), "Shrine of Blood: +20% damage, -20% max HP · 2 waves left", "blood: boons then banes")
+	check_eq(Shrines.effect_text(&"no_such_shrine", 2), "no_such_shrine · 2 waves left", "an unknown id shows its id")
+
+
+func test_banner_lines_list_the_running_shrines_in_order() -> void:
+	check(Shrines.banner_lines().is_empty(), "nothing runs: no sub-lines")
+	RunState.add_shrine_effect(&"greed", 3)
+	RunState.add_shrine_effect(&"blood", 1)
+	check_eq(Shrines.banner_lines(), [
+		"Shrine of Greed: +30% gold, enemies +20% damage · 3 waves left",
+		"Shrine of Blood: +20% damage, -20% max HP · 1 wave left",
+	] as Array[String], "one effect_text per running shrine, the waves left from the run state")
+	RunState.tick_shrine_effects()
+	check_eq(Shrines.banner_lines(), ["Shrine of Greed: +30% gold, enemies +20% damage · 2 waves left"] as Array[String],
+			"blood expired, greed counted down")
 
 
 # --- The vote model ----------------------------------------------------------------
@@ -490,6 +522,23 @@ func test_banked_pickups_pay_the_greed_bonus_with_the_fraction_kept() -> void:
 	check_eq(RunState.gold, 13, "ten 1-gold coins pay 13, not 10 or 20")
 
 
+## A banked coin's fraction belongs to the team (slot -1), never to a hero: a hero's own Gold Find fraction stays as it is.
+func test_banked_gold_keeps_its_fraction_on_the_team_never_on_a_hero() -> void:
+	RunState.add_shrine_effect(&"greed", 3)
+	_live()
+	RunState.gold = 0
+	RunState.add_gold_for(0, 1, 50.0)
+	var hero_fraction := RunState.gold_remainder(0)
+	check(hero_fraction > 0.0 and hero_fraction < 1.0, "hero 0 holds a fraction of a coin (%.3f)" % hero_fraction)
+	var team_before := RunState.gold_remainder(-1)
+	var q := Pickup.create(1, 0)
+	_world().add_child(q)
+	q.collect_to_bank()
+	check_near(RunState.gold_remainder(0), hero_fraction, 0.0001, "the banked coin does not touch hero 0's fraction")
+	check_near(RunState.gold_remainder(-1), 0.3, 0.0001, "the team keeps the banked fraction (1.3 -> 0.3), was %.3f" % team_before)
+	check_eq(RunState.gold, 2, "1 coin from the hero's pickup and 1 from the bank")
+
+
 func test_xp_scaling_keeps_the_fraction() -> void:
 	check_eq(RunState.scale_xp(7), 7, "no shrine: unchanged")
 	RunState.add_shrine_effect(&"learning", 3)
@@ -698,6 +747,118 @@ func test_fortune_with_an_empty_purse_takes_nothing() -> void:
 	Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())
 	check(RunState.spend_log.is_empty(), "no spend entry for 0 gold")
 	check_eq((_hero_of(0)).equipment.backpack.size(), 1, "the item still comes")
+
+
+func test_fortune_with_a_purse_too_small_for_a_share_says_so() -> void:
+	_human()
+	RunState.gold = 3
+	var result := Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())
+	check(RunState.spend_log.is_empty(), "25% of 3 rounds to nothing: no spend")
+	check_eq(RunState.gold, 3, "the purse is kept")
+	check_eq((result["lines"] as Array)[0], "The purse is too small: the shrine takes nothing.", "a small purse, not an empty one")
+	check_eq((_hero_of(0)).equipment.backpack.size(), 1, "the item still comes")
+
+
+func test_fortune_with_an_empty_purse_says_it_is_empty() -> void:
+	_human()
+	RunState.gold = 0
+	var result := Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The purse is empty: the shrine takes nothing.", "empty only at 0 gold")
+
+
+func test_the_gambler_loss_with_a_small_purse_is_one_sentence() -> void:
+	_human()
+	RunState.gold = 1
+	RunState.shrine_rng.seed = _gambler_seed(false)
+	var result := Shrines.accept(_shrine(&"gambler"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The dice turn on you: the purse is too small to take from.", "one clause behind the prefix")
+	check(RunState.spend_log.is_empty() and RunState.gold == 1, "nothing taken from 1 gold")
+
+
+func test_the_gambler_loss_with_an_empty_purse_says_it_is_empty() -> void:
+	_human()
+	RunState.gold = 0
+	RunState.shrine_rng.seed = _gambler_seed(false)
+	var result := Shrines.accept(_shrine(&"gambler"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The dice turn on you: the purse is empty.", "empty")
+
+
+func test_the_gambler_loss_says_how_much_the_shrine_took() -> void:
+	_human()
+	RunState.gold = 101
+	RunState.shrine_rng.seed = _gambler_seed(false)
+	var result := Shrines.accept(_shrine(&"gambler"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The dice turn on you: the shrine takes 50 gold.", "one clause behind the prefix")
+
+
+func test_the_gambler_win_with_a_small_purse_gains_nothing_and_says_so() -> void:
+	_human()
+	RunState.gold = 1
+	RunState.shrine_rng.seed = _gambler_seed(true)
+	var result := Shrines.accept(_shrine(&"gambler"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The dice favour you, but the purse is too small to gain from.", "half of 1 is nothing")
+	check(RunState.gold_gain_log.is_empty() and RunState.gold == 1, "no gain logged, the purse kept")
+
+
+func test_the_gambler_win_with_an_empty_purse_says_it_is_empty() -> void:
+	_human()
+	RunState.gold = 0
+	RunState.shrine_rng.seed = _gambler_seed(true)
+	var result := Shrines.accept(_shrine(&"gambler"), PlayerManager.get_slots())
+	check_eq((result["lines"] as Array)[0], "The dice favour you, but the purse is empty.", "empty only at 0 gold")
+
+
+func test_full_backpacks_share_one_sale_line() -> void:
+	var classes: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue"]
+	for i in 4:
+		_human("pad:%d" % i, classes[i])
+	_fill_backpack(_hero_of(0))
+	_fill_backpack(_hero_of(2))
+	RunState.gold = 0
+	RunState.set_wave(7)
+	var result := Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())
+	var lines: Array[String] = []
+	lines.assign(result["lines"])
+	check_eq(lines.size(), 4, "the purse line, two items, one sale line")
+	var sales: Array[String] = []
+	for line in lines:
+		if line.begins_with("Backpacks full"):
+			sales.append(line)
+	check_eq(sales.size(), 1, "one sale line for the two full backpacks")
+	check_eq(RunState.gold_gain_log.size(), 2, "each sale is still logged for its hero")
+	var total := 0
+	for e in RunState.gold_gain_log:
+		total += int(e["amount"])
+	check_eq(sales[0], "Backpacks full: 2 items sold for %s gold." % UiTheme.format_int(total), "the count and the total")
+
+
+func test_fortune_epics_are_usable_by_their_hero_over_many_seeds_and_classes() -> void:
+	RunState.set_wave(7)
+	var made := 0
+	var bad: Array[String] = []
+	for cid in Db.class_ids:
+		UiFakes.reset_players()
+		var slot := _bot("bot:%s" % cid, cid)
+		var hero := slot.player as Player
+		for seed_value in 200:
+			hero.equipment.backpack.clear()
+			RunState.gold = 0
+			RunState.shrine_rng.seed = seed_value
+			Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())
+			if hero.equipment.backpack.size() != 1:
+				bad.append("%s seed %d: no item" % [cid, seed_value])
+				continue
+			var item := hero.equipment.backpack[0]
+			made += 1
+			if item.rarity != Items.Rarity.EPIC or not item.can_be_used_by(slot.class_data):
+				bad.append("%s seed %d: %s" % [cid, seed_value, item.display_name])
+	check_eq(made, 200 * Db.class_ids.size(), "every hero got its item every time")
+	check(bad.is_empty(), "every Fortune item is an Epic its hero can use (first failures: %s)" % ", ".join(PackedStringArray(bad.slice(0, 5))))
+
+
+func _fill_backpack(hero: Player) -> void:
+	while hero.equipment.has_space():
+		hero.equipment.add_to_backpack(MarketFakes.make_item("Junk", Items.SlotType.TRINKET))
 
 
 func _gambler_seed(win: bool) -> int:
@@ -1001,6 +1162,44 @@ func test_the_chips_follow_the_votes() -> void:
 	check(_chip_text(chip0).contains("Accept"), "the human accepted")
 
 
+## Four heroes with full backpacks accept Fortune at 1920 x 1080: the result (the purse line and ONE sale line) ends
+## above the voter chips. Before the sale lines were merged, each full backpack wrapped to two lines and the last
+## hero's line ran behind the chips.
+func test_the_fortune_result_stays_above_the_chips_with_four_full_backpacks() -> void:
+	_async = true
+	var root_size := tree.root.size
+	tree.root.size = Vector2i(1920, 1080)
+	var classes: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue"]
+	var inputs: Array[UiFakes.HumanInput] = []
+	for i in 4:
+		inputs.append(_human("pad:%d" % i, classes[i]))
+	for s in PlayerManager.get_slots():
+		_fill_backpack(s.player as Player)
+	RunState.gold = 201
+	RunState.set_wave(7)
+	_screen()
+	screen.decided.connect(func(accepted: bool, _reason: StringName) -> void:
+		if accepted:
+			var lines: Array[String] = []
+			lines.assign(Shrines.accept(_shrine(&"fortune"), PlayerManager.get_slots())["lines"])
+			screen.show_result(lines))
+	screen.open(_shrine(&"fortune"), PlayerManager.get_slots())
+	_past_lockout()
+	for input in inputs:
+		_tap(input, PlayerInput.Pad.A)
+	check_eq(screen.phase, ShrineScreen.Phase.RESULT, "all four accepted: the result shows")
+	await tree.process_frame
+	await tree.process_frame
+	var result := screen.result_box.get_global_rect()
+	var chips := screen.chips_row.get_global_rect()
+	check(screen.result_box.visible, "the result box is shown")
+	check(result.end.y <= chips.position.y, "the result ends at %.1f, the chips start at %.1f" % [result.end.y, chips.position.y])
+	check_eq(screen.result_detail.text.split("\n").size(), 2, "the purse line and one sale line, nothing per hero")
+	check(screen.result_detail.text.contains("Backpacks full: 4 items sold for "), "the sale line counts the four")
+	tree.root.size = root_size
+	finished.emit()
+
+
 func _chip_text(node: Node) -> String:
 	var out := ""
 	if node is Label:
@@ -1269,6 +1468,38 @@ func test_the_hud_shows_one_icon_per_running_shrine_with_its_waves_left() -> voi
 	check_eq((hud.shrine_row.get_child(0) as ShrineIcon).badge, 2, "greed: 2")
 	RunState.start_run(1, 3)
 	check(not hud.shrine_row.visible, "a new run clears the row")
+
+
+func test_the_banner_grows_a_sub_line_per_running_shrine_and_goes_back_to_one_line() -> void:
+	var hud := Hud.create()
+	tree.root.add_child(hud)
+	nodes.append(hud)
+	var one: Array[String] = ["Shrine of Greed: +30% gold, enemies +20% damage · 2 waves left"]
+	hud.show_banner("Wave 3", UiTheme.GOLD, one)
+	check(hud.banner_sub.visible, "the sub-line shows")
+	check_eq(hud.banner_sub.text, one[0], "the running shrine, with its effect and waves left")
+	check_eq(hud.banner_label.text, "Wave 3", "the title is still the wave")
+	check_eq(hud.banner_label.offset_bottom, Hud.BANNER_HEIGHT, "the title keeps its own height")
+	check_eq(hud.banner_sub.offset_bottom, Hud.BANNER_HEIGHT + Hud.BANNER_SUB_HEIGHT, "one line under the title")
+	var two: Array[String] = [one[0], "Shrine of Haste: +15% haste, enemies 15% faster · 1 wave left"]
+	hud.show_banner("Wave 4", UiTheme.GOLD, two)
+	check_eq(hud.banner_sub.offset_bottom, Hud.BANNER_HEIGHT + 2.0 * Hud.BANNER_SUB_HEIGHT, "two running shrines, two lines")
+	check(hud.banner_sub.text.contains("\n") and hud.banner_sub.text.contains("Shrine of Haste"), "both lines in the sub-label")
+	hud.show_banner("Wave cleared!")
+	check(not hud.banner_sub.visible and hud.banner_sub.text == "", "no shrines, no sub-line")
+	check_eq(hud.banner_sub.offset_bottom, Hud.BANNER_HEIGHT, "back to the one-line banner")
+
+
+func test_the_wave_banner_lists_the_shrines_that_run() -> void:
+	_run_with_bots(1, 0.0)
+	check(not main.hud.banner_sub.visible, "wave 1 under no shrine: no sub-line")
+	_clear_wave_and_wait()
+	Shrines.accept(_shrine(&"greed"), PlayerManager.get_slots())
+	main._on_intermission_continue()
+	check_eq(main.state, Main.State.WAVE, "wave 2")
+	check_eq(main.hud.banner_sub.text, "Shrine of Greed: +30% gold, enemies +20% damage · 3 waves left",
+			"the wave banner lists greed with the three waves it has")
+	check(main.hud.banner_sub.visible, "the sub-line shows under the wave title")
 
 
 func test_the_icons_have_a_picture_per_shrine() -> void:

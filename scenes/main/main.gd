@@ -363,7 +363,8 @@ func start_wave(n: int) -> void:
 	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
-		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave)
+		# The running shrines (M6b) are listed under the title, with the waves they have left.
+		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, Shrines.banner_lines())
 	_pause_if_pad_missing()
 
 

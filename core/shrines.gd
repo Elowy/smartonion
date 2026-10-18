@@ -95,11 +95,25 @@ static func duration_text(data: ShrineData) -> String:
 	return "Lasts the next %d wave%s" % [data.waves, "" if data.waves == 1 else "s"]
 
 
-## One line for logs and the HUD tooltip: "Shrine of Greed (2 waves left)".
+## One line for the wave banner and the logs, the boons then the banes in the short card wording:
+## "Shrine of Greed: +30% gold, enemies +20% damage · 2 waves left".
 static func effect_text(id: StringName, waves_left: int) -> String:
 	var data := Db.get_shrine(id)
 	var name := data.display_name if data != null else String(id)
-	return "%s (%d wave%s left)" % [name, waves_left, "" if waves_left == 1 else "s"]
+	var parts: Array[String] = _lines(data, true, true)
+	parts.append_array(_lines(data, false, true))
+	var summary := ""
+	if not parts.is_empty():
+		summary = ": " + ", ".join(PackedStringArray(parts))
+	return "%s%s · %d wave%s left" % [name, summary, waves_left, "" if waves_left == 1 else "s"]
+
+
+## The wave banner's sub-lines: one [method effect_text] per running shrine (empty while none runs).
+static func banner_lines() -> Array[String]:
+	var out: Array[String] = []
+	for e in RunState.shrine_effects:
+		out.append(effect_text(StringName(e.get("id", &"")), int(e.get("waves_left", 0))))
+	return out
 
 
 ## The running shrines as one log line ("greed 3, haste 1"; "none").
@@ -113,24 +127,30 @@ static func effects_log() -> String:
 
 
 ## The lines of one side of the card: [param good] = the boons, else the banes. Every number comes from the data.
-static func _lines(data: ShrineData, good: bool) -> Array[String]:
+## [param short]: the one-line wording of [method effect_text] ("+30% gold", "enemies +20% damage").
+static func _lines(data: ShrineData, good: bool, short: bool = false) -> Array[String]:
 	var out: Array[String] = []
 	if data == null:
 		return out
+	var from_pickups := "" if short else " from pickups"
 	# [text, good] pairs in card order.
 	var all: Array = []
 	if not is_zero_approx(data.gold_pct):
-		all.append(["%s gold from pickups" % _pct(data.gold_pct), data.gold_pct > 0.0])
+		all.append(["%s gold%s" % [_pct(data.gold_pct), from_pickups], data.gold_pct > 0.0])
 	if not is_zero_approx(data.xp_pct):
-		all.append(["%s XP from pickups" % _pct(data.xp_pct), data.xp_pct > 0.0])
+		all.append(["%s XP%s" % [_pct(data.xp_pct), from_pickups], data.xp_pct > 0.0])
 	for e in data.hero_effects:
 		all.append_array(_hero_lines(e))
 	if not is_zero_approx(data.enemy_damage_pct):
-		all.append(["Enemies deal %s damage" % _pct(data.enemy_damage_pct), data.enemy_damage_pct < 0.0])
+		all.append([("enemies %s damage" if short else "Enemies deal %s damage") % _pct(data.enemy_damage_pct),
+				data.enemy_damage_pct < 0.0])
 	if not is_zero_approx(data.enemy_hp_pct):
-		all.append(["Enemies have %s HP" % _pct(data.enemy_hp_pct), data.enemy_hp_pct < 0.0])
+		all.append([("enemies %s HP" if short else "Enemies have %s HP") % _pct(data.enemy_hp_pct), data.enemy_hp_pct < 0.0])
 	if not is_zero_approx(data.enemy_speed_pct):
-		all.append(["Enemies move %s faster" % _pct(data.enemy_speed_pct), data.enemy_speed_pct < 0.0])
+		# The sign is the direction ("15% faster" / "15% slower"), never a second sign.
+		var speed := data.enemy_speed_pct
+		var move := "%s%% %s" % [_num(absf(speed)), "faster" if speed > 0.0 else "slower"]
+		all.append([("enemies %s" if short else "Enemies move %s") % move, speed < 0.0])
 	if data.give_epic:
 		all.append(["Every hero gets a free Epic item", true])
 	if data.purse_loss_pct > 0.0:
@@ -304,8 +324,11 @@ static func accept(data: ShrineData, slots: Array[PlayerSlot]) -> Dictionary:
 		var win := RunState.shrine_rng.randf() < data.gamble_chance
 		if win:
 			var won := floori(RunState.gold * data.gamble_win_pct / 100.0)
-			RunState.add_gold_logged(won, -1, data.display_name)
-			lines.append("The dice favour you: +%s gold!" % UiTheme.format_int(won) if won > 0 else "The dice favour you, but the purse is empty.")
+			if won > 0:
+				RunState.add_gold_logged(won, -1, data.display_name)
+				lines.append("The dice favour you: +%s gold!" % UiTheme.format_int(won))
+			else:
+				lines.append("The dice favour you, but the purse is %s." % _small_purse_text())
 		else:
 			lines.append(_take_from_purse(data, data.gamble_lose_pct, "The dice turn on you: "))
 	if data.give_epic:
@@ -313,19 +336,36 @@ static func accept(data: ShrineData, slots: Array[PlayerSlot]) -> Dictionary:
 	return {"lines": lines}
 
 
-## The shrine takes [param pct] of the purse (rounded down; spend kind [constant SPEND_KIND]).
+## The shrine takes [param pct] of the purse (rounded down; spend kind [constant SPEND_KIND]). One sentence: behind
+## the Gambler's [param prefix] the clause starts in lower case ("The dice turn on you: the purse is empty.").
 static func _take_from_purse(data: ShrineData, pct: float, prefix: String = "") -> String:
 	var amount := floori(RunState.gold * pct / 100.0)
 	if amount > 0 and RunState.try_spend_for(amount, -1, SPEND_KIND, data.display_name):
-		return "%sThe shrine takes %s gold." % [prefix, UiTheme.format_int(amount)]
-	return "%sThe purse is empty: the shrine takes nothing." % prefix
+		var taken := UiTheme.format_int(amount)
+		if prefix != "":
+			return prefix + "the shrine takes %s gold." % taken
+		return "The shrine takes %s gold." % taken
+	var empty := RunState.gold <= 0
+	if prefix != "":
+		return prefix + ("the purse is empty." if empty else "the purse is too small to take from.")
+	return "The purse is empty: the shrine takes nothing." if empty else "The purse is too small: the shrine takes nothing."
 
 
-## A free Epic item for every hero (usable by their class) into the backpack; a full backpack sells it.
+## What a share of the purse is when it rounds to nothing: "empty" with no gold at all, else "too small to gain from"
+## (the end of "The dice favour you, but the purse is ...").
+static func _small_purse_text() -> String:
+	return "empty" if RunState.gold <= 0 else "too small to gain from"
+
+
+## A free Epic item for every hero (usable by their class) into the backpack; a full backpack sells it. The sales
+## share one result line ("Backpacks full: 3 items sold for 201 gold"), so four full backpacks never run behind the
+## voter chips.
 static func _give_epics(slots: Array[PlayerSlot]) -> Array[String]:
 	var lines: Array[String] = []
 	var sorted := slots.duplicate()
 	sorted.sort_custom(func(a: PlayerSlot, b: PlayerSlot) -> bool: return a.index < b.index)
+	var sold := 0
+	var sold_gold := 0
 	for s: PlayerSlot in sorted:
 		var hero := s.player as Player
 		if hero == null or not is_instance_valid(hero) or hero.equipment == null:
@@ -342,5 +382,8 @@ static func _give_epics(slots: Array[PlayerSlot]) -> Array[String]:
 		else:
 			var gold := item.greed_value()
 			RunState.add_gold_logged(gold, s.index, "Shrine of Fortune: %s" % item.display_name)
-			lines.append("%s: backpack full, [%s] sold for %s gold." % [s.label(), item.display_name, UiTheme.format_int(gold)])
+			sold += 1
+			sold_gold += gold
+	if sold > 0:
+		lines.append("Backpacks full: %d item%s sold for %s gold." % [sold, "" if sold == 1 else "s", UiTheme.format_int(sold_gold)])
 	return lines
