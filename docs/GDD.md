@@ -2533,9 +2533,9 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M3 | Kasztok | 5 kaszt, erőforrások, 2-2 alap képesség, Mastery |
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, közös kassza |
-| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a és M6b**, lásd alább |
+| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, módok (Endless, Hardcore, ranglista), környezetek, események, szentélyek, Dungeon-portál, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a (kész) és M6b (a terv rögzítve)**, lásd alább |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
-| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
+| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon; az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.8) |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
 **Az M6 két részben jön**
@@ -2552,14 +2552,22 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - a Damage Meter, a díjak és a run kártya (12. fejezet),
   - balansz-kör **nincs**: az új tartalom a játékot nehezebbé tette, a hangolás egyszer, az
     M6b végén készül (9. fejezet).
-- **M6b** – a tartalom és a módok:
-  - játékmódok: Végtelen mód, Hardcore mód, módválasztó képernyő, helyi ranglista,
-  - az 5 aréna-környezet saját veszélyekkel és a sorsoló animáció,
-  - hullám közbeni események és szentélyek,
-  - a Dungeon-portál,
-  - a tartalom-csomagok (5.8): fegyver-alaptípusok +3 (a Crossbow, a Polearm és a Fist Weapon
-    az M8-cal jön), páncél- és ékszer-alaptípusok, utótagok, 50 enchant, névvel ellátott és
-    kaszt-specifikus itemek, 30 trinket, 25 legendary,
+- **M6b** – a tartalom és a módok (**a terv rögzítve, a megvalósítás következik**; a
+  részletek a 16.1-ben és a hivatkozott fejezetekben):
+  - játékmódok: **Endless** mód, **Hardcore** mód, módválasztás a lobbyban, helyi ranglista
+    (16.1; 1., 8., 12. fejezet),
+  - az **5 aréna-környezet** saját veszélyekkel és a „Rolling the arena…” sorsoló animáció
+    (13. fejezet, 16.1); a végleges látvány az M7-ben készül,
+  - **hullám közbeni események** (Guarded Chest, Defend the Totem, Goblin Caravan; 8. fejezet,
+    16.1) és **szentélyek** (16.1),
+  - a **Dungeon-portál**: 4 termes dungeon és a Dungeon Warden mini-boss (8. fejezet, 16.1),
+  - a **tartalom-csomagok** (5.8): fegyver-alaptípusok +3 (**Two-Hand Sword**, **Two-Hand
+    Mace**, **Orb**; a Crossbow, a Polearm és a Fist Weapon az M8-cal jön), páncél- és
+    ékszer-alaptípusok, utótagok, 50 enchant, névvel ellátott és kaszt-specifikus itemek,
+    30 trinket, 25 legendary; a kaszt-független tier setek az **M8-ra tolódtak** (a
+    set-rendszer módosítását igénylik),
+  - **az M6b egyik csomagja sem hangol számokat:** minden szám az itt rögzített kiinduló
+    érték, a meglévő értékek változatlanok (9. fejezet),
   - a végleges 25 hullámos balansz (Normal), **egyszer, a legvégén**, az összes M6b-s
     tartalommal együtt. A nyitott pontok (9. fejezet, „Nyitott kérdések M6b-re”): a Flesh
     Golem sebzése, a 20. hullám elit-hulláma, Vor'thalax kill-ideje létszám szerint, a szóló
@@ -2568,41 +2576,196 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 ### 16.1 Jóváhagyott ötletek (backlog)
 
 A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 két része: **M6a** és
-**M6b**, lásd fent). A részletek a megvalósításkor kerülnek a megfelelő fejezetbe.
+**M6b**, lásd fent). A részletek a megvalósításkor kerülnek a megfelelő fejezetbe; az **M6b**
+elemeinek **terve rögzített** (alább részletezve, a számok kiinduló értékek, hangolás nincs).
 
 | Ötlet | Mit jelent | Mérföldkő |
 |---|---|---|
 | **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
 | **Sebzésmérő és díjak** | WoW-szerű damage meter a menet végén (sebzés, gyógyítás, elnyelt sebzés, kapott sebzés, felélesztések, elesések, ölések) és díjak: „Most Damage”, „Guardian Angel”, „Floor Inspector” stb. – részletek: 12. fejezet | **Kész (M6a)** |
 | **Menet végi összefoglaló kártya** | Megosztható kép („Save card”): kasztok, elért hullám, idő, legjobb itemek, díjak – részletek: 12. fejezet | **Kész (M6a)** |
-| **Véletlen környezet menetenként** | 5 féle aréna-környezet: temető, mocsár, vulkán, jégbarlang, erdei rom – saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **M6b** (tartalom), M7 (látvány) |
-| **Hullám közbeni események** | Őrzött kincsesláda, megvédendő totem, elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **M6b** |
-| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | **M6b** |
-| **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, helyi ranglistával | **M6b** |
-| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **M6b** |
-| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **M6b** |
+| **Véletlen környezet menetenként** | 5 féle aréna-környezet: erdei rom, temető, mocsár, vulkán, jégbarlang – saját veszélyekkel és saját palettával, kellékkészlettel; a menet elején egy „Rolling the arena…” sorsoló animáció (vízszintes kártyasor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **M6b** (tartalom, lásd lent), M7 (végleges látvány) |
+| **Hullám közbeni események** | Őrzött kincsesláda (Guarded Chest), megvédendő totem (Defend the Totem), elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **M6b** (lásd lent) |
+| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben, és minden játékosnak el kell fogadnia | **M6b** (lásd lent) |
+| **Végtelen mód (Endless)** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, a 30. hullámtól 5 hullámonként bossal | **M6b** (lásd lent) |
+| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **M6b** (lásd lent) |
+| **Módválasztás és helyi ranglista** | A lobbyban választható mód (Normal / Endless) és Hardcore-kapcsoló; módonként, létszámonként helyi top 10 | **M6b** (lásd lent) |
+| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **M6b** (lásd lent) |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
-| **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
+| **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+
+**Játékmódok: Endless és Hardcore (M6b)**
+
+- **Módválasztás:** a lobbyban **bármelyik játékos** az **Y**-nal léptet a módok között
+  (**Normal** ↔ **Endless**), és az **X**-szel kapcsolja a **Hardcore**-t; a két kapcsoló
+  független. A lobby fejlécében mindig látszik az aktuális választás („*Mode: Endless ·
+  Hardcore*”, 12. fejezet). Indítási kapcsolók: `--mode=normal|endless`, `--hardcore`.
+- **A menet hossza a módból jön:** Normal 25 hullám, Endless korlátlan (a kódban
+  `RunState.total_waves()`: 25, illetve 0 = korlátlan; az „utolsó hullám” Endlessben sosem
+  igaz). Nincs több beégetett 25-ös szám.
+- **Endless:**
+  - **Indulás:** a 25. hullámon Vor'thalax halála **nem** zárja le a menetet: „*Endless
+    begins!*” szalag, és jön a 26. hullám. (Normalban ez továbbra is a győzelem.)
+  - **A 26. hullámtól:** a hullámhossz legfeljebb **210 mp**, az ellenségek növekedési
+    képletei változatlanul folytatódnak (9. fejezet).
+  - **Bossok:** a 30. hullámtól **minden 5. hullám** boss-hullám, váltakozva **Morvain** (30.,
+    40., …) és **Vor'thalax** (35., 45., …), a szokásos hullám-skálázással (8. fejezet).
+  - **Elit-hullám:** a 20. hullám szabálya a **33., 43., 53. …** hullámon ismétlődik.
+  - A bolt és a piac a szokásos módon működik (a szentély és a Dungeon-portál szabályai lent).
+  - A menet **csak vereséggel ér véget**; a ranglista az elért hullámot rögzíti.
+- **Hardcore:**
+  - **Nincs Spirit Healer** (az aréna nem hozza létre): csak a társak tudnak feléleszteni.
+  - Az elesett hős keretén a Spirit Healerhez irányító felirat helyett: „*Only a teammate can
+    revive you*”.
+  - Az elesett hősök a **következő hullám elején** így is visszatérnek (50% HP-val), mint
+    Normalban.
+  - **HARDCORE jelvény** a HUD-n, a lobbyban és a végképernyőn; **külön ranglista-kategória**.
+  - **Szóló Hardcore = szóló Normal:** egyedül az első elesés amúgy is a menet vége.
+
+**Helyi ranglista (M6b)**
+
+- **Hol:** helyi fájl, `user://leaderboard.json`, verziózott formátummal.
+- **Kategóriák:** minden (mód, Hardcore, játékosszám) hármasra külön **top 10**.
+- **Egy bejegyzés:** az elért hullám (Endless) vagy a győzelem ideje (Normal), a kasztok, a
+  dátum és hogy győzelem volt-e.
+- **Mikor ír:** a menet végén. Smoke-futás, demó és teszt **nem ír**, hacsak egy teszt nem állít
+  be ideiglenes útvonalat.
+- **Végképernyő:** a „*Best: …*” sor és a menet kategóriájának táblája, az új bejegyzés
+  kiemelve (12. fejezet).
+- **Felépítés:** tiszta adatmodell és egy fájl-I/O segéd; ideiglenes útvonalon tesztelhető.
+
+**Aréna-környezetek és a sorsoló animáció (M6b)**
+
+- **Öt környezet** (`EnvironmentData` adat a `data/environments/` mappában), menetenként
+  egy: a menet elején sorsolódik, és a menet végéig megmarad. Az aréna **mérete nem
+  változik**. A tartalom az M6b-ben készül (paletta, kellékek, veszélyek), a végleges látvány
+  az M7-ben.
+
+  | Környezet | Veszély | Szabály (kiinduló értékek) |
+  |---|---|---|
+  | **Forest Ruin** (erdei rom) | – | A mai aréna, nincs veszély |
+  | **Cemetery** (temető) | **Grasping Hands** | ~9 mp-enként 2–3 jelzett kör (1,5 m sugarú) jelenik meg a hősök alatt; 1 mp figyelmeztetés után a kezek 1,2 mp-re **gyökerezik** a hőst, és a grunt-érintéses sebzés 0,5-szörösét okozzák |
+  | **Swamp** (mocsár) | **Bog pools** | Menetenként 5, a helyükön álló lápfolt: bent a hősök mozgássebessége **−30%**, az ellenségeké **−15%** |
+  | **Volcano** (vulkán) | **Lava vents** | 6 fix kürtő, mindegyik ~8 mp-enként kitör (1 mp figyelmeztetés, 2 m sugár); a grunt-érintéses sebzés 1,5-szeresét okozza a hősöknek **és az ellenségeknek** |
+  | **Ice Cave** (jégbarlang) | **Falling Icicles** | ~7 mp-enként 3 jelzett kör (1,2 m sugarú) a hősök közelében; a grunt-érintéses sebzés 1-szerese és 30% lassítás 1,5 mp-re |
+
+- **Veszélyek közös szabályai:**
+  - A „grunt-érintéses sebzés” a Skeleton Grunt érintéses sebzése az adott hullámon: a hullám
+    ellenség-sebzés növekedését és a csapatlétszám-sebzésszorzót is használja (9. fejezet).
+  - **Boss-hullámon** a veszélyek **fele gyakorisággal** futnak.
+  - Minden veszély ellenség-veszélyzónának számít: a botok kikerülik, és a hullám vége
+    eltünteti (8. fejezet, „Veszélyzónák és a botok”).
+- **Megjelenés:** környezetenként saját **paletta** (ég, köd, ambient fény, nap, talajszínek,
+  falszín) és saját **kellékkészlet**, primitívekből építve:
+  - Cemetery: sírkövek, száraz fák, kripta;
+  - Swamp: nád, zavaros tavak, mangrove;
+  - Volcano: bazalt, izzó repedések;
+  - Ice Cave: jégkristályok, hó, oszlopok;
+  - Forest Ruin: a mai kinézet.
+
+  A draw-call keret a mai marad (összevont meshek / MultiMesh).
+- **Sorsolás:** a menet futásmagjából számolt **külön véletlenszám-generátorral** történik.
+- **Sorsoló animáció:** a lobbyban az indítás után a „*Rolling the arena…*” képernyő:
+  - a környezet-kártyák **vízszintes sora** (ismétlődve) ~3,5 mp alatt lassul, és a
+    kisorsolt kártyán áll meg;
+  - 1 mp szünet, majd indul a menet;
+  - smoke-futásban, demóban és tesztben kimarad.
+- **Kijelzés:** a környezetet a run kártya és a végképernyő is mutatja (12. fejezet).
+- Debug: `--env=<id>` a kisorsolt környezetet kényszeríti.
+
+**Hullám közbeni események (M6b)**
+
+- **Mikor:** a **4. hullámtól**; **soha** nem boss-hullámon, a 20. hullámon és az elit-szabályú
+  hullámokon (Endlessben a 33., 43., 53. …); minden jogosult hullámon **30%** eséllyel, egy
+  hullámban **legfeljebb egy**. Az esemény saját véletlenszám-generátorral sorsolódik, a hullám
+  **20–40%-ánál** indul, szalag jelzi, és a kamera a célpontot is képen tartja.
+- **Guarded Chest** (őrzött láda):
+  - A láda körül **4 őr** áll: az adott hullámon jogosult ellenségtípusok, ×2 HP-val,
+    affix nélkül.
+  - Ha az őrök meghaltak, a ládánál **1,5 mp-ig** álló hős kinyitja.
+  - **Jutalom:** egy **Rare+** item (a hullám végi Need / Greed / Pass dobásra megy, nem számít
+    a normál drop hullámlimitjébe) + a hullám átlagos ellenség-goldjának **10-szerese**.
+  - Ha nem nyitják ki, a hullám végén eltűnik.
+- **Defend the Totem** (megvédendő totem):
+  - Egy szövetséges totem; HP-ja a hullám Skeleton Gruntja HP-jának **30-szorosa** a csapatméret
+    szerinti HP-szorzóval (9. fejezet). A **8 m-en belüli** ellenségek rá támadnak.
+  - Ha **20 mp-ig** életben marad: minden hős **+15% sebzést** kap a hullám végéig, és a csapat
+    a hullám átlagos ellenség-XP-jének **25-szörösét** kapja.
+  - Ha elesik, nincs semmi jutalom.
+- **Goblin Caravan** (Goblin karaván):
+  - Egy kordé **3 őrrel**, ami ~25 mp alatt átkel az arénán a szélétől a széléig; a kordé
+    HP-ja a hullám Skeleton Gruntja HP-jának **40-szerese**.
+  - **Megölve:** a hullám átlagos ellenség-goldjának **40-szeresét** szórja szét, és egy
+    **Rare** itemet ad.
+  - A túloldalon elszökik: „*The caravan got away*”.
+- **Botok:** az esemény őreivel a szokásos módon harcolnak, kinyitják a ládát, a totemet
+  őrzik (6 m-en belül maradnak), és a kordét üldözik, ha nincs ellenség a közelben.
+- **Jutalmak és ellenségek részletei:** 8. fejezet (esemény-ellenségek), 10.1 (loot).
+
+**Szentélyek a szünetekben (M6b)**
+
+- **Mikor:** minden szünetben **5%** eséllyel (a menet utolsó hulláma után nem), saját
+  véletlenszám-generátorral. A szünet új fázisa a **SHRINE**, a loot roll és a szintlépés
+  **között** (12. fejezet).
+- **Szavazás:** egy kártya mutatja a szentély áldását és átkát; **minden játékos** szavaz:
+  **Accept (A)** vagy **Decline (B)**. Csak akkor lép életbe, ha **mindenki elfogadta**; egy
+  elutasítás vagy a **15 mp-es** időkorlát lejárta elutasítás.
+- **Hatások** (a „3 hullámig” hatások a következő 3 hullámra szólnak):
+
+  | Szentély | Áldás | Átok |
+  |---|---|---|
+  | **Shrine of Greed** | +30% felszedett gold (3 hullámig) | az ellenségek +20% sebzést okoznak |
+  | **Shrine of Haste** | +15% Haste (3 hullámig) | az ellenségek +15% sebessége |
+  | **Shrine of Learning** | +50% XP (3 hullámig) | az ellenségek +25% HP-ja |
+  | **Shrine of Blood** | +20% sebzés (3 hullámig) | −20% Max HP |
+  | **Shrine of Fortune** | minden hős kap egy **Epic** itemet, azonnal | a kassza **25%-át** azonnal elveszti |
+  | **Shrine of the Gambler** | 50% eséllyel a kassza ×1,5 | különben a kassza ×0,5 (azonnal) |
+
+- **HUD:** az aktív szentély-hatásokat kis ikonok mutatják, a hátralévő hullámok számával.
+- **Botok:** a Greed, Haste, Learning és Blood szentélyt elfogadják, a Fortune-t és a Gamblert
+  elutasítják.
+- Debug: `--shrine-chance=X` felülírja az 5%-os esélyt.
 
 **Dungeon-portál (M6b)**
 
-- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után**: a hullámok közti szünetben
-  portál nyílik az arénában.
-- **Opcionális:** a csapat közösen dönt, belép-e (mint a bolti rerollnál, mindenki szavaz).
-  Ha nem lépnek be, a menet a szokásos módon folytatódik.
-- **Belül:** 3–4 kisebb, zárt terem egymás után, mindegyikben egy feladattal (takarítás,
-  túlélés, valami megvédése), a végén egy **mini-boss**. A harcrendszer és az aréna-technika
-  ugyanaz, mint a menetben.
-- **Szabályok:** nincs Spirit Healer, csak a társak tudnak feléleszteni.
-- **Siker:** nagyobb esély tier set-darabra, garantált Epic item (Need / Greed / Pass), később
-  Artifact-esély is.
-- **Bukás** (mindenki elesett): a dungeon véget ér, a csapat elveszíti a közös kassza
-  **50%-át**, és a menet a következő hullámmal folytatódik (a hullám elején mindenki feléled).
+- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után** (Normalban, Endlessben és
+  Hardcore módban is): a szünetben, a szintlépés **után** és a piac **előtt** (PORTAL fázis)
+  a „*A dungeon portal has opened!*” felirat jelenik meg.
+- **Opcionális, csapatszavazással:** mindenki szavaz (Accept / Decline). Ha **mindenki**
+  elfogadta, a csapat belép; egy elutasítás vagy a **20 mp-es** időkorlát lejárta kihagyja, és a
+  menet a piaccal folytatódik.
+- **Belül:** külön, kis aréna (**24 × 14 m**, a menet környezetének palettájával, környezeti
+  veszély nélkül); **4 terem** egymás után, mindegyik rövid, forgatókönyves harc a menet
+  jogosult ellenségeivel, a kitisztított hullám szerint skálázva. A harcrendszer és az
+  aréna-technika ugyanaz, mint a menetben.
+
+  | # | Terem | Feladat |
+  |---|---|---|
+  | 1 | **Clear** | 25 ellenség megölése |
+  | 2 | **Survive** | 25 mp sűrű spawn túlélése |
+  | 3 | **Defend** | egy parázstartó (brazier) életben tartása 20 mp-ig |
+  | 4 | **Warden** | mini-boss: a **Dungeon Warden** (8. fejezet) |
+
+  A termek között **3 mp-es** „*Room cleared*” szünet van, ami a hősök Max HP-jának **30%-át**
+  gyógyítja.
+- **Szabályok:** nincs Spirit Healer, a társak élesztenek; ha **mindenki** elesik, a dungeon
+  bukás. A piac időzítője a dungeon alatt **áll**.
+- **Siker:** minden hős kap egy **garantált Epic** itemet (a dungeon után Need / Greed / Pass
+  dobás), **50% eséllyel** egy extra tier set-darabot a csapat egyik kasztjának, és a
+  kitisztított hullám átlagos ellenség-goldjának **20-szorosát** kapja a csapat (10.1).
+- **Bukás:** a közös kassza **50%-át** elveszíti a csapat, és visszatér a piacra (mindenki
+  feléled, mint egy hullám elején).
+- **Akárhogy is végződik, a piac következik.**
+- **HUD:** „*Dungeon – Room 2/4 · <feladat>*” és a terem-feladat állása; a sebzésmérő és a
+  menet-statisztikák a dungeon sebzését is számolják.
+- **Botok:** a 6. és a 9. hullám után belépnek; a 12. és a 15. után csak akkor, ha az előző
+  hullámban senki sem esett el.
 - **Szerepek:** a kasztok úgy működnek, mint a menetben; külön tank / healer / DPS
   hangsúly nincs.
 - **Később (M10, ha az M6b-s változat bevált):** külön Dungeon mód a főmenüből, egymásba
   nyíló termekkel és több bosszal.
+- Debug: `--dungeon=1` a következő hullám után portált nyit.
 
 **Goldsinkek (M6a)**
 
