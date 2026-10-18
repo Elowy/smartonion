@@ -1579,15 +1579,15 @@ jutalom.
 | Megjelenik | 7. hullámtól | 9. hullámtól | 12. hullámtól |
 | Viselkedés | üldöző (Chase) | támogató (Support) | brute |
 | Alap HP | 7 | 6 | 40 |
-| Érintéses sebzés | 2 | 1 | 2,5 |
+| Érintéses sebzés | 2 | 1 | 4 |
 | Sebesség (m/s) | 2,1 | 2,3 | 1,5 |
 | Spawn-súly | 0,6 | 0,35 | 0,25 |
 | Csoportméret | 2–3 | 1 | 1 |
 | Gold / XP | 1 / 2 | 2 / 3 | 4 / 5 |
 
-A Flesh Golem eredetileg 4 érintéses sebzéssel a hősök teljes sebzésbevitelének ~38%-át okozta
-a 10. hullámtól (a spawnolt ellenségek ~2%-ából), ezért 2,5-re csökkent; így a részesedése ~27%
-(9. fejezet, „M6a mérés”).
+A Flesh Golem érintéses sebzése (és vele a horog, ami 1× ennyi) az M6a kiinduló értéke, nem
+hangolt szám: a bot-futásokban a spawnolt ellenségek kis részéből a hősök kapott sebzésének
+nagy részét adja, ezért a végső balansz nyitott kérdése (9. fejezet, „Nyitott kérdések M6b-re”).
 
 - **Plague Ghoul** (sugár 0,5 m): úgy üldöz, mint a Skeleton Grunt.
   - Halálakor **méregtócsát** hagy ott, ahol meghalt (ha a hullám vége tünteti el, nem
@@ -1689,8 +1689,9 @@ a 10. hullámtól (a spawnolt ellenségek ~2%-ából), ezért 2,5-re csökkent; 
     igazi eliteké). Nem számít elitnek: a Slayer és az Execute elit-prioritása nem hat rájuk.
   - Az igazi elitek (3× HP, elit-jutalom) várható száma ezen a hullámon a **kétszeres**.
   - Nincs boss, és Loot Goblin sem jön (lásd lent).
-  - A botoknál a 20. hullám tisztán kiugrik (4 fő: 5,4 elesés / menet a 20. hullámon, 0,8 a
-    19.-en és a 21.-en; 2 fő: 2,4 / 0,0), de nem fal (9. fejezet, „M6a mérés”).
+  - A botoknak a 20. hullám kiugró nyomást jelent (az elit-affixes golemek és Axethrowerek);
+    hogy mennyire legyen kemény, a végső balansz nyitott kérdése (9. fejezet, „Nyitott
+    kérdések M6b-re”).
 
 **Loot Goblin** (ritka, különleges ellenség)
 
@@ -1765,8 +1766,9 @@ változnak. Közös szabályok:
   (nyugodt bossnál átlátszó), így a keret nem ugrik meg, amikor a boss dühöngeni kezd.
 - **Boss HP:** `alap HP × az adott hullám szokásos ellenség-HP-szorzója × (1 + k × (játékosok −
   1))`, ahol a co-op szorzó a boss saját szorzója (9. fejezet), nem a normál +20% játékosonként:
-  **Morvain k = 0,75** (×1 / ×1,75 / ×2,5 / ×3,25), **Vor'thalax k = 2,0** (×1 / ×3 / ×5 / ×7; a
-  csapat sebzése gyorsabban nő a létszámnál: itemek, Artifactok, fókusz).
+  **k = 0,75** mindkét bossnál (×1 / ×1,75 / ×2,5 / ×3,25 1–4 játékosnál). A `k` bossonként
+  állítható adat; hogy a csapat sebzése gyorsabban nő-e a létszámnál (itemek, Artifactok,
+  fókusz), a végső balansz kérdése (9. fejezet).
 - **Boss sebzés:** `alap érintéses sebzés × az adott hullám szokásos sebzés-szorzója × a
   csapatlétszám-sebzésszorzó` (9. fejezet). Az alábbi „N× érintéses” az így kapott érintéses
   sebzés N-szerese.
@@ -1803,7 +1805,7 @@ változnak. Közös szabályok:
 elitek is kétszer annyian jönnek (lásd „Elitek”).
 
 **25. hullám – Vor'thalax, the Burning Tyrant** (démon, végső boss; alap HP 450, érintéses
-sebzés 1,5)
+sebzés 4)
 
 - **Kinézet:** szarvas démon, izzó tűzfény.
 - **Fire Fields** – 8 mp-enként 2 égő folt (2 m sugarú) jelenik meg a hősök pozícióján; 1 mp
@@ -1817,15 +1819,13 @@ sebzés 1,5)
 - **Imp Swarm** – 20 mp-enként 6 Candlekin („imp”) érkezik.
 - **2. fázis** 50% HP-nál: a Fire Fields 3 foltot hoz, a Meteor 10 mp-enként jön.
 - **Győzelem:** Vor'thalax halála a 25. hullámon a menet győzelme – nem az időzítő lejárta.
-- **Alap HP 450, érintés 1,5, k = 2:** a korábbi 1200-as alap HP elírás volt: a természetes
-  (nem szintre állított) botok 210 mp alatt a HP-nak csak a 33–62%-át vitték le vele (38–67% maradt). A 25.
-  hullámon a hősök 60–110 HP-júak és az ellenség-sebzés ×45, ezért a boss minden területi
-  támadása és érintése egy lövésre megöli a törékeny hőst; ezért a boss érintéses sebzése 1,5
-  (eredetileg 4), és a HP-ja a létszámmal meredekebben nő, mint Morvainé (k = 2: a csapat
-  sebzése gyorsabban nő a létszámnál).
-- **Mért (botok) kill-idők:** 4 fő 36–102 s (medián 80 s), 2 fő 43–108 s, 1 fő a Rogue 9–20 s,
-  a Mage 64 s, a Paladin nem győzi le (DPS < 1k/s a bossra). A harc ideje erősen kaszt-függő
-  (a bot-csapat DPS-e a bossra 0,8k–23k/s): a végső balansz az M6b-é (9. fejezet).
+- **Alap HP 450:** a korábbi 1200-as alap HP elírás volt: a természetes (nem szintre állított)
+  botok 210 mp alatt a HP-nak csak a 33–62%-át vitték le vele (38–67% maradt). Az érintéses
+  sebzés 4, a HP a létszámmal ugyanúgy nő, mint Morvainé (k = 0,75).
+- **A harc hossza nyitott kérdés:** a kill-idő létszámtól és kasztoktól erősen függ (a csapat
+  sebzése gyorsabban nő a létszámnál, mint a boss HP-ja, és a bot-csapat DPS-e a bossra
+  kasztonként nagyon eltér), és a boss minden területi támadása és érintése a késői
+  hullámok sebzés-szorzójával érkezik. A végső balansz az M6b-é (9. fejezet).
 
 ---
 
@@ -1860,8 +1860,8 @@ sebzés 1,5)
   - +60% ellenségszám,
   - +20% ellenség-HP,
   - a boss HP-ja ×(1 + k × (játékosok − 1)) – ez a boss saját szorzója, a normál +20%
-    helyett (Morvain k = 0,75, Vor'thalax k = 2; az alap boss-HP-t és a sebzést a 8. fejezet
-    adja),
+    helyett (mindkét bossnál k = 0,75: ×1 / ×1,75 / ×2,5 / ×3,25; az alap boss-HP-t és a
+    sebzést a 8. fejezet adja),
   - az Artifact normál ölésből eső esélye osztva a játékosszámmal (5.5), mert az ölések
     száma a csapattal nő.
 - **Spawn-ráta:** `(0,9 + 0,08 × (h − 1))` ellenség / mp egy játékosra, co-opban szorozva az
@@ -1882,47 +1882,43 @@ sebzés 1,5)
     esett el, az első elesések a 5–22. hullámon, a 20–25. hullámon erős a nyomás. 2 fő: 6
     próbából 5 végigért, 1 a 23. hullámon esett el. 1 fő: 13 próbából 6 végigért, a többi a
     8–24. hullámon halt meg.
-  - **M6a mérés (botok, 25 hullám, 19 futás: 4 fő 5 seed, 2 fő 5, 1 fő 9; a golem
-    puhítása és a Vor'thalax-hangolás után):**
-    - 4 fő: **5-ből 4 végigért** (a vesztes a végső boss ellen bukott, 166 mp-nél, 29% HP
-      maradt rajta). Az első elesések a 8–18. hullámon; a 15–19. hullámon menetenként átlag 2,8
-      (7,0 volt a golem puhítása előtt), a 20–24. hullámon 3–21. A 20. hullám kiugrik (5,4
-      elesés / menet a 20.-on, 0,8 a 19.-en és a 21.-en).
-    - 2 fő: **5-ből 3 végigért** (1 volt); a golem puhítása előtt 5-ből 2 duó a 14. hullámon
-      halt meg. A vesztesek: 1 a 20. hullámon, 1 a végső boss ellen.
-    - 1 fő: a medián halálhullám 25 (24 volt); 9-ből 2 valódi győzelem (mindkettő Rogue), 2
-      Paladin-menet él a bossal, de nem tudja megölni (smoke-biztosíték 210 mp-nél), a halálok a
-      7., 20., 22., 23. és 25. hullám. Az egyedüli hős első elesése a menet vége, ezért az
-      egyes seedek nagyon zajosak.
-    - **Morvain** (a hangolás nem érintette): medián kill-idő 63 s (4 fő), 55 s (2 fő), 59 s
-      (1 fő). **Vor'thalax:** lásd 8. fejezet.
-    - A golem aránya a kapott sebzésből a 10. hullámtól 38% → 27%; az Axethrower lett a
-      legnagyobb egyedi forrás a legtöbb 4 fős menetben.
-    - A késői kassza: a 4 fős menetekben az utolsó piacon 150–320 gold marad (az M6a előtt
-      2000 fölött), a szóló és duó menetekben a szórás nagy (50–4 800 gold).
-    - Egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a smoke-biztosíték ölte meg):
-      a mátrix olvasásakor a „TIMEOUT” sorokat külön kell számolni.
-  - **Nyitott kérdések M6b-re:**
-    - A hősök HP-ja a 25. hullámon 60–110, az ellenség-sebzés ×45: a végső boss, a 20. hullám
-      és a golem horga a Mage-et és a Rogue-ot minden szorzótól függetlenül egy lövéssel öli.
-      A hős-HP és az ellenség-sebzési görbe viszonya (egy hős-HP-növekedési tag szintenként
-      vagy Item Level-enként) a végső balansz feladata.
-    - A Vor'thalax-harc osztályfüggő (a bot-csapat DPS-e a bossra 0,8k–23k/s: a Paladin / Warrior
-      bot csak nagyon lassan sebzi); a 4 fős medián (80 s) a 90–180 s-os cél alatt van. Lehetséges
-      lépés: a 4 fős szorzó ×7 → ×8–9 (k = 2,4), de a gyengébb csapatok már a határon vannak.
-    - A duók és a szóló hősök 10–19. hullámai szinte elesés nélkül telnek (a golem puhítása
-      óta), a duó nem tud éleszteni (az 5 duóból 2 elbukott); a csapatlétszám-sebzésszorzóhoz
-      (fent) szándékosan nem nyúltunk.
-    - A számok a `4aa2c3e` + a balansz-commitok állapotán mértek: az Artifact-kínálat osztása
-      (5.5) és az Artifactot viselő bot Enchanter-szabálya (5.7) a késői erőt módosítja, ezért a
-      4 és 2 fős mátrixot az összefésült fejen újra kell futtatni (kevesebb Artifact kevesebb
-      késői fegyversebzést jelent).
-    - Egy adat-módosítás is átrendezi az RNG-t (egy szóló Mage a 24. helyett a 20. hullámon
-      halt meg): az egyes seedek párjai zajosak, a következtetések az összesítésre épülnek.
-    - A kasztok közti szórás a végleges 25 hullámos balansz (**M6b**, 16. fejezet) feladata:
-      egyedül a Warrior a 7., 22. és 23. hullámon halt meg, a Rogue mindkét seeden végigért.
-      A késői kasszát az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market; 16.1)
-      célozták.
+- **Nehézség az M6a után:** az M6a tartalma (a három új ellenség, a 20. hullám elit-hulláma,
+  Morvain és Vor'thalax) a játékot az M5-nél **nehezebbé tette**. Ezt szándékosan nem
+  hangoltuk újra: a hullám- és sebzés-görbe, a csapatlétszám-szorzó és az új ellenségek,
+  bossok kiinduló számai változatlanok. A végleges 25 hullámos balansz **egyszer, az M6b
+  végén** készül (16. fejezet), az összes M6b-s tartalommal (item-csomagok, módok, események)
+  együtt, hogy ne kétszer kelljen hangolni.
+  - **Nyitott kérdések M6b-re** (az ismert nyomáspontok; számszerű célok és mérések a
+    végső balanszban készülnek):
+    - **Flesh Golem sebzése:** az érintéses sebzése (4) és a horog (1×) a bot-futásokban a
+      kapott sebzés nagy részét adja a 12. hullámtól, a spawnolt ellenségek kis részéből.
+    - **A 20. hullám (elit-hullám):** minden ellenség elit-affixet kap (golemek
+      Shielding / Vampiric affixszel, Enraged / Frenzied Axethrowerek); a három természetes
+      bot-futás közül kettő (a 4 fős és a szóló) ezen a hullámon halt meg.
+    - **Vor'thalax kill-ideje létszám szerint:** a boss HP-ja ×(1 + 0,75 (játékosok − 1)),
+      de a csapat sebzése gyorsabban nő a létszámnál (itemek, Artifactok, fókusz), ezért a
+      harc hossza létszámonként és kasztonként erősen eltér (a bot-csapat DPS-e a bossra
+      kasztonként nagyon különböző). A `k`, az alap HP és a boss sebzése a hangolható
+      kar; a hős-HP és az ellenség-sebzés viszonya is ide tartozik (a 25. hullámon az
+      ellenség-sebzés ×45, a hősök HP-ja ennél lassabban nő: egy boss-támadás vagy a golem
+      horga a törékeny hőst – Mage, Rogue – egy lövéssel ölheti; egy hős-HP-növekedési tag
+      szintenként vagy Item Level-enként a lehetséges megoldás).
+    - **Szóló és duó túlélés:** egyedül az első elesés vereség, a duó pedig nem tud
+      éleszteni, ha mindkét hős elesik (a természetes futásokban a duó a 14. hullámon,
+      a szóló hős a 20. hullámon halt meg); a csapatlétszám-sebzésszorzóhoz (fent) ezért
+      a végső balansz nyúlhat.
+    - **Artifact-kínálat:** a normál ölés esélye osztva a játékosszámmal (5.5), a várt szám
+      számított érték; a 4 és 2 fős futásokat az összefésült fejen még nem mértük le, és az
+      Artifactokat viselő bot Enchanter-szabálya (5.7) is a késői erőt módosítja (kevesebb
+      Artifact kevesebb késői fegyversebzést jelent).
+    - **A kasztok közti szórás:** a bossra mért sebzésben és a túlélésben is nagy; a végső
+      balansz feladata.
+    - **A késői kassza:** az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market;
+      16.1) célozták; hogy elég jól elviszik-e a goldot, a végső balanszban dől el.
+    - **Módszertan:** egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a
+      smoke-biztosíték 210 mp-nél megöli): a mátrix olvasásakor a „TIMEOUT” sorokat külön kell
+      számolni. Egy adat-módosítás is átrendezi az RNG-t, ezért az egyes seedek párjai
+      zajosak, a következtetések az összesítésre épülnek.
 
 - **Teljesítménycél:** egyszerre legfeljebb ~150 ellenség a képernyőn (szükség esetén LOD és
   egyszerűsített animáció).
