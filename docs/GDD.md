@@ -1718,6 +1718,7 @@ nagy részét adja, ezért a végső balansz nyitott kérdése (9. fejezet, „N
     igazi eliteké). Nem számít elitnek: a Slayer és az Execute elit-prioritása nem hat rájuk.
   - Az igazi elitek (3× HP, elit-jutalom) várható száma ezen a hullámon a **kétszeres**.
   - Nincs boss, és Loot Goblin sem jön (lásd lent).
+  - **Endless módban** (M6b) ez a szabály a **33., 43., 53. …** hullámon ismétlődik (16.1).
   - A botoknak a 20. hullám kiugró nyomást jelent (az elit-affixes golemek és Axethrowerek);
     hogy mennyire legyen kemény, a végső balansz nyitott kérdése (9. fejezet, „Nyitott
     kérdések M6b-re”).
@@ -1763,9 +1764,29 @@ nagy részét adja, ezért a végső balansz nyitott kérdése (9. fejezet, „N
 - **Co-op:** a csapatnak össze kell hangolnia, hogy körbezárják (pl. Frost Nova,
   Hammer of Justice, Charge, Blizzard lassítása).
 
+**Esemény-ellenségek és -célpontok** (M6b)
+
+A hullám közbeni események (16.1) szereplői. A számok kiinduló értékek (nincs hangolás); a
+„grunt HP” a Skeleton Grunt HP-ja az adott hullámon (a szokásos hullám-növekedéssel, 9.
+fejezet).
+
+- **Guarded Chest – őrök:** 4 őr a láda körül, az adott hullámon jogosult ellenségtípusok
+  közül, **×2 HP**-val és **affix nélkül**.
+- **Defend the Totem – totem:** szövetséges célpont. HP-ja **30 × grunt HP** a csapatméret
+  szerinti HP-szorzóval (9. fejezet). A **8 m-en belüli** ellenségek a hősök helyett a totemre
+  támadnak.
+- **Goblin Caravan – kordé:** HP-ja **40 × grunt HP**; 3 őr kíséri, és ~25 mp alatt átkel az
+  arénán a szélétől a széléig. Megölve gold-özönt és egy Rare itemet dob (10.1); a túloldalon
+  elszökik („*The caravan got away*”).
+- **Kamera és botok:** a kamera az esemény célpontját is képen tartja. A botok az őrökkel
+  normálisan harcolnak, kinyitják a ládát, a totem 6 m-es körzetében maradnak, és a kordét
+  üldözik, ha nincs ellenség a közelben.
+- **Dungeon Warden:** lásd a Bossok alatt.
+
 **Bossok** (M6a)
 
-Boss-hullám a **10.** és a **25.** hullám. A számok kiinduló értékek, a balanszolás során
+Boss-hullám a **10.** és a **25.** hullám (M6b: Endless módban a 30.-tól minden 5. hullám is,
+lásd a „Győzelem” pontot és a 16.1-et). A számok kiinduló értékek, a balanszolás során
 változnak. Közös szabályok:
 
 - **A boss az időzítő helyett:** a hullám a **boss halálával ér véget** (nincs időkorlát). A
@@ -1810,11 +1831,19 @@ változnak. Közös szabályok:
   sebzésébe.
 - **Győzelem:** Vor'thalax halála a 25. hullámon: „Victory!” szalag, 1,6 mp, majd a győzelmi
   képernyő. A másik boss-hullám végén a szalag „<Boss neve> defeated!”.
+  - **Endless módban** (M6b) Vor'thalax halála nem zárja le a menetet: „*Endless begins!*”
+    szalag, és jön a 26. hullám.
+  - Endlessben a **30. hullámtól minden 5. hullám** boss-hullám: **Morvain** a 30., 40., …,
+    **Vor'thalax** a 35., 45., … hullámon, ugyanazokkal a képességekkel és szabályokkal,
+    a szokásos hullám-skálázással. A menet itt csak vereséggel ér véget.
 - **Veszélyzónák és a botok:** a boss köreit, kúpját, mezőit, meteorjait és a Plague Ghoul
   tócsáját a botok veszélyzónának tekintik: a sugarán + 0,9 m-en belül kifelé tolják magukat
   (a közepéből a pálya közepe felé; ártalmatlan vagy lejárt zóna nem tol). A Meteor körébe a
   bot-csapat beáll (a sebzés megoszlik), a magányos hős kilép belőle (4× kap 8× helyett). A
   hullám vége minden ellenség-veszélyzónát eltüntet.
+  - **M6b:** az aréna-környezetek veszélyei (Grasping Hands, lápfoltok, lávakürtők, Falling
+    Icicles; 16.1) is ellenség-veszélyzónák: a botok kikerülik őket, és a hullám vége
+    eltünteti őket.
 - **Fejlesztői biztosíték (csak `--smoke`):** ha egy boss a saját enrage-e után 120 mp-pel még
   él (tehát 210 mp-nél), meghal („SMOKE boss timeout” sor), hogy a futás mindig véget érjen.
   Egy lezárt smoke-futás tehát nem bizonyítja, hogy a boss legyőzhető.
@@ -1856,12 +1885,26 @@ sebzés 4)
   kasztonként nagyon eltér), és a boss minden területi támadása és érintése a késői
   hullámok sebzés-szorzójával érkezik. A végső balansz az M6b-é (9. fejezet).
 
+**Dungeon Warden** (mini-boss, M6b – a Dungeon 4. terme, 16.1)
+
+- **Adat:** `BossData`, **alap HP 120**; a HP a boss-szabályokat követi (a „Boss HP” pont: az
+  adott hullám szokásos ellenség-HP-szorzója, a létszám szerinti boss-szorzó), a kitisztított
+  hullám szerint skálázva.
+- **Képességei** a boss-veszélyekből újrahasznosítottak: **Frost Circles** és **Raise Dead**
+  (Morvain, lásd fent).
+- **Enrage 60 mp-nél** (a boss-hullámok 90 mp-es Enrage-e helyett).
+- A Warden legyőzése zárja a dungeont (siker és jutalom: 16.1, 10.1).
+- A számok kiinduló értékek, az M6b-ben nincs hangolás.
+
 ---
 
 ## 9. Hullámok és skálázás
 
-- **25 hullám**; a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
+- **25 hullám** (Normal mód); a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
   A két boss-hullámot (10., 25.) a boss halála zárja, nem az időzítő (8. fejezet, „Bossok”).
+  - **Endless módban** (M6b) a 26. hullámtól a hullámhossz legfeljebb 210 mp, az ellenségek
+    növekedési képletei (alább) változatlanul folytatódnak; a 30.-tól minden 5. hullám
+    boss-hullám, a 33., 43., … hullám elit-hullám (1. fejezet, 16.1).
 
 - **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
   - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
@@ -1917,6 +1960,12 @@ sebzés 4)
   bossok kiinduló számai változatlanok. A végleges 25 hullámos balansz **egyszer, az M6b
   végén** készül (16. fejezet), az összes M6b-s tartalommal (item-csomagok, módok, események)
   együtt, hogy ne kétszer kelljen hangolni.
+  - **Az M6b nem hangol:** egyik csomagja sem (módok, környezeti veszélyek, események,
+    szentélyek, Dungeon, item-tartalom) módosítja a hullám- és sebzés-görbét, a
+    csapatlétszám-szorzót vagy a meglévő tartalom számait; ahol egy csomag új értéket ír elő
+    (pl. az Epic fegyverek +10% támadási sebessége, 4.1), azt a megfelelő fejezet rögzíti. Az
+    új elemek számai (16.1, 8. fejezet) kiinduló értékek; a végső balansz mindet **egyszer, a
+    legvégén** hangolja, a lenti nyitott pontokkal együtt.
   - **Nyitott kérdések M6b-re** (az ismert nyomáspontok; számszerű célok és mérések a
     végső balanszban készülnek):
     - **Flesh Golem sebzése:** az érintéses sebzése (4) és a horog (1×) a bot-futásokban a
@@ -1977,6 +2026,11 @@ sebzés 4)
 - **Mi kerül a kasszába:**
   - **Eladás** (a vételár 35%-a).
   - **Gold Find:** annak a játékosnak a Gold Find-ja számít, aki felszedi a goldot.
+  - **M6b – esemény, Dungeon, szentély:** a Guarded Chest (10×), a Goblin Caravan (40×) és a
+    sikeres Dungeon (20×) a **hullám átlagos ellenség-goldjának** többszörösét adja (16.1,
+    10.1); a **Shrine of Greed** +30%-ot ad a felszedett goldra, a **Shrine of Fortune** és
+    a **Shrine of the Gambler** közvetlenül a kasszát változtatja (−25%, illetve ×1,5 / ×0,5);
+    a Dungeon bukása a kassza 50%-át viszi el.
 - **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 8. fejezet.
 
 **Koordinációs eszközök (hogy a közös kassza ne okozzon káoszt)**
@@ -2025,6 +2079,8 @@ sebzés 4)
 **XP**
 
 - **Közös XP-sáv:** az egész csapat egyszerre lép szintet, mindenki kap választást.
+- **M6b:** a sikeres **Defend the Totem** a hullám átlagos ellenség-XP-jének 25-szörösét adja,
+  a **Shrine of Learning** +50% XP-t 3 hullámig (16.1).
 
 **Item-loot:** lásd **10.1** (Need / Greed / Pass).
 
@@ -2081,6 +2137,14 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
 | Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
 | Artifact (ritka) | lásd 5.5: boss 15% (bossonként egyszer), goblin 5%, elit 2%, normál 0,05% ÷ játékosszám – a 10. hullámtól | Artifact |
+| Guarded Chest (M6b esemény) | a láda kinyitásakor 1 (+ 10× átlagos ellenség-gold) | Rare+ |
+| Goblin Caravan (M6b esemény) | a kordé megölésekor 1 (+ 40× átlagos ellenség-gold) | Rare |
+| Dungeon (M6b), sikeres | **játékosonként 1** (+ 50% eséllyel 1 extra tier set-darab a csapat egy kasztjának; + 20× átlagos ellenség-gold) | Epic |
+| Shrine of Fortune (M6b) | **játékosonként 1**, azonnal, ingyen (16.1) | Epic |
+
+Az események itemei a hullám végi Need / Greed / Pass dobásra mennek, mint minden drop; a
+Guarded Chest itemje **a normál drop hullámlimitjén kívül** esik. A Dungeon itemeinek dobása a
+dungeon **után**, még a piac előtt történik.
 
 **A földön**
 
@@ -2453,10 +2517,21 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   A hagyma-hősök és a „komoly” szörnyek közti kontraszt a humor forrása.
 - **UI-téma:** sötét kő és arany keretek, pergamen tooltip, ritkaság-színek a WoW
   konvenciója szerint.
-- **Arénák:** menetenként **5 környezet** egyike, a menet elején sorsolva, a menet végéig
-  megmaradva (16.1): **temető, mocsár, vulkán, jégbarlang, erdei rom**. Mindegyiknek saját
-  veszélyei vannak (tartalom: M6b, látvány: M7). Az MVP-ben egyetlen aréna van: egy erdei
-  tisztás.
+- **Arénák** (M6b): menetenként **5 környezet** egyike, a menet elején sorsolva (a „Rolling the
+  arena…” animációval, 12. fejezet), a menet végéig megmaradva (16.1):
+  - **Forest Ruin** (erdei rom – a mai aréna, veszély nélkül), **Cemetery** (temető),
+    **Swamp** (mocsár), **Volcano** (vulkán), **Ice Cave** (jégbarlang).
+  - Mindegyiknek saját **veszélye** van (Grasping Hands, lápfoltok, lávakürtők, Falling
+    Icicles; a szabályokat a 16.1 táblázata adja).
+  - **Megjelenés:** környezetenként saját paletta (ég, köd, ambient fény, nap, talajszínek,
+    falszín) és saját kellékkészlet, primitívekből építve: sírkövek, száraz fák és kripta;
+    nád, zavaros tavak és mangrove; bazalt és izzó repedések; jégkristályok, hó és oszlopok.
+  - Az aréna **mérete** minden környezetben ugyanaz, a draw-call keret a mai marad (összevont
+    meshek / MultiMesh).
+  - Az M6b a **tartalmat** adja (paletta, kellékek, veszélyek, sorsolás); a végleges látvány
+    (assetek, shaderek, VFX) az M7-ben készül.
+  - A **Dungeon** külön, kis arénája (24 × 14 m) a menet környezetének palettáját használja,
+    környezeti veszély nélkül (16.1).
 
 ---
 
