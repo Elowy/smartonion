@@ -2098,29 +2098,46 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   `LootRollScreen` info row), `compact_artifact()` (an Artifact with `viewer_equipment`: short
   property text, no flavor / "Scales with" / own-class line, `COMPACT_ARTIFACT_SEPARATION` instead of
   `LINE_SEPARATION`, comparison differences in an `HFlowContainer` via `_delta_flow`).
-- `LootRollScreen`: new public `frame`, `tooltip_fit`, `tooltip_room()`; `_fit_tooltip()` (called from
-  `_fill_item`): tooltip widths `TOOLTIP_WIDTHS` (360 / 480 / 600) first, then a scale
-  (`MIN_TOOLTIP_FIT` 0.5); the tooltip sits in a `_tip_box` Control sized to the scaled tooltip inside
-  the `CenterContainer`. **The frame stays below the title block:** `frame_band() -> Vector2` = (top,
-  bottom) in screen pixels, `max(FRAME_TOP_MARGIN, title_block_bottom + FRAME_TITLE_GAP)` to `chips_top -
-  FRAME_CHIPS_GAP` (`TITLE_TOP` 22; the title block is measured from the `_top` vbox, so a subtitle change is
-  picked up); `_centre_middle_row()` (called from `_fit_tooltip`) puts the middle row (queue, frame, log) on the
-  middle of that band, and `tooltip_room()` is the band height minus the measured frame chrome and the
-  two-line result reserve (`RESULT_RESERVE`, plus `BOTTOM_MARGIN`). (`MIDDLE_OFFSET` is gone: the old fixed
-  centre let a tall frame cover the "Loot Roll" title and subtitle.) At 1920x1080 with 4 players the title
-  block ends at y = 136 and the room is about 503 px (was 618); the five Artifact tooltips are 585–676 px tall at
-  their widest width, so they show at a fit of 0.74–0.82 (was 0.91–1.0). Not done: hiding the title while the
-  tooltip is tall (would give a bigger scale).
+- `LootRollScreen`: new public `frame`, `tooltip_fit`, `title_mode`, `tooltip_room()`; `_fit_tooltip()` (called from
+  `_fill_item`); the tooltip sits in a `_tip_box` Control sized to the scaled tooltip inside the `CenterContainer`.
+  The tooltip is fitted in this order, so an ordinary item is never shown smaller because of the title:
+  1. **The title block collapses first.** `enum TitleMode { FULL, COMPACT, HIDDEN }` (`TITLE_MODES` is the order):
+     FULL = "Loot Roll" 60 px (`FULL_TITLE_FONT`) at `TITLE_TOP` 22 plus the subtitle; COMPACT = one line of
+     `COMPACT_TITLE_FONT` 32 at `COMPACT_TITLE_TOP` 8, no subtitle; HIDDEN = nothing. `set_title_mode(mode)` applies
+     it, `title_bottom()` measures the block as shown (from the `_top` vbox, so a subtitle change is picked up).
+  2. **At each title mode the tooltip gets wider** (`TOOLTIP_WIDTHS` 360 / 480 / 600 / 720: fewer wrapped lines; the
+     frame grows with it, 700 px at least). The first (mode, width) whose height fits `tooltip_room()` wins; the mode
+     is only left when none of the four widths fits. `_room_with_title(mode)` evaluates the room for a mode without
+     changing it. Every item starts again from FULL.
+  3. **Scaled last.** Only when even the widest tooltip does not fit with no title the tooltip is scaled to the room
+     (`MIN_TOOLTIP_FIT` 0.5; a window far too small for it overflows instead). A (mode, width) that fitted always
+     means scale exactly 1.0.
+  **The frame stays clear of the title block as shown:** `frame_band() -> Vector2` = (top, bottom) in screen pixels,
+  `max(FRAME_TOP_MARGIN 8, title_bottom() + FRAME_TITLE_GAP 8)` (just `FRAME_TOP_MARGIN` when HIDDEN) to `chips_top -
+  FRAME_CHIPS_GAP`; `_centre_middle_row()` (called from `_fit_tooltip`) puts the middle row (queue, frame, log) on the
+  middle of that band, and `tooltip_room()` is the band height minus the measured frame chrome and the two-line
+  result reserve (`RESULT_RESERVE` 48; the chips' top already includes `BOTTOM_MARGIN` 24). (`MIDDLE_OFFSET` is gone:
+  the old fixed centre let a tall frame cover the "Loot Roll" title and subtitle.) At 1920x1080 with 4 players the
+  full title block ends at y = 136 and the room is about 503 px; the compact line gives about 586 px, no title more.
+  The tallest random Stormcaller roll (612 px) did not fit the compact room at 600 px wide; at 720 it is 550 px, which
+  is why the fourth width exists. Result: ordinary items stay at scale 1.0 (1125 of 1263 measured keep the full title,
+  138 the compact line); the five Artifacts show without a title at 0.991-1.000 (the body text is 20 px x scale,
+  `ItemTooltip.BODY_SIZE`).
 - Smoke log: `RunState.artifact_dropped(item, source: StringName)` (emitted by
   `LootDrops.roll_artifact` on a hit, `ItemGenerator.SOURCE_IDS`); `Main.artifact_lines` (cleared by
   `start_run`), `Main._on_artifact_dropped`, `Main._log_artifacts_held(hero)` (called from
   `open_intermission` after each hero's `end_wave`, i.e. after growth); line builders
   `Artifacts.drop_line` / `Artifacts.held_line`. The last wave of a smoke run has no wave end, so no
   `held` line for it.
-- Tests: `test_m6_artifacts_fit` (roll window layout, Looted tag; `READABLE_FIT` 0.7, `_check_frame` also asserts
-  "frame top >= title block bottom"; `test_the_frame_stays_below_the_title_block_for_every_artifact` (five
-  Artifacts, 4 players), `..._with_a_greed_result` (the two-line result grows the frame both ways), `..._for_a_solo_hero`),
-  `test_m6_artifacts_log` (smoke log),
+- Tests: `test_m6_artifacts_fit` (roll window layout, Looted tag; `READABLE_FIT` 0.85; `_check_frame` asserts the
+  frame is on screen, holds its tooltip, starts below the title block as shown and covers neither the shown title /
+  subtitle nor a player chip; `test_no_ordinary_wave_25_item_is_scaled_or_loses_its_title` (the 63 hand-made items
+  plus 120 generated wave-25 drops: scale exactly 1.0, the title at least as the compact line),
+  `test_the_frame_stays_clear_of_the_title_block_for_every_artifact` (+ `..._with_a_greed_result`, `..._for_a_solo_hero`),
+  `test_an_artifact_is_scaled_only_after_the_title_block_is_gone` (waves 10 and 25: scale >= 0.85, below 1.0 only with
+  the title hidden), `test_the_title_block_collapses_in_steps`, `test_each_title_step_gives_the_tooltip_more_room`,
+  `test_the_next_item_gets_its_own_title_block_and_a_low_screen_scales`; mutation check: `TITLE_MODES` = full only
+  makes 74 checks fail), `test_m6_artifacts_log` (smoke log),
   `test_ui_items_panel.test_artifact_tooltips_fit_the_4_player_panels` (corner panels),
   compact block tests in `test_m6_artifacts_ui`, short text tests in `test_m6_artifacts_core`,
   Shatterfrost data / reach tests in `test_m6_artifacts_props`.
@@ -2608,17 +2625,16 @@ copy or `--boss-hp` was used, which also scales Morvain):
 
 The M6a tests (each new behaviour has a test that fails without it; the new tests were mutation-checked, e.g.
 deleting `and hazard == Vector2.ZERO` in the rescue stand, the `_bots_black_market()` call in `_bots_reroll` or the
-`_damage_source_id` argument fails a test):
+loot roll's title-block collapse (`TITLE_MODES` = full only) fails a test):
 
 | File | Covers |
 |---|---|
 | `tests/test_m6_foundation.gd` | the foundation hooks: Dust wallet, meter recorders and credit, run clock, boss kind of `record_special_kill`, SUPPORT / BRUTE dispatch, death-effect virtual, `BossData`, the Db dirs, `ConsumableData`, the Enchanter tab, the `roll_artifact` wiring, the bot-pass order, the SMOKE keys and the launch flags |
 | `tests/test_m6_enemies.gd`, `test_m6_enemies_player.gd` | the three enemies' data, the puddle, the Acolyte (distance, heal / shield, interruptions, priority target, never heals a boss), the golem's hook, `take_hook` / `pull_toward` on real heroes, the bots' hook dodge per golem |
 | `tests/test_m6_bosses.gd` | boss data and rules, the scheduler, the hazards, rewards, director boss waves, smoke safety, elite wave 20 / lite affix, the HUD frame, the bots' hazard steering, Main's boss flow and victory; `test_visuals_camera.gd`: boss framing |
-| `tests/test_m6_artifacts_core.gd`, `_props.gd`, `_ui.gd`, `_fit.gd`, `_log.gd` | the five Artifacts: data and validation, growth / awakening, the pair rule, drops (one roll per kill; `test_chances_by_source_and_fortune` for the 2-player run, `test_normal_kill_chance_is_divided_by_the_party_size` for 1-4 players), Need / Greed, the ten properties on real heroes, tooltips, the loot roll window fit (`READABLE_FIT` 0.7; the frame below the title block for every Artifact, with a two-line Greed result and for a solo hero), the corner-panel fit, the smoke log |
+| `tests/test_m6_artifacts_core.gd`, `_props.gd`, `_ui.gd`, `_fit.gd`, `_log.gd` | the five Artifacts: data and validation, growth / awakening, the pair rule, drops (one roll per kill; `test_chances_by_source_and_fortune` for the 2-player run, `test_normal_kill_chance_is_divided_by_the_party_size` for 1-4 players), Need / Greed, the ten properties on real heroes, tooltips, the loot roll window fit (`READABLE_FIT` 0.85: ordinary wave-25 items at scale 1.0, Artifacts >= 0.85 with the title hidden, the title block collapsing in steps and starting again with the next item, the frame clear of the shown title and the chips, with a two-line Greed result and for a solo hero), the corner-panel fit, the smoke log |
 | `tests/test_enchanter.gd`, `test_ui_enchanter.gd`, `test_loot_roll.gd`, `test_ui_market_loot.gd` | ranks I-V, Dust, Disenchant, prices, Reroll / Empower / Imbue, the tab, the hold rule, the purse board Dust, the loot roll Pass -> Dust and the B prompts, the bots' Enchanter pass |
 | `tests/test_m6_shopsinks_core.gd`, `_ui.gd` | the seven consumables, the stall row and the Black Market (side rng, prices, set pieces), the layout at 1920x1080 and 1280x720, the bots |
 | `tests/test_m6_meter.gd`, `_credit.gd`, `_ui.gd` | the recorders, the caster credit at every heal / shield / revive call site through the real code, the end screen, the awards, the run card |
 | `tests/test_m6_followup.gd` | the follow-up fixes: the market header names no seconds before a boss wave (waves 10 and 25, the other waves keep their line, the open market screen), `Enchanter.best_weapon` skipping Artifacts and `bot_target` (the weapon, else the best Epic+ armour / off-hand; the Fangs pair counts as two Artifacts; a bot holding an Artifact enchants its armour; a bot with a normal weapon still enchants the weapon first), the rescue stand beside a downed teammate (`test_a_bot_beside_a_downed_teammate_*`: stands still without a hazard, leaves a puddle / a boss circle it stands in, ignores a far one), a bot reroll that redraws an affordable Black Market upgrade buys it |
-| `tests/test_m6_balance.gd` | 7 tests: `record_damage_taken` keeps source and wave, `start_run` clears it, a hit on a hero is booked under the golem / `environment`, the `taken_by_source` format, the golem pins (contact 2.5, hook still 1 x, a duo's wave-14 hit < 16 raw), the Vor'thalax pins (contact 1.5, k = 2, x1 / x3 / x5 / x7, Morvain unchanged, a duo's meteor share < 170 raw), `Main.heroes_defence_text`; `test_m6_enemies.gd` (golem contact) and `test_m6_bosses.gd` (Vor'thalax contact) were updated |
 | `tests/test_m6_integration.gd` | the "Cross-system contracts" above: the puddle as a bot hazard and `WaveDirector.stop()`, the Acolyte beside a real boss, a boss kill in the meter, one Artifact roll per boss, Dawn's Embrace credit, consumable / Black Market / enchant spends in the purse board, Artifacts never sold / disenchanted / enchanted / dusted, the Enchanter tab greying them |
