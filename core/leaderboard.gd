@@ -16,8 +16,10 @@ extends RefCounted
 ##   path). [method default_path] is the real file ([member path_override] replaces it in tests).
 ## - A missing file is an empty board. A file that cannot be parsed is moved to "<path>.corrupt" and
 ##   the board starts empty ([member load_error] says so). A file of a NEWER version is never
-##   overwritten: the board is [member read_only] (the entries stay readable but [method save_file]
-##   refuses), so an old build cannot destroy a newer build's data.
+##   overwritten: the board stays empty and read-only ([member read_only]: [method save_file] refuses),
+##   so an old build cannot destroy a newer build's data. Something at the path that cannot be read as
+##   a file (a directory, a file that cannot be opened) is never overwritten either: the same empty,
+##   read-only board, with [member load_error] "unreadable".
 ## - [method record_run] is the one call the game makes at a run's end. It writes nothing while
 ##   [member writes_enabled] is false: tests/run_tests.gd switches it off, and Main skips the call in
 ##   smoke / demo / screenshot runs ([method Main.writes_leaderboard]). A test that wants to exercise
@@ -38,9 +40,9 @@ static var path_override := ""
 var path := ""
 ## Category key -> Array[Dictionary] of entries, best first (at most MAX_ENTRIES each).
 var categories: Dictionary = {}
-## "" = loaded fine (or no file); else why the file was not used: "corrupt" or "newer version".
+## "" = loaded fine (or no file); else why the file was not used: "corrupt", "newer version" or "unreadable".
 var load_error := ""
-## The file is of a newer version: [method save_file] refuses.
+## The file is of a newer version, or exists but cannot be read: [method save_file] refuses.
 var read_only := false
 
 
@@ -149,20 +151,21 @@ func add_entry(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party:
 	return at
 
 
-## Reads [member path]. Returns OK for a missing file (an empty board) and for a readable one; an
-## unreadable or corrupt file leaves the board empty, sets [member load_error] and moves the file to
-## "<path>.corrupt"; a newer version leaves the board empty, sets [member read_only] and
-## [member load_error].
+## Reads [member path]. Returns OK for a missing file (an empty board) and for a readable one; a corrupt
+## file leaves the board empty, sets [member load_error] and moves the file to "<path>.corrupt"; a newer
+## version, or a path that exists but cannot be read as a file, leaves the board empty and read-only
+## ([member read_only]) with [member load_error] set ("newer version" / "unreadable").
 func load_file() -> Error:
 	categories = {}
 	load_error = ""
 	read_only = false
+	if DirAccess.dir_exists_absolute(path):
+		return _set_unreadable(ERR_FILE_CANT_OPEN)
 	if not FileAccess.file_exists(path):
 		return OK
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		load_error = "unreadable"
-		return FileAccess.get_open_error()
+		return _set_unreadable(FileAccess.get_open_error())
 	var text := file.get_as_text()
 	file.close()
 	var json := JSON.new()  # (JSON.parse_string would print an engine error for a broken file)
@@ -203,7 +206,8 @@ func save_file() -> Error:
 
 ## The call a finished run makes: loads the board at [method default_path], adds [param entry] to its
 ## category, saves, and returns the entry's rank (-1 = not in the top MAX_ENTRIES, or nothing written:
-## [member writes_enabled] is false, or the file is of a newer version).
+## [member writes_enabled] is false, or the board is [member read_only] (a newer version, or a file that
+## cannot be read).
 static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> int:
 	if not writes_enabled:
 		return -1
@@ -218,6 +222,14 @@ static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, 
 
 
 # --- Internals --------------------------------------------------------------------------------
+
+## An existing board file that cannot be read: nothing is overwritten (the board is read-only).
+func _set_unreadable(err: Error) -> Error:
+	categories = {}
+	read_only = true
+	load_error = "unreadable"
+	return err
+
 
 func _set_corrupt() -> void:
 	load_error = "corrupt"

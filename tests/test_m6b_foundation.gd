@@ -146,7 +146,8 @@ func after_each() -> void:
 
 func _remove_board_files() -> void:
 	for path in [TMP_BOARD, TMP_BOARD + ".tmp", TMP_BOARD + ".corrupt"]:
-		if FileAccess.file_exists(path):
+		# (A directory at the board path is removed too: a test makes one to make the file unreadable.)
+		if FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
@@ -1139,6 +1140,25 @@ func test_leaderboard_older_or_odd_files() -> void:
 	check_eq(list[1]["wave"], 2, "then the wave-2 run")
 	check_eq(list[1]["date"], "", "a missing date stays empty (no invented one)")
 	check(not board.categories.has("bad"), "a category that is no list is dropped")
+
+
+func test_an_unreadable_board_file_is_never_overwritten() -> void:
+	# A directory where the board file goes: the path exists but cannot be opened as a file.
+	DirAccess.make_dir_recursive_absolute(TMP_BOARD)
+	var board := Leaderboard.create(TMP_BOARD)
+	board.load_file()
+	check(board.read_only, "an existing file that cannot be opened makes the board read-only")
+	check_eq(board.load_error, "unreadable", "reason")
+	check(board.categories.is_empty(), "the board stays empty")
+	board.add_entry(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1)
+	check_eq(board.save_file(), ERR_FILE_NO_PERMISSION, "saving refuses")
+	check(DirAccess.dir_exists_absolute(TMP_BOARD), "the directory is left alone")
+	check(not FileAccess.file_exists(TMP_BOARD + ".tmp"), "no temporary file was written")
+	Leaderboard.writes_enabled = true
+	Leaderboard.path_override = TMP_BOARD
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1), -1,
+			"record_run writes nothing")
+	check(DirAccess.dir_exists_absolute(TMP_BOARD), "still a directory")
 
 
 func test_leaderboard_corrupt_file_is_set_aside() -> void:
