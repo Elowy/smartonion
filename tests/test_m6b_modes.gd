@@ -309,9 +309,22 @@ func test_the_ghost_hint_names_the_teammate_in_hardcore() -> void:
 	frame._process(0.016)
 	check_eq(frame.hint_label.text, UnitFrame.SICKNESS_HINT % 10, "a sickness countdown would still show first")
 	hero.res_sickness_left = 0.0
-	RunState.hardcore = false  # the same ghost in a normal run: the Spirit Healer's hint
+	frame._process(0.016)
+	check_eq(frame.hint_label.text, UnitFrame.TEAMMATE_HINT, "and the teammate hint is back once it is over")
+
+
+func test_the_ghost_hint_names_the_spirit_healer_in_a_normal_run() -> void:
+	_run_with_bots(2)
+	check(main.arena.spirit_healer != null and not RunState.hardcore, "a normal run has its Spirit Healer")
+	var hero := main.players[0]
+	hero.take_damage(1.0e6, CombatMath.KIND_MELEE, null)
+	check(hero.downed, "downed")
+	var frame := UnitFrame.create(0)
+	_add(frame)
+	frame.bind(hero)
 	frame._process(0.016)
 	check("Spirit Healer" in frame.hint_label.text, "normal run: %s" % frame.hint_label.text)
+	check(frame.hint_label.text != UnitFrame.TEAMMATE_HINT, "not the teammate hint")
 
 
 func test_a_downed_hero_comes_back_at_the_next_wave_start_in_hardcore() -> void:
