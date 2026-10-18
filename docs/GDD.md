@@ -2202,13 +2202,19 @@ indulnak.
 - **Játékos-chipek:** alul 1–4 chip a játékosok színével. Mindegyiken látszik az upgrade-nyíl,
   a döntés állapota (pipa), majd a végén a dobás eredménye (kocka, érme vagy Pass ikon és a szám).
 - **Jobb oldal:** üzenetsor a dobásokról, és egy „Items: 2 / 5” számláló.
-- **Az item-keret** (és a tooltipje) mindig a „Loot Roll” cím és az alcíme alatt marad, a
-  játékos-chipek felett. Egy magas tooltip (minden Artifact) ezért kisebb léptékben látszik: a
-  legmagasabb Artifact, a Skull of the Damned ≈ 0,74-szeres, a többi ≈ 0,78–0,82 méretben
-  (1920×1080-on ≈ 13 px törzsszöveg). A tooltip először **szélesebb** lesz (360 → 480 → 600 px,
-  kevesebb töréssort ad), és csak ha ez sem elég, kicsinyedik (legfeljebb 0,5-ig). Egy kétsoros
-  Greed-eredménysor helye (48 px) mindig le van foglalva, így az eredménysor nem csúszik a
-  chipek alá. A hétköznapi itemek tooltipje változatlan.
+- **Az item-keret** (és a tooltipje) a játékos-chipek felett marad, és nem takarja a „Loot
+  Roll” címet, amennyire az látszik. A hétköznapi itemek (egyedi itemek, set-darabok, a 25.
+  hullám véletlen dropjai) tooltipje ezért mindig **1,0-s léptékben** látszik: ha magas, a
+  hely először a **cím-blokkból** jön, lépésenként (teljes cím alcímmel → egy kompakt, kisebb
+  betűs sor alcím nélkül → nincs cím), és minden lépésnél a tooltip előbb **szélesebb** lesz
+  (360 → 480 → 600 → 720 px, kevesebb töréssort ad; a keret vele nő). Csak ha a legszélesebb
+  tooltip sem fér el cím nélkül, kicsinyedik (legfeljebb 0,5-ig; kisebb ablakon ez
+  előfordulhat). Minden item újra a teljes cím-blokkal indul.
+  - Az Artifact tooltipje (két tulajdonság-blokk) a legmagasabb: cím nélkül látszik, 1920×1080-on
+    négy játékosnál mind az öt ≈ 0,99–1,0-s léptékben (a legalacsonyabb a Skull of the Damned,
+    0,99). A törzsszöveg 20 px × lépték; a tesztelt alsó határ 0,85 (≈ 17 px).
+  - Egy kétsoros Greed-eredménysor helye (48 px) mindig le van foglalva, így az eredménysor
+    nem csúszik a chipek alá.
 - Az Artifacton nincs zöld „Looted” felirat (nincs Looted +6 Item Level), a loot roll tooltipje
   (nincs néző hős) a teljes szöveget mutatja.
 
