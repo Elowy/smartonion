@@ -357,15 +357,22 @@ static func _sanitize(raw: Dictionary) -> Dictionary:
 
 
 ## Sorts [param list] best first, keeping the file's order among equal entries (an equal older entry stays
-## above a newer one, as [method add_entry] put them; Array.sort_custom is not stable).
+## above a newer one, as [method add_entry] put them). Each entry is paired with its index in the file and the
+## index breaks every tie, so the order is total: Array.sort_custom (not stable by itself) gives the stable
+## result in O(n log n) whatever the file holds.
 static func _sort_best_first(list: Array[Dictionary], p_mode: StringName) -> void:
-	for i in range(1, list.size()):
-		var e := list[i]
-		var j := i - 1
-		while j >= 0 and better(e, list[j], p_mode):
-			list[j + 1] = list[j]
-			j -= 1
-		list[j + 1] = e
+	var pairs: Array[Dictionary] = []
+	for i in list.size():
+		pairs.append({"entry": list[i], "index": i})
+	pairs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if better(a["entry"], b["entry"], p_mode):
+			return true
+		if better(b["entry"], a["entry"], p_mode):
+			return false
+		return int(a["index"]) < int(b["index"]))
+	for i in pairs.size():
+		var e: Dictionary = pairs[i]["entry"]
+		list[i] = e
 
 
 ## [param e] with exactly the entry fields and their types (missing ones get neutral values; the date

@@ -527,6 +527,55 @@ func test_equal_entries_keep_the_files_order_when_loaded() -> void:
 	check_eq(dates, ["2026-10-04", "2026-10-01", "2026-10-02", "2026-10-03"] as Array[String], "the best first, equal ones as stored")
 
 
+func test_forty_equal_entries_keep_the_files_order() -> void:
+	var entries: Array = []
+	for i in 40:
+		entries.append(_entry(20, 600.0, false, "2026-10-%02d 10:00:00" % (i + 1)))
+	_write_board(entries)
+	var board := Leaderboard.create(TMP_BOARD)
+	board.load_file()
+	var dates: Array[String] = []
+	for e in board.entries_for(RunState.MODE_ENDLESS, false, 2):
+		dates.append(Leaderboard.date_text(e))
+	var expected: Array[String] = []
+	for i in Leaderboard.MAX_ENTRIES:
+		expected.append("2026-10-%02d" % (i + 1))
+	check_eq(dates, expected, "the first ten of the file, in the file's order")
+
+
+func test_equal_entries_inside_a_mixed_file_keep_the_files_order() -> void:
+	# Two waves interleaved: an unstable sort would shuffle the equal ones of each wave.
+	var entries: Array = []
+	for i in 60:
+		entries.append(_entry(20 + i % 2, 600.0, false, "2026-10-%02d 10:00:00" % (i + 1)))
+	_write_board(entries)
+	var board := Leaderboard.create(TMP_BOARD)
+	board.load_file()
+	var dates: Array[String] = []
+	for e in board.entries_for(RunState.MODE_ENDLESS, false, 2):
+		dates.append(Leaderboard.date_text(e))
+	check_eq(dates, ["2026-10-02", "2026-10-04", "2026-10-06", "2026-10-08", "2026-10-10",
+			"2026-10-12", "2026-10-14", "2026-10-16", "2026-10-18", "2026-10-20"] as Array[String],
+			"the wave 21 entries first (odd positions in the file), each group in the file's order")
+
+
+func test_a_file_of_three_thousand_entries_loads_well_under_a_second() -> void:
+	var entries: Array = []
+	for i in 3000:
+		entries.append(_entry((i * 7) % 40 + 1, float((i * 37) % 1000), false, "2026-10-01 12:%02d:00" % (i % 60)))
+	_write_board(entries)
+	var board := Leaderboard.create(TMP_BOARD)
+	var started := Time.get_ticks_usec()
+	board.load_file()
+	var ms := (Time.get_ticks_usec() - started) / 1000.0
+	check(ms < 1000.0, "loaded in %.0f ms" % ms)
+	var list := board.entries_for(RunState.MODE_ENDLESS, false, 2)
+	check_eq(list.size(), Leaderboard.MAX_ENTRIES, "cut to the top ten")
+	check_eq(int(list[0]["wave"]), 40, "the best wave first")
+	for k in range(1, list.size()):
+		check(not Leaderboard.better(list[k], list[k - 1], RunState.MODE_ENDLESS), "best first at place %d" % (k + 1))
+
+
 func test_a_later_wave_and_a_longer_time_rank_higher_when_the_party_fell() -> void:
 	# Endless: the later wave first, then the LONGER time held out on it.
 	check(Leaderboard.better(_entry(34, 100.0), _entry(33, 2000.0), RunState.MODE_ENDLESS), "a later wave beats a longer time")
