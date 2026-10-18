@@ -1,13 +1,26 @@
 class_name FallingIcicle
 extends ArenaHazard
-## The Ice Cave's Falling Icicles (GDD 16.1): a pale blue circle (radius 1.2) appears near a hero and
+## The Ice Cave's Falling Icicles (GDD 16.1): a deep blue circle (radius 1.2) appears near a hero and
 ## fills up for the telegraph time (1 s); in its last moments an icicle drops out of the ceiling and
 ## shatters – every hero inside takes [member damage] (1x the Skeleton Grunt's contact damage at the
 ## wave) and is chilled (movement -[member slow_pct] percent for [member slow_time] seconds, a
 ## GeneralBuff on the hero under [constant CHILL_KEY]).
+##
+## The marker is DARK on purpose: the ice floor is pale blue snow, and a pale blue ring on it measured
+## 1.1:1 (nobody saw it). A deep blue band with a dark outline pass ([method Mats.set_ring_stroke]) and a
+## darker, fairly opaque fill keeps [constant ArenaHazard.MIN_MARKER_CONTRAST] on every floor tone.
 
 const CHILL_KEY := &"ice_chill"
+## The shatter's burst and the pale flash after the impact (harmless by then).
 const FROST := Color(0.6, 0.88, 1.0)
+## The telegraph's ring (deep blue) and its fill (a lighter blue, but darker than the snow).
+const MARKER := Color(0.03, 0.13, 0.52)
+const FILL := Color(0.08, 0.28, 0.8)
+## The ring band as a share of the circle's radius, and how much bigger its quad is than the circle, so
+## that the dark outline pass just outside the band fits inside the quad (a quad is clipped at 1.0).
+const BAND_INNER := 0.86
+const BAND_OUTER := 0.985
+const OUTLINE_PAD := 1.12
 ## The icicle starts to fall this long (s) before the impact, from FALL_HEIGHT metres.
 const FALL_TIME := 0.5
 const FALL_HEIGHT := 12.0
@@ -31,17 +44,17 @@ static func spawn(parent: Node, pos: Vector3, p_radius: float, p_telegraph: floa
 	h.damage = p_damage
 	h.slow_pct = p_slow_pct
 	h.slow_time = p_slow_time
-	h.color = FROST
+	h.color = MARKER
 	h.tally = p_tally
 	place(parent, h, pos)
 	return h
 
 
 func _build() -> void:
-	_outline = _ring("Outline", radius * 2.0)
+	_outline = _ring("Outline", radius * 2.0 * OUTLINE_PAD)
 	_fill = _ring("Fill", radius * 2.0)
-	Mats.set_ring(_outline, FROST, 0.9, 0.985, 0.12)
-	Mats.set_ring(_fill, FROST.lerp(Color.WHITE, 0.4), 0.96, 1.0, 0.4)
+	_set_outline(1.0, 0.12, 1.0)
+	Mats.set_ring(_fill, FILL, 0.96, 1.0, 0.5)
 	_spike = MeshInstance3D.new()
 	_spike.name = "Icicle"
 	_spike.mesh = MeshKit.cached("hazard:icicle", func() -> Mesh:
@@ -60,8 +73,10 @@ func _build() -> void:
 func _update_telegraph(progress: float) -> void:
 	if _outline == null:
 		return
-	var pulse := 0.75 + 0.25 * sin(age * (6.0 + 14.0 * progress))
-	Mats.set_ring(_outline, Color(FROST.r, FROST.g, FROST.b, pulse), 0.9, 0.985, 0.1 + 0.1 * progress)
+	# (The band pulses between 76% and 100% opaque only: at the half of the other hazards' pulse it washed
+	# out on the snow.)
+	var pulse := 0.88 + 0.12 * sin(age * (6.0 + 14.0 * progress))
+	_set_outline(pulse, 0.12 + 0.1 * progress, 1.0)
 	var d := maxf(0.05, radius * 2.0 * progress)
 	_fill.scale = Vector3(d, 1.0, d)
 	var left := telegraph_time - age
@@ -91,7 +106,15 @@ func fade_time() -> float:
 func _update_fade(amount: float) -> void:
 	if _outline == null:
 		return
-	Mats.set_ring(_outline, Color(FROST.r, FROST.g, FROST.b, amount), 0.9, 0.985, 0.1 * amount)
+	_set_outline(amount, 0.1 * amount, amount)
 	Mats.set_ring(_fill, Color(0.85, 0.96, 1.0, amount), 0.96, 1.0, 0.4 * amount)
 	# The spike stays stuck a while, then sinks.
 	_spike.position.y = lerpf(-0.9, 0.85, clampf(amount * 1.6, 0.0, 1.0))
+
+
+## The outline ring: the deep blue band of [param alpha] with a faint blue tint inside it
+## ([param tint]) and the dark outline / white inner stroke at [param stroke] (0..1).
+func _set_outline(alpha: float, tint: float, stroke: float) -> void:
+	Mats.set_ring(_outline, Color(MARKER.r, MARKER.g, MARKER.b, alpha), BAND_INNER / OUTLINE_PAD,
+			BAND_OUTER / OUTLINE_PAD, tint)
+	Mats.set_ring_stroke(_outline, stroke)

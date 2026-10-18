@@ -52,6 +52,11 @@ static func spawn(parent: Node, pos: Vector3, p_radius: float, p_hero_slow: floa
 	return h
 
 
+## The pool is marked by its bright rim (the mud itself is nearly as dark as the ground).
+func marker_color() -> Color:
+	return MUD_RIM
+
+
 ## Bots steer around the pool, but only mildly (it slows, it does not hurt).
 func hazard_push(from: Vector3, margin: float = BOT_AVOID_MARGIN) -> Vector2:
 	if not is_dangerous():

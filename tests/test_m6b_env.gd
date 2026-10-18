@@ -608,6 +608,94 @@ func test_a_falling_icicle_hurts_and_chills_the_hero_it_lands_on() -> void:
 	check(FallingIcicle.CHILL_KEY != FrostCircle.CHILL_KEY, "separate from Morvain's chill")
 
 
+# --- The markers against their own floors -------------------------------------------------------------
+
+## The ring node that marks a hazard (the Outline of the telegraphing ones, the Rim of a bog pool).
+func _marker_node(h: ArenaHazard) -> MeshInstance3D:
+	var node: Variant = h.get("_outline")
+	if node == null:
+		node = h.get("_rim")
+	return node as MeshInstance3D
+
+
+func _ring_param(node: MeshInstance3D, param: StringName) -> Variant:
+	return (node.material_override as ShaderMaterial).get_shader_parameter(param)
+
+
+## A float ring parameter (0 while the hazard never set it: the shader's default).
+func _ring_float(node: MeshInstance3D, param: StringName) -> float:
+	var v: Variant = _ring_param(node, param)
+	return float(v) if v != null else 0.0
+
+
+func test_the_contrast_ratio_is_the_wcag_one() -> void:
+	check_near(ArenaHazard.contrast_ratio(Color.BLACK, Color.WHITE), 21.0, 0.001, "black on white")
+	check_near(ArenaHazard.contrast_ratio(Color.WHITE, Color.BLACK), 21.0, 0.001, "either way round")
+	check_near(ArenaHazard.contrast_ratio(Color(0.3, 0.6, 0.9), Color(0.3, 0.6, 0.9)), 1.0, 0.0001, "the same colour")
+	check_near(ArenaHazard.contrast_ratio(Color(0.5, 0.5, 0.5), Color.WHITE), 3.98, 0.01, "mid grey on white (sRGB 0.5 is 21% luminance)")
+	check_eq(EnvironmentData.new().floor_colors().size(), 6, "the six ground tones (grass x4, dirt x2)")
+	var ice := _env(&"ice_cave")
+	check(ice.floor_colors().has(ice.grass_light) and ice.floor_colors().has(ice.dirt_dark), "they are the environment's own")
+
+
+func test_every_hazard_marker_stands_out_from_its_own_floor() -> void:
+	_hero(Vector3(2, 0, 0))
+	for id in [&"cemetery", &"swamp", &"volcano", &"ice_cave"]:
+		var env := _env(id)
+		var hz := _hazard_director(id, 5)
+		_step(hz, 4.3)  # (past the first cast of every hazard)
+		var laid := _hazards_of(ArenaHazard)
+		check(not laid.is_empty(), "%s: a hazard is laid" % id)
+		for n in laid:
+			var h := n as ArenaHazard
+			var marker := h.marker_color()
+			var drawn: Color = _ring_param(_marker_node(h), &"ring_color")
+			check(Color(drawn.r, drawn.g, drawn.b).is_equal_approx(Color(marker.r, marker.g, marker.b)), "%s: the marker colour is the one the ring is drawn in" % id)
+			for floor_color in env.floor_colors():
+				var ratio := ArenaHazard.contrast_ratio(marker, floor_color)
+				check(ratio >= ArenaHazard.MIN_MARKER_CONTRAST, "%s: the marker %s against the floor %s is %.2f:1 (needs %.1f)" % [
+						id, marker.to_html(false), floor_color.to_html(false), ratio, ArenaHazard.MIN_MARKER_CONTRAST])
+		hz.director.stop()
+		hz.director.queue_free()
+		for n in laid:
+			if is_instance_valid(n):
+				n.free()
+		EnemyGrid.mark_dirty()
+
+
+func test_the_old_pale_blue_icicle_ring_would_have_failed_that_check() -> void:
+	var ice := _env(&"ice_cave")
+	var worst := INF
+	for floor_color in ice.floor_colors():
+		worst = minf(worst, ArenaHazard.contrast_ratio(FallingIcicle.FROST, floor_color))
+	check(worst < ArenaHazard.MIN_MARKER_CONTRAST, "pale frost on the snow is %.2f:1: the check can fail" % worst)
+
+
+func test_the_icicle_telegraph_keeps_a_dark_outline_and_a_solid_band_all_the_way() -> void:
+	var ic := FallingIcicle.spawn(_entities(), Vector3(6, 0, 6), 1.2, 1.0, 1.0, 30.0, 1.5)
+	var outline := _marker_node(ic)
+	var worst_alpha := 1.0
+	for i in 19:
+		_step(ic, 0.05)
+		if ic.stage != EnemyHazard.Stage.TELEGRAPH:
+			break
+		var drawn: Color = _ring_param(outline, &"ring_color")
+		worst_alpha = minf(worst_alpha, drawn.a)
+		check(_ring_float(outline, &"ring_stroke") >= 1.0, "the dark outline pass is on (t=%.2f)" % ic.age)
+	check(worst_alpha >= 0.75, "the band never goes see-through (min alpha %.2f)" % worst_alpha)
+	var fill: Color = _ring_param(ic._fill, &"ring_color")
+	var shape: Vector4 = _ring_param(ic._fill, &"ring_shape")
+	var floor_luma := 0.0
+	for floor_color in _env(&"ice_cave").floor_colors():
+		floor_luma += floor_color.get_luminance() / 6.0
+	check(fill.get_luminance() < floor_luma * 0.75, "the fill is a darker blue than the snow (%.2f vs %.2f)" % [fill.get_luminance(), floor_luma])
+	check(shape.z >= 0.45, "and fairly opaque (%.2f)" % shape.z)
+	var outline_scale := (outline.scale.x * 0.5) / ic.radius
+	check(outline_scale > 1.0, "the outline quad is bigger than the circle so the dark pass is not clipped")
+	var outline_shape: Vector4 = _ring_param(outline, &"ring_shape")
+	check(outline_shape.y * outline_scale <= 1.0, "the band ends inside the hit circle")
+
+
 # --- Lava vents -----------------------------------------------------------------------------------------
 
 func test_the_six_vents_erupt_in_turn_every_eight_seconds() -> void:

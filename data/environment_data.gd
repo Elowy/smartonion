@@ -66,3 +66,9 @@ extends Resource
 ## True when the environment runs a ground hazard.
 func has_hazard() -> bool:
 	return hazard_id != &""
+
+
+## The colours the arena's ground shader paints (grass and dirt; the road is a dirt tone): what a ground
+## hazard's marker has to stand out from ([method ArenaHazard.marker_color]).
+func floor_colors() -> Array[Color]:
+	return [grass_dark, grass_mid, grass_light, grass_warm, dirt_light, dirt_dark]
