@@ -19,10 +19,11 @@ unique_effect = &"ability_mod"
 unique_params = {
 "ability": "shuriken_toss",
 "mods": {
+"shuriken_add": 1.0,
 "range_add": 3.0
 }
 }
-unique_text = "Equip: Your Shuriken Toss flies 3 m farther."
+unique_text = "Equip: Your Shuriken Toss throws 1 more shuriken and flies 3 m farther."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

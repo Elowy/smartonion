@@ -396,3 +396,28 @@ func test_girdle_of_lasting_grace_shortens_lay_on_hands_at_rank_one() -> void:
 			"Rank I: the cooldown param is 60 - 10")
 	check_near(p.abilities.cooldown_of(ability), before - 10.0, 0.001,
 			"the hero waits 10 sec less")
+
+
+func test_leathers_of_the_unseen_throw_adds_a_shuriken() -> void:
+	# The count is the item's main effect; the 3 m of range is its second key.
+	var p := _fresh_hero(&"rogue")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var item := ItemGenerator.from_unique(Db.get_unique(&"leathers_of_the_unseen_throw"), 5, false, rng,
+			Db.get_class_data(&"rogue"))
+	check(p.equipment.equip(item), "the leathers are worn")
+	var ability := Db.get_ability(&"shuriken_toss")
+	var slot := p.abilities.learn(ability)
+	check(slot >= 0, "Shuriken Toss learned")
+	var at_rank := p.abilities.params_at_rank(ability, 1)
+	check_near(float(at_rank["shuriken"]), 4.0, 0.001, "Rank I: 3 + 1 shuriken")
+	check_near(float(at_rank["range"]), 14.0, 0.001, "Rank I: 11 + 3 m range")
+	Fakes.spawn_enemy(world, Vector3(4, 0, -4))
+	EnemyGrid.mark_dirty()
+	check(p.abilities.try_cast(slot), "cast")
+	var stars := 0
+	for node in tree.get_nodes_in_group(&"projectiles"):
+		var b := node as RogueBlade
+		if b != null and b.attacker == p and not b.is_queued_for_deletion():
+			stars += 1
+	check_eq(stars, 4, "four shuriken are thrown")
