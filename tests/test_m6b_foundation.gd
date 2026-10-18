@@ -11,7 +11,8 @@ const EFakes := preload("res://tests/enemies_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const MarketFakes := preload("res://tests/test_ui_market_fakes.gd")
 const DT := 1.0 / 60.0
-const TMP_BOARD := "user://m6b_foundation_leaderboard.json"
+# One temp board per test process: worktrees share user://, so parallel runs must not share a file.
+var TMP_BOARD := "user://m6b_lb_%d.json" % OS.get_process_id()
 
 
 ## An EventSpawner whose events "exist": it records the starts and the wave ends.
@@ -1040,6 +1041,10 @@ func test_the_break_path_rolls_the_shrine_and_the_portal_before_the_intermission
 
 
 # --- Leaderboard ------------------------------------------------------------------------------
+
+func test_the_temp_board_is_named_per_process() -> void:
+	check_eq(TMP_BOARD, "user://m6b_lb_%d.json" % OS.get_process_id(), "parallel worktrees share user:// and must not share the file")
+
 
 func test_leaderboard_category_keys() -> void:
 	check_eq(Leaderboard.category_key(&"normal", false, 2), "normal/standard/2", "normal")
