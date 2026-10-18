@@ -154,6 +154,23 @@ func test_the_dungeon_layout_is_24_by_14_with_its_own_walls() -> void:
 	check_eq(arena.wall_boxes_for(Arena.SIZE), Arena.wall_boxes(), "the clearing's boxes are unchanged")
 
 
+func test_a_stand_alone_small_arena_has_its_own_bounds_and_walls() -> void:
+	var small := Arena.create(null, false, Arena.DUNGEON_SIZE)
+	world.add_child(small)
+	check_eq(small.get_bounds(), Rect2(-12.0, -7.0, 24.0, 14.0), "the small room's rectangle")
+	check_eq(small.get_decor_rect().size, Arena.DUNGEON_SIZE + Vector2(48, 48), "its decor grows around it")
+	var shapes: Array[CollisionShape3D] = []
+	for c in small.walls.get_children():
+		if c is CollisionShape3D:
+			shapes.append(c)
+	var boxes := Arena.wall_boxes_for(Arena.DUNGEON_SIZE)
+	check_eq(shapes.size(), 4, "four walls")
+	for i in shapes.size():
+		check_eq((shapes[i].shape as BoxShape3D).size, boxes[i].size, "wall %d" % i)
+	check_eq(arena.get_bounds().size, Arena.SIZE, "the other arena is the clearing")
+	check_eq(Arena.create().get_bounds().size, Arena.SIZE, "the default stays the clearing")
+
+
 func test_the_dungeon_layout_has_no_spirit_healer_and_one_environment() -> void:
 	check(arena.spirit_healer != null, "the clearing has one")
 	var healer := arena.spirit_healer
@@ -589,6 +606,32 @@ func test_everybody_down_fails_the_dungeon_and_the_party_gets_up() -> void:
 	check(not arena.in_dungeon_layout, "the clearing is back")
 
 
+func test_a_hero_given_up_mid_dungeon_is_dropped_from_the_party() -> void:
+	_start(6, 2)
+	_enter_room(Dungeon.Room.CLEAR)
+	var gone := heroes[1]
+	gone.get_parent().remove_child(gone)
+	gone.free()
+	_step(DT)
+	check_eq(dungeon.heroes.size(), 1, "the freed hero left the list")
+	check_eq(dungeon.phase, Dungeon.Phase.ROOM, "the other one fights on")
+	_down(heroes[0])
+	_step(DT)
+	check_eq(dungeon.phase, Dungeon.Phase.OUTRO, "and when it falls the dungeon is lost")
+
+
+func test_with_every_hero_gone_the_dungeon_fails() -> void:
+	_start(6, 1)
+	_enter_room(Dungeon.Room.CLEAR)
+	var gone := heroes[0]
+	gone.get_parent().remove_child(gone)
+	gone.free()
+	_step(DT)
+	check_eq(dungeon.phase, Dungeon.Phase.OUTRO, "nobody left: failed")
+	_step(Dungeon.OUTRO_TIME + 0.05)
+	check_eq(finished_with, [false] as Array[bool], "and over")
+
+
 func test_a_solo_hero_going_down_fails_the_dungeon_not_the_run() -> void:
 	_start(6, 1)
 	_enter_room(Dungeon.Room.CLEAR)
@@ -687,7 +730,11 @@ func test_the_summary_line_names_rooms_and_times() -> void:
 	_enter_room(Dungeon.Room.CLEAR)
 	dungeon._room_done()
 	var line := dungeon.summary_text()
-	check(line.contains("failed on wave 6") and line.contains("1 / 4 rooms"), line)
+	check(line.contains("failed on wave 6") and line.contains("1 / 4 rooms ("), line)
+	var none := Dungeon.create(arena, 9)
+	world.add_child(none)
+	check_eq(none.summary_text(), "failed on wave 9: 0 / 4 rooms, 0 kills, 0.0 s", "no empty parentheses without rooms")
+	none.free()
 
 
 # --- Rewards -----------------------------------------------------------------------------------------

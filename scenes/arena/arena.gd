@@ -168,12 +168,16 @@ var _home: Dictionary = {}
 
 ## The arena of [param p_environment] (null = the forest clearing: EnvironmentData's defaults).
 ## [param p_spirit_healer] false builds it without the Spirit Healer ([member spirit_healer] stays
-## null – the hardcore mode and the dungeon use this; every consumer of the healer is null-safe).
-static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true) -> Arena:
+## null – the hardcore mode uses this; every consumer of the healer is null-safe). [param p_size] is
+## the playable size (default SIZE; DUNGEON_SIZE builds a stand-alone dungeon room – the run's dungeon
+## swaps the layout of its own arena instead, see [method enter_dungeon_layout]).
+static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true,
+		p_size: Vector2 = SIZE) -> Arena:
 	var arena := Arena.new()
 	arena.name = "Arena"
 	arena.environment = p_environment if p_environment != null else EnvironmentData.new()
 	arena._with_spirit_healer = p_spirit_healer
+	arena.play_size = p_size
 	arena._build()
 	return arena
 

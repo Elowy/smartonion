@@ -661,6 +661,23 @@ func test_a_cleared_dungeon_pays_and_hands_the_break_back() -> void:
 	check(smoke["dungeon_time"] > 60.0, "SMOKE_RESULT: time")
 
 
+func test_the_meter_counts_the_dungeons_kills_and_the_run_stats_too() -> void:
+	_run_with_bots(2)
+	_break_after(6)
+	_enter_by_vote()
+	var kills := RunState.kills
+	var by_p1: int = RunState.kills_by_player.get(0, 0)
+	main.dungeon._physics_process(Dungeon.INTRO_TIME + 0.02)  # room one begins
+	main.dungeon._physics_process(0.1)  # a group is telegraphed ...
+	main.dungeon._physics_process(1.2)  # ... and hatches
+	var enemies := tree.get_nodes_in_group(&"enemies")
+	check(enemies.size() > 0, "enemies in the dungeon")
+	var n := enemies.size()
+	_kill_all(main.players[0])
+	check_eq(RunState.kills, kills + n, "the run's kill count includes the dungeon")
+	check_eq(RunState.kills_by_player.get(0, 0), by_p1 + n, "and the killer's meter")
+
+
 func test_after_the_loot_roll_the_market_opens_with_the_full_countdown() -> void:
 	_run_with_bots(2)
 	_break_after(6)

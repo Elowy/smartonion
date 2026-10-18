@@ -229,6 +229,7 @@ func _physics_process(delta: float) -> void:
 	if not is_running():
 		return
 	total_time += delta
+	_prune_heroes()
 	_update_spawner(delta)
 	if phase != Phase.OUTRO and _all_heroes_down():
 		_fail("The party has fallen")
@@ -332,6 +333,7 @@ func _finish() -> void:
 ## end, without the wave-end signal – Artifacts must not grow twice), downed ones are revived at the
 ## wave-start ratio, the clearing's scenery comes back and the heroes go to its spawn points.
 func _leave() -> void:
+	_prune_heroes()
 	_clear_room_world()
 	if is_inside_tree():
 		for node in get_tree().get_nodes_in_group(&"ability_areas"):
@@ -355,6 +357,17 @@ func _leave() -> void:
 	Enemy.invalidate_player_cache()
 	if is_instance_valid(arena) and is_instance_valid(arena.camera):
 		arena.camera.snap()
+
+
+## Forgets the heroes that were freed (a player given up through the pause menu): reading a freed
+## instance into a Player-typed variable is a script error, so the list is checked as Variants.
+func _prune_heroes() -> void:
+	var i := heroes.size() - 1
+	while i >= 0:
+		var raw: Variant = heroes[i]
+		if not is_instance_valid(raw):
+			heroes.remove_at(i)
+		i -= 1
 
 
 func _place_heroes() -> void:
@@ -739,6 +752,7 @@ func summary_text() -> String:
 	var times: Array[String] = []
 	for t in room_times:
 		times.append("%.1f s" % t)
-	return "%s on wave %d: %d / %d rooms (%s), %d kills, %.1f s%s" % [
-		"cleared" if success else "failed", wave, rooms_cleared, ROOM_COUNT, ", ".join(times),
+	return "%s on wave %d: %d / %d rooms%s, %d kills, %.1f s%s" % [
+		"cleared" if success else "failed", wave, rooms_cleared, ROOM_COUNT,
+		" (%s)" % ", ".join(times) if not times.is_empty() else "",
 		kills_total, total_time, "" if success or fail_reason == "" else " – " + fail_reason]
