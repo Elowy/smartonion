@@ -24,6 +24,10 @@ const ARTIFACT_DIR := "res://data/artifacts/"
 const ENVIRONMENT_DIR := "res://data/environments/"
 ## Roll order of the environments; any extra one is appended alphabetically.
 const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swamp", &"volcano", &"ice_cave"]
+## data/shrines/<id>.tres (ShrineData, M6b: the six shrines of the break's shrine vote).
+const SHRINE_DIR := "res://data/shrines/"
+## Pool order of the shrines; any extra one is appended alphabetically.
+const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -54,6 +58,9 @@ var consumables: Dictionary[StringName, ConsumableData] = {}
 var environments: Dictionary[StringName, EnvironmentData] = {}
 ## The environment ids in ENVIRONMENT_ORDER (extras alphabetically): the order of the roll reel.
 var environment_ids: Array[StringName] = []
+## Every shrine, by id (M6b), and the ids in SHRINE_ORDER (extras alphabetically): the roll's pool order.
+var shrines: Dictionary[StringName, ShrineData] = {}
+var shrine_ids: Array[StringName] = []
 var class_ids: Array[StringName] = []
 
 
@@ -129,6 +136,20 @@ func reload() -> void:
 			extra_envs.append(id)
 	extra_envs.sort()
 	environment_ids.append_array(extra_envs)
+	shrines.clear()
+	for res in _load_dir(SHRINE_DIR):
+		if res is ShrineData:
+			shrines[res.id] = res
+	shrine_ids.clear()
+	for id in SHRINE_ORDER:
+		if shrines.has(id):
+			shrine_ids.append(id)
+	var extra_shrines: Array[StringName] = []
+	for id in shrines:
+		if id not in shrine_ids:
+			extra_shrines.append(id)
+	extra_shrines.sort()
+	shrine_ids.append_array(extra_shrines)
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -213,6 +234,11 @@ func get_boss(id: StringName) -> BossData:
 
 func get_consumable(id: StringName) -> ConsumableData:
 	return consumables.get(id)
+
+
+## The shrine [param id] (null = unknown).
+func get_shrine(id: StringName) -> ShrineData:
+	return shrines.get(id)
 
 
 ## The environment [param id] (null = unknown).

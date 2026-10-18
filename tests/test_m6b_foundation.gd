@@ -30,8 +30,9 @@ class ProbeSpawner extends EventSpawner:
 
 
 ## An Intermission that records the phases it enters, the frames of the SHRINE / PORTAL phases and the
-## players who left during them. hold_shrine / hold_portal withhold the stub's "vote is over", so the
-## phase stays open and _process runs it.
+## players who left during them. hold_shrine / hold_portal keep the phase open (so _process runs it); without
+## them the probe ends the SHRINE vote right away (the real vote screen is tested in test_m6b_shrines.gd;
+## these tests are about the chain of phases) and the PORTAL stub passes through.
 class PhaseProbe extends Intermission:
 	var entered: Array[Intermission.Phase] = []
 	var hold_shrine := false
@@ -48,6 +49,8 @@ class PhaseProbe extends Intermission:
 	func _start_shrine() -> void:
 		entered.append(Intermission.Phase.SHRINE)
 		super()
+		if not hold_shrine and phase == Intermission.Phase.SHRINE:
+			_on_shrine_finished()
 
 	func _on_shrine_finished() -> void:
 		if not hold_shrine:
@@ -953,7 +956,7 @@ func test_the_no_op_phases_are_skipped() -> void:
 	check_eq(screen.phase, Intermission.Phase.MARKET, "in the market")
 
 
-func test_a_pending_shrine_passes_through_the_stub() -> void:
+func test_a_pending_shrine_opens_the_phase_and_the_break_goes_on_when_the_vote_is_over() -> void:
 	_make_screen()
 	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
 	RunState.pending_shrine = &"greed"
@@ -961,7 +964,7 @@ func test_a_pending_shrine_passes_through_the_stub() -> void:
 	screen.open(5, 0)
 	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.MARKET] as Array[Intermission.Phase],
 			"the shrine phase, then (no level-ups, no portal) the market")
-	check_eq(RunState.pending_shrine, &"", "the stub consumed the shrine")
+	check_eq(RunState.pending_shrine, &"", "the shrine was consumed")
 	check_eq(screen.phase, Intermission.Phase.MARKET, "the break did not stall")
 
 

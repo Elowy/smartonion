@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ShrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/shrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"haste"
+display_name = "Shrine of Haste"
+description = "The air around the stone hums and the dust never settles. Quick feet for you, quicker feet for them."
+waves = 3
+icon_id = &"haste"
+color = Color(0.3, 0.85, 0.95, 1)
+bot_accepts = true
+enemy_speed_pct = 15.0
+hero_effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"haste": 15.0
+}
+}])

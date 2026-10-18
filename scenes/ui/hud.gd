@@ -20,6 +20,10 @@ const BANNER_OUT := 0.55
 const BANNER_ANCHOR := 0.22
 const BANNER_HEIGHT := 100.0
 const BANNER_ALPHA := 0.38
+## M6b: the banner's small lines under its text (the wave banner lists the running shrines): font size, and the
+## height one line takes.
+const BANNER_SUB_SIZE := 24
+const BANNER_SUB_HEIGHT := 32.0
 const XP_SEGMENTS := 20
 ## Height of the XP strip along the bottom screen edge (reference px).
 const XP_STRIP_HEIGHT := 26.0
@@ -32,6 +36,8 @@ const BOSS_BAR_HEIGHT := 22.0
 const BOSS_PHASES := 2
 const BOSS_BAR_COLOR := Color(0.84, 0.16, 0.14)
 const PIP_SIZE := 14.0
+## M6b: side of the running shrines' icons under the gold (each with its waves-left badge).
+const SHRINE_ICON_SIZE := 40.0
 ## The ENRAGED line pulses between this alpha and 1 (never dim on the dark plaque); the row is
 ## always reserved (alpha 0 while calm), so nothing below it jumps when the boss enrages.
 const ENRAGED_ALPHA_MIN := 0.8
@@ -46,6 +52,8 @@ var level_label: Label
 var xp_label: Label
 var xp_bar: UiBar
 var banner_label: Label
+## The small lines under the banner's text (M6b: the running shrines on the wave banner); hidden without any.
+var banner_sub: Label
 var notice_label: Label
 ## "Team Loot: N" (RunState.team_loot); its row is hidden while N is 0.
 var team_loot_label: Label
@@ -71,6 +79,9 @@ var _floater_amount := 0
 ## Seconds since the last pickup added to the floater.
 var _floater_age := 0.0
 var _clock := 0.0
+
+## The running shrines (RunState.shrine_effects) as small icons with the waves they have left; hidden while none runs.
+var shrine_row: HBoxContainer
 
 ## The boss frame (replaces the timer on boss waves): its box, name, HP bar, phase pips and the
 ## "ENRAGED" line, and the boss it shows.
@@ -152,10 +163,12 @@ func set_wave_time(seconds_left: float) -> void:
 	_timer_second = whole
 
 
-## Big centred banner ("Wave 3", "Wave cleared!", "LEVEL UP!").
-func show_banner(text: String, color: Color = UiTheme.GOLD) -> void:
+## Big centred banner ("Wave 3", "Wave cleared!", "LEVEL UP!"); [param sub_lines] are small lines under it (the wave
+## banner lists the running shrines, M6b), none = the one-line banner.
+func show_banner(text: String, color: Color = UiTheme.GOLD, sub_lines: Array[String] = []) -> void:
 	banner_label.text = text
 	banner_label.add_theme_color_override(&"font_color", color)
+	_show_banner_sub(sub_lines)
 	if _banner_tween != null and _banner_tween.is_valid():
 		_banner_tween.kill()
 	_banner.visible = true
@@ -174,6 +187,15 @@ func show_banner(text: String, color: Color = UiTheme.GOLD) -> void:
 	_banner_tween.chain().tween_interval(BANNER_HOLD)
 	_banner_tween.chain().tween_property(_banner, "modulate:a", 0.0, BANNER_OUT)
 	_banner_tween.chain().tween_callback(_banner.hide)
+
+
+## The banner's small lines: one label line each under the title; the ribbon grows to hold them.
+func _show_banner_sub(sub_lines: Array[String]) -> void:
+	var height := BANNER_HEIGHT + BANNER_SUB_HEIGHT * sub_lines.size()
+	banner_sub.text = "\n".join(PackedStringArray(sub_lines))
+	banner_sub.visible = not sub_lines.is_empty()
+	banner_sub.offset_bottom = height
+	_banner.offset_bottom = height
 
 
 func is_banner_visible() -> bool:
@@ -276,6 +298,48 @@ func _build_top() -> void:
 	_loot_row.add_child(team_loot_label)
 	_loot_row.visible = false
 	col.add_child(_loot_row)
+	_build_shrine_row(col)
+
+
+## The running shrines' icons (M6b): one ShrineIcon per effect in RunState.shrine_effects with a badge of the
+## waves it has left, under the gold; the row is hidden while no shrine runs.
+func _build_shrine_row(col: VBoxContainer) -> void:
+	shrine_row = UiTheme.hbox(6)
+	shrine_row.name = "ShrineRow"
+	shrine_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Room above and below the icons (the plaque's column packs its rows tightly).
+	shrine_row.custom_minimum_size = Vector2(0, SHRINE_ICON_SIZE + 14.0)
+	shrine_row.visible = false
+	col.add_child(shrine_row)
+
+
+## Rebuilds the shrine icons from RunState.shrine_effects (RunState.shrines_changed).
+func _refresh_shrines() -> void:
+	if shrine_row == null:
+		return
+	for c in shrine_row.get_children():
+		shrine_row.remove_child(c)
+		c.queue_free()
+	for e in RunState.shrine_effects:
+		var data := Db.get_shrine(StringName(e.get("id", &"")))
+		if data == null:
+			continue
+		var icon := ShrineIcon.create(data, SHRINE_ICON_SIZE, int(e.get("waves_left", 0)))
+		icon.name = "Shrine_%s" % data.id
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		shrine_row.add_child(icon)
+	shrine_row.visible = shrine_row.get_child_count() > 0
+
+
+## The shrines whose icons show (tests, screenshots), in row order.
+func shown_shrines() -> Array[ShrineData]:
+	var out: Array[ShrineData] = []
+	if shrine_row == null:
+		return out
+	for c in shrine_row.get_children():
+		if c is ShrineIcon and not c.is_queued_for_deletion():
+			out.append((c as ShrineIcon).data)
+	return out
 
 
 ## The HARDCORE badge (M6b MODES) on the first row of the plaque (call it first, right after the column is
@@ -434,10 +498,30 @@ func _build_banner() -> void:
 		line.offset_top = -1.0
 		line.offset_bottom = 1.0
 		_banner.add_child(line)
+	# The title keeps the top BANNER_HEIGHT of the banner; the small lines (M6b) go under it.
 	banner_label = UiTheme.centered_label("", UiTheme.TITLE, 64)
 	banner_label.add_theme_constant_override(&"outline_size", 14)
-	banner_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	banner_label.anchor_left = 0.0
+	banner_label.anchor_right = 1.0
+	banner_label.anchor_top = 0.0
+	banner_label.anchor_bottom = 0.0
+	banner_label.offset_left = 0.0
+	banner_label.offset_top = 0.0
+	banner_label.offset_right = 0.0
+	banner_label.offset_bottom = BANNER_HEIGHT
 	_banner.add_child(banner_label)
+	banner_sub = UiTheme.centered_label("", &"", BANNER_SUB_SIZE, UiTheme.TEXT)
+	banner_sub.name = "BannerSub"
+	banner_sub.add_theme_constant_override(&"outline_size", 6)
+	banner_sub.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	banner_sub.anchor_left = 0.0
+	banner_sub.anchor_right = 1.0
+	banner_sub.anchor_top = 0.0
+	banner_sub.anchor_bottom = 0.0
+	banner_sub.offset_top = BANNER_HEIGHT
+	banner_sub.offset_bottom = BANNER_HEIGHT
+	banner_sub.visible = false
+	_banner.add_child(banner_sub)
 	_banner.visible = false
 
 
@@ -487,6 +571,8 @@ func _ready() -> void:
 	RunState.xp_changed.connect(_on_xp_changed)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
+	RunState.shrines_changed.connect(_refresh_shrines)
+	_refresh_shrines()
 	_on_wave_changed(RunState.wave)
 	_loot_count = RunState.team_loot.size()
 	_show_team_loot()

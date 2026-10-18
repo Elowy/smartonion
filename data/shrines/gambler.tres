@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ShrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/shrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"gambler"
+display_name = "Shrine of the Gambler"
+description = "A worn dice cup sits on the stone. The house always has a smile ready, win or lose."
+waves = 0
+icon_id = &"gambler"
+color = Color(1, 0.5, 0.6, 1)
+bot_accepts = false
+gamble_chance = 0.5
+gamble_win_pct = 50.0
+gamble_lose_pct = 50.0
