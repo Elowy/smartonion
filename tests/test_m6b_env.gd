@@ -1111,19 +1111,26 @@ func test_the_roll_view_flag_boots_the_lobby_and_opens_the_screen() -> void:
 
 # --- End screen and run card ------------------------------------------------------------------------------------------
 
-func test_the_end_screen_names_the_arena_and_its_hazard() -> void:
-	check_eq(GameOverScreen.environment_text(&"cemetery"), "Arena: Cemetery  ·  Grasping Hands", "a hazard environment")
-	check_eq(GameOverScreen.environment_text(&"forest_ruin"), "Arena: Forest Ruin", "the forest has no hazard")
+func test_the_end_screen_names_the_arena() -> void:
+	check_eq(GameOverScreen.environment_text(&"cemetery"), "Arena: Cemetery", "a hazard environment")
+	check_eq(GameOverScreen.environment_text(&"forest_ruin"), "Arena: Forest Ruin", "the forest")
 	check_eq(GameOverScreen.environment_text(&"nowhere"), "", "an unknown id shows nothing")
 	RunState.start_run(1, 5, RunState.MODE_NORMAL, false, &"swamp")
 	var screen := GameOverScreen.create()
 	tree.root.add_child(screen)
 	nodes.append(screen)
 	screen.open(false)
-	check_eq(screen.environment_label.text, "Arena: Swamp  ·  Bog Pools", "the end screen")
+	check_eq(screen.environment_label.text, "Arena: Swamp", "the end screen")
 	RunState.start_run(1, 5, RunState.MODE_NORMAL, false, &"forest_ruin")
 	screen.open(true)
 	check_eq(screen.environment_label.text, "Arena: Forest Ruin", "per run")
+	# It costs no height: the panel of the worst-case page is not taller than without it.
+	var with_label := screen.panel.get_combined_minimum_size().y
+	screen.environment_label.visible = false
+	check_near(screen.panel.get_combined_minimum_size().y, with_label, 1.0, "the arena label adds no height")
+	# ... and the tabs stay centred (the outer cells share the free width).
+	screen.environment_label.visible = true
+	check_eq(screen.environment_label.size_flags_stretch_ratio, 1.0, "the arena cell")
 
 
 func test_the_run_card_carries_the_environment() -> void:

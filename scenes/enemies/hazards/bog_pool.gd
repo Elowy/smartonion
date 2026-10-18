@@ -4,7 +4,8 @@ extends ArenaHazard
 ## lays the same five again every wave). No telegraph and no damage: a hero standing in it moves
 ## [member hero_slow] percent slower (a GeneralBuff on the hero under [constant SLOW_KEY], refreshed
 ## while he stays and gone a moment after he leaves), an enemy [member enemy_slow] percent slower
-## (Enemy.apply_slow, scanned every SCAN_TICKS physics ticks through the enemy grid). Bots keep out
+## (Enemy.apply_slow, scanned every SCAN_TICKS physics ticks through the enemy grid; the heroes every
+## HERO_SCAN_TICKS). Bots keep out
 ## of it, gently ([method hazard_push]: a weaker push than the damaging hazards').
 
 const SLOW_KEY := &"bog_slow"
@@ -12,8 +13,10 @@ const MUD := Color(0.17, 0.2, 0.07)
 const MUD_RIM := Color(0.6, 0.68, 0.26)
 ## Seconds the slow outlasts a step out of the pool (the buff / slow is refreshed while inside).
 const LINGER := 0.35
-## Enemies are scanned every this many physics ticks (the hero check runs every tick).
+## Enemies are scanned every SCAN_TICKS physics ticks, heroes every HERO_SCAN_TICKS (the slow outlasts
+## the gap: LINGER is far longer than three ticks). Pools are staggered by their index.
 const SCAN_TICKS := 6
+const HERO_SCAN_TICKS := 3
 ## How strongly a bot keeps away from the pool (a multiple of a damaging hazard's push) and its margin.
 const BOT_WEIGHT := 0.5
 const BOT_AVOID_MARGIN := 0.3
@@ -94,11 +97,12 @@ func _strike() -> void:
 
 func _update_active(_delta: float) -> void:
 	_tick += 1
-	for hero in heroes_in_circle():
-		var buff := GeneralBuff.find(hero, SLOW_KEY)
-		if buff == null or buff.left < LINGER * 0.5:
-			GeneralBuff.apply(hero, SLOW_KEY, LINGER, {Stats.SPEED: -hero_slow})
-			hero_slows += 1
+	if (_tick + index) % HERO_SCAN_TICKS == 0:
+		for hero in heroes_in_circle():
+			var buff := GeneralBuff.find(hero, SLOW_KEY)
+			if buff == null or buff.left < LINGER * 0.5:
+				GeneralBuff.apply(hero, SLOW_KEY, LINGER, {Stats.SPEED: -hero_slow})
+				hero_slows += 1
 	if (_tick + index) % SCAN_TICKS == 0:
 		for e in enemies_in_circle():
 			e.apply_slow(enemy_slow, LINGER * 1.5)
