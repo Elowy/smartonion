@@ -695,7 +695,7 @@ func _fill() -> void:
 
 ## The market header's "what comes next" line. A boss wave has no timer (it ends when the boss
 ## falls; the HUD shows the boss frame instead of a clock), so it names no seconds. The endless mode
-## has no final wave, so its line is "Next up: Wave 26  ·  210 seconds".
+## has no final wave, so its line is "Next up: Wave 26  ·  <seconds>" (no "of 25").
 static func next_wave_text(next: int) -> String:
 	if _is_past_the_end(next):
 		return "The final battle is won"

@@ -165,11 +165,11 @@ func load_file() -> Error:
 		return FileAccess.get_open_error()
 	var text := file.get_as_text()
 	file.close()
-	var parsed: Variant = JSON.parse_string(text)
-	if not (parsed is Dictionary) or not (parsed as Dictionary).has("version"):
+	var json := JSON.new()  # (JSON.parse_string would print an engine error for a broken file)
+	if json.parse(text) != OK or not (json.data is Dictionary) or not (json.data as Dictionary).has("version"):
 		_set_corrupt()
 		return ERR_PARSE_ERROR
-	var data: Dictionary = parsed
+	var data: Dictionary = json.data
 	var version := int(data.get("version", 0))
 	if version > FORMAT_VERSION:
 		read_only = true

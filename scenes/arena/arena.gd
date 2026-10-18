@@ -6,7 +6,8 @@ extends Node3D
 ##   entities:      Node3D  – parent for players, enemies, projectiles, pickups and VFX.
 ##   camera:        CameraRig
 ##   spirit_healer: SpiritHealer – part of the level at SPIRIT_HEALER_POINT (GDD 1): ghosts
-##                  standing in its circle come back at full HP.
+##                  standing in its circle come back at full HP (null when the arena was built
+##                  without one: hardcore, the dungeon).
 ## Everything (ground shader, walls, trees, props, light, environment) is built in code by
 ## [method create]; decoration lives outside the playable rectangle so the camera never
 ## shows the void.
@@ -145,12 +146,17 @@ var ground: MeshInstance3D
 ## Dirt patches inside the arena: (x, z, radius, noise seed).
 var dirt_patches: Array[Vector4] = []
 
+var _with_spirit_healer := true
+
 
 ## The arena of [param p_environment] (null = the forest clearing: EnvironmentData's defaults).
-static func create(p_environment: EnvironmentData = null) -> Arena:
+## [param p_spirit_healer] false builds it without the Spirit Healer ([member spirit_healer] stays
+## null – the hardcore mode and the dungeon use this; every consumer of the healer is null-safe).
+static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true) -> Arena:
 	var arena := Arena.new()
 	arena.name = "Arena"
 	arena.environment = p_environment if p_environment != null else EnvironmentData.new()
+	arena._with_spirit_healer = p_spirit_healer
 	arena._build()
 	return arena
 
@@ -227,10 +233,11 @@ func _build() -> void:
 	var decor := _build_decor(rng)
 	decor.name = "Decor"
 	add_child(decor)
-	# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
-	spirit_healer = SpiritHealer.create()
-	spirit_healer.position = SPIRIT_HEALER_POINT
-	add_child(spirit_healer)
+	if _with_spirit_healer:
+		# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
+		spirit_healer = SpiritHealer.create()
+		spirit_healer.position = SPIRIT_HEALER_POINT
+		add_child(spirit_healer)
 	entities = Node3D.new()
 	entities.name = "Entities"
 	add_child(entities)
