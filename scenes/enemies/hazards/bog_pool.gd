@@ -61,7 +61,10 @@ static func spawn(parent: Node, pos: Vector3, p_radius: float, p_hero_slow: floa
 	return h
 
 
-## The pool is marked by its bright rim (the mud itself is nearly as dark as the ground).
+## The pool is marked by its bright rim (the mud itself is nearly as dark as the ground). This is the colour
+## the rim is drawn in: in the picture the mud ring, which shares the render priority, covers most of it, so the
+## swamp's pool reads as a dark oval (measured 1.3:1 for the rim, 1.4:1 for the oval against the olive ground in a
+## screenshot; the rim on top of the mud would be a 4.4:1 lime ring, a look the art pass decides).
 func marker_color() -> Color:
 	return MUD_RIM
 
