@@ -9,8 +9,8 @@ extends ArenaHazard
 ## of it, gently ([method hazard_push]: a weaker push than the damaging hazards').
 
 const SLOW_KEY := &"bog_slow"
-const MUD := Color(0.17, 0.2, 0.07)
-const MUD_RIM := Color(0.6, 0.68, 0.26)
+const MUD := Color(0.09, 0.08, 0.04)
+const MUD_RIM := Color(0.78, 0.84, 0.34)
 ## Seconds the slow outlasts a step out of the pool (the buff / slow is refreshed while inside).
 const LINGER := 0.35
 ## Enemies are scanned every SCAN_TICKS physics ticks, heroes every HERO_SCAN_TICKS (the slow outlasts
@@ -114,7 +114,7 @@ func _update_look() -> void:
 	if _mud == null:
 		return
 	var fade := clampf(age / FADE_IN, 0.0, 1.0)
-	Mats.set_ring(_mud, Color(MUD.r, MUD.g, MUD.b, 0.82 * fade), 0.93, 1.0, 0.82 * fade)
+	Mats.set_ring(_mud, Color(MUD.r, MUD.g, MUD.b, 0.88 * fade), 0.93, 1.0, 0.88 * fade)
 	Mats.set_ring(_rim, Color(MUD_RIM.r, MUD_RIM.g, MUD_RIM.b, 0.9 * fade), 0.88, 0.985, 0.0)
 	for i in _bubbles.size():
 		var phase := age * 2.2 + float(i) * 1.9 + float(index) * 0.7
