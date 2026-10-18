@@ -490,9 +490,11 @@ func _on_dungeon_room_started(index: int) -> void:
 func _on_dungeon_room_cleared(index: int) -> void:
 	if dungeon == null:
 		return
-	_log("dungeon room %d/%d (%s) cleared in %.1f s: %d / %d standing, %d kills" % [index + 1,
+	var extra := " (the brazier kept %d%% of its HP)" % roundi(dungeon.brazier_left * 100.0) \
+			if index == Dungeon.Room.DEFEND and dungeon.brazier_left >= 0.0 else ""
+	_log("dungeon room %d/%d (%s) cleared in %.1f s: %d / %d standing, %d kills%s" % [index + 1,
 		Dungeon.ROOM_COUNT, Dungeon.ROOM_NAMES[index], dungeon.room_times[-1], living_player_count(),
-		players.size(), dungeon.kills_total])
+		players.size(), dungeon.kills_total, extra])
 
 
 ## The dungeon is over (won or lost) and the arena is the clearing again: the reward (or the failure's

@@ -1,6 +1,6 @@
 class_name PortalScreen
 extends Control
-## The PORTAL phase of the between-wave screen (GDD 16.1 "Dungeon-portál", M6b): "A dungeon portal
+## The PORTAL phase of the between-wave screen (GDD 16.1, dungeon portal, M6b): "A dungeon portal
 ## has opened!" and the team's vote. Every player with a hero votes Accept (A) or Decline (B) on their
 ## own device; it is the reroll vote's rule: ALL must accept for the party to enter, one decline or the
 ## [constant VOTE_TIME] (20 s) timeout skips the dungeon. The deciding frame emits [signal decided].

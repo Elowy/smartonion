@@ -1,6 +1,6 @@
 class_name Dungeon
 extends Node
-## The dungeon (GDD 16.1 "Dungeon-portál", M6b): an optional run of four short scripted rooms the
+## The dungeon (GDD 16.1, dungeon portal, M6b): an optional run of four short scripted rooms the
 ## party enters through the portal vote after wave 6, 9, 12 and 15 ([method is_portal_wave],
 ## Main._roll_portal, Intermission PORTAL phase). Main creates it, calls [method start] with the
 ## heroes and listens to [signal finished].
@@ -135,6 +135,8 @@ var total_time := 0.0
 ## Smoke runs only (Main sets it): kill a Warden that outlives its enrage by SMOKE_BOSS_GRACE.
 var smoke_boss_timeout := false
 var brazier: DungeonBrazier
+## The share of the brazier's HP that was left when the Defend room was won (-1 = not won yet; balance data).
+var brazier_left := -1.0
 var warden: Boss
 var warden_data: BossData
 ## The generator the dungeon draws from (RunState.dungeon_rng).
@@ -293,6 +295,8 @@ func _update_room(delta: float) -> void:
 func _room_done() -> void:
 	room_times.append(room_time)
 	rooms_cleared += 1
+	if room == Room.DEFEND and is_instance_valid(brazier):
+		brazier_left = brazier.hp_ratio()
 	_clear_room_world()
 	room_cleared.emit(room)
 	phase_time = 0.0

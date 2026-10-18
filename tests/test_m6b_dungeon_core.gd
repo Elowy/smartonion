@@ -1,5 +1,5 @@
 extends TestCase
-## M6b DUNGEON, the core (GDD 16.1 "Dungeon-portál"): the Arena's dungeon layout (24 x 14, the run's
+## M6b DUNGEON, the core (GDD 16.1, dungeon portal): the Arena's dungeon layout (24 x 14, the run's
 ## palette, no Spirit Healer, nothing of the clearing lost), the Dungeon's four rooms (Clear / Survive /
 ## Defend / Warden), the 3 s heal pauses, the fail rules (everybody down, a lost brazier), the Warden
 ## (a BossData run by Boss, enrage at 60 s, Raise Dead through the Dungeon), the dungeon enemies' lack
@@ -168,7 +168,9 @@ func test_a_stand_alone_small_arena_has_its_own_bounds_and_walls() -> void:
 	for i in shapes.size():
 		check_eq((shapes[i].shape as BoxShape3D).size, boxes[i].size, "wall %d" % i)
 	check_eq(arena.get_bounds().size, Arena.SIZE, "the other arena is the clearing")
-	check_eq(Arena.create().get_bounds().size, Arena.SIZE, "the default stays the clearing")
+	var default := Arena.create()
+	check_eq(default.get_bounds().size, Arena.SIZE, "the default stays the clearing")
+	default.free()
 
 
 func test_the_dungeon_layout_has_no_spirit_healer_and_one_environment() -> void:
@@ -449,6 +451,17 @@ func test_room_three_is_won_after_20_seconds_with_the_brazier_standing() -> void
 	check_eq(dungeon.phase, Dungeon.Phase.PAUSE, "held")
 	check(dungeon.brazier == null, "the brazier is cleared away")
 	check_eq(dungeon.room_times.size(), 1, "recorded")
+
+
+func test_the_brazier_health_left_is_recorded_for_the_balance_pass() -> void:
+	_start()
+	check_near(dungeon.brazier_left, -1.0, 0.0001, "not known before the room is won")
+	_enter_room(Dungeon.Room.DEFEND)
+	dungeon._spawning = false
+	dungeon.brazier.take_damage(dungeon.brazier.max_hp * 0.25)
+	_step(Dungeon.DEFEND_TIME + 0.1)
+	check_eq(dungeon.phase, Dungeon.Phase.PAUSE, "held")
+	check_near(dungeon.brazier_left, 0.75, 0.0001, "75% left")
 
 
 func test_a_destroyed_brazier_fails_the_dungeon() -> void:

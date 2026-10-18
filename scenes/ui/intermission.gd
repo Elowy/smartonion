@@ -459,10 +459,9 @@ func _on_portal_finished() -> void:
 
 
 ## One frame of the PORTAL phase (the tree is paused, the screen processes always). Inside the dungeon
-## the screen does nothing: the countdown has not started and nobody votes any more.
+## the screen is hidden ([method _process] returns before the phase runs), the vote is closed and the
+## market countdown has not started.
 func _update_portal(delta: float) -> void:
-	if _in_dungeon:
-		return
 	portal_screen.update(delta)
 
 

@@ -1,6 +1,6 @@
 class_name DungeonRewards
 extends RefCounted
-## What a dungeon pays out (GDD 16.1 "Dungeon-portál", 10.1), the pure part of the DUNGEON package –
+## What a dungeon pays out (GDD 16.1, dungeon portal, 10.1), the pure part of the DUNGEON package –
 ## [Dungeon] runs the rooms, Main hands the result to this file and then to the Intermission.
 ##
 ## - Success ([method grant_success]): every hero with a hero in play gets one guaranteed Epic
