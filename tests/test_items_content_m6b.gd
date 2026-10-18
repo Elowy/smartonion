@@ -421,3 +421,57 @@ func test_leathers_of_the_unseen_throw_adds_a_shuriken() -> void:
 		if b != null and b.attacker == p and not b.is_queued_for_deletion():
 			stars += 1
 	check_eq(stars, 4, "four shuriken are thrown")
+
+
+# --- The Equip line of a class item greys out until the hero learns its ability -----------------
+
+func _tip(item: ItemInstance, viewer: ClassData, viewer_eq: Equipment = null) -> ItemTooltip:
+	var t := ItemTooltip.create()
+	tree.root.add_child(t)
+	t.viewer_equipment = viewer_eq
+	t.show_item(item, viewer)
+	return t
+
+
+func _free_tip(t: ItemTooltip) -> void:
+	t.get_parent().remove_child(t)
+	t.free()
+
+
+func test_class_item_equip_line_greys_out_until_the_ability_is_learned() -> void:
+	PlayerManager.clear()
+	var cls := Db.get_class_data(&"warrior")
+	var data := Db.get_unique(&"warhelm_of_the_standing_shout")  # Equip: Battle Shout
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var item := ItemGenerator.from_unique(data, 5, false, rng, cls)
+	# Nobody to ask (no hero joined): nothing is missing, the line is plain green.
+	var nobody := _tip(item, cls)
+	var plain := nobody.find_line(data.unique_text, true)
+	check(plain != null and plain.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.ENCHANT_GREEN),
+			"no hero to ask: the Equip line is green")
+	_free_tip(nobody)
+
+	var slot := PlayerManager.join(ScriptedInput.new("m6b_tip:warrior"), cls)
+	var hero := Player.create(slot)
+	check(not hero.abilities.knows(&"battle_shout"), "precondition: Battle Shout is not learned yet")
+	var needs_text := "%s (needs %s)" % [data.unique_text, Artifacts.ability_name(&"battle_shout")]
+	var before := _tip(item, cls, hero.equipment)
+	var grey := before.find_line(data.unique_text)
+	check(grey != null and grey.text == needs_text, "the Equip line names what it needs")
+	check(grey != null and grey.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.DIM),
+			"greyed out while the ability is missing")
+	_free_tip(before)
+
+	check(hero.abilities.learn(Db.get_ability(&"battle_shout")) >= 0, "Battle Shout learned")
+	var after := _tip(item, cls, hero.equipment)
+	var learned := after.find_line(data.unique_text, true)
+	check(learned != null, "once learned: the plain Equip line, no suffix")
+	check(learned != null and learned.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.ENCHANT_GREEN),
+			"once learned: green")
+	check(after.find_line("(needs") == null, "once learned: no needs text")
+	_free_tip(after)
+
+	PlayerManager.clear()
+	if is_instance_valid(hero):
+		hero.free()
