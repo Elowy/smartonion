@@ -48,6 +48,9 @@ const MAX_ENCHANTS: Array[int] = [0, 1, 1, 2, 2, 0]
 const BOT_FIRST_WAVE := 12
 ## Actions a bot does per market round at most.
 const BOT_MAX_ACTIONS := 2
+## A bot without an enchantable weapon (it wears an Artifact) works on equipped armour / off-hand
+## of at least this rarity ([method bot_target]).
+const BOT_FALLBACK_MIN_RARITY := Items.Rarity.EPIC
 
 const REASON_NO_ITEM := "No item"
 const REASON_ARTIFACT := "Artifacts cannot be changed"
@@ -370,14 +373,36 @@ static func refresh_name(item: ItemInstance, old_prefix: String) -> void:
 # --- Bots --------------------------------------------------------------------------------------
 
 ## The weapon a bot enchants: its best attacking weapon (higher rarity, then Item Level, then the
-## main hand), equipped. Null without one.
+## main hand), equipped. An Artifact is skipped (it can never be enchanted, see
+## [method bot_target] for what the bot works on instead). Null without one.
 static func best_weapon(eq: Equipment) -> ItemInstance:
 	if eq == null:
 		return null
 	var best: ItemInstance = null
 	for hand in [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]:
 		var item := eq.get_item(hand)
-		if not Equipment.is_attacking_weapon(item):
+		if not Equipment.is_attacking_weapon(item) or item.rarity >= Items.Rarity.ARTIFACT:
+			continue
+		if best == null or item.rarity > best.rarity or (item.rarity == best.rarity and item.item_level > best.item_level):
+			best = item
+	return best
+
+
+## What a bot enchants: its [method best_weapon]; when it has none besides an Artifact (a hero
+## wearing the class Artifact, the pair included) the best other equipped non-Artifact item that
+## is Epic or better and still has something for [method bot_plan] to do – an armour or jewellery
+## piece or a non-attacking off-hand (higher rarity, then Item Level, then the lower equip slot).
+## Null when there is nothing to work on.
+static func bot_target(eq: Equipment) -> ItemInstance:
+	var weapon := best_weapon(eq)
+	if weapon != null or eq == null:
+		return weapon
+	var best: ItemInstance = null
+	for equip_slot in Items.EquipSlot.values():
+		var item := eq.get_item(equip_slot)
+		if item == null or item.rarity < BOT_FALLBACK_MIN_RARITY or item.rarity >= Items.Rarity.ARTIFACT:
+			continue
+		if Equipment.is_attacking_weapon(item) or bot_plan(item, eq.class_data).is_empty():
 			continue
 		if best == null or item.rarity > best.rarity or (item.rarity == best.rarity and item.item_level > best.item_level):
 			best = item
@@ -408,13 +433,13 @@ static func bot_plan(item: ItemInstance, class_data: ClassData) -> Dictionary:
 	return {}
 
 
-## A bot's enchanting round: up to BOT_MAX_ACTIONS actions on its best weapon ([method bot_plan]),
+## A bot's enchanting round: up to BOT_MAX_ACTIONS actions on its [method bot_target] ([method bot_plan]),
 ## each only while its gold stays inside [param gold_budget]; when the Dust pile is short for the
 ## next action the bot disenchants spare backpack items (not upgrades for it, never the last
 ## weapon – [method bot_disenchant_spare]) to make up the difference. Returns the actions done.
 static func bot_enchant(slot: PlayerSlot, gold_budget: int, rng: RandomNumberGenerator = null) -> int:
 	var eq := _equipment_of(slot)
-	var item := best_weapon(eq)
+	var item := bot_target(eq)
 	if item == null:
 		return 0
 	var done := 0

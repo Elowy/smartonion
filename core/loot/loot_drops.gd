@@ -7,8 +7,8 @@ extends RefCounted
 ## Artifact roll ([method roll_artifact], GDD 5.5) there and, for every kill, in
 ## [method on_enemy_killed] after the normal roll: ONE roll per kill (an elite calls it twice,
 ## a boss once per hero), from wave 10, boss 15% (+ pity) / Loot Goblin 5% / elite 2% / normal
-## enemy 0.05%, x (1 + the killer's Fortune %); the class is one of the team's (80%) or any (20%),
-## at most one Artifact per class per run.
+## enemy 0.05% / party size (kills scale with the players), x (1 + the killer's Fortune %); the
+## class is one of the team's (80%) or any (20%), at most one Artifact per class per run.
 ## Every generated drop passes the party's classes (&"team_classes", [method team_classes]) so
 ## class-bound content (tier set pieces) is rolled for a class that is playing.
 ##
@@ -37,6 +37,9 @@ const ARTIFACT_MIN_WAVE := 10
 const ARTIFACT_CHANCE_BOSS := 0.15
 const ARTIFACT_CHANCE_GOBLIN := 0.05
 const ARTIFACT_CHANCE_ELITE := 0.02
+## A normal kill's chance for a SOLO run; [method artifact_chance] divides it by the party size
+## (RunState.player_count), because the kills of a wave scale with the players while the
+## boss / Loot Goblin / elite counts do not.
 const ARTIFACT_CHANCE_NORMAL := 0.0005
 const ARTIFACT_PITY_STEP := 0.05
 const ARTIFACT_TEAM_CLASS_SHARE := 0.8
@@ -149,8 +152,9 @@ static func kill_artifact_source(enemy: Node3D, source: ItemGenerator.Source) ->
 
 
 ## Artifact chance (0..1) of one roll for a kill of [param source] by [param killer]: the table
-## chance (a boss's plus RunState.artifact_pity) x (1 + the killer's Fortune / 100), or
-## artifact_chance_override when it is on. Not the shop.
+## chance (a boss's plus RunState.artifact_pity; a normal kill's divided by the party size,
+## [method normal_chance]) x (1 + the killer's Fortune / 100), or artifact_chance_override when
+## it is on. Not the shop.
 static func artifact_chance(source: ItemGenerator.Source, killer: Node3D) -> float:
 	if artifact_chance_override >= 0.0:
 		return clampf(artifact_chance_override, 0.0, 1.0)
@@ -163,8 +167,16 @@ static func artifact_chance(source: ItemGenerator.Source, killer: Node3D) -> flo
 		ItemGenerator.Source.ELITE:
 			base = ARTIFACT_CHANCE_ELITE
 		ItemGenerator.Source.LOOT:
-			base = ARTIFACT_CHANCE_NORMAL
+			base = normal_chance()
 	return clampf(base * (1.0 + killer_fortune(killer) / 100.0), 0.0, 1.0)
+
+
+## The Artifact chance of a normal enemy kill before Fortune: [constant ARTIFACT_CHANCE_NORMAL]
+## divided by the party size (RunState.player_count, at least 1) – a bigger party makes
+## proportionally more kills, so the expected number of normal-kill Artifacts per run does not
+## grow with it.
+static func normal_chance() -> float:
+	return ARTIFACT_CHANCE_NORMAL / float(maxi(1, RunState.player_count))
 
 
 ## The class ids an Artifact may still drop for: classes that have one and did not get theirs
