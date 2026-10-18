@@ -456,8 +456,9 @@ func end_run(p_victory: bool) -> void:
 
 
 ## The finished run in the leaderboard: its entry (the wave that ended it, the wave play time, the party's
-## classes as the run started ([member run_classes]), victory) goes into the file's category for the run's mode, hardcore flag and party size
-## ([method writes_leaderboard]; Leaderboard.record_run), then the board is read for the end screen
+## classes as the run started ([member run_classes]), victory) goes into the file's category for the run's
+## mode, hardcore flag and party size ([method writes_leaderboard]; Leaderboard.record_run), then the board is
+## read for the end screen
 ## (Leaderboard.screen_model: the "Best: ..." line, the top 10 of the category, the run's place). {} when the
 ## leaderboard file is off limits: Leaderboard.writes_enabled is false (the unit tests), or a smoke run
 ## without a file of its own (--leaderboard) – a smoke run does not even read the player's file.
