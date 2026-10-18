@@ -2556,6 +2556,7 @@ A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 ké
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
 | **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+| **Meta-progresszió bővítések** | Önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
 
 **Dungeon-portál (M6b)**
 
@@ -2763,6 +2764,29 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 - menet-statisztika események,
 - verziózott mentés,
 - profilhoz köthető beállítások.
+
+### 17.8 Bővítések a legeslegvégére
+
+Elfogadott ötletek, amelyek **minden más után** (M9 és a Remote Play Together után) jönnek.
+Ugyanaz az elv, mint a 17. fejezetben: új lehetőségek, nem nyers erő.
+
+- **Önkéntes nehezítések (Heat-szerű):** menet előtt a csapat apró nehezítéseket választhat
+  (pl. „+20% ellenség-sebesség”, „nincs Spirit Healer”, „1 bolti ajánlattal kevesebb”);
+  mindegyik több Valort és Class XP-t ad. Finomabb skála, mint a Heroic / Mythic.
+- **Heti kihívás:** fix seed, fix környezet, 1–2 előre megadott nehezítés, saját ranglista és
+  plusz Valor; később online is (Remote Play Together).
+- **Receptkönyv (Cooking / Alchemy):** a menetekben ritka receptek esnek, amelyek véglegesen
+  bővítik a bolti fogyóeszköz-sor kínálatát (több választék, nem erősebb hős).
+- **Hagymafajták:** az Onion Patch kertjében a menetekből hozott magok „nőnek”, és új
+  megjelenést nyitnak (Shallot, Red Onion, Leek, Spring Onion …) – csak kozmetika.
+- **Kezdőfegyver-választék:** Class Level mérföldkövek új indulófegyvereket nyitnak
+  kasztonként (pl. Warrior kétkezes karddal, Mage Orbbal) – új játékstílus, nem erő.
+- **Bestiárium (Onion Almanac):** ellenségenkénti ölésszám, rövid leírás, mérföldkövekért
+  címek és keretek; a bossok és az események is bekerülnek.
+- **Mini-petek:** nem harcoló kis kísérők, gyűjthetők a Loot Goblintól, bossoktól és
+  dungeonokból – kozmetika.
+- **Paragon-szintek:** a 30-as Class Level fölött végtelen szintek, csak kozmetikai
+  jutalommal (keretek, portré-díszek).
 
 ---
 
