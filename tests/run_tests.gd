@@ -21,6 +21,10 @@ func _run() -> void:
 	# autoloads exist.
 	var leaderboard: GDScript = load("res://core/leaderboard.gd")
 	leaderboard.set(&"writes_enabled", false)
+	# No shrine at a break unless a test asks for one (--shrine-chance / RunState.shrine_chance_override): a
+	# random 5% shrine would turn every Main flow test that follows a wave into a flake.
+	var shrines: GDScript = load("res://core/shrines.gd")
+	shrines.set(&"base_chance", 0.0)
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

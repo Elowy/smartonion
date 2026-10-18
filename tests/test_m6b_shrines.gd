@@ -18,14 +18,19 @@ var intermission: Intermission
 var _resolved: Array[Array] = []
 
 
+var _base_chance_before := 0.0
+
+
 func before_each() -> void:
 	UiFakes.reset_players()
 	RunState.start_run(1, SEED)
 	tree.paused = false
 	_resolved.clear()
+	_base_chance_before = Shrines.base_chance
 
 
 func after_each() -> void:
+	Shrines.base_chance = _base_chance_before
 	if main != null and is_instance_valid(main):
 		if main.get_parent() != null:
 			main.get_parent().remove_child(main)
@@ -285,7 +290,15 @@ func test_cast_by_a_stranger_does_nothing() -> void:
 
 # --- The roll ----------------------------------------------------------------------
 
+func test_the_test_runner_switches_the_default_chance_off() -> void:
+	check_eq(Shrines.base_chance, 0.0, "tests meet no shrine they did not ask for")
+	check_eq(Shrines.chance(), 0.0, "also through chance()")
+	RunState.shrine_chance_override = 1.0
+	check_eq(Shrines.chance(), 1.0, "unless a test asks (--shrine-chance)")
+
+
 func test_the_chance_is_five_percent_unless_overridden() -> void:
+	Shrines.base_chance = Shrines.CHANCE
 	check_eq(Shrines.CHANCE, 0.05, "5%")
 	check_eq(Shrines.chance(), 0.05, "default")
 	RunState.shrine_chance_override = 0.3
@@ -295,6 +308,7 @@ func test_the_chance_is_five_percent_unless_overridden() -> void:
 
 
 func test_about_five_percent_of_the_breaks_get_a_shrine() -> void:
+	Shrines.base_chance = Shrines.CHANCE
 	var hits := 0
 	for i in 4000:
 		if Shrines.roll() != &"":

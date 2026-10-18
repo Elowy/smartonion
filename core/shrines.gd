@@ -23,6 +23,9 @@ extends RefCounted
 const SOURCE := &"shrine"
 ## The chance of a shrine at a break (GDD 16.1: 5%); --shrine-chance replaces it.
 const CHANCE := 0.05
+## The chance a break has without --shrine-chance. The test runner sets it to 0 (through the script object, like
+## the leaderboard switch), so a Main flow test never meets a shrine it did not ask for; the game never changes it.
+static var base_chance := CHANCE
 ## The spend kind of the purse a shrine takes (RunState.try_spend_for).
 const SPEND_KIND := &"shrine"
 
@@ -48,10 +51,10 @@ static func available() -> Array[ShrineData]:
 	return out
 
 
-## The chance of a shrine at a break: --shrine-chance when given, else [constant CHANCE].
+## The chance of a shrine at a break: --shrine-chance when given, else [member base_chance] (5%).
 static func chance() -> float:
 	var override := RunState.shrine_chance_override
-	return clampf(override, 0.0, 1.0) if override >= 0.0 else CHANCE
+	return clampf(override, 0.0, 1.0) if override >= 0.0 else base_chance
 
 
 ## The roll of one break: the id of the shrine on offer ("" = none). Draws from RunState.shrine_rng only: first the
