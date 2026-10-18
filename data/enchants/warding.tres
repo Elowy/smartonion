@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"warding"
+prefix = "Warding"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 0.8
+equip_stats = Dictionary[StringName, float]({})
+effect = &"shield"
+params = {
+"max_hp_pct": 4.0,
+"duration_fixed": 5.0
+}
+ppm = 2.0
+chance = 0.0
+icd = 6.0
+school = &"holy"
+description = "Chance on hit: A ward absorbs damage equal to {max_hp_pct}% of your Max HP for {duration_fixed} sec."

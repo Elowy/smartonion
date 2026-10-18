@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"clinging"
+prefix = "Clinging"
+kind = 3
+slot_types = Array[int]([0, 2, 3, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 0.8
+equip_stats = Dictionary[StringName, float]({})
+effect = &"slow"
+params = {
+"pct_fixed": 40.0,
+"duration_fixed": 3.0
+}
+ppm = 0.0
+chance = 20.0
+icd = 4.0
+school = &"nature"
+description = "When struck: 20% chance to slow the attacker by {pct_fixed}% for {duration_fixed} sec."
