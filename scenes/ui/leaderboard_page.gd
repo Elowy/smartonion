@@ -113,7 +113,16 @@ func _fill_rows(entries: Array, rank: int, mode: StringName) -> void:
 			highlighted = i
 
 
-## [hero, class ...]-style fixed columns: [param cells] are the controls of one row.
+## The text of column [param column] (0 rank, 1 result, 2 time, 3 party, 4 date, 5 "This run") of place
+## [param place] (0 = the first); "" outside the table (tests).
+func cell_text(place: int, column: int) -> String:
+	if place < 0 or place >= rows.size():
+		return ""
+	var cells := (rows[place].get_child(0) as HBoxContainer).get_children()
+	return (cells[column] as Label).text if column >= 0 and column < cells.size() else ""
+
+
+## Fixed columns: [param cells] are the controls of one row.
 func _row_layout(cells: Array) -> HBoxContainer:
 	var row := UiTheme.hbox(10)
 	for i in cells.size():
