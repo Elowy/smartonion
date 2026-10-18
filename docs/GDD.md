@@ -252,7 +252,7 @@ Minden kaszt tartalmaz:
 | Szerep | Közelharci bruiser |
 | Páncél | Plate |
 | Kezdőfegyver | One-Hand Sword |
-| Jártasság | Minden közelharci fegyver, Shield, kétkezes fegyverek, **Dual Wield** |
+| Jártasság | Minden közelharci fegyver (az M6b-től a Two-Hand Sword és a Two-Hand Mace is), Shield, kétkezes fegyverek, **Dual Wield** |
 | Alap | +5 Max HP, +2 Armor, **−5% Speed** |
 | Erőforrás | **Rage** (0–100): +4 / kiosztott találat, +10 / elszenvedett találat, −3 / mp ha nincs találat |
 | Képesség 1 | **Whirlwind** – 40 Rage: körkörös csapás, 150% fegyversebzés a környező ellenségekre |
@@ -265,7 +265,7 @@ Minden kaszt tartalmaz:
 | Szerep | Távolsági varázsló, AoE |
 | Páncél | Cloth |
 | Kezdőfegyver | Wand |
-| Jártasság | Wand, Staff, One-Hand Sword, Dagger, Off-hand Tome |
+| Jártasság | Wand, Staff, One-Hand Sword, Dagger, Off-hand Tome, Off-hand Orb (M6b) |
 | Alap | **−3 Max HP**, **−2 Armor**, +3 Intellect |
 | Erőforrás | **Mana** (100 + 2 × Int), +10 / mp (Haste-tel nő) |
 | Képesség 1 | **Blizzard** – 50 Mana: jégeső a legsűrűbb ellenségcsoportra, 3 mp, lassít |
@@ -278,7 +278,7 @@ Minden kaszt tartalmaz:
 | Szerep | Tank / támogató – **co-op erősség** |
 | Páncél | Plate |
 | Kezdőfegyver | Mace + Shield |
-| Jártasság | Sword, Mace, kétkezes Sword / Mace, Shield, Off-hand Tome |
+| Jártasság | Sword, Mace, kétkezes Sword / Mace (Two-Hand Sword, Two-Hand Mace – M6b), Shield, Off-hand Tome |
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
@@ -304,7 +304,7 @@ Minden kaszt tartalmaz:
 | Szerep | DoT és pet (idéző) |
 | Páncél | Cloth |
 | Kezdőfegyver | Staff |
-| Jártasság | Wand, Staff, Dagger, One-Hand Sword, Off-hand Tome |
+| Jártasság | Wand, Staff, Dagger, One-Hand Sword, Off-hand Tome, Off-hand Orb (M6b) |
 | Alap | Állandó **Imp** pet (Intellect-tel skálázódó tűzlövedékek), **−2 Armor**, **−5% Speed** |
 | Erőforrás | **Soul Shard** (0–5): +1 minden 12. ölés után |
 | Képesség 1 | **Rain of Fire** – 1 Soul Shard: tűzeső a legsűrűbb csoportra, 4 mp |
@@ -384,7 +384,7 @@ talent (*Ancestral Spirit*) a felélesztést is felgyorsítja.
 
 ---
 
-## 4. Fegyverek (MVP: 10 db)
+## 4. Fegyverek (MVP: 10 db; M6b: +3)
 
 Slotok: **Main Hand**, **Off Hand**. Kétkezes (2H) fegyver mindkettőt elfoglalja.
 Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkettő támad.
@@ -404,6 +404,19 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 
 - A fegyverek is **ritkaságot** kapnak (lásd 5.2): magasabb ritkaság = nagyobb alapsebzés + bónusz stat.
 - A bolt minden játékosnak **csak olyan fegyvert kínál, amit a kasztja használhat**.
+
+**M6b: három új fegyver** (a Crossbow, a Polearm és a Fist Weapon az M8-cal jön, 3.7):
+
+| Fegyver | Típus | Ki használhatja | Jellemző |
+|---|---|---|---|
+| **Two-Hand Sword** | 2H közelharci | Warrior, Paladin | A One-Hand Sword kétkezes párja |
+| **Two-Hand Mace** | 2H közelharci | Paladin, Warrior | A Mace kétkezes párja |
+| **Orb** | Off Hand | Mage, Warlock | Varázserő-jellegű statok (Spell Power-típus), **nincs automatikus támadása** (mint a Tome-nak) |
+
+- Mindhárom a többi fegyverrel azonos szabályok szerint kap ritkaságot, és kovácsolható (4.1).
+- Mindegyiknek van **saját Forge Legendary hatása** (fegyvertípusonként egy, 4.1) és egy
+  **procedurális megjelenése** (primitívekből, a végleges modellek az M7-ben).
+- A sebzés- és skálázási számok kiinduló értékek; az M6b nem hangol (9. fejezet).
 
 ### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
 
@@ -455,8 +468,8 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 | Common | ×1,0 | – |
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
-| Epic | ×2,2 | +2 stat (a „+10% támadási sebesség” az M6b item-tartalom passzában jön, M5-ben nincs) |
-| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – 10 kézzel tervezett hatás, fegyvertípusonként egy (pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+| Epic | ×2,2 | +2 stat és **+10% támadási sebesség** (az M6b item-tartalom csomagjában jön, M5-ben és M6a-ban nincs) |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (10 van; az M6b három új fegyvere – Two-Hand Sword, Two-Hand Mace, Orb – még 3-mal bővíti; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
 
 **Korlátok:**
 - Legendary fölé nem lehet kovácsolni; a kovácsolt Legendary-t sem lehet tovább kovácsolni.
@@ -590,6 +603,8 @@ A legtöbb item **generált**: alaptípus + ritkaság + WoW-szerű utótag.
 
 Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 
+**M6b:** az utótagok száma 25-re nő (5.8); a példák a 12 alap-utótagot mutatják.
+
 **Anyag-fokozatok (alaptípusok):** minden páncéltípusnak 3 fokozata van. A magasabb
 fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
@@ -599,6 +614,16 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Leather | Rugged | Thick | Shadowhide |
 | Mail | Chain | Scaled | Stormforged |
 | Plate | Iron | Steel | Runed |
+
+**M6b – a fokozatok külön alaptípusok:**
+- A mai alaptípusok (slotonként és páncéltípusonként egy, összesen 32) az **I. fokozatot**
+  adják; az M6b hozzáadja a **II.** és a **III.** fokozatot (+64): slotonként és
+  páncéltípusonként 3 alaptípus, összesen **96 páncél-alaptípus**.
+- A II. fokozat a **9.**, a III. a **17. hullámtól** érhető el (az alaptípus `min_wave`
+  adata, `ItemBaseData.min_wave`).
+- **Generálás:** a generátor a hullámon elérhető **legmagasabb fokozatot 70%**, egy
+  **alacsonyabbat 30%** eséllyel választja.
+- Az ékszer-alaptípusok 20-ra (10 Neck, 10 Ring) nőnek (5.8).
 
 **Teljes névminta:** `[Enchant-előtag] [Anyag] [Alaptípus] [of the Utótag]`
 
@@ -626,6 +651,9 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 \* Munkanevek – a végleges nevek nem utalhatnak Blizzard-márkákra (lásd 14. fejezet).
 
+**M6b:** a trinketek száma **30**-ra nő (+20), mind kézzel tervezett, proc- vagy aktiválós
+hatással (5.8).
+
 #### Legendary itemek (8 db)
 
 | Név | Slot | Hatás |
@@ -639,6 +667,9 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Sash of Twin Souls | Waist | A második képesség cooldownja −30% |
 | Gauntlets of the Titan | Hands | +20% közelharci sebzés, −10% támadási sebesség |
 
+**M6b:** a Legendary itemek száma **25**-re nő (+17), az újak is kézzel tervezett procokkal
+(5.8). A fegyvertípusonkénti Forge Legendary hatások (4.1) ettől külön készletet adnak.
+
 #### Tier setek (kasztonként 1, Epic ritkaság, 5 darab: Head, Shoulders, Chest, Hands, Legs)
 
 | Kaszt | Set | 2 darab | 4 darab |
@@ -650,6 +681,10 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Warlock | Felfire Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
 | Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
 | Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Chain Lightning +2 célpontot ér |
+
+> **M6b-ből M8-ra tolva:** a **kaszt-független tier setek** (5.8) – ezek a set-rendszer
+> módosítását igénylik (a rendszer ma kasztonként egy setet feltételez), ezért az M8-cal
+> jönnek, nem az M6b-vel. Az M6b-ben a tier setek kasztonként egy-egy marad.
 
 - **Nevek:** a Paladin, a Rogue és a Warlock setje új nevet kapott (korábban Lightforged
   Plate, Shadowcraft Garb, Felheart Raiment), mert azok WoW-setek, illetve -kifejezések
@@ -833,6 +868,10 @@ sor jelzi: „*Classes: Mage*”.
 
 A többi 10 a fejlesztés közben készül el, ugyanígy: kasztonként 4.
 
+**M6b:** kasztonként **8**, összesen **40** kaszt-specifikus item lesz (az M6a-ban 10 van, tehát
++30). Mind „*Equip:*” sorral módosítja a kaszt képességeit (ability mod), Rare-től felfelé
+(5.8).
+
 ### 5.6 Backpack
 
 - **10 hely játékosonként.**
@@ -935,6 +974,11 @@ III ×2, IV ×2,5, V ×3 (az egész értékű statok, pl. „+1 Pierce”, lefel
 A rang szorzója a gold-procnál (Greedy) a gold tört részét átviszi a következő procra, így a
 II. rang procjonként átlagban 1,5 goldot ad.
 
+**M6b – 50 enchant:** a készlet 26 új enchanttal bővül (összesen 50), saját nevekkel, a
+meglévő proc- és bónusz-szókincsen belül (egyetlen új trigger-fajta csak akkor, ha
+elkerülhetetlen). A rangok, a PPM-szabályok és az Enchanter (lent) változatlanok. Az új nevek
+nem utalhatnak Blizzard-márkákra (14. fejezet).
+
 **Enchanting – Arcane Dust és az Enchanter (M6a):**
 
 Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kassza-táblán látszik
@@ -1012,18 +1056,48 @@ Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kas
 
 ### 5.8 Tartalomcél – „sok item”
 
-| Kategória | MVP (M2) | Teljes játék (M6b+) |
-|---|---|---|
-| Fegyver-alaptípus | 10 | 16 (+ kétkezes kard, kétkezes buzogány, polearm, fist weapon, crossbow, orb) |
-| Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 60 | 150+ |
-| Ékszer-alaptípus (Neck, Ring) | 8 | 20 |
-| Stat-utótag („of the Bear” …) | 12 | 25 |
-| Enchantment | 24 | 50+ |
-| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | 40 |
-| Kaszt-specifikus itemek | 20 (kasztonként 4) | 60+ (kasztonként 8+) |
-| Trinket | 10 | 30 |
-| Legendary | 8 | 25 |
-| Tier set | 5 (kasztonként 1) | 10 (+5 kaszt-független) |
+Az **M6b** adja a teljes item-tartalmat, két kivétellel, amelyek az **M8-ra tolódtak**: a
+Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
+
+| Kategória | Állapot (M6a) | M6b-cél | M8 után |
+|---|---|---|---|
+| Fegyver-alaptípus | 10 | **13** (+ Two-Hand Sword, Two-Hand Mace, Orb) | 16 (+ Crossbow, Polearm, Fist Weapon) |
+| Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 32 (csak az I. fokozat) | **96** (3 fokozat × 32) | 96 |
+| Ékszer-alaptípus (Neck, Ring) | 8 (4 + 4) | **20** (10 Neck, 10 Ring) | 20 |
+| Stat-utótag („of the Bear” …) | 18 | **25** | 25 |
+| Enchantment | 24 | **50** (+26) | 50 |
+| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | **40** (+30) | 40 |
+| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8, +30) | 60+ (kasztonként 8+, az új kasztokkal) |
+| Trinket | 10 | **30** (+20) | 30 |
+| Legendary | 8 | **25** (+17) | 25 |
+| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (az új fegyverekhez) | 16 |
+| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1) | kasztonként 1 + 5 kaszt-független |
+
+**Az M6b tartalom-csomagjai**
+
+- **Fegyverek:** három új fegyvertípus – **Two-Hand Sword** (Warrior, Paladin), **Two-Hand
+  Mace** (Paladin, Warrior) és **Orb** (Off Hand a Mage-nek és a Warlocknak: varázserő-jellegű
+  statok, nincs automatikus támadás) –, mindegyikhez saját Forge Legendary hatás
+  (fegyvertípusonként egy) és procedurális megjelenés (4. fejezet). A Crossbow, a Polearm és a
+  Fist Weapon az M8-cal jön. Az **Epic** fegyverek **+10% támadási sebességet** kapnak (4.1).
+- **Páncél:** a két újabb anyag-fokozat minden slotra és páncéltípusra: a II. a 9., a III. a 17.
+  hullámtól (`ItemBaseData.min_wave`); a generátor az elérhető legmagasabb fokozatot 70%-ban,
+  egy alacsonyabbat 30%-ban választja (5.4). Az eredmény **96** alaptípus.
+- **Ékszer és utótag:** 20 ékszer-alaptípus (10 Neck, 10 Ring) és 25 stat-utótag.
+- **Enchantok:** 50 (+26), saját nevekkel, a meglévő proc- és bónusz-szókincsen belül; új
+  trigger-fajta csak akkor, ha elkerülhetetlen (5.7).
+- **Kézzel tervezett itemek:**
+  - névvel ellátott Rare / Epic: 40 (+30);
+  - kaszt-specifikus: kasztonként 8 = 40 (+30), „*Equip:*” sorral módosítják a kaszt
+    képességeit (5.5);
+  - trinket: 30 (+20);
+  - Legendary: 25 (+17), kézzel tervezett procokkal.
+- **Kaszt-független tier setek:** az **M8-ra tolódtak**, mert a set-rendszer módosítását
+  igénylik (5.5); az M6b-ben a setek kasztonként egy-egy maradnak.
+- **Nevek:** az új itemek és enchantok nevei nem Blizzard-nevek; mindet ellenőrizzük a 14.
+  fejezet listája szerint.
+- A csomagok számai kiinduló értékek: az M6b nem hangol, a végleges balansz a legvégén
+  készül (9. fejezet).
 
 A generált alaptípusok, utótagok és enchantok kombinációjából **több ezer** különböző
 item jön ki. A kézzel tervezett itemek adják a „hűha, ez leesett!” pillanatokat.
@@ -2577,6 +2651,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **Nem használjuk:** Blizzard-tulajdonnevek (Azeroth, Murloc, Thunderfury, Ashbringer,
   Horde/Alliance stb.), logók, eredeti assetek, a Friz Quadrata font.
 - A dokumentumban `*`-gal jelölt nevek munkanevek, publikálás előtt cserélendők.
+- **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőrizzük,
+  mielőtt bekerül a játékba.
 
 ---
 
