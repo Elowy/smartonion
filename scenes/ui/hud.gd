@@ -32,6 +32,8 @@ const BOSS_BAR_HEIGHT := 22.0
 const BOSS_PHASES := 2
 const BOSS_BAR_COLOR := Color(0.84, 0.16, 0.14)
 const PIP_SIZE := 14.0
+## M6b: side of the running shrines' icons under the gold (each with its waves-left badge).
+const SHRINE_ICON_SIZE := 40.0
 ## The ENRAGED line pulses between this alpha and 1 (never dim on the dark plaque); the row is
 ## always reserved (alpha 0 while calm), so nothing below it jumps when the boss enrages.
 const ENRAGED_ALPHA_MIN := 0.8
@@ -69,6 +71,9 @@ var _floater_amount := 0
 ## Seconds since the last pickup added to the floater.
 var _floater_age := 0.0
 var _clock := 0.0
+
+## The running shrines (RunState.shrine_effects) as small icons with the waves they have left; hidden while none runs.
+var shrine_row: HBoxContainer
 
 ## The boss frame (replaces the timer on boss waves): its box, name, HP bar, phase pips and the
 ## "ENRAGED" line, and the boss it shows.
@@ -273,6 +278,45 @@ func _build_top() -> void:
 	_loot_row.add_child(team_loot_label)
 	_loot_row.visible = false
 	col.add_child(_loot_row)
+	_build_shrine_row(col)
+
+
+## The running shrines' icons (M6b): one ShrineIcon per effect in RunState.shrine_effects with a badge of the
+## waves it has left, under the gold; the row is hidden while no shrine runs.
+func _build_shrine_row(col: VBoxContainer) -> void:
+	shrine_row = UiTheme.hbox(6)
+	shrine_row.name = "ShrineRow"
+	shrine_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	shrine_row.visible = false
+	col.add_child(shrine_row)
+
+
+## Rebuilds the shrine icons from RunState.shrine_effects (RunState.shrines_changed).
+func _refresh_shrines() -> void:
+	if shrine_row == null:
+		return
+	for c in shrine_row.get_children():
+		shrine_row.remove_child(c)
+		c.queue_free()
+	for e in RunState.shrine_effects:
+		var data := Db.get_shrine(StringName(e.get("id", &"")))
+		if data == null:
+			continue
+		var icon := ShrineIcon.create(data, SHRINE_ICON_SIZE, int(e.get("waves_left", 0)))
+		icon.name = "Shrine_%s" % data.id
+		shrine_row.add_child(icon)
+	shrine_row.visible = shrine_row.get_child_count() > 0
+
+
+## The shrines whose icons show (tests, screenshots), in row order.
+func shown_shrines() -> Array[ShrineData]:
+	var out: Array[ShrineData] = []
+	if shrine_row == null:
+		return out
+	for c in shrine_row.get_children():
+		if c is ShrineIcon and not c.is_queued_for_deletion():
+			out.append((c as ShrineIcon).data)
+	return out
 
 
 ## The boss frame (hidden until a boss wave): name, HP bar, phase pips and the ENRAGED line.
@@ -473,6 +517,8 @@ func _ready() -> void:
 	RunState.xp_changed.connect(_on_xp_changed)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
+	RunState.shrines_changed.connect(_refresh_shrines)
+	_refresh_shrines()
 	_on_wave_changed(RunState.wave)
 	_loot_count = RunState.team_loot.size()
 	_show_team_loot()

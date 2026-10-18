@@ -250,6 +250,10 @@ func _decide() -> void:
 	_fill_result()
 	_refresh_chips(true)
 	decided.emit(vote.is_accepted(), vote.reason)
+	if _result_left <= 0.0 and phase == Phase.RESULT:
+		# Nobody is watching (bots only): the break goes on in the same frame.
+		phase = Phase.DONE
+		finished.emit()
 
 
 ## The decision's headline ("Everyone accepted", "P2 declined – the shrine fades").

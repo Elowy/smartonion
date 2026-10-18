@@ -25,8 +25,6 @@ const SOURCE := &"shrine"
 const CHANCE := 0.05
 ## The spend kind of the purse a shrine takes (RunState.try_spend_for).
 const SPEND_KIND := &"shrine"
-## Hero bonus shims (one ConsumableData per shrine id: the consumables' effect resolver works on them).
-static var _shims: Dictionary[StringName, ConsumableData] = {}
 
 
 # --- The roll ----------------------------------------------------------------------------------
@@ -226,16 +224,13 @@ static func clear_hero(player: Player) -> void:
 	player.bonuses.set_effects(SOURCE, [] as Array[Dictionary])
 
 
-## The hero-effect entries of [param data] as a ConsumableData (cached): the consumables' resolver turns
-## "stats_pct" into plain stats against the hero's current numbers.
+## The hero-effect entries of [param data] as a ConsumableData: the consumables' resolver turns "stats_pct" into
+## plain stats against the hero's current numbers. (Not cached: a static Resource would still be alive at exit.)
 static func _shim(data: ShrineData) -> ConsumableData:
-	var shim: ConsumableData = _shims.get(data.id)
-	if shim == null or shim.effects != data.hero_effects:
-		shim = ConsumableData.new()
-		shim.id = data.id
-		shim.display_name = data.display_name
-		shim.effects = data.hero_effects
-		_shims[data.id] = shim
+	var shim := ConsumableData.new()
+	shim.id = data.id
+	shim.display_name = data.display_name
+	shim.effects = data.hero_effects
 	return shim
 
 
