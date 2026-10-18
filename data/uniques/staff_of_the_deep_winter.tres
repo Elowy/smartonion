@@ -5,8 +5,8 @@
 
 [resource]
 script = ExtResource("1_script")
-id = &"winterbloom_staff"
-display_name = "Winterbloom Staff"
+id = &"staff_of_the_deep_winter"
+display_name = "Staff of the Deep Winter"
 flavor = "Blooms once a year. The year is whenever it decides."
 slot_type = 11
 armor_type = -1

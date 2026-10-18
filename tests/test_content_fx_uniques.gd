@@ -19,7 +19,7 @@ const NEW_LEGENDARIES: Array[StringName] = [
 	&"breastplate_of_unbroken_anger", &"girdle_of_the_last_roar", &"tearjerker",
 	&"hood_of_the_quiet_knife", &"bracers_of_the_hidden_blade", &"breeches_of_the_light_fingers",
 	&"vial_of_distilled_adrenaline", &"amulet_of_unspent_wishes", &"leggings_of_the_brimming_well",
-	&"winterbloom_staff", &"gloves_of_the_patient_rot", &"robe_of_the_hollow_pact",
+	&"staff_of_the_deep_winter", &"gloves_of_the_patient_rot", &"robe_of_the_hollow_pact",
 	&"ring_of_the_mischievous_imp", &"grimoire_of_seeded_doom",
 ]
 const OLD_LEGENDARIES: Array[StringName] = [
@@ -528,9 +528,9 @@ func test_leggings_of_the_brimming_well_stack_spell_power_and_arcane_damage() ->
 	check_eq(p.stats.get_raw(Stats.SPELL_POWER) - sp, 0.0, "gone after 6 sec")
 
 
-func test_winterbloom_staff_freezes_its_target() -> void:
+func test_staff_of_the_deep_winter_freezes_its_target() -> void:
 	var p := _hero(&"mage")
-	_wear(p, &"winterbloom_staff")
+	_wear(p, &"staff_of_the_deep_winter")
 	check(p.main_hand.id == &"staff", "the Legendary is a staff")
 	var e := _real(Vector3(3, 0, 0))
 	var hp := e.hp
