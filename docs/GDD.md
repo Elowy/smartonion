@@ -3185,3 +3185,9 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
 | Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
 | Vor'thalax | Alap HP 450 (az 1200 elírás volt), érintéses sebzés 4, a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) mint Morvainé; a Flesh Golem érintéses sebzése 4 – a végső balansz az M6b végén, egyszer (8., 9. fejezet) |
+| Módok (M6b) | **Normal** (25 hullám) vagy **Endless** (a 25. hullám után folytatódik, a 30.-tól 5 hullámonként boss; csak vereséggel ér véget), opcionális **Hardcore** (nincs Spirit Healer); a lobbyban választható (Y / X); módonként és létszámonként helyi top 10 ranglista (1., 12., 16.1) |
+| Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány az M7-ben (13., 16.1) |
+| Események és szentélyek (M6b) | Hullám közbeni esemény a 4. hullámtól, 30% eséllyel, hullámonként legfeljebb egy (Guarded Chest, Defend the Totem, Goblin Caravan); szentély a szünetekben 5% eséllyel, csak egyhangú elfogadással (8., 10.1, 16.1) |
+| Dungeon-portál (M6b) | A 6., 9., 12. és 15. hullám után, csapatszavazással; 4 terem (Clear, Survive, Defend, Warden); siker: hősönként 1 garantált Epic, bukás: a kassza 50%-a elvész, a piac mindkét esetben következik (8., 16.1) |
+| M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8 |
+| M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangol; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |
