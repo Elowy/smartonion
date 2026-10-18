@@ -628,6 +628,19 @@ func test_a_shrine_that_ran_out_leaves_nothing_on_the_hero() -> void:
 	check(hero.bonuses.effects_of(Shrines.SOURCE).is_empty(), "the next wave starts clean")
 
 
+func test_hero_effects_are_only_applied_while_a_wave_is_on() -> void:
+	_human()
+	var hero := _hero_of(0)
+	var base_hp := hero.max_hp()
+	RunState.add_shrine_effect(&"blood", 3)
+	Shrines.apply_to_hero(hero)
+	check_near(hero.max_hp(), base_hp, 0.001, "a running shrine does nothing to the heroes in the break")
+	check(hero.bonuses.effects_of(Shrines.SOURCE).is_empty(), "no shrine source")
+	_live()
+	Shrines.apply_to_hero(hero)
+	check_near(hero.max_hp(), base_hp * 0.8, 0.2, "live: it does")
+
+
 func test_the_effects_do_not_apply_to_a_freed_or_missing_hero() -> void:
 	RunState.add_shrine_effect(&"blood", 3)
 	Shrines.begin_wave([null])
@@ -797,7 +810,12 @@ func test_a_human_votes_with_a_and_waits_for_the_lockout() -> void:
 	_step()
 	pad.release(PlayerInput.Pad.A)
 	_step(0.0)
-	check_eq(screen.vote.undecided(), [0] as Array[int], "the opening frame and the lockout swallow the press")
+	check_eq(screen.vote.undecided(), [0] as Array[int], "the opening frame swallows the press")
+	_step(0.1)
+	_tap(pad, PlayerInput.Pad.A)
+	check_eq(screen.vote.undecided(), [0] as Array[int], "0.1 s in: still inside the lockout (a loot-roll press must not vote)")
+	_tap(pad, PlayerInput.Pad.B)
+	check(not screen.vote.is_decided(), "B is locked out too")
 	_past_lockout()
 	_tap(pad, PlayerInput.Pad.A)
 	check(screen.vote.is_accepted(), "A accepts")
@@ -1008,6 +1026,26 @@ func test_a_pending_shrine_opens_the_vote_between_loot_and_level_up() -> void:
 	check_eq(intermission.phase, Intermission.Phase.LEVEL_UP, "then the level-up cards")
 	check(not intermission.shrine_screen.visible, "the card is gone")
 	check_eq(RunState.pending_shrine, &"", "consumed")
+
+
+func test_the_shrine_comes_after_the_loot_roll() -> void:
+	_bot("bot:a", &"warrior")
+	_make_intermission()
+	RunState.add_team_loot(MarketFakes.make_item("Looted Charm", Items.SlotType.TRINKET, Items.NO_ARMOR, Items.Rarity.RARE, 50))
+	RunState.pending_shrine = &"greed"
+	intermission.open(5, 0)
+	check_eq(intermission.phase, Intermission.Phase.LOOT, "the loot roll first")
+	check(not intermission.shrine_screen.visible, "no card yet")
+	for i in 40:
+		for slot in PlayerManager.get_slots():
+			slot.input.poll(0.25)
+		if intermission.loot_screen.visible:
+			intermission.loot_screen._process(0.25)
+		if intermission.phase != Intermission.Phase.LOOT:
+			break
+	check_eq(intermission.phase, Intermission.Phase.SHRINE, "then the shrine")
+	check(intermission.shrine_screen.visible, "the card shows")
+	check(not intermission.loot_screen.visible, "the loot screen is gone")
 
 
 func test_an_accepted_shrine_takes_effect_and_is_reported() -> void:
