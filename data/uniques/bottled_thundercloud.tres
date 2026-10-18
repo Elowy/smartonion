@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bottled_thundercloud"
+display_name = "Bottled Thundercloud"
+flavor = "Do not shake. Seriously."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"nature_damage": 6.0,
+&"haste": 2.0
+})
+class_restriction = &""
+unique_effect = &"chain"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 2.5,
+"icd": 2.0,
+"damage": 13.0,
+"targets": 3,
+"school": "nature"
+}
+unique_text = "Chance on hit: A bolt of lightning leaps between 3 enemies for 13 Nature damage each."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

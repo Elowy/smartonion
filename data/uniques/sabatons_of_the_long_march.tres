@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"sabatons_of_the_long_march"
+display_name = "Sabatons of the Long March"
+flavor = "Nobody remembers where the march began. Nobody wants to be in its way."
+slot_type = 8
+armor_type = 3
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"strength": 6.0,
+&"stamina": 8.0,
+&"speed": 8.0,
+&"versatility": 3.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "periodic",
+"interval": 6.0,
+"damage": 18.0,
+"radius": 3.0,
+"school": "holy",
+"at": "self",
+"slow": 40.0,
+"slow_duration": 2.0
+}
+unique_text = "Every 6 sec: Hallows the ground around you, dealing 18 Holy damage to enemies within 3 m and slowing them by 40% for 2 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

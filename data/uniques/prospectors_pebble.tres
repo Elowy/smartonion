@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"prospectors_pebble"
+display_name = "Prospector's Pebble"
+flavor = "It always points at gold. Nobody asked how."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"gold_find": 10.0
+})
+class_restriction = &""
+unique_effect = &"gold"
+unique_params = {
+"trigger": "periodic",
+"interval": 15.0,
+"amount": 2
+}
+unique_text = "Every 15 sec: Finds 2 gold."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"pauldrons_of_the_radiant_bulwark"
+display_name = "Pauldrons of the Radiant Bulwark"
+flavor = "So bright that enemies keep swinging at the wrong target."
+slot_type = 2
+armor_type = 3
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"strength": 7.0,
+&"stamina": 9.0,
+&"holy_damage": 10.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "when_struck",
+"chance": 20.0,
+"icd": 8.0,
+"amount": 0.0,
+"max_hp_pct": 15.0,
+"duration": 5.0
+}
+unique_text = "When struck: 20% chance to raise a radiant ward absorbing 15% of your Max HP for 5 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

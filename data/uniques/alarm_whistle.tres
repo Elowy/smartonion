@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"alarm_whistle"
+display_name = "Alarm Whistle"
+flavor = "The loudest thing a vegetable can do."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"speed": 5.0,
+&"dodge": 2.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 35.0,
+"per_wave": 1,
+"damage": 25.0,
+"radius": 4.0,
+"school": "physical",
+"at": "self",
+"stun": 1.5
+}
+unique_text = "Equip: When you fall below 35% health, a deafening blast deals 25 damage to enemies within 4 m and stuns them for 1.5 sec. Once per wave."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

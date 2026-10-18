@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bell_of_stillness"
+display_name = "Bell of Stillness"
+flavor = "Silence is golden. This is bronze, but it works."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"stamina": 4.0,
+&"versatility": 2.0
+})
+class_restriction = &""
+unique_effect = &"stun"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 2.0,
+"icd": 6.0,
+"duration": 1.5
+}
+unique_text = "Chance on hit: The bell tolls, stunning the target for 1.5 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

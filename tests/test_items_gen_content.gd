@@ -85,8 +85,8 @@ func test_unique_counts() -> void:
 			trinkets += 1
 		else:
 			named += 1
-	check_eq(trinkets, 10, "trinkets")
-	check_eq(legendaries, 8, "Legendaries")
+	check_eq(trinkets, 30, "trinkets (10 + 20 in M6b)")
+	check_eq(legendaries, 25, "Legendaries (8 + 17 in M6b)")
 	check(named >= 10, "named Rare / Epic items (%d)" % named)
 	for class_id in Db.class_ids:
 		check(per_class.get(class_id, 0) >= 2, "class items for %s" % class_id)
@@ -169,6 +169,8 @@ func test_no_blizzard_trademarks() -> void:
 		texts.append(Db.item_bases[id].display_name)
 	for id in Db.affixes:
 		texts.append(Db.affixes[id].suffix)
+	for id in Db.enchants:
+		texts.append_array([Db.enchants[id].prefix, Db.enchants[id].description])
 	for id in Db.sets:
 		texts.append(Db.sets[id].display_name)
 		for bonus in Db.sets[id].bonuses:

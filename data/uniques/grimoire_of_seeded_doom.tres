@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/tome.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"grimoire_of_seeded_doom"
+display_name = "Grimoire of Seeded Doom"
+flavor = "Page 1: doom. Page 2: more doom. Page 3 is left blank, for your own."
+slot_type = 11
+armor_type = -1
+rarity = 4
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 8.0,
+&"shadow_damage": 14.0,
+&"spell_power": 4.0
+})
+class_restriction = &""
+unique_effect = &"explode"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 3.0,
+"icd": 3.0,
+"damage": 26.0,
+"radius": 3.0,
+"school": "shadow",
+"dot": 20.0,
+"dot_duration": 4.0
+}
+unique_text = "Chance on hit: The target bursts in shadow, dealing 26 Shadow damage to it and enemies within 3 m and leaving them rotting for 20 more over 4 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

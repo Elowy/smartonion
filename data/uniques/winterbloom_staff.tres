@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"winterbloom_staff"
+display_name = "Winterbloom Staff"
+flavor = "Blooms once a year. The year is whenever it decides."
+slot_type = 11
+armor_type = -1
+rarity = 4
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"intellect": 9.0,
+&"spell_power": 6.0,
+&"frost_damage": 12.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"icd": 3.0,
+"damage": 24.0,
+"school": "frost",
+"stun": 1.5
+}
+unique_text = "Chance on hit: A shard of winter strikes the target for 24 Frost damage and freezes it in place for 1.5 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0
