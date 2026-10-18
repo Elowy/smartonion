@@ -27,6 +27,11 @@ extends Resource
 ## Which ground hazard the arena runs during a wave (&"" = none). Read by the ENV package's hazard
 ## director; every hazard is an EnemyHazard (group enemy_hazards).
 @export var hazard_id: StringName = &""
+## The hazard's name and one rule line for the roll animation's card ("Grasping Hands", "...").
+@export var hazard_name := ""
+@export_multiline var hazard_text := ""
+## The accent of the environment's roll card (frame and name); the forest's leaf green by default.
+@export var card_color := Color(0.5, 0.72, 0.3)
 
 # --- Sky, fog and light --------------------------------------------------------------------------
 @export var sky_color := Color(0.56, 0.74, 0.92)

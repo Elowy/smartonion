@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnvironmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/environment_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"volcano"
+display_name = "Volcano"
+description = "A scorched crater ringed by black rock. The ground here is only pretending to be solid."
+roll_weight = 1.0
+decor_id = &"volcano"
+hazard_id = &"lava_vents"
+hazard_name = "Lava Vents"
+hazard_text = "Six vents erupt in turn. The blast burns heroes and enemies alike."
+card_color = Color(1, 0.5, 0.2, 1)
+sky_color = Color(0.24, 0.09, 0.06, 1)
+ambient_color = Color(0.82, 0.52, 0.42, 1)
+ambient_energy = 0.62
+fog_color = Color(0.44, 0.19, 0.1, 1)
+fog_density = 0.0085
+sun_color = Color(1, 0.62, 0.36, 1)
+sun_energy = 1.0
+sun_rotation = Vector3(-50, -140, 0)
+glow_intensity = 0.8
+saturation = 1.15
+contrast = 1.08
+grass_dark = Color(0.1, 0.085, 0.085, 1)
+grass_mid = Color(0.17, 0.14, 0.13, 1)
+grass_light = Color(0.26, 0.21, 0.19, 1)
+grass_warm = Color(0.36, 0.2, 0.12, 1)
+dirt_light = Color(0.3, 0.2, 0.16, 1)
+dirt_dark = Color(0.14, 0.1, 0.09, 1)
+has_road = false
+road_width = 1.7
+wall_tint = Color(0.56, 0.46, 0.44, 1)

@@ -93,6 +93,9 @@ var wave_director: WaveDirector
 var goblin_spawner: GoblinSpawner
 ## Child of the WaveDirector (M6b): the mid-wave event slot (EVENTS package).
 var event_spawner: EventSpawner
+## Child of the WaveDirector (M6b): the arena environment's hazard director (ENV package; a Forest Ruin
+## run has one too, with nothing to do).
+var environment_hazards: EnvironmentHazards
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -299,6 +302,8 @@ func start_run() -> void:
 	event_spawner = EventSpawner.create(wave_director)
 	wave_director.add_child(event_spawner)
 	event_spawner.announced.connect(_on_announced)
+	environment_hazards = EnvironmentHazards.create(wave_director, Db.environment_or_default(RunState.environment))
+	wave_director.add_child(environment_hazards)
 
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
@@ -657,6 +662,7 @@ func _teardown_run() -> void:
 	wave_director = null
 	goblin_spawner = null  # freed with the director
 	event_spawner = null
+	environment_hazards = null  # (freed with the director)
 	arena = null
 	players.clear()
 	_disconnected.clear()
@@ -1056,6 +1062,7 @@ func smoke_result(result: String) -> Dictionary:
 		"dungeons_entered": RunState.dungeons_entered,
 		"dungeons_completed": RunState.dungeons_completed,
 		"dungeons_failed": RunState.dungeons_failed,
+		"hazards": environment_hazards.stats() if environment_hazards != null else {},
 		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,

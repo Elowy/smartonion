@@ -163,6 +163,10 @@ var res_sickness_left := 0.0
 var invulnerable_left := 0.0
 ## Remaining stealth (Vanish) in seconds: enemies neither target, touch nor shoot this player.
 var stealth_left := 0.0
+## Remaining root in seconds (M6b, the Cemetery's Grasping Hands): the hero cannot walk, but still
+## attacks and casts. [method apply_root] sets it; it ends by itself, at the wave start and when the
+## hero goes down.
+var rooted_left := 0.0
 ## Named incoming-damage multipliers (Shield Wall 0.5 ...), applied after armour; cleared at
 ## wave start.
 var damage_taken_mults: Dictionary[StringName, float] = {}
@@ -302,6 +306,19 @@ func is_reviving() -> bool:
 	return false
 
 
+## Roots the hero for [param duration] seconds (a longer root stays; a downed hero cannot be
+## rooted). Returns whether the root took hold.
+func apply_root(duration: float) -> bool:
+	if downed or duration <= 0.0:
+		return false
+	rooted_left = maxf(rooted_left, duration)
+	return true
+
+
+func is_rooted() -> bool:
+	return rooted_left > 0.0
+
+
 ## Wave cleared (before the intermission): abilities / Mastery and talent / set scripts drop
 ## auras and buffs, the proc buffs end (ProcSystem.end_wave), and Armor Specialization is
 ## recomputed from what stays for the market.
@@ -335,6 +352,7 @@ func begin_wave() -> void:
 		_hp_updated()
 	invulnerable_left = 0.0
 	stealth_left = 0.0
+	rooted_left = 0.0
 	res_sickness_left = 0.0
 	forced_crits = 0
 	damage_mults.clear()
@@ -779,6 +797,7 @@ func face_attack(direction: Vector3) -> void:
 func _physics_process(delta: float) -> void:
 	invulnerable_left = maxf(0.0, invulnerable_left - delta)
 	stealth_left = maxf(0.0, stealth_left - delta)
+	rooted_left = maxf(0.0, rooted_left - delta)
 	res_sickness_left = maxf(0.0, res_sickness_left - delta)
 	_attack_look_left = maxf(0.0, _attack_look_left - delta)
 	_update_movement(delta)
@@ -802,6 +821,9 @@ func _update_movement(delta: float) -> void:
 	var max_speed := current_max_speed()
 	var target := Vector3(move.x, 0.0, move.y) * max_speed
 	var rate := ACCELERATION if move.length() > MOVE_DEADZONE else DECELERATION
+	if rooted_left > 0.0:
+		target = Vector3.ZERO  # (the stick still turns the hero)
+		velocity = Vector3.ZERO
 	velocity = Vector3(velocity.x, 0.0, velocity.z).move_toward(target, rate * delta)
 	var arena := Arena.current if is_inside_tree() else null
 	var motion := velocity * delta + _separation_motion(delta) + _pull_motion(delta)
@@ -1112,6 +1134,7 @@ func _go_down() -> void:
 	_regen_accum = 0.0
 	invulnerable_left = 0.0
 	stealth_left = 0.0
+	rooted_left = 0.0
 	if model != null:
 		model.set_downed(true)
 		model.set_revive_progress(0.0)
