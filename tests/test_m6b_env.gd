@@ -880,6 +880,42 @@ func test_a_bog_pool_slows_the_heroes_and_enemies_inside_and_hurts_nobody() -> v
 	check(pool.stage == EnemyHazard.Stage.ACTIVE, "still there 20 s later")
 
 
+func test_a_bog_pool_touches_its_materials_only_while_it_fades_in() -> void:
+	var pool := BogPool.spawn(_entities(), Vector3(4, 0, 4), 2.3, 30.0, 15.0)
+	var mud_alpha := func() -> float: return (_ring_param(pool._mud, &"ring_color") as Color).a
+	var rim_alpha := func() -> float: return (_ring_param(pool._rim, &"ring_color") as Color).a
+	check_near(mud_alpha.call(), 0.0, 0.0001, "invisible when laid")
+	for b in pool._bubbles:
+		check(not b.visible, "the bubbles wait for the pool to appear")
+	_step(pool, 0.2)
+	check_near(mud_alpha.call(), 0.88 * 0.5, 0.05, "half way in at 0.2 s")
+	check(pool.look_updates > 1, "the fade writes the materials")
+	for b in pool._bubbles:
+		check(not b.visible, "still no bubbles")
+	_step(pool, 0.3)
+	check_near(mud_alpha.call(), 0.88, 0.0001, "the mud is fully in")
+	check_near(rim_alpha.call(), 0.9, 0.0001, "so is the rim")
+	for b in pool._bubbles:
+		check(b.visible, "the bubbles show once it has faded in")
+	var writes := pool.look_updates
+	var before: Array[Transform3D] = []
+	for b in pool._bubbles:
+		before.append(b.transform)
+	_step(pool, 12.0)
+	check_eq(pool.look_updates, writes, "not one more material write in 12 s (no per-tick look update)")
+	check_near(mud_alpha.call(), 0.88, 0.0001, "and the pool looks the same")
+	for i in pool._bubbles.size():
+		check(pool._bubbles[i].transform.is_equal_approx(before[i]), "bubble %d is not moved from script" % i)
+	# The bubbles animate on the GPU: one shared self-animating material.
+	var shared := pool._bubbles[0].material_override
+	check(shared is ShaderMaterial and (shared as ShaderMaterial).shader.code.contains("TIME"), "the bubble material animates itself on TIME")
+	for b in pool._bubbles:
+		check(b.material_override == shared, "one material for all five bubbles")
+	check(Mats.bubble(BogPool.BUBBLE_COLOR) == shared, "cached")
+	check(Mats.bubble(Color(1, 0, 0)) != shared, "per colour")
+	check(pool.stage == EnemyHazard.Stage.ACTIVE and pool.hero_slows == 0, "still a working pool (nobody in it)")
+
+
 func test_the_bots_steer_around_a_bog_pool_but_only_gently() -> void:
 	var pool := BogPool.spawn(_entities(), Vector3(4, 0, 0), 2.3, 30.0, 15.0)
 	var from := Vector3(6.0, 0, 0)

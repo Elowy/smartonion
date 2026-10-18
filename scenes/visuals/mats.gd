@@ -168,6 +168,25 @@ void fragment() {
 }
 """
 
+## A small unlit sphere that swells and pops over and over, animated by the GPU (bog bubbles): scales
+## around its own centre by max(0, sin(TIME * 2.2 + phase)) * 0.9 and rises a little with it. The phase
+## is a hash of the node's world XZ, so bubbles in different places are out of step (instance uniforms
+## are not an option, see the header). Nothing is animated from script.
+const _BUBBLE_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_back, depth_draw_opaque, shadows_disabled;
+uniform vec4 albedo : source_color = vec4(0.62, 0.82, 0.3, 1.0);
+void vertex() {
+	vec2 at = MODEL_MATRIX[3].xz;
+	float phase = TIME * 2.2 + fract(sin(dot(at, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+	float s = max(0.0, sin(phase)) * 0.9;
+	VERTEX = VERTEX * max(s, 0.01) + vec3(0.0, 0.03 + s * 0.1, 0.0);
+}
+void fragment() {
+	ALBEDO = albedo.rgb;
+}
+"""
+
 ## WoW-like cast bar quad (QuadMesh, UV 0..1) that always faces the camera and draws on
 ## top. Uniforms: bar_color (fill), bar_progress (0..1).
 const _CAST_BAR_CODE := """
@@ -348,6 +367,19 @@ static func ring() -> Material:
 	var m := ShaderMaterial.new()
 	m.shader = _shader("ring", _RING_CODE)
 	m.render_priority = -1
+	return m
+
+
+## The self-animating bubble material of [constant _BUBBLE_CODE] for [param color] (lightened a little
+## like [method glow]). Cached per colour.
+static func bubble(color: Color) -> Material:
+	var key := "bubble:%s" % color.to_html()
+	if _cache.has(key):
+		return _cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = _shader("bubble", _BUBBLE_CODE)
+	m.set_shader_parameter(&"albedo", Color(color.r, color.g, color.b, 1.0).lerp(Color.WHITE, 0.15))
+	_cache[key] = m
 	return m
 
 
