@@ -42,6 +42,11 @@ extends Node
 ##   the WaveDirector gets an [EventSpawner] child ([member event_spawner]) next to the GoblinSpawner.
 ##   Every "last wave" decision reads RunState.total_waves() / is_final_wave() (0 = endless: the run
 ##   ends only in defeat).
+## - M6b dungeon: after wave 6, 9, 12 and 15 (and after the next wave with --dungeon) the break gets a
+##   PORTAL phase ([method _roll_portal]); when the party's vote passes the Intermission hides and
+##   [method enter_dungeon] runs a [Dungeon] (State.DUNGEON: the same arena in a 24 x 14 layout, the HUD
+##   shows "Dungeon – Room n/4"); [method _on_dungeon_finished] pays the reward (DungeonRewards) and gives
+##   the break back to the Intermission, which rolls the Epics and opens the market.
 ## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
 ## --start-level, --panel-tab, --mode, --hardcore, --env, --event ...): see LaunchOptions. SMOKE_RESULT
 ## keys: see smoke_result().
@@ -50,7 +55,8 @@ signal state_changed(state: State)
 ## A run ended (before the Game Over screen opens).
 signal run_finished(victory: bool)
 
-enum State { BOOT, MENU, LOBBY, WAVE, WAVE_END, INTERMISSION, GAME_OVER }
+## DUNGEON (M6b) is appended: the party is inside a dungeon, between a break's portal vote and its market.
+enum State { BOOT, MENU, LOBBY, WAVE, WAVE_END, INTERMISSION, GAME_OVER, DUNGEON }
 
 ## Seconds (game time) between "Wave cleared!" and the intermission screen.
 const WAVE_END_DELAY := 1.6
@@ -80,6 +86,9 @@ const SMOKE_TIMEOUT_EXTRA := 60.0
 ## Game seconds allowed per intermission of a smoke run (the loot roll shows every item's
 ## result for LootRollScreen.RESULT_TIME).
 const SMOKE_INTERMISSION_ALLOWANCE := 12.0
+## Game seconds a dungeon of a smoke run may take: the intro, three timed rooms and the Warden with its
+## enrage (60 s) and the smoke safety after it (Dungeon.SMOKE_BOSS_GRACE), plus the pauses.
+const SMOKE_DUNGEON_ALLOWANCE := 60.0 + 60.0 + Dungeon.SMOKE_BOSS_GRACE + 60.0 + 40.0
 ## Game seconds a boss wave of a smoke run may take on top of its nominal duration: the enrage
 ## (90 s), the safety kill after it (WaveDirector.SMOKE_BOSS_GRACE) and the fight's start.
 const SMOKE_BOSS_ALLOWANCE := 90.0 + WaveDirector.SMOKE_BOSS_GRACE + 30.0
@@ -93,6 +102,8 @@ var wave_director: WaveDirector
 var goblin_spawner: GoblinSpawner
 ## Child of the WaveDirector (M6b): the mid-wave event slot (EVENTS package).
 var event_spawner: EventSpawner
+## The dungeon the party is in (M6b DUNGEON); null outside one.
+var dungeon: Dungeon
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -152,6 +163,8 @@ var _wave_perf := RunPerf.new()
 var _clock: PhysicsClock
 ## RunState.team_loot size last seen (items_looted counts the growth).
 var _loot_seen := 0
+## players_downed when the wave began (RunState.last_wave_downs at its end).
+var _downs_at_wave_start := 0
 
 
 ## Main for [param p_options] (null = parse the command line in _ready).
@@ -279,6 +292,7 @@ func start_run() -> void:
 	level_cards = 0
 	ranks_trained = 0
 	shop_rerolls = 0
+	_downs_at_wave_start = 0
 	gold_at_last_shop = RunState.gold
 	_loot_seen = RunState.team_loot.size()
 	victory = false
@@ -312,6 +326,7 @@ func start_run() -> void:
 	intermission.level_card_picked.connect(_on_level_card_picked)
 	intermission.ranks_trained.connect(_on_ranks_trained)
 	intermission.bot_rerolled.connect(_on_bot_rerolled)
+	intermission.portal_accepted.connect(_on_portal_accepted, CONNECT_DEFERRED)
 	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
 	intermission.bot_shopping = options.smoke or options.demo
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
@@ -353,6 +368,7 @@ func start_wave(n: int) -> void:
 	for p in players:
 		if is_instance_valid(p):
 			p.begin_wave()
+	_downs_at_wave_start = players_downed
 	_set_state(State.WAVE)
 	_wave_perf = RunPerf.new()
 	_wave_start_msec = Time.get_ticks_msec()
@@ -409,6 +425,100 @@ func open_intermission() -> void:
 	intermission.open(wave, RunState.pending_level_ups)
 
 
+## The portal vote passed (Intermission.portal_accepted): the party goes into the dungeon.
+func _on_portal_accepted() -> void:
+	if state == State.INTERMISSION:
+		enter_dungeon()
+
+
+## Enters a dungeon scaled to the wave just cleared: the Intermission is hidden, the tree runs again, the
+## HUD shows the dungeon's line and the [Dungeon] takes the arena over until [signal Dungeon.finished].
+func enter_dungeon() -> void:
+	if arena == null or dungeon != null:
+		return
+	RunState.dungeons_entered += 1
+	_set_state(State.DUNGEON)
+	get_tree().paused = false
+	if pause_menu != null:
+		pause_menu.hide()
+	dungeon = Dungeon.create(arena, wave)
+	dungeon.smoke_boss_timeout = options.smoke
+	dungeon.announced.connect(_on_announced)
+	dungeon.status_changed.connect(_on_dungeon_status)
+	dungeon.boss_spawned.connect(_on_dungeon_boss_spawned)
+	dungeon.boss_cleared.connect(_on_dungeon_boss_cleared)
+	dungeon.room_started.connect(_on_dungeon_room_started)
+	dungeon.room_cleared.connect(_on_dungeon_room_cleared)
+	dungeon.finished.connect(_on_dungeon_finished)
+	add_child(dungeon)
+	if hud != null:
+		hud.show()
+	var party: Array[Player] = []
+	for p in players:
+		if is_instance_valid(p):
+			party.append(p)
+	dungeon.start(party)
+	_log("dungeon entered after wave %d: %d heroes, environment %s" % [wave, party.size(), RunState.environment])
+	_on_dungeon_status()
+	_pause_if_pad_missing()
+
+
+func _on_dungeon_status() -> void:
+	if hud != null and dungeon != null:
+		hud.set_dungeon_status(dungeon.title_text(), dungeon.task_text(), dungeon.seconds_left())
+
+
+func _on_dungeon_boss_spawned(boss: Boss) -> void:
+	if hud != null:
+		hud.bind_boss(boss)
+
+
+func _on_dungeon_boss_cleared() -> void:
+	if hud != null:
+		hud.clear_boss()
+
+
+func _on_dungeon_room_started(index: int) -> void:
+	_log("dungeon room %d/%d (%s) started after %.1f s" % [index + 1, Dungeon.ROOM_COUNT,
+		Dungeon.ROOM_NAMES[index], dungeon.total_time if dungeon != null else 0.0])
+
+
+func _on_dungeon_room_cleared(index: int) -> void:
+	if dungeon == null:
+		return
+	_log("dungeon room %d/%d (%s) cleared in %.1f s: %d / %d standing, %d kills" % [index + 1,
+		Dungeon.ROOM_COUNT, Dungeon.ROOM_NAMES[index], dungeon.room_times[-1], living_player_count(),
+		players.size(), dungeon.kills_total])
+
+
+## The dungeon is over (won or lost) and the arena is the clearing again: the reward (or the failure's
+## loss) is paid, the HUD goes back to the break and the Intermission rolls the Epics and opens the market.
+func _on_dungeon_finished(success: bool) -> void:
+	var d := dungeon
+	dungeon = null
+	if d != null:
+		RunState.dungeon_time += d.total_time
+		RunState.dungeon_rooms_cleared += d.rooms_cleared
+		_log("dungeon %s" % d.summary_text())
+		_free_node(d)
+	if success:
+		RunState.dungeons_completed += 1
+		var paid := DungeonRewards.grant_success(wave, PlayerManager.get_slots(), RunState.dungeon_rng)
+		_log("dungeon reward: %d Epics%s, %d gold" % [paid["items"].size(),
+			" + a set piece" if paid["extra"] != null else "", paid["gold"]])
+	else:
+		RunState.dungeons_failed += 1
+		_log("dungeon lost: the purse loses %d gold" % DungeonRewards.apply_failure())
+	if hud != null:
+		hud.clear_boss()
+		hud.clear_dungeon()
+		hud.hide()
+	_set_state(State.INTERMISSION)
+	get_tree().paused = true
+	if intermission != null:
+		intermission.dungeon_returned(success)
+
+
 ## Ends the run: Game Over screen (victory or defeat) over the frozen arena.
 func end_run(p_victory: bool) -> void:
 	if arena == null or state == State.GAME_OVER:
@@ -457,7 +567,7 @@ func quit_to_menu() -> void:
 
 ## Opens the PauseMenu for [param by] (null = no player, e.g. a controller was unplugged).
 func pause_game(by: PlayerSlot = null) -> void:
-	if state != State.WAVE and state != State.WAVE_END:
+	if not _is_in_action():
 		return
 	if pause_menu == null or pause_menu.visible:
 		return
@@ -466,7 +576,7 @@ func pause_game(by: PlayerSlot = null) -> void:
 
 
 func resume_game() -> void:
-	var running := state == State.WAVE or state == State.WAVE_END
+	var running := _is_in_action()
 	if running and pause_menu != null and not PlayerManager.disconnected_slots().is_empty():
 		# A joined controller is unplugged: stay paused (the menu offers "Continue without Pn").
 		if not pause_menu.visible:
@@ -503,7 +613,7 @@ func drop_player(slot: PlayerSlot) -> void:
 	_show_disconnect_notice()
 	if PlayerManager.disconnected_slots().is_empty():
 		resume_game()
-	elif is_running() and (state == State.WAVE or state == State.WAVE_END):
+	elif is_running() and _is_in_action():
 		pause_game(null)
 	_check_party_wipe()
 
@@ -550,8 +660,13 @@ func _physics_process(delta: float) -> void:
 		_after_wave_end()
 
 
+## A wave, its "Wave cleared!" pause or a dungeon is being played (the pause menu may open).
+func _is_in_action() -> bool:
+	return state == State.WAVE or state == State.WAVE_END or state == State.DUNGEON
+
+
 func _process(_delta: float) -> void:
-	if not get_tree().paused and (state == State.WAVE or state == State.WAVE_END):
+	if not get_tree().paused and _is_in_action():
 		_poll_pause_buttons()
 		if state == State.WAVE:
 			_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
@@ -606,10 +721,20 @@ func _roll_shrine() -> void:
 	pass
 
 
-## DUNGEON seam (M6b): the break's portal roll (RunState.portal_pending, from RunState.dungeon_rng), called
-## on the break path just before open_intermission. The DUNGEON package owns the body.
+## DUNGEON (M6b): the break's portal roll, called on the break path just before open_intermission. The
+## portal opens after waves 6, 9, 12 and 15 (Dungeon.is_portal_wave; normal, endless and hardcore runs)
+## and after the next wave when --dungeon forced it (RunState.dungeon_forced, spent by it:
+## RunState.portal_forced tells the bots). No randomness. RunState.last_wave_downs (the heroes downed in
+## the wave just cleared) is the bots' rule after waves 12 and 15.
 func _roll_portal() -> void:
-	pass
+	RunState.portal_pending = false
+	RunState.portal_forced = false
+	if RunState.dungeon_forced:
+		RunState.dungeon_forced = false
+		RunState.portal_pending = true
+		RunState.portal_forced = true
+	elif Dungeon.is_portal_wave(wave):
+		RunState.portal_pending = true
 
 
 # --- Run building ------------------------------------------------------------------
@@ -648,8 +773,9 @@ func _place_players() -> void:
 func _teardown_run() -> void:
 	if is_inside_tree():
 		get_tree().paused = false
-	for node: Variant in [pause_menu, game_over, intermission, hud, wave_director, arena]:
+	for node: Variant in [pause_menu, game_over, intermission, hud, dungeon, wave_director, arena]:
 		_free_node(node)
+	dungeon = null
 	pause_menu = null
 	game_over = null
 	intermission = null
@@ -721,6 +847,7 @@ func _on_wave_cleared(n: int) -> void:
 	if state != State.WAVE or n != wave:
 		return
 	waves_completed += 1
+	RunState.last_wave_downs = players_downed - _downs_at_wave_start
 	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; elites %d/%d, goblin %d/%d/%d; %s" % [
 		n, (Time.get_ticks_msec() - _wave_start_msec) / 1000.0, RunState.kills, RunState.gold,
 		RunState.level, living_player_count(), players.size(), players_downed, items_looted, items_bought,
@@ -864,7 +991,7 @@ func _on_demo_restart() -> void:
 
 func _on_player_downed_changed(is_downed: bool, _player: Player) -> void:
 	if not is_downed:
-		if state == State.WAVE and not _reviving_all:
+		if (state == State.WAVE or state == State.DUNGEON) and not _reviving_all:
 			revives += 1
 		return
 	players_downed += 1
@@ -964,6 +1091,10 @@ func _start_smoke() -> void:
 		expected += RunState.wave_duration(w) + WAVE_END_DELAY + 0.5 + SMOKE_INTERMISSION_ALLOWANCE
 		if RunState.is_boss_wave(w):
 			expected += SMOKE_BOSS_ALLOWANCE
+		if Dungeon.is_portal_wave(w) and w < options.last_wave():
+			expected += SMOKE_DUNGEON_ALLOWANCE
+	if options.dungeon:
+		expected += SMOKE_DUNGEON_ALLOWANCE
 	var real := expected / options.effective_time_scale()
 	_smoke_deadline_msec = _start_msec + int((real * SMOKE_TIMEOUT_FACTOR + SMOKE_TIMEOUT_EXTRA) * 1000.0)
 	print("SMOKE start: %d bots, waves %d-%d, seed %d, time scale %.1f, %d physics ticks/s, timeout %.0f s" % [
@@ -992,7 +1123,8 @@ func _finish_smoke(result: String) -> void:
 ## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict). M6b keys:
 ## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
 ## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
-## counters of the feature packages; 0 until they land).
+## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
+## inside dungeons).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
@@ -1056,6 +1188,8 @@ func smoke_result(result: String) -> Dictionary:
 		"dungeons_entered": RunState.dungeons_entered,
 		"dungeons_completed": RunState.dungeons_completed,
 		"dungeons_failed": RunState.dungeons_failed,
+		"dungeon_rooms_cleared": RunState.dungeon_rooms_cleared,
+		"dungeon_time": snappedf(RunState.dungeon_time, 0.1),
 		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,

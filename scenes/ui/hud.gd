@@ -36,6 +36,8 @@ const PIP_SIZE := 14.0
 ## always reserved (alpha 0 while calm), so nothing below it jumps when the boss enrages.
 const ENRAGED_ALPHA_MIN := 0.8
 const ENRAGED_PULSE_SPEED := 8.0
+## The dungeon's task line (M6b).
+const DUNGEON_TASK_COLOR := Color(0.86, 0.78, 1.0)
 
 var frames: Array[UnitFrame] = []
 var wave_label: Label
@@ -78,6 +80,7 @@ var boss_bar: UiBar
 var boss_enraged_label: Label
 var _boss_pips: Array[Panel] = []
 var _boss: Boss
+var _dungeon_shown := false
 
 
 static func create() -> Hud:
@@ -118,6 +121,34 @@ func clear_boss(_wave: int = 0) -> void:
 	if boss_frame != null:
 		boss_frame.visible = false
 	timer_label.visible = true
+
+
+## M6b dungeon: the plaque shows [param title] ("Dungeon – Room 2/4") in the wave line, the room's
+## [param task] ("Kill enemies  12 / 25") under it and, in the timed rooms ([param seconds_left] >= 0),
+## the room's countdown in the timer's place. The Warden's boss frame goes through [method bind_boss] /
+## [method clear_boss] as on a boss wave. [method clear_dungeon] brings the wave line back.
+func set_dungeon_status(title: String, task: String, seconds_left: float = -1.0) -> void:
+	_dungeon_shown = true
+	wave_label.text = title
+	wave_tag_label.text = task
+	wave_tag_label.add_theme_color_override(&"font_color", DUNGEON_TASK_COLOR)
+	wave_tag_label.visible = task != ""
+	if is_boss_frame_visible() or seconds_left < 0.0:
+		timer_label.visible = false
+	else:
+		timer_label.visible = true
+		set_wave_time(seconds_left)
+
+
+## The dungeon is over: the plaque shows the wave line again.
+func clear_dungeon() -> void:
+	_dungeon_shown = false
+	_on_wave_changed(RunState.wave)
+
+
+## True while the plaque shows the dungeon's status line.
+func is_dungeon_shown() -> bool:
+	return _dungeon_shown
 
 
 ## True while the boss frame replaces the timer.

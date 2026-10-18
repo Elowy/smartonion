@@ -213,6 +213,14 @@ var shrine_effects: Array[Dictionary] = []
 ## The dungeon portal is open for this break (DUNGEON package sets it at the wave end;
 ## Intermission.wants_portal() reads it).
 var portal_pending := false
+## This break's portal was opened by --dungeon (the bots then enter whatever the wave was) / the heroes
+## downed during the wave just cleared (the bots' rule after waves 12 and 15). Set by Main at the
+## wave's end, read by the PortalScreen.
+var portal_forced := false
+var last_wave_downs := 0
+## Seconds the party spent in dungeons this run, and the rooms it cleared there (SMOKE_RESULT).
+var dungeon_time := 0.0
+var dungeon_rooms_cleared := 0
 
 
 ## The environment roll (ENV package): a run started with an empty environment takes
@@ -258,6 +266,10 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	pending_shrine = &""
 	shrine_effects.clear()
 	portal_pending = false
+	portal_forced = false
+	last_wave_downs = 0
+	dungeon_time = 0.0
+	dungeon_rooms_cleared = 0
 	kills = 0
 	gold_earned = 0
 	kills_by_player.clear()
