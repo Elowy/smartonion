@@ -845,10 +845,14 @@ func test_pool_places_are_a_function_of_the_rng_and_keep_their_rules() -> void:
 		rng2.seed = seed_value
 		check_eq(EnvironmentHazards.draw_pool_points(rng2), pts, "the same rng draws the same places")
 		for i in pts.size():
-			check(Rect2(-Arena.SIZE / 2.0, Arena.SIZE).grow(-EnvironmentHazards.BOG_WALL_MARGIN + 0.001).has_point(Vector2(pts[i].x, pts[i].z)), "off the walls")
-			check(Vector2(pts[i].x, pts[i].z).length() >= EnvironmentHazards.BOG_CENTER_CLEARANCE - 0.001, "clear of the middle")
+			# (The rules as literals, not as the constants: a constant set to 0 would still satisfy itself.)
+			check(Rect2(-Arena.SIZE / 2.0, Arena.SIZE).grow(-3.0 + 0.001).has_point(Vector2(pts[i].x, pts[i].z)), "3 m off the walls")
+			check(Vector2(pts[i].x, pts[i].z).length() >= 4.5 - 0.001, "4.5 m clear of the middle")
 			for j in range(i + 1, pts.size()):
-				check(pts[i].distance_to(pts[j]) >= EnvironmentHazards.BOG_SPACING - 0.001, "spaced apart")
+				check(pts[i].distance_to(pts[j]) >= 6.0 - 0.001, "6 m apart (%.2f m)" % pts[i].distance_to(pts[j]))
+	check_eq(EnvironmentHazards.BOG_WALL_MARGIN, 3.0, "the wall margin is 3 m")
+	check_eq(EnvironmentHazards.BOG_CENTER_CLEARANCE, 4.5, "the clearance round the middle is 4.5 m")
+	check_eq(EnvironmentHazards.BOG_SPACING, 6.0, "the spacing is 6 m")
 
 
 func test_a_bog_pool_slows_the_heroes_and_enemies_inside_and_hurts_nobody() -> void:
@@ -982,6 +986,44 @@ func test_the_wave_end_frees_every_hazard_and_clears_their_effects() -> void:
 	cem.director.stop()
 	for h in hands:
 		check(h.is_queued_for_deletion(), "freed at the wave end")
+
+
+func test_the_wave_end_clears_the_icicle_chill() -> void:
+	var hero := _real_hero(0, Vector3(0.4, 0, 0))
+	var speed := hero.stats.get_stat(Stats.SPEED)
+	var hz := _hazard_director(&"ice_cave", 5)
+	var ic := FallingIcicle.spawn(_entities(), Vector3.ZERO, 1.2, 1.0, 1.0, 30.0, 1.5)
+	_step(ic, 1.1)
+	check(GeneralBuff.find(hero, FallingIcicle.CHILL_KEY) != null, "chilled by the icicle")
+	check_near(hero.stats.get_stat(Stats.SPEED), speed - 30.0, 0.0001, "30% slower")
+	hz.director.stop()
+	hz.end_wave()
+	check(GeneralBuff.find(hero, FallingIcicle.CHILL_KEY) == null, "the chill ends with the wave")
+	check_near(hero.stats.get_stat(Stats.SPEED), speed, 0.0001, "and the hero is quick again")
+
+
+func test_circles_laid_for_heroes_at_the_wall_stay_inside_the_arena() -> void:
+	var bounds := EFakes.arena_of(world).get_bounds()
+	# A hero in the north-east corner and one at the middle of the west wall, 0.2 m off the stones.
+	_hero(Vector3(bounds.end.x - 0.2, 0, bounds.position.y + 0.2))
+	_hero(Vector3(bounds.position.x + 0.2, 0, 0))
+	var inner := bounds.grow(-0.8 + 0.001)
+	var outside := 0
+	for id in [&"cemetery", &"ice_cave"]:
+		var hz := _hazard_director(id, 5)
+		_step(hz, 65.0)  # about seven casts
+		var laid := _hazards_of(GraspingHands) if id == &"cemetery" else _hazards_of(FallingIcicle)
+		check(laid.size() >= 12, "%s: plenty of circles (%d)" % [id, laid.size()])
+		var near_wall := 0
+		for n in laid:
+			var p := (n as Node3D).global_position
+			if not inner.has_point(Vector2(p.x, p.z)):
+				outside += 1
+			if absf(p.x) > bounds.end.x - 1.0 or p.z < bounds.position.y + 1.0:
+				near_wall += 1
+		check(near_wall > 0, "%s: some of them lie at the wall (the test means something)" % id)
+		hz.director.stop()
+	check_eq(outside, 0, "no circle's centre is within 0.8 m of the wall or beyond it")
 
 
 func test_main_wires_a_hazard_director_for_the_runs_environment() -> void:
