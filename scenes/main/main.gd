@@ -312,6 +312,7 @@ func start_run() -> void:
 	intermission.level_card_picked.connect(_on_level_card_picked)
 	intermission.ranks_trained.connect(_on_ranks_trained)
 	intermission.bot_rerolled.connect(_on_bot_rerolled)
+	intermission.shrine_resolved.connect(_on_shrine_resolved)
 	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
 	intermission.bot_shopping = options.smoke or options.demo
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
@@ -353,6 +354,7 @@ func start_wave(n: int) -> void:
 	for p in players:
 		if is_instance_valid(p):
 			p.begin_wave()
+	_begin_shrines()
 	_set_state(State.WAVE)
 	_wave_perf = RunPerf.new()
 	_wave_start_msec = Time.get_ticks_msec()
@@ -601,9 +603,28 @@ func _after_wave_end() -> void:
 
 
 ## SHRINES seam (M6b): the break's shrine roll (RunState.pending_shrine, from RunState.shrine_rng), called
-## on the break path just before open_intermission. The SHRINES package owns the body.
+## on the break path just before open_intermission. The wave that just ended first counts against every
+## running shrine (their effects stop, the expired ones go), then the 5% roll (--shrine-chance) decides whether
+## the SHRINE phase of this break opens. See Shrines.
 func _roll_shrine() -> void:
-	pass
+	var expired := Shrines.end_wave(players)
+	if not expired.is_empty():
+		_log("shrines expired after wave %d: %s" % [wave, ", ".join(PackedStringArray(expired))])
+	RunState.pending_shrine = Shrines.roll()
+	if RunState.pending_shrine != &"":
+		_log("a shrine waits after wave %d: %s" % [wave, RunState.pending_shrine])
+
+
+## The running shrines' effects (M6b) go live for the wave that starts (start_wave, after the heroes' begin_wave).
+func _begin_shrines() -> void:
+	Shrines.begin_wave(players)
+	if not RunState.shrine_effects.is_empty():
+		_log("wave %d runs under shrines: %s" % [wave, Shrines.effects_log()])
+
+
+## Intermission.shrine_resolved (the SHRINE phase's vote was decided): the smoke log line.
+func _on_shrine_resolved(id: StringName, accepted: bool, reason: StringName) -> void:
+	_log("shrine %s %s (%s); running: %s" % [id, "accepted" if accepted else "declined", reason, Shrines.effects_log()])
 
 
 ## DUNGEON seam (M6b): the break's portal roll (RunState.portal_pending, from RunState.dungeon_rng), called

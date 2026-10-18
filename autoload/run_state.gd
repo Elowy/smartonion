@@ -33,6 +33,8 @@ signal special_killed(kind: StringName, killer_index: int)
 ## Arcane Dust (the team's second currency) changed by [param delta] (add_dust,
 ## try_spend_dust_for; start_run emits it with delta 0).
 signal dust_changed(dust: int, delta: int)
+## The running shrine effects changed (a shrine was accepted, a wave ended, a run started): the HUD icons.
+signal shrines_changed
 ## An Artifact dropped (LootDrops.roll_artifact hit): the new [param item] and the id of the kill's
 ## source (ItemGenerator.SOURCE_IDS: &"boss", &"goblin", &"elite", &"loot"). Main logs it.
 signal artifact_dropped(item: ItemInstance, source: StringName)
@@ -210,6 +212,14 @@ var dungeons_failed := 0
 var pending_shrine: StringName = &""
 ## Shrine effects running over the next waves: {"id": StringName, "waves_left": int} (SHRINES package).
 var shrine_effects: Array[Dictionary] = []
+## The shrine effects work only while a wave is on (Shrines.begin_wave .. Shrines.end_wave): the multipliers
+## of pickups and enemies read 1 outside, so the market, a dungeon or a test never sees them.
+var shrine_effects_live := false
+## The fraction of an XP point the shrine's XP bonus has not paid out yet ([method scale_xp]).
+var shrine_xp_remainder := 0.0
+## Every gold gain that was logged by name this round (the shrines' wins; [method add_gold_logged]): {"slot":
+## int (-1 = the team), "label": String, "amount": int, "wave": int}. Cleared by [method begin_spend_round].
+var gold_gain_log: Array[Dictionary] = []
 ## The dungeon portal is open for this break (DUNGEON package sets it at the wave end;
 ## Intermission.wants_portal() reads it).
 var portal_pending := false
@@ -257,6 +267,9 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	dungeons_failed = 0
 	pending_shrine = &""
 	shrine_effects.clear()
+	shrine_effects_live = false
+	shrine_xp_remainder = 0.0
+	gold_gain_log.clear()
 	portal_pending = false
 	kills = 0
 	gold_earned = 0
@@ -309,6 +322,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	gold_changed.emit(gold, 0)
 	dust_changed.emit(arcane_dust, 0)
 	xp_changed.emit(xp, xp_to_next_level())
+	shrines_changed.emit()
 
 
 func end_run(p_victory: bool) -> void:
@@ -456,6 +470,16 @@ func gold_remainder(slot_index: int) -> float:
 	return _gold_remainder.get(slot_index, 0.0)
 
 
+## [method add_gold] that also logs where the gold came from (the Gambler's win): player slot
+## [param slot_index] (-1 = the team), a display [param label]. Non-positive amounts do nothing. The gold
+## twin of [method add_dust]'s gain log.
+func add_gold_logged(amount: int, slot_index: int = -1, label: String = "") -> void:
+	if amount <= 0:
+		return
+	add_gold(amount)
+	gold_gain_log.append({"slot": slot_index, "label": label, "amount": amount, "wave": wave})
+
+
 func can_afford(amount: int) -> bool:
 	return gold >= amount
 
@@ -475,7 +499,8 @@ func try_spend(amount: int) -> bool:
 ## &"shop_forge", &"shop_reroll", &"trainer", &"level_reroll", &"talent_reset") and a display
 ## [param label] ("Rare Dagger", "Fireball Rank III"). M6 adds the kinds &"consumable" (a
 ## consumables-row card), &"black_market" (the Black Market offer) and &"enchant" (an Enchanter
-## action; its Dust part goes through [method try_spend_dust_for] with the same kind). On
+## action; its Dust part goes through [method try_spend_dust_for] with the same kind). M6b adds
+## &"shrine" (the purse a Shrine of Fortune / of the Gambler takes at once; slot -1 = the team). On
 ## success the entry goes to [member spend_log], the amount to [member gold_spent], and
 ## [signal spent] fires.
 func try_spend_for(amount: int, slot_index: int, kind: StringName, label: String) -> bool:
@@ -525,6 +550,7 @@ func begin_spend_round() -> void:
 	spend_log.clear()
 	dust_spend_log.clear()
 	dust_gain_log.clear()
+	gold_gain_log.clear()
 	if not wants.is_empty():
 		wants.clear()
 		wants_changed.emit()
@@ -560,6 +586,62 @@ func _want_index(slot_index: int, key: String) -> int:
 		if int(wants[i].get("slot", -2)) == slot_index and String(wants[i].get("key", "")) == key:
 			return i
 	return -1
+
+
+# --- Shrine effects (M6b, SHRINES package; the rules live in Shrines) -----------------------------
+
+## True while shrine [param id] runs.
+func has_shrine_effect(id: StringName) -> bool:
+	return shrine_waves_left(id) > 0
+
+
+## Waves the running shrine [param id] has left (0 = not running).
+func shrine_waves_left(id: StringName) -> int:
+	for e in shrine_effects:
+		if StringName(e.get("id", &"")) == id:
+			return int(e.get("waves_left", 0))
+	return 0
+
+
+## Starts shrine [param id] for [param waves] waves (it restarts when it already runs).
+func add_shrine_effect(id: StringName, waves: int) -> void:
+	if id == &"" or waves <= 0:
+		return
+	for e in shrine_effects:
+		if StringName(e.get("id", &"")) == id:
+			e["waves_left"] = waves
+			shrines_changed.emit()
+			return
+	shrine_effects.append({"id": id, "waves_left": waves})
+	shrines_changed.emit()
+
+
+## A wave is over: every running shrine has one wave less; the ones that reach 0 are removed and returned
+## (oldest first).
+func tick_shrine_effects() -> Array[StringName]:
+	var expired: Array[StringName] = []
+	for i in range(shrine_effects.size() - 1, -1, -1):
+		var left := int(shrine_effects[i].get("waves_left", 0)) - 1
+		if left <= 0:
+			expired.push_front(StringName(shrine_effects[i].get("id", &"")))
+			shrine_effects.remove_at(i)
+		else:
+			shrine_effects[i]["waves_left"] = left
+	if not shrine_effects.is_empty() or not expired.is_empty():
+		shrines_changed.emit()
+	return expired
+
+
+## [param amount] pickup XP times the running shrines' XP bonus ([method Shrines.xp_mult]), whole points: the
+## fraction a pickup could not pay is kept for the next one. Plain [param amount] while no shrine boosts XP.
+func scale_xp(amount: int) -> int:
+	var mult := Shrines.xp_mult()
+	if amount <= 0 or is_equal_approx(mult, 1.0):
+		return amount
+	var exact := amount * mult + shrine_xp_remainder
+	var whole := floori(exact + 0.000001)
+	shrine_xp_remainder = maxf(0.0, exact - whole)
+	return whole
 
 
 # --- Shared XP ---------------------------------------------------------------

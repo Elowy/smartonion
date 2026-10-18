@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ShrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/shrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"greed"
+display_name = "Shrine of Greed"
+description = "Coins glitter in the offering bowl. Everything here wants to be taken, and everything here wants to take back."
+waves = 3
+icon_id = &"greed"
+color = Color(1, 0.8, 0.25, 1)
+bot_accepts = true
+gold_pct = 30.0
+enemy_damage_pct = 20.0

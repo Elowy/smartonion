@@ -148,11 +148,11 @@ func collect(player: Player) -> void:
 	var gained_xp := xp
 	if player != null and is_instance_valid(player):
 		var slot_index := player.slot.index if player.slot != null else -1
-		RunState.add_gold_for(slot_index, gold, player.stats.get_stat(Stats.GOLD_FIND))
+		RunState.add_gold_for(slot_index, gold, Shrines.gold_find_pct(player.stats.get_stat(Stats.GOLD_FIND)))
 		gained_xp = player.xp_with_gain(xp)
 	else:
-		RunState.add_gold(gold)
-	RunState.add_xp(gained_xp)
+		_bank_gold()
+	RunState.add_xp(RunState.scale_xp(gained_xp))
 	var pos := global_position if is_inside_tree() else position
 	Vfx.pickup_sparkle(pos + Vector3.UP * HOVER_HEIGHT)
 	_remove()
@@ -164,9 +164,17 @@ func collect_to_bank() -> void:
 	if _collected:
 		return
 	_collected = true
-	RunState.add_gold(gold)
-	RunState.add_xp(xp)
+	_bank_gold()
+	RunState.add_xp(RunState.scale_xp(xp))
 	_remove()
+
+
+## Gold without a collector: plain, or with the running shrines' gold bonus (its fraction is kept, like Gold Find's).
+func _bank_gold() -> void:
+	if is_equal_approx(Shrines.gold_mult(), 1.0):
+		RunState.add_gold(gold)
+	else:
+		RunState.add_gold_for(-1, gold, Shrines.gold_find_pct(0.0))
 
 
 # --- Frame update ----------------------------------------------------------------

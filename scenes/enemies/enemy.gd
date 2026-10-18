@@ -300,12 +300,15 @@ static func setup(e: Enemy, p_data: EnemyData, p_wave: int) -> Enemy:
 		return e
 	e.name = String(p_data.id).to_pascal_case() if p_data.id != &"" else "Enemy"
 	e.radius = p_data.radius
-	e.max_hp = maxf(1.0, p_data.hp_at_wave(e.wave) * RunState.coop_hp_mult())
+	# A running shrine (M6b: Shrines) makes every enemy of its waves tougher: x1 when none does.
+	e.max_hp = maxf(1.0, p_data.hp_at_wave(e.wave) * RunState.coop_hp_mult() * Shrines.enemy_hp_mult())
 	e.hp = e.max_hp
-	e.contact_damage = p_data.contact_damage_at_wave(e.wave) * RunState.coop_damage_mult()
-	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave) * RunState.coop_damage_mult()
+	var shrine_damage := Shrines.enemy_damage_mult()
+	e.contact_damage = p_data.contact_damage_at_wave(e.wave) * RunState.coop_damage_mult() * shrine_damage
+	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave) * RunState.coop_damage_mult() * shrine_damage
 	var rng := RunState.rng
-	e.move_speed = p_data.move_speed * (1.0 + rng.randf_range(-MOVE_SPEED_JITTER, MOVE_SPEED_JITTER))
+	e.move_speed = p_data.move_speed * (1.0 + rng.randf_range(-MOVE_SPEED_JITTER, MOVE_SPEED_JITTER)) \
+			* Shrines.enemy_speed_mult()
 	e._weave_phase = rng.randf() * TAU
 	e._strafe_sign = 1.0 if rng.randf() < 0.5 else -1.0
 	e._strafe_left = rng.randf_range(STRAFE_SWITCH_MIN, STRAFE_SWITCH_MAX)

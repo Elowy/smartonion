@@ -4,8 +4,11 @@ extends Control
 ##
 ##   LOOT   – only when RunState.team_loot holds items: the full-screen LootRollScreen rolls
 ##            RunState.take_team_loot() (Need / Greed / Pass, solo Take / Sell / Leave).
-##   SHRINE – M6b hook (SHRINES package): only when RunState.pending_shrine is set. A shrine's
-##            boon-and-bane card the whole party votes on, between the loot roll and the level-ups.
+##   SHRINE – M6b: only when RunState.pending_shrine is set (the 5% roll of Main._roll_shrine) and
+##            somebody has a hero. A shrine's boon-and-bane card (ShrineScreen) the whole party votes
+##            on – Accept (A) / Decline (B), all must accept, 15 s then declined, bots by the data –
+##            between the loot roll and the level-ups. An accepted shrine takes effect at once
+##            (Shrines.accept); signal shrine_resolved reports the decision.
 ##   LEVEL_UP – only when the team gained levels this wave (level_ups > 0) and someone has a
 ##            hero: the full-screen LevelUpScreen (GDD 6.1) – every hero picks 1 of 5 cards per
 ##            level gained in their own quarter, with their own controller (bots / unplugged
@@ -58,6 +61,9 @@ signal level_card_picked(slot_index: int, card: LevelCard)
 signal ranks_trained(slot_index: int, count: int)
 ## A bot paid [param cost] gold for a reroll of the stall (statistics).
 signal bot_rerolled(slot_index: int, cost: int)
+## The party's vote on the break's shrine was decided (M6b, statistics): the shrine id, accepted by everyone?,
+## and why ([member ShrineVote.reason]: &"accepted", &"declined", &"timeout", &"nobody").
+signal shrine_resolved(id: StringName, accepted: bool, reason: StringName)
 
 ## The break's phases in the order they run (CLOSED = the screen is not open). SHRINE and PORTAL are
 ## M6b slots: nothing opens them until their package sets RunState.pending_shrine / portal_pending.
@@ -135,6 +141,8 @@ var countdown_label: Label
 var time_left := -1.0
 var shop_panel: ShopPanel
 var loot_screen: LootRollScreen
+## The SHRINE phase's card and vote (M6b, scenes/ui/shrine/shrine_screen.gd).
+var shrine_screen: ShrineScreen
 var level_up_screen: LevelUpScreen
 ## Slot index -> that player's personal panel (only players with a hero get one).
 var panels: Dictionary[int, PlayerPanel] = {}
@@ -235,6 +243,7 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	_update_countdown()
 	_refresh_chips(true)
 	level_up_screen.close()
+	shrine_screen.close()
 	show()
 	_enter_phase(Phase.LOOT)
 
@@ -305,6 +314,7 @@ func is_open() -> bool:
 func set_backdrop_opacity(alpha: float) -> void:
 	_backdrop.modulate.a = alpha
 	loot_screen.set_backdrop_opacity(alpha)
+	shrine_screen.set_backdrop_opacity(alpha)
 	level_up_screen.set_backdrop_opacity(alpha)
 
 
@@ -379,27 +389,49 @@ func _on_loot_finished() -> void:
 		_enter_phase(Phase.SHRINE)
 
 
-## SHRINES hook: opens the shrine vote (RunState.pending_shrine). The foundation has no shrine
-## screen: it clears the pending shrine and goes on, so a pending shrine can never stall the break.
-## The package replaces the body and calls [method _on_shrine_finished] when the vote is decided.
+## SHRINES hook: opens the shrine vote on RunState.pending_shrine (the party's card, ShrineScreen). A shrine that
+## cannot be shown (unknown id, nobody with a hero) is dropped at once, so a pending shrine never stalls the
+## break. The effect is applied when the vote is decided ([method _on_shrine_decided]); the screen calls
+## [method _on_shrine_finished] when the decision has had its time.
 func _start_shrine() -> void:
 	phase = Phase.SHRINE
 	loot_screen.hide()
 	_market_root.visible = false
 	_swallow_humans()
-	_on_shrine_finished()
+	shrine_screen.bot_think_time = loot_screen.bot_think_time
+	if not shrine_screen.open(Db.get_shrine(RunState.pending_shrine), PlayerManager.get_slots()):
+		_on_shrine_finished()
+		return
+	RunState.shrines_offered += 1
 
 
-## SHRINES hook: the vote is over (accepted, declined or timed out): the level-up cards come next.
+## SHRINES hook: the vote is over (accepted, declined or timed out) and its result was shown: the level-up
+## cards come next.
 func _on_shrine_finished() -> void:
 	if phase == Phase.SHRINE and not _done:
 		RunState.pending_shrine = &""
+		shrine_screen.close()
 		_enter_phase(Phase.LEVEL_UP)
 
 
 ## SHRINES hook: one frame of the SHRINE phase (the tree is paused, the screen processes always).
-func _update_shrine(_delta: float) -> void:
-	pass
+func _update_shrine(delta: float) -> void:
+	shrine_screen.update(delta)
+
+
+## The vote on the shrine was decided: an accepted one takes effect (Shrines.accept: a timed shrine starts running,
+## an instant one acts now) and its lines go under the result headline.
+func _on_shrine_decided(accepted: bool, reason: StringName) -> void:
+	var data := shrine_screen.data
+	if data == null:
+		return
+	if accepted:
+		RunState.shrines_accepted += 1
+		var result := Shrines.accept(data, PlayerManager.get_slots())
+		var lines: Array[String] = []
+		lines.assign(result.get("lines", []))
+		shrine_screen.show_result(lines)
+	shrine_resolved.emit(data.id, accepted, reason)
 
 
 func _start_level_up() -> void:
@@ -592,6 +624,11 @@ func _build() -> void:
 	loot_screen.roll_resolved.connect(func(r: LootRoll) -> void: loot_rolled.emit(r))
 	loot_screen.visible = false
 	add_child(loot_screen)
+
+	shrine_screen = ShrineScreen.create()
+	shrine_screen.decided.connect(_on_shrine_decided)
+	shrine_screen.finished.connect(_on_shrine_finished)
+	add_child(shrine_screen)
 
 	level_up_screen = LevelUpScreen.create()
 	level_up_screen.finished.connect(_on_level_up_finished)
@@ -1298,10 +1335,10 @@ func _on_player_left(slot: PlayerSlot) -> void:
 	_refresh_chips(true)
 
 
-## SHRINES hook: [param slot] left while the shrine vote runs (the package drops their vote, re-checks the
-## voters). The foundation has nothing to do.
-func _on_shrine_player_left(_slot: PlayerSlot) -> void:
-	pass
+## SHRINES hook: [param slot] left while the shrine vote runs: their vote goes away, the others may now be
+## unanimous (or nobody is left and the shrine fades).
+func _on_shrine_player_left(slot: PlayerSlot) -> void:
+	shrine_screen.remove_slot(slot.index)
 
 
 ## DUNGEON hook: [param slot] left while the portal vote runs (the package drops their vote, re-checks the

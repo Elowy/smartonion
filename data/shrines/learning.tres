@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ShrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/shrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"learning"
+display_name = "Shrine of Learning"
+description = "A cracked lectern and a book that turns its own pages. Knowledge is never free; the lesson fights back."
+waves = 3
+icon_id = &"learning"
+color = Color(0.7, 0.45, 1, 1)
+bot_accepts = true
+xp_pct = 50.0
+enemy_hp_pct = 25.0
