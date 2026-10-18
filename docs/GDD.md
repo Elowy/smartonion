@@ -1898,9 +1898,9 @@ sebzés 4)
       bot-futás közül kettő (a 4 fős és a szóló) ezen a hullámon halt meg.
     - **Vor'thalax kill-ideje létszám szerint:** a boss HP-ja ×(1 + 0,75 (játékosok − 1)),
       de a csapat sebzése gyorsabban nő a létszámnál (itemek, Artifactok, fókusz), ezért a
-      harc hossza létszámonként és kasztonként erősen eltér (a bot-csapat DPS-e a bossra
-      kasztonként nagyon különböző). A `k`, az alap HP és a boss sebzése a hangolható
-      kar; a hős-HP és az ellenség-sebzés viszonya is ide tartozik (a 25. hullámon az
+      harc hossza létszámonként erősen eltér (egy-egy természetes bot-futáson: 4 fő ≈ 2
+      perc, 3 fő ≈ 2,5 perc a vereség határán, a szóló bot ≈ 3,3 perc sok felélesztéssel). A
+      `k`, az alap HP és a boss sebzése a hangolható kar; a hős-HP és az ellenség-sebzés viszonya is ide tartozik (a 25. hullámon az
       ellenség-sebzés ×45, a hősök HP-ja ennél lassabban nő: egy boss-támadás vagy a golem
       horga a törékeny hőst – Mage, Rogue – egy lövéssel ölheti; egy hős-HP-növekedési tag
       szintenként vagy Item Level-enként a lehetséges megoldás).
@@ -1912,8 +1912,6 @@ sebzés 4)
       számított érték; a 4 és 2 fős futásokat az összefésült fejen még nem mértük le, és az
       Artifactokat viselő bot Enchanter-szabálya (5.7) is a késői erőt módosítja (kevesebb
       Artifact kevesebb késői fegyversebzést jelent).
-    - **A kasztok közti szórás:** a bossra mért sebzésben és a túlélésben is nagy; a végső
-      balansz feladata.
     - **A késői kassza:** az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market;
       16.1) célozták; hogy elég jól elviszik-e a goldot, a végső balanszban dől el.
     - **Módszertan:** egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a
@@ -2772,10 +2770,10 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 
 Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a Flesh Golem
 sebzése, a 20. hullám, Vor'thalax kill-ideje létszám szerint, a duók és a szóló hősök
-túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon, a
-kasztok közti szórás) a 9. fejezetben vannak („Nyitott kérdések M6b-re”); az
-ütemezésük a 16. fejezet **M6b** listájában található: ezeket az M6b végleges balansza kezeli. A
-késői kasszát az M6a goldsinkjei célozták (16.1).
+túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon) a
+9. fejezetben vannak („Nyitott kérdések M6b-re”); az ütemezésük a 16. fejezet **M6b**
+listájában található: ezeket az M6b végleges balansza kezeli, egyszer, a legvégén. A késői
+kasszát az M6a goldsinkjei célozták (16.1).
 
 ### Lezárt döntések
 
