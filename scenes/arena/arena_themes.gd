@@ -15,6 +15,8 @@ extends RefCounted
 
 ## The most mesh instances a set may add (the forest builds 15; walls and ground are separate).
 const MAX_DRAW_CALLS := 16
+## Metres a lava vent (basalt rim radius 1.35) keeps from the walls to be drawn at all.
+const VENT_CLEARANCE := 1.6
 const GATE := ArenaDecor.GATE_HALF_WIDTH
 
 # Cemetery
@@ -595,6 +597,19 @@ static func _swamp_lights(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 # Volcano
 # =================================================================================================
 
+## The lava vents that are drawn in an arena of playable rectangle [param bounds]: the ones that fit inside it
+## (VENT_CLEARANCE from the walls). The whole clearing has all six; the dungeon's smaller room (24 x 14 m) has
+## none – its walls would cut the vents in half, and an environment hazard is not at work in a dungeon, so a
+## glowing vent there would only be a trap that is not one.
+static func vents_in(bounds: Rect2) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	var inner := bounds.grow(-VENT_CLEARANCE)
+	for v in EnvironmentHazards.LAVA_VENT_POINTS:
+		if inner.has_point(Vector2(v.x, v.z)):
+			out.append(v)
+	return out
+
+
 static func _volcano(arena: Arena, rng: RandomNumberGenerator) -> Node3D:
 	var root := Node3D.new()
 	var bounds := arena.get_bounds()
@@ -701,7 +716,7 @@ static func _volcano_props(root: Node3D, bounds: Rect2, rng: RandomNumberGenerat
 		_post(k, base, Vector3(rng.randf_range(-6.0, 6.0), 0.0, rng.randf_range(-6.0, 6.0)), 0.0, 0.5, 0.65, 3.0 + i * 0.9, Color(0.09, 0.08, 0.11), 6)
 		_post(k, base, Vector3.ZERO, 0.0, 0.0, 0.5, 0.7, Color(0.09, 0.08, 0.11), 6, 3.0 + i * 0.9)
 	# The vents inside the arena: a low basalt rim and a dark crust (the glow mesh adds the cores).
-	for v in EnvironmentHazards.LAVA_VENT_POINTS:
+	for v in vents_in(bounds):
 		k.add_cylinder(1.35, 1.35, 0.05, MeshKit.xf(v + Vector3(0.0, 0.03, 0.0)), Color(0.07, 0.05, 0.06), 14)
 		for i in 9:
 			var a := TAU * float(i) / 9.0 + rng.randf_range(-0.15, 0.15)
@@ -715,7 +730,7 @@ static func _volcano_props(root: Node3D, bounds: Rect2, rng: RandomNumberGenerat
 static func _volcano_glow(root: Node3D, bounds: Rect2, decor: Rect2, rng: RandomNumberGenerator) -> void:
 	var k := MeshKit.new()
 	var z0 := bounds.position.y - ArenaDecor.WALL_OFFSET
-	for v in EnvironmentHazards.LAVA_VENT_POINTS:
+	for v in vents_in(bounds):
 		k.add_cylinder(0.78, 0.78, 0.04, MeshKit.xf(v + Vector3(0.0, 0.07, 0.0)), Color.WHITE, 12)
 		# Cracks radiating from the vent.
 		for i in 5:
