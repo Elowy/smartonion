@@ -287,7 +287,29 @@ func test_class_item_mods_reach_the_hero_through_equipment() -> void:
 		check(after != before, "%s: the ability's params change" % id)
 
 
-func test_class_item_text_states_the_mod_numbers() -> void:
+## Every number an Equip line states (the "10" of "10%", the "0.5" of "0.5 sec").
+static func _text_numbers(text: String) -> Array[float]:
+	var out: Array[float] = []
+	var re := RegEx.new()
+	re.compile("[0-9]+(\\.[0-9]+)?")
+	for m in re.search_all(text):
+		out.append(m.get_string().to_float())
+	out.sort()
+	return out
+
+
+## The absolute values of a mod dictionary, sorted.
+static func _mod_numbers(mods: Dictionary) -> Array[float]:
+	var out: Array[float] = []
+	for key in mods:
+		out.append(absf(float(mods[key])))
+	out.sort()
+	return out
+
+
+func test_class_item_text_numbers_are_the_mod_values() -> void:
+	# Exactly the mods' numbers, no more: an absolute value of the ability (say "below 30% health")
+	# that a rank or a spec changes would be a second number here.
 	for id in CLASS_IDS:
 		var data := Db.get_unique(id)
 		if data == null:
@@ -295,9 +317,44 @@ func test_class_item_text_states_the_mod_numbers() -> void:
 		check(data.unique_text.begins_with("Equip: "), "%s: an Equip: line" % id)
 		check(not data.unique_text.contains("{"), "%s: no placeholder left" % id)
 		var mods: Dictionary = data.unique_params.get("mods", {})
-		for key in mods:
-			var number := _num_text(absf(float(mods[key])))
-			check(data.unique_text.contains(number), "%s: the text shows %s (%s)" % [id, number, key])
+		check_eq(_text_numbers(data.unique_text), _mod_numbers(mods),
+				"%s: the text's numbers are the mods' (%s)" % [id, data.unique_text])
+
+
+## Words that say how much a number changes ("1 sec longer", "10% higher"), not what it is.
+const RELATIVE_WORDS: Array[String] = ["longer", "shorter", "more", "higher", "additional", "farther",
+		"further", "lower", "extra"]
+
+
+func test_class_item_text_says_how_much_it_changes() -> void:
+	# A number that a rank changes is only true as a difference: "stuns for 1 sec" is 2 sec at
+	# Rank III, "stuns for 1 sec longer" is true at every rank.
+	for id in CLASS_IDS:
+		var data := Db.get_unique(id)
+		if data == null:
+			continue
+		var relative := false
+		for word in RELATIVE_WORDS:
+			if data.unique_text.contains(word):
+				relative = true
+		check(relative, "%s: the text says how much it changes (%s)" % [id, data.unique_text])
+
+
+## The Equip lines that stated an absolute value which the ranks or a spec change, reworded.
+const REWORDED_LINES: Dictionary = {
+	&"wristguards_of_the_sundering_edge": "Equip: Your Execute's threshold is 10% higher.",
+	&"legplates_of_the_bold_leap": "Equip: Your Heroic Leap stuns enemies for 1 sec longer.",
+	&"pauldrons_of_the_pale_smoke": "Equip: Your Poison Bomb's fumes slow an additional 20%.",
+	&"cuffs_of_the_blazing_heart": "Equip: Your Pyroblast's burn deals 10% more of its hit.",
+	&"leggings_of_the_falling_star": "Equip: Your Meteor stuns enemies for 0.5 sec longer.",
+}
+
+
+func test_absolute_equip_lines_are_reworded() -> void:
+	for id in REWORDED_LINES:
+		var data := Db.get_unique(id)
+		if data != null:
+			check_eq(data.unique_text, REWORDED_LINES[id], "%s: the relative wording" % id)
 
 
 func test_class_item_tooltip_shows_the_equip_line() -> void:
