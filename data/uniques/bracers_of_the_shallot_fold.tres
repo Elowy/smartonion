@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bracers_of_the_shallot_fold"
+display_name = "Bracers of the Shallot Fold"
+flavor = "Every fold a little safer."
+slot_type = 4
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 3.0,
+&"spirit": 3.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "when_struck",
+"chance": 20.0,
+"icd": 6.0,
+"amount": 3.0,
+"duration": 3.0
+}
+unique_text = "When struck: 20% chance to layer up, absorbing 3 damage for 3 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ring_of_the_ember_bulb"
+display_name = "Ring of the Ember Bulb"
+flavor = "Warm to the touch, bitter to the eye."
+slot_type = 9
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"versatility": 4.0,
+&"stamina": 3.0
+})
+class_restriction = &""
+unique_effect = &"explode"
+unique_params = {
+"trigger": "on_kill",
+"chance": 6.0,
+"damage": 10.0,
+"radius": 2.0,
+"school": "fire"
+}
+unique_text = "On kill: 6% chance the enemy bursts into flame, dealing 10 Fire damage to enemies within 2 m."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

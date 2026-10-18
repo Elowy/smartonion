@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"signet_of_the_festering_wound"
+display_name = "Signet of the Festering Wound"
+flavor = "Something in the wound is growing."
+slot_type = 9
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"crit": 5.0,
+&"leech": 4.0
+})
+class_restriction = &""
+unique_effect = &"dot"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"damage": 8.0,
+"duration": 4.0,
+"stacks": 2,
+"school": "shadow"
+}
+unique_text = "Chance on hit: The wound festers for 8 Shadow damage over 4 sec. Stacks up to 2 times."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

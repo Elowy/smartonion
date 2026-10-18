@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cuffs_of_the_last_breath"
+display_name = "Cuffs of the Last Breath"
+flavor = "Keep breathing."
+slot_type = 4
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"spirit": 3.0,
+&"versatility": 2.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 30.0,
+"per_wave": 1,
+"amount": 6.0,
+"duration": 4.0
+}
+unique_text = "Equip: When you fall below 30% health, a barrier absorbs 6 damage for 4 sec. Once per wave."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

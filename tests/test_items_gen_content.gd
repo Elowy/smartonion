@@ -87,7 +87,7 @@ func test_unique_counts() -> void:
 			named += 1
 	check_eq(trinkets, 10, "trinkets")
 	check_eq(legendaries, 8, "Legendaries")
-	check(named >= 10, "named Rare / Epic items (%d)" % named)
+	check_eq(named, 40, "named Rare / Epic items (M6b: 10 + 30)")
 	for class_id in Db.class_ids:
 		check(per_class.get(class_id, 0) >= 2, "class items for %s" % class_id)
 

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"halo_of_the_pearled_onion"
+display_name = "Halo of the Pearled Onion"
+flavor = "Rounder than a halo, and it bites."
+slot_type = 0
+armor_type = 0
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 7.0,
+&"spirit": 4.0,
+&"versatility": 2.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 3.0,
+"damage": 16.0,
+"school": "arcane"
+}
+unique_text = "Chance on hit: Hurls a pearl of light at the target for 16 Arcane damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0
