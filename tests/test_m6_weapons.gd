@@ -352,3 +352,80 @@ func test_tearglass_bursts_on_every_third_spell() -> void:
 	# The warlock can wield it as well.
 	var lock := Equipment.new(Db.get_class_data(&"warlock"))
 	check(lock.can_equip(orb), "a warlock can use it too")
+
+
+# --- Epic weapons: +10% attack speed (GDD 4.1) ----------------------------------------------
+
+func test_only_epic_weapons_get_the_attack_speed_bonus() -> void:
+	check_eq(Items.WEAPON_RARITY_ATTACK_SPEED.size(), Items.RARITY_NAMES.size(), "one entry per rarity")
+	for r in Items.RARITY_NAMES.size():
+		var expected := 10.0 if r == Items.Rarity.EPIC else 0.0
+		check_eq(Items.WEAPON_RARITY_ATTACK_SPEED[r], expected, "%s: %s%%" % [Items.RARITY_NAMES[r], expected])
+	for id in Db.weapons:
+		var base: WeaponData = Db.weapons[id]
+		check_eq(base.attack_speed_pct, 0.0, "%s: the data files carry no bonus" % id)
+		for r in Items.RARITY_NAMES.size():
+			var w := ItemInstance.scaled_weapon(base, r)
+			var expected := 10.0 if r == Items.Rarity.EPIC and base.attacks() else 0.0
+			check_eq(w.attack_speed_pct, expected, "%s (%s): attack speed" % [id, Items.RARITY_NAMES[r]])
+			check_eq(base.attack_speed_pct, 0.0, "%s: the base is never touched" % id)
+	var epic_sword := ItemInstance.scaled_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC)
+	check_near(epic_sword.attack_speed_mult(), 1.1, 0.0001, "x1.1")
+	check_near(epic_sword.effective_cooldown(), 0.9 / 1.1, 0.0001, "0.9 s -> 0.82 s")
+	check_eq(epic_sword.cooldown, 0.9, "the base cooldown stays")
+	var tome := ItemInstance.scaled_weapon(Db.get_weapon(&"tome"), Items.Rarity.EPIC)
+	check_eq(tome.attack_speed_pct, 0.0, "a passive off-hand has no attacks to speed up")
+
+
+func test_epic_speed_multiplies_with_haste_in_the_weapon_cooldown() -> void:
+	var stats := StatBlock.new()
+	var common := ItemInstance.scaled_weapon(Db.get_weapon(&"sword"), Items.Rarity.COMMON)
+	var epic := ItemInstance.scaled_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC)
+	check_near(CombatMath.weapon_cooldown(common, stats), 0.9, 0.0001, "Common: 0.9 s")
+	check_near(CombatMath.weapon_cooldown(epic, stats), 0.9 / 1.1, 0.0001, "Epic: 10% faster")
+	stats.set_source(&"test", {Stats.HASTE: 20.0})
+	check_near(CombatMath.weapon_cooldown(common, stats), 0.9 / 1.2, 0.0001, "Common with 20% Haste")
+	check_near(CombatMath.weapon_cooldown(epic, stats), 0.9 / (1.2 * 1.1), 0.0001, "Epic with 20% Haste: both count")
+	# Attack / Spell Power per hit is normalised to the base cooldown, so the bonus is real speed.
+	stats.set_source(&"power", {Stats.ATTACK_POWER: 10.0})
+	check_near(CombatMath.weapon_power_bonus(epic, stats), CombatMath.weapon_power_bonus(common, stats), 0.0001,
+			"Attack Power per hit is the same")
+
+
+func test_epic_weapon_attacks_ten_percent_more_often() -> void:
+	var counts: Array[int] = []
+	for rarity in [Items.Rarity.RARE, Items.Rarity.EPIC]:
+		var p := _hero(&"warrior")
+		var sword := ItemGenerator.generate_weapon(Db.get_weapon(&"sword"), rarity, 5, false, rng)
+		p.equipment.add_to_backpack(sword)
+		check(p.equipment.equip(sword, Items.EquipSlot.MAIN_HAND), "equipped in the main hand")
+		check_eq(p.weapons.size(), 1, "one runner")
+		var target := _fake(Vector3(1.5, 0, 0))
+		var runner := p.weapons[0]
+		var attacks := 0
+		for i in 60 * 120:
+			if runner.tick(DT):
+				attacks += 1
+		counts.append(attacks)
+		check(target.fake_hits() >= attacks, "the target was hit")
+		target.free()
+		p.free()
+		EnemyGrid.mark_dirty()
+	check(counts[0] > 120, "a Rare sword attacks every 0.9 s (%d)" % counts[0])
+	check_near(float(counts[1]) / float(counts[0]), 1.1, 0.03, "Epic: 10%% more attacks (%d vs %d)" % [counts[1], counts[0]])
+
+
+func test_forged_and_hand_made_epics_keep_the_bonus_and_legendaries_do_not() -> void:
+	var a := ItemGenerator.generate_weapon(Db.get_weapon(&"mace"), Items.Rarity.RARE, 9, false, rng)
+	var b := ItemGenerator.generate_weapon(Db.get_weapon(&"mace"), Items.Rarity.RARE, 9, false, rng)
+	var epic := Forge.make_result(a, b, rng)
+	check_eq(epic.rarity, Items.Rarity.EPIC, "forged Epic")
+	check_eq(epic.weapon.attack_speed_pct, 10.0, "Rare + Rare -> Epic: +10% attack speed")
+	var legendary := Forge.make_result(epic, ItemGenerator.generate_weapon(Db.get_weapon(&"mace"), Items.Rarity.EPIC, 9, false, rng), rng)
+	check_eq(legendary.rarity, Items.Rarity.LEGENDARY, "forged Legendary")
+	check_eq(legendary.weapon.attack_speed_pct, 0.0, "the Legendary row has no attack speed bonus")
+	var frostfang := ItemGenerator.from_unique(Db.get_unique(&"frostfang"), 5, false, rng)
+	check_eq(frostfang.rarity, Items.Rarity.EPIC, "a hand-made Epic weapon")
+	check_eq(frostfang.weapon.attack_speed_pct, 10.0, "gets it too (same rarity scaling)")
+	var storm := ItemGenerator.from_unique(Db.get_unique(&"stormcaller"), 12, true, rng)
+	check_eq(storm.weapon.attack_speed_pct, 0.0, "a hand-made Legendary does not")

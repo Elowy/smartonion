@@ -178,10 +178,14 @@ static func from_weapon(base: WeaponData, p_rarity: int = Items.Rarity.COMMON, p
 	return item
 
 
-## A copy of [param base] with the rarity damage multiplier applied (GDD 4.1).
+## A copy of [param base] with the rarity damage multiplier applied (GDD 4.1) and, for
+## attacking weapons, the rarity's attack speed bonus (Epic +10%, Items.WEAPON_RARITY_ATTACK_SPEED).
 static func scaled_weapon(base: WeaponData, p_rarity: int) -> WeaponData:
 	var w := base.duplicate() as WeaponData
 	w.rarity = p_rarity
-	w.base_damage = base.base_damage * Items.WEAPON_RARITY_DAMAGE[clampi(p_rarity, 0, 5)]
+	var rarity_index := clampi(p_rarity, 0, 5)
+	w.base_damage = base.base_damage * Items.WEAPON_RARITY_DAMAGE[rarity_index]
+	if base.attacks():
+		w.attack_speed_pct = base.attack_speed_pct + Items.WEAPON_RARITY_ATTACK_SPEED[rarity_index]
 	w.bonus_stats = base.bonus_stats.duplicate()
 	return w

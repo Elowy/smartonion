@@ -81,6 +81,20 @@ func test_weapon_tooltip_lines() -> void:
 	check(str(sword.sell_value()) in tip.line_texts(), "sell value shown")
 
 
+func test_epic_weapon_tooltip_shows_the_attack_speed_bonus() -> void:
+	var epic := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.EPIC, 5)
+	tip.show_item(epic, Db.get_class_data(&"warrior"))
+	check(tip.find_line("Speed 0.82") != null, "the faster swing time: %s" % tip.line_texts())
+	var bonus := tip.find_line("+10% Attack Speed")
+	check(bonus != null and _color(bonus).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "a green bonus line")
+	# 13.2 damage (6 x 2.2) / (0.9 / 1.1) s.
+	check(tip.find_line("(16.1 damage per second)") != null, "the DPS counts the speed: %s" % tip.line_texts())
+	check_near(ItemTooltip.weapon_dps(epic), 13.2 / (0.9 / 1.1), 0.001, "weapon_dps uses the effective cooldown")
+	var rare := ItemInstance.from_weapon(Db.get_weapon(&"sword"), Items.Rarity.RARE, 5)
+	tip.show_item(rare, Db.get_class_data(&"warrior"))
+	check(tip.find_line("Speed 0.90") != null and tip.find_line("Attack Speed", true) == null, "Rare: no bonus line")
+
+
 func test_armor_stats_enchants_and_looted() -> void:
 	var helm := armor("Runed Plate Helm of the Bear", Items.SlotType.HEAD, ClassData.ArmorType.PLATE,
 		Items.Rarity.EPIC, {"strength": 8, "stamina": 9}, 14, true)

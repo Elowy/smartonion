@@ -23,6 +23,10 @@ enum AttackKind { MELEE_ARC, PROJECTILE, NONE }
 @export var scaling: Dictionary[StringName, float] = {}
 ## Seconds between attacks at Haste 0.
 @export var cooldown: float = 1.0
+## Attack speed bonus in percent on top of Haste: +10 = attacks 10% faster (cooldown / 1.1).
+## Not authored in the .tres files: ItemInstance.scaled_weapon sets it from the rarity
+## (Items.WEAPON_RARITY_ATTACK_SPEED – Epic +10%).
+@export var attack_speed_pct: float = 0.0
 @export var crit_mult: float = 2.0
 @export var knockback: float = 2.0
 ## 0..1 chance to stun the target for stun_duration seconds.
@@ -53,6 +57,19 @@ enum AttackKind { MELEE_ARC, PROJECTILE, NONE }
 @export var base_price: int = 20
 @export var rarity: int = 0
 @export var color: Color = Color(0.8, 0.8, 0.85)
+
+
+## Attack speed multiplier of the weapon itself (rarity bonus), 1 = none. Haste comes on top
+## (CombatMath.weapon_cooldown).
+func attack_speed_mult() -> float:
+	return 1.0 + maxf(-90.0, attack_speed_pct) / 100.0
+
+
+## Seconds between attacks at Haste 0 with the weapon's own attack speed bonus (what the
+## tooltip shows as "Speed"); [member cooldown] stays the base that Attack / Spell Power and
+## "procs per minute" are normalised to.
+func effective_cooldown() -> float:
+	return cooldown / attack_speed_mult()
 
 
 func is_two_handed() -> bool:
