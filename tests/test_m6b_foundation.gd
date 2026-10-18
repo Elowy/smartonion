@@ -876,6 +876,35 @@ func _make_screen() -> void:
 	tree.root.add_child(screen)
 
 
+func test_process_runs_the_shrine_frames_while_the_vote_is_open() -> void:
+	_make_screen()
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	screen.hold_shrine = true
+	RunState.pending_shrine = &"greed"
+	screen.open(5, 0)
+	check_eq(screen.phase, Intermission.Phase.SHRINE, "the held shrine vote is open")
+	screen._process(DT)
+	screen._process(DT)
+	check_eq(screen.shrine_updates, 2, "two frames of the shrine phase")
+	check_eq(screen.portal_updates, 0, "no portal frames")
+	check_eq(screen.phase, Intermission.Phase.SHRINE, "the vote is still open")
+
+
+func test_process_runs_the_portal_frames_while_the_vote_is_open() -> void:
+	_make_screen()
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	screen.hold_portal = true
+	RunState.portal_pending = true
+	screen.open(5, 0)
+	check_eq(screen.phase, Intermission.Phase.PORTAL, "the held portal vote is open")
+	screen._process(DT)
+	screen._process(DT)
+	screen._process(DT)
+	check_eq(screen.portal_updates, 3, "three frames of the portal phase")
+	check_eq(screen.shrine_updates, 0, "no shrine frames")
+	check_eq(screen.phase, Intermission.Phase.PORTAL, "the vote is still open")
+
+
 func test_phase_order_and_chain() -> void:
 	var P := Intermission.Phase
 	check(P.CLOSED < P.LOOT and P.LOOT < P.SHRINE and P.SHRINE < P.LEVEL_UP and P.LEVEL_UP < P.PORTAL and P.PORTAL < P.MARKET,
@@ -1096,15 +1125,18 @@ func test_leaderboard_newer_version_is_never_overwritten() -> void:
 
 
 func test_leaderboard_older_or_odd_files() -> void:
+	# The entries are stored worst first: the sanitize sort must put the victory on top.
 	var file := FileAccess.open(TMP_BOARD, FileAccess.WRITE)
-	file.store_string('{"version": 1, "categories": {"normal/standard/2": [{"wave": 20.0, "time": 99.94, "classes": ["mage"], "victory": true}, "junk", {"wave": 2}], "bad": 5}}')
+	file.store_string('{"version": 1, "categories": {"normal/standard/2": [{"wave": 2}, "junk", {"wave": 20.0, "time": 99.94, "classes": ["mage"], "victory": true}], "bad": 5}}')
 	file.close()
 	var board := Leaderboard.create(TMP_BOARD)
 	check_eq(board.load_file(), OK, "loads")
 	var list := board.entries_for(&"normal", false, 2)
 	check_eq(list.size(), 2, "the junk entry is dropped")
 	check_eq(typeof(list[0]["wave"]), TYPE_INT, "types are restored")
-	check(bool(list[0]["victory"]), "best first (the victory)")
+	check(bool(list[0]["victory"]), "best first (the victory), though it was stored last")
+	check_eq(list[0]["wave"], 20, "the victory is the wave-20 run")
+	check_eq(list[1]["wave"], 2, "then the wave-2 run")
 	check_eq(list[1]["date"], "", "a missing date stays empty (no invented one)")
 	check(not board.categories.has("bad"), "a category that is no list is dropped")
 
