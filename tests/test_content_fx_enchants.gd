@@ -8,14 +8,14 @@ const Fakes := preload("res://tests/player_fakes.gd")
 const DT := 1.0 / 60.0
 
 const NEW_EQUIP: Array[StringName] = [
-	&"scorching", &"glacial", &"sweeping", &"quickened", &"gilded", &"thorned", &"riposting", &"studious",
+	&"scorching", &"glacial", &"sweeping", &"quickened", &"gilded", &"spiked", &"riposting", &"studious",
 ]
 const NEW_ON_HIT: Array[StringName] = [
 	&"rupturing", &"warding", &"soothing", &"concussive", &"rimebound", &"smoldering", &"frenzied",
 ]
 const NEW_ON_KILL: Array[StringName] = [&"feasting", &"rousing", &"arcing", &"gravewarded", &"wailing"]
 const NEW_WHEN_STRUCK: Array[StringName] = [
-	&"barbed", &"mending", &"fortifying", &"bulwarking", &"emberhide", &"clinging",
+	&"barbed", &"rallying", &"fortifying", &"bulwarking", &"emberhide", &"clinging",
 ]
 ## The 24 enchants that existed before M6b (their ids stay as they are).
 const OLD_IDS: Array[StringName] = [
@@ -135,6 +135,18 @@ func test_there_are_fifty_enchants_and_the_old_ones_are_untouched() -> void:
 	check_eq(per_kind.get(EnchantData.Kind.WHEN_STRUCK, 0), 8, "when-struck enchants")
 
 
+## The two prefixes the fix-up chose: "Mending" and "Thorned" echoed the stat suffixes of the same
+## name ("Mending ... of Mending", "Thorned ... of Thorns"), so they are Rallying and Spiked.
+func test_prefixes_are_rallying_and_spiked_without_suffix_echo() -> void:
+	var rallying: EnchantData = Db.enchants.get(&"rallying")
+	var spiked: EnchantData = Db.enchants.get(&"spiked")
+	check(rallying != null and rallying.prefix == "Rallying", "the when-struck heal is Rallying")
+	check(spiked != null and spiked.prefix == "Spiked", "the equip thorns enchant is Spiked")
+	check(not Db.enchants.has(&"mending") and not Db.enchants.has(&"thorned"), "the old ids are gone")
+	for id in Db.enchants:
+		check(Db.enchants[id].prefix not in ["Mending", "Thorned"], "%s: no old prefix" % id)
+
+
 func test_new_enchants_have_valid_fields_and_tooltips_at_every_rank() -> void:
 	var prefixes := {}
 	var proc_slots: Array[int] = [Items.SlotType.WEAPON, Items.SlotType.RING, Items.SlotType.TRINKET]
@@ -194,7 +206,7 @@ func test_equip_enchant_numbers_scale_with_the_rank_and_show_in_the_text() -> vo
 	var expect := {
 		&"scorching": [&"fire_damage", 10.0], &"glacial": [&"frost_damage", 10.0],
 		&"sweeping": [&"area_size", 8.0], &"quickened": [&"cooldown_reduction", 5.0],
-		&"gilded": [&"gold_find", 10.0], &"thorned": [&"thorns", 3.0],
+		&"gilded": [&"gold_find", 10.0], &"spiked": [&"thorns", 3.0],
 		&"riposting": [&"parry", 4.0], &"studious": [&"xp_gain", 10.0],
 	}
 	for id: StringName in expect:
@@ -261,9 +273,9 @@ func test_gold_find_enchant_adds_gold() -> void:
 	check_near(CombatMath.gold_with_find(10, p.stats), 13.0, 0.0001, "rank III: +20% more")
 
 
-func test_thorns_enchant_hurts_melee_attackers() -> void:
+func test_spiked_enchant_hurts_melee_attackers() -> void:
 	var p := _hero()
-	p.equipment.equip(_enchanted(&"thorned", 0, Items.SlotType.CHEST))
+	p.equipment.equip(_enchanted(&"spiked", 0, Items.SlotType.CHEST))
 	var e := _real(Vector3(1, 0, 0))
 	var hp := e.hp
 	p.take_damage(2.0, CombatMath.KIND_MELEE, e)
@@ -472,9 +484,9 @@ func test_barbed_impales_the_attacker() -> void:
 	check_near(_sum(e.fake_damage_log), 5.0 + 8.0, 0.05, "8 more over 3 sec")
 
 
-func test_mending_heals_when_struck() -> void:
+func test_rallying_heals_when_struck() -> void:
 	var p := _hero()
-	_wear(p, &"mending")
+	_wear(p, &"rallying")
 	var e := _fake(Vector3(1, 0, 0))
 	p.hp = 100.0
 	p.procs.on_struck(e, 2.0)
@@ -522,11 +534,11 @@ func test_clinging_slows_the_attacker() -> void:
 
 func test_struck_enchants_fire_through_player_take_damage() -> void:
 	var p := _hero()
-	_wear(p, &"mending")
+	_wear(p, &"rallying")
 	var e := _real(Vector3(1, 0, 0))
 	p.hp = 100.0
 	p.take_damage(2.0, CombatMath.KIND_MELEE, e)
-	check(p.procs.fire_count(&"mending") == 1 and p.hp > 100.0 - 2.0, "the hit triggered it (hp %s)" % p.hp)
+	check(p.procs.fire_count(&"rallying") == 1 and p.hp > 100.0 - 2.0, "the hit triggered it (hp %s)" % p.hp)
 
 
 # --- Real trigger paths ---------------------------------------------------------------------------
