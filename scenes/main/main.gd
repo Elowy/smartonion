@@ -997,7 +997,8 @@ func _on_demo_restart() -> void:
 
 func _on_player_downed_changed(is_downed: bool, _player: Player) -> void:
 	if not is_downed:
-		if (state == State.WAVE or state == State.DUNGEON) and not _reviving_all:
+		var in_fight := state == State.WAVE or (state == State.DUNGEON and dungeon != null and dungeon.counts_revives())
+		if in_fight and not _reviving_all:
 			revives += 1
 		return
 	players_downed += 1

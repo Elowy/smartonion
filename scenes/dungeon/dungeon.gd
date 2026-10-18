@@ -221,6 +221,12 @@ func is_running() -> bool:
 	return phase != Phase.IDLE and phase != Phase.DONE
 
 
+## The heroes are in the fight (from the intro to the outro): a hero getting up now was revived by a
+## teammate. The entry's begin_wave and the exit's wave-start revive are not that (Main.revives).
+func counts_revives() -> bool:
+	return phase == Phase.INTRO or phase == Phase.ROOM or phase == Phase.PAUSE or phase == Phase.OUTRO
+
+
 ## 1-based number of the room shown ("Room 2/4"): the current one, the one just cleared during the
 ## pause, the first before the rooms begin.
 func room_number() -> int:

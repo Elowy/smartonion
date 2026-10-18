@@ -732,6 +732,21 @@ func test_revives_inside_the_dungeon_are_counted() -> void:
 	check_eq(main.revives, revives + 1, "a revive in the dungeon counts")
 
 
+func test_the_entrys_and_the_exits_wave_start_revives_are_not_counted() -> void:
+	_run_with_bots(2)
+	_break_after(6)
+	_down(main.players[1])  # a ghost at the portal
+	var revives := main.revives
+	_enter_by_vote()
+	check(not main.players[1].downed, "begin_wave brought it back")
+	check_eq(main.revives, revives, "that is not a teammate's revive")
+	main.dungeon._physics_process(Dungeon.INTRO_TIME + 0.02)
+	for p in main.players:
+		_down(p)
+	_play_dungeon(false)
+	check_eq(main.revives, revives, "nor is the exit's wave-start revive of a lost dungeon")
+
+
 func test_quitting_during_the_dungeon_frees_everything() -> void:
 	_run_with_bots(2)
 	_break_after(6)
