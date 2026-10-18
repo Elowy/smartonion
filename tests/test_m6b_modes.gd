@@ -527,6 +527,33 @@ func test_equal_entries_keep_the_files_order_when_loaded() -> void:
 	check_eq(dates, ["2026-10-04", "2026-10-01", "2026-10-02", "2026-10-03"] as Array[String], "the best first, equal ones as stored")
 
 
+func test_a_later_wave_and_a_longer_time_rank_higher_when_the_party_fell() -> void:
+	# Endless: the later wave first, then the LONGER time held out on it.
+	check(Leaderboard.better(_entry(34, 100.0), _entry(33, 2000.0), RunState.MODE_ENDLESS), "a later wave beats a longer time")
+	check(Leaderboard.better(_entry(33, 2150.0), _entry(33, 2000.0), RunState.MODE_ENDLESS), "the same wave: the longer time")
+	check(not Leaderboard.better(_entry(33, 2000.0), _entry(33, 2150.0), RunState.MODE_ENDLESS), "the same wave: not the shorter")
+	# Normal defeats: the same rule.
+	check(Leaderboard.better(_entry(20, 1100.0), _entry(20, 1000.0), RunState.MODE_NORMAL), "a defeat: the longer time on the same wave")
+	check(not Leaderboard.better(_entry(20, 1000.0), _entry(20, 1100.0), RunState.MODE_NORMAL), "a defeat: not the shorter")
+	check(Leaderboard.better(_entry(21, 100.0), _entry(20, 1100.0), RunState.MODE_NORMAL), "a defeat: the later wave first")
+	# Normal victories: the SHORTER time.
+	check(Leaderboard.better(_entry(25, 1000.0, true), _entry(25, 1100.0, true), RunState.MODE_NORMAL), "a victory: the shorter time")
+	check(not Leaderboard.better(_entry(25, 1100.0, true), _entry(25, 1000.0, true), RunState.MODE_NORMAL), "a victory: not the longer")
+	check(Leaderboard.better(_entry(25, 1500.0, true), _entry(24, 3000.0), RunState.MODE_NORMAL), "a victory beats any defeat")
+	check(not Leaderboard.better(_entry(20, 1000.0), _entry(20, 1000.0), RunState.MODE_NORMAL), "a tie is not better")
+
+
+func test_the_board_puts_the_longer_defeat_above_the_faster_one() -> void:
+	var board := Leaderboard.create(TMP_BOARD)
+	check_eq(board.add_entry(_entry(33, 2000.0), RunState.MODE_ENDLESS, false, 2), 0, "the first entry")
+	check_eq(board.add_entry(_entry(33, 2150.0), RunState.MODE_ENDLESS, false, 2), 0, "a longer run on the same wave takes the top")
+	check_eq(board.add_entry(_entry(33, 1000.0), RunState.MODE_ENDLESS, false, 2), 2, "a faster fall goes last")
+	var times: Array[float] = []
+	for e in board.entries_for(RunState.MODE_ENDLESS, false, 2):
+		times.append(float(e["time"]))
+	check_eq(times, [2150.0, 2000.0, 1000.0] as Array[float], "the order by time")
+
+
 # --- Main.end_run records the run ----------------------------------------------------------------
 
 func _recording_main(opts: LaunchOptions = null) -> void:

@@ -10,8 +10,9 @@ extends RefCounted
 ## An entry: {"wave": int (the wave reached: the last wave cleared on a victory, the wave that ended
 ## the run on a defeat), "time": float (seconds of wave play, RunState.run_time), "classes": [class
 ## ids in slot order], "date": "YYYY-MM-DD HH:MM:SS", "victory": bool}. Entries of a category are
-## kept best first ([method better]): a normal run ranks victories by the shortest time, then
-## defeats by the highest wave; an endless run ranks by the highest wave, then the shortest time.
+## kept best first ([method better]). A normal run ranks victories by the shortest time, and defeats by the
+## highest wave, then by the LONGEST time (the longer the party held out on its last wave, the better). An
+## endless run ranks every entry by the highest wave, then by the longest time.
 ##
 ## - The path is injectable: [code]Leaderboard.create(path)[/code] works on any file (tests use a temp
 ##   path). [method default_path] is the real file ([member path_override] replaces it in tests).
@@ -31,6 +32,8 @@ const DEFAULT_PATH := "user://leaderboard.json"
 const MAX_ENTRIES := 10
 const PARTY_MIN := 1
 const PARTY_MAX := 4
+## Times are snapped to 0.1 s (see [method make_entry]), so this tolerance only absorbs float noise.
+const TIME_EPSILON := 0.00001
 
 ## Master switch of [method record_run] (the unit test runner switches it off).
 static var writes_enabled := true
@@ -87,6 +90,8 @@ static func make_entry(p_wave: int, p_time: float, p_classes: Array, p_victory: 
 
 ## True when entry [param a] ranks above [param b] in a [param p_mode] board (see the class doc).
 ## Ties are not "better" (a new entry goes below an equal older one).
+## Endless: the later wave, then the LONGER time. Normal: a victory above a defeat, victories by the
+## SHORTER time, defeats by the later wave and then the LONGER time.
 static func better(a: Dictionary, b: Dictionary, p_mode: StringName) -> bool:
 	var a_wave := int(a.get("wave", 0))
 	var b_wave := int(b.get("wave", 0))
@@ -95,16 +100,16 @@ static func better(a: Dictionary, b: Dictionary, p_mode: StringName) -> bool:
 	if p_mode == RunState.MODE_ENDLESS:
 		if a_wave != b_wave:
 			return a_wave > b_wave
-		return a_time < b_time - 0.00001
+		return a_time > b_time + TIME_EPSILON
 	var a_won := bool(a.get("victory", false))
 	var b_won := bool(b.get("victory", false))
 	if a_won != b_won:
 		return a_won
 	if a_won:
-		return a_time < b_time - 0.00001
+		return a_time < b_time - TIME_EPSILON
 	if a_wave != b_wave:
 		return a_wave > b_wave
-	return a_time < b_time - 0.00001
+	return a_time > b_time + TIME_EPSILON
 
 
 # --- Reading ----------------------------------------------------------------------------------
