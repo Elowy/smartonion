@@ -29,7 +29,7 @@ unique_params = {
 "dot": 20.0,
 "dot_duration": 4.0
 }
-unique_text = "Chance on hit: The target bursts in shadow, dealing 26 Shadow damage to it and enemies within 3 m and leaving them rotting for 20 more over 4 sec."
+unique_text = "Chance on hit: The target bursts, dealing 26 Shadow damage to it and enemies within 3 m, and rots them for 20 more over 4 sec."
 sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
 min_wave = 10
 weight = 1.0

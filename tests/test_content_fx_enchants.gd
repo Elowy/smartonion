@@ -184,6 +184,8 @@ func test_new_enchants_have_valid_fields_and_tooltips_at_every_rank() -> void:
 		for rank in 5:
 			var text := EnchantRoll.new(e, rank).description()
 			check(not text.contains("{") and not text.contains("}"), "%s rank %d filled: %s" % [id, rank, text])
+		# A Legendary carries two of them under its text: no longer than the old Shadowflame (135).
+		check(EnchantRoll.new(e, 2).description().length() <= 120, "%s: a tooltip line of at most 120 characters" % id)
 		for word in BANNED:
 			check(word not in (e.prefix + " " + e.description).to_lower(), "%s: no trademark '%s'" % [id, word])
 

@@ -154,7 +154,8 @@ func _selected_icon(i: int) -> Rect2:
 
 ## Both players of the column under [param top] (P1 / P2) show their tooltips: each on screen,
 ## clear of the other panel and of the other tooltip. Returns whether the bottom one made way
-## (its plan without the top one's tooltip would have covered it).
+## (its plan without the top one's tooltip would have covered it, or come closer to it than
+## PlayerPanel.TOOLTIP_NEIGHBOUR_GAP – the rule _tooltip_plan itself applies).
 func _check_column_apart(top: int, what: String) -> bool:
 	var bottom := top + 2
 	var t := _check_clear_of_the_column_mate(top, "%s: P%d" % [what, top + 1])
@@ -162,7 +163,7 @@ func _check_column_apart(top: int, what: String) -> bool:
 	check(not t.intersects(b), "%s: P%d's tooltip %s and P%d's %s keep apart" % [what, top + 1, t, bottom + 1, b])
 	var panel := screen.panels[bottom]
 	var would := panel._tooltip_plan(false).rect
-	if not would.intersects(t):
+	if not would.intersects(t.grow(PlayerPanel.TOOLTIP_NEIGHBOUR_GAP)):
 		check(b.is_equal_approx(would), "%s: P%d's tooltip stays where it would be anyway" % [what, bottom + 1])
 		return false
 	var own := _rect(panel)

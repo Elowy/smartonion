@@ -29,7 +29,7 @@ unique_params = {
 "school": "physical",
 "spread": 3.0
 }
-unique_text = "Chance on hit: Rends the target for 36 Physical damage over 4 sec (stacks 3 times). A bleeding enemy that dies spreads its wounds to enemies within 3 m."
+unique_text = "Chance on hit: Rends the target for 36 Physical damage over 4 sec (stacks 3 times). Spreads within 3 m on death."
 sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
 min_wave = 10
 weight = 1.0

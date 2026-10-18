@@ -26,7 +26,7 @@ unique_params = {
 "at": "self",
 "stun": 1.5
 }
-unique_text = "Equip: When you fall below 35% health, a deafening blast deals 25 damage to enemies within 4 m and stuns them for 1.5 sec. Once per wave."
+unique_text = "Equip: When you fall below 35% health, a blast deals 25 damage to enemies within 4 m and stuns them for 1.5 sec. Once per wave."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

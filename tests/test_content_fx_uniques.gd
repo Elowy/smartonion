@@ -284,6 +284,11 @@ func _check_effect(id: StringName, d: UniqueItemData) -> void:
 			check(d.unique_text.begins_with("Equip: "), "%s: Equip: line (low HP)" % id)
 	for word in BANNED:
 		check(word not in (d.display_name + " " + d.flavor + " " + d.unique_text).to_lower(), "%s: no trademark '%s'" % [id, word])
+	# Tooltip height: the loot roll window gives its title block up first (test_m6_artifacts_fit), and
+	# a main-hand weapon already carries the most lines. The old texts are at most 117 characters.
+	check(d.unique_text.length() <= 130, "%s: a tooltip line of at most 130 characters (%d)" % [id, d.unique_text.length()])
+	if d.weapon != null and d.weapon.hand != WeaponData.Hand.OFF_HAND:
+		check(d.unique_text.length() <= 115, "%s: a main-hand weapon's text of at most 115 characters (%d)" % [id, d.unique_text.length()])
 
 
 func test_tooltips_show_the_numbers_of_the_params() -> void:
