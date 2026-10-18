@@ -3,9 +3,12 @@
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
 > fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
-> Státusz: **M0–M6a kész** (a 16. fejezet szerint; az M6b és a későbbi mérföldkövek még
-> tervezés). Ez a dokumentum a fejlesztés alapja; minden szám kiinduló érték, a balanszolás
-> során változni fog.
+> Státusz: **M0–M6a kész** (a 16. fejezet szerint). Az **M6b** (módok, környezetek,
+> események, szentélyek, Dungeon-portál, tartalom-csomagok) terve ebben a dokumentumban
+> rögzített, a megvalósítás következik; az M7 és a későbbi mérföldkövek még tervezés. Ez a
+> dokumentum a fejlesztés alapja; minden szám kiinduló érték, a balanszolás során változni
+> fog (az M6b maga nem hangol: a végleges balansz egyszer, a legvégén készül, lásd 9. és 16.
+> fejezet).
 
 ---
 
@@ -21,7 +24,8 @@
 | Co-op | Helyi, **1–4 játékos**, kontrollerrel (+1 opcionális billentyű+egér) |
 | Fegyverek | **WoW-szerű: Main Hand + Off Hand** (kétkezes fegyver mindkét slotot foglalja) |
 | Aktív képességek | **Igen**, kasztonként saját erőforrással (Rage, Mana, Energy, Holy Power, Soul Shard) |
-| Menet hossza | **25 hullám** |
+| Menet hossza | **25 hullám** (Normal mód); az **Endless** módban a 25. hullám után folytatható (M6b, lásd 16.1) |
+| Módok (M6b) | **Normal** vagy **Endless**, opcionálisan **Hardcore** (nincs Spirit Healer); a lobbyban választható, módonként helyi ranglista (16.1) |
 | Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 9.1) |
 | Szintlépés | **5 kártya, abilityk és statok keverve**, 1 választható; goldért rerollolható; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
 | Talentek | WoW-szerű **talentfák** (kasztonként 3); a **10. szinttől szintenként 1 talentpont**, a hullámok között költhető (lásd 7. fejezet) |
@@ -36,33 +40,49 @@
 ## 1. Játékmenet-ciklus
 
 ```
-Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
-  → [ Hullám (harc) → Loot roll (Need / Greed / Pass) → Szintlépés (ability / stat)
-      → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25
-  → Győzelem / Vereség képernyő (összegzés, Damage Meter, díjak, run kártya)
+Főmenü → Csatlakozás (Press A to join) → Kasztválasztás + módválasztás (Normal / Endless, Hardcore)
+  → Aréna sorsolása („Rolling the arena…”, 12. fejezet)
+  → [ Hullám (harc; esetleg egy esemény) → Loot roll (Need / Greed / Pass)
+      → (Szentély, 5% eséllyel) → Szintlépés (ability / stat)
+      → (Dungeon-portál a 6., 9., 12., 15. hullám után)
+      → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25   (Endless: a 25. után tovább)
+  → Győzelem / Vereség képernyő (összegzés, Damage Meter, díjak, run kártya, ranglista)
 ```
 
-- **Egy menet = 25 hullám.**
+- **Egy menet = 25 hullám** (Normal mód). Az **Endless** mód a 25. hullám után is folytatódik
+  (lásd lent és 16.1); a menet hossza ezentúl a módból jön, nem egy beégetett 25-ös szám.
 - Hullámhossz:
   - **1–10. hullám:** `20 + 5 × (hullám − 1)` másodperc, legfeljebb 60 mp (a 9–10. hullám 60 mp).
   - **A 10. hullám felett hullámonként +10 mp:** 11. = 70 mp, 15. = 110 mp, 20. = 160 mp,
     25. = 210 mp.
+  - **Endless módban a 26. hullámtól** a hullámhossz **legfeljebb 210 mp** (a 25. hullám
+    hossza a plafon).
   - Egy teljes menet így kb. **42 perc** harc (a két boss-hullámot a képlet szerinti hosszal
     számolva; valójában a boss legyőzése dönt), plusz a hullámok közötti idő.
 - **Különleges hullámok** (részletek: 8. fejezet):
   - **10.** – boss-hullám: Lich Commander Morvain (mini-raid boss),
   - **20.** – elit-hullám (minden ellenség elit-affixet kap, de csak ×1,5 HP-val),
-  - **25.** – végső boss: Vor'thalax, the Burning Tyrant; a halála a menet győzelme.
+  - **25.** – végső boss: Vor'thalax, the Burning Tyrant; Normal módban a halála a menet
+    győzelme, **Endless módban** nem ér véget a menet: „*Endless begins!*” szalag, és jön a
+    26. hullám.
+  - **Endless, 26. hullám fölött:** minden 5. hullám boss-hullám a 30.-tól, váltakozva
+    Morvain (30., 40., …) és Vor'thalax (35., 45., …); a 20. hullám elit-szabálya a 33., 43.,
+    53. … hullámon ismétlődik.
 
   A boss-hullámon a fenti hullámhossz nem érvényes: a hullám **a boss halálával ér véget**
   (nincs időkorlát, de 90 mp után Enrage). Közben a normál ellenségek a szokásos spawn-ráta
   50%-ával tovább érkeznek.
 - Hullám közben a karakterek **automatikusan támadnak** a fegyvereikkel a legközelebbi
   ellenségre; a játékos **mozog** és **képességeket** használ.
+- **Hullám közbeni esemény** (M6b): a 4. hullámtól, 30% eséllyel egy hullámban legfeljebb egy
+  esemény jön – őrzött láda, megvédendő totem vagy Goblin karaván (16.1).
 - A hullám végén a földön maradt gold és XP automatikusan begyűjtődik.
 - Hullám után: **loot roll** a hullámban szerzett itemekre (közös képernyőn) →
-  szintlépés-választások (ability vagy stat) → bolt / trainer / talents / karakterpanel
-  → minden játékos „Ready” → következő hullám.
+  (M6b: 5% eséllyel **szentély**) → szintlépés-választások (ability vagy stat) →
+  (M6b: a 6., 9., 12., 15. hullám után **Dungeon-portál**) → bolt / trainer / talents /
+  karakterpanel → minden játékos „Ready” → következő hullám.
+- **Aréna-környezet** (M6b): a menet elején 5 környezet egyike sorsolódik ki, és a menet
+  végéig megmarad (13. fejezet és 16.1).
 
 ### Elesés és halál (co-op)
 
@@ -124,6 +144,14 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
+- **Hardcore mód** (M6b, a lobbyban kapcsolható; részletek: 16.1):
+  - **Nincs Spirit Healer:** az aréna nem hozza létre, így csak a társak tudnak feléleszteni
+    (5 mp-es csatornázás, Word of Glory).
+  - Az elesett hős keretén a „Go to the Spirit Healer …” helyett a „*Only a teammate can
+    revive you*” felirat áll.
+  - Aki a hullám végéig nem kap segítséget, a **következő hullám elején** így is visszatér
+    (50% HP-val), mint Normalban.
+  - **Szóló Hardcore = szóló Normal:** egyedül az első elesés amúgy is a menet vége.
 
 ---
 
