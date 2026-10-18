@@ -72,10 +72,11 @@ static func set_ids() -> Array[StringName]:
 # =================================================================================================
 
 ## Tall objects in the decor band, chunked like the forest's trees (north, south, west, east; a near
-## and a far part each). [param placer] is called as placer(kit, Vector3 base, rng, far).
+## and a far part each). [param placer] is called as placer(kit, Vector3 base, rng, far); nothing stands
+## within [param keep_out] metres of the walls (the wide mangrove canopies need more than the forest's 2.6).
 static func _scatter_tall(root: Node3D, bounds: Rect2, decor: Rect2, rng: RandomNumberGenerator,
 		base_name: String, material: Material, dense_p: float, sparse_p: float, placer: Callable,
-		cell: float = 3.6) -> void:
+		keep_out: float = 2.6, cell: float = 3.6) -> void:
 	var kits: Array[MeshKit] = []
 	for i in 8:
 		kits.append(MeshKit.new())
@@ -85,7 +86,8 @@ static func _scatter_tall(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 		while x < decor.end.x:
 			var p := Vector2(x + rng.randf_range(0.2, cell - 0.2), y + rng.randf_range(0.2, cell - 0.2))
 			var dense := absf(p.x) > bounds.end.x + 5.0 or p.y < bounds.position.y - 5.0 or p.y > bounds.end.y + 11.0
-			if ArenaDecor.tree_allowed(p, bounds, decor) and rng.randf() < (dense_p if dense else sparse_p):
+			if ArenaDecor.tree_allowed(p, bounds, decor) and not bounds.grow(keep_out).has_point(p) \
+					and rng.randf() < (dense_p if dense else sparse_p):
 				var far := ArenaDecor.distance_outside(p, bounds) > ArenaDecor.FAR_TREE_DISTANCE
 				placer.call(kits[ArenaDecor.chunk_of(p, bounds) + (4 if far else 0)], Vector3(p.x, 0.0, p.y), rng, far)
 			x += cell
@@ -173,6 +175,9 @@ static func _ground_multimesh(root: Node3D, node_name: String, mesh: Mesh, bound
 		tints: Array[Color], inside_margin: float = 0.5, lighten: float = 0.18) -> void:
 	var points: Array[Transform3D] = []
 	var colors: Array[Color] = []
+	var mesh_height := mesh.get_aabb().end.y
+	var inside_top := 0.0
+	var inside_count := 0
 	for i in count:
 		var p: Vector2
 		if i < inside:
@@ -185,8 +190,16 @@ static func _ground_multimesh(root: Node3D, node_name: String, mesh: Mesh, bound
 		var s := rng.randf_range(scale_lo, scale_hi) * (0.8 if i < inside else 1.15)
 		points.append(Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3.ONE * s), Vector3(p.x, 0.0, p.y)))
 		colors.append(tints[rng.randi_range(0, tints.size() - 1)].lightened(rng.randf_range(0.0, lighten)))
+		if bounds.has_point(p):
+			inside_count += 1
+			inside_top = maxf(inside_top, mesh_height * s)
 	if not points.is_empty():
-		root.add_child(ArenaDecor.multimesh(node_name, mesh, points, colors))
+		var node := ArenaDecor.multimesh(node_name, mesh, points, colors)
+		# What stands inside the playable rectangle (a MultiMesh cannot be read back headless): how many
+		# and how tall the tallest is. The tests pin "knee high at most".
+		node.set_meta(&"inside_count", inside_count)
+		node.set_meta(&"inside_top", inside_top)
+		root.add_child(node)
 
 
 ## A tuft of [param blades] thin blades (white, tinted per copy by the MultiMesh).
@@ -409,7 +422,7 @@ static func _swamp(arena: Arena, rng: RandomNumberGenerator) -> Node3D:
 	var root := Node3D.new()
 	var bounds := arena.get_bounds()
 	var decor := arena.get_decor_rect()
-	_scatter_tall(root, bounds, decor, rng, "Mangroves", Mats.toon_vc(true, Color.WHITE, 0.045), 0.8, 0.5, _mangrove)
+	_scatter_tall(root, bounds, decor, rng, "Mangroves", Mats.toon_vc(true, Color.WHITE, 0.045), 0.8, 0.5, _mangrove, 4.0)
 	_swamp_undergrowth(root, bounds, decor, rng)
 	_swamp_props(root, bounds, rng)
 	_swamp_lights(root, bounds, decor, rng)
