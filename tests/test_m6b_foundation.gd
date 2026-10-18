@@ -203,12 +203,15 @@ func test_game_over_screen_reads_the_run_length() -> void:
 	check_eq(GameOverScreen.waves_cleared(true), 25, "normal victory")
 	screen_go.open(true)
 	check_eq(screen_go.waves_value.text, "25 / 25", "normal victory text")
+	check_eq(screen_go.subtitle_label.text, "All 25 waves survived – the onions prevail!", "normal victory subtitle")
 	RunState.start_run(1, 1, RunState.MODE_ENDLESS)
 	RunState.set_wave(31)
 	check_eq(GameOverScreen.waves_cleared(false), 30, "endless: every wave before the fatal one")
 	screen_go.open(false)
 	check_eq(screen_go.waves_value.text, "30", "endless: the count alone")
 	check_eq(screen_go.title_label.text, "Defeat", "defeat")
+	screen_go.open(true)  # (an endless run has no victory; a forced one must still read sensibly)
+	check_eq(screen_go.subtitle_label.text, "31 waves survived – the onions prevail!", "endless victory subtitle")
 
 
 func test_run_summary_and_card_read_the_run_length() -> void:

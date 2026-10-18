@@ -283,8 +283,9 @@ func _fill() -> void:
 	if victory:
 		title_label.text = "Victory!"
 		title_label.add_theme_color_override(&"font_color", UiTheme.GOLD)
-		subtitle_label.text = "All %d waves survived – the onions prevail!" % RunState.total_waves() \
-				if RunState.total_waves() > 0 else "%d waves survived – the onions prevail!" % waves_cleared(true)
+		var survived := "All %d waves survived" % RunState.total_waves() if RunState.total_waves() > 0 \
+				else "%d waves survived" % waves_cleared(true)
+		subtitle_label.text = survived + " – the onions prevail!"
 	else:
 		title_label.text = "Defeat"
 		title_label.add_theme_color_override(&"font_color", UiTheme.RED)
