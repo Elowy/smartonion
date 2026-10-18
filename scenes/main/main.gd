@@ -68,6 +68,8 @@ const DEMO_MARKET_TIME := 4.0
 const DEMO_BOT_THINK_TIME := 1.0
 ## Demo mode: seconds a bot "thinks" per level-up card (LevelUpScreen.bot_think_time).
 const DEMO_LEVEL_UP_THINK_TIME := 1.0
+## Demo mode: seconds a bot "thinks" before it votes at the dungeon portal (PortalScreen.bot_think_time).
+const DEMO_PORTAL_THINK_TIME := 1.5
 const LAYER_HUD := 10
 const LAYER_MENU := 20
 const LAYER_INTERMISSION := 30
@@ -332,6 +334,7 @@ func start_run() -> void:
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
 	intermission.loot_screen.bot_think_time = DEMO_BOT_THINK_TIME if options.demo and not options.smoke else 0.0
 	intermission.level_up_screen.bot_think_time = DEMO_LEVEL_UP_THINK_TIME if options.demo and not options.smoke else 0.0
+	intermission.portal_screen.bot_think_time = DEMO_PORTAL_THINK_TIME if options.demo and not options.smoke else 0.0
 	_layers[LAYER_INTERMISSION].add_child(intermission)
 	game_over = GameOverScreen.create()
 	game_over.back_to_menu_requested.connect(_on_game_over_back, CONNECT_DEFERRED)
@@ -458,7 +461,8 @@ func enter_dungeon() -> void:
 		if is_instance_valid(p):
 			party.append(p)
 	dungeon.start(party)
-	_log("dungeon entered after wave %d: %d heroes, environment %s" % [wave, party.size(), RunState.environment])
+	_log("dungeon entered after wave %d at t=%.1f: %d heroes, environment %s" % [wave, _game_time(), party.size(),
+		RunState.environment])
 	_on_dungeon_status()
 	_pause_if_pad_missing()
 
@@ -479,8 +483,8 @@ func _on_dungeon_boss_cleared() -> void:
 
 
 func _on_dungeon_room_started(index: int) -> void:
-	_log("dungeon room %d/%d (%s) started after %.1f s" % [index + 1, Dungeon.ROOM_COUNT,
-		Dungeon.ROOM_NAMES[index], dungeon.total_time if dungeon != null else 0.0])
+	_log("dungeon room %d/%d (%s) started after %.1f s (t=%.1f)" % [index + 1, Dungeon.ROOM_COUNT,
+		Dungeon.ROOM_NAMES[index], dungeon.total_time if dungeon != null else 0.0, _game_time()])
 
 
 func _on_dungeon_room_cleared(index: int) -> void:
