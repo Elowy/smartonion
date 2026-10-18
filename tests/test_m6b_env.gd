@@ -1042,6 +1042,9 @@ func test_a_random_seed_is_fixed_by_the_roll_screen_so_the_run_matches_it() -> v
 	main._on_roll_finished(winner)
 	check_eq(RunState.environment, winner, "the run rolled what the screen showed")
 	check_eq(RunState.environment, RunState.environment_for_seed(RunState.run_seed), "= the roll of its (random) seed")
+	var first_seed := RunState.run_seed
+	main.start_run()  # (play again without a new roll: the fixed seed was used up, this run is a fresh random one)
+	check(RunState.run_seed != first_seed, "the roll's seed is not reused by the next run")
 
 
 func test_env_forces_the_roll_screens_result() -> void:
