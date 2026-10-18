@@ -465,6 +465,15 @@ static func grip_pose(weapon_type: StringName, off_hand: bool) -> Transform3D:
 		&"tome":
 			rot = Vector3(-25, -48 * side, 0)
 			pos = Vector3(0, 0.2, 0.02)
+		&"two_hand_sword":
+			rot = Vector3(-34, 0, -18 * side)
+			pos = Vector3(0, 0.04, 0)
+		&"two_hand_mace":
+			rot = Vector3(-38, 0, -24 * side)
+			pos = Vector3(0, -0.02, 0)
+		&"orb":
+			rot = Vector3(-12, 0, 0)
+			pos = Vector3(0, 0.08, 0.06)
 	return MeshKit.xf(pos, rot)
 
 

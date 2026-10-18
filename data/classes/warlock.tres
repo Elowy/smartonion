@@ -22,7 +22,7 @@ base_stats = Dictionary[StringName, float]({
 &"speed": -5.0
 })
 main_hand = ExtResource("2_mh")
-proficiencies = Array[StringName]([&"wand", &"staff", &"dagger", &"sword", &"tome"])
+proficiencies = Array[StringName]([&"wand", &"staff", &"dagger", &"sword", &"tome", &"orb"])
 resource_type = &"soul_shard"
 resource_color = Color(0.7, 0.3, 0.9, 1)
 resources = Array[ExtResource("3_res_script")]([ExtResource("4_soul_shards")])

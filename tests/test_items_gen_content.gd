@@ -23,20 +23,30 @@ const BANNED: Array[String] = [
 ]
 
 
+## Material tiers of the armour bases (ItemBase.min_wave): I from wave 1 (the original 32), II from
+## wave 9, III from wave 17 (Items.material_tier's thresholds).
+const BASE_TIER_WAVES: Array[int] = [1, 9, 17]
+
+
 func test_armor_and_jewellery_bases() -> void:
-	var seen := {}
+	var per_tier := {}
+	var armour := 0
 	var neck := 0
 	var ring := 0
 	for id in Db.item_bases:
 		var base := Db.item_bases[id]
 		check_eq(base.id, id, "id matches")
 		check(base.display_name != "", "%s has a name" % id)
+		check(base.min_wave in BASE_TIER_WAVES, "%s: min_wave %d is a tier wave" % [id, base.min_wave])
 		if base.slot_type in Items.ARMOR_SLOTS:
+			armour += 1
 			check(base.armor_type in Items.ARMOR_TYPE_NAMES, "%s has an armor type" % id)
-			var key := "%d:%d" % [base.slot_type, base.armor_type]
-			check(not seen.has(key), "one base per slot and armor type (%s)" % id)
-			seen[key] = true
+			# One base per slot, armor type and material tier (min_wave).
+			var tier_key := "%d:%d:%d" % [base.slot_type, base.armor_type, base.min_wave]
+			check(not per_tier.has(tier_key), "one base per slot, armor type and tier (%s)" % id)
+			per_tier[tier_key] = true
 		else:
+			check_eq(base.min_wave, 1, "%s: jewellery bases are not tiered" % id)
 			check_eq(base.armor_type, Items.NO_ARMOR, "%s: jewellery has no armor type" % id)
 			if base.slot_type == Items.SlotType.NECK:
 				neck += 1
@@ -44,14 +54,23 @@ func test_armor_and_jewellery_bases() -> void:
 				ring += 1
 			else:
 				check(false, "%s: only armor, neck and ring bases (trinkets are hand-made)" % id)
-	check_eq(seen.size(), 32, "8 armor slots x 4 armor types")
-	check(neck >= 2 and ring >= 2, "neck and ring bases")
+	# 8 armor slots x 4 armor types x 3 material tiers (I, II, III) = 96, one base each.
+	check_eq(armour, 96, "armor bases: 8 slots x 4 armor types x 3 tiers")
+	for slot in Items.ARMOR_SLOTS:
+		for armor_type in [ClassData.ArmorType.CLOTH, ClassData.ArmorType.LEATHER,
+				ClassData.ArmorType.MAIL, ClassData.ArmorType.PLATE]:
+			for wave in BASE_TIER_WAVES:
+				check(per_tier.has("%d:%d:%d" % [slot, armor_type, wave]),
+						"slot %d, armor type %d: a tier at wave %d" % [slot, armor_type, wave])
+	check_eq(neck, 10, "neck bases (GDD 5.8)")
+	check_eq(ring, 10, "ring bases (GDD 5.8)")
+	check_eq(Db.item_bases.size(), 116, "item bases: 96 armour + 20 jewellery")
 
 
 func test_suffixes() -> void:
 	for id in GDD_SUFFIXES:
 		check(Db.affixes.has(id), "GDD suffix %s" % id)
-	check(Db.affixes.size() >= 12, "at least 12 suffixes")
+	check_eq(Db.affixes.size(), 25, "25 stat suffixes (GDD 5.8)")
 	for id in Db.affixes:
 		var affix := Db.affixes[id]
 		check(affix.suffix.begins_with("of "), "%s: suffix text" % id)

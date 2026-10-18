@@ -75,6 +75,7 @@ const SET_UPGRADE_TOLERANCE := 0.3
 const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
 	&"gun": "Gun", &"wand": "Wand", &"staff": "Staff", &"shield": "Shield", &"tome": "Tome",
+	&"two_hand_sword": "2H Sword", &"two_hand_mace": "2H Mace", &"orb": "Orb",
 }
 
 var item: ItemInstance
@@ -285,7 +286,7 @@ static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_
 	var dmg := w.base_damage
 	if primary != &"":
 		dmg += float(w.scaling.get(primary, 0.0)) * primary_value
-	var dps := dmg / maxf(0.08, w.cooldown)
+	var dps := dmg / maxf(0.08, w.effective_cooldown())
 	if with_companion and p_item.companion != null:
 		dps += weapon_dps(p_item.companion, primary, primary_value)
 	return dps
@@ -668,9 +669,11 @@ func _viewer_hero() -> Player:
 
 func _weapon_lines(w: WeaponData) -> void:
 	if w.attacks():
-		_pair("%s Damage" % fmt_number(w.base_damage), "Speed %.2f" % w.cooldown, WHITE, WHITE)
+		_pair("%s Damage" % fmt_number(w.base_damage), "Speed %.2f" % w.effective_cooldown(), WHITE, WHITE)
 		# (This weapon alone: the pair's other dagger has its own tooltip, the comparison counts both.)
 		_line("(%s damage per second)" % fmt_number(weapon_dps(item, &"", 0.0, false), 1), WHITE)
+		if w.attack_speed_pct > 0.0:
+			_line("+%s%% Attack Speed" % fmt_number(w.attack_speed_pct), ENCHANT_GREEN)
 		var parts := PackedStringArray()
 		for stat: StringName in _ordered(w.scaling.keys()):
 			parts.append("%s %d%%" % [Stats.display_name(stat), roundi(float(w.scaling[stat]) * 100.0)])

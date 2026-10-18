@@ -3,7 +3,7 @@ extends RefCounted
 ## Procedural item silhouettes drawn in code (no image assets yet), used by ItemIcon:
 ## one shape per Items.SlotType (helm / hood, amulet, pauldrons, breastplate / robe, bracer,
 ## gauntlet, belt, legguards, boot, ring, trinket) and one per weapon_type (sword, axe, mace,
-## dagger, bow, gun, wand, staff, shield, tome). Armour is coloured by its material (cloth,
+## dagger, bow, gun, wand, staff, shield, tome, two_hand_sword, two_hand_mace, orb). Armour is coloured by its material (cloth,
 ## leather, mail, plate), gems by the item's rarity. Empty equipment slots use the same shapes
 ## as flat, faint silhouettes. Shapes are authored in a unit square (y down).
 
@@ -45,6 +45,7 @@ const EMPTY_SHAPES := {
 ## Every weapon_type with its own silhouette.
 const WEAPON_SHAPES: Array[StringName] = [
 	&"sword", &"axe", &"mace", &"dagger", &"bow", &"gun", &"wand", &"staff", &"shield", &"tome",
+	&"two_hand_sword", &"two_hand_mace", &"orb",
 ]
 
 
@@ -243,6 +244,9 @@ static func draw_shape(ci: CanvasItem, rect: Rect2, shape: StringName, pal: Pale
 		&"staff": _staff(pen, pal)
 		&"shield": _shield(pen, pal)
 		&"tome": _tome(pen, pal)
+		&"two_hand_sword": _greatsword(pen, pal)
+		&"two_hand_mace": _maul(pen, pal)
+		&"orb": _orb(pen, pal)
 		_: _trinket(pen, pal)
 
 
@@ -492,6 +496,25 @@ static func _sword(pen: Pen, pal: Palette, length: float) -> void:
 	pen.gem(Pen.along(o, u, guard, 0.0), 0.035, pal.gem)
 
 
+## The two-handed sword: the sword with a longer grip, a broader blade and a wider guard.
+static func _greatsword(pen: Pen, pal: Palette) -> void:
+	var o := Vector2(0.1, 0.9)
+	var u := DIAG
+	var guard := 0.3
+	var tip := 1.04
+	var hw := 0.105
+	pen.capsule(Pen.along(o, u, 0.03, 0.0), Pen.along(o, u, guard, 0.0), 0.05, pal.grip)
+	pen.circle(Pen.along(o, u, 0.02, 0.0), 0.07, pal.trim)
+	pen.capsule(Pen.along(o, u, 0.17, -0.06), Pen.along(o, u, 0.17, 0.06), 0.028, pal.trim)
+	pen.poly([Pen.along(o, u, guard, -hw), Pen.along(o, u, tip - 0.16, -hw),
+		Pen.along(o, u, tip, 0.0), Pen.along(o, u, tip - 0.16, hw), Pen.along(o, u, guard, hw)], pen.c(pal.main), true, 0.2)
+	pen.line(Pen.along(o, u, guard + 0.04, 0.0), Pen.along(o, u, tip - 0.18, 0.0), Color(0, 0, 0, 0.3), 0.026)
+	pen.line(Pen.along(o, u, guard + 0.04, -hw * 0.55), Pen.along(o, u, tip - 0.2, -hw * 0.55), Color(1, 1, 1, 0.5), 0.015)
+	pen.poly([Pen.along(o, u, guard - 0.045, -0.24), Pen.along(o, u, guard + 0.045, -0.24),
+		Pen.along(o, u, guard + 0.045, 0.24), Pen.along(o, u, guard - 0.045, 0.24)], pen.c(pal.trim))
+	pen.gem(Pen.along(o, u, guard, 0.0), 0.04, pal.gem)
+
+
 static func _axe(pen: Pen, pal: Palette) -> void:
 	var o := Vector2(0.14, 0.86)
 	var u := DIAG
@@ -524,6 +547,22 @@ static func _mace(pen: Pen, pal: Palette) -> void:
 	pen.dot(head + Vector2(-0.05, -0.05), 0.04, Color(1, 1, 1, 0.5))
 	pen.capsule(Pen.along(o, u, 0.6, -0.07), Pen.along(o, u, 0.6, 0.07), 0.03, pal.trim)
 	pen.gem(head, 0.05, pal.gem)
+
+
+## The two-handed mace (a maul): a long haft and a heavy block head with iron caps.
+static func _maul(pen: Pen, pal: Palette) -> void:
+	var o := Vector2(0.12, 0.88)
+	var u := DIAG
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.96, 0.0), 0.046, pal.wood)
+	pen.capsule(Pen.along(o, u, 0.03, 0.0), Pen.along(o, u, 0.26, 0.0), 0.045, pal.grip)
+	pen.capsule(Pen.along(o, u, 0.5, -0.07), Pen.along(o, u, 0.5, 0.07), 0.03, pal.trim)
+	pen.poly([Pen.along(o, u, 0.68, -0.18), Pen.along(o, u, 0.94, -0.18), Pen.along(o, u, 0.94, 0.18),
+		Pen.along(o, u, 0.68, 0.18)], pen.c(pal.main), true, 0.2)
+	for a: float in [0.66, 0.92]:
+		pen.poly([Pen.along(o, u, a - 0.025, -0.2), Pen.along(o, u, a + 0.025, -0.2),
+			Pen.along(o, u, a + 0.025, 0.2), Pen.along(o, u, a - 0.025, 0.2)], pen.c(pal.trim))
+	pen.dot(Pen.along(o, u, 0.76, -0.1), 0.035, Color(1, 1, 1, 0.45))
+	pen.gem(Pen.along(o, u, 0.8, 0.0), 0.045, pal.gem)
 
 
 static func _bow(pen: Pen, pal: Palette) -> void:
@@ -619,6 +658,19 @@ static func _shield(pen: Pen, pal: Palette) -> void:
 	pen.circle(Vector2(0.5, 0.44), 0.11, pal.trim)
 	pen.gem(Vector2(0.5, 0.44), 0.06, pal.gem)
 	pen.line(Vector2(0.24, 0.2), Vector2(0.4, 0.16), Color(1, 1, 1, 0.4), 0.025)
+
+
+## The orb: a glowing sphere in a three-pronged golden cradle.
+static func _orb(pen: Pen, pal: Palette) -> void:
+	var core := Vector2(0.5, 0.42)
+	pen.poly([Vector2(0.36, 0.86), Vector2(0.64, 0.86), Vector2(0.58, 0.74), Vector2(0.42, 0.74)], pen.c(pal.trim))
+	pen.capsule(Vector2(0.5, 0.74), Vector2(0.5, 0.66), 0.05, pal.grip)
+	pen.circle(core, 0.27, pal.main.darkened(0.2))
+	pen.gem(core, 0.22, pal.gem, true)
+	pen.dot(core + Vector2(-0.08, -0.09), 0.05, Color(1, 1, 1, 0.55))
+	for side: float in [-1.0, 1.0]:
+		pen.capsule(Vector2(0.5 + side * 0.12, 0.72), Vector2(0.5 + side * 0.3, 0.46), 0.022, pal.trim)
+		pen.capsule(Vector2(0.5 + side * 0.3, 0.46), Vector2(0.5 + side * 0.22, 0.2), 0.022, pal.trim)
 
 
 static func _tome(pen: Pen, pal: Palette) -> void:

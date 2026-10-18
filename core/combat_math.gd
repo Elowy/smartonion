@@ -124,9 +124,11 @@ static func xp_with_gain(amount: float, xp_gain_pct: float) -> float:
 	return maxf(0.0, amount * (1.0 + xp_gain_pct / 100.0))
 
 
-## Seconds between attacks, after Haste.
+## Seconds between attacks, after Haste and the weapon's own attack speed bonus (Epic +10%,
+## GDD 4.1 – multiplies with Haste; the Attack / Spell Power normalisation and PPM chances keep
+## the base cooldown, so the bonus is a real attack speed gain like Haste).
 static func weapon_cooldown(weapon: WeaponData, stats: StatBlock) -> float:
-	return maxf(0.08, weapon.cooldown / maxf(0.2, stats.attack_speed_mult()))
+	return maxf(0.08, weapon.cooldown / maxf(0.2, stats.attack_speed_mult() * weapon.attack_speed_mult()))
 
 
 static func roll_crit(stats: StatBlock, rng: RandomNumberGenerator) -> bool:

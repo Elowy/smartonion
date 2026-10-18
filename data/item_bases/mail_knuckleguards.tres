@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/item_base.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mail_knuckleguards"
+display_name = "Knuckleguards"
+slot_type = 5
+armor_type = 2
+weight = 1.0
+look = &""
+min_wave = 17

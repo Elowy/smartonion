@@ -119,6 +119,10 @@ const SET_SLOTS: Array[int] = [
 	Items.SlotType.HEAD, Items.SlotType.SHOULDERS, Items.SlotType.CHEST, Items.SlotType.HANDS,
 	Items.SlotType.LEGS,
 ]
+## Armour bases (GDD 5.4 / 5.8, M6b): the bases of one slot x armour type are material tiers of
+## each other (ItemBase.min_wave 1 / 9 / 17). Of those available at the wave the highest tier is
+## taken with this chance, else one of the lower tiers (uniform).
+const BASE_TOP_TIER_CHANCE := 0.7
 ## &"class_data" option: share of items made for that class (usable + favoured stats).
 const CLASS_BIAS_CHANCE := 0.6
 const OWN_ARMOR_WEIGHT := 4.0
@@ -390,7 +394,7 @@ static func generate(source: Source, wave: int, rng: RandomNumberGenerator, opti
 		if weapon != null:
 			return _make_weapon(weapon, rarity, wave, looted, favour, rng, for_class)
 		slot = Items.SlotType.CHEST
-	var base := _pick_base(slot, usable, favour, rng)
+	var base := pick_base(slot, usable, favour, wave, rng)
 	if base == null:
 		var any_weapon := _pick_weapon(usable, rng)
 		if any_weapon == null:
@@ -685,21 +689,54 @@ static func _pick_weapon(usable: ClassData, rng: RandomNumberGenerator) -> Weapo
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
-static func _pick_base(slot: int, usable: ClassData, favour: ClassData,
+## The base of a generated item for [param slot] at [param wave] (null = none fits). Bases
+## with min_wave above the wave are not available; [param usable] drops armour heavier than its
+## class wears. Armour bases are grouped per armour type (the material tiers of one slot x type):
+## one weighted draw picks the type (the weight of the highest available tier, x OWN_ARMOR_WEIGHT
+## for [param favour]'s own type – with one tier per type exactly the pre-M6b draw), then a group
+## with several tiers draws once more: the highest tier below BASE_TOP_TIER_CHANCE, else
+## one of the lower tiers (a second draw only with two or more lower ones). Jewellery bases are
+## variety, every base is its own entry. Draws: 1, +1 for a group with tiers, +1 for the
+## lower-tier pick among several.
+static func pick_base(slot: int, usable: ClassData, favour: ClassData, wave: int,
 		rng: RandomNumberGenerator) -> ItemBase:
-	var pool: Array[ItemBase] = []
-	var weights: Array[float] = []
+	# Entries in the draw order: jewellery in Db order, armour by armour type; each is a list of
+	# one base (jewellery) or the tiers of one armour type, lowest first.
+	var entries: Array[Array] = []
+	var tiers_of: Dictionary[int, Array] = {}
 	for id in Db.item_bases:
 		var base: ItemBase = Db.item_bases[id]
-		if base.slot_type != slot or base.weight <= 0.0 or not Db.is_unlocked(base.id):
+		if base.slot_type != slot or base.weight <= 0.0 or base.min_wave > wave \
+				or not Db.is_unlocked(base.id):
 			continue
 		if usable != null and base.armor_type != Items.NO_ARMOR and base.armor_type > usable.armor_type:
 			continue
-		pool.append(base)
-		var own := favour != null and base.armor_type == favour.armor_type
-		weights.append(base.weight * (OWN_ARMOR_WEIGHT if own else 1.0))
+		if base.armor_type == Items.NO_ARMOR:
+			entries.append([base])
+		else:
+			if not tiers_of.has(base.armor_type):
+				tiers_of[base.armor_type] = []
+			tiers_of[base.armor_type].append(base)
+	var armor_types := tiers_of.keys()
+	armor_types.sort()
+	for armor_type: int in armor_types:
+		var tiers: Array = tiers_of[armor_type]
+		tiers.sort_custom(func(a: ItemBase, b: ItemBase) -> bool:
+			return a.min_wave < b.min_wave or (a.min_wave == b.min_wave and String(a.id) < String(b.id)))
+		entries.append(tiers)
+	var weights: Array[float] = []
+	for tiers in entries:
+		var top: ItemBase = tiers[-1]
+		var own := favour != null and top.armor_type == favour.armor_type
+		weights.append(top.weight * (OWN_ARMOR_WEIGHT if own else 1.0))
 	var i := _pick_index(weights, rng)
-	return pool[i] if i >= 0 else null
+	if i < 0:
+		return null
+	var picked: Array = entries[i]
+	if picked.size() == 1 or rng.randf() < BASE_TOP_TIER_CHANCE:
+		return picked[-1]
+	var lower := picked.size() - 1
+	return picked[0] if lower == 1 else picked[rng.randi_range(0, lower - 1)]
 
 
 ## A suffix for [param slot_type]. [param favour] prefers its primary stat; [param weapon]
