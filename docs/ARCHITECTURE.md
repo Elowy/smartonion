@@ -184,7 +184,7 @@ the new screen never sees the button press that closed the old one.
     players (M4: 0.35 / 0.45 / 0.6 / 0.8): small parties have fewer rescuers (solo: the first
     down is defeat) and more enemies per head.
   - Bosses (M6a) take their HP from `BossData.max_hp_for(wave, players)` = `hp_at_wave × (1 + coop_hp_per_player
-    (n − 1))` (Morvain 0.75, Vor'thalax 2.0) instead of `coop_hp_mult`; their damage is the usual growth × `party`.
+    (n − 1))` (0.75 for both bosses: x1 / x1.75 / x2.5 / x3.25) instead of `coop_hp_mult`; their damage is the usual growth × `party`.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -271,8 +271,8 @@ adds `elites_spawned`, `elites_killed`, `goblins_spawned`, `goblins_killed`, `go
 `weapons_forged` (RunState counters), `talent_points_spent` (Σ `TalentState.points_spent()`
 over the heroes), `talent_resets`, `set_bonuses` (Σ `SetBonuses.active_count`) and
 `gold_spent` (every `RunState.try_spend_for`). M6a adds `bosses_killed`, `artifacts_dropped`,
-`consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time`, `meter`
-(per slot) and `taken_by_source` (see the M6a chapter). Each cleared wave also prints a
+`consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time` and `meter`
+(per slot) (see the M6a chapter). Each cleared wave also prints a
 `SMOKE wave n cleared ...` line (M5: `elites killed/spawned, goblin spawned/killed/escaped`),
 and each closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1
 (R bot rerolls so far)`.
@@ -1668,9 +1668,12 @@ scenes/ui/        meter_page.gd, meter_bar.gd, run_card_view.gd; enchanter/ (Enc
 ```
 
 - Built as a foundation plus six features (enemies, bosses, Artifacts, Enchanter, consumables / Black Market,
-  damage meter), merged, reviewed; a balance pass and a set of fixes followed. The sections below follow the
-  features; "Cross-system contracts" lists what holds between them, "Balance pass" and "Validation and balance
-  data points" the numbers.
+  damage meter), merged, reviewed; a set of fixes followed. The sections below follow the features; "Cross-system
+  contracts" lists what holds between them, "Validation and balance data points" the numbers measured on the way.
+- **No balance pass in M6a.** The M6a content made the game harder than M5 and its numbers (the enemies, the bosses,
+  the wave and party multipliers) are the first values. The final 25-wave balance is done once, at the end of M6b
+  (GDD 9, "Nyitott kérdések M6b-re"; GDD 16). The known pressure points are listed in "Open items for the M6b
+  balance" below.
 - Out of scope: M6b (modes, environments, events, the Dungeon portal, content packs, the final balance), GDD 16.
 
 ### Foundation hooks
@@ -1698,9 +1701,6 @@ own section below.
   `bosses_by_player` (int) and the recorders `record_heal / record_absorb / record_damage_taken /
   record_revive / record_down` (a slot index < 0 and non-positive amounts are ignored); the callers are listed in
   "Damage meter, end screen, run card".
-- **Damage by source** (balance diagnostics, no gameplay): `damage_taken_by_source: Dictionary` =
-  `{source id: {wave: float}}`, cleared by `start_run`; `record_damage_taken(player_index, amount, source_id :=
-  &"")` adds to it under the current wave when `source_id` is given (see "Balance pass").
 - **Run clock**: `run_time: float`, `tick_run_time(delta)`. `Main._physics_process` ticks it while
   `state == State.WAVE` and the tree is not paused, i.e. the sum of the wave times ("Wave cleared!", the
   loot roll, the market and pauses do not count).
@@ -1766,8 +1766,8 @@ own section below.
 #### Main, SMOKE_RESULT, command line
 
 - SMOKE_RESULT keys added in M6: `bosses_killed artifacts_dropped consumables_bought black_market_bought
-  enchants_done dust_earned dust_spent run_time` (`run_time` at 0.1 s), the damage meter's `meter` (per slot) and
-  the balance pass's `taken_by_source` (see "Balance pass"). Key presence is asserted in
+  enchants_done dust_earned dust_spent run_time` (`run_time` at 0.1 s) and the damage meter's `meter` (per slot).
+  Key presence is asserted in
   `tests/test_m5_foundation.gd`, `test_main_m2_flow.gd` and `test_m6_foundation.gd`.
 - Launch flags: `--boss-hp=X` (multiplies boss HP, `BossData.hp_mult`, clamped 0.01..100, default 1),
   `--artifact-chance=X` (overrides every Artifact roll's chance, clamped 0..1, default -1 = off; 0 = never, not
@@ -1775,7 +1775,7 @@ own section below.
   **count**: `--start-wave=9 --waves=2` plays waves 9 and 10; `--start-wave=24 --waves=25` plays 24 and 25.
 - New smoke log lines: `SMOKE boss <name> arrived / defeated ...`, `SMOKE boss timeout ...`, `SMOKE defeat with
   boss ...` (bosses), `SMOKE artifact drop: ...` / `SMOKE artifact held: ...` (Artifacts), `SMOKE meter P1 ...`
-  (damage meter), `SMOKE heroes: ...` (balance, a second line at every boss arrival).
+  (damage meter).
 
 ### Enemies: Plague Ghoul, Cultist Acolyte, Flesh Golem
 
@@ -1785,7 +1785,7 @@ New enemy types are pure data plus the behaviours below:
 |---|---|---|---|
 | `plague_ghoul` | CHASE | 7 | `death_effect = &"poison_puddle"` |
 | `cultist_acolyte` | SUPPORT | 9 | `priority_target = true`, `attack_cooldown` = channel period |
-| `flesh_golem` | BRUTE | 12 | `attack_cooldown` = hook period, `contact_damage` 2.5 (4.0 before the balance pass), hook = 1 x contact |
+| `flesh_golem` | BRUTE | 12 | `attack_cooldown` = hook period, `contact_damage` 4.0, hook = 1 x contact |
 
 `EnemyData` gained three export groups, all read by `Enemy` (no per-type subclass; the behaviour
 follows the data, so `Enemy.create(data, wave)` stays the one factory):
@@ -1857,8 +1857,8 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
 
 - `BossData extends EnemyData` (`is_boss = true`; `max_hp` / `contact_damage` are the base values,
   the usual wave growth applies). Fields: `boss_wave`, `intro`, `phase_hp_ratio` (0.5),
-  `phase_cooldown_mult`, `abilities: Array[BossAbility]`, `coop_hp_per_player` (per boss: Morvain 0.75,
-  Vor'thalax 2.0; the default of the field is 0.75), enrage
+  `phase_cooldown_mult`, `abilities: Array[BossAbility]`, `coop_hp_per_player` (0.75, the field's default,
+  for both bosses), enrage
   (`enrage_time` 90, `enrage_damage_mult` 1.5, `enrage_speed_mult` 1.3, `enrage_step_time` 30,
   `enrage_step_damage` 0.25), `reward_gold` (50). Helpers: `BossData.for_wave(w)` (Db lookup by
   `boss_wave`, lowest id on a tie, null = the wave is a normal one), `max_hp_for(wave, players)` =
@@ -1876,8 +1876,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   scale 2.1, model `lich`, Frost Circles 7 s / Raise Dead 12 s (4, 6) / Frost Breath 9 s, cooldowns
   ×0.7 in phase 2, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25 by party size) and
   `data/bosses/vorthalax.tres` (wave 25: base HP 450 (the GDD's earlier 1200 left 38-67% of the HP after the 210 s
-  smoke safety, see "Boss-fight data points"), contact 1.5 (4.0 before the balance pass), `coop_hp_per_player` 2.0
-  (0.75 before) = x1 / x3 / x5 / x7,
+  smoke safety, see "Boss-fight data points"), contact 4, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25,
   speed 2.0, radius 1.1, scale 2.3, model `demon`, Fire Fields 8 s (2, 3) / Meteor 14 s (10 s) / Imp Swarm 20 s
   (6 Candlekin)). Bosses live in `Db.bosses`, never in `Db.enemies`.
 
@@ -2332,9 +2331,8 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   `reviver_slots` after the revive happened (a hero that is not down records nothing). Callers: the teammate channel
   (`_update_revive` passes the living teammates inside the circle at the moment it completes), Word of Glory (the
   caster); the wave start, the Spirit Healer and the smoke runner pass none.
-- `Player._go_down` -> `record_down`. `Player.take_damage`: `record_damage_taken(slot, hp_before - hp,
-  _damage_source_id(attacker))` (HP really lost, no overkill, after armour / mults / shields / cheat-death; the source
-  id is for the balance diagnostics, see "Balance pass"); a blocked hit records
+- `Player._go_down` -> `record_down`. `Player.take_damage`: `record_damage_taken(slot, hp_before - hp)` (HP really
+  lost, no overkill, after armour / mults / shields / cheat-death); a blocked hit records
   `record_absorb(slot, mitigated(raw) - mitigated(blocked))`. The mitigation chain moved into `Player._mitigated(amount,
   kind, source)` (pure) so it can be evaluated for the unblocked hit too.
 - `ProcSystem.Shield` has `owner_slot`; `add_shield(amount, duration, source := &"", owner_slot := -1)` (-1 = the
@@ -2449,104 +2447,30 @@ describe each side).
    mixed into it (a hook is a 0.8 s event).
 9. **Determinism.** See "Determinism (M6a draw points)" below.
 
-### Balance pass (levers, diagnostics, results)
+### Open items for the M6b balance
 
-Done on top of the merged M6a head (`4aa2c3e`), bots only: `godot --headless --fixed-fps 60 --path . -- --smoke
---waves=25 --allow-defeat --players=N --classes=... --seed=S`, two Godot processes at a time (the same build and
-seed are bit-identical). Raw numbers: GDD chapter 9, "M6a mérés".
+The M6a content made the game harder than M5, and its numbers were **not** re-tuned: a balance round would be
+redone by the M6b content (item packs, modes, events) anyway, so the 25-wave balance is done once, at the end of M6b
+(GDD 9 "Nyitott kérdések M6b-re", GDD 16). These are the pressure points the merged head's runs showed (the numbers
+are in "Validation and balance data points"); they are questions, not targets:
 
-- **Method.** Baseline = the M6a head plus the diagnostics commit (no gameplay change). The matrix: 4p warrior /
-  mage / paladin / rogue seeds 3 / 21 / 55 / 7, 2p warrior + mage seed 21 and paladin + rogue seed 34, 1p paladin 21 /
-  mage 34 / warrior 7 / rogue 13, plus nine extra seeds (4p 5; 2p wm 5, wm 8, pr 8; 1p warrior 8, warrior 21, mage 7,
-  paladin 13, rogue 34): 19 configurations, because one run per configuration is mostly noise (a solo hero's first
-  down is the run). Three tuning rounds: round 1 the golem and the first Vor'thalax numbers, rounds 2 and 3
-  Vor'thalax only (a change that touches only Vor'thalax cannot change a run before wave 25 - checked: identical
-  downs per wave - so those rounds re-ran only the runs that reached wave 25). "TIMEOUT" = the smoke safety killed
-  the boss 210 s after its arrival: the run is `completed`, but the boss was NOT beaten.
-- **Baseline findings.**
-  - Natural parties finished more often than the review feared: 4p 4 of 5 (the lost one: seed 5, wave 20), 2p 1 of
-    5 (two duos died on wave 14, two lost to the final boss within 12-17 s), 1p 1 of 9 (three lost to the final
-    boss, the rest died on waves 7-24; the M5 base also lost solo heroes on waves 8, 19 and 24 on the same seeds, so
-    the early solo deaths are not an M6a regression).
-  - **Flesh Golem = 38% of all damage taken from wave 10 on** (19 runs; 20-53% per run in waves 10-19) from ~2% of
-    the spawned enemies. Axethrower 20-35%, Gurglers 10-20%, the rest < 8% each (Vor'thalax' own hits 6-12% of waves
-    20+ in 4p). A wave-14 golem hit on a duo's warrior: 24.4 raw, 11.9 after armour, on a 43.7 HP hero.
-  - **Wave 20 is a spike, not a wall**: 4p downs per run on wave 20 5.4 (2.0 / 2.4 on 18 / 19, 0.2 on 21); 2p 0.7. The
-    one wipe (4p seed 5) already had 9 downs on 15-19.
-  - **Vor'thalax died too fast for a full party and killed small parties at once**: 4p kills in 29 / 41 / 45 / 50 s
-    (HP x3.25) at 3-7 downs each; the duos that did not win died 11.7 s and 17.3 s after its arrival, a solo mage
-    25.7 s. At wave 25 the heroes have **59-109 HP** (wave 10: 16-56; mage 59-104, warrior 65-105, paladin 71-109,
-    rogue 60-84) and the damage curve is x45: every hazard or contact hit one-shots a squishy hero (a wave-25
-    meteor shared by a duo was 435 raw per hero). Solo DPS on the boss spans 0.8k/s (paladin) to 23k/s (rogue).
-- **Levers (old -> new):**
-
-  | Lever | Old | New | Why |
-  |---|---|---|---|
-  | `data/enemies/flesh_golem.tres` `contact_damage` | 4.0 | **2.5** | 38% of the damage taken from 2% of the enemies; the hook (1 x contact) follows. Before it 2 of 5 duos died on wave 14 and 4p seed 5 wiped on 20; after it neither does (golem share 28% in waves 10-19, 26% from 20). |
-  | `data/bosses/vorthalax.tres` `coop_hp_per_player` | 0.75 | **2.0** | Boss HP x1 / x3 / x5 / x7 by party size (was x1 / x1.75 / x2.5 / x3.25): party DPS grows faster than the party (items, 5 Artifacts, focus). A first try at +300% (x10 at 4p, a 110 s fight) wiped 3 of 4 full parties and every duo, so it went back to +200%. |
-  | `data/bosses/vorthalax.tres` `contact_damage` | 4.0 | **1.5** | Every hazard of the boss is a multiple of it (Fire Fields 1x, Meteor 8x / 4x, contact). Not on the agreed lever list: the fight's length is bounded by how long a party survives, and at 4 / 2 it one-shot most heroes. 4 -> 2 in round 2, 2 -> 1.5 in round 3. |
-  | Morvain, the wave-20 rule, the puddle, the Acolyte heal, `COOP_DAMAGE_MULTS`, the golem's cooldown / spawn weight | - | **unchanged** | Morvain kills 19-97 s (medians 63 s 4p / 55 s 2p / 59 s 1p; target 40-90 s). Wave 20 is a clear spike once the golem is soft. Puddles are 3-6% of the damage, the Acolyte's heal does not show in the data. The duo / solo mid-game is already thin after the golem nerf (0 downs on 10-19), so the damage table stays. |
-
-- **Diagnostics added** (no gameplay): `RunState.damage_taken_by_source` (`{source id: {wave: float}}`, cleared by
-  `start_run`) fed by `record_damage_taken(player_index, amount, source_id := &"")`; `Player.take_damage` passes
-  `_damage_source_id(attacker)` = the attacker's `EnemyData.id` (a boss's hazards carry the boss as `source`, so they
-  book under the boss id; an add books under its own id) or `&"environment"` for a hit without an enemy (the poison
-  puddle) - dodged / parried / blocked-away / absorbed damage is not booked (it is HP taken). SMOKE_RESULT
-  `taken_by_source` = `RunSummary.source_damage_dict()`: `{source id: {"wave": damage rounded to 0.1}}` (string
-  keys; the analysis scripts sum it per wave band). A boss arrival prints a second smoke line `SMOKE heroes: P1
-  warrior 98 HP (takes 32% of a raw hit), ...` (`Main.heroes_defence_text`; HP = `Stats.max_hp`, "takes" =
-  `CombatMath.incoming_damage(100, ...)` for a melee hit, i.e. after Armor, Versatility, Avoidance).
-- **Results** (19 runs; before -> after):
-
-  | Target | Measured |
-  |---|---|
-  | 4p: no downs on waves 1-4 | 0 in every run (0) |
-  | 4p: occasional downs from ~8-13, regular from ~15 | first downs on waves 8 / 10 / 12 / 16 / 18 (8 / 10 / 12 / 13 / 14); downs on 15-19 per run 2.8 (7.0) |
-  | 4p: most seeds clear 25, wipes <= ~1 in 4 and not before ~18 | 4 of 5 clear (4 of 5); the loss is the final boss (166 s, 29% HP left, 46 downs in the run); waves 20-24 downs per run 3 / 5 / 12 / 12 / 21 (11 / 21 / 11 / 7 / 14) |
-  | 2p: most seeds reach 20+, <= ~1 in 3 wipe | all 5 reach wave 20; 3 of 5 clear (1 of 5; two died on wave 14 before); losses: wave 20 (wm seed 8) and the final boss (wm seed 5, 28 s) |
-  | 1p: median death wave ~20+, >= 1 of ~4 clears | median death wave 25 (24); 2 real clears (both rogue) + 2 TIMEOUT "clears" (paladin) of 9 (1 clear); deaths on waves 7 / 20 / 22 / 23 / 25 |
-  | Morvain ~40-90 s | medians 63 s (4p) / 55 s (2p) / 59 s (1p), unchanged |
-  | Vor'thalax ~90-180 s | 4p 36 / 64 / 97 / 102 s (29 / 41 / 45 / 50 s), median 80 s; 2p 43 / 58 / 108 s (58 s); 1p rogue 9 / 20 s, solo mage 64 s (lost, 35% HP left), solo paladin never (TIMEOUT at 210 s, alive, 0 downs) |
-  | Wave 20 a spike, not a wall | 4p 5.4 downs per run on wave 20 vs 0.8 on 19 and 21 (before 5.4 vs 2.4 / 0.2); 2p 2.4 vs 0.0; no wipe on it except 2p wm seed 8 (2 downs = a duo wipe) |
-
-  Requested matrix (before -> after; downs 1-4 / 5-9 / 10-14 / 15-19 / 20-25 in `downs`):
-
-  | run | before | after |
-  |---|---|---|
-  | 4p s3 | clear, downs 0/0/4/3/15, Vor 29 s | clear, 0/0/0/2/3, Vor 64 s |
-  | 4p s21 | clear, 0/0/3/20/24, Vor 41 s | clear, 0/0/1/1/5, Vor 102 s |
-  | 4p s55 | clear, 0/0/2/2/15, Vor 45 s | clear, 0/0/0/4/14, Vor 36 s |
-  | 4p s7 | clear, 0/0/1/1/14, Vor 50 s | lost to the boss at 166 s (29% HP left), 0/0/1/2/43 |
-  | 4p s5 (extra) | wiped on wave 20 | clear, Vor 97 s |
-  | 2p wm s21 | died on wave 14 | clear, Vor 108 s |
-  | 2p pr s34 | clear, Vor 58 s | clear, Vor 58 s, 0 downs |
-  | 2p wm s5 (extra) | died on wave 14 | lost to the boss at 28 s |
-  | 2p wm s8 (extra) | lost to the boss at 12 s | died on wave 20 |
-  | 2p pr s8 (extra) | lost to the boss at 17 s | clear, Vor 43 s |
-  | 1p paladin s21 | lost to the boss (197 s) | TIMEOUT |
-  | 1p mage s34 | lost to the boss (26 s) | lost to the boss (64 s) |
-  | 1p warrior s7 | died on wave 7 | died on wave 7 (the M5 base also lost solo heroes on 8 / 19 / 24 on these seeds) |
-  | 1p rogue s13 | clear, Vor 9 s | clear, Vor 20 s |
-
-  Golem share of the damage taken: waves 10-19 38% -> 28%, waves 20-25 38% -> 26% (the Axethrower is now the biggest
-  single source in most 4p runs).
-- **Open problems** (for the M6b final balance):
-  - Vor'thalax is a class lottery: DPS on the boss spans 0.8k/s (a solo paladin never kills it) to 23k/s (rogue). One
-    duo (warrior + mage) lost 28 s into the fight with 74% HP left, a full party with a weak seed (4p seed 7, 46 downs
-    in the run) lost at 166 s with 29% left. If the 4p median (80 s) should reach 90-180 s: 4p x7 -> x8-9
-    (`coop_hp_per_player` 2.0 -> 2.4), but the weaker parties are at the edge already; or lower the Paladin / Warrior
-    bot's boss targeting.
-  - Hero HP vs the damage curve at wave 25 (60-110 HP, hits x45): the final boss, wave 20 and the golem's hook one-shot
-    the mage / rogue whatever the multiplier is; a hero-HP growth term (per level, per Item Level) is the principled fix.
-  - Duos and solo heroes have almost no mid-game pressure after the golem nerf (0 downs on waves 10-19 in 1p / 2p),
-    while a solo first down on waves 7-23 ends the run (1p warrior seed 7 dies on wave 7 on the M5 base too).
-    `COOP_DAMAGE_MULTS` was deliberately not touched.
-  - Re-run the 4p / 2p matrix on the head with the supply fix (fewer Artifacts in 4p / 2p: less late weapon damage)
-    and the bot Enchanter fix: these numbers are on `4aa2c3e` plus the balance commits only.
-  - A smoke "clear" does not prove the boss is beatable (2 solo paladin runs): count the `TIMEOUT` lines when
-    reading a matrix.
-  - Single-seed before / after pairs are noisy (one data-only change moved 1p mage seed 7 from wave 24 to wave 20);
-    the conclusions rest on the totals.
+- **Flesh Golem damage.** `data/enemies/flesh_golem.tres` `contact_damage` 4.0 (the hook is 1 x contact), from a small
+  share of the spawned enemies, was the biggest single source of damage taken in waves 10-19 of the natural runs.
+  Levers: its contact damage, spawn weight and hook cooldown.
+- **Wave 20 (the elite wave).** Every enemy carries an affix; two of the three natural runs died there. Levers: the
+  lite affix rule (HP x1.5), the real elites' doubled count.
+- **Vor'thalax kill time by party size.** His HP is x(1 + 0.75 (n - 1)) while the bots' damage on him grows faster
+  than the party (about 0.9k / 3k / 6k per second for 1 / 3 / 4 bots), so one base HP cannot fit every party size.
+  Levers: `coop_hp_per_player`, the base HP, his contact damage (his hazards are multiples of it).
+- **Solo and duo survival.** A solo hero's first down is the defeat, a duo that loses both heroes cannot revive
+  (the natural duo run died on wave 14). Lever: `RunState.COOP_DAMAGE_MULTS`.
+- **Artifact supply.** The normal-kill chance is divided by the party size (GDD 5.5) and a bot wearing an Artifact
+  enchants its armour instead of its weapon (`Enchanter.bot_target`): both change the late power, and the 4p / 2p
+  matrix has not been run on that head.
+- **Hero HP against the damage curve.** At wave 25 the enemy damage multiplier is x45; a hero-HP growth term (per
+  level or per Item Level) is the principled fix if heroes need to survive a boss hit.
+- **Reading a smoke matrix.** A smoke "clear" does not prove a boss is beatable (the safety kill after 210 s counts
+  as a clear: count the `TIMEOUT` lines), and a data-only change shifts the RNG stream, so single-seed pairs are noisy.
 
 ### Determinism (M6a draw points)
 
@@ -2556,8 +2480,8 @@ bit-identical per seed.
 - The seeded `--fixed-fps 60 --smoke --waves=6 --seed=5` differs from the pre-M6 base only through the enemy data fixes
   (Marsh Gurgler group 4-6, Greedy 5% / +1 gold, which shift the RNG stream): 587 kills, 2 goblins, 195.1 s run time
   instead of 595 kills / 0 goblins; every other feature alone was identical to the base. The follow-ups (the Artifact
-  threshold, the bot Enchanter target, the market header, the loot roll layout, the golem / Vor'thalax numbers and the
-  diagnostics) change nothing in those six waves: same 587 kills.
+  threshold, the bot Enchanter target, the market header and the loot roll layout) change nothing in those six waves:
+  same 587 kills.
 - Boss wave start: eligible list -> (no elite schedule) -> first group pick -> `wave_started` (the GoblinSpawner draws
   nothing on a boss wave) -> opening group -> the boss point. Waves 1-9, 11-19 and 21-24 draw what they drew before.
   Wave 20: one affix draw per enemy that is not a due real elite (`roll_affix`).
