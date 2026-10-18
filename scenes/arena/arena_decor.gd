@@ -239,6 +239,19 @@ static func distance_outside(p: Vector2, r: Rect2) -> float:
 	return Vector2(dx, dy).length()
 
 
+## The decor sets of the other environments (ArenaThemes) reuse these three helpers.
+static func chunk_of(p: Vector2, bounds: Rect2) -> int:
+	return _chunk(p, bounds)
+
+
+static func perimeter_point(r: Rect2, d: float) -> Vector2:
+	return _perimeter_point(r, d)
+
+
+static func multimesh(n: String, mesh: Mesh, xforms: Array[Transform3D], colors: Array[Color]) -> MultiMeshInstance3D:
+	return _multimesh(n, mesh, xforms, colors)
+
+
 static func _chunk(p: Vector2, bounds: Rect2) -> int:
 	if p.y < bounds.position.y:
 		return 0
