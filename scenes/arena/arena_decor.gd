@@ -40,7 +40,8 @@ static func build(arena: Arena, rng: RandomNumberGenerator) -> Node3D:
 
 
 ## Low stone wall with pillars, corner towers and a north gate, just outside [param bounds].
-static func build_wall_visual(bounds: Rect2, seed_value: int) -> Node3D:
+## [param tint] is multiplied onto the stones' vertex colours (EnvironmentData.wall_tint; white = as is).
+static func build_wall_visual(bounds: Rect2, seed_value: int, tint: Color = Color.WHITE) -> Node3D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value + 17
 	var k := MeshKit.new()
@@ -72,7 +73,7 @@ static func build_wall_visual(bounds: Rect2, seed_value: int) -> Node3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "Stones"
 	mi.mesh = k.build()
-	mi.material_override = Mats.toon_vc()
+	mi.material_override = Mats.toon_vc(true, tint)
 	root.add_child(mi)
 	# Torch flames on the gate and the north corners.
 	var flames := MeshKit.new()

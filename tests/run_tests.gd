@@ -15,6 +15,12 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Tests never touch the player's leaderboard file (a test that exercises Leaderboard.record_run
+	# sets Leaderboard.path_override to a temp path and switches writing on itself). Set through the
+	# script object: naming the class here would compile it (and the autoloads it needs) before the
+	# autoloads exist.
+	var leaderboard: GDScript = load("res://core/leaderboard.gd")
+	leaderboard.set(&"writes_enabled", false)
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

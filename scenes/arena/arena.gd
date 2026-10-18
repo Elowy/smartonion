@@ -6,10 +6,14 @@ extends Node3D
 ##   entities:      Node3D  – parent for players, enemies, projectiles, pickups and VFX.
 ##   camera:        CameraRig
 ##   spirit_healer: SpiritHealer – part of the level at SPIRIT_HEALER_POINT (GDD 1): ghosts
-##                  standing in its circle come back at full HP.
+##                  standing in its circle come back at full HP (null when the arena was built
+##                  without one: hardcore, the dungeon).
 ## Everything (ground shader, walls, trees, props, light, environment) is built in code by
 ## [method create]; decoration lives outside the playable rectangle so the camera never
 ## shows the void.
+## M6b: [method create] takes an optional [EnvironmentData] (the run's arena environment: palette,
+## decor set, hazard id); without one the arena is the forest clearing it always was. The playable
+## SIZE is the same for every environment.
 
 ## Playable area size in metres (x = width, y = depth along Z).
 const SIZE := Vector2(34.0, 22.0)
@@ -134,16 +138,25 @@ var entities: Node3D
 var camera: CameraRig
 var spirit_healer: SpiritHealer
 var walls: StaticBody3D
+## The environment this arena was built from (never null; EnvironmentData.new() = the forest).
+var environment: EnvironmentData
 var sun: DirectionalLight3D
 var world_environment: WorldEnvironment
 var ground: MeshInstance3D
 ## Dirt patches inside the arena: (x, z, radius, noise seed).
 var dirt_patches: Array[Vector4] = []
 
+var _with_spirit_healer := true
 
-static func create() -> Arena:
+
+## The arena of [param p_environment] (null = the forest clearing: EnvironmentData's defaults).
+## [param p_spirit_healer] false builds it without the Spirit Healer ([member spirit_healer] stays
+## null – the hardcore mode and the dungeon use this; every consumer of the healer is null-safe).
+static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true) -> Arena:
 	var arena := Arena.new()
 	arena.name = "Arena"
+	arena.environment = p_environment if p_environment != null else EnvironmentData.new()
+	arena._with_spirit_healer = p_spirit_healer
 	arena._build()
 	return arena
 
@@ -217,13 +230,14 @@ func _build() -> void:
 	_build_environment()
 	_build_ground(rng)
 	_build_walls()
-	var decor := ArenaDecor.build(self, rng)
+	var decor := _build_decor(rng)
 	decor.name = "Decor"
 	add_child(decor)
-	# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
-	spirit_healer = SpiritHealer.create()
-	spirit_healer.position = SPIRIT_HEALER_POINT
-	add_child(spirit_healer)
+	if _with_spirit_healer:
+		# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
+		spirit_healer = SpiritHealer.create()
+		spirit_healer.position = SPIRIT_HEALER_POINT
+		add_child(spirit_healer)
 	entities = Node3D.new()
 	entities.name = "Entities"
 	add_child(entities)
@@ -234,34 +248,34 @@ func _build() -> void:
 func _build_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.56, 0.74, 0.92)
+	env.background_color = environment.sky_color
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.6, 0.66, 0.8)
-	env.ambient_light_energy = 0.62
+	env.ambient_light_color = environment.ambient_color
+	env.ambient_light_energy = environment.ambient_energy
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.tonemap_exposure = 1.0
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.7, 0.8, 0.88)
-	env.fog_density = 0.0045
+	env.fog_light_color = environment.fog_color
+	env.fog_density = environment.fog_density
 	env.fog_sky_affect = 0.0
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
+	env.glow_intensity = environment.glow_intensity
 	env.glow_strength = 1.0
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = 0.95
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.12
-	env.adjustment_contrast = 1.05
+	env.adjustment_saturation = environment.saturation
+	env.adjustment_contrast = environment.contrast
 	world_environment = WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = env
 	add_child(world_environment)
 	sun = DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-52.0, -128.0, 0.0)
-	sun.light_color = Color(1.0, 0.92, 0.78)
-	sun.light_energy = 0.92
+	sun.rotation_degrees = environment.sun_rotation
+	sun.light_color = environment.sun_color
+	sun.light_energy = environment.sun_energy
 	sun.shadow_enabled = true
 	sun.shadow_blur = 1.6
 	sun.shadow_bias = 0.04
@@ -269,6 +283,13 @@ func _build_environment() -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 75.0
 	add_child(sun)
+
+
+## The decoration around the playable rectangle for [member environment]'s decor set
+## (EnvironmentData.decor_id). Only the forest exists so far: the ENV package adds a branch per set
+## here (a `match` on the id, the forest as the default for every id it does not know).
+func _build_decor(rng: RandomNumberGenerator) -> Node3D:
+	return ArenaDecor.build(self, rng)
 
 
 func _build_ground(rng: RandomNumberGenerator) -> void:
@@ -290,7 +311,14 @@ func _build_ground(rng: RandomNumberGenerator) -> void:
 	mat.set_shader_parameter("patches", arr)
 	mat.set_shader_parameter("patch_count", dirt_patches.size())
 	mat.set_shader_parameter("arena_half", SIZE / 2.0)
-	mat.set_shader_parameter("road", Vector2(0.0, 1.7))
+	# (A road width of ~0 makes no road: the shader divides the distance to the road by it.)
+	mat.set_shader_parameter("road", Vector2(0.0, environment.road_width if environment.has_road else 0.0001))
+	mat.set_shader_parameter("grass_dark", environment.grass_dark)
+	mat.set_shader_parameter("grass_mid", environment.grass_mid)
+	mat.set_shader_parameter("grass_light", environment.grass_light)
+	mat.set_shader_parameter("grass_warm", environment.grass_warm)
+	mat.set_shader_parameter("dirt_light", environment.dirt_light)
+	mat.set_shader_parameter("dirt_dark", environment.dirt_dark)
 	var plane := PlaneMesh.new()
 	plane.size = get_decor_rect().grow(40.0).size
 	ground = MeshInstance3D.new()
@@ -314,7 +342,7 @@ func _build_walls() -> void:
 		cs.shape = shape
 		cs.position = box.get_center()
 		walls.add_child(cs)
-	var visual := ArenaDecor.build_wall_visual(get_bounds(), DECOR_SEED)
+	var visual := ArenaDecor.build_wall_visual(get_bounds(), DECOR_SEED, environment.wall_tint)
 	walls.add_child(visual)
 
 

@@ -20,6 +20,10 @@ const BOSS_DIR := "res://data/bosses/"
 const CONSUMABLE_DIR := "res://data/consumables/"
 ## data/artifacts/<id>.tres (ArtifactData, M6 ARTIFACTS: one weapon per class).
 const ARTIFACT_DIR := "res://data/artifacts/"
+## data/environments/<id>.tres (EnvironmentData, M6b: the arena environments; ENV package).
+const ENVIRONMENT_DIR := "res://data/environments/"
+## Roll order of the environments; any extra one is appended alphabetically.
+const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swamp", &"volcano", &"ice_cave"]
 ## Lobby order of the launch classes; any extra class is appended alphabetically.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 
@@ -46,6 +50,10 @@ var bosses: Dictionary[StringName, BossData] = {}
 var artifacts: Dictionary[StringName, ArtifactData] = {}
 ## Every shop consumable, by id (M6).
 var consumables: Dictionary[StringName, ConsumableData] = {}
+## Every arena environment, by id (M6b).
+var environments: Dictionary[StringName, EnvironmentData] = {}
+## The environment ids in ENVIRONMENT_ORDER (extras alphabetically): the order of the roll reel.
+var environment_ids: Array[StringName] = []
 var class_ids: Array[StringName] = []
 
 
@@ -107,6 +115,20 @@ func reload() -> void:
 	for res in _load_dir(CONSUMABLE_DIR):
 		if res is ConsumableData:
 			consumables[res.id] = res
+	environments.clear()
+	for res in _load_dir(ENVIRONMENT_DIR):
+		if res is EnvironmentData:
+			environments[res.id] = res
+	environment_ids.clear()
+	for id in ENVIRONMENT_ORDER:
+		if environments.has(id):
+			environment_ids.append(id)
+	var extra_envs: Array[StringName] = []
+	for id in environments:
+		if id not in environment_ids:
+			extra_envs.append(id)
+	extra_envs.sort()
+	environment_ids.append_array(extra_envs)
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -191,6 +213,18 @@ func get_boss(id: StringName) -> BossData:
 
 func get_consumable(id: StringName) -> ConsumableData:
 	return consumables.get(id)
+
+
+## The environment [param id] (null = unknown).
+func get_environment(id: StringName) -> EnvironmentData:
+	return environments.get(id)
+
+
+## The environment of [param id], else the default one (RunState.DEFAULT_ENVIRONMENT), else null
+## (Arena.create(null) is then the forest anyway).
+func environment_or_default(id: StringName) -> EnvironmentData:
+	var env: EnvironmentData = environments.get(id)
+	return env if env != null else environments.get(RunState.DEFAULT_ENVIRONMENT)
 
 
 func get_artifact(id: StringName) -> ArtifactData:

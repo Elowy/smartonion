@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EnvironmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/environment_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"forest_ruin"
+display_name = "Forest Ruin"
+description = "A sunlit forest clearing inside an old stone wall. No tricks, just the onions and what is coming for them."

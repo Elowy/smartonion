@@ -11,8 +11,9 @@ extends RefCounted
 ##    "class_name": "Warrior", "class_color": Color, "alive": bool (standing at the end),
 ##    "best_item": ItemInstance or null, "stats": {stat id: float}}
 ## The summary [method build] returns:
-##   {"victory", "waves_cleared", "total_waves", "wave", "mode", "time", "time_text", "kills",
-##    "gold_earned", "level", "coop", "heroes": [hero entries + "awards": Array[StringName]],
+##   {"victory", "waves_cleared", "total_waves" (0 = endless), "wave", "mode" (RunState.mode_text:
+##    "Endless · Hardcore"), "endless", "hardcore", "environment" (display name), "time", "time_text",
+##    "kills", "gold_earned", "level", "coop", "heroes": [hero entries + "awards": Array[StringName]],
 ##    "awards": [{"id", "name", "slot"} in AWARDS order, only the ones somebody won]}
 
 ## The meter's stats in display order (the keys of a hero's "stats").
@@ -102,9 +103,12 @@ static func collect(p_victory: bool) -> Dictionary:
 	var run := {
 		"victory": p_victory,
 		"waves_cleared": GameOverScreen.waves_cleared(p_victory),
-		"total_waves": RunState.TOTAL_WAVES,
+		"total_waves": RunState.total_waves(),
 		"wave": maxi(RunState.wave, 1),
-		"mode": mode_label(RunState.difficulty),
+		"mode": mode_label(RunState.mode, RunState.hardcore),
+		"endless": RunState.is_endless(),
+		"hardcore": RunState.hardcore,
+		"environment": environment_label(RunState.environment),
 		"time": RunState.run_time,
 		"kills": RunState.kills,
 		"gold_earned": RunState.gold_earned,
@@ -237,11 +241,17 @@ static func class_color(data: ClassData) -> Color:
 	return c
 
 
-## "Normal" / "Endless" / "Hardcore" ... for the end screen and the card.
-static func mode_label(mode: StringName = &"normal") -> String:
-	if mode == &"":
-		return "Normal"
-	return String(mode).capitalize()
+## "Normal" / "Endless" / "Normal · Hardcore" ... for the end screen and the card (RunState.mode_text).
+static func mode_label(mode: StringName = &"normal", hardcore: bool = false) -> String:
+	return RunState.mode_text(mode, hardcore)
+
+
+## The display name of environment [param id] ("Forest Ruin"); an unknown id is capitalised as is.
+static func environment_label(id: StringName) -> String:
+	var env := Db.get_environment(id)
+	if env != null and env.display_name != "":
+		return env.display_name
+	return String(id).capitalize()
 
 
 # --- Formatting -------------------------------------------------------------------------------
