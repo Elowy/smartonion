@@ -5,11 +5,22 @@ extends TestCase
 ## (never kiting it) like a Loot Goblin.
 
 const DT := 1.0 / 60.0
+## The bots' simulated walk in [method test_four_bots_around_a_swarmed_totem_stay_within_6_m]: speed (m/s),
+## ticks (8 s) and the ticks the walk in may take (3 s).
+const SIM_SPEED := 5.0
+const SIM_TICKS := 480
+const SIM_SETTLE_TICKS := 180
 
 ## A stand-in for an enemy hazard: pushes every bot the same way (the bots read hazard_push).
 class PushProbe extends Node3D:
 	func hazard_push(_from: Vector3) -> Vector2:
 		return Vector2(0.0, 2.0)
+
+
+## A stand-in for an enemy hazard that pushes the bots towards -X (away from a totem at the origin).
+class PullAwayProbe extends Node3D:
+	func hazard_push(_from: Vector3) -> Vector2:
+		return Vector2(-1.0, 0.0)
 
 
 class FakeHero extends Node3D:
@@ -78,6 +89,21 @@ func _totem(pos: Vector3) -> DefendTotem:
 	arena.entities.add_child(t)
 	t.global_position = pos
 	return t
+
+
+## A real Skeleton Grunt in the arena at [param pos].
+func _grunt(pos: Vector3) -> Enemy:
+	var e := Enemy.create(Db.get_enemy(EventSpawner.GRUNT_ID), 5)
+	arena.entities.add_child(e)
+	e.global_position = pos
+	return e
+
+
+## A grunt the [param totem]'s lure sent for it (taunted onto the totem).
+func _lured(pos: Vector3, totem: DefendTotem) -> Enemy:
+	var e := _grunt(pos)
+	e.apply_taunt(totem, 1000.0)
+	return e
 
 
 func _cart(pos: Vector3) -> CaravanCart:
@@ -243,6 +269,146 @@ func test_a_bot_with_a_swarm_on_the_totem_still_comes_back_to_it() -> void:
 		_enemy(Vector3(-7.0, 0.0, float(i) - 1.0))
 	var m := _event(mage, totem)
 	check(m[0].x > m[1].x, "the totem still pulls it, whatever it kites from")
+
+
+## Lured grunts in a block on the straight line between a bot at x = [param bot_x] and the totem at the origin.
+func _swarm_between(bot_x: float, totem: DefendTotem, count: int = 8) -> void:
+	for i in count:
+		_lured(Vector3(bot_x + 2.0 + 0.3 * float(i % 4), 0.0, -1.5 + float(i / 4) * 3.0), totem)
+
+
+func test_a_bot_beyond_the_limit_walks_back_through_the_enemies_on_the_totem() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var mage := _bot_player(&"mage", Vector3(-8.0, 0.0, 0.0))
+	_swarm_between(-8.0, totem)
+	var m := _move(mage)
+	check(m.x > 0.7, "8 m out with 8 lured enemies in the way it still heads for the totem: %s" % m)
+	var warrior := _bot_player(&"warrior", Vector3(-8.0, 0.0, 6.0))
+	m = _move(warrior)
+	check(m.x > 0.3, "a melee bot too (crowded, it kites like a ranged one): %s" % m)
+
+
+func test_the_enemies_on_the_totem_kite_a_bot_only_up_to_the_limit() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var inside := BotInput.totem_limit() - 1.0
+	var mage := _bot_player(&"mage", Vector3(-inside, 0.0, 0.0))
+	_swarm_between(-inside, totem)
+	var m := _move(mage)
+	check(m.x < -0.7, "inside the limit it keeps away from the swarm as ever: %s" % m)
+	var past := BotInput.totem_limit() + 0.5
+	mage.global_position = Vector3(-past, 0.0, 0.0)
+	for e in arena.entities.get_children():
+		if e is Enemy:
+			e.global_position.x += inside - past
+	m = _move(mage)
+	check(m.x > 0.3, "just past the limit the same swarm no longer pushes it out: %s" % m)
+
+
+func test_only_the_enemies_on_a_live_totem_stop_kiting_the_bot() -> void:
+	var totem := _totem(Vector3.ZERO)
+	# Past the limit but inside the guard radius, where the pull is only its plain 4: the kite push decides.
+	var x := -(BotInput.totem_limit() + 0.5)
+	var mage := _bot_player(&"mage", Vector3(x, 0.0, 0.0))
+	var pet := Node3D.new()
+	arena.entities.add_child(pet)
+	var grunts: Array[Enemy] = []
+	for i in 8:
+		var e := _grunt(Vector3(x + 2.0 + 0.3 * float(i % 4), 0.0, -1.5 + float(i / 4) * 3.0))
+		e.apply_taunt(pet, 1000.0)
+		grunts.append(e)
+	var m := _move(mage)
+	check(m.x < -0.7, "enemies busy with a pet are a threat like any other: %s" % m)
+	for e in grunts:
+		e.release_taunt(pet)
+		e.apply_taunt(totem, 1000.0)
+	m = _move(mage)
+	check(m.x > 0.3, "the same grunts on the totem are skipped: %s" % m)
+	totem.state = DefendTotem.State.HELD
+	m = _move(mage)
+	check(m.x < -0.7, "a held totem is not guarded any more, its enemies kite as ever: %s" % m)
+	pet.queue_free()
+
+
+func test_a_bot_far_out_is_pulled_back_through_enemies_that_are_not_after_the_totem() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var mage := _bot_player(&"mage", Vector3(-9.0, 0.0, 0.0))
+	for i in 5:
+		_enemy(Vector3(-7.0, 0.0, -1.0 + 0.5 * float(i)))
+	_move(mage)
+	var m := _move(mage)
+	check(m.x > 0.5, "five plain enemies 2 m ahead do not keep it out: %s" % m)
+	mage.global_position = Vector3(-(DefendTotem.GUARD_RADIUS - 0.5), 0.0, 0.0)
+	for n in tree.get_nodes_in_group(&"enemies"):
+		(n as Node3D).global_position.x = mage.global_position.x + 2.0
+	m = _move(mage)
+	check(m.x < 0.0, "inside the guard radius the floor is off and the enemies kite it as before: %s" % m)
+	totem.state = DefendTotem.State.HELD
+	mage.global_position = Vector3(-9.0, 0.0, 0.0)
+	for n in tree.get_nodes_in_group(&"enemies"):
+		(n as Node3D).global_position.x = -7.0
+	m = _move(mage)
+	check(m.x < 0.0, "a held totem pulls nobody: %s" % m)
+
+
+func test_a_hazard_switches_the_pull_floor_off() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var mage := _bot_player(&"mage", Vector3(-9.0, 0.0, 0.0))
+	for i in 5:
+		_enemy(Vector3(-9.0, 0.0, -2.0 + 0.1 * float(i)))
+	_move(mage)
+	var plain := _move(mage)
+	check(plain.x > 0.5, "enemies beside it (not between): the floored pull heads for the totem: %s" % plain)
+	var probe := PullAwayProbe.new()
+	probe.add_to_group(EnemyHazard.GROUP)
+	arena.entities.add_child(probe)
+	var hazard := _move(mage)
+	check(hazard.x < 0.35, "with a hazard on it the pull stays at its plain cap and the hazard's push counts: %s" % hazard)
+	probe.free()
+	check(totem.is_active(), "(the totem stood the whole time)")
+
+
+func test_a_bot_beyond_the_limit_does_not_run_a_rescue_into_the_enemies_on_the_totem() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var warrior := _bot_player(&"warrior", Vector3(-8.0, 0.0, 0.0))
+	var ghost := _bot_player(&"mage", Vector3(-8.0, 0.0, 3.0))
+	ghost.downed = true
+	for i in 4:
+		_lured(Vector3(-8.5 + 0.5 * float(i), 0.0, 3.5), totem)
+	var m := _move(warrior)
+	check(m.x > 0.4 and m.y < 0.9, "4 lured enemies stand on the ghost: no rescue run, back to the totem: %s" % m)
+
+
+func test_four_bots_around_a_swarmed_totem_stay_within_6_m() -> void:
+	var totem := _totem(Vector3.ZERO)
+	var bots: Array[Player] = [
+		_bot_player(&"mage", Vector3(-10.0, 0.0, 2.0)),
+		_bot_player(&"warlock", Vector3(9.0, 0.0, -4.0)),
+		_bot_player(&"warrior", Vector3(1.0, 0.0, 11.0)),
+		_bot_player(&"rogue", Vector3(-5.0, 0.0, -9.0)),
+	]
+	for i in 14:
+		var a := TAU * float(i) / 14.0
+		_lured(Vector3(cos(a), 0.0, sin(a)) * (2.5 + float(i % 3)), totem)
+	# Four more that are after nobody in particular, one next to each bot on its way in.
+	for at in [Vector3(-8.0, 0.0, 1.0), Vector3(7.0, 0.0, -3.0), Vector3(1.0, 0.0, 9.0), Vector3(-4.0, 0.0, -7.5)]:
+		_enemy(at)
+	var outside := 0
+	var samples := 0
+	var worst_late := 0.0
+	for tick in SIM_TICKS:
+		for p in bots:
+			var m := _move(p)
+			p.global_position += Vector3(m.x, 0.0, m.y) * SIM_SPEED * DT
+			var d := Vector2(p.global_position.x, p.global_position.z).length()
+			samples += 1
+			if d > DefendTotem.GUARD_RADIUS:
+				outside += 1
+			if tick >= SIM_SETTLE_TICKS:
+				worst_late = maxf(worst_late, d)
+	var share := float(outside) / float(samples)
+	check(share <= 0.2, "at most a fifth of the bot-time beyond 6 m (the walk in included): %.1f%%" % (share * 100.0))
+	check(worst_late <= DefendTotem.GUARD_RADIUS + 0.2,
+		"once settled nobody strays past 6 m: worst %.2f m" % worst_late)
 
 
 # --- Bots: the cart ----------------------------------------------------------------------------
