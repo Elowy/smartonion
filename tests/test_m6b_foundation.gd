@@ -518,26 +518,100 @@ func test_arena_can_be_built_without_the_spirit_healer() -> void:
 
 
 func test_arena_follows_a_custom_environment() -> void:
+	# Every EnvironmentData field gets a value that differs from its default (checked below), and every
+	# one of them is asserted on the arena built from it: the world environment, the sun, the ground
+	# shader parameters and the wall material's tint. A field added later fails the first check until
+	# this test gives it a value and an assertion.
 	var env := EnvironmentData.new()
 	env.id = &"test_env"
+	env.display_name = "Test Glade"
+	env.description = "A test environment."
+	env.roll_weight = 0.5
+	env.decor_id = &"test_decor"
+	env.hazard_id = &"grasping_hands"
 	env.sky_color = Color(0.1, 0.1, 0.2)
+	env.ambient_color = Color(0.3, 0.2, 0.1)
+	env.ambient_energy = 0.31
+	env.fog_color = Color(0.4, 0.5, 0.6)
 	env.fog_density = 0.02
+	env.sun_color = Color(0.2, 0.9, 0.5)
 	env.sun_energy = 0.4
+	env.sun_rotation = Vector3(-30.0, 40.0, 10.0)
+	env.glow_intensity = 0.8
+	env.saturation = 0.7
+	env.contrast = 1.3
 	env.grass_dark = Color(0.9, 0.1, 0.1)
+	env.grass_mid = Color(0.8, 0.2, 0.2)
+	env.grass_light = Color(0.7, 0.3, 0.3)
+	env.grass_warm = Color(0.6, 0.4, 0.3)
+	env.dirt_light = Color(0.5, 0.5, 0.9)
+	env.dirt_dark = Color(0.2, 0.2, 0.6)
 	env.has_road = false
+	env.road_width = 2.4
 	env.wall_tint = Color(0.5, 0.5, 1.0)
+	var defaults := EnvironmentData.new()
+	var unset: Array[String] = []
+	for prop in env.get_script().get_script_property_list():
+		var name: String = prop["name"]
+		if name == "script" or not (prop["usage"] & PROPERTY_USAGE_STORAGE):
+			continue
+		if env.get(name) == defaults.get(name):
+			unset.append(name)
+	check_eq(unset, [] as Array[String], "every EnvironmentData field has a non-default value in this test")
+
 	var arena := Arena.create(env)
 	nodes.append(arena)
-	check_eq(arena.world_environment.environment.background_color, Color(0.1, 0.1, 0.2), "sky")
-	check_eq(arena.world_environment.environment.fog_density, 0.02, "fog")
-	check_eq(arena.sun.light_energy, 0.4, "sun")
+	check(arena.environment == env, "the arena keeps the environment it was built from")
+	check_eq(arena.environment.id, &"test_env", "id")
+	check_eq(arena.environment.display_name, "Test Glade", "display_name")
+	check_eq(arena.environment.description, "A test environment.", "description")
+	check_eq(arena.environment.roll_weight, 0.5, "roll_weight")
+	check_eq(arena.environment.decor_id, &"test_decor", "decor_id (an unknown set builds the forest)")
+	check_eq(arena.environment.hazard_id, &"grasping_hands", "hazard_id")
+	check(arena.environment.has_hazard(), "has_hazard")
+	# World environment.
+	var wenv := arena.world_environment.environment
+	check_eq(wenv.background_color, Color(0.1, 0.1, 0.2), "sky_color -> background")
+	check_eq(wenv.ambient_light_color, Color(0.3, 0.2, 0.1), "ambient_color")
+	check_eq(wenv.ambient_light_energy, 0.31, "ambient_energy")
+	check_eq(wenv.fog_light_color, Color(0.4, 0.5, 0.6), "fog_color")
+	check_eq(wenv.fog_density, 0.02, "fog_density")
+	check_eq(wenv.glow_intensity, 0.8, "glow_intensity")
+	check_eq(wenv.adjustment_saturation, 0.7, "saturation")
+	check_eq(wenv.adjustment_contrast, 1.3, "contrast")
+	# Sun.
+	check_eq(arena.sun.light_color, Color(0.2, 0.9, 0.5), "sun_color")
+	check_eq(arena.sun.light_energy, 0.4, "sun_energy")
+	check(arena.sun.rotation_degrees.is_equal_approx(Vector3(-30.0, 40.0, 10.0)), "sun_rotation")
+	# Ground shader.
 	var mat := arena.ground.material_override as ShaderMaterial
-	check_eq(mat.get_shader_parameter("grass_dark"), Color(0.9, 0.1, 0.1), "ground colour")
-	check(mat.get_shader_parameter("road").y < 0.01, "no road: a vanishing width")
+	check(mat.get_shader_parameter("road").y < 0.01, "has_road false: a vanishing road width")
+	check_eq(mat.get_shader_parameter("grass_dark"), Color(0.9, 0.1, 0.1), "grass_dark")
+	check_eq(mat.get_shader_parameter("grass_mid"), Color(0.8, 0.2, 0.2), "grass_mid")
+	check_eq(mat.get_shader_parameter("grass_light"), Color(0.7, 0.3, 0.3), "grass_light")
+	check_eq(mat.get_shader_parameter("grass_warm"), Color(0.6, 0.4, 0.3), "grass_warm")
+	check_eq(mat.get_shader_parameter("dirt_light"), Color(0.5, 0.5, 0.9), "dirt_light")
+	check_eq(mat.get_shader_parameter("dirt_dark"), Color(0.2, 0.2, 0.6), "dirt_dark")
+	# Road: has_road switches it, road_width sets it (a second arena with the road on).
+	var with_road := env.duplicate() as EnvironmentData
+	with_road.has_road = true
+	var road_arena := Arena.create(with_road)
+	nodes.append(road_arena)
+	var road_mat := road_arena.ground.material_override as ShaderMaterial
+	check_eq(road_mat.get_shader_parameter("road"), Vector2(0.0, 2.4), "has_road + road_width")
+	# Walls: the wall material is tinted by wall_tint.
+	var stones := arena.walls.get_node("WallVisual/Stones") as MeshInstance3D
+	var wall_mat := stones.material_override as ShaderMaterial
+	check_eq(wall_mat.get_shader_parameter("albedo"), Color(0.5, 0.5, 1.0), "wall_tint -> wall material")
+	check_eq(road_arena.walls.get_node("WallVisual/Stones").material_override.get_shader_parameter("albedo"),
+			Color(0.5, 0.5, 1.0), "wall_tint on every arena of the environment")
+	# decor_id: the arena keeps the id; the decor set of an unknown id is the forest's (same children).
+	var forest := Arena.create()
+	nodes.append(forest)
+	check_eq(arena.get_node("Decor").get_child_count(), forest.get_node("Decor").get_child_count(),
+			"an unknown decor_id builds the forest decor")
 	check_eq(arena.get_bounds(), Rect2(-Arena.SIZE / 2.0, Arena.SIZE), "the playable rectangle never changes")
-	check(not env.has_hazard(), "no hazard by default")
-	env.hazard_id = &"grasping_hands"
-	check(env.has_hazard(), "a hazard id")
+	check(not EnvironmentData.new().has_hazard(), "no hazard by default")
 
 
 func test_db_loads_the_environments() -> void:
