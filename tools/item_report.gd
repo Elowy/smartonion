@@ -255,6 +255,29 @@ func _print_bases(items: Array) -> void:
 		if base.min_wave > 1:
 			by_tier_base[base.id] = by_tier_base.get(base.id, 0) + 1
 	print("Tier I %d, tier II %d, tier III %d  (bases above tier I seen: %s)\n" % [tiers[0], tiers[1], tiers[2], by_tier_base])
+	# Jewellery bases and stat suffixes (a generated item carries one suffix; matched by its name).
+	var jewel_total := 0
+	for id in db.item_bases:
+		if db.item_bases[id].slot_type in [Items.SlotType.NECK, Items.SlotType.RING]:
+			jewel_total += 1
+	var jewel_seen := {}
+	var by_suffix := {}
+	for item in items:
+		if item.unique:
+			continue
+		if item.slot_type in [Items.SlotType.NECK, Items.SlotType.RING] and db.item_bases.has(item.source_id):
+			jewel_seen[item.source_id] = true
+		for id in db.affixes:
+			if item.display_name.ends_with(db.affixes[id].suffix):
+				by_suffix[id] = by_suffix.get(id, 0) + 1
+				break
+	print("Jewellery bases seen: %d of %d" % [jewel_seen.size(), jewel_total])
+	var suffix_ids := by_suffix.keys()
+	suffix_ids.sort_custom(func(a: StringName, b: StringName) -> bool: return by_suffix[a] > by_suffix[b])
+	var suffix_parts: PackedStringArray = []
+	for id in suffix_ids:
+		suffix_parts.append("%s %d" % [id, by_suffix[id]])
+	print("By suffix (%d of %d seen): %s\n" % [by_suffix.size(), db.affixes.size(), ", ".join(suffix_parts)])
 
 
 func _print_prices(items: Array) -> void:
