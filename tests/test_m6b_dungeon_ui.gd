@@ -777,6 +777,47 @@ func test_quitting_during_the_dungeon_frees_everything() -> void:
 	check(not is_instance_valid(d) and not is_instance_valid(arena), "the dungeon and the arena are freed")
 
 
+func test_a_downed_hero_in_the_dungeon_is_told_a_teammate_revives_them() -> void:
+	_run_with_bots(2)
+	_break_after(6)
+	main.enter_dungeon()
+	main.dungeon._physics_process(Dungeon.INTRO_TIME + 0.02)
+	check(main.arena.spirit_healer == null, "no Spirit Healer in the dungeon")
+	var p := main.players[0]
+	_down(p)
+	var frame := UnitFrame.create(0)
+	nodes.append(frame)
+	tree.root.add_child(frame)
+	frame.bind(p)
+	frame._process(0.016)
+	check(frame.is_downed_shown(), "DOWNED overlay")
+	check(frame.hint_label.is_visible_in_tree(), "the hint is shown")
+	check_eq(frame.hint_label.text, UnitFrame.TEAMMATE_HINT, "a teammate revives inside the dungeon")
+	check_eq(UnitFrame.TEAMMATE_HINT, "Only a teammate can revive you", "the shared wording")
+	frame.unbind()
+
+
+func test_the_clearing_still_sends_a_downed_hero_to_the_spirit_healer() -> void:
+	_run_with_bots(2)
+	check(main.arena.spirit_healer != null, "the clearing has its Spirit Healer")
+	var p := main.players[0]
+	_down(p)
+	var frame := UnitFrame.create(0)
+	nodes.append(frame)
+	tree.root.add_child(frame)
+	frame.bind(p)
+	frame._process(0.016)
+	check("Spirit Healer" in frame.hint_label.text, "the hint names the Spirit Healer: %s" % frame.hint_label.text)
+	check(frame.hint_label.text != UnitFrame.TEAMMATE_HINT, "not the teammate hint")
+	frame.unbind()
+	# The dungeon over, the clearing (and its Spirit Healer) is back for the next downed hero.
+	_break_after(6)
+	main.enter_dungeon()
+	_play_dungeon()
+	check(main.arena.spirit_healer != null, "the Spirit Healer is back after the dungeon")
+	check(main.arena.spirit_healer.is_inside_tree(), "and it is in the clearing")
+
+
 func test_downs_in_the_wave_feed_the_bots_rule() -> void:
 	_run_with_bots(2)
 	check_eq(RunState.last_wave_downs, 0, "none yet")
