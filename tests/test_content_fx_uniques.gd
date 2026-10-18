@@ -544,6 +544,12 @@ func test_staff_of_the_deep_winter_freezes_its_target() -> void:
 	check(e.is_stunned(), "frozen in place")
 
 
+func test_staff_of_the_deep_winter_flavour_matches_its_name() -> void:
+	# The first flavour line ("Blooms once a year...") was left over from the old Winterbloom name.
+	check_eq(Db.get_unique(&"staff_of_the_deep_winter").flavor,
+			"It remembers every winter and brings them back on request.", "the flavour line")
+
+
 func test_grimoire_of_seeded_doom_bursts_and_rots() -> void:
 	var p := _hero(&"mage")
 	_wear(p, &"grimoire_of_seeded_doom")
