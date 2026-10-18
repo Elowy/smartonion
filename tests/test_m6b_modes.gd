@@ -757,10 +757,25 @@ func test_leaderboard_flag_makes_a_smoke_run_write_its_own_file() -> void:
 	check(main.writes_leaderboard(), "even a smoke run writes its own file")
 
 
-func test_quitting_to_the_menu_does_not_record_the_run() -> void:
+func test_quitting_to_the_menu_does_not_record_a_normal_run() -> void:
 	_recording_main()
 	main.quit_to_menu()
-	check(not FileAccess.file_exists(TMP_BOARD), "an abandoned run is not a result")
+	check(not FileAccess.file_exists(TMP_BOARD), "an abandoned normal run is not a result")
+
+
+func test_an_endless_run_quit_from_the_pause_menu_records_the_wave_reached() -> void:
+	var opts := LaunchOptions.new()
+	opts.mode = RunState.MODE_ENDLESS
+	opts.start_wave = 27
+	_recording_main(opts)
+	RunState.tick_run_time(321.0)
+	main.quit_to_menu()
+	var entries := _board().entries_for(RunState.MODE_ENDLESS, false, 2)
+	check_eq(entries.size(), 1, "the quit run is on the endless board")
+	check_eq(int(entries[0]["wave"]), 27, "the wave it reached")
+	check(not bool(entries[0]["victory"]), "a defeat")
+	check_near(float(entries[0]["time"]), 321.0, 0.11, "the time played")
+	check(not RunState.active and main.state == Main.State.MENU, "the run is over and the menu is up (no game-over screen)")
 
 
 ## A directory where the board's temporary file goes: the board itself still loads, but the save cannot open it.

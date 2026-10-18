@@ -491,9 +491,12 @@ func _record_hero_results() -> void:
 				RunSummary.best_item(hero.equipment) if valid else null)
 
 
-## Pause Menu "Quit to Menu": abandons the run.
+## Pause Menu "Quit to Menu": abandons the run. An endless run is still a result: it goes into the leaderboard
+## as a defeat on the wave it reached (its wave in progress). A normal run that is quit is not recorded.
 func quit_to_menu() -> void:
 	if arena != null and RunState.active:
+		if RunState.is_endless():
+			_record_leaderboard(false)
 		RunState.end_run(false)
 	go_to_menu()
 
