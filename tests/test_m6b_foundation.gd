@@ -1254,6 +1254,30 @@ func test_launch_flags_parse() -> void:
 	check_eq(o.shrine_chance, 0.0, "0 = never (not off)")
 
 
+func test_launch_flag_switches_read_their_value_in_any_case() -> void:
+	for v in ["0", "false", "FALSE", "False", "no", "No", "NO", "off", "OFF"]:
+		var o := LaunchOptions.parse(PackedStringArray(["--hardcore=" + v, "--dungeon=" + v]))
+		check(not o.hardcore and not o.dungeon, "=%s switches the flag off" % v)
+	for v in ["1", "true", "yes", "on", "anything"]:
+		var o := LaunchOptions.parse(PackedStringArray(["--hardcore=" + v, "--dungeon=" + v]))
+		check(o.hardcore and o.dungeon, "=%s switches the flag on" % v)
+	var bare := LaunchOptions.parse(PackedStringArray(["--hardcore", "--dungeon"]))
+	check(bare.hardcore and bare.dungeon, "a bare switch is on")
+	check(LaunchOptions.parse(PackedStringArray(["--dungeon=Off"])).unknown.is_empty(), "a known value is no warning")
+
+
+func test_a_non_numeric_shrine_chance_is_unknown_and_unset() -> void:
+	var o := LaunchOptions.parse(PackedStringArray(["--shrine-chance=abc"]))
+	check_eq(o.shrine_chance, -1.0, "unset: the normal chance")
+	check_eq(o.unknown, ["--shrine-chance=abc"] as Array[String], "reported like the other bad values")
+	o = LaunchOptions.parse(PackedStringArray(["--shrine-chance"]))
+	check_eq(o.shrine_chance, -1.0, "a bare flag is unset too")
+	check_eq(o.unknown, ["--shrine-chance"] as Array[String], "and reported")
+	o = LaunchOptions.parse(PackedStringArray(["--shrine-chance=0.5"]))
+	check_eq(o.shrine_chance, 0.5, "a number is set")
+	check(o.unknown.is_empty(), "and understood")
+
+
 func test_launch_flags_reject_bad_values() -> void:
 	var o := LaunchOptions.parse(PackedStringArray(["--mode=turbo", "--env=nowhere", "--event=party"]))
 	check_eq(o.unknown, ["--mode=turbo", "--env=nowhere", "--event=party"] as Array[String], "reported once by Main")

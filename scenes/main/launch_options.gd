@@ -64,6 +64,9 @@ const MAX_ENDLESS_START_WAVE := 99
 ## --boss-hp range (a boss with ~0 HP or an unkillable one is no test).
 const MIN_BOSS_HP_MULT := 0.01
 const MAX_BOSS_HP_MULT := 100.0
+## Values that switch a boolean flag (--hardcore=0, --dungeon=No ...) off, compared lower-cased. A bare
+## switch, or any other value, switches it on.
+const FLAG_OFF_VALUES: Array[String] = ["0", "false", "no", "off"]
 
 var smoke := false
 var demo := false
@@ -109,6 +112,11 @@ var shrine_chance := -1.0
 var dungeon := false
 ## Arguments that were not understood (reported once by Main).
 var unknown: Array[String] = []
+
+
+## A boolean flag's value: on, unless it is one of FLAG_OFF_VALUES (case-insensitive).
+static func _flag_on(value: String) -> bool:
+	return not (value.to_lower() in FLAG_OFF_VALUES)
 
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
@@ -180,7 +188,7 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				else:
 					o.unknown.append(arg)
 			"--hardcore":
-				o.hardcore = value != "0" and value != "false"
+				o.hardcore = _flag_on(value)
 			"--env":
 				if Db.get_environment(StringName(value)) != null:
 					o.environment = StringName(value)
@@ -192,9 +200,12 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				else:
 					o.unknown.append(arg)
 			"--shrine-chance":
-				o.shrine_chance = clampf(value.to_float(), 0.0, 1.0)
+				if value.is_valid_float():
+					o.shrine_chance = clampf(value.to_float(), 0.0, 1.0)
+				else:
+					o.unknown.append(arg)  # (not a number: unset, the normal chance)
 			"--dungeon":
-				o.dungeon = value != "0" and value != "false"
+				o.dungeon = _flag_on(value)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
