@@ -399,7 +399,7 @@ func _finish(kind: StringName, success: bool) -> void:
 	result = &"completed" if success else &"failed"
 	if success:
 		RunState.events_completed += 1
-	print("EVENT %s (wave %d): %s" % [kind, _event_wave(), result])
+	print("EVENT %s (wave %d): %s at %.1f s" % [kind, _event_wave(), result, wave_elapsed()])
 	event_finished.emit(kind, success)
 
 
