@@ -367,6 +367,33 @@ func get_safe_ground_rect() -> Rect2:
 	return safe_ground_rect(focus, distance, _aspect())
 
 
+## [method get_safe_ground_rect] on the screen (px): the largest axis-aligned rectangle inside the
+## projection of the safe ground rectangle, within the viewport. Name tags of the mid-wave events
+## stay inside it, so they are never cut off or hidden under the HUD ([EventTag]).
+func get_safe_screen_rect() -> Rect2:
+	return safe_screen_rect(camera, get_safe_ground_rect())
+
+
+## The screen rectangle (px) inside the projection of the ground rectangle [param ground] (XZ) as
+## [param cam] sees it: the ground's corners are projected, the far edge and the near edge give the
+## top and the bottom, the narrower of the two give the left and the right. Clipped to the
+## viewport; the whole viewport when [param ground] is empty or [param cam] is orthogonal.
+static func safe_screen_rect(cam: Camera3D, ground: Rect2) -> Rect2:
+	var view := cam.get_viewport().get_visible_rect()
+	if ground.size.x <= 0.0 or ground.size.y <= 0.0 or cam.projection != Camera3D.PROJECTION_PERSPECTIVE:
+		return view
+	var tl := cam.unproject_position(Vector3(ground.position.x, 0.0, ground.position.y))
+	var tr := cam.unproject_position(Vector3(ground.end.x, 0.0, ground.position.y))
+	var bl := cam.unproject_position(Vector3(ground.position.x, 0.0, ground.end.y))
+	var br := cam.unproject_position(Vector3(ground.end.x, 0.0, ground.end.y))
+	var x0 := maxf(tl.x, bl.x)
+	var x1 := minf(tr.x, br.x)
+	var y0 := maxf(tl.y, tr.y)
+	var y1 := minf(bl.y, br.y)
+	var rect := Rect2(x0, y0, maxf(x1 - x0, 0.0), maxf(y1 - y0, 0.0))
+	return view.intersection(rect) if rect.size.x > 0.0 and rect.size.y > 0.0 else view
+
+
 ## Where a framed player may stand so the whole team still fits on one screen together
 ## with [param others] (the other framed players' positions). Unbounded without others.
 static func walk_rect_for(others: Array[Vector3], aspect: float) -> Rect2:

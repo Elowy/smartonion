@@ -52,9 +52,10 @@ static func bar(parent: Node3D, node_name: String, height: float, color: Color, 
 
 
 ## A billboard text tag whose bottom edge is [param height] m above [param parent]'s origin: fixed on-screen
-## size (like the Loot Goblin's tag), no depth test, outlined.
+## size (like the Loot Goblin's tag), no depth test, outlined. It is an [EventTag]: it keeps itself on screen
+## and out from under the HUD.
 static func label(parent: Node3D, node_name: String, text: String, height: float, color: Color) -> Label3D:
-	var l := Label3D.new()
+	var l := EventTag.new()
 	l.name = node_name
 	l.text = text
 	l.font_size = LABEL_FONT_SIZE
@@ -71,7 +72,8 @@ static func label(parent: Node3D, node_name: String, text: String, height: float
 	l.render_priority = 24
 	l.outline_render_priority = 23
 	l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	l.position = Vector3(0.0, height, 0.0)
+	l.home = Vector3(0.0, height, 0.0)
+	l.position = l.home
 	parent.add_child(l)
 	return l
 
