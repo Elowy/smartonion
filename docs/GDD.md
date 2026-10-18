@@ -2234,6 +2234,9 @@ dungeon **után**, még a piac előtt történik.
 
 **Loot roll közben:** A = Need, X = Greed, B = Pass, Y = Greed all remaining.
 
+**Lobbyban** (M6b): Y = mód léptetése (Normal ↔ Endless), X = Hardcore ki / be – bármelyik
+játékos megteheti. **Szentély-szavazáskor:** A = Accept, B = Decline.
+
 **Gombfeliratok:** a játék felismeri a kontroller típusát, és ahhoz igazítja a feliratokat:
 - Xbox: A B X Y,
 - PlayStation: ✕ ○ □ △,
@@ -2263,6 +2266,15 @@ indulnak.
 **Csatlakozási képernyő**
 
 - 4 hely; „Press A to join”; kasztválasztás karakter-előnézettel.
+- **Módválasztás** (M6b): **bármelyik játékos** az **Y**-nal léptet a módok között (Normal ↔
+  Endless), és az **X**-szel kapcsolja a **Hardcore**-t. A lobby fejlécében mindig az aktuális
+  választás látszik („*Mode: Endless · Hardcore*”), Hardcore-nál HARDCORE jelvénnyel (16.1).
+- **Sorsoló képernyő** („*Rolling the arena…*”, M6b): az indítás után, a menet előtt:
+  - a környezet-kártyák **vízszintes sora** (ismétlődve) ~3,5 mp alatt lassul, és a
+    kisorsolt kártyán áll meg;
+  - 1 mp szünet, majd indul a menet;
+  - a környezetet a futás magjából számolt külön véletlenszám-generátor sorsolja;
+  - smoke-futásban, demóban és tesztben kimarad; a `--env=<id>` az eredményt kényszeríti.
 
 **Harci HUD**
 
@@ -2284,6 +2296,14 @@ indulnak.
   „ENRAGED” felirat (8. fejezet).
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).
+- **M6b kiegészítések:**
+  - **HARDCORE jelvény** a HUD-n, ha a menet Hardcore módú.
+  - **Szentély-ikonok:** az aktív szentély-hatásokat (16.1) kis ikonok mutatják, a hátralévő
+    hullámok számával.
+  - **Esemény-szalag:** a hullám közbeni esemény indulását szalag jelzi, és a kamera az
+    esemény célpontját is képen tartja (16.1).
+  - **Dungeon:** a dungeonban a HUD „*Dungeon – Room 2/4 · <feladat>*” sort és a terem
+    feladatának állását mutatja (16.1).
 
 **Loot roll képernyő (közös)**
 
@@ -2312,9 +2332,18 @@ indulnak.
 
 - **Sorrend:**
   1. loot roll (közös),
-  2. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
-  3. közös bolt + személyes panelek egyszerre,
-  4. Ready.
+  2. (M6b) **szentély** – 5% eséllyel, közös kártya, szavazással,
+  3. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
+  4. (M6b) **Dungeon-portál** – a 6., 9., 12. és 15. hullám után, csapatszavazással; belépés
+     esetén a dungeon, utána a jutalom-dobás,
+  5. közös bolt + személyes panelek egyszerre,
+  6. Ready.
+- **Szentély-kártya** (M6b): a szentély neve, az áldása és az átka; minden játékos szavaz:
+  **Accept (A)** vagy **Decline (B)**. Csak az egyhangú elfogadás lép életbe; egy elutasítás
+  vagy a **15 mp-es** időkorlát lejárta elutasítás (16.1).
+- **Portál-szavazás** (M6b): „*A dungeon portal has opened!*” felirat és csapatszavazás; ha
+  mindenki elfogadta, a csapat belép, egy elutasítás vagy a **20 mp-es** időkorlát kihagyja
+  (16.1).
 - **Fejléc:** a következő hullám sora: „Next up: Wave 4 of 25  ·  60 seconds”; a boss-hullám
   előtt másodperc nélkül („Next up: Wave 10 of 25 – Boss wave! (ends when the boss falls)”, 8.
   fejezet), az elit 20. hullám előtt „… seconds  –  Elite wave!” (piros).
@@ -2461,6 +2490,12 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
     rövidíti mappahatáron (a fájlnév és az utolsó mappák maradnak, pl. „Saved to
     …/SmartOnion/cards/run_2026-10-14_15-20-11.png”), így a panel nem szélesedik; a teljes
     útvonal a naplóba kerül. Hiba esetén „The card could not be saved.”.
+- **M6b kiegészítések a végképernyőn:**
+  - **Környezet:** a végképernyő és a run kártya a menet környezetét is mutatja
+    (`RunState.environment`, pl. „Cemetery”).
+  - **HARDCORE jelvény**, ha a menet Hardcore módú.
+  - **Ranglista:** a „*Best: …*” sor és a menet kategóriájának (mód, Hardcore, játékosszám)
+    helyi **top 10** táblája, az új bejegyzés kiemelve (16.1).
 
 ---
 
@@ -2556,13 +2591,14 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
 - `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
 - `SetData`, `EnemyData`, `WaveData`, `BossData`, `ConsumableData`, `DifficultyData`.
+- `EnvironmentData` (M6b): az aréna-környezetek (paletta, kellékkészlet, veszély; 16.1).
 
 **Fő rendszerek**
 
 | Rendszer | Feladat |
 |---|---|
 | `PlayerManager` | Eszközök (kontroller / billentyűzet) játékoshoz rendelése, csatlakozás / kilépés |
-| `RunState` | Hullámszám, közös kassza, közös XP, játékosállapotok |
+| `RunState` | Hullámszám, közös kassza, közös XP, játékosállapotok; M6b-től a mód (Normal / Endless, a menet hossza ebből jön), a Hardcore, a környezet és az aktív szentély-hatások |
 | `StatBlock` | Alapstatok + módosítók (item, ability, talent, buff) → végső statok |
 | `CombatSystem` | Sebzés képlete, krit, DoT, gyógyítás, procok |
 | `AbilitySystem` | Erőforrások, cooldownok, slotok, rangok, auto-cast, képességek végrehajtása |
@@ -2581,7 +2617,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 
 ```
 /project.godot
-/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ bosses/ consumables/ waves/ difficulties/
+/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ bosses/ consumables/ waves/ difficulties/ environments/
 /scenes/      main/ arena/ player/ enemies/ ui/
 /scripts/     systems/ abilities/ ai/
 /assets/      models/ textures/ icons/ audio/ fonts/
@@ -2594,6 +2630,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **automatikus mentés minden hullám végén** (a teljes menet állapota: hullám, kassza,
   XP, játékosok felszerelése, abilityk, talentek), így egy 25 hullámos menet félbehagyható és
   folytatható;
+- a **helyi ranglista** (M6b): `user://leaderboard.json`, verziózott, kategóriánként (mód,
+  Hardcore, játékosszám) top 10 (16.1);
 - a fő profil meta-progressziója (17. fejezet).
 
 ---
