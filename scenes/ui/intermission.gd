@@ -1282,8 +1282,12 @@ func _on_player_left(slot: PlayerSlot) -> void:
 	drop_shop_pings(RunState.shop, slot.index)
 	if not is_open():
 		return
+	if phase == Phase.SHRINE:
+		_on_shrine_player_left(slot)
 	if phase == Phase.LEVEL_UP:
 		level_up_screen.remove_slot(slot.index)
+	if phase == Phase.PORTAL:
+		_on_portal_player_left(slot)
 	if phase == Phase.MARKET:
 		var slots := PlayerManager.get_slots()
 		_sync_panels(slots)
@@ -1292,6 +1296,18 @@ func _on_player_left(slot: PlayerSlot) -> void:
 			shop_panel.shop.prune_votes(shop_panel.voter_indices())
 		purse_board.update(PlayerManager.get_slots())
 	_refresh_chips(true)
+
+
+## SHRINES hook: [param slot] left while the shrine vote runs (the package drops their vote, re-checks the
+## voters). The foundation has nothing to do.
+func _on_shrine_player_left(_slot: PlayerSlot) -> void:
+	pass
+
+
+## DUNGEON hook: [param slot] left while the portal vote runs (the package drops their vote, re-checks the
+## voters). The foundation has nothing to do.
+func _on_portal_player_left(_slot: PlayerSlot) -> void:
+	pass
 
 
 ## Takes [param slot_index]'s "P2 wants" pings off every unsold offer of [param shop]

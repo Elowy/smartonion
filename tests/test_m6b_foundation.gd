@@ -28,9 +28,17 @@ class ProbeSpawner extends EventSpawner:
 		super()
 
 
-## An Intermission that records the phases it enters.
+## An Intermission that records the phases it enters, the frames of the SHRINE / PORTAL phases and the
+## players who left during them. hold_shrine / hold_portal withhold the stub's "vote is over", so the
+## phase stays open and _process runs it.
 class PhaseProbe extends Intermission:
 	var entered: Array[Intermission.Phase] = []
+	var hold_shrine := false
+	var hold_portal := false
+	var shrine_updates := 0
+	var portal_updates := 0
+	var shrine_left: Array[int] = []
+	var portal_left: Array[int] = []
 
 	func _start_loot() -> void:
 		entered.append(Intermission.Phase.LOOT)
@@ -40,6 +48,18 @@ class PhaseProbe extends Intermission:
 		entered.append(Intermission.Phase.SHRINE)
 		super()
 
+	func _on_shrine_finished() -> void:
+		if not hold_shrine:
+			super()
+
+	func _update_shrine(delta: float) -> void:
+		shrine_updates += 1
+		super(delta)
+
+	func _on_shrine_player_left(slot: PlayerSlot) -> void:
+		shrine_left.append(slot.index)
+		super(slot)
+
 	func _start_level_up() -> void:
 		entered.append(Intermission.Phase.LEVEL_UP)
 		super()
@@ -48,9 +68,37 @@ class PhaseProbe extends Intermission:
 		entered.append(Intermission.Phase.PORTAL)
 		super()
 
+	func _on_portal_finished() -> void:
+		if not hold_portal:
+			super()
+
+	func _update_portal(delta: float) -> void:
+		portal_updates += 1
+		super(delta)
+
+	func _on_portal_player_left(slot: PlayerSlot) -> void:
+		portal_left.append(slot.index)
+		super(slot)
+
 	func _start_market() -> void:
 		entered.append(Intermission.Phase.MARKET)
 		super()
+
+
+## A Main whose break path is recorded: the two roll seams and the intermission, in call order.
+class BreakProbe extends Main:
+	var calls: Array[String] = []
+
+	func _roll_shrine() -> void:
+		calls.append("shrine")
+		super()
+
+	func _roll_portal() -> void:
+		calls.append("portal")
+		super()
+
+	func open_intermission() -> void:
+		calls.append("open")
 
 
 var main: Main
@@ -907,6 +955,45 @@ func test_level_up_comes_between_the_shrine_and_the_portal() -> void:
 	screen._on_level_up_finished()
 	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.LEVEL_UP, Intermission.Phase.PORTAL,
 			Intermission.Phase.MARKET] as Array[Intermission.Phase], "then the portal, then the market")
+
+
+func test_a_player_leaving_the_shrine_vote_reaches_its_hook() -> void:
+	_make_screen()
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	screen.hold_shrine = true
+	RunState.pending_shrine = &"greed"
+	screen.open(5, 0)
+	check_eq(screen.phase, Intermission.Phase.SHRINE, "the shrine vote is held open")
+	var slot := PlayerManager.get_slots()[0]
+	screen._on_player_left(slot)
+	check_eq(screen.shrine_left, [slot.index] as Array[int], "the SHRINE hook got the slot")
+	check_eq(screen.portal_left, [] as Array[int], "not the PORTAL hook")
+
+
+func test_a_player_leaving_the_portal_vote_reaches_its_hook() -> void:
+	_make_screen()
+	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
+	screen.hold_portal = true
+	RunState.portal_pending = true
+	screen.open(5, 0)
+	check_eq(screen.phase, Intermission.Phase.PORTAL, "the portal vote is held open")
+	var slot := PlayerManager.get_slots()[0]
+	screen._on_player_left(slot)
+	check_eq(screen.portal_left, [slot.index] as Array[int], "the PORTAL hook got the slot")
+	check_eq(screen.shrine_left, [] as Array[int], "not the SHRINE hook")
+
+
+func test_the_break_path_rolls_the_shrine_and_the_portal_before_the_intermission() -> void:
+	var probe := BreakProbe.new()
+	probe.options = LaunchOptions.new()
+	main = probe  # freed by after_each
+	probe.wave = 5
+	probe._after_wave_end()
+	check_eq(probe.calls, ["shrine", "portal", "open"] as Array[String], "the rolls come just before the break")
+	probe.calls.clear()
+	probe.wave = 25  # the normal mode's last wave ends the run: no break, no rolls
+	probe._after_wave_end()
+	check(probe.calls.is_empty(), "no break after the last wave")
 
 
 # --- Leaderboard ------------------------------------------------------------------------------

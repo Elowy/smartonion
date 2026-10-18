@@ -595,7 +595,21 @@ func _after_wave_end() -> void:
 	if RunState.is_final_wave(wave):
 		end_run(true)
 	else:
+		_roll_shrine()
+		_roll_portal()
 		open_intermission()
+
+
+## SHRINES seam (M6b): the break's shrine roll (RunState.pending_shrine, from RunState.shrine_rng), called
+## on the break path just before open_intermission. The SHRINES package owns the body.
+func _roll_shrine() -> void:
+	pass
+
+
+## DUNGEON seam (M6b): the break's portal roll (RunState.portal_pending, from RunState.dungeon_rng), called
+## on the break path just before open_intermission. The DUNGEON package owns the body.
+func _roll_portal() -> void:
+	pass
 
 
 # --- Run building ------------------------------------------------------------------
