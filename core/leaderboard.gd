@@ -2,15 +2,17 @@ class_name Leaderboard
 extends RefCounted
 ## The local leaderboard (GDD 16.1, M6b MODES): per category – (mode, hardcore, party size) – the best
 ## MAX_ENTRIES runs, kept in a small versioned JSON file (user://leaderboard.json). This class is the
-## pure data model plus the file IO; what the end screen shows of it is the MODES package.
+## pure data model plus the file IO; the end screen's texts and model are [method screen_model] and the
+## text helpers under "The end screen's board".
 ##
 ## File format (FORMAT_VERSION 1):
 ##   {"version": 1, "categories": {"normal/standard/2": [entry, ...], "endless/hardcore/4": [...]}}
 ## An entry: {"wave": int (the wave reached: the last wave cleared on a victory, the wave that ended
 ## the run on a defeat), "time": float (seconds of wave play, RunState.run_time), "classes": [class
 ## ids in slot order], "date": "YYYY-MM-DD HH:MM:SS", "victory": bool}. Entries of a category are
-## kept best first ([method better]): a normal run ranks victories by the shortest time, then
-## defeats by the highest wave; an endless run ranks by the highest wave, then the shortest time.
+## kept best first ([method better]). A normal run ranks victories by the shortest time, and defeats by the
+## highest wave, then by the LONGEST time (the longer the party held out on its last wave, the better). An
+## endless run ranks every entry by the highest wave, then by the longest time.
 ##
 ## - The path is injectable: [code]Leaderboard.create(path)[/code] works on any file (tests use a temp
 ##   path). [method default_path] is the real file ([member path_override] replaces it in tests).
@@ -30,6 +32,8 @@ const DEFAULT_PATH := "user://leaderboard.json"
 const MAX_ENTRIES := 10
 const PARTY_MIN := 1
 const PARTY_MAX := 4
+## Times are snapped to 0.1 s (see [method make_entry]), so this tolerance only absorbs float noise.
+const TIME_EPSILON := 0.00001
 
 ## Master switch of [method record_run] (the unit test runner switches it off).
 static var writes_enabled := true
@@ -86,6 +90,8 @@ static func make_entry(p_wave: int, p_time: float, p_classes: Array, p_victory: 
 
 ## True when entry [param a] ranks above [param b] in a [param p_mode] board (see the class doc).
 ## Ties are not "better" (a new entry goes below an equal older one).
+## Endless: the later wave, then the LONGER time. Normal: a victory above a defeat, victories by the
+## SHORTER time, defeats by the later wave and then the LONGER time.
 static func better(a: Dictionary, b: Dictionary, p_mode: StringName) -> bool:
 	var a_wave := int(a.get("wave", 0))
 	var b_wave := int(b.get("wave", 0))
@@ -94,16 +100,16 @@ static func better(a: Dictionary, b: Dictionary, p_mode: StringName) -> bool:
 	if p_mode == RunState.MODE_ENDLESS:
 		if a_wave != b_wave:
 			return a_wave > b_wave
-		return a_time < b_time - 0.00001
+		return a_time > b_time + TIME_EPSILON
 	var a_won := bool(a.get("victory", false))
 	var b_won := bool(b.get("victory", false))
 	if a_won != b_won:
 		return a_won
 	if a_won:
-		return a_time < b_time - 0.00001
+		return a_time < b_time - TIME_EPSILON
 	if a_wave != b_wave:
 		return a_wave > b_wave
-	return a_time < b_time - 0.00001
+	return a_time > b_time + TIME_EPSILON
 
 
 # --- Reading ----------------------------------------------------------------------------------
@@ -205,20 +211,119 @@ func save_file() -> Error:
 
 
 ## The call a finished run makes: loads the board at [method default_path], adds [param entry] to its
-## category, saves, and returns the entry's rank (-1 = not in the top MAX_ENTRIES, or nothing written:
-## [member writes_enabled] is false, or the board is [member read_only] (a newer version, or a file that
-## cannot be read).
-static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> int:
+## category, saves, and returns {"rank": int, "save_failed": bool}. "rank" is the entry's place (0 = the best),
+## -1 when it did not make the top MAX_ENTRIES or nothing was written ([member writes_enabled] is false, or the
+## board is [member read_only]: a newer version, or a file that cannot be read). "save_failed" is true only when
+## the entry made the board but the file could not be written: then "rank" is -1 too and the file is as it was.
+static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> Dictionary:
+	var outcome := {"rank": -1, "save_failed": false}
 	if not writes_enabled:
-		return -1
+		return outcome
 	var board := create()
 	board.load_file()
 	if board.read_only:
-		return -1
+		return outcome
 	var rank := board.add_entry(entry, p_mode, p_hardcore, p_party)
-	if rank >= 0 and board.save_file() != OK:
-		return -1
-	return rank
+	if rank < 0:
+		return outcome
+	if board.save_file() != OK:
+		outcome["save_failed"] = true
+		return outcome
+	outcome["rank"] = rank
+	return outcome
+
+
+# --- The end screen's board (M6b MODES) -------------------------------------------------------
+
+## What an entry reached: "Wave 31" (an endless run), "Victory" or "Fell on wave 18" (a normal run).
+static func result_text(entry: Dictionary, p_mode: StringName) -> String:
+	var wave := int(entry.get("wave", 0))
+	if p_mode == RunState.MODE_ENDLESS:
+		return "Wave %d" % wave
+	return "Victory" if bool(entry.get("victory", false)) else "Fell on wave %d" % wave
+
+
+## [method result_text] and the run time: "Wave 31 · 18:22", "Victory · 24:10" (the "Best: ..." line).
+static func summary_text(entry: Dictionary, p_mode: StringName) -> String:
+	return "%s · %s" % [result_text(entry, p_mode), RunSummary.format_time(float(entry.get("time", 0.0)))]
+
+
+## The date part of an entry's "YYYY-MM-DD HH:MM:SS".
+static func date_text(entry: Dictionary) -> String:
+	return String(entry.get("date", "")).get_slice(" ", 0)
+
+
+## "Warrior, Mage" for the class ids of an entry (an unknown id is capitalised as is).
+static func party_text(entry: Dictionary) -> String:
+	var names: Array[String] = []
+	for id: Variant in entry.get("classes", []):
+		var data := Db.get_class_data(StringName(String(id)))
+		names.append(data.display_name if data != null else String(id).capitalize())
+	return ", ".join(names)
+
+
+## "4 players" / "1 player".
+static func party_size_text(p_party: int) -> String:
+	var n := clampi(p_party, PARTY_MIN, PARTY_MAX)
+	return "%d player%s" % [n, "" if n == 1 else "s"]
+
+
+## The title of a category: "Endless · Hardcore · 4 players".
+static func category_text(p_mode: StringName, p_hardcore: bool, p_party: int) -> String:
+	return "%s · %s" % [RunState.mode_text(p_mode, p_hardcore), party_size_text(p_party)]
+
+
+## One row of the board: {"rank": "1", "result", "time", "party", "date"} (the end screen's table cells).
+static func row_texts(rank_index: int, entry: Dictionary, p_mode: StringName) -> Dictionary:
+	return {
+		"rank": str(rank_index + 1),
+		"result": result_text(entry, p_mode),
+		"time": RunSummary.format_time(float(entry.get("time", 0.0))),
+		"party": party_text(entry),
+		"date": date_text(entry),
+	}
+
+
+## The "Best: ..." line of the end screen: the best entry of the category ("Best: Wave 31 · 18:22"), plus
+## this run's place when it made the board ("  –  New best!" for the first place, "  –  This run: #3").
+## [param p_rank] is the place [method record_run] returned (-1 = the run is not on the board).
+static func best_line(p_best: Dictionary, p_mode: StringName, p_rank: int = -1) -> String:
+	var line := "Best: %s" % (summary_text(p_best, p_mode) if not p_best.is_empty() else "–")
+	if p_rank == 0:
+		line += "  –  New best!"
+	elif p_rank > 0:
+		line += "  –  This run: #%d" % (p_rank + 1)
+	return line
+
+
+## What the end screen shows of the board after a run: {"mode", "hardcore", "party", "key" (the category),
+## "category_text", "entries" (the category on [param board], best first), "rank" (the run's place in
+## them, -1 = not on the board: it was not written or missed the top 10), "entry" (the run's own entry),
+## "best" ({} = none yet), "line" (the "Best: ..." text), "error" ("" or why the file was not used),
+## "save_failed" (the entry made the board but the file could not be written: see [method record_run])}.
+## [param board] is the board read after the run was recorded ([method load_file]).
+static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringName, p_hardcore: bool,
+		p_party: int, p_rank: int, p_save_failed: bool = false) -> Dictionary:
+	var entries := board.entries_for(p_mode, p_hardcore, p_party)
+	var best: Dictionary = entries[0] if not entries.is_empty() else {}
+	var rank := p_rank if p_rank >= 0 and p_rank < entries.size() and not p_save_failed else -1
+	var line := best_line(best, p_mode, rank)
+	if board.load_error != "":
+		line = "Leaderboard unavailable (%s)" % board.load_error
+	return {
+		"mode": p_mode,
+		"hardcore": p_hardcore,
+		"party": clampi(p_party, PARTY_MIN, PARTY_MAX),
+		"key": category_key(p_mode, p_hardcore, p_party),
+		"category_text": category_text(p_mode, p_hardcore, p_party),
+		"entries": entries,
+		"rank": rank,
+		"entry": entry,
+		"best": best,
+		"line": line,
+		"error": board.load_error,
+		"save_failed": p_save_failed,
+	}
 
 
 # --- Internals --------------------------------------------------------------------------------
@@ -252,11 +357,30 @@ static func _sanitize(raw: Dictionary) -> Dictionary:
 		for e: Variant in raw[key]:
 			if e is Dictionary:
 				list.append(_clean_entry(e))
-		list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return better(a, b, mode))
+		_sort_best_first(list, mode)
 		while list.size() > MAX_ENTRIES:
 			list.pop_back()
 		out[key] = list
 	return out
+
+
+## Sorts [param list] best first, keeping the file's order among equal entries (an equal older entry stays
+## above a newer one, as [method add_entry] put them). Each entry is paired with its index in the file and the
+## index breaks every tie, so the order is total: Array.sort_custom (not stable by itself) gives the stable
+## result in O(n log n) whatever the file holds.
+static func _sort_best_first(list: Array[Dictionary], p_mode: StringName) -> void:
+	var pairs: Array[Dictionary] = []
+	for i in list.size():
+		pairs.append({"entry": list[i], "index": i})
+	pairs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if better(a["entry"], b["entry"], p_mode):
+			return true
+		if better(b["entry"], a["entry"], p_mode):
+			return false
+		return int(a["index"]) < int(b["index"]))
+	for i in pairs.size():
+		var e: Dictionary = pairs[i]["entry"]
+		list[i] = e
 
 
 ## [param e] with exactly the entry fields and their types (missing ones get neutral values; the date

@@ -49,6 +49,8 @@ var banner_label: Label
 var notice_label: Label
 ## "Team Loot: N" (RunState.team_loot); its row is hidden while N is 0.
 var team_loot_label: Label
+## M6b: the HARDCORE badge above the wave line (visible in a hardcore run only).
+var hardcore_badge: HardcoreBadge
 
 var _banner: Control
 var _banner_tween: Tween
@@ -243,6 +245,7 @@ func _build_top() -> void:
 	# Compact (it sits over the far / top part of the playfield): tight line spacing.
 	var col := UiTheme.vbox(-6)
 	plaque.add_child(col)
+	_build_mode_badge(col)
 	wave_label = UiTheme.centered_label(RunState.wave_progress_text(1), UiTheme.GOLD_LABEL, 22)
 	col.add_child(wave_label)
 	wave_tag_label = UiTheme.centered_label("", UiTheme.HEADING, 18, UiTheme.RED)
@@ -273,6 +276,16 @@ func _build_top() -> void:
 	_loot_row.add_child(team_loot_label)
 	_loot_row.visible = false
 	col.add_child(_loot_row)
+
+
+## The HARDCORE badge (M6b MODES) on the first row of the plaque (call it first, right after the column is
+## made): shown in a hardcore run only (the HUD is built for a run after RunState.start_run, so the flag is
+## known), hidden otherwise – it takes no room then.
+func _build_mode_badge(col: VBoxContainer) -> void:
+	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_SMALL - 2)
+	hardcore_badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	hardcore_badge.visible = RunState.hardcore
+	col.add_child(hardcore_badge)
 
 
 ## The boss frame (hidden until a boss wave): name, HP bar, phase pips and the ENRAGED line.
@@ -468,6 +481,7 @@ func _build_notice() -> void:
 # --- RunState ----------------------------------------------------------------------
 
 func _ready() -> void:
+	hardcore_badge.visible = RunState.hardcore
 	RunState.wave_changed.connect(_on_wave_changed)
 	RunState.gold_changed.connect(_on_gold_changed)
 	RunState.xp_changed.connect(_on_xp_changed)

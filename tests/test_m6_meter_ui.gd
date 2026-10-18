@@ -328,9 +328,13 @@ func test_lb_rb_and_left_right_turn_the_page_after_the_input_delay() -> void:
 	UiFakes.tap(screen, pads[1], PlayerInput.Pad.RB)
 	check_eq(screen.page, GameOverScreen.Page.METER, "RB (any player's pad) -> the Damage Meter")
 	UiFakes.tap(screen, pads[0], PlayerInput.Pad.RB)
-	check_eq(screen.page, GameOverScreen.Page.METER, "the end does not wrap")
+	check_eq(screen.page, GameOverScreen.Page.LEADERBOARD, "RB again -> the Leaderboard (M6b)")
+	UiFakes.tap(screen, pads[0], PlayerInput.Pad.RB)
+	check_eq(screen.page, GameOverScreen.Page.LEADERBOARD, "the end does not wrap")
 	UiFakes.tap(screen, pads[0], PlayerInput.Pad.LB)
-	check_eq(screen.page, GameOverScreen.Page.SUMMARY, "LB -> back")
+	check_eq(screen.page, GameOverScreen.Page.METER, "LB -> back")
+	UiFakes.tap(screen, pads[0], PlayerInput.Pad.LB)
+	check_eq(screen.page, GameOverScreen.Page.SUMMARY, "LB -> the Summary")
 	UiFakes.tap(screen, pads[0], PlayerInput.Pad.LB)
 	check_eq(screen.page, GameOverScreen.Page.SUMMARY, "the start does not wrap either")
 	UiFakes.nudge(screen, pads[0], Vector2(1.0, 0.0))
@@ -452,6 +456,29 @@ func test_the_worst_case_meter_page_fits_the_screen() -> void:
 		check(need.y <= 1080.0 - 40.0, "page %d: the panel needs %s px of the 1080" % [page, need.y])
 		check(need.x <= 1920.0 - 40.0, "page %d: and %s px of the 1920 width" % [page, need.x])
 	check_eq(screen.panel.get_combined_minimum_size().x, 1140.0, "the panel keeps its width")
+
+
+## The same worst case in an endless hardcore run: the mode row under the subtitle and a full ten-place board.
+func test_the_worst_case_endless_hardcore_page_fits_the_screen() -> void:
+	RunState.start_run(4, 7, RunState.MODE_ENDLESS, true)
+	_record_worst_case_run()
+	var board := Leaderboard.create("user://unused_board.json")  # (in memory: nothing is read or written)
+	var key := Leaderboard.category_key(RunState.MODE_ENDLESS, true, 4)
+	for i in Leaderboard.MAX_ENTRIES:
+		board.add_entry(Leaderboard.make_entry(40 - i, 1000.0 + i, [&"warrior", &"mage", &"paladin", &"rogue"], false,
+				"2026-10-01 12:00:00"), RunState.MODE_ENDLESS, true, 4)
+	check_eq(board.categories[key].size(), Leaderboard.MAX_ENTRIES, "a full board")
+	var model := Leaderboard.screen_model(board, board.entries_for(RunState.MODE_ENDLESS, true, 4)[0],
+			RunState.MODE_ENDLESS, true, 4, 0)
+	var screen := _screen()
+	screen.open(false, model)
+	check(screen.mode_row.visible and screen.hardcore_badge.visible, "the mode row and the badge are up")
+	check_eq(screen.meter_page.awards_grid.get_child_count(), RunSummary.AWARDS.size(), "all seven awards were won")
+	for page in GameOverScreen.PAGE_NAMES.size():
+		screen.set_page(page as GameOverScreen.Page)
+		var need := screen.panel.get_combined_minimum_size()
+		check(need.y <= 1080.0 - 40.0, "page %d: the panel needs %s px of the 1080" % [page, need.y])
+		check(need.x <= 1920.0 - 40.0, "page %d: and %s px of the 1920 width" % [page, need.x])
 
 
 func test_awards_show_in_co_op_only() -> void:

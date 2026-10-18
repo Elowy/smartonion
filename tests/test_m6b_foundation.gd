@@ -334,7 +334,7 @@ func test_main_clamps_and_ends_by_the_run_length() -> void:
 	check_eq(main.state, Main.State.WAVE, "playing")
 	main.start_wave(120)
 	check_eq(main.wave, 120, "no upper clamp")
-	check_eq(main._wave_cleared_text(25), "Wave cleared!", "no victory banner past 25")
+	check(main._wave_cleared_text(25) != "Victory!", "no victory banner in the endless mode (MODES: \"Endless begins!\")")
 
 
 ## A second Main run in the same test (the first one is torn down).
@@ -1065,10 +1065,10 @@ func test_leaderboard_ranking() -> void:
 	check(Leaderboard.better(far_loss, near_loss, &"normal"), "normal: defeats by the wave reached")
 	check(not Leaderboard.better(slow_win, slow_win, &"normal"), "a tie is not better")
 	var deep := Leaderboard.make_entry(40, 1500.0, [&"mage"], false)
-	var deeper_faster := Leaderboard.make_entry(40, 1400.0, [&"mage"], false)
+	var deep_quick := Leaderboard.make_entry(40, 1400.0, [&"mage"], false)
 	var shallow := Leaderboard.make_entry(30, 900.0, [&"mage"], false)
 	check(Leaderboard.better(deep, shallow, &"endless"), "endless: the higher wave first")
-	check(Leaderboard.better(deeper_faster, deep, &"endless"), "endless: then the shorter time")
+	check(Leaderboard.better(deep, deep_quick, &"endless"), "endless: then the longer time")
 	var e := Leaderboard.make_entry(7, 12.34, [&"warrior", &"mage"], false, "2026-01-01 10:00:00")
 	check_eq(e["classes"], ["warrior", "mage"] as Array[String], "classes as strings")
 	check_near(float(e["time"]), 12.3, 0.0001, "time to 0.1 s")
@@ -1086,8 +1086,9 @@ func test_leaderboard_keeps_the_top_ten_per_category() -> void:
 	check_eq(int(list[9]["wave"]), 14, "the tenth")
 	check_eq(board.add_entry(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"endless", false, 2), -1, "too weak for the board")
 	check_eq(board.entries_for(&"endless", false, 2).size(), 10, "nothing changed")
-	check_eq(board.rank_of(Leaderboard.make_entry(18, 1.0, [&"mage"], false), &"endless", false, 2), 5, "rank_of")
-	check_eq(board.add_entry(Leaderboard.make_entry(18, 1.0, [&"mage"], false), &"endless", false, 2), 5, "inserted in the middle")
+	# Same wave as the 18 above (time 100): the longer time ranks first, so this one goes above it.
+	check_eq(board.rank_of(Leaderboard.make_entry(18, 200.0, [&"mage"], false), &"endless", false, 2), 5, "rank_of")
+	check_eq(board.add_entry(Leaderboard.make_entry(18, 200.0, [&"mage"], false), &"endless", false, 2), 5, "inserted in the middle")
 	check(board.entries_for(&"endless", false, 3).is_empty() and board.entries_for(&"endless", true, 2).is_empty()
 			and board.entries_for(&"normal", false, 2).is_empty(), "other categories are separate")
 	check_eq(board.best_for(&"endless", false, 3), {}, "no best in an empty category")
@@ -1139,7 +1140,7 @@ func test_leaderboard_newer_version_is_never_overwritten() -> void:
 	check_eq(FileAccess.get_file_as_string(TMP_BOARD), future, "the file is untouched")
 	Leaderboard.writes_enabled = true
 	Leaderboard.path_override = TMP_BOARD
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1), -1, "record_run writes nothing")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1)["rank"], -1, "record_run writes nothing")
 	check_eq(FileAccess.get_file_as_string(TMP_BOARD), future, "still untouched")
 
 
@@ -1174,7 +1175,7 @@ func test_an_unreadable_board_file_is_never_overwritten() -> void:
 	check(not FileAccess.file_exists(TMP_BOARD + ".tmp"), "no temporary file was written")
 	Leaderboard.writes_enabled = true
 	Leaderboard.path_override = TMP_BOARD
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1), -1,
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1)["rank"], -1,
 			"record_run writes nothing")
 	check(DirAccess.dir_exists_absolute(TMP_BOARD), "still a directory")
 
@@ -1200,13 +1201,13 @@ func test_leaderboard_record_run_respects_the_write_gate() -> void:
 	Leaderboard.path_override = TMP_BOARD
 	var entry := Leaderboard.make_entry(25, 700.0, [&"warrior"], true)
 	Leaderboard.writes_enabled = false
-	check_eq(Leaderboard.record_run(entry, &"normal", false, 1), -1, "switched off: nothing recorded")
+	check_eq(Leaderboard.record_run(entry, &"normal", false, 1)["rank"], -1, "switched off: nothing recorded")
 	check(not FileAccess.file_exists(TMP_BOARD), "and no file written")
 	Leaderboard.writes_enabled = true
 	check_eq(Leaderboard.default_path(), TMP_BOARD, "path_override replaces the default path")
-	check_eq(Leaderboard.record_run(entry, &"normal", false, 1), 0, "the first entry is the best")
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 650.0, [&"warrior"], true), &"normal", false, 1), 0, "a faster win is the new best")
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 800.0, [&"warrior"], true), &"normal", false, 1), 2, "a slower one is third")
+	check_eq(Leaderboard.record_run(entry, &"normal", false, 1)["rank"], 0, "the first entry is the best")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 650.0, [&"warrior"], true), &"normal", false, 1)["rank"], 0, "a faster win is the new best")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 800.0, [&"warrior"], true), &"normal", false, 1)["rank"], 2, "a slower one is third")
 	var board := Leaderboard.create()
 	board.load_file()
 	check_eq(board.entries_for(&"normal", false, 1).size(), 3, "all three are in the file")

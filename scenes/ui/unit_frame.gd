@@ -35,6 +35,8 @@ const PANEL_ALPHA := 0.8
 const SMALL_FONT := 18
 ## Shown while downed: what a ghost should do (GDD 1 – 1 s in the healer's circle = full HP).
 const GHOST_HINT := "Go to the Spirit Healer"
+## M6b hardcore: the arena has no Spirit Healer, so the ghost waits for a teammate.
+const HARDCORE_HINT := "Only a teammate can revive you"
 const WAITING_HINT := "Spirit Healer: %d s"
 const SICKNESS_HINT := "Resurrection Sickness: %d s"
 ## Hint text and revive bar fill (pale spirit blue while the Spirit Healer channels).
@@ -282,7 +284,8 @@ func _on_downed_changed(is_downed: bool) -> void:
 
 
 ## The ghost hint: Resurrection Sickness time left, else the Spirit Healer's next pulse
-## ("Spirit Healer: 7 s" while waiting in its circle, "Go to the Spirit Healer (7 s)" else).
+## ("Spirit Healer: 7 s" while waiting in its circle, "Go to the Spirit Healer (7 s)" else); in a hardcore
+## run, which has no healer, "Only a teammate can revive you".
 func _update_hint() -> void:
 	var text := GHOST_HINT
 	var color := GHOST_HINT_COLOR
@@ -291,6 +294,8 @@ func _update_hint() -> void:
 	if player.res_sickness_left > 0.0:
 		text = SICKNESS_HINT % ceili(player.res_sickness_left)
 		color = Player.RES_SICKNESS_TEXT_COLOR
+	elif RunState.hardcore:
+		text = HARDCORE_HINT
 	elif healer != null and is_instance_valid(healer):
 		var secs := ceili(maxf(0.0, healer.pulse_left))
 		text = (WAITING_HINT % secs) if player.healer_channel > 0.0 else (GHOST_HINT + " (%d s)" % secs)

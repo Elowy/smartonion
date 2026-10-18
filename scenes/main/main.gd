@@ -84,6 +84,8 @@ const SMOKE_INTERMISSION_ALLOWANCE := 12.0
 ## (90 s), the safety kill after it (WaveDirector.SMOKE_BOSS_GRACE) and the fight's start.
 const SMOKE_BOSS_ALLOWANCE := 90.0 + WaveDirector.SMOKE_BOSS_GRACE + 30.0
 const DISCONNECT_NOTICE := "%s's controller disconnected – plug it back in to continue"
+## The banner of the endless mode's wave 25 clear (RunState.begins_endless): the run goes on.
+const ENDLESS_BEGINS_TEXT := "Endless begins!"
 
 var options: LaunchOptions
 var state := State.BOOT
@@ -125,6 +127,9 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
+## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
+## player who left mid-run (drop_player), the slots no longer have them.
+var run_classes: Array[StringName] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
@@ -176,6 +181,8 @@ func _ready() -> void:
 		OS.add_logger(_error_counter)
 	for arg in options.unknown:
 		push_warning("Main: unknown command line argument '%s'" % arg)
+	if options.leaderboard_path != "":
+		Leaderboard.path_override = options.leaderboard_path
 	_build_layers()
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
@@ -237,9 +244,11 @@ func go_to_lobby() -> void:
 		lobby = Lobby.create()
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
 		lobby.back_requested.connect(_on_lobby_back, CONNECT_DEFERRED)
+		lobby.mode_changed.connect(configure_run)  # the mode select (Y / X) stores the run settings at once
 		_layers[LAYER_MENU].add_child(lobby)
 	else:
 		lobby.reset()
+	lobby.set_run_mode(options.mode, options.hardcore)  # --mode / --hardcore, or what the party chose last time
 	_set_state(State.LOBBY)
 
 
@@ -256,6 +265,9 @@ func start_run() -> void:
 		return
 	RunState.start_run(slots.size(), options.run_seed(), options.mode, options.hardcore, _environment_id())
 	artifact_lines.clear()
+	run_classes.clear()
+	for slot in slots:
+		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
 	RunState.shrine_chance_override = options.shrine_chance
 	RunState.event_override = options.event
@@ -267,7 +279,7 @@ func start_run() -> void:
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
-	first_wave = options.start_wave
+	first_wave = options.clamp_wave(options.start_wave)  # (the lobby may have changed the mode since the parse)
 	wave = 0
 	waves_completed = 0
 	players_downed = 0
@@ -284,7 +296,8 @@ func start_run() -> void:
 	victory = false
 	perf = RunPerf.new()
 
-	arena = Arena.create(Db.environment_or_default(RunState.environment))
+	# Hardcore: no Spirit Healer (only a teammate can revive a downed hero).
+	arena = Arena.create(Db.environment_or_default(RunState.environment), not RunState.hardcore)
 	arena.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(arena)
 	wave_director = WaveDirector.create(arena)
@@ -365,8 +378,8 @@ func start_wave(n: int) -> void:
 	_pause_if_pad_missing()
 
 
-## The next run's mode and hardcore flag (the lobby's mode select calls this; --mode / --hardcore set
-## the same fields at launch). An unknown mode plays as normal.
+## The next run's mode and hardcore flag (the lobby's mode select calls this, through Lobby.mode_changed;
+## --mode / --hardcore set the same fields at launch). An unknown mode plays as normal.
 func configure_run(p_mode: StringName, p_hardcore: bool) -> void:
 	options.mode = p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
 	options.hardcore = p_hardcore
@@ -381,8 +394,11 @@ func _environment_id() -> StringName:
 
 
 ## True when a finished run goes into the leaderboard file (Leaderboard.record_run): not in smoke,
-## demo, screenshot or forced-view runs, whose runs are not the player's.
+## demo, screenshot or forced-view runs, whose runs are not the player's – unless --leaderboard names
+## a file of its own for them.
 func writes_leaderboard() -> bool:
+	if options.leaderboard_path != "":
+		return true
 	return not (options.smoke or options.demo or options.view != "" or options.screenshot_path != "")
 
 
@@ -423,6 +439,7 @@ func end_run(p_victory: bool) -> void:
 		hud.hide()
 	RunState.end_run(p_victory)
 	_record_hero_results()
+	var board := _record_leaderboard(p_victory)
 	_set_state(State.GAME_OVER)
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
@@ -431,11 +448,38 @@ func end_run(p_victory: bool) -> void:
 		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
-		game_over.open(p_victory)
+		game_over.open(p_victory, board)
 	if _smoke_running:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
 		get_tree().create_timer(DEMO_RESTART_DELAY, true).timeout.connect(_on_demo_restart)
+
+
+## The finished run in the leaderboard: its entry (the wave that ended it, the wave play time, the party's
+## classes as the run started ([member run_classes]), victory) goes into the file's category for the run's
+## mode, hardcore flag and party size ([method writes_leaderboard]; Leaderboard.record_run), then the board is
+## read for the end screen
+## (Leaderboard.screen_model: the "Best: ..." line, the top 10 of the category, the run's place). {} when the
+## leaderboard file is off limits: Leaderboard.writes_enabled is false (the unit tests), or a smoke run
+## without a file of its own (--leaderboard) – a smoke run does not even read the player's file.
+func _record_leaderboard(p_victory: bool) -> Dictionary:
+	if not Leaderboard.writes_enabled or (options.smoke and not writes_leaderboard()):
+		return {}
+	var entry := Leaderboard.make_entry(wave, RunState.run_time, run_classes, p_victory)
+	var rank := -1
+	var save_failed := false
+	if writes_leaderboard():
+		var outcome := Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count)
+		rank = int(outcome["rank"])
+		save_failed = bool(outcome["save_failed"])
+	var board := Leaderboard.create()
+	board.load_file()
+	var model := Leaderboard.screen_model(board, entry, RunState.mode, RunState.hardcore, RunState.player_count,
+			rank, save_failed)
+	_log("leaderboard %s: %s" % [model["key"], model["line"]])
+	if save_failed:
+		_log("leaderboard: the run made the board but %s could not be written" % board.path)
+	return model
 
 
 ## How every hero ended the run (standing or down, the best item), taken now because the heroes are
@@ -448,9 +492,12 @@ func _record_hero_results() -> void:
 				RunSummary.best_item(hero.equipment) if valid else null)
 
 
-## Pause Menu "Quit to Menu": abandons the run.
+## Pause Menu "Quit to Menu": abandons the run. An endless run is still a result: it goes into the leaderboard
+## as a defeat on the wave it reached (its wave in progress). A normal run that is quit is not recorded.
 func quit_to_menu() -> void:
 	if arena != null and RunState.active:
+		if RunState.is_endless():
+			_record_leaderboard(false)
 		RunState.end_run(false)
 	go_to_menu()
 
@@ -736,11 +783,13 @@ func _on_wave_cleared(n: int) -> void:
 	_set_state(State.WAVE_END)
 
 
-## The banner of a won wave: "Victory!" after the last one (never in the endless mode), "<Boss>
-## defeated!" after a boss wave, else "Wave cleared!".
+## The banner of a won wave: "Victory!" after the last one (never in the endless mode, whose wave 25 gives
+## "Endless begins!" instead), "<Boss> defeated!" after a boss wave, else "Wave cleared!".
 func _wave_cleared_text(n: int) -> String:
 	if RunState.is_final_wave(n):
 		return "Victory!"
+	if RunState.begins_endless(n):
+		return ENDLESS_BEGINS_TEXT
 	# (The boss itself may be freed by now: the definition stays.)
 	if wave_director != null and wave_director.boss_data != null:
 		return "%s defeated!" % wave_director.boss_data.display_name
