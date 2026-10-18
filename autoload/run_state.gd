@@ -215,10 +215,16 @@ var shrine_effects: Array[Dictionary] = []
 var portal_pending := false
 
 
+## The environment roll (ENV package): a run started with an empty environment takes
+## [method roll_environment] (the seed-derived roll). [member environment_roller] stands in for the
+## roll body when set (tests and the ENV package's own hooks).
+static var environment_roller: Callable
+
 ## [param p_mode] (MODE_NORMAL / MODE_ENDLESS; anything else plays as normal), [param p_hardcore]
-## and [param p_environment] (an id of Db.environments) are the M6b run settings.
+## and [param p_environment] (an id of Db.environments, or &"" = rolled by [method roll_environment]
+## once the run seed and [member environment_rng] are set) are the M6b run settings.
 func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = MODE_NORMAL,
-		p_hardcore: bool = false, p_environment: StringName = DEFAULT_ENVIRONMENT) -> void:
+		p_hardcore: bool = false, p_environment: StringName = &"") -> void:
 	active = true
 	victory = false
 	wave = 0
@@ -234,11 +240,11 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	run_seed = rng.seed
 	mode = p_mode if p_mode in MODES else MODE_NORMAL
 	hardcore = p_hardcore
-	environment = p_environment if p_environment != &"" else DEFAULT_ENVIRONMENT
 	environment_rng = sub_rng(SALT_ENVIRONMENT)
 	event_rng = sub_rng(SALT_EVENTS)
 	shrine_rng = sub_rng(SALT_SHRINES)
 	dungeon_rng = sub_rng(SALT_DUNGEON)
+	environment = p_environment if p_environment != &"" else roll_environment()
 	shrine_chance_override = -1.0
 	event_override = &""
 	dungeon_forced = false
@@ -407,6 +413,15 @@ func sub_rng(salt: int) -> RandomNumberGenerator:
 	var r := RandomNumberGenerator.new()
 	r.seed = derived_seed(run_seed, salt)
 	return r
+
+
+## The environment of a run that was started without one (start_run calls it after run_seed and
+## environment_rng are set). The ENV package replaces the body; it draws from [member environment_rng]
+## only, never from [member rng]. Until then it returns the Forest Ruin without drawing.
+func roll_environment() -> StringName:
+	if environment_roller.is_valid():
+		return environment_roller.call() as StringName
+	return DEFAULT_ENVIRONMENT
 
 
 # --- Shared wallet -----------------------------------------------------------

@@ -63,6 +63,7 @@ var _path_before := ""
 
 func before_each() -> void:
 	UiFakes.reset_players()
+	RunState.environment_roller = Callable()
 	RunState.start_run(1, 4242)
 	tree.paused = false
 	_writes_before = Leaderboard.writes_enabled
@@ -71,6 +72,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	RunState.environment_roller = Callable()
 	Leaderboard.writes_enabled = _writes_before
 	Leaderboard.path_override = _path_before
 	_remove_board_files()
@@ -391,6 +393,66 @@ func test_a_random_run_seed_is_recorded() -> void:
 	var r := RandomNumberGenerator.new()
 	r.seed = RunState.run_seed
 	check_eq(r.randi(), RunState.rng.randi(), "re-seeding with run_seed reproduces the gameplay stream")
+
+
+# --- The environment roll ------------------------------------------------------------------
+
+## A roller that records what it saw (the run seed, environment_rng's seed, the calls) and returns [param id].
+func _roller_returning(id: StringName, seen: Dictionary) -> Callable:
+	return func() -> StringName:
+		seen["calls"] = int(seen.get("calls", 0)) + 1
+		seen["run_seed"] = RunState.run_seed
+		seen["env_seed"] = RunState.environment_rng.seed
+		return id
+
+
+func test_an_empty_environment_takes_the_roller_result() -> void:
+	var seen := {}
+	RunState.environment_roller = _roller_returning(&"dusk_marsh", seen)
+	RunState.start_run(1, 4242)
+	check_eq(seen.get("calls", 0), 1, "the roller runs once per run")
+	check_eq(RunState.environment, &"dusk_marsh", "an empty environment is the roller's result")
+	check_eq(seen.get("run_seed", -1), 4242, "the roll runs after run_seed is set")
+	check_eq(seen.get("env_seed", -1), RunState.derived_seed(4242, RunState.SALT_ENVIRONMENT),
+			"the roll runs after environment_rng is set")
+	RunState.start_run(1, 4242, RunState.MODE_NORMAL, false, &"")
+	check_eq(RunState.environment, &"dusk_marsh", "the same empty argument rolls again")
+	check_eq(seen.get("calls", 0), 2, "each run rolls once")
+
+
+func test_the_roll_without_a_roller_is_the_forest() -> void:
+	RunState.start_run(1, 4242)
+	check_eq(RunState.environment, &"forest_ruin", "no roller: the Forest Ruin, without drawing")
+
+
+func test_a_forced_environment_wins_over_the_roll() -> void:
+	var seen := {}
+	RunState.environment_roller = _roller_returning(&"dusk_marsh", seen)
+	var opts := LaunchOptions.new()
+	opts.environment = &"forest_ruin"
+	_run_with_bots(1, opts)
+	check_eq(RunState.environment, &"forest_ruin", "--env forces the environment")
+	check_eq(seen.get("calls", 0), 0, "the roll does not run when --env forces one")
+
+
+func test_main_rolls_when_no_environment_is_forced() -> void:
+	var seen := {}
+	RunState.environment_roller = _roller_returning(&"forest_ruin", seen)
+	_run_with_bots(1, LaunchOptions.new())
+	check_eq(seen.get("calls", 0), 1, "Main passes an empty environment, so the run rolls")
+	check_eq(RunState.environment, &"forest_ruin", "the run takes the roll")
+
+
+func test_the_environment_roll_never_touches_the_gameplay_rng() -> void:
+	var ref := RandomNumberGenerator.new()
+	ref.seed = 77
+	RunState.environment_roller = func() -> StringName:
+		return &"dusk_marsh" if RunState.environment_rng.randi() % 2 == 0 else &"forest_ruin"
+	RunState.start_run(1, 77)
+	check_eq(RunState.rng.state, ref.state, "the roll leaves the gameplay rng at its seed")
+	check_eq(RunState.rng.randi(), ref.randi(), "the gameplay stream is the plain seeded one")
+	check(RunState.environment_rng.state != RunState.sub_rng(RunState.SALT_ENVIRONMENT).state,
+			"the roll drew from environment_rng")
 
 
 # --- Arena / EnvironmentData ------------------------------------------------------------------

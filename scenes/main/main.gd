@@ -372,13 +372,12 @@ func configure_run(p_mode: StringName, p_hardcore: bool) -> void:
 	options.hardcore = p_hardcore
 
 
-## The environment of the next run: --env when given, else the default (Forest Ruin). The ENV package
-## replaces the default with the roll (RunState.environment_rng is seeded in RunState.start_run, so a
-## roll before the run takes its seed from RunState.derived_seed).
+## The environment argument of RunState.start_run: --env when given (and known), else &"" so the run
+## rolls its own environment (RunState.roll_environment, after its run seed and environment_rng exist).
 func _environment_id() -> StringName:
 	if options.environment != &"" and Db.get_environment(options.environment) != null:
 		return options.environment
-	return RunState.DEFAULT_ENVIRONMENT
+	return &""
 
 
 ## True when a finished run goes into the leaderboard file (Leaderboard.record_run): not in smoke,
