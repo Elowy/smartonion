@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"wasp_nest_charm"
+display_name = "Wasp-Nest Charm"
+flavor = "Still humming. Not in a friendly way."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"crit": 3.0,
+&"haste": 2.0
+})
+class_restriction = &""
+unique_effect = &"dot"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 5.0,
+"icd": 0.5,
+"damage": 16.0,
+"duration": 4.0,
+"stacks": 3,
+"school": "nature"
+}
+unique_text = "Chance on hit: A swarm stings the target for 16 Nature damage over 4 sec. Stacks up to 3 times."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

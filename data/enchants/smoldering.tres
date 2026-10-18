@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"smoldering"
+prefix = "Smoldering"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 1.0
+equip_stats = Dictionary[StringName, float]({})
+effect = &"dot"
+params = {
+"damage": 14.0,
+"duration_fixed": 4.0,
+"stacks_fixed": 2.0
+}
+ppm = 4.0
+chance = 0.0
+icd = 0.5
+school = &"fire"
+description = "Chance on hit: Sets the target alight for {damage} Fire damage over {duration_fixed} sec. Stacks up to {stacks_fixed} times."

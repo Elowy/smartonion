@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"rallying"
+prefix = "Rallying"
+kind = 3
+slot_types = Array[int]([0, 2, 3, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 0.9
+equip_stats = Dictionary[StringName, float]({})
+effect = &"heal"
+params = {
+"max_hp_pct": 4.0
+}
+ppm = 0.0
+chance = 12.0
+icd = 6.0
+school = &"holy"
+description = "When struck: 12% chance to restore {max_hp_pct}% of your Max HP."

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"singing_bowl"
+display_name = "Singing Bowl"
+flavor = "Hum along. It helps."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"stamina": 4.0,
+&"resource_regen": 3.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "periodic",
+"interval": 15.0,
+"amount": 0.0,
+"max_hp_pct": 8.0,
+"duration": 8.0
+}
+unique_text = "Every 15 sec: A resonant ward absorbs 8% of your Max HP for 8 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

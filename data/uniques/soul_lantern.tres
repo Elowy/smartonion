@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"soul_lantern"
+display_name = "Soul Lantern"
+flavor = "Burns on borrowed light."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"spirit": 3.0,
+&"stamina": 3.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "on_kill",
+"chance": 12.0,
+"icd": 4.0,
+"amount": 0.0,
+"max_hp_pct": 8.0,
+"duration": 6.0
+}
+unique_text = "On kill: 12% chance to gain a shield absorbing 8% of your Max HP for 6 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

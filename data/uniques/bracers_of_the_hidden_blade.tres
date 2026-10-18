@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bracers_of_the_hidden_blade"
+display_name = "Bracers of the Hidden Blade"
+flavor = "The sleeve hides it. The bracer makes it quick."
+slot_type = 4
+armor_type = 1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"agility": 6.0,
+&"crit": 5.0,
+&"haste": 4.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 5.0,
+"icd": 0.5,
+"damage": 14.0,
+"hit_pct": 120.0,
+"school": "physical"
+}
+unique_text = "Chance on hit: A hidden blade strikes the target for 120% of the hit as Physical damage."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

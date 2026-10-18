@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ashfall_feather"
+display_name = "Ashfall Feather"
+flavor = "It has burned out and come back more times than anyone can count."
+slot_type = 10
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"stamina": 6.0,
+&"spirit": 3.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 30.0,
+"per_wave": 1,
+"amount": 0.0,
+"max_hp_pct": 25.0,
+"target": "self"
+}
+unique_text = "Equip: When you fall below 30% health, heal for 25% of your Max HP. Once per wave."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

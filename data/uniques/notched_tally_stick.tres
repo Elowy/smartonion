@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"notched_tally_stick"
+display_name = "Notched Tally Stick"
+flavor = "It counts every one. Loudly."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"crit": 3.0,
+&"haste": 2.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "on_kill",
+"chance": 100.0,
+"stats": {
+&"damage_pct": 1.0
+},
+"duration": 8.0,
+"max_stacks": 8
+}
+unique_text = "On kill: Grants 1% Damage for 8 sec. Stacks up to 8 times."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

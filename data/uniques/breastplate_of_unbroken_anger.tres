@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"breastplate_of_unbroken_anger"
+display_name = "Breastplate of Unbroken Anger"
+flavor = "Every dent is a grudge."
+slot_type = 3
+armor_type = 3
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"strength": 10.0,
+&"stamina": 10.0,
+&"crit": 5.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "when_struck",
+"chance": 40.0,
+"icd": 0.5,
+"stats": {
+&"damage_pct": 4.0
+},
+"duration": 8.0,
+"max_stacks": 6
+}
+unique_text = "When struck: 40% chance to gain 4% Damage for 8 sec. Stacks up to 6 times."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

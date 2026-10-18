@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"jar_of_leeches"
+display_name = "Jar of Leeches"
+flavor = "They are very hungry. And very polite about it."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"leech": 1.0,
+&"stamina": 2.0
+})
+class_restriction = &""
+unique_effect = &"drain"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 4.0,
+"icd": 1.0,
+"damage": 7.0,
+"school": "shadow"
+}
+unique_text = "Chance on hit: Leeches drain 7 Shadow damage from the target, healing you for the same amount."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

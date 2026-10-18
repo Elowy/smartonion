@@ -94,7 +94,7 @@ func test_the_named_weapons_of_the_gdd() -> void:
 func test_artifacts_stay_out_of_the_normal_pools() -> void:
 	for id in Db.uniques:
 		check(Db.uniques[id].rarity != Items.Rarity.ARTIFACT, "%s is no Artifact" % id)
-	check_eq(Db.uniques.size(), 63, "the 63 hand-made items are unchanged")
+	check_eq(Db.uniques.size(), 100, "the 63 hand-made items of M6a + 20 trinkets + 17 Legendaries (M6b CONTENT-FX)")
 	for id in Db.artifacts:
 		check(not ItemGenerator.unique_available(Db.artifacts[id], ItemGenerator.Source.BOSS, 25),
 				"%s is never a hand-made roll" % id)

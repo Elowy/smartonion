@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fortifying"
+prefix = "Fortifying"
+kind = 3
+slot_types = Array[int]([0, 2, 3, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 0.9
+equip_stats = Dictionary[StringName, float]({})
+effect = &"buff"
+params = {
+"armor": 4.0,
+"duration_fixed": 5.0
+}
+ppm = 0.0
+chance = 15.0
+icd = 8.0
+school = &"physical"
+description = "When struck: 15% chance to gain +{armor} Armor for {duration_fixed} sec."

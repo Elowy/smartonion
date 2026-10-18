@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"beetle_carapace"
+display_name = "Beetle Carapace"
+flavor = "Molted, polished, and mildly offended."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"armor": 2.0,
+&"stamina": 3.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "when_struck",
+"chance": 15.0,
+"icd": 6.0,
+"stats": {
+&"armor": 8.0
+},
+"duration": 5.0
+}
+unique_text = "When struck: 15% chance to gain 8 Armor for 5 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

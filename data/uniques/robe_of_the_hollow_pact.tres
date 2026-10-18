@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"robe_of_the_hollow_pact"
+display_name = "Robe of the Hollow Pact"
+flavor = "They said you would not miss a little piece of your soul."
+slot_type = 3
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 10.0,
+&"stamina": 10.0,
+&"shadow_damage": 10.0,
+&"spirit": 2.0
+})
+class_restriction = &""
+unique_effect = &"drain"
+unique_params = {
+"trigger": "when_struck",
+"chance": 20.0,
+"icd": 2.0,
+"damage": 24.0,
+"school": "shadow"
+}
+unique_text = "When struck: 20% chance to drain 24 Shadow damage from the attacker, healing you for the same amount."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

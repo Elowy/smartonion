@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"warbeat_drum"
+display_name = "Warbeat Drum"
+flavor = "Played by someone with no sense of rhythm and a great deal of conviction."
+slot_type = 10
+armor_type = -1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"haste": 4.0,
+&"mastery": 4.0,
+&"stamina": 3.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 6.0,
+"icd": 0.5,
+"stats": {
+&"haste": 4.0
+},
+"duration": 6.0,
+"max_stacks": 5
+}
+unique_text = "Chance on hit: The drum beats, granting 4% Haste for 6 sec. Stacks up to 5 times."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

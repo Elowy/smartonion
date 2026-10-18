@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"greathelm_of_the_gilded_oath"
+display_name = "Greathelm of the Gilded Oath"
+flavor = "Sworn on the third layer, where promises hold best."
+slot_type = 0
+armor_type = 3
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"stamina": 9.0,
+&"holy_damage": 12.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "periodic",
+"interval": 8.0,
+"amount": 0.0,
+"max_hp_pct": 12.0,
+"target": "lowest_ally"
+}
+unique_text = "Every 8 sec: Your oath mends the most wounded ally for 12% of their Max HP."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

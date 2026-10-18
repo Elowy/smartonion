@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"gloves_of_the_patient_rot"
+display_name = "Gloves of the Patient Rot"
+flavor = "Rot is just time with a plan."
+slot_type = 5
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 8.0,
+&"shadow_damage": 12.0,
+&"haste": 4.0
+})
+class_restriction = &""
+unique_effect = &"dot"
+unique_params = {
+"trigger": "periodic",
+"interval": 6.0,
+"damage": 40.0,
+"duration": 5.0,
+"stacks": 1,
+"school": "shadow",
+"spread": 3.0
+}
+unique_text = "Every 6 sec: Sows rot in the nearest enemy for 40 Shadow damage over 5 sec. It spreads within 3 m when the host dies."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0
