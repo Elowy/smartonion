@@ -19,6 +19,10 @@ signal finished
 signal roll_resolved(roll: LootRoll)
 
 enum Phase { IDLE, CHOOSING, RESULT, DONE }
+## How much of the "Loot Roll" title block is shown: the full one (title and subtitle), a compact
+## single line (smaller title, no subtitle) or none. A tall item tooltip collapses it before it is
+## scaled down ([method _fit_tooltip]).
+enum TitleMode { FULL, COMPACT, HIDDEN }
 
 ## GDD 10.1: seconds to decide per item; undecided players pass.
 const ROLL_TIME := 15.0
@@ -29,22 +33,32 @@ const ITEM_INPUT_DELAY := 0.25
 const LOG_LINES := 16
 const QUEUE_SHOWN := 7
 const CHIP_SIZE := Vector2(290, 96)
-## The window's middle row (queue, frame, log) is centred this far above the screen's middle.
-const MIDDLE_OFFSET := -70.0
+## Top of the title block ("Loot Roll" and its subtitle) below the screen's top edge.
+const TITLE_TOP := 22.0
+## The compact title block: one line of this font size (the title is 60 px in the full block), this
+## far below the screen's top edge.
+const COMPACT_TITLE_FONT := 32
+const COMPACT_TITLE_TOP := 8.0
+const FULL_TITLE_FONT := 60
 ## Gap below the player chips row to the screen's bottom edge.
 const BOTTOM_MARGIN := 24.0
-## The item frame keeps this far from the screen's top edge and from the chips (its stone border
-## would otherwise touch them).
+## The item frame keeps this far from the screen's top edge, below the title block and above the
+## chips (its stone border would otherwise touch them). The window's middle row (queue, frame,
+## log) is centred in the band between those limits ([method frame_band]).
 const FRAME_TOP_MARGIN := 8.0
+const FRAME_TITLE_GAP := 8.0
 const FRAME_CHIPS_GAP := 8.0
 ## Room kept in the frame for a winner line of two lines (a long Greed result wraps): the frame
 ## grows by that when the timer bar gives way to the result.
 const RESULT_RESERVE := 48.0
 ## Widths the item tooltip may take, its normal one first: a tall one (an Artifact with its two
-## property blocks) is made wider – fewer wrapped lines – before it is scaled down to the room.
-const TOOLTIP_WIDTHS: Array[float] = [ItemTooltip.WIDTH, 480.0, 600.0]
+## property blocks, a set piece with its bonuses) is made wider – fewer wrapped lines – before it is
+## scaled down to the room. The frame grows with the tooltip (it is 700 px wide at least).
+const TOOLTIP_WIDTHS: Array[float] = [ItemTooltip.WIDTH, 480.0, 600.0, 720.0]
 ## The tooltip is never scaled below this (a window far too small for it overflows instead).
 const MIN_TOOLTIP_FIT := 0.5
+## Collapsing the title block is tried in this order, before the tooltip is scaled down.
+const TITLE_MODES: Array[TitleMode] = [TitleMode.FULL, TitleMode.COMPACT, TitleMode.HIDDEN]
 
 ## Seconds a bot "thinks" before deciding (0 = at once; demo mode slows bots down a little
 ## so the ticks can be watched).
@@ -79,6 +93,8 @@ var frame: PanelContainer
 var tooltip: ItemTooltip
 ## The scale the tooltip was fitted to the room with (1 = as it is; see [method _fit_tooltip]).
 var tooltip_fit := 1.0
+## How much of the title block the current item leaves visible (see [enum TitleMode]).
+var title_mode := TitleMode.FULL
 var timer_bar: UiBar
 var result_label: RichTextLabel
 var chips_row: HBoxContainer
@@ -100,6 +116,8 @@ var _legend_pass := ""
 var _legend_built := false
 var _queue_box: VBoxContainer
 var _backdrop: TextureRect
+var _top: VBoxContainer
+var _middle: HBoxContainer
 var _bottom: VBoxContainer
 var _tip_holder: CenterContainer
 ## Holds the (scaled) tooltip at the size it is drawn at, so the frame measures that.
@@ -475,24 +493,24 @@ func _build() -> void:
 	add_child(_backdrop)
 
 	var top := UiTheme.vbox(0)
+	_top = top
 	top.anchor_left = 0.5
 	top.anchor_right = 0.5
 	top.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top.offset_top = 22
+	top.offset_top = TITLE_TOP
 	add_child(top)
-	title_label = UiTheme.centered_label("Loot Roll", UiTheme.TITLE, 60)
+	title_label = UiTheme.centered_label("Loot Roll", UiTheme.TITLE, FULL_TITLE_FONT)
 	top.add_child(title_label)
 	subtitle_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY)
 	top.add_child(subtitle_label)
 
 	var middle := UiTheme.hbox(26)
+	_middle = middle
 	middle.alignment = BoxContainer.ALIGNMENT_CENTER
 	middle.anchor_right = 1.0
 	middle.anchor_top = 0.5
 	middle.anchor_bottom = 0.5
 	middle.grow_vertical = Control.GROW_DIRECTION_BOTH
-	middle.offset_top = MIDDLE_OFFSET
-	middle.offset_bottom = MIDDLE_OFFSET
 	add_child(middle)
 	middle.add_child(_build_queue())
 	middle.add_child(_build_frame())
@@ -674,34 +692,104 @@ func _fill_item() -> void:
 	_fill_queue()
 
 
-## The tallest the item tooltip may be so the frame stays on screen and clear of the player chips
-## (at the 1920 x 1080 design size; the winner line's room included): the frame is centred on the
-## middle row's line, between FRAME_TOP_MARGIN and FRAME_CHIPS_GAP above the chips; what is not
-## the tooltip (head, dividers, timer bar, margins) is measured, not assumed.
-func tooltip_room() -> float:
+## Shows [param mode] of the title block (see [enum TitleMode]): the full one, one smaller line
+## without the subtitle, or nothing.
+func set_title_mode(mode: TitleMode) -> void:
+	title_mode = mode
+	_top.visible = mode != TitleMode.HIDDEN
+	subtitle_label.visible = mode == TitleMode.FULL
+	title_label.add_theme_font_size_override(&"font_size",
+		FULL_TITLE_FONT if mode == TitleMode.FULL else COMPACT_TITLE_FONT)
+	_top.offset_top = TITLE_TOP if mode == TitleMode.FULL else COMPACT_TITLE_TOP
+
+
+## The bottom edge of the title block as laid out now (0 when it is hidden).
+func title_bottom() -> float:
+	if title_mode == TitleMode.HIDDEN:
+		return 0.0
+	return _top.offset_top + _top.get_combined_minimum_size().y
+
+
+## The vertical band (top, bottom in screen pixels at the current height) the item frame may fill:
+## FRAME_TITLE_GAP below the title block (as shown now – the frame is as wide as the title, so it
+## must not cover it) and FRAME_CHIPS_GAP above the player chips; never above FRAME_TOP_MARGIN.
+func frame_band() -> Vector2:
+	var view_h := _view_height()
+	var chips_top := view_h - BOTTOM_MARGIN - _bottom.get_combined_minimum_size().y
+	var top := FRAME_TOP_MARGIN
+	if title_mode != TitleMode.HIDDEN:
+		top = maxf(top, title_bottom() + FRAME_TITLE_GAP)
+	return Vector2(top, chips_top - FRAME_CHIPS_GAP)
+
+
+func _view_height() -> float:
 	var view_h := size.y
 	if view_h <= 0.0:
 		view_h = get_viewport_rect().size.y if is_inside_tree() else float(ProjectSettings.get_setting("display/window/size/viewport_height", 1080))
-	var centre := view_h * 0.5 + MIDDLE_OFFSET
-	var chips_top := view_h - BOTTOM_MARGIN - _bottom.get_combined_minimum_size().y
-	var frame_h := 2.0 * minf(centre - FRAME_TOP_MARGIN, chips_top - FRAME_CHIPS_GAP - centre)
+	return view_h
+
+
+## Centres the middle row (queue, frame, log) in [method frame_band], so the frame has the most
+## room under the title and above the chips.
+func _centre_middle_row() -> void:
+	var view_h := _view_height()
+	var band := frame_band()
+	var offset := (band.x + band.y) * 0.5 - view_h * 0.5
+	_middle.offset_top = offset
+	_middle.offset_bottom = offset
+
+
+## The tallest the item tooltip may be so the frame stays on screen, below the title block (as
+## shown now) and clear of the player chips (at the 1920 x 1080 design size; the winner line's room
+## included): the frame fills [method frame_band] at most; what is not the tooltip (head, dividers,
+## timer bar, margins) is measured, not assumed.
+func tooltip_room() -> float:
+	var band := frame_band()
+	var frame_h := band.y - band.x
 	var chrome := frame.get_combined_minimum_size().y - _tip_holder.get_combined_minimum_size().y
 	return frame_h - chrome - RESULT_RESERVE
 
 
-## Fits the tooltip into [method tooltip_room]: its normal width first, then the wider ones
-## (TOOLTIP_WIDTHS: fewer wrapped lines), and only when even the widest is too tall it is scaled
-## down (not below MIN_TOOLTIP_FIT). The holder takes the size it is drawn at.
-func _fit_tooltip() -> void:
+## The tooltip room with [param mode] of the title block shown (the title block stays as it was).
+func _room_with_title(mode: TitleMode) -> float:
+	var before := title_mode
+	set_title_mode(mode)
 	var room := tooltip_room()
-	var height := 0.0
+	set_title_mode(before)
+	return room
+
+
+## Fits the tooltip into the room. The order of what gives way: the full title block collapses
+## first (the compact line, then none – [enum TitleMode]), with the tooltip's normal width and then
+## the wider ones (TOOLTIP_WIDTHS: fewer wrapped lines) tried at each step, so an ordinary item is
+## never shown smaller because of the title; only when even the widest tooltip does not fit with no
+## title it is scaled down (not below MIN_TOOLTIP_FIT). The holder takes the size it is drawn at.
+func _fit_tooltip() -> void:
+	var heights: Array[float] = []
 	for width in TOOLTIP_WIDTHS:
 		tooltip.custom_minimum_size.x = width
 		tooltip.layout_now()
-		height = tooltip.get_combined_minimum_size().y
-		if height <= room:
+		heights.append(tooltip.get_combined_minimum_size().y)
+	var mode: TitleMode = TITLE_MODES[0]
+	var pick := heights.size() - 1
+	var fits := false
+	for m in TITLE_MODES:
+		mode = m
+		var room := _room_with_title(m)
+		for i in heights.size():
+			if heights[i] <= room:
+				pick = i
+				fits = true
+				break
+		if fits:
 			break
-	tooltip_fit = clampf(room / maxf(1.0, height), MIN_TOOLTIP_FIT, 1.0)
+	set_title_mode(mode)
+	_centre_middle_row()
+	var room := tooltip_room()
+	tooltip.custom_minimum_size.x = TOOLTIP_WIDTHS[pick]
+	tooltip.layout_now()
+	var height := tooltip.get_combined_minimum_size().y
+	tooltip_fit = 1.0 if fits else clampf(room / maxf(1.0, height), MIN_TOOLTIP_FIT, 1.0)
 	tooltip.scale = Vector2.ONE * tooltip_fit
 	tooltip.position = Vector2.ZERO
 	_tip_box.custom_minimum_size = tooltip.size * tooltip_fit
