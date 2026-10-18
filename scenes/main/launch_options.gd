@@ -40,7 +40,7 @@ extends RefCounted
 ##   --env=ID             M6b: forces the arena environment (an id of Db.environments, e.g.
 ##                        forest_ruin) instead of the roll
 ##   --event=ID           M6b debug hook: every eligible wave gets that mid-wave event (guarded_chest,
-##                        defend_totem, goblin_caravan; RunState.event_override)
+##                        defend_totem, goblin_caravan – or chest, totem, caravan; RunState.event_override)
 ##   --shrine-chance=X    M6b debug hook: the chance of a shrine at every break (0..1;
 ##                        RunState.shrine_chance_override; default: the normal chance)
 ##   --dungeon[=1]        M6b debug hook: the dungeon portal opens after the next wave
@@ -195,8 +195,9 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				else:
 					o.unknown.append(arg)
 			"--event":
-				if StringName(value) in EventSpawner.EVENT_IDS:
-					o.event = StringName(value)
+				var event_id := EventSpawner.parse_id(value)
+				if event_id != &"":
+					o.event = event_id
 				else:
 					o.unknown.append(arg)
 			"--shrine-chance":
