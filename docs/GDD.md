@@ -699,7 +699,8 @@ Az Artifact-dobás **ölésenként** történik, a normál loot-dobás után, é
   százalékpont a következő boss-esélyhez; egy boss egyetlen lépés); bármelyik Artifact-drop
   nullázza. A többi forrást nem érinti.
 - **Várható Artifact egy teljes (25 hullámos) menetben** (Fortune 0, számított érték; a
-  40. szintű bot-futások – 1 fő 5, 4 fő 4 Artifact – egyeznek vele):
+  40. szintű bot-futások – 1 fő 5, 4 fő 4 Artifact – összhangban vannak vele; egy-egy futás
+  nem bizonyíték, a 2 fős futás pedig a 20. hullámon vereséggel ért véget):
 
   | Játékosok | Normál ölés (10–25. hullám) | Várt találat: normál / elit / boss / goblin | Összesen | Várt Artifact (max. 5) | Osztás nélkül |
   |---|---|---|---|---|---|
@@ -2793,5 +2794,5 @@ késői kasszát az M6a goldsinkjei célozták (16.1).
 | M6 felosztása | M6a (rendszerek: ellenségek, bossok, Artifactok, Enchanter, goldsinkek, Damage Meter) és M6b (módok, környezetek, események, Dungeon-portál, tartalom-csomagok, végleges balansz) – 16. fejezet |
 | Arcane Dust | A csapat második közös pénzneme; Disenchantból és a mindenki által Passolt itemekből jön, az Enchanter költi (5.7) |
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
-| Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1–4 játékosnál ≈ 2,6–2,9 menetenként (5.5) |
+| Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
 | Vor'thalax | Alap HP 450, érintéses sebzés 1,5, a boss HP-ja ×(1 + 2 × (játékosok − 1)); a Flesh Golem érintéses sebzése 2,5 (8. fejezet) |
