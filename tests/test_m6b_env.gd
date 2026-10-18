@@ -117,6 +117,14 @@ func _make_main(opts: LaunchOptions = null) -> Main:
 	return main
 
 
+## Gives a roll screen a fixed 1920 x 1080 rect (anchored to the top left: a full-rect anchored Control
+## would have its size overridden by its parent).
+func _fit(screen: Control) -> void:
+	screen.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+	screen.position = Vector2.ZERO
+	screen.size = Vector2(1920, 1080)
+
+
 func _free_main() -> void:
 	if main != null and is_instance_valid(main):
 		main._teardown_run()
@@ -918,7 +926,7 @@ func test_the_roll_screen_runs_a_reel_that_lands_on_the_winner() -> void:
 	var screen := EnvironmentRollScreen.create(&"swamp")
 	tree.root.add_child(screen)
 	nodes.append(screen)
-	screen.size = Vector2(1920, 1080)
+	_fit(screen)
 	var n := Db.environment_ids.size()
 	check_eq(screen.cards.size(), EnvironmentRollScreen.CYCLES * n, "the list repeated")
 	check_eq(screen.target_index() % n, Db.environment_ids.find(&"swamp"), "the target card is the winner")
@@ -965,13 +973,13 @@ func test_the_roll_screen_lands_on_each_environment_and_can_be_skipped() -> void
 		var screen := EnvironmentRollScreen.create(id)
 		tree.root.add_child(screen)
 		nodes.append(screen)
-		screen.size = Vector2(1920, 1080)
+		_fit(screen)
 		screen.step(EnvironmentRollScreen.SPIN_TIME + 0.01)
 		check_eq(screen.card_under_marker(), id, "lands on %s" % id)
 	var s := EnvironmentRollScreen.create(&"volcano")
 	tree.root.add_child(s)
 	nodes.append(s)
-	s.size = Vector2(1920, 1080)
+	_fit(s)
 	s.step(0.3)
 	var done := []
 	s.finished.connect(func(e: StringName) -> void: done.append(e))
@@ -988,7 +996,7 @@ func test_a_players_a_press_skips_the_spin_after_the_grace_time() -> void:
 	var screen := EnvironmentRollScreen.create(&"cemetery")
 	tree.root.add_child(screen)
 	nodes.append(screen)
-	screen.size = Vector2(1920, 1080)
+	_fit(screen)
 	UiFakes.tap(screen, pad, PlayerInput.Pad.A, 0.1)
 	check(screen.is_spinning(), "a press right at the start is ignored (the press that readied the lobby)")
 	UiFakes.step(screen, 1.0)
@@ -997,7 +1005,7 @@ func test_a_players_a_press_skips_the_spin_after_the_grace_time() -> void:
 	var s2 := EnvironmentRollScreen.create(&"cemetery")
 	tree.root.add_child(s2)
 	nodes.append(s2)
-	s2.size = Vector2(1920, 1080)
+	_fit(s2)
 	UiFakes.step(s2, 1.0)
 	UiFakes.tap(s2, pad, PlayerInput.Pad.START, 0.05)
 	check_eq(s2.phase, EnvironmentRollScreen.Phase.HOLD, "START skips too")
@@ -1020,7 +1028,7 @@ func test_the_lobby_start_plays_the_roll_screen_and_then_the_run_with_the_same_e
 	check(main.roll_screen == screen, "one screen")
 	var winner := screen.winner
 	check_eq(winner, RunState.environment_for_seed(2024), "it shows the environment of the run seed")
-	screen.size = Vector2(1920, 1080)
+	_fit(screen)
 	screen.step(EnvironmentRollScreen.SPIN_TIME + 0.1)
 	screen.step(EnvironmentRollScreen.HOLD_TIME + 0.1)
 	# (the run starts from the deferred signal; drive it directly)
@@ -1102,7 +1110,7 @@ func test_the_roll_view_flag_boots_the_lobby_and_opens_the_screen() -> void:
 	_make_main(opts)
 	check(main.roll_screen != null, "the screen opens at boot")
 	check_eq(main.roll_screen.winner, &"ice_cave", "on the forced environment")
-	main.roll_screen.size = Vector2(1920, 1080)
+	_fit(main.roll_screen)
 	main.roll_screen.step(EnvironmentRollScreen.SPIN_TIME + EnvironmentRollScreen.HOLD_TIME + 0.2)
 	main._on_roll_finished(&"ice_cave")
 	check_eq(main.state, Main.State.LOBBY, "a forced view never starts the run")
