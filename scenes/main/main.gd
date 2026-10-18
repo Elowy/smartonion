@@ -1259,7 +1259,7 @@ func _finish_smoke(result: String) -> void:
 	for line in meter_lines(data["meter"]):
 		print("SMOKE meter " + line)
 	print("SMOKE_RESULT " + JSON.stringify(data))
-	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
+	_quit(0 if String(data["result"]) == "completed" and int(data["errors"]) == 0 else 1)
 
 
 ## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line"). M5 keys: elites_spawned,
@@ -1275,6 +1275,7 @@ func _finish_smoke(result: String) -> void:
 ## inside dungeons).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
+	var outcome := smoke_outcome(result)
 	var need_wins := 0
 	for slot_index in RunState.need_wins_by_player:
 		need_wins += RunState.need_wins_by_player[slot_index]
@@ -1287,7 +1288,7 @@ func smoke_result(result: String) -> Dictionary:
 			talent_points += p.talents.points_spent()
 		set_bonuses += SetBonuses.active_count(p.equipment)
 	var data := {
-		"result": result,
+		"result": outcome,
 		"waves_completed": waves_completed,
 		"first_wave": first_wave,
 		"last_wave": wave,
@@ -1349,7 +1350,16 @@ func smoke_result(result: String) -> Dictionary:
 	}
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
+	if not options.unknown.is_empty():
+		data["unknown_args"] = options.unknown
 	return data
+
+
+## The result a smoke run reports: "bad_args" when the command line held an argument that was not understood
+## (a typo such as --env=nope would otherwise play a different run, and the run would still exit 0), else
+## [param result] as the run ended. Only a "completed" result without errors exits 0 (see _finish_smoke).
+func smoke_outcome(result: String) -> String:
+	return "bad_args" if not options.unknown.is_empty() else result
 
 
 ## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).

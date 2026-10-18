@@ -4,7 +4,8 @@ extends RefCounted
 ## Parsed once by Main; see docs/ARCHITECTURE.md "Command line".
 ##
 ##   --smoke              4 bots, menus skipped, time scale 4, plays --waves=N waves, prints
-##                        "SMOKE_RESULT {json}" and quits (exit 1 on errors / defeat / stall)
+##                        "SMOKE_RESULT {json}" and quits (exit 1 on errors / defeat / stall, and on
+##                        an unknown argument: the result is "bad_args", the arguments in "unknown_args")
 ##   --demo               bots at normal speed, endless (for screenshots / attract mode)
 ##   --players=N          bot count (1..4, default 4)
 ##   --classes=a,b,...    bot classes in join order (cycled; default: Db.class_ids)
@@ -118,7 +119,8 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
-## Arguments that were not understood (reported once by Main).
+## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
+## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
 
 

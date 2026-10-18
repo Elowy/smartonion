@@ -1408,3 +1408,31 @@ func test_smoke_result_reports_the_run_settings() -> void:
 	var data := main.smoke_result("completed")
 	check_eq(data["mode"], "endless", "mode")
 	check_eq(data["hardcore"], true, "hardcore")
+
+
+## A typo on the command line is not a completed run: --env=nope would play a random environment and
+## --bogus-flag does nothing, so the smoke run reports "bad_args" (and the process exits 1, see _finish_smoke).
+func test_a_smoke_run_with_an_unknown_argument_reports_bad_args() -> void:
+	var typo := LaunchOptions.parse(PackedStringArray(["--env=nope", "--bogus-flag", "--waves=2"]))
+	check_eq(typo.unknown, ["--env=nope", "--bogus-flag"] as Array[String], "both arguments are unknown")
+	_run_with_bots(1, typo)
+	main.options.smoke = true  # (set after the start: a smoke Main would boot into its own run)
+	var data := main.smoke_result("completed")
+	check_eq(data["result"], "bad_args", "not a completed run")
+	check_eq(data.get("unknown_args"), ["--env=nope", "--bogus-flag"], "the arguments are named in SMOKE_RESULT")
+	var clean := LaunchOptions.parse(PackedStringArray(["--env=forest_ruin", "--waves=2", "--event=totem",
+			"--shrine-chance=0.5", "--dungeon=1"]))
+	check(clean.unknown.is_empty(), "every M6b flag is known")
+	_run_with_bots_again(clean)
+	main.options.smoke = true
+	data = main.smoke_result("completed")
+	check_eq(data["result"], "completed", "a clean command line keeps the result")
+	check(not data.has("unknown_args"), "and names no argument")
+
+
+## An invalid value is an unknown argument too (the flag is recognised, its value is not).
+func test_invalid_values_are_unknown_arguments() -> void:
+	for bad in ["--mode=nope", "--env=nope", "--event=nope", "--shrine-chance=abc", "--view=nope",
+			"--end-page=nope", "--leaderboard=", "--bogus-flag"]:
+		check_eq(LaunchOptions.parse(PackedStringArray([bad])).unknown, [bad] as Array[String], "%s is unknown" % bad)
+	check(LaunchOptions.parse(PackedStringArray(["--filter=abc"])).unknown.is_empty(), "the unit test runner's flag is ignored")
