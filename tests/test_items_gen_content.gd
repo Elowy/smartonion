@@ -70,7 +70,7 @@ func test_armor_and_jewellery_bases() -> void:
 func test_suffixes() -> void:
 	for id in GDD_SUFFIXES:
 		check(Db.affixes.has(id), "GDD suffix %s" % id)
-	check(Db.affixes.size() >= 12, "at least 12 suffixes")
+	check_eq(Db.affixes.size(), 25, "25 stat suffixes (GDD 5.8)")
 	for id in Db.affixes:
 		var affix := Db.affixes[id]
 		check(affix.suffix.begins_with("of "), "%s: suffix text" % id)
