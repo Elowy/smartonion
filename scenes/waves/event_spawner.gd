@@ -112,7 +112,10 @@ func pending_time() -> float:
 ## wave's pending event first. Returns the event id rolled (&"" = none).
 func roll_wave(wave: int) -> StringName:
 	_wave = wave
-	_duration = RunState.wave_duration(wave)
+	# The length the director counts this wave down from (its duration is set before wave_started is
+	# emitted); the run's wave length when there is no director.
+	var running := director != null and is_instance_valid(director)
+	_duration = director.duration if running else RunState.wave_duration(wave)
 	_start_at = -1.0
 	event_id = &""
 	var chance := chance_for(wave)

@@ -783,6 +783,19 @@ func test_event_roll_uses_its_own_rng() -> void:
 	check_eq(RunState.rng.state, gameplay, "and the gameplay rng still did not move")
 
 
+func test_roll_wave_times_the_event_by_the_director_duration() -> void:
+	# A director whose wave is 300 s (not the run's wave length): the start share applies to 300 s.
+	var director := WaveDirector.new()
+	nodes.append(director)
+	director.duration = 300.0
+	var spawner := EventSpawner.create(director)
+	nodes.append(spawner)
+	RunState.event_override = EventSpawner.GUARDED_CHEST
+	spawner.roll_wave(5)
+	check(spawner.pending_time() >= 0.2 * 300.0 - 0.0001 and spawner.pending_time() <= 0.4 * 300.0 + 0.0001,
+			"20-40%% of the director's duration (%.2f of 300 s)" % spawner.pending_time())
+
+
 func test_event_roll_draw_order_and_rate() -> void:
 	var spawner := EventSpawner.create(null)
 	nodes.append(spawner)
