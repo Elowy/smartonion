@@ -33,6 +33,8 @@ extends Node
 ## - Elite wave (RunState.ELITE_WAVES, wave 20): every enemy gets an elite affix, a "lite" one
 ##   (HP x EliteAffixes.LITE_HP_MULT, normal rewards, a compact look; Enemy.make_elite); the real
 ##   elites (HP x3, elite rewards) come twice as often (EliteAffixes.expected_count).
+## - Mid-wave events (M6b, EVENTS package): an [EventSpawner] child (like the GoblinSpawner) rolls and
+##   starts them; [method stop] frees every node in the group [constant EventSpawner.GROUP].
 ## Does not process while the tree is paused. Copes with enemies being freed at any time.
 ##
 ## RunState.rng order inside [method start_wave]: eligible list (no draw) → elite schedule
@@ -220,6 +222,10 @@ func stop() -> void:
 		if is_instance_valid(node) and not node.is_queued_for_deletion():
 			node.queue_free()
 	GeneralBuff.clear(tree, FrostCircle.CHILL_KEY)
+	# Mid-wave event objects (M6b: the chest, the totem, the caravan; EventSpawner.GROUP).
+	for node in tree.get_nodes_in_group(EventSpawner.GROUP):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			node.queue_free()
 
 
 # --- Queries / formulas -------------------------------------------------------------

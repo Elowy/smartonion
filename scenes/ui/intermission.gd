@@ -4,10 +4,14 @@ extends Control
 ##
 ##   LOOT   – only when RunState.team_loot holds items: the full-screen LootRollScreen rolls
 ##            RunState.take_team_loot() (Need / Greed / Pass, solo Take / Sell / Leave).
+##   SHRINE – M6b hook (SHRINES package): only when RunState.pending_shrine is set. A shrine's
+##            boon-and-bane card the whole party votes on, between the loot roll and the level-ups.
 ##   LEVEL_UP – only when the team gained levels this wave (level_ups > 0) and someone has a
 ##            hero: the full-screen LevelUpScreen (GDD 6.1) – every hero picks 1 of 5 cards per
 ##            level gained in their own quarter, with their own controller (bots / unplugged
 ##            pads automatically, idle humans after the countdown).
+##   PORTAL – M6b hook (DUNGEON package): only when RunState.portal_pending is set. The dungeon
+##            portal's team vote, between the level-ups and the market.
 ##   MARKET – RunState.shop.open_round(cleared_wave, slots, RunState.rng) once per open; the
 ##            shared ShopPanel (goblin stall) in the middle, one PlayerPanel per player with a
 ##            hero in that player's corner (P1 top-left, P2 top-right, P3 bottom-left,
@@ -15,6 +19,10 @@ extends Control
 ##            PurseBoard under it (the shared gold, ready pips, this round's spend ticker and
 ##            the team's wants – GDD 10) and the ready chips (a "★N" badge while the hero has
 ##            N talent points to spend) + "Next wave in N s" countdown at the bottom.
+##
+## The phases run in the order LOOT, SHRINE, LEVEL_UP, PORTAL, MARKET ([method _enter_phase]): a phase
+## with nothing to do ([method wants_phase]) is skipped, SHRINE and PORTAL always unless a package made
+## them want to run – with nothing pending the chain is exactly LOOT, LEVEL_UP, MARKET as before M6b.
 ##
 ## Input (MARKET, per slot, through PlayerSlot.input): each player's focus is either the shop
 ## cursor (ShopPanel.handle_input) or their own panel (PlayerPanel.handle_input); LB / RB
@@ -51,7 +59,9 @@ signal ranks_trained(slot_index: int, count: int)
 ## A bot paid [param cost] gold for a reroll of the stall (statistics).
 signal bot_rerolled(slot_index: int, cost: int)
 
-enum Phase { CLOSED, LOOT, LEVEL_UP, MARKET }
+## The break's phases in the order they run (CLOSED = the screen is not open). SHRINE and PORTAL are
+## M6b slots: nothing opens them until their package sets RunState.pending_shrine / portal_pending.
+enum Phase { CLOSED, LOOT, SHRINE, LEVEL_UP, PORTAL, MARKET }
 
 ## GDD 12: seconds after which the next wave starts even if not everyone is ready.
 const AUTO_CONTINUE_TIME := 60.0
@@ -226,17 +236,60 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	_refresh_chips(true)
 	level_up_screen.close()
 	show()
-	if not RunState.team_loot.is_empty():
-		_start_loot()
-	elif wants_level_up():
-		_start_level_up()
-	else:
-		_start_market()
+	_enter_phase(Phase.LOOT)
 
 
 ## The team gained levels this wave and somebody has a hero to pick cards for.
 func wants_level_up() -> bool:
 	return level_ups > 0 and not LevelUpScreen.pickers(PlayerManager.get_slots()).is_empty()
+
+
+## A shrine waits for this break (M6b, SHRINES package: RunState.pending_shrine) and somebody has a
+## hero to vote.
+func wants_shrine() -> bool:
+	return RunState.pending_shrine != &"" and _has_voters()
+
+
+## The dungeon portal is open for this break (M6b, DUNGEON package: RunState.portal_pending) and
+## somebody has a hero to vote.
+func wants_portal() -> bool:
+	return RunState.portal_pending and _has_voters()
+
+
+## Phase [param p_phase] has something to do in this break (MARKET always does).
+func wants_phase(p_phase: Phase) -> bool:
+	match p_phase:
+		Phase.LOOT:
+			return not RunState.team_loot.is_empty()
+		Phase.SHRINE:
+			return wants_shrine()
+		Phase.LEVEL_UP:
+			return wants_level_up()
+		Phase.PORTAL:
+			return wants_portal()
+	return p_phase == Phase.MARKET
+
+
+## The phase after [param p_phase] in the chain (MARKET stays MARKET).
+static func next_phase(p_phase: Phase) -> Phase:
+	match p_phase:
+		Phase.CLOSED:
+			return Phase.LOOT
+		Phase.LOOT:
+			return Phase.SHRINE
+		Phase.SHRINE:
+			return Phase.LEVEL_UP
+		Phase.LEVEL_UP:
+			return Phase.PORTAL
+	return Phase.MARKET
+
+
+func _has_voters() -> bool:
+	for s in PlayerManager.get_slots():
+		var hero := s.player as Player
+		if hero != null and is_instance_valid(hero):
+			return true
+	return false
 
 
 ## Bots and players whose device is unplugged never block the next wave.
@@ -302,12 +355,51 @@ func _bots_make_room_for_artifacts(loot: Array[ItemInstance]) -> void:
 				_bot_make_room(s, eq)
 
 
+## Starts [param first] or, when it has nothing to do, the first phase after it that has (the chain
+## ends in MARKET, which always runs).
+func _enter_phase(first: Phase) -> void:
+	var p := first
+	while p != Phase.MARKET and not wants_phase(p):
+		p = next_phase(p)
+	match p:
+		Phase.LOOT:
+			_start_loot()
+		Phase.SHRINE:
+			_start_shrine()
+		Phase.LEVEL_UP:
+			_start_level_up()
+		Phase.PORTAL:
+			_start_portal()
+		_:
+			_start_market()
+
+
 func _on_loot_finished() -> void:
 	if phase == Phase.LOOT and not _done:
-		if wants_level_up():
-			_start_level_up()
-		else:
-			_start_market()
+		_enter_phase(Phase.SHRINE)
+
+
+## SHRINES hook: opens the shrine vote (RunState.pending_shrine). The foundation has no shrine
+## screen: it clears the pending shrine and goes on, so a pending shrine can never stall the break.
+## The package replaces the body and calls [method _on_shrine_finished] when the vote is decided.
+func _start_shrine() -> void:
+	phase = Phase.SHRINE
+	loot_screen.hide()
+	_market_root.visible = false
+	_swallow_humans()
+	_on_shrine_finished()
+
+
+## SHRINES hook: the vote is over (accepted, declined or timed out): the level-up cards come next.
+func _on_shrine_finished() -> void:
+	if phase == Phase.SHRINE and not _done:
+		RunState.pending_shrine = &""
+		_enter_phase(Phase.LEVEL_UP)
+
+
+## SHRINES hook: one frame of the SHRINE phase (the tree is paused, the screen processes always).
+func _update_shrine(_delta: float) -> void:
+	pass
 
 
 func _start_level_up() -> void:
@@ -320,7 +412,31 @@ func _start_level_up() -> void:
 
 func _on_level_up_finished() -> void:
 	if phase == Phase.LEVEL_UP and not _done:
-		_start_market()
+		_enter_phase(Phase.PORTAL)
+
+
+## DUNGEON hook: opens the portal vote (RunState.portal_pending). The foundation has no portal
+## screen: it closes the portal and goes on, so a pending portal can never stall the break. The
+## package replaces the body and calls [method _on_portal_finished] when the vote (and a dungeon
+## run it started) is over.
+func _start_portal() -> void:
+	phase = Phase.PORTAL
+	level_up_screen.close()
+	_market_root.visible = false
+	_swallow_humans()
+	_on_portal_finished()
+
+
+## DUNGEON hook: the portal vote (and the dungeon, when the party went in) is over: the market is next.
+func _on_portal_finished() -> void:
+	if phase == Phase.PORTAL and not _done:
+		RunState.portal_pending = false
+		_enter_phase(Phase.MARKET)
+
+
+## DUNGEON hook: one frame of the PORTAL phase (the tree is paused, the screen processes always).
+func _update_portal(_delta: float) -> void:
+	pass
 
 
 func _start_market() -> void:
@@ -565,7 +681,7 @@ func _fill() -> void:
 	title_label.text = "Wave %d cleared!" % cleared_wave
 	var next := cleared_wave + 1
 	next_label.text = next_wave_text(next)
-	var flagged := next <= RunState.TOTAL_WAVES and (RunState.is_boss_wave(next) or RunState.is_elite_wave(next))
+	var flagged := not _is_past_the_end(next) and (RunState.is_boss_wave(next) or RunState.is_elite_wave(next))
 	next_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.2) if flagged else UiTheme.TEXT_DIM)
 	purse_board.set_shop(RunState.shop)
 	purse_board.refresh()
@@ -578,14 +694,22 @@ func _fill() -> void:
 
 
 ## The market header's "what comes next" line. A boss wave has no timer (it ends when the boss
-## falls; the HUD shows the boss frame instead of a clock), so it names no seconds.
+## falls; the HUD shows the boss frame instead of a clock), so it names no seconds. The endless mode
+## has no final wave, so its line is "Next up: Wave 26  ·  <seconds>" (no "of 25").
 static func next_wave_text(next: int) -> String:
-	if next > RunState.TOTAL_WAVES:
+	if _is_past_the_end(next):
 		return "The final battle is won"
+	var of_total := " of %d" % RunState.total_waves() if RunState.total_waves() > 0 else ""
 	if RunState.is_boss_wave(next):
-		return "Next up: Wave %d of %d – Boss wave! (ends when the boss falls)" % [next, RunState.TOTAL_WAVES]
+		return "Next up: Wave %d%s – Boss wave! (ends when the boss falls)" % [next, of_total]
 	var tag := "  –  Elite wave!" if RunState.is_elite_wave(next) else ""
-	return "Next up: Wave %d of %d  ·  %d seconds%s" % [next, RunState.TOTAL_WAVES, int(RunState.wave_duration(next)), tag]
+	return "Next up: Wave %d%s  ·  %d seconds%s" % [next, of_total, int(RunState.wave_duration(next)), tag]
+
+
+## [param next] lies beyond the run's last wave (never in the endless mode).
+static func _is_past_the_end(next: int) -> bool:
+	var total := RunState.total_waves()
+	return total > 0 and next > total
 
 
 func _fill_gold() -> void:
@@ -711,6 +835,12 @@ func _process(delta: float) -> void:
 		return
 	if phase == Phase.LEVEL_UP:
 		level_up_screen.update(delta)
+		return
+	if phase == Phase.SHRINE:
+		_update_shrine(delta)
+		return
+	if phase == Phase.PORTAL:
+		_update_portal(delta)
 		return
 	if phase != Phase.MARKET:
 		return
@@ -1152,8 +1282,12 @@ func _on_player_left(slot: PlayerSlot) -> void:
 	drop_shop_pings(RunState.shop, slot.index)
 	if not is_open():
 		return
+	if phase == Phase.SHRINE:
+		_on_shrine_player_left(slot)
 	if phase == Phase.LEVEL_UP:
 		level_up_screen.remove_slot(slot.index)
+	if phase == Phase.PORTAL:
+		_on_portal_player_left(slot)
 	if phase == Phase.MARKET:
 		var slots := PlayerManager.get_slots()
 		_sync_panels(slots)
@@ -1162,6 +1296,18 @@ func _on_player_left(slot: PlayerSlot) -> void:
 			shop_panel.shop.prune_votes(shop_panel.voter_indices())
 		purse_board.update(PlayerManager.get_slots())
 	_refresh_chips(true)
+
+
+## SHRINES hook: [param slot] left while the shrine vote runs (the package drops their vote, re-checks the
+## voters). The foundation has nothing to do.
+func _on_shrine_player_left(_slot: PlayerSlot) -> void:
+	pass
+
+
+## DUNGEON hook: [param slot] left while the portal vote runs (the package drops their vote, re-checks the
+## voters). The foundation has nothing to do.
+func _on_portal_player_left(_slot: PlayerSlot) -> void:
+	pass
 
 
 ## Takes [param slot_index]'s "P2 wants" pings off every unsold offer of [param shop]

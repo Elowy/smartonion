@@ -25,9 +25,10 @@ static func model(summary: Dictionary) -> Dictionary:
 	var victory := bool(summary.get("victory", false))
 	var cleared := int(summary.get("waves_cleared", 0))
 	var total := int(summary.get("total_waves", 0))
-	var waves_text := "%d / %d waves" % [cleared, total]
+	var waves_text := "%d / %d waves" % [cleared, total] if total > 0 else "%d waves" % cleared
 	if not victory:  # the wave that ended the run (the one after the last cleared)
-		waves_text = "Fell on wave %d" % clampi(int(summary.get("wave", cleared + 1)), 1, maxi(total, 1))
+		var fell := int(summary.get("wave", cleared + 1))
+		waves_text = "Fell on wave %d" % (clampi(fell, 1, total) if total > 0 else maxi(fell, 1))
 	var time_text := String(summary.get("time_text", RunSummary.format_time(float(summary.get("time", 0.0)))))
 	var mode := String(summary.get("mode", "Normal"))
 	var heroes: Array[Dictionary] = []
