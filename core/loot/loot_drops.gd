@@ -236,6 +236,31 @@ static func drop_special(source: ItemGenerator.Source, enemy: Node3D, killer: No
 	return bag
 
 
+## The guaranteed item of a mid-wave event (M6b EVENTS: the Guarded Chest, the Goblin Caravan) as a
+## [LootBag] at [param world_pos]: [param source] picks the generator's rarity table (ELITE = Rare+, the
+## chest) or [param rarity] >= 0 forces it (RARE, the caravan); [param opener]'s Fortune counts. Like the
+## special drops it is not counted against the wave's drop cap (RunState.loot_drops_this_wave) and it
+## makes no Artifact roll. It goes through the team loot (the Need / Greed / Pass roll) when a hero
+## picks the bag up or at the wave end; with nowhere to put a bag it goes straight into the team loot.
+## Returns the bag (null in that case).
+static func drop_event_item(source: ItemGenerator.Source, world_pos: Vector3, opener: Node3D = null,
+		rarity: int = -1) -> LootBag:
+	var wave := maxi(1, RunState.wave)
+	var options := {&"fortune": killer_fortune(opener), &"team_classes": team_classes()}
+	if rarity >= 0:
+		options[&"rarity"] = rarity
+	var item := ItemGenerator.generate(source, wave, RunState.rng, options)
+	if item == null:
+		return null
+	item.looted = true
+	if item.buy_price <= 0:
+		item.buy_price = ItemGenerator.price_for(item.rarity, wave)
+	var bag := _place_bag(item, Vector3(world_pos.x, 0.0, world_pos.z), opener)
+	if bag == null:
+		RunState.add_team_loot(item)
+	return bag
+
+
 ## A looted item of [param source] at the current wave (killer's Fortune, the team's classes).
 static func _generate(source: ItemGenerator.Source, killer: Node3D) -> ItemInstance:
 	var wave := maxi(1, RunState.wave)

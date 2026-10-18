@@ -13,7 +13,8 @@ extends Node3D
 ## not fit with them (a narrow screen), the view only leans towards it, and it never limits
 ## where a player may walk ([method get_walk_rect]). M6: a living boss (group &"bosses", [Boss])
 ## is framed the same way ([method boss_points], also an "extra"), so its telegraphs and the
-## adds it raises stay in sight.
+## adds it raises stay in sight. M6b: so is the target of a mid-wave event (group
+## EventSpawner.GROUP: the chest, the totem, the caravan's cart – [method event_points]).
 ##
 ## The rig node sits at the look-at point on the ground; [member camera] is offset back and
 ## up along the pitch. Framing math is static (see [method compute_framing]) and unit tested.
@@ -213,7 +214,8 @@ func _goblin_points() -> Array[Vector3]:
 		return out
 	var goblins := get_tree().get_nodes_in_group(&"loot_goblins")
 	var bosses := get_tree().get_nodes_in_group(&"bosses")
-	if goblins.is_empty() and bosses.is_empty():
+	var events := get_tree().get_nodes_in_group(EventSpawner.GROUP)
+	if goblins.is_empty() and bosses.is_empty() and events.is_empty():
 		return out
 	var living: Array[Node3D] = []
 	var ghosts: Array[Node3D] = []
@@ -222,6 +224,21 @@ func _goblin_points() -> Array[Vector3]:
 		return out
 	out = goblin_points(goblins)
 	out.append_array(boss_points(bosses))
+	out.append_array(event_points(events))
+	return out
+
+
+## Ground points of the mid-wave [param events]' objects (the group EventSpawner.GROUP: the Guarded Chest,
+## the totem, the caravan's cart) the camera frames as soft points, like the Loot Goblin: whatever an
+## object's event_frame_points() answers (nothing once the chest is open, the totem done or the cart
+## gone).
+static func event_points(events: Array[Node]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for node in events:
+		if node == null or not is_instance_valid(node) or not node.has_method(&"event_frame_points"):
+			continue
+		var pts: Array[Vector3] = node.call(&"event_frame_points")
+		out.append_array(pts)
 	return out
 
 

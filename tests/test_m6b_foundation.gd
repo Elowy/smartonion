@@ -853,7 +853,8 @@ func test_event_starts_at_its_time_and_counts() -> void:
 	check_eq(spawner.ended, 1, "end_wave hook")
 
 
-func test_the_base_event_spawner_spawns_nothing() -> void:
+func test_the_event_spawner_builds_the_rolled_event_at_its_time() -> void:
+	# (P0-B pinned "the base spawner spawns nothing"; the EVENTS package fills the slot.)
 	world = EFakes.make_world(tree)
 	var director := WaveDirector.create(EFakes.arena_of(world))
 	world.add_child(director)
@@ -864,10 +865,13 @@ func test_the_base_event_spawner_spawns_nothing() -> void:
 	RunState.event_override = EventSpawner.GUARDED_CHEST
 	director.start_wave(5)
 	check(spawner.pending_time() > 0.0, "the slot rolled")
+	check_eq(RunState.events_spawned, 0, "nothing before its time")
 	EFakes.step_all([director, spawner], 20.0)
-	check_eq(RunState.events_spawned, 0, "no event exists yet: nothing spawned or counted")
-	check(announced.is_empty(), "no banner")
-	check(not spawner.start_event(EventSpawner.GUARDED_CHEST), "start_event reports false")
+	check_eq(RunState.events_spawned, 1, "the chest was built and counted")
+	check(spawner.chest != null and spawner.chest.is_in_group(EventSpawner.GROUP), "an event object")
+	check_eq(announced, [EventSpawner.CHEST_TEXT] as Array[String], "with its banner")
+	check(not spawner.start_event(&"no_such_event"), "an unknown event builds nothing")
+	check_eq(RunState.events_spawned, 1, "and counts nothing")
 
 
 func test_wave_end_cancels_a_pending_event_and_frees_event_objects() -> void:
