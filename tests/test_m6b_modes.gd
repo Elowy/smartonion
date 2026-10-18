@@ -452,10 +452,15 @@ func test_the_lobby_stores_the_choice_in_main_and_the_run_uses_it() -> void:
 
 func test_the_lobby_opens_on_the_mode_flags_of_the_command_line() -> void:
 	var opts := LaunchOptions.parse(PackedStringArray(["--mode=endless", "--hardcore"]))
+	check(opts.unknown.is_empty(), "both flags are known")
 	_make_main(opts)
 	main.go_to_lobby()
+	UiFakes.step(main.lobby, 0.0)  # a frame: the header is laid out and on screen
 	check_eq(main.lobby.mode_label.text, "Mode: Endless · Hardcore", "--mode=endless --hardcore")
-	check(main.lobby.hardcore_badge.visible, "the badge")
+	check(main.lobby.mode_label.is_visible_in_tree(), "the header is on screen")
+	check(main.lobby.hardcore_badge.visible and main.lobby.hardcore_badge.is_visible_in_tree(), "the badge is on screen")
+	check_eq(main.lobby.run_mode, RunState.MODE_ENDLESS, "the lobby's run settings match the flags")
+	check(main.lobby.hardcore, "hardcore too")
 
 
 # --- The leaderboard texts and the model ---------------------------------------------------------
