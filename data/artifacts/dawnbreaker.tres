@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="ArtifactData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/artifact_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/mace.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"dawnbreaker"
+display_name = "Dawnbreaker"
+flavor = "Every night ends. This is how."
+slot_type = 11
+armor_type = -1
+rarity = 5
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"stamina": 4.0,
+&"crit": 3.0,
+&"haste": 2.0
+})
+enchant_ids = Array[StringName]([&"hallowed", &"mighty"])
+enchant_ranks = Array[int]([1, 1])
+class_restriction = &"paladin"
+sources = Array[StringName]([&"loot"])
+min_wave = 10
+weight = 0.0
+class_id = &"paladin"
+unlock_waves = Array[int]([3, 6])
+properties = Array[Dictionary]([{
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "consecration"
+},
+"mods": {
+"heal_max_hp_pct_add": 1.0
+},
+"requires": {
+"knows": "consecration"
+}
+}],
+"name": "Hallowed Dawn",
+"needs": "consecration",
+"short": "Consecration heals allies in it for 2% max HP a second.",
+"text": "Consecration heals the allies standing in it for 2% of their max HP every second."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"shield_max_hp_pct_add": 15.0
+},
+"requires": {
+"knows": "word_of_glory"
+}
+}],
+"name": "Dawn's Embrace",
+"needs": "word_of_glory",
+"short": "Word of Glory also shields its target for 15% max HP.",
+"text": "Word of Glory also shields its target for 15% of their max HP."
+}])
+weapon_color = Color(1, 0.88, 0.5, 1)

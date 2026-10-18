@@ -7,6 +7,9 @@ extends Control
 ## controller disconnects. Listens to RunState (wave, gold, xp, level, team loot) by itself.
 ## Under the gold a "Team Loot: N" bag counter shows the items picked up this wave (they wait
 ## for the Need / Greed / Pass roll, GDD 10.1); hidden while the team loot is empty.
+## M6: on a boss wave a boss frame (name, HP bar, phase pips, "ENRAGED") takes the timer's place
+## ([method bind_boss] / [method clear_boss]; it already shows from the wave's start, when the
+## wave is a boss wave with a BossData, so the stale clock never shows).
 
 const MARGIN := 22.0
 const LOW_TIME := 5.0
@@ -23,6 +26,16 @@ const XP_STRIP_HEIGHT := 26.0
 ## Gold "+N" floater: pickups add up on one floater beside the coin, shown this long after
 ## the last pickup.
 const FLOATER_TIME := 0.6
+## Boss frame: width of the HP bar (reference px), its height, and the number of phase pips.
+const BOSS_BAR_WIDTH := 440.0
+const BOSS_BAR_HEIGHT := 22.0
+const BOSS_PHASES := 2
+const BOSS_BAR_COLOR := Color(0.84, 0.16, 0.14)
+const PIP_SIZE := 14.0
+## The ENRAGED line pulses between this alpha and 1 (never dim on the dark plaque); the row is
+## always reserved (alpha 0 while calm), so nothing below it jumps when the boss enrages.
+const ENRAGED_ALPHA_MIN := 0.8
+const ENRAGED_PULSE_SPEED := 8.0
 
 var frames: Array[UnitFrame] = []
 var wave_label: Label
@@ -57,6 +70,15 @@ var _floater_amount := 0
 var _floater_age := 0.0
 var _clock := 0.0
 
+## The boss frame (replaces the timer on boss waves): its box, name, HP bar, phase pips and the
+## "ENRAGED" line, and the boss it shows.
+var boss_frame: VBoxContainer
+var boss_name_label: Label
+var boss_bar: UiBar
+var boss_enraged_label: Label
+var _boss_pips: Array[Panel] = []
+var _boss: Boss
+
 
 static func create() -> Hud:
 	var h := Hud.new()
@@ -78,6 +100,44 @@ func bind_players(players: Array[Player]) -> void:
 		var idx := p.slot.index if p.slot != null else i
 		if idx >= 0 and idx < frames.size():
 			frames[idx].bind(p)
+
+
+## Shows the frame of [param boss] (WaveDirector.boss_spawned): its name, HP, phase and enrage
+## follow the boss every frame until [method clear_boss].
+func bind_boss(boss: Boss) -> void:
+	_boss = boss
+	var title := boss.boss_data.display_name if boss != null and boss.boss_data != null else \
+			(boss.data.display_name if boss != null and boss.data != null else "")
+	_show_boss_frame(title)
+	_update_boss_frame()
+
+
+## Hides the boss frame and brings the timer back (the wave ended).
+func clear_boss(_wave: int = 0) -> void:
+	_boss = null
+	if boss_frame != null:
+		boss_frame.visible = false
+	timer_label.visible = true
+
+
+## True while the boss frame replaces the timer.
+func is_boss_frame_visible() -> bool:
+	return boss_frame != null and boss_frame.visible
+
+
+## The boss frame's "ENRAGED" line is showing (its row is always reserved, see
+## [constant ENRAGED_ALPHA_MIN]: shown means not transparent).
+func is_boss_enraged_shown() -> bool:
+	return boss_enraged_label != null and boss_enraged_label.visible and boss_enraged_label.modulate.a > 0.01
+
+
+## The phase pip (0-based) lit up last: the boss's current phase (1-based) as shown.
+func boss_phase_shown() -> int:
+	var n := 0
+	for pip in _boss_pips:
+		if pip.has_meta(&"lit"):
+			n += 1
+	return n
 
 
 func set_wave_time(seconds_left: float) -> void:
@@ -190,6 +250,7 @@ func _build_top() -> void:
 	col.add_child(wave_tag_label)
 	timer_label = UiTheme.centered_label("20", UiTheme.BIG_NUMBER, 52)
 	col.add_child(timer_label)
+	_build_boss_frame(col)
 	col.add_child(UiTheme.divider(160))
 	var gold_row := UiTheme.hbox(8)
 	gold_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -212,6 +273,76 @@ func _build_top() -> void:
 	_loot_row.add_child(team_loot_label)
 	_loot_row.visible = false
 	col.add_child(_loot_row)
+
+
+## The boss frame (hidden until a boss wave): name, HP bar, phase pips and the ENRAGED line.
+func _build_boss_frame(col: VBoxContainer) -> void:
+	boss_frame = UiTheme.vbox(2)
+	boss_frame.name = "BossFrame"
+	boss_frame.custom_minimum_size = Vector2(BOSS_BAR_WIDTH, 0.0)
+	boss_frame.visible = false
+	boss_name_label = UiTheme.centered_label("", UiTheme.HEADING, 26, UiTheme.RED.lightened(0.15))
+	boss_frame.add_child(boss_name_label)
+	boss_bar = UiBar.create(BOSS_BAR_COLOR, BOSS_BAR_HEIGHT, UiTheme.FONT_SMALL)
+	boss_bar.set_values(1.0, 1.0, "100%")
+	boss_frame.add_child(boss_bar)
+	var row := UiTheme.hbox(10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	for i in BOSS_PHASES:
+		var pip := Panel.new()
+		pip.custom_minimum_size = Vector2(PIP_SIZE, PIP_SIZE)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(pip)
+		_boss_pips.append(pip)
+		_light_pip(pip, i == 0)
+	boss_frame.add_child(row)
+	boss_enraged_label = UiTheme.centered_label("ENRAGED", UiTheme.HEADING, 22, UiTheme.RED.lightened(0.3))
+	# Takes its row up front (transparent while calm) so the plaque never grows mid-fight.
+	boss_enraged_label.modulate.a = 0.0
+	boss_frame.add_child(boss_enraged_label)
+	# Sits where the timer sits (the timer hides while the frame shows).
+	col.add_child(boss_frame)
+	col.move_child(boss_frame, timer_label.get_index() + 1)
+
+
+## A round pip: lit (bright gold ring) or dim.
+func _light_pip(pip: Panel, lit: bool) -> void:
+	var style := StyleBoxFlat.new()
+	style.set_corner_radius_all(int(PIP_SIZE * 0.5))
+	style.bg_color = UiTheme.GOLD if lit else Color(0.16, 0.13, 0.11)
+	style.border_color = UiTheme.GOLD_BORDER if lit else Color(0.35, 0.3, 0.25)
+	style.set_border_width_all(2)
+	pip.add_theme_stylebox_override(&"panel", style)
+	if lit:
+		pip.set_meta(&"lit", true)
+	elif pip.has_meta(&"lit"):
+		pip.remove_meta(&"lit")
+
+
+## Frame on, timer off.
+func _show_boss_frame(title: String) -> void:
+	boss_name_label.text = title
+	boss_frame.visible = true
+	timer_label.visible = false
+	boss_enraged_label.modulate.a = 0.0
+
+
+## Follows the bound boss: HP bar (percent), phase pips, ENRAGED (pulsing).
+func _update_boss_frame() -> void:
+	if _boss == null or not is_instance_valid(_boss):
+		return
+	var ratio := _boss.hp_ratio()
+	boss_bar.set_values(ratio * 1000.0, 1000.0, "%d%%" % int(ceilf(ratio * 100.0 - 0.001)))
+	for i in _boss_pips.size():
+		var lit := i < _boss.phase
+		if lit != _boss_pips[i].has_meta(&"lit"):
+			_light_pip(_boss_pips[i], lit)
+	if _boss.is_boss_enraged():
+		var pulse := 0.5 + 0.5 * sin(_clock * ENRAGED_PULSE_SPEED)
+		boss_enraged_label.modulate.a = lerpf(ENRAGED_ALPHA_MIN, 1.0, pulse)
+	else:
+		boss_enraged_label.modulate.a = 0.0
 
 
 ## WoW-style XP bar: a thin segmented strip across the whole bottom edge, the team level at
@@ -353,6 +484,17 @@ func _ready() -> void:
 
 func _on_wave_changed(w: int) -> void:
 	wave_label.text = "Wave %d / %d" % [maxi(w, 1), RunState.TOTAL_WAVES]
+	_boss = null
+	var boss_data := BossData.for_wave(w) if RunState.is_boss_wave(w) else null
+	if boss_data != null:
+		# A boss wave has no clock: the frame shows from the start (full bar) until the boss comes.
+		_show_boss_frame(boss_data.display_name)
+		boss_bar.set_values(1.0, 1.0, "100%")
+		for i in _boss_pips.size():
+			_light_pip(_boss_pips[i], i == 0)
+	else:
+		boss_frame.visible = false
+		timer_label.visible = true
 	if RunState.is_boss_wave(w):
 		wave_tag_label.text = "BOSS WAVE"
 		wave_tag_label.add_theme_color_override(&"font_color", UiTheme.RED)
@@ -447,6 +589,8 @@ static func _floater_text(amount: int) -> String:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if _boss != null:
+		_update_boss_frame()
 	if _floater.visible:
 		_floater_age += delta
 		if _floater_age >= FLOATER_TIME:

@@ -103,7 +103,7 @@ func _shield_ally() -> void:
 	var amount := minf(ally.max_hp() * _shield_pct / 100.0, cap - ally.procs.shield_of(_key))
 	if amount <= 0.0:
 		return
-	ally.procs.add_shield(amount, _duration, _key)
+	ally.procs.add_shield(amount, _duration, _key, player.slot_index())
 	ally_shields += 1
 	var id := ally.get_instance_id()
 	if _clock - float(_last_beam.get(id, -INF)) >= _beam_interval:

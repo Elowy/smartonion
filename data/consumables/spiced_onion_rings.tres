@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ConsumableData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"spiced_onion_rings"
+display_name = "Spiced Onion Rings"
+kind = 1
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 5.0
+}
+}])
+base_price = 10
+icon_id = &"spiced_onion_rings"
+description = "Crunchy, sharp and dangerously hot. A better eye for weak spots for one wave."

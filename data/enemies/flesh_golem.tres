@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"flesh_golem"
+display_name = "Flesh Golem"
+behavior = 5
+max_hp = 40.0
+contact_damage = 4.0
+move_speed = 1.5
+radius = 0.9
+knockback_resist = 0.8
+stun_resist = 0.5
+attack_cooldown = 6.0
+hook_range_min = 4.0
+hook_range_max = 9.0
+hook_telegraph = 0.8
+hook_pull = 3.0
+hook_damage_ratio = 1.0
+first_wave = 12
+spawn_weight = 0.25
+group_min = 1
+group_max = 1
+gold = 4
+xp = 5
+model_style = &"golem"
+color = Color(0.74, 0.5, 0.46, 1)
+model_scale = 1.6

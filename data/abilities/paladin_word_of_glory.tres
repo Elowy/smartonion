@@ -25,6 +25,7 @@ params = {
 "prefer_downed": true,
 "revive_hp": 0.4,
 "shield_duration": 8.0,
+"shield_max_hp_pct": 0.0,
 "shield_share": 0.0,
 "spell_power_scale": 1.0,
 "verdict_pct": 0.0,

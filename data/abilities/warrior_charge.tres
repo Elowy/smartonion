@@ -26,6 +26,8 @@ params = {
 "shield_duration": 5.0,
 "shield_max": 15.0,
 "shield_per_enemy": 0.0,
+"shockwave_radius": 0.0,
+"shockwave_stun": 0.0,
 "speed": 36.0,
 "stun": 1.0,
 "stun_radius": 2.0,

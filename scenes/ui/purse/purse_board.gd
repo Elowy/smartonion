@@ -3,7 +3,8 @@ extends PanelContainer
 ## The purse board (GDD 10 "Coordination tools", M5) in the Intermission header: the shared
 ## wallet and what the team does with it, so a shared purse does not end in chaos.
 ##
-##   wallet – the coin and the shared gold ([member gold_value]); under it the ready pips (one
+##   wallet – the coin and the shared gold ([member gold_value]) with the team's Arcane Dust (M6a:
+##            the sparkle and [member dust_value], right of the gold, violet); under it the ready pips (one
 ##            diamond per joined player in their colour, filled once that player is ready – the
 ##            GDD's "ready state next to the wallet") and "2/4 ready".
 ##   Spent  – this round's spend ticker (RunState.spend_log, newest first): who, what, how much
@@ -28,10 +29,26 @@ extends PanelContainer
 ## (RunState.begin_spend_round clears the log without a signal). The per-frame check of the
 ## players compares the last seen index / colour / ready flag field by field (no strings). No RNG.
 
-## The board's design width (the stall's width; fits between the two top corner panels).
-const WIDTH := 712.0
-const WALLET_WIDTH := 96.0
-const CAPTION_WIDTH := 52.0
+## The board's design width (a little wider than the stall: the Dust next to the gold needs the room;
+## still fits between the two top corner panels, 732 px apart at 1920 x 1080).
+const WIDTH := 722.0
+## Wide enough for the gold and the team's Dust side by side (a coin, a gold and a sparkle with
+## a Dust of up to three digits fit at the full font size at normal values and, shrunk by
+## [method _fit_wallet], at five-digit gold; the text column takes what is left).
+const WALLET_WIDTH := 124.0
+## The wallet's two numbers: the gold row's font sizes.
+const GOLD_FONT := 20
+const DUST_FONT := 17
+## The gold row's fixed parts: the coin, the sparkle and the gap between its five children.
+const COIN_SIZE := 19.0
+const SPARKLE_SIZE := 16.0
+const ROW_GAP := 3
+## Font sizes (gold, Dust) of the wallet row, largest first ([method _fit_wallet]): a five-digit gold
+## with a three-digit Dust does not fit WALLET_WIDTH at the first pair, so the numbers shrink.
+const WALLET_FONTS: Array[Vector2i] = [
+	Vector2i(GOLD_FONT, DUST_FONT), Vector2i(18, 15), Vector2i(17, 14), Vector2i(16, 13), Vector2i(15, 12), Vector2i(14, 11),
+]
+const CAPTION_WIDTH := 45.0
 const TEXT_FONT := 16
 const CAPTION_FONT := 15
 ## Height of one text line and how far neighbouring lines overlap (the font's line box has
@@ -49,13 +66,16 @@ const EMPTY_WANTS := "None – ping an offer or a Trainer rank (R3 / Tab)"
 const TEAM := "Team"
 ## Layout: the board's side margins, the gaps around the rule after the wallet, the rule's width
 ## and the gap between the captions and the lines.
-const MARGIN_X := 10.0
-const RULE_GAP := 8.0
+const MARGIN_X := 7.0
+const RULE_GAP := 6.0
 const RULE_WIDTH := 2.0
-const CAPTION_GAP := 6.0
+const CAPTION_GAP := 5.0
 
 ## The shared gold (the Intermission's gold_value).
 var gold_value: Label
+## The team's Arcane Dust, right of the gold ([method refresh_dust]).
+var dust_value: Label
+var dust_icon: DustIcon
 var pips: ReadyPips
 ## "2/4 ready".
 var ready_label: Label
@@ -138,14 +158,12 @@ static func slot_color(slot_index: int) -> Color:
 	return s.color if s != null else PlayerManager.PLAYER_COLORS[slot_index]
 
 
-## "[Rare Dagger]" for shop items ("[Rare Dagger] (forged)" for an auto-forge), the label as it
-## is for every other spend.
+## "[Rare Dagger]" for shop items and the Black Market offer ("[Rare Dagger] (forged)" for an
+## auto-forge), the label as it is for every other spend (consumables: "Flask of Fury").
 static func spend_label(entry: Dictionary) -> String:
 	var label := String(entry.get("label", ""))
 	var kind := StringName(entry.get("kind", &""))
-	if kind == &"shop":
-		return "[%s]" % label
-	if kind == &"shop_forge":
+	if kind == &"shop" or kind == &"shop_forge" or kind == &"black_market":
 		var forged := " (forged)"
 		if label.ends_with(forged):
 			return "[%s]%s" % [label.trim_suffix(forged), forged]
@@ -174,7 +192,10 @@ static func want_text(want: Dictionary) -> String:
 static func merged_wants(p_shop: Shop, p_wants: Array[Dictionary]) -> Array[Dictionary]:
 	var by_slot: Dictionary[int, Array] = {}
 	if p_shop != null:
-		for o in p_shop.offers:
+		var listed: Array = p_shop.offers.duplicate()
+		if p_shop.black_market != null:
+			listed.append(p_shop.black_market)
+		for o: Shop.Offer in listed:
 			if o == null or o.item == null or o.sold:
 				continue
 			for i in o.pinged_by:
@@ -233,6 +254,26 @@ static func more_text(n: int) -> String:
 	return "+%d more" % n
 
 
+## The team's Dust as the wallet shows it: whole numbers below 1,000, then "1.2k" (rounded down, one
+## decimal; "1k" for a full thousand), "12k" from 10,000 and "1.2M" from a million – the wallet
+## column is only [constant WALLET_WIDTH] wide.
+static func dust_text(amount: int) -> String:
+	if amount < 1000:
+		return str(amount)
+	if amount < 10000:
+		return _tenths(floori(amount / 100.0), "k")
+	if amount < 1000000:
+		return "%dk" % floori(amount / 1000.0)
+	return _tenths(floori(amount / 100000.0), "M")
+
+
+## [param tenths] / 10 with one decimal ("12" -> "1.2"), "1" instead of "1.0", then [param unit].
+static func _tenths(tenths: int, unit: String) -> String:
+	if tenths % 10 == 0:
+		return "%d%s" % [floori(tenths / 10.0), unit]
+	return "%d.%d%s" % [floori(tenths / 10.0), tenths % 10, unit]
+
+
 # --- Queries --------------------------------------------------------------------------------
 
 ## The ticker as plain text, one string per shown line (empty round: the "nothing spent" line).
@@ -287,12 +328,45 @@ func set_shop(p_shop: Shop) -> void:
 func refresh() -> void:
 	_dirty = false
 	refresh_gold()
+	refresh_dust()
 	var used := _fill_ticker()
 	_fill_wants(ROWS - used)
 
 
 func refresh_gold() -> void:
 	gold_value.text = UiTheme.format_int(RunState.gold)
+	_fit_wallet()
+
+
+## The team's Arcane Dust next to the gold ([method dust_text]: "1.2k" from 1,000; RunState.dust_changed
+## calls it while the board is in the tree); the sparkle dims at 0.
+func refresh_dust() -> void:
+	dust_value.text = dust_text(RunState.arcane_dust)
+	dust_icon.set_dim(RunState.arcane_dust <= 0)
+	dust_value.add_theme_color_override(&"font_color",
+		DustIcon.COLOR_BRIGHT if RunState.arcane_dust > 0 else UiTheme.TEXT_DIM)
+	_fit_wallet()
+
+
+## Keeps the gold row inside [constant WALLET_WIDTH]: the first of [constant WALLET_FONTS] (largest
+## first) whose coin + gold + sparkle + Dust row fits is used – normal values keep the full sizes,
+## a five-digit gold with a three-digit Dust shrinks both numbers a little.
+func _fit_wallet() -> void:
+	var fixed := COIN_SIZE + SPARKLE_SIZE + 4.0 * ROW_GAP
+	var chosen: Vector2i = WALLET_FONTS[WALLET_FONTS.size() - 1]
+	for pair in WALLET_FONTS:
+		if fixed + _text_width_of(gold_value, pair.x) + _text_width_of(dust_value, pair.y) <= WALLET_WIDTH:
+			chosen = pair
+			break
+	if gold_value.get_theme_font_size(&"font_size") != chosen.x:
+		gold_value.add_theme_font_size_override(&"font_size", chosen.x)
+	if dust_value.get_theme_font_size(&"font_size") != chosen.y:
+		dust_value.add_theme_font_size_override(&"font_size", chosen.y)
+
+
+## Width of [param label]'s text at [param font_size] in the label's own font.
+static func _text_width_of(label: Label, font_size: int) -> float:
+	return label.get_theme_font(&"font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 
 ## Called every MARKET frame: the pips follow [param slots]' ready flags (redrawn only when one
@@ -355,14 +429,21 @@ func _build() -> void:
 	wallet.custom_minimum_size.x = WALLET_WIDTH
 	wallet.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(wallet)
-	var gold_row := UiTheme.hbox(6)
+	var gold_row := UiTheme.hbox(ROW_GAP)
 	wallet.add_child(gold_row)
-	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(22, 22))
+	var coin := UiIcon.create(UiIcon.Kind.COIN, Vector2(COIN_SIZE, COIN_SIZE))
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(coin)
-	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, 23, UiTheme.GOLD)
+	gold_value = UiTheme.label("0", UiTheme.GOLD_LABEL, GOLD_FONT, UiTheme.GOLD)
 	gold_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	gold_row.add_child(gold_value)
+	gold_row.add_child(UiTheme.spacer())
+	dust_icon = DustIcon.create(SPARKLE_SIZE)
+	dust_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_row.add_child(dust_icon)
+	dust_value = UiTheme.label("0", UiTheme.GOLD_LABEL, DUST_FONT, DustIcon.COLOR_BRIGHT)
+	dust_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_row.add_child(dust_value)
 	pips = ReadyPips.new()
 	pips.name = "ReadyPips"
 	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -517,7 +598,7 @@ func _entry_bbcode(entry: Dictionary) -> String:
 	var kind := StringName(entry.get("kind", &""))
 	var label := spend_label(entry)
 	var label_bb := _color(ShopPanel.bb_escape(label), UiTheme.TEXT)
-	if kind == &"shop" or kind == &"shop_forge":
+	if kind == &"shop" or kind == &"shop_forge" or kind == &"black_market":
 		var name := String(entry.get("label", "")).trim_suffix(" (forged)")
 		var item := _offer_item(name, int(entry.get("amount", -1)))
 		if item != null:
@@ -541,7 +622,10 @@ func _offer_item(name: String, price: int) -> ItemInstance:
 	if shop == null:
 		return null
 	var found: ItemInstance = null
-	for o in shop.offers:
+	var listed: Array = shop.offers.duplicate()
+	if shop.black_market != null:
+		listed.append(shop.black_market)
+	for o: Shop.Offer in listed:
 		if o == null or o.item == null or o.item.display_name != name:
 			continue
 		if o.price == price:
@@ -570,11 +654,17 @@ func _mark_dirty(_a: Variant = null) -> void:
 	_dirty = true
 
 
+func _on_dust_changed(_dust: int, _delta: int) -> void:
+	refresh_dust()
+
+
 func _enter_tree() -> void:
 	if not RunState.spent.is_connected(_mark_dirty):
 		RunState.spent.connect(_mark_dirty)
 	if not RunState.wants_changed.is_connected(_mark_dirty):
 		RunState.wants_changed.connect(_mark_dirty)
+	if not RunState.dust_changed.is_connected(_on_dust_changed):
+		RunState.dust_changed.connect(_on_dust_changed)
 	if shop != null and not shop.changed.is_connected(_mark_dirty):
 		shop.changed.connect(_mark_dirty)
 
@@ -584,5 +674,7 @@ func _exit_tree() -> void:
 		RunState.spent.disconnect(_mark_dirty)
 	if RunState.wants_changed.is_connected(_mark_dirty):
 		RunState.wants_changed.disconnect(_mark_dirty)
+	if RunState.dust_changed.is_connected(_on_dust_changed):
+		RunState.dust_changed.disconnect(_on_dust_changed)
 	if shop != null and shop.changed.is_connected(_mark_dirty):
 		shop.changed.disconnect(_mark_dirty)
