@@ -31,7 +31,8 @@ extends RefCounted
 ##   --artifact-chance=X  M6 debug hook: overrides the Artifact drop chance of every roll (0..1,
 ##                        LootDrops.artifact_chance_override; default: off, the normal chances)
 ##   --end-page=NAME      dev: the page the end screen opens on with --view=game_over / victory –
-##                        summary (default) or meter (the Damage Meter; screenshots)
+##                        summary (default), meter (the Damage Meter) or leaderboard (the M6b board;
+##                        screenshots)
 ##   --save-card          dev: the end screen saves the run card (user://cards/run_<date>.png) as
 ##                        soon as --view forces it, prints "CARD <path>" and keeps going (screenshots)
 ##   --mode=NAME          M6b: the run mode – normal (default) or endless (RunState.mode; the lobby's

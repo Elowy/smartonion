@@ -198,8 +198,12 @@ func _build() -> void:
 	title_label = UiTheme.centered_label("Victory!", UiTheme.TITLE, 110)
 	title_label.add_theme_constant_override(&"outline_size", 18)
 	col.add_child(title_label)
+	# The subtitle and the mode row are one group with a tight gap: a hidden mode row (a normal run) takes no
+	# room, and an endless / hardcore one adds less height, so the worst-case panel still fits 1080 px.
+	var head := UiTheme.vbox(2)
+	col.add_child(head)
 	subtitle_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_LARGE)
-	col.add_child(subtitle_label)
+	head.add_child(subtitle_label)
 	mode_row = UiTheme.hbox(14)
 	mode_row.name = "ModeRow"
 	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -208,7 +212,7 @@ func _build() -> void:
 	mode_row.add_child(mode_label)
 	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_BODY - 2)
 	mode_row.add_child(hardcore_badge)
-	col.add_child(mode_row)
+	head.add_child(mode_row)
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
 
