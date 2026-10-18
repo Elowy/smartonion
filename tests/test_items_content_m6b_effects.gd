@@ -26,3 +26,33 @@ func test_robe_of_the_tidewoven_veil_makes_the_ice_barrier_absorb_a_quarter_more
 	check_near(_ctx(p, &"ice_barrier").num("power"), 1.25, 0.0001, "power x1.25 from the robe")
 	check_near(worn, (4.0 + 0.5 * i + 0.5 * sp) * 1.25, 0.001, "the whole absorb x1.25 at Rank I")
 	check(worn > before, "the robe makes the barrier stronger")
+
+
+## The burn an enemy takes from a Fireball hit, as a share of that hit: the burn total (rate x
+## duration, plus what has burnt so far) over the first hit the enemy took.
+func _burn_share(p: Player, e: Fakes.FakeEnemy) -> float:
+	var burn := MageBurn.find(e, p)
+	check(burn != null, "burning")
+	if burn == null or e.fake_damage_log.is_empty():
+		return 0.0
+	return (burn.remaining() + burn.dealt) / e.fake_damage_log[0]
+
+
+func test_long_coal_staff_makes_the_fireball_burn_deal_15_percent_more_of_the_hit() -> void:
+	var p := _mage()
+	var slot := _learn(p, &"fireball")
+	var first := _enemy(Vector3(5, 0, 0))
+	check(p.abilities.try_cast(slot), "cast")
+	_fly()
+	check_near(_burn_share(p, first), 0.5, 0.01, "without the staff the burn is 50% of the hit")
+	# The first enemy steps out of reach (no auto-cast on it), the burn runs out and the Fireball
+	# recharges (the hero's runner ticks its cooldown).
+	first.global_position = Vector3(-30, 0, 0)
+	EnemyGrid.mark_dirty()
+	_step(4.5, [p])
+	check_eq(MageBurn.find(first, p), null, "the first burn is over")
+	_wear(p, &"long_coal_staff")
+	var second := _enemy(Vector3(5, 0, 0))
+	check(p.abilities.try_cast(slot), "cast with the staff")
+	_fly()
+	check_near(_burn_share(p, second), 0.65, 0.01, "with the staff the burn is 65% of the hit")

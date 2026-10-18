@@ -21,10 +21,10 @@ unique_effect = &"ability_mod"
 unique_params = {
 "ability": "fireball",
 "mods": {
-"burn_duration_add": 2.0
+"burn_pct_add": 15.0
 }
 }
-unique_text = "Equip: Your Fireball's burn lasts 2 sec longer."
+unique_text = "Equip: Your Fireball's burn deals 15% more of its hit."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0
