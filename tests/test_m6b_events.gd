@@ -513,7 +513,8 @@ func test_a_totem_that_lasts_20_s_pays_xp_and_the_team_buff() -> void:
 	for h in heroes:
 		check_near(h.bonuses.damage_mult(null, &"physical", &"weapon"), 1.15, 0.0001, "+15% damage for every hero")
 	check_eq(_xp_in(main.arena.entities) - xp_before, DefendTotem.reward_xp(6), "25 x the average enemy XP")
-	check(EventSpawner.TOTEM_HELD_TEXT in announcements, "banner")
+	check(EventSpawner.totem_held_text() in announcements, "banner")
+	check_eq(EventSpawner.totem_held_text(), "The totem holds!  +15% damage", "its words")
 	var calm := totem.damage_taken
 	totem.take_damage(100.0)
 	check_eq(totem.damage_taken, calm, "a held totem takes no more damage")
@@ -751,18 +752,53 @@ func test_the_same_event_rng_builds_the_same_event() -> void:
 	check_eq(picks[0][1], picks[1][1], "the same guards")
 
 
-func test_building_an_event_does_not_move_the_roll_stream_of_the_gameplay_rng() -> void:
-	# Everything the spawner chooses itself comes from the event rng; the gameplay rng moves only through
-	# the enemies' own setup (4 draws each, like any enemy).
+func test_the_totem_is_built_from_the_event_rng_alone() -> void:
+	# Everything the spawner chooses itself comes from the event rng (a chest's and a cart's guards then go
+	# through Enemy.setup, which draws from the gameplay rng like every enemy; a totem has none).
 	_make_spawner()
 	spawner.roll_wave(5)
 	var event_state := RunState.event_rng.state
-	spawner.start_event(EventSpawner.DEFEND_TOTEM)
-	var after_totem := RunState.event_rng.state
-	check(after_totem != event_state, "choosing a spot draws from the event rng")
 	var gameplay := RunState.rng.state
-	spawner.end_wave()
+	spawner.start_event(EventSpawner.DEFEND_TOTEM)
+	check(RunState.event_rng.state != event_state, "choosing a spot draws from the event rng")
 	check_eq(RunState.rng.state, gameplay, "a totem draws nothing from the gameplay rng")
+	spawner.end_wave()
+	check_eq(RunState.rng.state, gameplay, "nor does settling it")
+
+
+func test_guards_and_the_gold_burst_stay_inside_their_numbers() -> void:
+	# The guards' ring is clamped into the arena (a chest in a corner), the burst pays the whole amounts.
+	var chest := GuardedChest.create(5)
+	_arena().entities.add_child(chest)
+	chest.global_position = Vector3(-16.0, 0.0, -10.0)
+	var datas: Array[EnemyData] = [EFakes.enemy_data(), EFakes.enemy_data(), EFakes.enemy_data(), EFakes.enemy_data()]
+	var guards := chest.guards.spawn_guards(datas, 5, GuardedChest.post_offsets(4), 2.0, _arena().entities)
+	check_eq(guards.size(), 4, "four guards")
+	var b := _arena().get_bounds()
+	for g in guards:
+		check(b.has_point(Vector2(g.global_position.x, g.global_position.z)), "inside the arena: %s" % g.global_position)
+	for off in GuardedChest.post_offsets(4):
+		check_near(off.length(), GuardedChest.POST_RADIUS, 0.0001, "the unclamped posts lie on the ring")
+	var pickups := EventFx.burst(_arena().entities, Vector3.ZERO, 10, 3, 8, 1.0)
+	var gold := 0
+	var xp := 0
+	for p in pickups:
+		gold += p.gold
+		xp += p.xp
+	check_eq(gold, 10, "all the gold is paid")
+	check_eq(xp, 3, "all the XP is paid")
+	check_eq(pickups.size(), 8, "in the piles that have something in them")
+	check(EventFx.burst(null, Vector3.ZERO, 10, 3).is_empty(), "no parent, no burst")
+
+
+func test_the_escort_stands_behind_the_cart_whichever_way_it_rolls() -> void:
+	for sign_x in [-1.0, 1.0]:
+		var dir := Vector3(sign_x, 0.0, 0.0)
+		var offsets := CaravanCart.escort_offsets(3, dir)
+		check_eq(offsets.size(), 3, "three posts")
+		for o in offsets:
+			check(o.dot(dir) < -2.0, "behind the cart (%s for dir %s)" % [o, dir])
+		check(offsets[0].z * offsets[1].z < 0.0, "two of them on either side")
 
 
 func test_a_run_with_a_forced_event_builds_it_and_settles_it_at_the_wave_end() -> void:

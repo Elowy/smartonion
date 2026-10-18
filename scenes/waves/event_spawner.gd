@@ -76,7 +76,7 @@ const CROSS_END_MARGIN := 2.0
 const CHEST_TEXT := "A guarded chest appeared!"
 const CHEST_OPENED_TEXT := "The chest was opened!"
 const TOTEM_TEXT := "Defend the totem!"
-const TOTEM_HELD_TEXT := "The totem holds!  +15% damage"
+const TOTEM_HELD_FORMAT := "The totem holds!  +%d%% damage"
 const TOTEM_FELL_TEXT := "The totem fell"
 const CARAVAN_TEXT := "A goblin caravan is crossing!"
 const CARAVAN_PLUNDERED_TEXT := "The caravan was plundered!"
@@ -131,6 +131,11 @@ static func parse_id(text: String) -> StringName:
 		"caravan":
 			return GOBLIN_CARAVAN
 	return &""
+
+
+## The banner of a held totem: "The totem holds!  +15% damage" (the buff percentage of DefendTotem).
+static func totem_held_text() -> String:
+	return TOTEM_HELD_FORMAT % roundi(DefendTotem.BUFF_PCT)
 
 
 ## HP of one Skeleton Grunt at [param wave] with the party's HP factor (what Enemy.setup gives a grunt):
@@ -373,7 +378,7 @@ func _on_totem_held(t: DefendTotem) -> void:
 	EventFx.burst(spawn_parent(), at, 0, DefendTotem.reward_xp(_event_wave()), DefendTotem.XP_PILES,
 			DefendTotem.XP_RING)
 	_finish(DEFEND_TOTEM, true)
-	announced.emit(TOTEM_HELD_TEXT, TOTEM_COLOR)
+	announced.emit(totem_held_text(), TOTEM_COLOR)
 
 
 func _on_totem_fell(_t: DefendTotem) -> void:
