@@ -62,7 +62,9 @@ func test_armor_and_jewellery_bases() -> void:
 			for wave in BASE_TIER_WAVES:
 				check(per_tier.has("%d:%d:%d" % [slot, armor_type, wave]),
 						"slot %d, armor type %d: a tier at wave %d" % [slot, armor_type, wave])
-	check(neck >= 2 and ring >= 2, "neck and ring bases")
+	check_eq(neck, 10, "neck bases (GDD 5.8)")
+	check_eq(ring, 10, "ring bases (GDD 5.8)")
+	check_eq(Db.item_bases.size(), 116, "item bases: 96 armour + 20 jewellery")
 
 
 func test_suffixes() -> void:
