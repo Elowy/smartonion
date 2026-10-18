@@ -194,6 +194,11 @@ static func brazier_hp(p_wave: int) -> float:
 ## Enters: the arena takes the dungeon layout, the heroes (the valid ones of [param p_heroes]) are put
 ## on its spawn points as at a wave start (Player.begin_wave: full HP, downed ones back at 50%) and the
 ## first room begins after INTRO_TIME.
+## Each hero gets the whole Player.begin_wave() reset, so a dungeon entry also counts as a wave start for
+## the wave_start procs: their cooldowns and per-wave limits re-arm, and their "every N" counters keep
+## counting across it (ProcSystem.begin_wave). No current content authors a wave_start trigger (data/ has
+## none), so nothing differs today; a wave_start proc added later must allow for the extra wave, or the
+## dungeon entry needs a lighter reset.
 func start(p_heroes: Array[Player]) -> void:
 	if phase != Phase.IDLE:
 		return
