@@ -78,7 +78,10 @@ func open(p_victory: bool) -> void:
 
 ## Number of waves the team survived.
 static func waves_cleared(p_victory: bool) -> int:
-	return RunState.TOTAL_WAVES if p_victory else clampi(RunState.wave - 1, 0, RunState.TOTAL_WAVES)
+	var total := RunState.total_waves()
+	if p_victory:
+		return total if total > 0 else maxi(RunState.wave, 0)
+	return clampi(RunState.wave - 1, 0, total) if total > 0 else maxi(RunState.wave - 1, 0)
 
 
 func set_backdrop_opacity(alpha: float) -> void:
@@ -280,12 +283,13 @@ func _fill() -> void:
 	if victory:
 		title_label.text = "Victory!"
 		title_label.add_theme_color_override(&"font_color", UiTheme.GOLD)
-		subtitle_label.text = "All %d waves survived – the onions prevail!" % RunState.TOTAL_WAVES
+		subtitle_label.text = "All %d waves survived – the onions prevail!" % RunState.total_waves() \
+				if RunState.total_waves() > 0 else "%d waves survived – the onions prevail!" % waves_cleared(true)
 	else:
 		title_label.text = "Defeat"
 		title_label.add_theme_color_override(&"font_color", UiTheme.RED)
 		subtitle_label.text = "The party was peeled on wave %d. Dry your tears and try again." % maxi(RunState.wave, 1)
-	waves_value.text = "%d / %d" % [waves_cleared(victory), RunState.TOTAL_WAVES]
+	waves_value.text = RunState.count_text(waves_cleared(victory))
 	kills_value.text = UiTheme.format_int(RunState.kills)
 	gold_value.text = UiTheme.format_int(RunState.gold_earned)
 	gold_value.add_theme_color_override(&"font_color", UiTheme.GOLD)

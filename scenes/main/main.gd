@@ -13,9 +13,10 @@ extends Node
 ##   wave_cleared -> WAVE_END ("Wave cleared!" for WAVE_END_DELAY) -> INTERMISSION (tree
 ##   paused: loot roll of RunState.team_loot, the level-up cards for
 ##   RunState.pending_level_ups, then the shared shop + personal panels; the pending level-ups
-##   are cleared when the next wave starts) -> next wave; after wave RunState.TOTAL_WAVES
-##   -> GAME_OVER (victory). Everybody downed at the same time (solo: the player is downed)
-##   -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with the same players.
+##   are cleared when the next wave starts) -> next wave; after wave RunState.total_waves() (25 in
+##   the normal mode, never in the endless one) -> GAME_OVER (victory). Everybody downed at the same
+##   time (solo: the player is downed) -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with
+##   the same players.
 ## - Any player's START during a wave opens the PauseMenu (get_tree().paused). A controller
 ##   unplugged during a run pauses the wave and shows a HUD notice until it is back (also when
 ##   it is already gone as the next wave is about to start). The game cannot be resumed while a
@@ -35,8 +36,15 @@ extends Node
 ##   after RunState.start_run (which resets them): GoblinSpawner.chance_override,
 ##   EliteAffixes.rate_mult, PlayerPanel.debug_start_tab and the start level
 ##   (RunState.set_start_level, before the heroes spawn).
+## - M6b: the run's mode (normal / endless), hardcore flag and environment come from the launch
+##   options ([method configure_run] is how the lobby changes them) and go into RunState.start_run;
+##   [member RunState.environment] picks the arena's [EnvironmentData] ([method _environment_id]), and
+##   the WaveDirector gets an [EventSpawner] child ([member event_spawner]) next to the GoblinSpawner.
+##   Every "last wave" decision reads RunState.total_waves() / is_final_wave() (0 = endless: the run
+##   ends only in defeat).
 ## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
-## --start-level, --panel-tab ...): see LaunchOptions. SMOKE_RESULT keys: see smoke_result().
+## --start-level, --panel-tab, --mode, --hardcore, --env, --event ...): see LaunchOptions. SMOKE_RESULT
+## keys: see smoke_result().
 
 signal state_changed(state: State)
 ## A run ended (before the Game Over screen opens).
@@ -83,6 +91,8 @@ var arena: Arena
 var wave_director: WaveDirector
 ## Child of the WaveDirector (M5): the Loot Goblin's spawner.
 var goblin_spawner: GoblinSpawner
+## Child of the WaveDirector (M6b): the mid-wave event slot (EVENTS package).
+var event_spawner: EventSpawner
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -244,9 +254,12 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
-	RunState.start_run(slots.size(), options.run_seed())
+	RunState.start_run(slots.size(), options.run_seed(), options.mode, options.hardcore, _environment_id())
 	artifact_lines.clear()
 	# Test hooks (start_run reset the statics to their defaults).
+	RunState.shrine_chance_override = options.shrine_chance
+	RunState.event_override = options.event
+	RunState.dungeon_forced = options.dungeon
 	GoblinSpawner.chance_override = options.goblin_chance
 	EliteAffixes.rate_mult = options.elite_mult
 	BossData.hp_mult = options.boss_hp
@@ -271,7 +284,7 @@ func start_run() -> void:
 	victory = false
 	perf = RunPerf.new()
 
-	arena = Arena.create()
+	arena = Arena.create(Db.environment_or_default(RunState.environment))
 	arena.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(arena)
 	wave_director = WaveDirector.create(arena)
@@ -283,6 +296,9 @@ func start_run() -> void:
 	goblin_spawner = GoblinSpawner.create(wave_director)
 	wave_director.add_child(goblin_spawner)
 	goblin_spawner.announced.connect(_on_announced)
+	event_spawner = EventSpawner.create(wave_director)
+	wave_director.add_child(event_spawner)
+	event_spawner.announced.connect(_on_announced)
 
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
@@ -317,7 +333,9 @@ func start_run() -> void:
 	hud.bind_players(players)
 	if _run_frame < 0:
 		_run_frame = Engine.get_physics_frames()
-	_log("run started: %d players (%s), first wave %d, seed %d" % [players.size(), _class_list(), first_wave, options.run_seed()])
+	_log("run started: %d players (%s), first wave %d, seed %d, mode %s, environment %s" % [
+		players.size(), _class_list(), first_wave, options.run_seed(), RunState.mode_text(RunState.mode, RunState.hardcore).to_lower(),
+		RunState.environment])
 	start_wave(first_wave)
 
 
@@ -325,7 +343,7 @@ func start_run() -> void:
 func start_wave(n: int) -> void:
 	if arena == null or wave_director == null:
 		return
-	wave = clampi(n, 1, RunState.TOTAL_WAVES)
+	wave = RunState.clamp_wave(n)
 	get_tree().paused = false
 	if intermission != null:
 		intermission.hide()
@@ -343,8 +361,30 @@ func start_wave(n: int) -> void:
 	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
-		hud.show_banner("Final Wave" if wave >= RunState.TOTAL_WAVES else "Wave %d" % wave)
+		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave)
 	_pause_if_pad_missing()
+
+
+## The next run's mode and hardcore flag (the lobby's mode select calls this; --mode / --hardcore set
+## the same fields at launch). An unknown mode plays as normal.
+func configure_run(p_mode: StringName, p_hardcore: bool) -> void:
+	options.mode = p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
+	options.hardcore = p_hardcore
+
+
+## The environment of the next run: --env when given, else the default (Forest Ruin). The ENV package
+## replaces the default with the roll (RunState.environment_rng is seeded in RunState.start_run, so a
+## roll before the run takes its seed from RunState.derived_seed).
+func _environment_id() -> StringName:
+	if options.environment != &"" and Db.get_environment(options.environment) != null:
+		return options.environment
+	return RunState.DEFAULT_ENVIRONMENT
+
+
+## True when a finished run goes into the leaderboard file (Leaderboard.record_run): not in smoke,
+## demo, screenshot or forced-view runs, whose runs are not the player's.
+func writes_leaderboard() -> bool:
+	return not (options.smoke or options.demo or options.view != "" or options.screenshot_path != "")
 
 
 ## Between-wave screen (tree paused): loot roll (if any team loot), then the shared shop and
@@ -553,7 +593,7 @@ func _show_disconnect_notice() -> void:
 
 
 func _after_wave_end() -> void:
-	if wave >= RunState.TOTAL_WAVES:
+	if RunState.is_final_wave(wave):
 		end_run(true)
 	else:
 		open_intermission()
@@ -603,6 +643,7 @@ func _teardown_run() -> void:
 	hud = null
 	wave_director = null
 	goblin_spawner = null  # freed with the director
+	event_spawner = null
 	arena = null
 	players.clear()
 	_disconnected.clear()
@@ -673,7 +714,7 @@ func _on_wave_cleared(n: int) -> void:
 		RunState.elites_killed, RunState.elites_spawned, RunState.goblins_spawned,
 		RunState.goblins_killed, RunState.goblins_escaped, _wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
-		if n >= RunState.TOTAL_WAVES:
+		if RunState.is_final_wave(n):
 			RunState.end_run(true)
 		_finish_smoke("completed")
 		return
@@ -682,10 +723,10 @@ func _on_wave_cleared(n: int) -> void:
 	_set_state(State.WAVE_END)
 
 
-## The banner of a won wave: "Victory!" after the last one, "<Boss> defeated!" after a boss
-## wave, else "Wave cleared!".
+## The banner of a won wave: "Victory!" after the last one (never in the endless mode), "<Boss>
+## defeated!" after a boss wave, else "Wave cleared!".
 func _wave_cleared_text(n: int) -> String:
-	if n >= RunState.TOTAL_WAVES:
+	if RunState.is_final_wave(n):
 		return "Victory!"
 	# (The boss itself may be freed by now: the definition stays.)
 	if wave_director != null and wave_director.boss_data != null:
@@ -935,7 +976,10 @@ func _finish_smoke(result: String) -> void:
 ## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
 ## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
 ## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
-## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict).
+## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict). M6b keys:
+## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
+## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
+## counters of the feature packages; 0 until they land).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var need_wins := 0
@@ -989,6 +1033,16 @@ func smoke_result(result: String) -> Dictionary:
 		"dust_earned": RunState.dust_earned,
 		"dust_spent": RunState.dust_spent,
 		"run_time": snappedf(RunState.run_time, 0.1),
+		"mode": String(RunState.mode),
+		"hardcore": RunState.hardcore,
+		"environment": String(RunState.environment),
+		"events_spawned": RunState.events_spawned,
+		"events_completed": RunState.events_completed,
+		"shrines_offered": RunState.shrines_offered,
+		"shrines_accepted": RunState.shrines_accepted,
+		"dungeons_entered": RunState.dungeons_entered,
+		"dungeons_completed": RunState.dungeons_completed,
+		"dungeons_failed": RunState.dungeons_failed,
 		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,

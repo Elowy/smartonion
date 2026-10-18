@@ -15,6 +15,9 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Tests never touch the player's leaderboard file (a test that exercises Leaderboard.record_run
+	# sets Leaderboard.path_override to a temp path and switches writing on itself).
+	Leaderboard.writes_enabled = false
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

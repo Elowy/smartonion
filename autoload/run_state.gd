@@ -10,6 +10,10 @@ extends Node
 ## - M6 foundation: Arcane Dust (the second team currency, [method add_dust] /
 ##   [method try_spend_dust_for]), the damage-meter record (per-slot healing, absorbed, damage
 ##   taken, revives, downs + [member run_time]), boss / artifact / consumable / enchant counters.
+## - M6b foundation: the run's [member mode] (normal / endless) and [member hardcore] flag, its
+##   [member environment], [method total_waves] (the run length every wave-count display and the
+##   victory check read; 0 = endless), the run seed with the sub-RNGs derived from it (environment,
+##   events, shrines, dungeon), the event / shrine / dungeon counters and the debug overrides.
 
 signal run_started
 signal run_ended(victory: bool)
@@ -33,7 +37,23 @@ signal dust_changed(dust: int, delta: int)
 ## source (ItemGenerator.SOURCE_IDS: &"boss", &"goblin", &"elite", &"loot"). Main logs it.
 signal artifact_dropped(item: ItemInstance, source: StringName)
 
+## The normal mode's length (what [method total_waves] returns in it). Gameplay and UI code reads
+## [method total_waves], never this constant (the endless mode has no last wave).
 const TOTAL_WAVES := 25
+## [method total_waves] of the endless mode: no last wave.
+const ENDLESS_WAVES := 0
+## Run modes ([member mode]).
+const MODE_NORMAL: StringName = &"normal"
+const MODE_ENDLESS: StringName = &"endless"
+const MODES: Array[StringName] = [MODE_NORMAL, MODE_ENDLESS]
+## The environment a run gets when nothing else is chosen (data/environments/forest_ruin.tres).
+const DEFAULT_ENVIRONMENT: StringName = &"forest_ruin"
+## Salts of the sub-RNGs ([method sub_rng]): each M6b feature that rolls on its own draws from a
+## generator seeded from [member run_seed] and its salt, so it never moves [member rng].
+const SALT_ENVIRONMENT := 0x454E56
+const SALT_EVENTS := 0x455654
+const SALT_SHRINES := 0x534852
+const SALT_DUNGEON := 0x44554E
 const BOSS_WAVES: Array[int] = [10, 25]
 const ELITE_WAVES: Array[int] = [20]
 ## The team starts at level 1 (WoW style); the XP curve counts level-ups from here.
@@ -56,8 +76,33 @@ var level := START_LEVEL
 ## Level-ups gained during the current wave, resolved on the between-wave screen.
 var pending_level_ups := 0
 var player_count := 1
-var difficulty: StringName = &"normal"
 var rng := RandomNumberGenerator.new()
+
+# M6b: what kind of run this is. Set by start_run (parameters), read everywhere through the helpers.
+## The run mode: MODE_NORMAL (25 waves, the final boss ends it) or MODE_ENDLESS (no last wave).
+var mode: StringName = MODE_NORMAL
+## Hardcore: no Spirit Healer, only a teammate can revive a downed hero (MODES package). Solo
+## hardcore is the normal solo run (the first down ends it).
+var hardcore := false
+## The id of the arena's environment (Db.environments; ENV package).
+var environment: StringName = DEFAULT_ENVIRONMENT
+## The seed this run's [member rng] started from (the given one, else the random one it drew).
+var run_seed := 0
+## Own generators of the M6b features, seeded once per run from [member run_seed] ([method sub_rng]):
+## the environment roll, the mid-wave events, the shrine roll at a break, the dungeon encounters. Their
+## draws never touch [member rng], so a seeded run without the feature plays as it did before.
+var environment_rng := RandomNumberGenerator.new()
+var event_rng := RandomNumberGenerator.new()
+var shrine_rng := RandomNumberGenerator.new()
+var dungeon_rng := RandomNumberGenerator.new()
+
+# M6b debug overrides (reset by start_run, applied by Main from the launch options).
+## --shrine-chance: the chance of a shrine at every break (0..1; < 0 = the normal chance).
+var shrine_chance_override := -1.0
+## --event: the mid-wave event every eligible wave gets (&"" = rolled; EventSpawner.EVENT_IDS).
+var event_override: StringName = &""
+## --dungeon: the dungeon portal opens after the next wave (DUNGEON package clears it when it does).
+var dungeon_forced := false
 
 # Run statistics (end screen).
 var kills := 0
@@ -149,8 +194,31 @@ var artifact_pity := 0.0
 ## Classes that already dropped their Artifact this run (max one per class, ARTIFACTS package).
 var artifact_classes: Array[StringName] = []
 
+# M6b counters (SMOKE_RESULT, end screen). The feature packages bump them.
+## Mid-wave events that appeared (EventSpawner.start_event) / were won by the party.
+var events_spawned := 0
+var events_completed := 0
+## Shrines offered at a break / accepted by the whole party (SHRINES package).
+var shrines_offered := 0
+var shrines_accepted := 0
+## Dungeon portals the party walked into / cleared / failed (DUNGEON package).
+var dungeons_entered := 0
+var dungeons_completed := 0
+var dungeons_failed := 0
+## The shrine waiting for the break's SHRINE phase (a shrine id; &"" = none). The SHRINES package
+## sets it when the break roll hits; Intermission.wants_shrine() reads it.
+var pending_shrine: StringName = &""
+## Shrine effects running over the next waves: {"id": StringName, "waves_left": int} (SHRINES package).
+var shrine_effects: Array[Dictionary] = []
+## The dungeon portal is open for this break (DUNGEON package sets it at the wave end;
+## Intermission.wants_portal() reads it).
+var portal_pending := false
 
-func start_run(p_player_count: int, seed_value: int = -1) -> void:
+
+## [param p_mode] (MODE_NORMAL / MODE_ENDLESS; anything else plays as normal), [param p_hardcore]
+## and [param p_environment] (an id of Db.environments) are the M6b run settings.
+func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = MODE_NORMAL,
+		p_hardcore: bool = false, p_environment: StringName = DEFAULT_ENVIRONMENT) -> void:
 	active = true
 	victory = false
 	wave = 0
@@ -163,6 +231,27 @@ func start_run(p_player_count: int, seed_value: int = -1) -> void:
 		rng.seed = seed_value
 	else:
 		rng.randomize()
+	run_seed = rng.seed
+	mode = p_mode if p_mode in MODES else MODE_NORMAL
+	hardcore = p_hardcore
+	environment = p_environment if p_environment != &"" else DEFAULT_ENVIRONMENT
+	environment_rng = sub_rng(SALT_ENVIRONMENT)
+	event_rng = sub_rng(SALT_EVENTS)
+	shrine_rng = sub_rng(SALT_SHRINES)
+	dungeon_rng = sub_rng(SALT_DUNGEON)
+	shrine_chance_override = -1.0
+	event_override = &""
+	dungeon_forced = false
+	events_spawned = 0
+	events_completed = 0
+	shrines_offered = 0
+	shrines_accepted = 0
+	dungeons_entered = 0
+	dungeons_completed = 0
+	dungeons_failed = 0
+	pending_shrine = &""
+	shrine_effects.clear()
+	portal_pending = false
 	kills = 0
 	gold_earned = 0
 	kills_by_player.clear()
@@ -246,8 +335,78 @@ func take_team_loot() -> Array[ItemInstance]:
 	return out
 
 
+## True while the current [member wave] is the run's last one (never in the endless mode).
 func is_last_wave() -> bool:
-	return wave >= TOTAL_WAVES
+	return is_final_wave(wave)
+
+
+# --- Run length (M6b: modes) --------------------------------------------------------------------
+
+## Waves of a [param p_mode] run: TOTAL_WAVES (25) in the normal mode, ENDLESS_WAVES (0 = unbounded)
+## in the endless mode.
+static func waves_for_mode(p_mode: StringName) -> int:
+	return ENDLESS_WAVES if p_mode == MODE_ENDLESS else TOTAL_WAVES
+
+
+## The length of the current run: 25 (normal) or 0 (endless: no last wave). Every wave count in the
+## game – the clamp of the wave number, the "Final Wave" banner, the victory check, the "Wave n / 25"
+## texts, the end screen – reads this, never a literal 25.
+func total_waves() -> int:
+	return waves_for_mode(mode)
+
+
+func is_endless() -> bool:
+	return mode == MODE_ENDLESS
+
+
+## Wave [param w] ends the run when it is won: the last wave of a normal run; never in the endless mode.
+func is_final_wave(w: int) -> bool:
+	var total := total_waves()
+	return total > 0 and w >= total
+
+
+## [param w] as a valid wave number of this run: at least 1, at most total_waves() (no upper bound
+## in the endless mode).
+func clamp_wave(w: int) -> int:
+	var total := total_waves()
+	return maxi(w, 1) if total <= 0 else clampi(w, 1, total)
+
+
+## "12 / 25" for a wave count in a normal run, just "12" in the endless mode.
+func count_text(n: int) -> String:
+	var total := total_waves()
+	return "%d / %d" % [n, total] if total > 0 else str(n)
+
+
+## "Wave 12 / 25" (normal) or "Wave 12" (endless): the HUD plaque.
+func wave_progress_text(w: int) -> String:
+	return "Wave %s" % count_text(w)
+
+
+## "Normal", "Endless", "Normal · Hardcore" ... ([param p_mode] capitalised, empty = Normal, plus
+## " · Hardcore"; the lobby header, the end screen and the run card use the same words).
+static func mode_text(p_mode: StringName, p_hardcore: bool = false) -> String:
+	var text := "Normal" if p_mode == &"" else String(p_mode).capitalize()
+	return text + " · Hardcore" if p_hardcore else text
+
+
+# --- Own random generators (M6b) -----------------------------------------------------------------
+
+## A well-mixed seed from [param base_seed] and [param salt] (SplitMix64): the same inputs always give
+## the same seed, different salts give unrelated ones.
+static func derived_seed(base_seed: int, salt: int) -> int:
+	var z := base_seed + salt * -7046029254386353131
+	z = (z ^ (z >> 30)) * -4658895280553007687
+	z = (z ^ (z >> 27)) * -7723592293110705685
+	return (z ^ (z >> 31)) & 0x7FFFFFFFFFFFFFFF
+
+
+## A fresh generator seeded from [member run_seed] and [param salt] (SALT_*). Calling it twice gives
+## two generators with the same stream; it never touches [member rng].
+func sub_rng(salt: int) -> RandomNumberGenerator:
+	var r := RandomNumberGenerator.new()
+	r.seed = derived_seed(run_seed, salt)
+	return r
 
 
 # --- Shared wallet -----------------------------------------------------------

@@ -243,7 +243,7 @@ func _build_top() -> void:
 	# Compact (it sits over the far / top part of the playfield): tight line spacing.
 	var col := UiTheme.vbox(-6)
 	plaque.add_child(col)
-	wave_label = UiTheme.centered_label("Wave 1 / %d" % RunState.TOTAL_WAVES, UiTheme.GOLD_LABEL, 22)
+	wave_label = UiTheme.centered_label(RunState.wave_progress_text(1), UiTheme.GOLD_LABEL, 22)
 	col.add_child(wave_label)
 	wave_tag_label = UiTheme.centered_label("", UiTheme.HEADING, 18, UiTheme.RED)
 	wave_tag_label.visible = false
@@ -483,7 +483,7 @@ func _ready() -> void:
 
 
 func _on_wave_changed(w: int) -> void:
-	wave_label.text = "Wave %d / %d" % [maxi(w, 1), RunState.TOTAL_WAVES]
+	wave_label.text = RunState.wave_progress_text(maxi(w, 1))
 	_boss = null
 	var boss_data := BossData.for_wave(w) if RunState.is_boss_wave(w) else null
 	if boss_data != null:
