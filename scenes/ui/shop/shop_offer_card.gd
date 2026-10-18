@@ -91,7 +91,8 @@ static func type_text(item: ItemInstance) -> String:
 	if item == null:
 		return ""
 	if item.is_weapon():
-		var t := String(item.weapon.weapon_type).capitalize()
+		var t: String = ItemTooltip.WEAPON_TYPE_NAMES.get(item.weapon.weapon_type,
+				String(item.weapon.weapon_type).capitalize())
 		if t == "":
 			t = "Weapon"
 		if item.is_two_handed():

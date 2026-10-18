@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"two_hand_mace"
+display_name = "Boulderbloom"
+unique_effect = &"nova"
+unique_params = {
+"trigger": "on_hit",
+"every": 4,
+"hit_pct": 70.0,
+"at": "self",
+"radius": 4.0,
+"slow": 50.0,
+"slow_duration": 3.0,
+"school": "physical"
+}
+unique_text = "Every 4th hit slams the ground: 70% of the hit to every enemy within 4 m of you, slowing them by 50% for 3 sec."
+flavor = "Grew from a seed. The seed was a boulder."

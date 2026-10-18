@@ -25,7 +25,7 @@ base_stats = Dictionary[StringName, float]({
 })
 main_hand = ExtResource("2_mh")
 off_hand = ExtResource("3_oh")
-proficiencies = Array[StringName]([&"sword", &"mace", &"shield", &"tome"])
+proficiencies = Array[StringName]([&"sword", &"mace", &"shield", &"tome", &"two_hand_sword", &"two_hand_mace"])
 resource_type = &"holy_power"
 resource_color = Color(1.0, 0.85, 0.3, 1)
 resources = Array[ExtResource("4_res_script")]([ExtResource("5_holy_power")])
