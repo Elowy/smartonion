@@ -64,17 +64,21 @@ func fill(board: Dictionary) -> void:
 	var rank := int(board.get("rank", -1))
 	category_label.text = String(board.get("category_text", "Leaderboard"))
 	_fill_rows(entries, rank, mode)
+	var save_failed := bool(board.get("save_failed", false))
 	if board.is_empty():
 		note_label.text = "The leaderboard is not recorded in this session."
 	elif String(board.get("error", "")) != "":
 		note_label.text = "The leaderboard file could not be used (%s)." % board["error"]
+	elif save_failed:
+		note_label.text = "Could not save the leaderboard."
 	elif rank >= 0:
 		note_label.text = "New entry: place %d of %d." % [rank + 1, Leaderboard.MAX_ENTRIES]
 	elif entries.is_empty():
 		note_label.text = "No runs recorded in this category yet."
 	else:
 		note_label.text = "This run did not reach the top %d." % Leaderboard.MAX_ENTRIES
-	note_label.add_theme_color_override(&"font_color", UiTheme.GOLD if rank >= 0 else UiTheme.TEXT_DIM)
+	var note_color := UiTheme.RED if save_failed else (UiTheme.GOLD if rank >= 0 else UiTheme.TEXT_DIM)
+	note_label.add_theme_color_override(&"font_color", note_color)
 
 
 func _fill_rows(entries: Array, rank: int, mode: StringName) -> void:

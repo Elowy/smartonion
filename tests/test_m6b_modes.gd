@@ -746,6 +746,43 @@ func test_quitting_to_the_menu_does_not_record_the_run() -> void:
 	check(not FileAccess.file_exists(TMP_BOARD), "an abandoned run is not a result")
 
 
+## A directory where the board's temporary file goes: the board itself still loads, but the save cannot open it.
+func _block_the_save() -> void:
+	check_eq(DirAccess.make_dir_absolute(TMP_BOARD + ".tmp"), OK, "the save is blocked for this test")
+
+
+func test_a_run_that_makes_the_board_but_cannot_be_saved_says_so() -> void:
+	_block_the_save()
+	var opts := LaunchOptions.new()
+	opts.mode = RunState.MODE_ENDLESS
+	opts.start_wave = 27
+	_recording_main(opts)
+	RunState.tick_run_time(321.0)
+	main.end_run(false)
+	check(bool(main.game_over.board["save_failed"]), "the save failed")
+	check_eq(main.game_over.board["rank"], -1, "no place: the file does not have the run")
+	check(not FileAccess.file_exists(TMP_BOARD), "no board file was written")
+	check_eq(main.game_over.leaderboard_page.note_label.text, "Could not save the leaderboard.", "the note says so")
+	check_eq(main.game_over.best_label.text, "Best: –", "the Best line: nothing on the board yet")
+
+
+func test_record_run_reports_a_failed_save_apart_from_a_missed_place() -> void:
+	Leaderboard.writes_enabled = true
+	Leaderboard.path_override = TMP_BOARD
+	_block_the_save()
+	var saved_failed := Leaderboard.record_run(_entry(27, 300.0), RunState.MODE_ENDLESS, false, 2)
+	check(bool(saved_failed["save_failed"]) and int(saved_failed["rank"]) == -1, "the entry made the board, the file did not change")
+	DirAccess.remove_absolute(TMP_BOARD + ".tmp")
+	var full: Array = []
+	for i in Leaderboard.MAX_ENTRIES:
+		full.append(_entry(40 - i, 1000.0))
+	_write_board(full)
+	var missed := Leaderboard.record_run(_entry(1, 1.0), RunState.MODE_ENDLESS, false, 2)
+	check(not bool(missed["save_failed"]) and int(missed["rank"]) == -1, "a run outside the top ten is not a save failure")
+	var model := Leaderboard.screen_model(_board(), _entry(1, 1.0), RunState.MODE_ENDLESS, false, 2, -1, false)
+	check(not bool(model["save_failed"]), "and the model says nothing failed")
+
+
 # --- The end screen: the Leaderboard page, the mode row, the badge -------------------------------
 
 func _screen(p_board: Dictionary = {}) -> GameOverScreen:

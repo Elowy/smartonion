@@ -211,20 +211,26 @@ func save_file() -> Error:
 
 
 ## The call a finished run makes: loads the board at [method default_path], adds [param entry] to its
-## category, saves, and returns the entry's rank (-1 = not in the top MAX_ENTRIES, or nothing written:
-## [member writes_enabled] is false, or the board is [member read_only] (a newer version, or a file that
-## cannot be read).
-static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> int:
+## category, saves, and returns {"rank": int, "save_failed": bool}. "rank" is the entry's place (0 = the best),
+## -1 when it did not make the top MAX_ENTRIES or nothing was written ([member writes_enabled] is false, or the
+## board is [member read_only]: a newer version, or a file that cannot be read). "save_failed" is true only when
+## the entry made the board but the file could not be written: then "rank" is -1 too and the file is as it was.
+static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> Dictionary:
+	var outcome := {"rank": -1, "save_failed": false}
 	if not writes_enabled:
-		return -1
+		return outcome
 	var board := create()
 	board.load_file()
 	if board.read_only:
-		return -1
+		return outcome
 	var rank := board.add_entry(entry, p_mode, p_hardcore, p_party)
-	if rank >= 0 and board.save_file() != OK:
-		return -1
-	return rank
+	if rank < 0:
+		return outcome
+	if board.save_file() != OK:
+		outcome["save_failed"] = true
+		return outcome
+	outcome["rank"] = rank
+	return outcome
 
 
 # --- The end screen's board (M6b MODES) -------------------------------------------------------
@@ -293,13 +299,14 @@ static func best_line(p_best: Dictionary, p_mode: StringName, p_rank: int = -1) 
 ## What the end screen shows of the board after a run: {"mode", "hardcore", "party", "key" (the category),
 ## "category_text", "entries" (the category on [param board], best first), "rank" (the run's place in
 ## them, -1 = not on the board: it was not written or missed the top 10), "entry" (the run's own entry),
-## "best" ({} = none yet), "line" (the "Best: ..." text), "error" ("" or why the file was not used)}.
+## "best" ({} = none yet), "line" (the "Best: ..." text), "error" ("" or why the file was not used),
+## "save_failed" (the entry made the board but the file could not be written: see [method record_run])}.
 ## [param board] is the board read after the run was recorded ([method load_file]).
 static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringName, p_hardcore: bool,
-		p_party: int, p_rank: int) -> Dictionary:
+		p_party: int, p_rank: int, p_save_failed: bool = false) -> Dictionary:
 	var entries := board.entries_for(p_mode, p_hardcore, p_party)
 	var best: Dictionary = entries[0] if not entries.is_empty() else {}
-	var rank := p_rank if p_rank >= 0 and p_rank < entries.size() else -1
+	var rank := p_rank if p_rank >= 0 and p_rank < entries.size() and not p_save_failed else -1
 	var line := best_line(best, p_mode, rank)
 	if board.load_error != "":
 		line = "Leaderboard unavailable (%s)" % board.load_error
@@ -315,6 +322,7 @@ static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringNa
 		"best": best,
 		"line": line,
 		"error": board.load_error,
+		"save_failed": p_save_failed,
 	}
 
 

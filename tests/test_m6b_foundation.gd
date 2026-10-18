@@ -1140,7 +1140,7 @@ func test_leaderboard_newer_version_is_never_overwritten() -> void:
 	check_eq(FileAccess.get_file_as_string(TMP_BOARD), future, "the file is untouched")
 	Leaderboard.writes_enabled = true
 	Leaderboard.path_override = TMP_BOARD
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1), -1, "record_run writes nothing")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1)["rank"], -1, "record_run writes nothing")
 	check_eq(FileAccess.get_file_as_string(TMP_BOARD), future, "still untouched")
 
 
@@ -1175,7 +1175,7 @@ func test_an_unreadable_board_file_is_never_overwritten() -> void:
 	check(not FileAccess.file_exists(TMP_BOARD + ".tmp"), "no temporary file was written")
 	Leaderboard.writes_enabled = true
 	Leaderboard.path_override = TMP_BOARD
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1), -1,
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(5, 1.0, [&"mage"], false), &"normal", false, 1)["rank"], -1,
 			"record_run writes nothing")
 	check(DirAccess.dir_exists_absolute(TMP_BOARD), "still a directory")
 
@@ -1201,13 +1201,13 @@ func test_leaderboard_record_run_respects_the_write_gate() -> void:
 	Leaderboard.path_override = TMP_BOARD
 	var entry := Leaderboard.make_entry(25, 700.0, [&"warrior"], true)
 	Leaderboard.writes_enabled = false
-	check_eq(Leaderboard.record_run(entry, &"normal", false, 1), -1, "switched off: nothing recorded")
+	check_eq(Leaderboard.record_run(entry, &"normal", false, 1)["rank"], -1, "switched off: nothing recorded")
 	check(not FileAccess.file_exists(TMP_BOARD), "and no file written")
 	Leaderboard.writes_enabled = true
 	check_eq(Leaderboard.default_path(), TMP_BOARD, "path_override replaces the default path")
-	check_eq(Leaderboard.record_run(entry, &"normal", false, 1), 0, "the first entry is the best")
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 650.0, [&"warrior"], true), &"normal", false, 1), 0, "a faster win is the new best")
-	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 800.0, [&"warrior"], true), &"normal", false, 1), 2, "a slower one is third")
+	check_eq(Leaderboard.record_run(entry, &"normal", false, 1)["rank"], 0, "the first entry is the best")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 650.0, [&"warrior"], true), &"normal", false, 1)["rank"], 0, "a faster win is the new best")
+	check_eq(Leaderboard.record_run(Leaderboard.make_entry(25, 800.0, [&"warrior"], true), &"normal", false, 1)["rank"], 2, "a slower one is third")
 	var board := Leaderboard.create()
 	board.load_file()
 	check_eq(board.entries_for(&"normal", false, 1).size(), 3, "all three are in the file")

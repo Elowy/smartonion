@@ -463,12 +463,18 @@ func _record_leaderboard(p_victory: bool) -> Dictionary:
 		classes.append(slot.class_data.id if slot.class_data != null else &"")
 	var entry := Leaderboard.make_entry(wave, RunState.run_time, classes, p_victory)
 	var rank := -1
+	var save_failed := false
 	if writes_leaderboard():
-		rank = Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count)
+		var outcome := Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count)
+		rank = int(outcome["rank"])
+		save_failed = bool(outcome["save_failed"])
 	var board := Leaderboard.create()
 	board.load_file()
-	var model := Leaderboard.screen_model(board, entry, RunState.mode, RunState.hardcore, RunState.player_count, rank)
+	var model := Leaderboard.screen_model(board, entry, RunState.mode, RunState.hardcore, RunState.player_count,
+			rank, save_failed)
 	_log("leaderboard %s: %s" % [model["key"], model["line"]])
+	if save_failed:
+		_log("leaderboard: the run made the board but %s could not be written" % board.path)
 	return model
 
 
