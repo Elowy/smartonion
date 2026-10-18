@@ -41,6 +41,8 @@ const XP_MULT := 25.0
 const XP_PILES := 8
 const XP_RING := 1.6
 const NAME_TEXT := "Totem"
+## How much larger than the modelled 3 m the pole is drawn.
+const VISUAL_SCALE := 1.25
 const COLOR := Color(0.3, 0.85, 0.9)
 
 const WOOD := Color(0.46, 0.3, 0.17)
@@ -230,9 +232,14 @@ func _label_text() -> String:
 
 
 func _build_visual() -> void:
+	# Drawn VISUAL_SCALE times the modelled size so it reads from the camera's distance.
+	var visual := Node3D.new()
+	visual.name = "Visual"
+	visual.scale = Vector3.ONE * VISUAL_SCALE
+	add_child(visual)
 	_body = Node3D.new()
 	_body.name = "Body"
-	add_child(_body)
+	visual.add_child(_body)
 	var pole := MeshInstance3D.new()
 	pole.name = "Pole"
 	pole.mesh = MeshKit.cached("event:totem_pole", func() -> Mesh: return _pole_mesh())
@@ -252,8 +259,8 @@ func _build_visual() -> void:
 	_orb.position.y = 2.55
 	_body.add_child(_orb)
 	_ring = EventFx.ring(self, "LureRing", LURE_RADIUS, COLOR, 0.992, 1.0)
-	_bar = EventFx.bar(self, "HpBar", 3.25, Color(0.25, 0.9, 0.35), 1.0)
-	_label = EventFx.label(self, "NameTag", _label_text(), 3.75, COLOR.lightened(0.3))
+	_bar = EventFx.bar(self, "HpBar", 3.95, Color(0.25, 0.9, 0.35), 1.0)
+	_label = EventFx.label(self, "NameTag", _label_text(), 4.2, COLOR.lightened(0.3))
 
 
 ## The carved pole: a stone foot, three stacked wooden faces with painted bands, wings and a crest.

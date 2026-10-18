@@ -8,8 +8,8 @@ extends RefCounted
 const RING_Y := 0.04
 ## Bar size (m) of [method bar] and its default height above the node origin.
 const BAR_SIZE := Vector2(1.7, 0.3)
-const LABEL_PIXEL_SIZE := 0.0056
-const LABEL_FONT_SIZE := 44
+const LABEL_PIXEL_SIZE := 0.00042
+const LABEL_FONT_SIZE := 40
 
 
 ## A flat ring of [param radius] m around [param parent]'s origin, drawn with the shared ring shader.
@@ -51,7 +51,8 @@ static func bar(parent: Node3D, node_name: String, height: float, color: Color, 
 	return mi
 
 
-## A billboard text tag [param height] m above [param parent]'s origin (no depth test, outlined).
+## A billboard text tag whose bottom edge is [param height] m above [param parent]'s origin: fixed on-screen
+## size (like the Loot Goblin's tag), no depth test, outlined.
 static func label(parent: Node3D, node_name: String, text: String, height: float, color: Color) -> Label3D:
 	var l := Label3D.new()
 	l.name = node_name
@@ -61,7 +62,9 @@ static func label(parent: Node3D, node_name: String, text: String, height: float
 	l.pixel_size = LABEL_PIXEL_SIZE
 	l.modulate = color
 	l.outline_modulate = Color(0.08, 0.05, 0.02)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.fixed_size = true
 	l.no_depth_test = true
 	l.shaded = false
 	l.double_sided = true

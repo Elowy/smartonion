@@ -233,6 +233,7 @@ func start_event(id: StringName) -> bool:
 	if not _spawn_event(id):
 		return false
 	RunState.events_spawned += 1
+	print("EVENT %s (wave %d): started at %.1f s" % [id, _event_wave(), wave_elapsed()])
 	return true
 
 

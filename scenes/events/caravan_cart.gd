@@ -227,7 +227,7 @@ func _death_loot(pos: Vector3, attacker: Node3D) -> void:
 
 func _build_hud() -> void:
 	_bar = EventFx.bar(self, "HpBar", 2.15, Color(0.95, 0.75, 0.2), 1.0)
-	_label = EventFx.label(self, "NameTag", NAME_TEXT, 2.7, UiTheme.GOLD)
+	_label = EventFx.label(self, "NameTag", NAME_TEXT, 2.4, UiTheme.GOLD)
 
 
 func _update_bar() -> void:

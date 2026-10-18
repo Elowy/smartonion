@@ -34,6 +34,8 @@ const GOLD_RING := 1.4
 const POST_RADIUS := 2.8
 const BAG_OFFSET := Vector3(0.0, 0.0, 1.5)
 const NAME_TEXT := "Guarded Chest"
+## How much larger than the modelled 1.5 m the chest is drawn.
+const VISUAL_SCALE := 1.3
 
 const WOOD := Color(0.5, 0.31, 0.16)
 const WOOD_DARK := Color(0.34, 0.2, 0.1)
@@ -214,15 +216,20 @@ func _label_text() -> String:
 
 
 func _build_visual() -> void:
+	# The chest is drawn VISUAL_SCALE times life size so it reads from the camera's distance.
+	var visual := Node3D.new()
+	visual.name = "Visual"
+	visual.scale = Vector3.ONE * VISUAL_SCALE
+	add_child(visual)
 	var body := MeshInstance3D.new()
 	body.name = "Body"
 	body.mesh = MeshKit.cached("event:chest_body", func() -> Mesh: return _body_mesh())
 	body.material_override = Mats.toon_vc()
-	add_child(body)
+	visual.add_child(body)
 	_lid = Node3D.new()
 	_lid.name = "LidPivot"
 	_lid.position = Vector3(0.0, 0.62, -0.475)
-	add_child(_lid)
+	visual.add_child(_lid)
 	var lid := MeshInstance3D.new()
 	lid.name = "Lid"
 	lid.mesh = MeshKit.cached("event:chest_lid", func() -> Mesh: return _lid_mesh())
@@ -232,7 +239,7 @@ func _build_visual() -> void:
 	_treasure.name = "Treasure"
 	_treasure.position = Vector3(0.0, 0.6, 0.0)
 	_treasure.visible = false
-	add_child(_treasure)
+	visual.add_child(_treasure)
 	var gold := MeshInstance3D.new()
 	gold.name = "Gold"
 	gold.mesh = MeshKit.cached("event:chest_gold", func() -> Mesh: return _gold_mesh())
@@ -242,9 +249,9 @@ func _build_visual() -> void:
 	_lock_ring = EventFx.ring(self, "LockRing", OPEN_RADIUS, LOCKED_COLOR, 0.9, 0.99, 0.05)
 	_progress_ring = EventFx.ring(self, "ProgressRing", OPEN_RADIUS, READY_COLOR, 0.86, 0.98, 0.1, 0.05)
 	_progress_ring.visible = false
-	_bar = EventFx.bar(self, "OpenBar", 1.7, GOLD, 0.0)
+	_bar = EventFx.bar(self, "OpenBar", 2.1, GOLD, 0.0)
 	_bar.visible = false
-	_label = EventFx.label(self, "NameTag", _label_text(), 2.3, UiTheme.GOLD)
+	_label = EventFx.label(self, "NameTag", _label_text(), 2.35, UiTheme.GOLD)
 	_label.visible = true
 
 
