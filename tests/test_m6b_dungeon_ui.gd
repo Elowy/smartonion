@@ -326,6 +326,40 @@ func test_one_chip_per_voter_shows_the_vote() -> void:
 	check_eq(portal.title_label.text, "A dungeon portal has opened!", "the title")
 
 
+func test_chip_borders_are_neutral_until_the_vote_then_green_or_red() -> void:
+	var a := _human(&"warrior")
+	var b := _human(&"mage")
+	_human(&"paladin")  # P3 is a green slot: its colour must not read as an Accept
+	_portal()
+	_open(6)
+	_wait_for_input()
+	var slots := PlayerManager.get_slots()
+	for s in slots:
+		check(_chip_border(s).is_equal_approx(UiTheme.GOLD_BORDER), "P%d pending: the neutral border" % (s.index + 1))
+		var name_label := _chip_name(s)
+		check(name_label != null, "P%d: the name is on the chip" % (s.index + 1))
+		if name_label != null:
+			check(name_label.get_theme_color(&"font_color").is_equal_approx(s.color.lightened(0.3)),
+					"P%d: the slot colour is on the name" % (s.index + 1))
+	_press(a, PlayerInput.Pad.A)
+	check(_chip_border(slots[0]).is_equal_approx(UiTheme.GREEN), "an Accept is green")
+	check(_chip_border(slots[1]).is_equal_approx(UiTheme.GOLD_BORDER), "the others stay neutral")
+	_press(b, PlayerInput.Pad.B)
+	check(_chip_border(slots[1]).is_equal_approx(UiTheme.RED), "a Decline is red")
+	check(_chip_border(slots[2]).is_equal_approx(UiTheme.GOLD_BORDER), "a voter still open stays neutral")
+
+
+func _chip_border(slot: PlayerSlot) -> Color:
+	return (portal._chips[slot.index].get_theme_stylebox(&"panel") as UiFrameStyle).border
+
+
+func _chip_name(slot: PlayerSlot) -> Label:
+	for l in portal._chips[slot.index].find_children("*", "Label", true, false):
+		if (l as Label).text == slot.label():
+			return l
+	return null
+
+
 # --- Intermission: the PORTAL phase ---------------------------------------------------------------------
 
 func _make_screen() -> void:

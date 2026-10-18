@@ -181,6 +181,9 @@ func cast(slot_index: int, vote: int) -> void:
 		return
 	votes[slot_index] = vote
 	_chip_keys.erase(slot_index)
+	# Shown before the decision: a Decline ends the vote in this call, and update() would not run
+	# the refresh again.
+	_refresh_chips()
 	_check_decided()
 
 
@@ -348,7 +351,9 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot, vote: int) -> void:
 	for c in chip.get_children():
 		chip.remove_child(c)
 		c.queue_free()
-	var border := s.color.darkened(0.3)
+	# A pending chip keeps the neutral frame border: green and red only mean Accept and Decline (the
+	# slot colour is on the name instead), so a green or red slot does not read as a vote.
+	var border := UiTheme.GOLD_BORDER
 	var fill := UiTheme.STONE_DARK
 	match vote:
 		Vote.ACCEPT:
