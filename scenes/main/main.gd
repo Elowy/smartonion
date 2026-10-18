@@ -127,6 +127,9 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
+## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
+## player who left mid-run (drop_player), the slots no longer have them.
+var run_classes: Array[StringName] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
@@ -262,6 +265,9 @@ func start_run() -> void:
 		return
 	RunState.start_run(slots.size(), options.run_seed(), options.mode, options.hardcore, _environment_id())
 	artifact_lines.clear()
+	run_classes.clear()
+	for slot in slots:
+		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
 	RunState.shrine_chance_override = options.shrine_chance
 	RunState.event_override = options.event
@@ -449,8 +455,8 @@ func end_run(p_victory: bool) -> void:
 		get_tree().create_timer(DEMO_RESTART_DELAY, true).timeout.connect(_on_demo_restart)
 
 
-## The finished run in the leaderboard: its entry (the wave that ended it, the wave play time, the classes in
-## slot order, victory) goes into the file's category for the run's mode, hardcore flag and party size
+## The finished run in the leaderboard: its entry (the wave that ended it, the wave play time, the party's
+## classes as the run started ([member run_classes]), victory) goes into the file's category for the run's mode, hardcore flag and party size
 ## ([method writes_leaderboard]; Leaderboard.record_run), then the board is read for the end screen
 ## (Leaderboard.screen_model: the "Best: ..." line, the top 10 of the category, the run's place). {} when the
 ## leaderboard file is off limits: Leaderboard.writes_enabled is false (the unit tests), or a smoke run
@@ -458,10 +464,7 @@ func end_run(p_victory: bool) -> void:
 func _record_leaderboard(p_victory: bool) -> Dictionary:
 	if not Leaderboard.writes_enabled or (options.smoke and not writes_leaderboard()):
 		return {}
-	var classes: Array[StringName] = []
-	for slot in PlayerManager.get_slots():
-		classes.append(slot.class_data.id if slot.class_data != null else &"")
-	var entry := Leaderboard.make_entry(wave, RunState.run_time, classes, p_victory)
+	var entry := Leaderboard.make_entry(wave, RunState.run_time, run_classes, p_victory)
 	var rank := -1
 	var save_failed := false
 	if writes_leaderboard():

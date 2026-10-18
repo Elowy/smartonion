@@ -663,6 +663,23 @@ func test_hardcore_and_party_size_pick_the_category() -> void:
 	check(board.entries_for(RunState.MODE_NORMAL, true, 2).is_empty(), "not another mode")
 
 
+func test_a_player_who_left_mid_run_still_counts_in_the_party() -> void:
+	Leaderboard.writes_enabled = true
+	var o := LaunchOptions.new()
+	o.leaderboard_path = TMP_BOARD
+	_run_with_bots(4, o)
+	var party: Array[String] = []
+	for slot in PlayerManager.get_slots():
+		party.append(String(slot.class_data.id))
+	check_eq(party.size(), 4, "four heroes at the start")
+	main.drop_player(PlayerManager.get_slot(3))
+	check_eq(PlayerManager.count(), 3, "the fourth player left")
+	main.end_run(false)
+	var entries := _board().entries_for(RunState.MODE_NORMAL, false, 4)
+	check_eq(entries.size(), 1, "still the four-player category")
+	check_eq(entries[0]["classes"], party, "all four classes, the one who left included")
+
+
 func test_a_second_run_ranks_against_the_first() -> void:
 	var opts := LaunchOptions.new()
 	opts.mode = RunState.MODE_ENDLESS
