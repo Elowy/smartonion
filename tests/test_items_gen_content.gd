@@ -29,8 +29,8 @@ const BASE_TIER_WAVES: Array[int] = [1, 9, 17]
 
 
 func test_armor_and_jewellery_bases() -> void:
-	var seen := {}
 	var per_tier := {}
+	var armour := 0
 	var neck := 0
 	var ring := 0
 	for id in Db.item_bases:
@@ -39,13 +39,12 @@ func test_armor_and_jewellery_bases() -> void:
 		check(base.display_name != "", "%s has a name" % id)
 		check(base.min_wave in BASE_TIER_WAVES, "%s: min_wave %d is a tier wave" % [id, base.min_wave])
 		if base.slot_type in Items.ARMOR_SLOTS:
+			armour += 1
 			check(base.armor_type in Items.ARMOR_TYPE_NAMES, "%s has an armor type" % id)
 			# One base per slot, armor type and material tier (min_wave).
 			var tier_key := "%d:%d:%d" % [base.slot_type, base.armor_type, base.min_wave]
 			check(not per_tier.has(tier_key), "one base per slot, armor type and tier (%s)" % id)
 			per_tier[tier_key] = true
-			if base.min_wave == 1:
-				seen["%d:%d" % [base.slot_type, base.armor_type]] = true
 		else:
 			check_eq(base.min_wave, 1, "%s: jewellery bases are not tiered" % id)
 			check_eq(base.armor_type, Items.NO_ARMOR, "%s: jewellery has no armor type" % id)
@@ -55,10 +54,14 @@ func test_armor_and_jewellery_bases() -> void:
 				ring += 1
 			else:
 				check(false, "%s: only armor, neck and ring bases (trinkets are hand-made)" % id)
-	check_eq(seen.size(), 32, "8 armor slots x 4 armor types, each with a tier I base")
-	for key in per_tier:
-		var parts: PackedStringArray = String(key).split(":")
-		check(seen.has("%s:%s" % [parts[0], parts[1]]), "%s: every slot x type has its tier I base" % key)
+	# 8 armor slots x 4 armor types x 3 material tiers (I, II, III) = 96, one base each.
+	check_eq(armour, 96, "armor bases: 8 slots x 4 armor types x 3 tiers")
+	for slot in Items.ARMOR_SLOTS:
+		for armor_type in [ClassData.ArmorType.CLOTH, ClassData.ArmorType.LEATHER,
+				ClassData.ArmorType.MAIL, ClassData.ArmorType.PLATE]:
+			for wave in BASE_TIER_WAVES:
+				check(per_tier.has("%d:%d:%d" % [slot, armor_type, wave]),
+						"slot %d, armor type %d: a tier at wave %d" % [slot, armor_type, wave])
 	check(neck >= 2 and ring >= 2, "neck and ring bases")
 
 
