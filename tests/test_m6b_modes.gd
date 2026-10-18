@@ -381,13 +381,14 @@ func test_any_joined_player_can_change_the_mode() -> void:
 	check_eq(lobby.run_mode, RunState.MODE_NORMAL, "the first one cycles on")
 
 
-func test_the_mode_keys_are_only_for_players_and_the_prompts_wait_for_the_first_one() -> void:
+func test_the_mode_key_prompts_light_up_with_the_first_player() -> void:
 	var lobby := _lobby()
 	UiFakes.step(lobby)
-	check(not lobby._mode_prompts.visible, "no key prompts while nobody has joined")
+	check_near(lobby._mode_prompts.modulate.a, Lobby.MODE_PROMPTS_IDLE_ALPHA, 0.001, "dimmed while nobody has joined")
+	check(lobby._mode_prompts.visible, "but there, so the header never changes height")
 	_human("pad:a")
 	UiFakes.step(lobby)
-	check(lobby._mode_prompts.visible, "the prompts show once somebody has joined")
+	check_near(lobby._mode_prompts.modulate.a, 1.0, 0.001, "lit once somebody has joined")
 	check_eq(lobby.mode_label.text, "Mode: Normal", "the header is there from the start")
 
 

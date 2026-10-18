@@ -27,6 +27,8 @@ signal back_requested
 signal mode_changed(mode: StringName, hardcore: bool)
 
 const COUNTDOWN_TIME := 3.0
+## The mode key prompts' opacity while nobody has joined (nobody can use them yet).
+const MODE_PROMPTS_IDLE_ALPHA := 0.4
 
 ## The run mode (RunState.MODES) and the hardcore flag the next run will use.
 var run_mode: StringName = RunState.MODE_NORMAL
@@ -137,11 +139,19 @@ func _build() -> void:
 	var col := UiTheme.vbox(10)
 	margin.add_child(col)
 
+	# The title stays in the middle; the mode select sits at the right end of the same row (it costs no height).
+	var head := UiTheme.hbox(20)
+	head.name = "Head"
+	col.add_child(head)
+	var head_left := Control.new()
+	head_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(head_left)
 	var title := UiTheme.centered_label("Assemble Your Party", UiTheme.TITLE, 60)
-	col.add_child(title)
+	head.add_child(title)
+	head.add_child(_build_mode_block())
 	var subtitle := UiTheme.centered_label("Up to four onion heroes  ·  pick a class and ready up", UiTheme.DIM, UiTheme.FONT_BODY + 2)
 	col.add_child(subtitle)
-	col.add_child(_build_mode_row())
 	col.add_child(UiTheme.divider(620))
 
 	var row := UiTheme.hbox(26)
@@ -176,26 +186,33 @@ func _build() -> void:
 	add_child(_countdown_label)
 
 
-## The mode header under the subtitle: "Mode: Endless · Hardcore", the HARDCORE badge and (once somebody has
-## joined) the prompts of the two keys.
-func _build_mode_row() -> Control:
-	var row := UiTheme.hbox(18)
+## The mode header at the right end of the title row: "Mode: Endless · Hardcore" with the HARDCORE badge,
+## and under it (once somebody has joined) the prompts of the two keys. It takes the row's free right half
+## (the left one is an empty twin, so the title stays centred).
+func _build_mode_block() -> Control:
+	var box := UiTheme.vbox(0)
+	box.name = "ModeBlock"
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var row := UiTheme.hbox(14)
 	row.name = "ModeRow"
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.size_flags_horizontal = Control.SIZE_SHRINK_END
+	box.add_child(row)
 	mode_label = UiTheme.centered_label(mode_text(), UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE)
 	mode_label.name = "ModeLabel"
 	row.add_child(mode_label)
-	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_BODY)
+	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_SMALL)
 	hardcore_badge.visible = hardcore
 	row.add_child(hardcore_badge)
 	_mode_prompts = UiTheme.prompt_row([
-		[UiGlyph.pad(PlayerInput.Pad.Y, 28.0), "/", UiGlyph.key("C", 28.0), "Mode"],
-		[UiGlyph.pad(PlayerInput.Pad.X, 28.0), "/", UiGlyph.key("R", 28.0), "Hardcore"],
-	], UiTheme.FONT_BODY, UiTheme.TEXT_DIM)
+		[UiGlyph.pad(PlayerInput.Pad.Y, 26.0), "/", UiGlyph.key("C", 26.0), "Mode"],
+		[UiGlyph.pad(PlayerInput.Pad.X, 26.0), "/", UiGlyph.key("R", 26.0), "Hardcore"],
+	], UiTheme.FONT_SMALL + 2, UiTheme.TEXT_DIM)
 	_mode_prompts.name = "ModePrompts"
-	_mode_prompts.visible = false
-	row.add_child(_mode_prompts)
-	return row
+	_mode_prompts.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_mode_prompts.modulate.a = MODE_PROMPTS_IDLE_ALPHA
+	box.add_child(_mode_prompts)
+	return box
 
 
 # --- Lifecycle -------------------------------------------------------------------------
@@ -312,7 +329,8 @@ func _refresh() -> void:
 	for i in cards.size():
 		cards[i].update_from(PlayerManager.get_slot(i), keyboard_free)
 	var slots := PlayerManager.get_slots()
-	_mode_prompts.visible = not slots.is_empty()  # only a joined player can change the mode
+	# Only a joined player can change the mode: the key prompts light up with the first one.
+	_mode_prompts.modulate.a = 1.0 if not slots.is_empty() else MODE_PROMPTS_IDLE_ALPHA
 	var ready_count := 0
 	for s in slots:
 		if s.ready:
