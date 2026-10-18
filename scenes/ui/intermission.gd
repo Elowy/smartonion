@@ -564,16 +564,9 @@ func _build_footer() -> void:
 func _fill() -> void:
 	title_label.text = "Wave %d cleared!" % cleared_wave
 	var next := cleared_wave + 1
-	var tag := ""
-	if RunState.is_boss_wave(next):
-		tag = "  –  Boss wave!"
-	elif RunState.is_elite_wave(next):
-		tag = "  –  Elite wave!"
-	if next > RunState.TOTAL_WAVES:
-		next_label.text = "The final battle is won"
-	else:
-		next_label.text = "Next up: Wave %d of %d  ·  %d seconds%s" % [next, RunState.TOTAL_WAVES, int(RunState.wave_duration(next)), tag]
-	next_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.2) if tag != "" else UiTheme.TEXT_DIM)
+	next_label.text = next_wave_text(next)
+	var flagged := next <= RunState.TOTAL_WAVES and (RunState.is_boss_wave(next) or RunState.is_elite_wave(next))
+	next_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.2) if flagged else UiTheme.TEXT_DIM)
 	purse_board.set_shop(RunState.shop)
 	purse_board.refresh()
 	purse_board.update(PlayerManager.get_slots())
@@ -582,6 +575,17 @@ func _fill() -> void:
 	level_ups_value.add_theme_color_override(&"font_color", UiTheme.GREEN if level_ups > 0 else UiTheme.TEXT_DIM)
 	level_ups_value.visible = level_ups > 0
 	_level_ups_caption.visible = level_ups > 0
+
+
+## The market header's "what comes next" line. A boss wave has no timer (it ends when the boss
+## falls; the HUD shows the boss frame instead of a clock), so it names no seconds.
+static func next_wave_text(next: int) -> String:
+	if next > RunState.TOTAL_WAVES:
+		return "The final battle is won"
+	if RunState.is_boss_wave(next):
+		return "Next up: Wave %d of %d – Boss wave! (ends when the boss falls)" % [next, RunState.TOTAL_WAVES]
+	var tag := "  –  Elite wave!" if RunState.is_elite_wave(next) else ""
+	return "Next up: Wave %d of %d  ·  %d seconds%s" % [next, RunState.TOTAL_WAVES, int(RunState.wave_duration(next)), tag]
 
 
 func _fill_gold() -> void:
@@ -908,7 +912,8 @@ static func bot_consumable_choice(p_shop: Shop, kind: ConsumableData.Kind) -> in
 
 
 ## M6 (ENCHANTER): from wave 12 on (the market after it, [constant Enchanter.BOT_FIRST_WAVE]) every
-## bot enchants its best weapon (Enchanter.bot_enchant: Reroll an enchant its class cannot use, else
+## bot enchants its best weapon – a bot wearing an Artifact its best Epic+ armour / off-hand
+## instead ([method Enchanter.bot_target]) – (Enchanter.bot_enchant: Reroll an enchant its class cannot use, else
 ## Imbue, else Empower the lowest rank). It runs before the buying pass of [method _bots_shop] with
 ## [constant BOT_ENCHANT_PURSE_SHARE] of the gold above [method bot_train_reserve]
 ## ([method bot_enchant_budget]), shared out evenly over the bots in slot order like the Trainer's

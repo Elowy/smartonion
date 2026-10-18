@@ -488,11 +488,11 @@ func test_chances_by_source_and_fortune() -> void:
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, null), 0.15, 0.000001, "boss 15%")
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.GOBLIN, null), 0.05, 0.000001, "Loot Goblin 5%")
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.ELITE, null), 0.02, 0.000001, "elite 2%")
-	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), 0.0005, 0.000001, "normal enemy 0.05%")
+	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), 0.00025, 0.000001, "normal enemy 0.05% / 2 players (this run)")
 	check_eq(LootDrops.artifact_chance(ItemGenerator.Source.SHOP, null), 0.0, "never from the shop")
 	var lucky := _killer(100.0)
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, lucky), 0.30, 0.000001, "Fortune 100 doubles it")
-	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, lucky), 0.001, 0.000001, "also the jackpot")
+	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, lucky), 0.0005, 0.000001, "also the jackpot (0.025% x 2)")
 	RunState.artifact_pity = 0.10
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, null), 0.25, 0.000001, "boss pity adds to the boss chance")
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.ELITE, null), 0.02, 0.000001, "but not to the others")
@@ -501,6 +501,24 @@ func test_chances_by_source_and_fortune() -> void:
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, lucky), 0.4, 0.000001, "Fortune too")
 	LootDrops.artifact_chance_override = 7.0
 	check_eq(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), 1.0, "capped at 100%")
+
+
+## The normal-kill chance is divided by the party size (kills scale with the players); the boss,
+## Loot Goblin and elite chances are not.
+func test_normal_kill_chance_is_divided_by_the_party_size() -> void:
+	var lucky := _killer(100.0)
+	for n in [1, 2, 3, 4]:
+		RunState.start_run(n, 4711)
+		RunState.set_wave(10)
+		var expected := 0.0005 / float(n)
+		check_near(LootDrops.normal_chance(), expected, 0.0000001, "%d player(s): 0.05%% / %d" % [n, n])
+		check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), expected, 0.0000001, "%d player(s): a normal kill" % n)
+		check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, lucky), expected * 2.0, 0.0000001, "%d player(s): Fortune still multiplies" % n)
+		check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, null), 0.15, 0.0000001, "%d player(s): boss unchanged" % n)
+		check_near(LootDrops.artifact_chance(ItemGenerator.Source.GOBLIN, null), 0.05, 0.0000001, "%d player(s): goblin unchanged" % n)
+		check_near(LootDrops.artifact_chance(ItemGenerator.Source.ELITE, null), 0.02, 0.0000001, "%d player(s): elite unchanged" % n)
+	LootDrops.artifact_chance_override = 0.4
+	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), 0.4, 0.0000001, "--artifact-chance is not divided")
 
 
 func test_override_zero_never_drops_and_draws_nothing() -> void:
