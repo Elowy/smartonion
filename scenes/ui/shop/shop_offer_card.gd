@@ -86,7 +86,7 @@ static func create_wide(p_index: int) -> ShopOfferCard:
 	return card
 
 
-## "Plate Head", "Sword (2H)", "Finger", "Trinket" – the type line under the name.
+## "Plate Head", "Axe (2H)", "2H Sword", "Finger", "Trinket" – the type line under the name.
 static func type_text(item: ItemInstance) -> String:
 	if item == null:
 		return ""
@@ -95,7 +95,8 @@ static func type_text(item: ItemInstance) -> String:
 				String(item.weapon.weapon_type).capitalize())
 		if t == "":
 			t = "Weapon"
-		if item.is_two_handed():
+		# "2H Sword" says it already; the two-hand axe is "Axe (2H)".
+		if item.is_two_handed() and not t.begins_with("2H "):
 			t += " (2H)"
 		return t
 	var slot_name: String = Items.SLOT_NAMES.get(item.slot_type, "")

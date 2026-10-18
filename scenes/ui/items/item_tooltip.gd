@@ -75,7 +75,7 @@ const SET_UPGRADE_TOLERANCE := 0.3
 const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
 	&"gun": "Gun", &"wand": "Wand", &"staff": "Staff", &"shield": "Shield", &"tome": "Tome",
-	&"two_hand_sword": "Sword", &"two_hand_mace": "Mace", &"orb": "Orb",
+	&"two_hand_sword": "2H Sword", &"two_hand_mace": "2H Mace", &"orb": "Orb",
 }
 
 var item: ItemInstance

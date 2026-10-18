@@ -429,3 +429,27 @@ func test_forged_and_hand_made_epics_keep_the_bonus_and_legendaries_do_not() -> 
 	check_eq(frostfang.weapon.attack_speed_pct, 10.0, "gets it too (same rarity scaling)")
 	var storm := ItemGenerator.from_unique(Db.get_unique(&"stormcaller"), 12, true, rng)
 	check_eq(storm.weapon.attack_speed_pct, 0.0, "a hand-made Legendary does not")
+
+
+## A refused weapon is named like its tooltip type line (the one that turns red for a caster): a
+## mage refused the Two-Hand Sword reads "Cannot use 2H Sword", not "Cannot use Sword" or "Two Hand".
+func test_refused_weapons_are_named_like_the_tooltip_type_line() -> void:
+	var mage := Db.get_class_data(&"mage")
+	var sword := ItemInstance.from_weapon(Db.get_weapon(&"two_hand_sword"))
+	check_eq(sword.unusable_reason(mage), "Cannot use 2H Sword", "a mage is refused the 2H Sword")
+	check_eq(ItemInstance.from_weapon(Db.get_weapon(&"two_hand_mace")).unusable_reason(mage), "Cannot use 2H Mace", "and the 2H Mace")
+	check_eq(ItemTooltip.type_text(sword), "2H Sword", "the tooltip type line")
+	for id in Db.weapons:
+		var item := ItemInstance.from_weapon(Db.weapons[id])
+		for class_id: StringName in [&"warrior", &"paladin", &"mage", &"warlock", &"rogue"]:
+			var cls := Db.get_class_data(class_id)
+			if not cls.can_use(item.weapon):
+				check_eq(item.unusable_reason(cls), "Cannot use %s" % ItemTooltip.type_text(item), "%s for %s" % [id, class_id])
+
+
+## The shop card's type line: "2H Sword" already says two-handed, so no second "(2H)"; a two-hand
+## axe (type "Axe") keeps its "(2H)".
+func test_shop_type_line_does_not_say_2h_twice() -> void:
+	check_eq(ShopOfferCard.type_text(ItemInstance.from_weapon(Db.get_weapon(&"two_hand_sword"))), "2H Sword", "2H Sword")
+	check_eq(ShopOfferCard.type_text(ItemInstance.from_weapon(Db.get_weapon(&"two_hand_mace"))), "2H Mace", "2H Mace")
+	check_eq(ShopOfferCard.type_text(ItemInstance.from_weapon(Db.get_weapon(&"two_hand_axe"))), "Axe (2H)", "the axe keeps (2H)")

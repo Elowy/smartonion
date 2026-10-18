@@ -94,7 +94,8 @@ func unusable_reason(class_data: ClassData) -> String:
 	if class_restriction != &"" and class_restriction != class_data.id:
 		return "Classes: %s" % String(class_restriction).capitalize()
 	if is_weapon() and not class_data.can_use(weapon):
-		return "Cannot use %s" % String(weapon.weapon_type).capitalize()
+		# The tooltip's type line ("2H Sword", "Axe"): the same noun the caster sees in red.
+		return "Cannot use %s" % ItemTooltip.type_text(self)
 	if armor_type != Items.NO_ARMOR and armor_type > class_data.armor_type:
 		return "Cannot wear %s" % Items.ARMOR_TYPE_NAMES.get(armor_type, "this armor")
 	return ""
