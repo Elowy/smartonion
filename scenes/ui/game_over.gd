@@ -27,6 +27,8 @@ const MAX_STATUS_CHARS := 72
 var victory := false
 var title_label: Label
 var subtitle_label: Label
+## The arena of the run (M6b ENV): "Arena: Cemetery  ·  Grasping Hands", in the environment's colour.
+var environment_label: Label
 var waves_value: Label
 var kills_value: Label
 var gold_value: Label
@@ -149,6 +151,23 @@ static func saved_text(full_path: String) -> String:
 	return "Saved to ...%s" % tail
 
 
+## The environment line under the subtitle: the arena of the run and its hazard.
+static func environment_text(id: StringName) -> String:
+	var env := Db.get_environment(id)
+	if env == null:
+		return ""
+	if env.has_hazard() and env.hazard_name != "":
+		return "Arena: %s  ·  %s" % [env.display_name, env.hazard_name]
+	return "Arena: %s" % env.display_name
+
+
+func _fill_environment() -> void:
+	environment_label.text = environment_text(RunState.environment)
+	var env := Db.get_environment(RunState.environment)
+	environment_label.add_theme_color_override(&"font_color",
+			env.card_color.lerp(Color.WHITE, 0.25) if env != null else UiTheme.TEXT_DIM)
+
+
 func _set_status(text: String, color: Color = UiTheme.TEXT_DIM) -> void:
 	if status_label == null:
 		return
@@ -184,6 +203,8 @@ func _build() -> void:
 	col.add_child(title_label)
 	subtitle_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_LARGE)
 	col.add_child(subtitle_label)
+	environment_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY)
+	col.add_child(environment_label)
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
 
@@ -290,6 +311,7 @@ func _fill() -> void:
 		title_label.text = "Defeat"
 		title_label.add_theme_color_override(&"font_color", UiTheme.RED)
 		subtitle_label.text = "The party was peeled on wave %d. Dry your tears and try again." % maxi(RunState.wave, 1)
+	_fill_environment()
 	waves_value.text = RunState.count_text(waves_cleared(victory))
 	kills_value.text = UiTheme.format_int(RunState.kills)
 	gold_value.text = UiTheme.format_int(RunState.gold_earned)

@@ -21,6 +21,9 @@ func _run() -> void:
 	# autoloads exist.
 	var leaderboard: GDScript = load("res://core/leaderboard.gd")
 	leaderboard.set(&"writes_enabled", false)
+	# The lobby's "Rolling the arena..." screen (4.5 s) is off in tests; a test of the screen switches it on.
+	var roll_screen: GDScript = load("res://scenes/ui/environment_roll_screen.gd")
+	roll_screen.set(&"enabled", false)
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

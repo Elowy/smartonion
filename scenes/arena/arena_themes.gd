@@ -414,7 +414,7 @@ static func _swamp(arena: Arena, rng: RandomNumberGenerator) -> Node3D:
 	_swamp_props(root, bounds, rng)
 	_swamp_lights(root, bounds, decor, rng)
 	var reeds := _reed_mesh(rng)
-	_ground_multimesh(root, "Reeds", reeds, bounds, decor, rng, 520, 26, 0.8, 1.5,
+	_ground_multimesh(root, "Reeds", reeds, bounds, decor, rng, 520, 0, 0.8, 1.5,
 			[Color(0.42, 0.5, 0.22), Color(0.5, 0.56, 0.26), Color(0.34, 0.44, 0.2)], 0.9)
 	var tufts := _tuft_mesh(rng, 5, 0.2, 0.34, 2.0, 0.035)
 	_ground_multimesh(root, "GrassTufts", tufts, bounds, decor, rng, 1000, 150, 0.8, 1.3,

@@ -9,7 +9,7 @@ extends ArenaHazard
 
 const SLOW_KEY := &"bog_slow"
 const MUD := Color(0.17, 0.2, 0.07)
-const MUD_RIM := Color(0.42, 0.5, 0.18)
+const MUD_RIM := Color(0.6, 0.68, 0.26)
 ## Seconds the slow outlasts a step out of the pool (the buff / slow is refreshed while inside).
 const LINGER := 0.35
 ## Enemies are scanned every this many physics ticks (the hero check runs every tick).
@@ -60,7 +60,7 @@ func _build() -> void:
 	_mud = _ring("Mud", radius * 2.0)
 	_rim = _ring("Rim", radius * 2.0)
 	Mats.set_ring(_mud, MUD, 0.93, 1.0, 0.0)
-	Mats.set_ring(_rim, MUD_RIM, 0.9, 0.99, 0.0)
+	Mats.set_ring(_rim, MUD_RIM, 0.88, 0.99, 0.0)
 	var bubble_mesh := MeshKit.cached("hazard:bog_bubble", func() -> Mesh:
 		var s := SphereMesh.new()
 		s.radius = 0.11
@@ -111,7 +111,7 @@ func _update_look() -> void:
 		return
 	var fade := clampf(age / FADE_IN, 0.0, 1.0)
 	Mats.set_ring(_mud, Color(MUD.r, MUD.g, MUD.b, 0.82 * fade), 0.93, 1.0, 0.82 * fade)
-	Mats.set_ring(_rim, Color(MUD_RIM.r, MUD_RIM.g, MUD_RIM.b, 0.8 * fade), 0.9, 0.985, 0.0)
+	Mats.set_ring(_rim, Color(MUD_RIM.r, MUD_RIM.g, MUD_RIM.b, 0.9 * fade), 0.88, 0.985, 0.0)
 	for i in _bubbles.size():
 		var phase := age * 2.2 + float(i) * 1.9 + float(index) * 0.7
 		var s := maxf(0.0, sin(phase)) * 0.9 * fade

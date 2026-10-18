@@ -409,7 +409,7 @@ func test_start_run_takes_mode_hardcore_and_environment() -> void:
 	RunState.start_run(2, 7, &"turbo")
 	check_eq(RunState.mode, RunState.MODE_NORMAL, "an unknown mode plays as normal")
 	RunState.start_run(2, 7, RunState.MODE_NORMAL, false, &"")
-	check_eq(RunState.environment, RunState.DEFAULT_ENVIRONMENT, "an empty environment is the default")
+	check_eq(RunState.environment, RunState.environment_for_seed(7), "an empty environment is the seed's roll")
 
 
 func test_run_settings_and_counters_reset_with_every_run() -> void:
@@ -430,7 +430,7 @@ func test_run_settings_and_counters_reset_with_every_run() -> void:
 	RunState.start_run(1, 3)
 	check_eq(RunState.mode, RunState.MODE_NORMAL, "mode back to normal")
 	check(not RunState.hardcore, "hardcore off")
-	check_eq(RunState.environment, RunState.DEFAULT_ENVIRONMENT, "environment back to the default")
+	check_eq(RunState.environment, RunState.environment_for_seed(3), "environment back to the seed's roll")
 	check_eq(RunState.shrine_chance_override, -1.0, "shrine chance override off")
 	check_eq(RunState.event_override, &"", "event override off")
 	check(not RunState.dungeon_forced, "dungeon flag off")
@@ -516,9 +516,13 @@ func test_an_empty_environment_takes_the_roller_result() -> void:
 	check_eq(seen.get("calls", 0), 2, "each run rolls once")
 
 
-func test_the_roll_without_a_roller_is_the_forest() -> void:
+func test_the_roll_without_a_roller_is_the_seed_derived_one() -> void:
 	RunState.start_run(1, 4242)
-	check_eq(RunState.environment, &"forest_ruin", "no roller: the Forest Ruin, without drawing")
+	check_eq(RunState.environment, RunState.environment_for_seed(4242), "no roller: the roll of the run seed")
+	check(RunState.environment in Db.environment_ids, "a known environment")
+	var mirror := RunState.sub_rng(RunState.SALT_ENVIRONMENT)
+	mirror.randf()
+	check_eq(RunState.environment_rng.state, mirror.state, "the roll drew exactly one value from environment_rng")
 
 
 func test_a_forced_environment_wins_over_the_roll() -> void:
@@ -625,6 +629,9 @@ func test_arena_follows_a_custom_environment() -> void:
 	env.roll_weight = 0.5
 	env.decor_id = &"test_decor"
 	env.hazard_id = &"grasping_hands"
+	env.hazard_name = "Test Hands"
+	env.hazard_text = "A test rule."
+	env.card_color = Color(0.9, 0.2, 0.7)
 	env.sky_color = Color(0.1, 0.1, 0.2)
 	env.ambient_color = Color(0.3, 0.2, 0.1)
 	env.ambient_energy = 0.31
@@ -664,6 +671,9 @@ func test_arena_follows_a_custom_environment() -> void:
 	check_eq(arena.environment.roll_weight, 0.5, "roll_weight")
 	check_eq(arena.environment.decor_id, &"test_decor", "decor_id (an unknown set builds the forest)")
 	check_eq(arena.environment.hazard_id, &"grasping_hands", "hazard_id")
+	check_eq(arena.environment.hazard_name, "Test Hands", "hazard_name")
+	check_eq(arena.environment.hazard_text, "A test rule.", "hazard_text")
+	check_eq(arena.environment.card_color, Color(0.9, 0.2, 0.7), "card_color")
 	check(arena.environment.has_hazard(), "has_hazard")
 	# World environment.
 	var wenv := arena.world_environment.environment
@@ -1334,12 +1344,12 @@ func test_configure_run_changes_the_next_run() -> void:
 	check(RunState.mode == RunState.MODE_NORMAL and not RunState.hardcore, "the next run is a normal one")
 
 
-func test_unknown_forced_environment_falls_back_to_the_default() -> void:
+func test_unknown_forced_environment_falls_back_to_the_roll() -> void:
 	var opts := LaunchOptions.new()
 	opts.environment = &"not_there"  # (parse would have refused it; a hand-built option must not crash)
 	_run_with_bots(1, opts)
-	check_eq(RunState.environment, RunState.DEFAULT_ENVIRONMENT, "default environment")
-	check(main.arena.environment == Db.get_environment(&"forest_ruin"), "the forest")
+	check(RunState.environment in Db.environment_ids, "an unknown id is not used: the run rolled a known environment")
+	check(main.arena.environment == Db.get_environment(RunState.environment), "the arena of the rolled environment")
 
 
 # --- SMOKE_RESULT -----------------------------------------------------------------------------
@@ -1349,7 +1359,7 @@ func test_smoke_result_has_the_m6b_keys() -> void:
 	var data := main.smoke_result("completed")
 	check_eq(data.get("mode"), "normal", "mode")
 	check_eq(data.get("hardcore"), false, "hardcore")
-	check_eq(data.get("environment"), "forest_ruin", "environment")
+	check_eq(data.get("environment"), String(RunState.environment), "environment")
 	for key in ["events_spawned", "events_completed", "shrines_offered", "shrines_accepted",
 			"dungeons_entered", "dungeons_completed", "dungeons_failed"]:
 		check(data.has(key), "SMOKE_RESULT has %s" % key)

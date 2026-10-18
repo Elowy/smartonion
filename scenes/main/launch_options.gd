@@ -13,7 +13,8 @@ extends RefCounted
 ##   --seed=N             RunState / bot seed
 ##   --screenshot=PATH    saves a PNG after --shot-time seconds of game time, then quits
 ##   --shot-time=S        seconds after the run starts (after boot for menu / lobby views)
-##   --view=NAME          dev: reach a screen for a screenshot – menu, lobby, game,
+##   --view=NAME          dev: reach a screen for a screenshot – menu, lobby, roll (the "Rolling the
+##                        arena..." screen, --env picks the card it lands on), game,
 ##                        intermission, game_over, victory, pause
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
@@ -54,7 +55,7 @@ const SMOKE_SEED := 1
 const DEFAULT_SHOT_TIME := 8.0
 ## Views that need a running game (bots are added and a run starts right away).
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
-const VIEWS: Array[String] = ["menu", "lobby", "game", "intermission", "game_over", "victory", "pause"]
+const VIEWS: Array[String] = ["menu", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
 ## --panel-tab values (PlayerPanel.TAB_IDS).
 const PANEL_TABS: Array[String] = ["character", "trainer", "talents", "enchanter"]
 ## --start-level ceiling (far beyond a full run).
@@ -221,14 +222,14 @@ func starts_run() -> bool:
 
 ## Bots join automatically (run views, or the lobby view to fill the cards).
 func uses_bots() -> bool:
-	return starts_run() or view == "lobby"
+	return starts_run() or view == "lobby" or view == "roll"
 
 
 ## The screen Main boots into: &"menu", &"lobby" or &"run".
 func boot_state() -> StringName:
 	if starts_run():
 		return &"run"
-	if view == "lobby":
+	if view == "lobby" or view == "roll":
 		return &"lobby"
 	return &"menu"
 
