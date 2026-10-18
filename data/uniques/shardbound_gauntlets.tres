@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shardbound_gauntlets"
+display_name = "Shardbound Gauntlets"
+flavor = "Light, cut into finger-shaped pieces."
+slot_type = 5
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"haste": 5.0,
+&"strength": 3.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 3.0,
+"damage": 9.0,
+"school": "arcane"
+}
+unique_text = "Chance on hit: Flicks a shard of light at the target for 9 Arcane damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

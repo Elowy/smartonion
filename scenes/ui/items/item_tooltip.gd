@@ -16,6 +16,8 @@ extends PanelContainer
 ## price (an Artifact is never sold); a pair (Fangs of the Shadow) says it equips with its other
 ## piece. See Artifacts.property_rows. Shown to a viewer (viewer_equipment set: the player panels,
 ## the shop) the block is compact (compact_artifact).
+## A class item's Equip line (an ability mod) greys out the same way when the viewing hero has
+## not learned its ability: "Equip: … (needs Battle Shout)" in DIM (see unique_needs).
 ## A set piece shown to a viewer (viewer_equipment set: the player panels, the shop) gets the
 ## compact set block – the pieces as their slot names on one line ("Head  Shoulders  Chest …")
 ## and no flavor text – so the tooltip stays readable inside a 4-player corner panel at 720p.
@@ -606,7 +608,11 @@ func _rebuild() -> void:
 		if text != "":
 			_line(text, ENCHANT_GREEN)
 	if item.unique_text != "":
-		_line(item.unique_text, ENCHANT_GREEN)
+		var needs := unique_needs(item, _viewer_hero())
+		if needs == &"":
+			_line(item.unique_text, ENCHANT_GREEN)
+		else:
+			_line("%s (needs %s)" % [item.unique_text, Artifacts.ability_name(needs)], DIM)
 	if item.is_artifact():
 		_artifact_block()
 	if item.set_id != &"":
@@ -665,6 +671,18 @@ func _viewer_hero() -> Player:
 		if fallback == null and viewer != null and slot.class_data == viewer:
 			fallback = hero
 	return fallback if viewer_equipment == null else null
+
+
+## The ability an ability-mod item's Equip line needs ("" = none): the item's ability when
+## [param hero] (the hero looking at the tooltip) has not learned it. Null [param hero] = nobody
+## to ask, so nothing is missing (as for an Artifact property's "(needs Whirlwind)").
+static func unique_needs(p_item: ItemInstance, hero: Player) -> StringName:
+	if p_item == null or p_item.unique_effect != &"ability_mod" or hero == null:
+		return &""
+	var ability_id := StringName(p_item.unique_params.get("ability", ""))
+	if ability_id == &"" or Artifacts.hero_knows(hero, ability_id):
+		return &""
+	return ability_id
 
 
 func _weapon_lines(w: WeaponData) -> void:

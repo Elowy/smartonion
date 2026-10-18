@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ring_of_the_chive_coil"
+display_name = "Ring of the Chive Coil"
+flavor = "It curls round the finger like a shoot."
+slot_type = 9
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"crit": 4.0,
+&"haste": 3.0
+})
+class_restriction = &""
+unique_effect = &"extra_attack"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 2.0,
+"icd": 2.5,
+"count": 1
+}
+unique_text = "Chance on hit: Strikes 1 more time at once."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

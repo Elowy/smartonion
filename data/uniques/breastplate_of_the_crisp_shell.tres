@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"breastplate_of_the_crisp_shell"
+display_name = "Breastplate of the Crisp Shell"
+flavor = "Crisp outside, hot inside."
+slot_type = 3
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"strength": 5.0,
+&"stamina": 6.0
+})
+class_restriction = &""
+unique_effect = &"reflect"
+unique_params = {
+"trigger": "when_struck",
+"chance": 15.0,
+"icd": 2.0,
+"damage": 5.0,
+"school": "fire"
+}
+unique_text = "When struck: 15% chance to scald the attacker for 5 Fire damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

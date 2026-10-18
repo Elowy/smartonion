@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"tunic_of_the_quiet_bulb"
+display_name = "Tunic of the Quiet Bulb"
+flavor = "Still, quiet and quick to move."
+slot_type = 3
+armor_type = 1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"agility": 5.0,
+&"stamina": 5.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "on_kill",
+"chance": 8.0,
+"icd": 4.0,
+"stats": {
+&"haste": 20.0
+},
+"duration": 3.0
+}
+unique_text = "On kill: 8% chance to gain 20% Haste for 3 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

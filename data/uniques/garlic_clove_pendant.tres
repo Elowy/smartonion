@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"garlic_clove_pendant"
+display_name = "Garlic Clove Pendant"
+flavor = "Keeps away more than vampires."
+slot_type = 1
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"stamina": 4.0,
+&"spirit": 3.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 2.5,
+"damage": 10.0,
+"school": "frost"
+}
+unique_text = "Chance on hit: A chill bolt deals 10 Frost damage to the target."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

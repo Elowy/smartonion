@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"jerkin_of_the_last_breath"
+display_name = "Jerkin of the Last Breath"
+flavor = "Unlucky for death, lucky for you."
+slot_type = 3
+armor_type = 1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"agility": 8.0,
+&"stamina": 7.0
+})
+class_restriction = &"rogue"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "cheat_death",
+"mods": {
+"heal_max_hp_pct_add": 5.0
+}
+}
+unique_text = "Equip: Your Cheat Death restores 5% more of your Max HP."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

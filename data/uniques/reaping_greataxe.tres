@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/two_hand_axe.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"reaping_greataxe"
+display_name = "Reaping Greataxe"
+flavor = "It cuts wider than it swings."
+slot_type = 11
+armor_type = -1
+rarity = 3
+weapon = ExtResource("2_weapon")
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"crit": 4.0
+})
+class_restriction = &"warrior"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "bladestorm",
+"mods": {
+"cooldown_add": -5.0
+}
+}
+unique_text = "Equip: Your Bladestorm has a 5 sec shorter cooldown."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

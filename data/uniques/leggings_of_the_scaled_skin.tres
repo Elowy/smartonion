@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"leggings_of_the_scaled_skin"
+display_name = "Leggings of the Scaled Skin"
+flavor = "Scales like a fish, pulses like a bell."
+slot_type = 7
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"strength": 5.0,
+&"stamina": 4.0
+})
+class_restriction = &""
+unique_effect = &"nova"
+unique_params = {
+"trigger": "when_struck",
+"chance": 8.0,
+"icd": 4.0,
+"damage": 6.0,
+"radius": 2.0,
+"school": "holy",
+"at": "self"
+}
+unique_text = "When struck: 8% chance to pulse, dealing 6 Holy damage to enemies within 2 m of you."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0
