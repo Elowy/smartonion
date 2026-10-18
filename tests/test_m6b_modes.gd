@@ -904,7 +904,7 @@ func test_an_empty_category_and_a_run_outside_the_top_ten() -> void:
 func test_the_end_screen_marks_endless_and_hardcore_runs() -> void:
 	RunState.start_run(2, 1)
 	var normal := _screen()
-	check(not normal.mode_row.visible, "a plain normal run adds nothing under the subtitle")
+	check(normal.mode_row.visible and not normal.mode_label.visible, "a plain normal run's row holds only the arena name")
 	check(not normal.hardcore_badge.visible, "no badge")
 	RunState.start_run(2, 1, RunState.MODE_ENDLESS)
 	var endless := _screen()

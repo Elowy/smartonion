@@ -1330,13 +1330,30 @@ func test_the_end_screen_names_the_arena() -> void:
 	RunState.start_run(1, 5, RunState.MODE_NORMAL, false, &"forest_ruin")
 	screen.open(true)
 	check_eq(screen.environment_label.text, "Arena: Forest Ruin", "per run")
-	# It costs no height: the panel of the worst-case page is not taller than without it.
-	var with_label := screen.panel.get_combined_minimum_size().y
-	screen.environment_label.visible = false
-	check_near(screen.panel.get_combined_minimum_size().y, with_label, 1.0, "the arena label adds no height")
-	# ... and the tabs stay centred (the outer cells share the free width).
-	screen.environment_label.visible = true
-	check_eq(screen.environment_label.size_flags_stretch_ratio, 1.0, "the arena cell")
+	# It sits in the mode row under the subtitle, with the whole panel width (not in the tab row, which cut it).
+	check(screen.environment_label.get_parent() == screen.mode_row, "the arena name is in the mode row")
+
+
+## The arena name under the subtitle has the panel's width, so its minimum size is its whole text. In the tab row it
+## got a third of the width and "Arena: Forest Ruin" was cut to "Arena: Forest R...". Checked for every environment,
+## in a normal and in an endless hardcore run (where the mode row also holds the mode and the badge).
+func test_the_arena_name_fits_its_text_for_every_environment() -> void:
+	var screen := GameOverScreen.create()
+	tree.root.add_child(screen)
+	nodes.append(screen)
+	for mode in [[RunState.MODE_NORMAL, false], [RunState.MODE_ENDLESS, true]]:
+		for id in Db.environment_ids:
+			RunState.start_run(4, 1, mode[0], mode[1], id)
+			screen.open(false)
+			var label := screen.environment_label
+			var where := "%s in a %s run" % [id, mode[0]]
+			check(label.is_visible_in_tree(), "%s: the name is on screen" % where)
+			check(label.text.begins_with("Arena: "), "%s: '%s'" % [where, label.text])
+			var text_width := label.get_theme_font(&"font").get_string_size(label.text,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, label.get_theme_font_size(&"font_size")).x
+			check(label.get_minimum_size().x >= text_width - 0.5,
+					"%s: the minimum width %.0f px is the whole text (%.0f px)" % [where, label.get_minimum_size().x, text_width])
+			check(label.get_minimum_size().x <= 1044.0, "%s: and it fits the panel's 1044 px of text width" % where)
 
 
 func test_the_end_screens_arena_label_keeps_its_font_size_and_the_environments_colour() -> void:

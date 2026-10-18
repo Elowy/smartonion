@@ -2,8 +2,8 @@ class_name GameOverScreen
 extends Control
 ## End-of-run screen (GDD 1, M6): "Victory!" (gold) or "Defeat" (red) over three pages (M6b adds the
 ## Leaderboard: [LeaderboardPage], the local top 10 of the run's category with this run highlighted; the
-## Summary shows the "Best: ..." line under its table, and a hardcore / endless run a mode row with the
-## HARDCORE badge under the subtitle). Summary:
+## Summary shows the "Best: ..." line under its table, and the mode row under the subtitle holds the arena
+## name, plus the mode and the HARDCORE badge in an endless / hardcore run). Summary:
 ## waves cleared, total kills, gold earned, team level, the run time and one row per player (class,
 ## kills, damage; the top damage dealer gets a crown). Damage Meter ([MeterPage]): bars per stat
 ## and hero in the class colours and, in co-op, the Awards ([RunSummary]). After INPUT_DELAY, on
@@ -30,8 +30,8 @@ const MAX_STATUS_CHARS := 72
 var victory := false
 var title_label: Label
 var subtitle_label: Label
-## The arena of the run (M6b ENV): "Arena: Cemetery", in the environment's colour, at the left of the tab
-## row (it costs no height: the worst-case meter page has 40 px to spare).
+## The arena of the run (M6b ENV): "Arena: Cemetery", in the environment's colour, in the mode row under the
+## subtitle, where it has the panel's whole width (in the tab row it was cut to "Arena: Forest R...").
 var environment_label: Label
 var waves_value: Label
 var kills_value: Label
@@ -50,8 +50,9 @@ var leaderboard_page: LeaderboardPage
 var page_box: MarginContainer
 ## M6b: the leaderboard model of this run ([method Leaderboard.screen_model]; {} = no board, see [method open]).
 var board: Dictionary = {}
-## M6b: "Endless mode" / "Normal mode" and the HARDCORE badge under the subtitle (the row shows for an endless
-## or a hardcore run only) and the "Best: ..." line under the Summary's hero table.
+## M6b: the mode row under the subtitle: the arena name ([member environment_label]) and, beside it, "Endless
+## mode" / "Normal mode" and the HARDCORE badge (an endless or a hardcore run only). The "Best: ..." line sits
+## under the Summary's hero table.
 var mode_row: HBoxContainer
 var mode_label: Label
 var hardcore_badge: HardcoreBadge
@@ -214,8 +215,9 @@ func _build() -> void:
 	title_label = UiTheme.centered_label("Victory!", UiTheme.TITLE, 110)
 	title_label.add_theme_constant_override(&"outline_size", 18)
 	col.add_child(title_label)
-	# The subtitle and the mode row are one group with a tight gap: a hidden mode row (a normal run) takes no
-	# room, and an endless / hardcore one adds less height, so the worst-case panel still fits 1080 px.
+	# The subtitle and the mode row are one group with a tight gap. The mode row always shows (it holds the arena
+	# name); the mode and the badge are hidden in a normal run, and in an endless / hardcore run the arena name
+	# joins that row on the same line, so the worst-case panel still fits 1080 px.
 	var head := UiTheme.vbox(2)
 	col.add_child(head)
 	subtitle_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_LARGE)
@@ -223,11 +225,13 @@ func _build() -> void:
 	mode_row = UiTheme.hbox(14)
 	mode_row.name = "ModeRow"
 	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	mode_row.visible = false
 	mode_label = UiTheme.centered_label("", UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
 	mode_row.add_child(mode_label)
 	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_BODY - 2)
 	mode_row.add_child(hardcore_badge)
+	environment_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY)
+	environment_label.name = "ArenaLabel"
+	mode_row.add_child(environment_label)
 	head.add_child(mode_row)
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
@@ -283,14 +287,6 @@ func _build() -> void:
 
 ## "LB  Summary | Damage Meter | Leaderboard  RB": the active page's name is gold.
 func _build_tabs() -> Control:
-	# [arena | tabs | nothing]: the two outer cells share the free width equally, so the tabs stay centred.
-	var outer := UiTheme.hbox(0)
-	environment_label = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_BODY)
-	environment_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	environment_label.size_flags_stretch_ratio = 1.0
-	environment_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	environment_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	outer.add_child(environment_label)
 	var row := UiTheme.hbox(28)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(UiGlyph.pad(PlayerInput.Pad.LB, 26.0))
@@ -299,11 +295,7 @@ func _build_tabs() -> Control:
 		tab_labels.append(tab)
 		row.add_child(tab)
 	row.add_child(UiGlyph.pad(PlayerInput.Pad.RB, 26.0))
-	outer.add_child(row)
-	var right := UiTheme.spacer()
-	right.size_flags_stretch_ratio = 1.0
-	outer.add_child(right)
-	return outer
+	return row
 
 
 func _stat_tile(parent: Control, caption: String, icon: Control) -> Label:
@@ -380,10 +372,10 @@ func _fill() -> void:
 	_fit_pages()
 
 
-## M6b: the mode row under the subtitle (an endless or a hardcore run: "Endless mode" and the HARDCORE badge),
+## M6b: the mode and the HARDCORE badge of the mode row under the subtitle (an endless or a hardcore run only),
 ## the "Best: ..." line of the Summary and the Leaderboard page, from [member board] and RunState.
 func _fill_mode_and_board() -> void:
-	mode_row.visible = RunState.is_endless() or RunState.hardcore
+	mode_label.visible = RunState.is_endless() or RunState.hardcore
 	mode_label.text = "%s mode" % RunState.mode_text(RunState.mode)
 	hardcore_badge.visible = RunState.hardcore
 	leaderboard_page.fill(board)
