@@ -89,7 +89,7 @@ func test_unique_counts() -> void:
 	check_eq(legendaries, 8, "Legendaries")
 	check_eq(named, 40, "named Rare / Epic items (M6b: 10 + 30)")
 	for class_id in Db.class_ids:
-		check(per_class.get(class_id, 0) >= 2, "class items for %s" % class_id)
+		check_eq(per_class.get(class_id, 0), 8, "class items for %s (M6b: 8 per class)" % class_id)
 
 
 func test_unique_data_is_valid() -> void:

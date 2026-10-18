@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"girdle_of_lasting_grace"
+display_name = "Girdle of Lasting Grace"
+flavor = "Grace has a long memory."
+slot_type = 6
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 6.0,
+&"stamina": 6.0,
+&"crit": 3.0
+})
+class_restriction = &"paladin"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "lay_on_hands",
+"mods": {
+"shield_duration_add": 3.0
+}
+}
+unique_text = "Equip: Your Lay on Hands' shield lasts 3 sec longer."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

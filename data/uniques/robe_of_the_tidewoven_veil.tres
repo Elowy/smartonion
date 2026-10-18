@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"robe_of_the_tidewoven_veil"
+display_name = "Robe of the Tidewoven Veil"
+flavor = "Woven by a sea that never froze."
+slot_type = 3
+armor_type = 0
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 8.0,
+&"stamina": 5.0
+})
+class_restriction = &"mage"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "ice_barrier",
+"mods": {
+"shield_pct": 25.0
+}
+}
+unique_text = "Equip: Your Ice Barrier absorbs 25% more damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

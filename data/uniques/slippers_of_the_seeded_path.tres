@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"slippers_of_the_seeded_path"
+display_name = "Slippers of the Seeded Path"
+flavor = "One seed, many sprouts."
+slot_type = 8
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 5.0,
+&"haste": 3.0
+})
+class_restriction = &"warlock"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "seed_of_corruption",
+"mods": {
+"chain_add": 1.0
+}
+}
+unique_text = "Equip: Your Seed of Corruption chains 1 more time."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

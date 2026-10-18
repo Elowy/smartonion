@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"leggings_of_dread_steps"
+display_name = "Leggings of Dread Steps"
+flavor = "Shuffle quietly toward them."
+slot_type = 7
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 6.0,
+&"stamina": 5.0
+})
+class_restriction = &"warlock"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "fear",
+"mods": {
+"radius_add": 1.0
+}
+}
+unique_text = "Equip: Your Fear reaches 1 m further."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

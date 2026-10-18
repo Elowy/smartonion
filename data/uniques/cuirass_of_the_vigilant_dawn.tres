@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cuirass_of_the_vigilant_dawn"
+display_name = "Cuirass of the Vigilant Dawn"
+flavor = "It is never stored; it is always worn."
+slot_type = 3
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 8.0,
+&"stamina": 9.0
+})
+class_restriction = &"paladin"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "divine_shield",
+"mods": {
+"cooldown_add": -8.0
+}
+}
+unique_text = "Equip: Your Divine Shield has an 8 sec shorter cooldown."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

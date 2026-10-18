@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cuffs_of_the_blazing_heart"
+display_name = "Cuffs of the Blazing Heart"
+flavor = "Fire kept in a sleeve."
+slot_type = 4
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 3.0,
+&"haste": 3.0
+})
+class_restriction = &"mage"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "pyroblast",
+"mods": {
+"burn_pct_add": 10.0
+}
+}
+unique_text = "Equip: Your Pyroblast's burn deals 10% more damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

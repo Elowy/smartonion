@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"legplates_of_the_bold_leap"
+display_name = "Legplates of the Bold Leap"
+flavor = "Leap first, check the landing later."
+slot_type = 7
+armor_type = 3
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"stamina": 6.0,
+&"strength": 3.0
+})
+class_restriction = &"warrior"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "heroic_leap",
+"mods": {
+"stun_add": 1.0
+}
+}
+unique_text = "Equip: Your Heroic Leap stuns enemies for 1 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0
