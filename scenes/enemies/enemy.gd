@@ -215,6 +215,10 @@ var attack_cooldown_mult := 1.0
 var damage_mult := 1.0
 ## The elite's nameplate / look (null for normal enemies).
 var elite_plate: ElitePlate
+## False for the dungeon's enemies (M6b): a death still counts as a kill (and leaves its
+## [member EnemyData.death_effect]) but pays no gold / XP and rolls no item or Artifact – the dungeon
+## has its own rewards ([DungeonRewards]).
+var drops_loot := true
 
 var _dead := false
 var _move_velocity := Vector3.ZERO
@@ -1507,7 +1511,8 @@ func _die(attacker: Node3D) -> void:
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
-	_death_loot(pos, attacker)
+	if drops_loot:
+		_death_loot(pos, attacker)
 	_on_death_effect()
 	_leave_world()
 	died.emit(self, killer_index)

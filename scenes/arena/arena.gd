@@ -14,9 +14,17 @@ extends Node3D
 ## M6b: [method create] takes an optional [EnvironmentData] (the run's arena environment: palette,
 ## decor set, hazard id); without one the arena is the forest clearing it always was. The playable
 ## SIZE is the same for every environment.
+## M6b dungeon: [method enter_dungeon_layout] swaps the scenery (environment, sun, ground, walls,
+## decor) for a small DUNGEON_SIZE room in the run's palette without a Spirit Healer – the entities,
+## the camera and Arena.current stay, so the heroes never leave the tree – and
+## [method leave_dungeon_layout] puts the clearing back. The playable rectangle of the layout in use
+## is [member play_size] ([method get_bounds]); SIZE stays the clearing's size for the static
+## readers that only fall back on it.
 
 ## Playable area size in metres (x = width, y = depth along Z).
 const SIZE := Vector2(34.0, 22.0)
+## The dungeon room's playable size (GDD 16.1).
+const DUNGEON_SIZE := Vector2(24.0, 14.0)
 ## Collision walls: height and thickness (metres); the inner faces sit on the bounds.
 const WALL_HEIGHT := 8.0
 const WALL_THICKNESS := 4.0
@@ -143,20 +151,33 @@ var environment: EnvironmentData
 var sun: DirectionalLight3D
 var world_environment: WorldEnvironment
 var ground: MeshInstance3D
+## The decoration around the playable rectangle (child "Decor").
+var decor: Node3D
 ## Dirt patches inside the arena: (x, z, radius, noise seed).
 var dirt_patches: Array[Vector4] = []
+## Playable size of the layout in use: SIZE, DUNGEON_SIZE while a dungeon layout is up.
+var play_size := SIZE
+## A dungeon layout replaced the clearing's scenery ([method enter_dungeon_layout]).
+var in_dungeon_layout := false
 
 var _with_spirit_healer := true
+## The clearing's layout while a dungeon layout is up: size, environment, scenery nodes, dirt
+## patches, Spirit Healer and its process mode.
+var _home: Dictionary = {}
 
 
 ## The arena of [param p_environment] (null = the forest clearing: EnvironmentData's defaults).
 ## [param p_spirit_healer] false builds it without the Spirit Healer ([member spirit_healer] stays
-## null – the hardcore mode and the dungeon use this; every consumer of the healer is null-safe).
-static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true) -> Arena:
+## null – the hardcore mode uses this; every consumer of the healer is null-safe). [param p_size] is
+## the playable size (default SIZE; DUNGEON_SIZE builds a stand-alone dungeon room – the run's dungeon
+## swaps the layout of its own arena instead, see [method enter_dungeon_layout]).
+static func create(p_environment: EnvironmentData = null, p_spirit_healer: bool = true,
+		p_size: Vector2 = SIZE) -> Arena:
 	var arena := Arena.new()
 	arena.name = "Arena"
 	arena.environment = p_environment if p_environment != null else EnvironmentData.new()
 	arena._with_spirit_healer = p_spirit_healer
+	arena.play_size = p_size
 	arena._build()
 	return arena
 
@@ -172,7 +193,7 @@ func _exit_tree() -> void:
 
 ## Playable rectangle on the XZ plane (Rect2.position = min x / min z).
 func get_bounds() -> Rect2:
-	return Rect2(-SIZE / 2.0, SIZE)
+	return Rect2(-play_size / 2.0, play_size)
 
 
 ## Ground rectangle the camera may show (bounds + VIEW_MARGIN, VIEW_MARGIN_SOUTH at +Z).
@@ -222,6 +243,90 @@ func is_inside(p: Vector3, margin: float = 0.0) -> bool:
 	return get_bounds().grow(-margin).has_point(Vector2(p.x, p.z))
 
 
+# --- Dungeon layout ------------------------------------------------------------
+
+## Swaps the clearing's scenery for a dungeon room of [param p_size] in the palette of
+## [param p_environment] (null = the one the arena has): the clearing's environment, sun, ground,
+## walls and decor leave the tree (kept for [method leave_dungeon_layout]), new ones of the small room
+## take their place, and the Spirit Healer is switched off ([member spirit_healer] is null meanwhile –
+## every consumer is null-safe). The entities root, the camera and Arena.current stay as they are, so
+## the heroes and everything else standing in `entities` keep working. Does nothing in a dungeon
+## layout already. The decor uses its own generator (DECOR_SEED), never RunState.rng.
+func enter_dungeon_layout(p_environment: EnvironmentData = null, p_size: Vector2 = DUNGEON_SIZE) -> void:
+	if in_dungeon_layout:
+		return
+	_home = {
+		"size": play_size, "environment": environment, "world_environment": world_environment,
+		"sun": sun, "ground": ground, "walls": walls, "decor": decor, "dirt_patches": dirt_patches,
+		"healer": spirit_healer,
+		"healer_mode": spirit_healer.process_mode if spirit_healer != null else Node.PROCESS_MODE_INHERIT,
+	}
+	for node: Node in [world_environment, sun, ground, walls, decor]:
+		if node != null and node.get_parent() == self:
+			remove_child(node)
+	if spirit_healer != null and is_instance_valid(spirit_healer):
+		spirit_healer.process_mode = Node.PROCESS_MODE_DISABLED
+		spirit_healer.visible = false
+	spirit_healer = null
+	play_size = p_size
+	if p_environment != null:
+		environment = p_environment
+	dirt_patches = []
+	in_dungeon_layout = true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = DECOR_SEED + 17
+	_build_environment()
+	_build_ground(rng)
+	_build_walls()
+	decor = _build_decor(rng)
+	decor.name = "Decor"
+	add_child(decor)
+
+
+## Puts the clearing back ([method enter_dungeon_layout] undone): the dungeon room's scenery is
+## removed first (never two WorldEnvironments in the tree), the Spirit Healer wakes up again.
+func leave_dungeon_layout() -> void:
+	if not in_dungeon_layout:
+		return
+	for node: Node in [world_environment, sun, ground, walls, decor]:
+		_discard(node)
+	in_dungeon_layout = false
+	play_size = _home["size"]
+	environment = _home["environment"]
+	world_environment = _home["world_environment"]
+	sun = _home["sun"]
+	ground = _home["ground"]
+	walls = _home["walls"]
+	decor = _home["decor"]
+	dirt_patches = _home["dirt_patches"]
+	for node: Node in [world_environment, sun, ground, walls, decor]:
+		if node != null and is_instance_valid(node):
+			add_child(node)
+	var healer: SpiritHealer = _home["healer"]
+	if healer != null and is_instance_valid(healer):
+		healer.process_mode = _home["healer_mode"]
+		spirit_healer = healer
+	_home = {}
+
+
+## The clearing's scenery is parked outside the tree while a dungeon layout is up: it is freed
+## with the arena.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and in_dungeon_layout:
+		for key: String in ["world_environment", "sun", "ground", "walls", "decor"]:
+			var node: Node = _home.get(key)
+			if node != null and is_instance_valid(node) and node.get_parent() == null:
+				node.free()
+
+
+static func _discard(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if node.get_parent() != null:
+		node.get_parent().remove_child(node)
+	node.queue_free()
+
+
 # --- Building ----------------------------------------------------------------
 
 func _build() -> void:
@@ -230,7 +335,7 @@ func _build() -> void:
 	_build_environment()
 	_build_ground(rng)
 	_build_walls()
-	var decor := _build_decor(rng)
+	decor = _build_decor(rng)
 	decor.name = "Decor"
 	add_child(decor)
 	if _with_spirit_healer:
@@ -310,7 +415,7 @@ func _build_ground(rng: RandomNumberGenerator) -> void:
 		arr.append(Vector4(0, 0, 0.001, 0))
 	mat.set_shader_parameter("patches", arr)
 	mat.set_shader_parameter("patch_count", dirt_patches.size())
-	mat.set_shader_parameter("arena_half", SIZE / 2.0)
+	mat.set_shader_parameter("arena_half", play_size / 2.0)
 	# (A road width of ~0 makes no road: the shader divides the distance to the road by it.)
 	mat.set_shader_parameter("road", Vector2(0.0, environment.road_width if environment.has_road else 0.0001))
 	mat.set_shader_parameter("grass_dark", environment.grass_dark)
@@ -335,7 +440,7 @@ func _build_walls() -> void:
 	walls.collision_layer = 1
 	walls.collision_mask = 0
 	add_child(walls)
-	for box in wall_boxes():
+	for box in wall_boxes_for(play_size):
 		var shape := BoxShape3D.new()
 		shape.size = box.size
 		var cs := CollisionShape3D.new()
@@ -349,13 +454,18 @@ func _build_walls() -> void:
 ## The four collision boxes (AABBs in arena space). Their inner faces lie exactly on the
 ## playable bounds; they overlap at the corners so nothing can slip out.
 static func wall_boxes() -> Array[AABB]:
-	var half := SIZE / 2.0
+	return wall_boxes_for(SIZE)
+
+
+## [method wall_boxes] of a playable rectangle of [param p_size] (the dungeon room's walls).
+static func wall_boxes_for(p_size: Vector2) -> Array[AABB]:
+	var half := p_size / 2.0
 	var t := WALL_THICKNESS
 	var h := WALL_HEIGHT
 	var y0 := -1.0
 	var out: Array[AABB] = []
-	out.append(AABB(Vector3(-half.x - t, y0, -half.y - t), Vector3(SIZE.x + 2.0 * t, h, t)))   # north
-	out.append(AABB(Vector3(-half.x - t, y0, half.y), Vector3(SIZE.x + 2.0 * t, h, t)))       # south
-	out.append(AABB(Vector3(-half.x - t, y0, -half.y - t), Vector3(t, h, SIZE.y + 2.0 * t)))   # west
-	out.append(AABB(Vector3(half.x, y0, -half.y - t), Vector3(t, h, SIZE.y + 2.0 * t)))        # east
+	out.append(AABB(Vector3(-half.x - t, y0, -half.y - t), Vector3(p_size.x + 2.0 * t, h, t)))   # north
+	out.append(AABB(Vector3(-half.x - t, y0, half.y), Vector3(p_size.x + 2.0 * t, h, t)))       # south
+	out.append(AABB(Vector3(-half.x - t, y0, -half.y - t), Vector3(t, h, p_size.y + 2.0 * t)))   # west
+	out.append(AABB(Vector3(half.x, y0, -half.y - t), Vector3(t, h, p_size.y + 2.0 * t)))        # east
 	return out

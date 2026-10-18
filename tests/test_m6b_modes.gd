@@ -304,7 +304,7 @@ func test_the_ghost_hint_names_the_teammate_in_hardcore() -> void:
 	frame.bind(hero)
 	frame._process(0.016)
 	check_eq(frame.hint_label.text, "Only a teammate can revive you", "the hardcore hint")
-	check_eq(UnitFrame.HARDCORE_HINT, "Only a teammate can revive you", "the constant")
+	check_eq(UnitFrame.TEAMMATE_HINT, "Only a teammate can revive you", "the constant (shared with the dungeon)")
 	hero.res_sickness_left = 9.5
 	frame._process(0.016)
 	check_eq(frame.hint_label.text, UnitFrame.SICKNESS_HINT % 10, "a sickness countdown would still show first")

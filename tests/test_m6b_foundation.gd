@@ -972,15 +972,19 @@ func test_a_pending_shrine_opens_the_phase_and_the_break_goes_on_when_the_vote_i
 	check_eq(screen.phase, Intermission.Phase.MARKET, "the break did not stall")
 
 
-func test_a_pending_portal_passes_through_the_stub() -> void:
+## (M6b DUNGEON: the portal phase is the team vote now; this was the foundation's pass-through stub.)
+func test_a_pending_portal_opens_the_vote_and_a_decline_goes_on_to_the_market() -> void:
 	_make_screen()
 	MarketFakes.human_with_hero(world, "pad:a", &"warrior")
 	RunState.portal_pending = true
 	check(screen.wants_portal(), "wanted")
 	screen.open(5, 0)
+	check_eq(screen.entered, [Intermission.Phase.PORTAL] as Array[Intermission.Phase], "the portal phase waits for the vote")
+	check(screen.portal_screen.is_active() and screen.portal_screen.visible, "the vote is on screen")
+	screen.portal_screen.cast(PlayerManager.get_slots()[0].index, PortalScreen.Vote.DECLINE)
 	check_eq(screen.entered, [Intermission.Phase.PORTAL, Intermission.Phase.MARKET] as Array[Intermission.Phase],
 			"the portal phase, then the market")
-	check(not RunState.portal_pending, "the stub closed the portal")
+	check(not RunState.portal_pending, "the portal is closed")
 
 
 func test_both_pending_run_in_order() -> void:
@@ -989,8 +993,11 @@ func test_both_pending_run_in_order() -> void:
 	RunState.pending_shrine = &"haste"
 	RunState.portal_pending = true
 	screen.open(5, 0)
+	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.PORTAL] as Array[Intermission.Phase],
+			"SHRINE before PORTAL (the portal waits for the vote)")
+	screen.portal_screen.cast(PlayerManager.get_slots()[0].index, PortalScreen.Vote.DECLINE)
 	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.PORTAL, Intermission.Phase.MARKET] as Array[Intermission.Phase],
-			"SHRINE before PORTAL, then the market")
+			"then the market")
 
 
 func test_pending_phases_without_a_hero_are_skipped() -> void:
@@ -1014,8 +1021,11 @@ func test_level_up_comes_between_the_shrine_and_the_portal() -> void:
 			"the shrine, then the level-up cards (the portal waits for the picks)")
 	check_eq(screen.phase, Intermission.Phase.LEVEL_UP, "waiting for the card pick")
 	screen._on_level_up_finished()
+	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.LEVEL_UP, Intermission.Phase.PORTAL] as Array[Intermission.Phase],
+			"then the portal vote")
+	screen.portal_screen.cast(PlayerManager.get_slots()[0].index, PortalScreen.Vote.DECLINE)
 	check_eq(screen.entered, [Intermission.Phase.SHRINE, Intermission.Phase.LEVEL_UP, Intermission.Phase.PORTAL,
-			Intermission.Phase.MARKET] as Array[Intermission.Phase], "then the portal, then the market")
+			Intermission.Phase.MARKET] as Array[Intermission.Phase], "then the market")
 
 
 func test_a_player_leaving_the_shrine_vote_reaches_its_hook() -> void:

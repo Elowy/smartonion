@@ -13,8 +13,13 @@ extends Control
 ##            hero: the full-screen LevelUpScreen (GDD 6.1) – every hero picks 1 of 5 cards per
 ##            level gained in their own quarter, with their own controller (bots / unplugged
 ##            pads automatically, idle humans after the countdown).
-##   PORTAL – M6b hook (DUNGEON package): only when RunState.portal_pending is set. The dungeon
-##            portal's team vote, between the level-ups and the market.
+##   PORTAL – M6b (DUNGEON package): only when RunState.portal_pending is set. "A dungeon portal has
+##            opened!" – the team vote of the PortalScreen (all accept → the party enters, any decline
+##            or the 20 s timeout skips it), between the level-ups and the market. An accepted vote
+##            hides this screen and emits [signal portal_accepted]: Main runs the dungeon (the screen
+##            idles, the market countdown has not started) and calls [method dungeon_returned]; a won
+##            dungeon's Epics go through the loot roll (Need / Greed / Pass) and then the market opens
+##            with its full countdown.
 ##   MARKET – RunState.shop.open_round(cleared_wave, slots, RunState.rng) once per open; the
 ##            shared ShopPanel (goblin stall) in the middle, one PlayerPanel per player with a
 ##            hero in that player's corner (P1 top-left, P2 top-right, P3 bottom-left,
@@ -64,6 +69,9 @@ signal bot_rerolled(slot_index: int, cost: int)
 ## The party's vote on the break's shrine was decided (M6b, statistics): the shrine id, accepted by everyone?,
 ## and why ([member ShrineVote.reason]: &"accepted", &"declined", &"timeout", &"nobody").
 signal shrine_resolved(id: StringName, accepted: bool, reason: StringName)
+## The portal vote passed (M6b): the party goes into the dungeon. The screen hides itself and waits for
+## [method dungeon_returned]; Main starts the dungeon.
+signal portal_accepted
 
 ## The break's phases in the order they run (CLOSED = the screen is not open). SHRINE and PORTAL are
 ## M6b slots: nothing opens them until their package sets RunState.pending_shrine / portal_pending.
@@ -144,6 +152,8 @@ var loot_screen: LootRollScreen
 ## The SHRINE phase's card and vote (M6b, scenes/ui/shrine/shrine_screen.gd).
 var shrine_screen: ShrineScreen
 var level_up_screen: LevelUpScreen
+## The portal vote (M6b, PORTAL phase).
+var portal_screen: PortalScreen
 ## Slot index -> that player's personal panel (only players with a hero get one).
 var panels: Dictionary[int, PlayerPanel] = {}
 ## Slot index -> true while the player's input goes to their own panel (else the shop).
@@ -163,6 +173,10 @@ var _t := 0.0
 var _countdown_second := -1
 var _market_time := 0.0
 var _bots_shopped := false
+## The party is inside the dungeon (between portal_accepted and dungeon_returned): the screen is hidden and
+## idle, no countdown runs. After a dungeon the loot roll of its rewards leads straight to the market.
+var _in_dungeon := false
+var _loot_to_market := false
 ## Slot index -> the slot was auto-ready (bot / unplugged pad) in the last frame: a pad that
 ## comes back must ready up again.
 var _was_auto: Dictionary[int, bool] = {}
@@ -234,6 +248,8 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	_market_time = 0.0
 	_bots_shopped = false
 	_was_auto.clear()
+	_in_dungeon = false
+	_loot_to_market = false
 	for slot in PlayerManager.get_slots():
 		slot.ready = is_auto_ready(slot)
 		_was_auto[slot.index] = slot.ready
@@ -244,6 +260,7 @@ func open(p_cleared_wave: int, p_level_ups: int) -> void:
 	_refresh_chips(true)
 	level_up_screen.close()
 	shrine_screen.close()
+	portal_screen.close()
 	show()
 	_enter_phase(Phase.LOOT)
 
@@ -316,6 +333,7 @@ func set_backdrop_opacity(alpha: float) -> void:
 	loot_screen.set_backdrop_opacity(alpha)
 	shrine_screen.set_backdrop_opacity(alpha)
 	level_up_screen.set_backdrop_opacity(alpha)
+	portal_screen.set_backdrop_opacity(alpha)
 
 
 ## Moves [param slot_index]'s input focus to their own panel ([param on]) or to the shop.
@@ -386,6 +404,12 @@ func _enter_phase(first: Phase) -> void:
 
 func _on_loot_finished() -> void:
 	if phase == Phase.LOOT and not _done:
+		if _loot_to_market:
+			# The dungeon's rewards were rolled: the break's other phases are behind us.
+			_loot_to_market = false
+			RunState.portal_pending = false
+			_enter_phase(Phase.MARKET)
+			return
 		_enter_phase(Phase.SHRINE)
 
 
@@ -447,28 +471,66 @@ func _on_level_up_finished() -> void:
 		_enter_phase(Phase.PORTAL)
 
 
-## DUNGEON hook: opens the portal vote (RunState.portal_pending). The foundation has no portal
-## screen: it closes the portal and goes on, so a pending portal can never stall the break. The
-## package replaces the body and calls [method _on_portal_finished] when the vote (and a dungeon
-## run it started) is over.
+## DUNGEON: opens the portal vote (RunState.portal_pending): "A dungeon portal has opened!" and every
+## voter's Accept / Decline (PortalScreen). [method _on_portal_decided] ends it.
 func _start_portal() -> void:
 	phase = Phase.PORTAL
 	level_up_screen.close()
+	loot_screen.hide()
 	_market_root.visible = false
 	_swallow_humans()
-	_on_portal_finished()
+	portal_screen.open(PlayerManager.get_slots(), cleared_wave, RunState.portal_forced, RunState.last_wave_downs)
 
 
-## DUNGEON hook: the portal vote (and the dungeon, when the party went in) is over: the market is next.
+## The portal vote (and the dungeon, when the party went in) is over: the market is next.
 func _on_portal_finished() -> void:
 	if phase == Phase.PORTAL and not _done:
 		RunState.portal_pending = false
+		portal_screen.close()
 		_enter_phase(Phase.MARKET)
 
 
-## DUNGEON hook: one frame of the PORTAL phase (the tree is paused, the screen processes always).
-func _update_portal(_delta: float) -> void:
-	pass
+## One frame of the PORTAL phase (the tree is paused, the screen processes always). Inside the dungeon
+## the screen is hidden ([method _process] returns before the phase runs), the vote is closed and the
+## market countdown has not started.
+func _update_portal(delta: float) -> void:
+	portal_screen.update(delta)
+
+
+## The vote fell: everybody accepted → the dungeon (this screen hides and waits for the party), else
+## the break goes on with the market.
+func _on_portal_decided(enter: bool) -> void:
+	if phase != Phase.PORTAL or _done:
+		return
+	if not enter:
+		_on_portal_finished()
+		return
+	_in_dungeon = true
+	portal_screen.close()
+	hide()
+	portal_accepted.emit()
+
+
+## The party is back from the dungeon ([param success] = the Warden fell; Main has already paid the
+## reward into RunState.team_loot or taken the failure's gold): the screen comes back, the Epics are
+## rolled for (Need / Greed / Pass) and the market follows – "either way, the market follows".
+func dungeon_returned(_success: bool) -> void:
+	if not _in_dungeon or _done:
+		return
+	_in_dungeon = false
+	show()
+	_swallow_humans()
+	_skip_frames = 1
+	if RunState.team_loot.is_empty():
+		_on_portal_finished()
+	else:
+		_loot_to_market = true
+		_enter_phase(Phase.LOOT)
+
+
+## True while the party is inside the dungeon.
+func is_in_dungeon() -> bool:
+	return _in_dungeon
 
 
 func _start_market() -> void:
@@ -634,6 +696,10 @@ func _build() -> void:
 	level_up_screen.finished.connect(_on_level_up_finished)
 	level_up_screen.card_picked.connect(func(i: int, c: LevelCard) -> void: level_card_picked.emit(i, c))
 	add_child(level_up_screen)
+
+	portal_screen = PortalScreen.create()
+	portal_screen.decided.connect(_on_portal_decided)
+	add_child(portal_screen)
 	visible = false
 
 
@@ -1341,10 +1407,11 @@ func _on_shrine_player_left(slot: PlayerSlot) -> void:
 	shrine_screen.remove_slot(slot.index)
 
 
-## DUNGEON hook: [param slot] left while the portal vote runs (the package drops their vote, re-checks the
-## voters). The foundation has nothing to do.
-func _on_portal_player_left(_slot: PlayerSlot) -> void:
-	pass
+## [param slot] left while the portal vote runs: their vote goes away and the others may decide (nobody
+## left to vote = a skip).
+func _on_portal_player_left(slot: PlayerSlot) -> void:
+	if not _in_dungeon:
+		portal_screen.remove_slot(slot.index)
 
 
 ## Takes [param slot_index]'s "P2 wants" pings off every unsold offer of [param shop]

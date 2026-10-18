@@ -8,6 +8,7 @@ extends EnemyData
 ## damage (the abilities' "N x contact" multiples).
 ##
 ## - [member boss_wave]: the wave it appears in ([method for_wave]); RunState.BOSS_WAVES lists them.
+##   0 = a boss of no wave (the Dungeon Warden, M6b: the Dungeon spawns it, see [Dungeon]).
 ## - Phase 2 at [member phase_hp_ratio] of its HP; [member phase_cooldown_mult] shortens every
 ##   ability interval that has no own phase-2 value (BossAbility.interval_at).
 ## - [member abilities]: the scripted attacks ([BossAbility]).
@@ -65,6 +66,8 @@ func _init() -> void:
 ## there is none – the wave then runs as a normal one). Past the normal run, the endless mode's boss
 ## waves (RunState.is_endless_boss_wave: 30, 35, 40 ...) take [method endless_boss].
 static func for_wave(wave: int) -> BossData:
+	if wave <= 0:
+		return null
 	var best: BossData = null
 	for id in Db.bosses:
 		var b := Db.bosses[id] as BossData
