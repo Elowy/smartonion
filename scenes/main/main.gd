@@ -666,14 +666,22 @@ func _record_hero_results() -> void:
 				RunSummary.best_item(hero.equipment) if valid else null)
 
 
-## Pause Menu "Quit to Menu": abandons the run. An endless run is still a result: it goes into the leaderboard
-## as a defeat on the wave it reached (its wave in progress). A normal run that is quit is not recorded.
+## Pause Menu "Quit to Menu": abandons the run ([method _record_abandoned_run] decides whether it is a result).
 func quit_to_menu() -> void:
 	if arena != null and RunState.active:
-		if RunState.is_endless():
-			_record_leaderboard(false)
+		_record_abandoned_run()
 		RunState.end_run(false)
 	go_to_menu()
+
+
+## An abandoned run (quit to the menu, or the last hero dropped out, see [method drop_player]) goes into the
+## leaderboard as a defeat on the wave in progress ([member wave]), but only in the endless mode and only after
+## at least one wave was cleared ([member waves_completed]). A run given up in its first fight, or one that only
+## started on a later wave (--start-wave) and was given up before clearing it, is no result: it would be a junk
+## entry with no time played. A normal run that is abandoned is not recorded.
+func _record_abandoned_run() -> void:
+	if RunState.is_endless() and waves_completed > 0:
+		_record_leaderboard(false)
 
 
 ## Opens the PauseMenu for [param by] (null = no player, e.g. a controller was unplugged).
@@ -718,6 +726,7 @@ func drop_player(slot: PlayerSlot) -> void:
 	_log("%s dropped out (controller unplugged), %d player(s) left" % [slot.label(), PlayerManager.count()])
 	if PlayerManager.count() == 0:
 		if arena != null and RunState.active:
+			_record_abandoned_run()
 			RunState.end_run(false)
 		go_to_lobby()
 		return

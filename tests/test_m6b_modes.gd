@@ -786,14 +786,64 @@ func test_an_endless_run_quit_from_the_pause_menu_records_the_wave_reached() -> 
 	opts.mode = RunState.MODE_ENDLESS
 	opts.start_wave = 27
 	_recording_main(opts)
+	_clear_wave_and_wait()  # a quit is a result only after a cleared wave
 	RunState.tick_run_time(321.0)
 	main.quit_to_menu()
 	var entries := _board().entries_for(RunState.MODE_ENDLESS, false, 2)
 	check_eq(entries.size(), 1, "the quit run is on the endless board")
-	check_eq(int(entries[0]["wave"]), 27, "the wave it reached")
+	check_eq(int(entries[0]["wave"]), 27, "the wave in progress: the one it was on when it was quit")
 	check(not bool(entries[0]["victory"]), "a defeat")
 	check_near(float(entries[0]["time"]), 321.0, 0.11, "the time played")
 	check(not RunState.active and main.state == Main.State.MENU, "the run is over and the menu is up (no game-over screen)")
+
+
+func test_a_run_quit_before_any_wave_was_cleared_is_not_recorded() -> void:
+	# Quit in the first fight, and quit in the first fight of a run that starts on a later wave (--start-wave):
+	# neither has cleared a wave, so neither is a result (a junk "Wave 1" entry with no time played).
+	for start in [1, 27]:
+		var opts := LaunchOptions.new()
+		opts.mode = RunState.MODE_ENDLESS
+		opts.start_wave = start
+		_recording_main(opts)
+		RunState.tick_run_time(12.0)
+		main.quit_to_menu()
+		check(_board().entries_for(RunState.MODE_ENDLESS, false, 2).is_empty(), "started on wave %d: nothing recorded" % start)
+
+
+func test_an_endless_run_whose_last_hero_drops_out_is_recorded_as_a_defeat() -> void:
+	var opts := LaunchOptions.new()
+	opts.mode = RunState.MODE_ENDLESS
+	opts.start_wave = 27
+	_recording_main(opts)
+	_clear_wave_and_wait()
+	RunState.tick_run_time(321.0)
+	for slot in PlayerManager.get_slots().duplicate():
+		main.drop_player(slot)
+	check_eq(PlayerManager.count(), 0, "everybody dropped out")
+	var entries := _board().entries_for(RunState.MODE_ENDLESS, false, 2)
+	check_eq(entries.size(), 1, "the abandoned run is on the endless board, as a quit is")
+	if entries.size() != 1:
+		return
+	check_eq(int(entries[0]["wave"]), 27, "the wave in progress")
+	check(not bool(entries[0]["victory"]), "a defeat")
+	check_near(float(entries[0]["time"]), 321.0, 0.11, "the time played")
+	check_eq(entries[0]["classes"], ["warrior", "mage"] as Array[String], "the classes of the party")
+	check(not RunState.active and main.state == Main.State.LOBBY, "the run is over and the lobby is up")
+
+
+func test_the_last_hero_dropping_out_records_nothing_before_a_cleared_wave_or_in_a_normal_run() -> void:
+	var early := LaunchOptions.new()
+	early.mode = RunState.MODE_ENDLESS
+	early.start_wave = 27
+	_recording_main(early)
+	for slot in PlayerManager.get_slots().duplicate():
+		main.drop_player(slot)
+	check(_board().entries_for(RunState.MODE_ENDLESS, false, 2).is_empty(), "no cleared wave: nothing recorded")
+	_recording_main()
+	_clear_wave_and_wait()
+	for slot in PlayerManager.get_slots().duplicate():
+		main.drop_player(slot)
+	check(_board().entries_for(RunState.MODE_NORMAL, false, 2).is_empty(), "a normal run is no result when it is dropped")
 
 
 ## A directory where the board's temporary file goes: the board itself still loads, but the save cannot open it.
