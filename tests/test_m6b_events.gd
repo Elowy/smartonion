@@ -881,3 +881,71 @@ func test_a_run_prints_no_event_lines_itself_main_logs_them_through_its_gate() -
 	sp.end_wave()
 	OS.remove_logger(spy)
 	check(spy.with_text("EVENT").is_empty(), "a plain run prints no event line: %s" % [spy.with_text("EVENT")])
+
+
+# --- The documented distances, as literal numbers -------------------------------------------------
+# The other tests use the constants symbolically; these pin the numbers the design documents (GDD 16.1,
+# the doc notes) so a retuned constant is a decision, not an accident.
+
+func test_the_documented_event_distances_are_pinned() -> void:
+	check_eq(EventGuards.AGGRO_RADIUS, 9.0, "guards wake when a hero comes within 9 m")
+	check_eq(EventSpawner.CHEST_HERO_DISTANCE, 10.0, "the chest keeps 10 m from the heroes")
+	check_eq(GuardedChest.OPEN_RADIUS, 2.0, "a hero within 2 m opens the chest")
+	check_eq(EventSpawner.TOTEM_HERO_DISTANCE, 4.0, "the totem keeps 4 m from the heroes")
+
+
+func test_guards_wake_at_9_m_and_not_before() -> void:
+	_make_spawner()
+	spawner.roll_wave(5)
+	check(spawner.start_event(EventSpawner.GUARDED_CHEST), "the chest is built")
+	var guards := spawner.chest.guards
+	var guard := guards.guards[0]
+	var out := guard.global_position - spawner.chest.global_position
+	out.y = 0.0
+	out = out.normalized() if out.length() > 0.01 else Vector3.RIGHT
+	# Straight out from the guard on the ring: no other guard is nearer to the hero than this one.
+	var hero := _hero(guard.global_position + out * 9.1)
+	guards.scan()
+	check(not guards.is_alerted, "9.1 m from the nearest guard: they stay on their posts")
+	hero.global_position = guard.global_position + out * 8.9
+	guards.scan()
+	check(guards.is_alerted, "8.9 m from it: the whole group wakes")
+
+
+func test_a_hero_opens_the_chest_from_2_m_and_not_from_further_out() -> void:
+	var chest := GuardedChest.create(5)
+	_arena().entities.add_child(chest)
+	chest.global_position = Vector3(2.0, 0.0, 2.0)
+	var hero := _hero(chest.global_position + Vector3(2.1, 0.0, 0.0))
+	for i in 60:
+		chest._physics_process(DT)
+	check_eq(chest.progress, 0.0, "2.1 m away: no progress at all")
+	hero.global_position = chest.global_position + Vector3(1.9, 0.0, 0.0)
+	for i in 60:
+		chest._physics_process(DT)
+	check_near(chest.progress, 1.0, 0.03, "1.9 m away: one second of the 1.5 s")
+
+
+## The arena offers the points in turn: the first 0.4 m inside the distance, the second 0.4 m outside it –
+## the event takes the second one.
+func _scripted_spawn_picks_the_second(kind: StringName, distance: float) -> void:
+	_make_spawner()
+	var hero_at := Vector3(-15.0, 0.0, 3.0)  # (away from the walls: the chest's point is clamped into the arena)
+	_hero(hero_at)
+	var too_close := hero_at + Vector3(distance - 0.4, 0.0, 0.0)
+	var fine := hero_at + Vector3(distance + 0.4, 0.0, 0.0)
+	var points: Array[Vector3] = [too_close, fine]
+	EFakes.arena_of(world).scripted_points = points
+	spawner.roll_wave(6)
+	check(spawner.start_event(kind), "%s is built" % kind)
+	var at := spawner.chest.global_position if kind == EventSpawner.GUARDED_CHEST else spawner.totem.global_position
+	check(EFakes.flat_distance(at, fine) < 0.01, "%s: %.1f m from the hero is too close, %.1f m is fine (it stands %.2f m away)"
+			% [kind, distance - 0.4, distance + 0.4, EFakes.flat_distance(at, hero_at)])
+
+
+func test_the_chest_spawns_at_least_10_m_from_the_heroes() -> void:
+	_scripted_spawn_picks_the_second(EventSpawner.GUARDED_CHEST, 10.0)
+
+
+func test_the_totem_spawns_at_least_4_m_from_the_heroes() -> void:
+	_scripted_spawn_picks_the_second(EventSpawner.DEFEND_TOTEM, 4.0)
