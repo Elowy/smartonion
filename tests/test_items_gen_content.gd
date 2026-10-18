@@ -23,20 +23,31 @@ const BANNED: Array[String] = [
 ]
 
 
+## Material tiers of the armour bases (ItemBase.min_wave): I from wave 1 (the original 32), II from
+## wave 9, III from wave 17 (Items.material_tier's thresholds).
+const BASE_TIER_WAVES: Array[int] = [1, 9, 17]
+
+
 func test_armor_and_jewellery_bases() -> void:
 	var seen := {}
+	var per_tier := {}
 	var neck := 0
 	var ring := 0
 	for id in Db.item_bases:
 		var base := Db.item_bases[id]
 		check_eq(base.id, id, "id matches")
 		check(base.display_name != "", "%s has a name" % id)
+		check(base.min_wave in BASE_TIER_WAVES, "%s: min_wave %d is a tier wave" % [id, base.min_wave])
 		if base.slot_type in Items.ARMOR_SLOTS:
 			check(base.armor_type in Items.ARMOR_TYPE_NAMES, "%s has an armor type" % id)
-			var key := "%d:%d" % [base.slot_type, base.armor_type]
-			check(not seen.has(key), "one base per slot and armor type (%s)" % id)
-			seen[key] = true
+			# One base per slot, armor type and material tier (min_wave).
+			var tier_key := "%d:%d:%d" % [base.slot_type, base.armor_type, base.min_wave]
+			check(not per_tier.has(tier_key), "one base per slot, armor type and tier (%s)" % id)
+			per_tier[tier_key] = true
+			if base.min_wave == 1:
+				seen["%d:%d" % [base.slot_type, base.armor_type]] = true
 		else:
+			check_eq(base.min_wave, 1, "%s: jewellery bases are not tiered" % id)
 			check_eq(base.armor_type, Items.NO_ARMOR, "%s: jewellery has no armor type" % id)
 			if base.slot_type == Items.SlotType.NECK:
 				neck += 1
@@ -44,7 +55,10 @@ func test_armor_and_jewellery_bases() -> void:
 				ring += 1
 			else:
 				check(false, "%s: only armor, neck and ring bases (trinkets are hand-made)" % id)
-	check_eq(seen.size(), 32, "8 armor slots x 4 armor types")
+	check_eq(seen.size(), 32, "8 armor slots x 4 armor types, each with a tier I base")
+	for key in per_tier:
+		var parts: PackedStringArray = String(key).split(":")
+		check(seen.has("%s:%s" % [parts[0], parts[1]]), "%s: every slot x type has its tier I base" % key)
 	check(neck >= 2 and ring >= 2, "neck and ring bases")
 
 
