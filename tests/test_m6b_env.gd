@@ -1056,6 +1056,38 @@ func test_the_roll_screen_runs_a_reel_that_lands_on_the_winner() -> void:
 	check_eq(finished.size(), 1, "never twice")
 
 
+func test_the_result_line_wraps_and_fits_the_screen_for_every_environment() -> void:
+	EnvironmentRollScreen.enabled = true
+	var longest := 0.0
+	for id in Db.environment_ids:
+		var env := _env(id)
+		var screen := EnvironmentRollScreen.create(id)
+		tree.root.add_child(screen)
+		nodes.append(screen)
+		_fit(screen)
+		check_eq(screen.result_label.text, "", "%s: no result line while the reel spins" % id)
+		screen.step(EnvironmentRollScreen.SPIN_TIME + 0.01)
+		var label := screen.result_label
+		var want := "%s – %s" % [env.hazard_name, env.hazard_text] if env.has_hazard() else "No tricks today."
+		check_eq(label.text, want, "%s: the result line is the hazard's name and rule" % id)
+		check_eq(label.autowrap_mode, TextServer.AUTOWRAP_WORD_SMART, "%s: it wraps at word borders" % id)
+		check_near(label.size.x, EnvironmentRollScreen.RESULT_WIDTH, 0.5, "%s: at a fixed width" % id)
+		var rect := label.get_global_rect()
+		check(rect.position.x >= 0.0 and rect.end.x <= 1920.0, "%s: inside the screen's width (%.0f .. %.0f)" % [id, rect.position.x, rect.end.x])
+		check(rect.position.y >= screen._clip.get_global_rect().end.y - 0.5, "%s: below the reel window" % id)
+		check(rect.end.y <= 1080.0, "%s: above the bottom edge" % id)
+		var lines := label.get_line_count()
+		check(lines >= 1 and lines <= EnvironmentRollScreen.RESULT_LINES, "%s: %d line(s), at most %d" % [id, lines, EnvironmentRollScreen.RESULT_LINES])
+		check_eq(label.get_visible_line_count(), lines, "%s: every line shows" % id)
+		check(float(lines) * label.get_line_height() <= label.size.y, "%s: the lines fit the label's height (%d x %.0f of %.0f px)" % [id, lines, label.get_line_height(), label.size.y])
+		check(not label.text.ends_with("…"), "%s: nothing is trimmed" % id)
+		check_eq(label.get_theme_font_size(&"font_size"), EnvironmentRollScreen.RESULT_FONT_SIZE, "%s: the font size" % id)
+		var font := label.get_theme_font(&"font")
+		longest = maxf(longest, font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, EnvironmentRollScreen.RESULT_FONT_SIZE).x)
+	# (The data really needs the wrap: one line of the longest rule is wider than the label.)
+	check(longest > EnvironmentRollScreen.RESULT_WIDTH, "the longest rule is %.0f px on one line, wider than the label" % longest)
+
+
 func test_the_roll_screen_lands_on_each_environment_and_can_be_skipped() -> void:
 	for id in Db.environment_ids:
 		var screen := EnvironmentRollScreen.create(id)
@@ -1227,6 +1259,31 @@ func test_the_end_screen_names_the_arena() -> void:
 	# ... and the tabs stay centred (the outer cells share the free width).
 	screen.environment_label.visible = true
 	check_eq(screen.environment_label.size_flags_stretch_ratio, 1.0, "the arena cell")
+
+
+func test_the_end_screens_arena_label_keeps_its_font_size_and_the_environments_colour() -> void:
+	var screen := GameOverScreen.create()
+	tree.root.add_child(screen)
+	nodes.append(screen)
+	var seen: Array[Color] = []
+	for id in Db.environment_ids:
+		RunState.start_run(1, 5, RunState.MODE_NORMAL, false, id)
+		screen.open(false)
+		var label := screen.environment_label
+		check(label.has_theme_font_size_override(&"font_size"), "%s: the label has its own font size" % id)
+		check_eq(label.get_theme_font_size(&"font_size"), UiTheme.FONT_BODY, "%s: the body size" % id)
+		check(label.has_theme_color_override(&"font_color"), "%s: the label has its own colour" % id)
+		var want := _env(id).card_color.lerp(Color.WHITE, 0.25)
+		var got := label.get_theme_color(&"font_color")
+		check(got.is_equal_approx(want), "%s: the colour is the environment's card colour, lightened (%s vs %s)" % [id, got.to_html(false), want.to_html(false)])
+		seen.append(got)
+	for i in seen.size():
+		for j in range(i + 1, seen.size()):
+			check(not seen[i].is_equal_approx(seen[j]), "every environment colours it differently (%d vs %d)" % [i, j])
+	RunState.environment = &"nowhere"
+	screen.open(false)
+	check_eq(screen.environment_label.text, "", "an unknown environment shows nothing")
+	check(screen.environment_label.get_theme_color(&"font_color").is_equal_approx(UiTheme.TEXT_DIM), "in the dim body colour")
 
 
 func test_the_run_card_carries_the_environment() -> void:

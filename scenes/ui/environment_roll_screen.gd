@@ -27,6 +27,12 @@ const CARD_GAP := 26.0
 const CYCLES := 7
 ## Ease-out exponent of the spin (the speed falls to 0 at the end; higher = a longer crawl).
 const EASE_POWER := 3.4
+## The result line under the reel (the hazard's name and rule): a fixed width, wrapped to at most
+## RESULT_LINES lines. The longest rule (the Cemetery's, 118 characters) is wider than the 1920 px screen
+## on one line and was clipped at both edges.
+const RESULT_WIDTH := 1500.0
+const RESULT_LINES := 2
+const RESULT_FONT_SIZE := 34
 
 ## Whether Main shows the screen after the lobby (false in tests unless a test needs it).
 static var enabled := true
@@ -152,10 +158,17 @@ func _build() -> void:
 	marker.offset_bottom = -150
 	add_child(marker)
 
-	result_label = UiTheme.centered_label("", UiTheme.GOLD_LABEL, 34)
-	result_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	result_label.offset_top = -140
-	result_label.offset_bottom = -80
+	result_label = UiTheme.centered_label("", UiTheme.GOLD_LABEL, RESULT_FONT_SIZE)
+	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result_label.max_lines_visible = RESULT_LINES
+	result_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	result_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	result_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	# (Below the reel window, which ends 150 px above the bottom; room for two lines.)
+	result_label.offset_top = -148
+	result_label.offset_bottom = -44
+	result_label.offset_left = -RESULT_WIDTH * 0.5
+	result_label.offset_right = RESULT_WIDTH * 0.5
 	add_child(result_label)
 	hint = UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.A), "/", UiGlyph.key("Enter"), "Skip"]],
 			UiTheme.FONT_BODY, UiTheme.TEXT_DIM)
