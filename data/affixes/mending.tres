@@ -6,7 +6,7 @@
 script = ExtResource("1_script")
 id = &"mending"
 suffix = "of Mending"
-stats = Array[StringName]([&"healing_done", &"resource_regen"])
+stats = Array[StringName]([&"spirit", &"resource_regen"])
 shares = Array[float]([0.6, 0.4])
 weight = 0.8
 slot_types = Array[int]([])

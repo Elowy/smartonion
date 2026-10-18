@@ -235,3 +235,30 @@ func test_new_suffixes_put_their_stats_on_an_item() -> void:
 			check(item.stats.get(stat, 0.0) >= 1.0, "%s: %s on the item" % [id, stat])
 		# No implicit armor (armor 0) and a Rare item: nothing but the suffix's own stats.
 		check_eq(item.stats.size(), a.stats.size(), "%s: only its own stats" % id)
+
+
+## Of Mending (GDD 5.4) pairs Resource Regen with Spirit. Healing Done is read by the Paladin kit
+## only, so 60% of the suffix would be dead stat for the other four classes.
+func test_mending_pairs_resource_regen_with_spirit() -> void:
+	var a := Db.affixes[&"mending"] as AffixData
+	check(Stats.SPIRIT in a.stats and Stats.RESOURCE_REGEN in a.stats, "Spirit and Resource Regen: %s" % [a.stats])
+	check(not (Stats.HEALING_DONE in a.stats), "no Healing Done (only the Paladin reads it)")
+	check_near(a.shares[a.stats.find(Stats.SPIRIT)], 0.6, 0.0001, "Spirit keeps the 60% share")
+	check_near(a.shares[a.stats.find(Stats.RESOURCE_REGEN)], 0.4, 0.0001, "Resource Regen keeps the 40% share")
+	check_near(a.weight, 0.8, 0.0001, "weight unchanged")
+
+
+func test_mending_stats_work_on_a_rolled_item() -> void:
+	var a := Db.affixes[&"mending"] as AffixData
+	var item := ItemInstance.new()
+	item.rarity = Items.Rarity.RARE
+	item.slot_type = Items.SlotType.CHEST
+	ItemGenerator._roll_stats(item, 30.0, a, 0, rng)
+	check(item.stats.get(Stats.SPIRIT, 0.0) >= 1.0, "Spirit on the rolled item: %s" % [item.stats])
+	check(item.stats.get(Stats.RESOURCE_REGEN, 0.0) >= 1.0, "Resource Regen on the rolled item")
+	check(not item.stats.has(Stats.HEALING_DONE), "no Healing Done on the rolled item")
+	# Any class's stat block reads them: Spirit regenerates HP, Resource Regen is in the stats.
+	var block := StatBlock.new()
+	block.set_source(&"item", item.equip_stats())
+	check(block.hp_regen_per_second() > 0.0, "Spirit regenerates HP")
+	check(block.get_raw(Stats.RESOURCE_REGEN) > 0.0, "Resource Regen is read")
