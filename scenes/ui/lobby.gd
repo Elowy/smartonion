@@ -187,8 +187,9 @@ func _build() -> void:
 
 
 ## The mode header at the right end of the title row: "Mode: Endless · Hardcore" with the HARDCORE badge,
-## and under it (once somebody has joined) the prompts of the two keys. It takes the row's free right half
-## (the left one is an empty twin, so the title stays centred).
+## and under it the prompts of the two keys (dim until somebody has joined: they always take their line,
+## so the row never changes height). It takes the row's free right half (the left one is an empty twin,
+## so the title stays centred).
 func _build_mode_block() -> Control:
 	var box := UiTheme.vbox(0)
 	box.name = "ModeBlock"

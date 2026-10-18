@@ -621,16 +621,36 @@ func test_the_leaderboard_stays_untouched_when_the_file_is_off_limits() -> void:
 	check(not main.game_over.best_label.visible, "no Best line")
 
 
-func test_smoke_demo_and_view_runs_do_not_write_the_players_file() -> void:
+func test_smoke_runs_do_not_even_read_the_players_file() -> void:
 	Leaderboard.writes_enabled = true
 	Leaderboard.path_override = TMP_BOARD
+	_write_board([_entry(31, 1122.0)])
 	_run_with_bots(2)
 	main.options.smoke = true  # (set after the start: a smoke Main would boot into its own run)
 	check(not main.writes_leaderboard(), "a smoke run does not write")
 	main.end_run(false)
-	check(not FileAccess.file_exists(TMP_BOARD), "no file")
-	check(main.game_over.board["rank"] == -1 and (main.game_over.board["entries"] as Array).is_empty(), "the screen shows the (empty) board, no place")
-	check_eq(main.game_over.best_label.text, "Best: –", "an empty board")
+	check(main.game_over.board.is_empty(), "no board model: the file was not read")
+	check_eq((_board().entries_for(RunState.MODE_ENDLESS, false, 2)).size(), 1, "and the file is as it was")
+
+
+func test_demo_and_view_runs_show_the_board_but_do_not_write_it() -> void:
+	Leaderboard.writes_enabled = true
+	Leaderboard.path_override = TMP_BOARD
+	for kind in ["demo", "view", "shot"]:
+		_run_with_bots(2)
+		match kind:
+			"demo":
+				main.options.demo = true
+			"view":
+				main.options.view = "game_over"
+			"shot":
+				main.options.screenshot_path = "/tmp/x.png"
+		check(not main.writes_leaderboard(), "%s: no write" % kind)
+		main.end_run(false)
+		check(not FileAccess.file_exists(TMP_BOARD), "%s: no file" % kind)
+		var model := main.game_over.board
+		check(model["rank"] == -1 and (model["entries"] as Array).is_empty(), "%s: the screen shows the (empty) board, no place" % kind)
+		check_eq(main.game_over.best_label.text, "Best: –", "%s: an empty board" % kind)
 
 
 func test_leaderboard_flag_makes_a_smoke_run_write_its_own_file() -> void:
