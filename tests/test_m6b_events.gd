@@ -6,6 +6,26 @@ extends TestCase
 ## in ~25 s with 3 guards; killed = 40 x average gold + a Rare item, else "The caravan got away"), their
 ## banners and counters, the camera's event points and the bots' play (test_m6b_events_bots.gd).
 
+## Records everything the game prints (stdout and stderr) while installed with OS.add_logger().
+class PrintSpy extends Logger:
+	var lines: Array[String] = []
+	var _mutex := Mutex.new()
+
+	func _log_message(message: String, _error: bool) -> void:
+		_mutex.lock()
+		lines.append(message)
+		_mutex.unlock()
+
+	func with_text(text: String) -> Array[String]:
+		var out: Array[String] = []
+		_mutex.lock()
+		for l in lines:
+			if text in l:
+				out.append(l)
+		_mutex.unlock()
+		return out
+
+
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
 const DT := 1.0 / 60.0
@@ -817,3 +837,47 @@ func test_a_run_with_a_forced_event_builds_it_and_settles_it_at_the_wave_end() -
 	main.wave_director._physics_process(DT)
 	check_eq(sp.result, &"failed", "nobody opened it before the wave ended")
 	check_eq(RunState.events_completed, 0, "not completed")
+
+
+# --- The log lines -----------------------------------------------------------------------------
+
+## The spy sees what the game prints: the base of the "nothing is printed" checks below.
+func test_the_print_spy_sees_what_is_printed() -> void:
+	var spy := PrintSpy.new()
+	OS.add_logger(spy)
+	print("PRINT_SPY_SELF_CHECK")
+	OS.remove_logger(spy)
+	check_eq(spy.with_text("PRINT_SPY_SELF_CHECK").size(), 1, "a print reaches the logger")
+
+
+func test_the_spawner_logs_through_its_signal_and_prints_nothing() -> void:
+	_make_spawner()
+	_hero(Vector3.ZERO)
+	var lines: Array[String] = []
+	spawner.logged.connect(func(text: String) -> void: lines.append(text))
+	var spy := PrintSpy.new()
+	OS.add_logger(spy)
+	spawner.roll_wave(5)
+	check(spawner.start_event(EventSpawner.GUARDED_CHEST), "the chest is built")
+	spawner.end_wave()
+	OS.remove_logger(spy)
+	check_eq(lines.size(), 2, "one line at the start, one at the end: %s" % [lines])
+	if lines.size() == 2:
+		var started := RegEx.create_from_string("^EVENT guarded_chest \\(wave 5\\): started at \\d+\\.\\d s$")
+		var ended := RegEx.create_from_string("^EVENT guarded_chest \\(wave 5\\): failed at \\d+\\.\\d s$")
+		check(started.search(lines[0]) != null, "the start line reads right: %s" % lines[0])
+		check(ended.search(lines[1]) != null, "so does the end line: %s" % lines[1])
+	check(spy.with_text("EVENT").is_empty(), "nothing was printed: %s" % [spy.lines])
+
+
+func test_a_run_prints_no_event_lines_itself_main_logs_them_through_its_gate() -> void:
+	_run_with_bots(1)
+	var sp := main.event_spawner
+	check(sp.logged.is_connected(main._log), "Main logs the spawner's lines through _log (smoke, demo and view runs only)")
+	var spy := PrintSpy.new()
+	OS.add_logger(spy)
+	sp.roll_wave(6)
+	check(sp.start_event(EventSpawner.DEFEND_TOTEM), "the totem is built (a plain run)")
+	sp.end_wave()
+	OS.remove_logger(spy)
+	check(spy.with_text("EVENT").is_empty(), "a plain run prints no event line: %s" % [spy.with_text("EVENT")])

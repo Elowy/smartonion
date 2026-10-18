@@ -25,9 +25,9 @@ extends Node
 ##   away", failed.
 ## Every event object joins the group [constant GROUP] (WaveDirector.stop() frees them at the wave end); each
 ## event ends once, with [method _finish]: [signal event_finished], RunState.events_completed when it was won,
-## one "EVENT ..." log line. [method end_wave] (wave_cleared) settles an event still open (= failed), takes
-## the totem buff off and forgets the objects. The camera frames the target (CameraRig.event_points) and bots
-## play along (BotInput).
+## one "EVENT ..." log line (through [signal logged], never straight to stdout). [method end_wave]
+## (wave_cleared) settles an event still open (= failed), takes the totem buff off and forgets the objects.
+## The camera frames the target (CameraRig.event_points) and bots play along (BotInput).
 ##
 ## Determinism: every draw of the spawner itself (the roll, the spot, the guard types, the cart's side and
 ## lane) comes from [member RunState.event_rng] (seeded once from the run seed, see RunState.start_run) and
@@ -40,6 +40,9 @@ extends Node
 signal announced(text: String, color: Color)
 ## An event ended: [param kind] (one of EVENT_IDS) and whether the team won it.
 signal event_finished(kind: StringName, success: bool)
+## A log line ("EVENT guarded_chest (wave 5): started at 12.3 s"): Main prints it through its own gated
+## log (smoke, demo and view runs only), so a plain run or a unit test prints nothing.
+signal logged(text: String)
 
 const GUARDED_CHEST := &"guarded_chest"
 const DEFEND_TOTEM := &"defend_totem"
@@ -238,7 +241,7 @@ func start_event(id: StringName) -> bool:
 	if not _spawn_event(id):
 		return false
 	RunState.events_spawned += 1
-	print("EVENT %s (wave %d): started at %.1f s" % [id, _event_wave(), wave_elapsed()])
+	logged.emit("EVENT %s (wave %d): started at %.1f s" % [id, _event_wave(), wave_elapsed()])
 	return true
 
 
@@ -397,14 +400,14 @@ func _on_cart_escaped(_c: CaravanCart) -> void:
 
 
 ## The running event ended, once: [signal event_finished], RunState.events_completed when it was won, one
-## log line ("EVENT guarded_chest (wave 6): completed").
+## [signal logged] line ("EVENT guarded_chest (wave 6): completed at 14.2 s").
 func _finish(kind: StringName, success: bool) -> void:
 	if result != &"" or kind != active_kind:
 		return
 	result = &"completed" if success else &"failed"
 	if success:
 		RunState.events_completed += 1
-	print("EVENT %s (wave %d): %s at %.1f s" % [kind, _event_wave(), result, wave_elapsed()])
+	logged.emit("EVENT %s (wave %d): %s at %.1f s" % [kind, _event_wave(), result, wave_elapsed()])
 	event_finished.emit(kind, success)
 
 

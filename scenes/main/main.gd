@@ -338,6 +338,7 @@ func start_run() -> void:
 	event_spawner = EventSpawner.create(wave_director)
 	wave_director.add_child(event_spawner)
 	event_spawner.announced.connect(_on_announced)
+	event_spawner.logged.connect(_log)
 	environment_hazards = EnvironmentHazards.create(wave_director, Db.environment_or_default(RunState.environment))
 	wave_director.add_child(environment_hazards)
 
