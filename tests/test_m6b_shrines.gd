@@ -508,15 +508,23 @@ func test_xp_scaling_keeps_the_fraction() -> void:
 func test_a_collected_pickup_pays_the_learning_bonus() -> void:
 	_human()
 	var hero := _hero_of(0)
-	RunState.add_shrine_effect(&"learning", 3)
-	_live()
-	var xp_before := RunState.xp + RunState.level * 1000
+	RunState.xp = 0
 	var p := Pickup.create(0, 10)
 	_world().add_child(p)
 	p.collect(hero)
-	var gained := (RunState.xp + RunState.level * 1000) - xp_before
-	check(gained >= 14 and gained <= 1000 + 15, "x1.5 XP (got %d)" % gained)
-	check_eq(RunState.shrine_xp_remainder, 0.0, "10 x 1.5 is whole")
+	check_eq(RunState.xp, 10, "plain: 10 XP")
+	RunState.xp = 0
+	RunState.add_shrine_effect(&"learning", 3)
+	_live()
+	var q := Pickup.create(0, 10)
+	_world().add_child(q)
+	q.collect(hero)
+	check_eq(RunState.xp, 15, "learning: x1.5")
+	RunState.xp = 0
+	var r := Pickup.create(0, 10)
+	_world().add_child(r)
+	r.collect_to_bank()
+	check_eq(RunState.xp, 15, "banked pickups pay it too")
 
 
 # --- Enemies ---------------------------------------------------------------------------
@@ -949,7 +957,7 @@ func test_the_card_shows_the_shrine() -> void:
 	check_eq(screen.boon_box.get_child_count(), 1, "one boon line")
 	check_eq((screen.boon_box.get_child(0) as Label).text, "+20% damage", "boon text")
 	check_eq((screen.bane_box.get_child(0) as Label).text, "-20% max HP", "bane text")
-	check(screen.boon_head.visible and screen.bane_head.visible, "both headings")
+	check(screen.boon_head.is_visible_in_tree() and screen.bane_head.is_visible_in_tree(), "both headings")
 	check_eq(screen.chips_row.get_child_count(), 2, "one chip per voter")
 	check(screen.timer_bar.visible and not screen.result_box.visible, "timer, no result yet")
 	check(screen.subtitle_label.text.contains("Everyone must accept"), "the party is told the rule")

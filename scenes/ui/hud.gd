@@ -287,6 +287,8 @@ func _build_shrine_row(col: VBoxContainer) -> void:
 	shrine_row = UiTheme.hbox(6)
 	shrine_row.name = "ShrineRow"
 	shrine_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Room above and below the icons (the plaque's column packs its rows tightly).
+	shrine_row.custom_minimum_size = Vector2(0, SHRINE_ICON_SIZE + 14.0)
 	shrine_row.visible = false
 	col.add_child(shrine_row)
 
@@ -304,6 +306,7 @@ func _refresh_shrines() -> void:
 			continue
 		var icon := ShrineIcon.create(data, SHRINE_ICON_SIZE, int(e.get("waves_left", 0)))
 		icon.name = "Shrine_%s" % data.id
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		shrine_row.add_child(icon)
 	shrine_row.visible = shrine_row.get_child_count() > 0
 

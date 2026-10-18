@@ -299,9 +299,10 @@ func _build() -> void:
 	middle.anchor_top = 0.5
 	middle.anchor_bottom = 0.5
 	middle.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	middle.grow_vertical = Control.GROW_DIRECTION_BOTH
-	middle.offset_top = -34.0
-	middle.offset_bottom = -34.0
+	# The card stays where it is; the result (a few lines for Fortune) grows downwards under it.
+	middle.grow_vertical = Control.GROW_DIRECTION_END
+	middle.offset_top = -300.0
+	middle.offset_bottom = -300.0
 	add_child(middle)
 	card = _build_card()
 	middle.add_child(card)
@@ -318,7 +319,7 @@ func _build() -> void:
 	status.add_child(result_box)
 	result_label = UiTheme.centered_label("", UiTheme.HEADING, 32)
 	result_box.add_child(result_label)
-	result_detail = UiTheme.wrapped_label("", &"", 22, UiTheme.TEXT)
+	result_detail = UiTheme.wrapped_label("", &"", 21, UiTheme.TEXT)
 	result_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_box.add_child(result_detail)
 
@@ -353,7 +354,7 @@ func _build_card() -> PanelContainer:
 	style.content_margin_top = 22
 	style.content_margin_bottom = 24
 	panel.add_theme_stylebox_override(&"panel", style.rebuild())
-	var col := UiTheme.vbox(10)
+	var col := UiTheme.vbox(12)
 	panel.add_child(col)
 	var head := UiTheme.hbox(20)
 	col.add_child(head)
@@ -372,14 +373,20 @@ func _build_card() -> PanelContainer:
 	flavour_label = UiTheme.wrapped_label("", UiTheme.DIM, 21)
 	col.add_child(flavour_label)
 	boon_head = UiTheme.label("BOON", UiTheme.HEADING, 24, UiTheme.GREEN)
-	col.add_child(boon_head)
 	boon_box = UiTheme.vbox(2)
-	col.add_child(boon_box)
+	col.add_child(_section(boon_head, boon_box))
 	bane_head = UiTheme.label("BANE", UiTheme.HEADING, 24, UiTheme.RED)
-	col.add_child(bane_head)
 	bane_box = UiTheme.vbox(2)
-	col.add_child(bane_box)
+	col.add_child(_section(bane_head, bane_box))
 	return panel
+
+
+## A heading with its lines right under it (the sections of the card stay apart from each other).
+func _section(head: Label, box: VBoxContainer) -> VBoxContainer:
+	var section := UiTheme.vbox(0)
+	section.add_child(head)
+	section.add_child(box)
+	return section
 
 
 func _build_legend() -> void:
@@ -428,7 +435,7 @@ func _fill_lines(head: Label, box: VBoxContainer, lines: Array[String], color: C
 	for c in box.get_children():
 		box.remove_child(c)
 		c.queue_free()
-	head.visible = not lines.is_empty()
+	head.get_parent().visible = not lines.is_empty()
 	for line in lines:
 		box.add_child(UiTheme.label(line, &"", 27, color))
 

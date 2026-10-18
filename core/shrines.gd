@@ -297,7 +297,7 @@ static func accept(data: ShrineData, slots: Array[PlayerSlot]) -> Dictionary:
 		return {"lines": lines}
 	if data.is_timed():
 		RunState.add_shrine_effect(data.id, data.waves)
-		lines.append(duration_text(data) + ".")
+		lines.append("Starts with the next wave (%d wave%s)." % [data.waves, "" if data.waves == 1 else "s"])
 	if data.purse_loss_pct > 0.0:
 		lines.append(_take_from_purse(data, data.purse_loss_pct))
 	if data.gamble_chance > 0.0:

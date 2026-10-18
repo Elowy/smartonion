@@ -56,8 +56,8 @@ func _draw() -> void:
 
 func _draw_badge() -> void:
 	var m := minf(size.x, size.y)
-	var rad := m * 0.27
-	var at := Vector2(size.x - rad * 0.85, size.y - rad * 0.85)
+	var rad := m * 0.24
+	var at := Vector2(size.x - rad * 0.5, size.y - rad * 0.5)
 	draw_circle(at, rad + 1.5, OUTLINE)
 	draw_circle(at, rad, BADGE_FILL)
 	draw_arc(at, rad, 0.0, TAU, 20, UiTheme.GOLD_BORDER, maxf(1.0, m * 0.04), true)
