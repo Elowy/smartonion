@@ -19,7 +19,7 @@ unique_effect = &"ability_mod"
 unique_params = {
 "ability": "ice_barrier",
 "mods": {
-"shield_pct": 25.0
+"power_pct": 25.0
 }
 }
 unique_text = "Equip: Your Ice Barrier absorbs 25% more damage."
