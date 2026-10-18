@@ -2501,10 +2501,9 @@ bit-identical per seed.
 
 ### Validation and balance data points
 
-#### The merged M6a head (before the balance pass and the fixes)
+#### The merged M6a head (before the fixes)
 
-Validation of the merged M6a (six feature branches merged plus three integration commits, before the balance pass
-and the fixes). All runs `--fixed-fps 60` (bit-identical for the same seed), headless, GL Compatibility.
+Validation of the merged M6a (six feature branches merged plus three integration commits, before the fixes). All runs `--fixed-fps 60` (bit-identical for the same seed), headless, GL Compatibility.
 
 **Suite.** 2183 passed, 0 failed (after each merge: bosses 1765, enemies 1832, Artifacts 1943 + 1 fixed, Enchanter
 2025, shop sinks 2081, meter 2165, integration tests +18). The one `ERROR` line in the log is the intentional
@@ -2536,7 +2535,7 @@ For comparison the pre-M6 base (M5 gameplay) plays the 2-player seed-21 run to t
 downs, gold at the last shop 1,876 (nothing to spend it on), no consumables / Dust. The M6 sinks work: the purse is
 emptied by consumables, enchants and the Black Market (gold at the last shop 41-307).
 
-**What kills the bots** (before the balance pass; a debug copy printed every hit by source, the numbers equal the
+**What kills the bots** (on the merged head; a debug copy printed every hit by source, the numbers equal the
 runs above): the **Flesh Golem** is the biggest damage dealer from wave 12 on: 42% (4 players) / 50% (1) / 37% (2) of all damage taken in waves 10-19
 (hook + melee), then the Troll Axethrower (25-32%); 7 of the 10 downs of waves 10-19 and 11 of the 14 downs of wave 20 in
 the 4-player run came from golem hits (wave 19 alone: 6 downs). **Wave 20** (every enemy carries an elite affix, HP x1.5)
@@ -2546,29 +2545,36 @@ is 4-6% of the damage taken; Morvain's own attacks are 5% (1 player) to 13% (2 p
 Disabling the bots' puddle avoidance on the 2-player seed made it worse (defeat on wave 12, Morvain 169.6 s): the
 avoidance is not what loses the run.
 
-**Boss kill times** are in the table (Morvain 52-93 s, 1-4 players); Vor'thalax was never reached naturally in these
-three runs, his numbers are the leveled-up experiments of the boss-fight data below (450 base HP); the balance pass
-ran him naturally.
+**Boss kill times** are in the table (Morvain 52-93 s, 1-4 players); Vor'thalax was never reached in these three runs,
+his natural runs (other seeds) are in the boss-fight data below.
 
-#### After the follow-ups (two branches on the merged head, validated separately)
+#### After the fixes (the merged head plus the follow-up fixes)
 
 - **Fixes** (market header, bot Enchanter target, Artifact supply, two pinned clauses, loot roll frame): full suite
-  2198 passed, 0 failed (baseline 2183, +15); `--fixed-fps 60 --smoke --waves=6 --seed=5` exit 0, 0 errors, 0 warnings,
-  587 kills, 2 goblins. Artifact supply runs (start level 40, `--boss-hp=0.05`, seed 5, 0 errors / warnings): the 1p
-  run completed with 4,671 kills and 5 Artifacts, the 4p run completed with 13,101 kills and 4 Artifacts; the 2p run
-  was defeated on wave 20, so the 2p row of the GDD 5.5 supply table is an interpolation, not a completed run. The
-  expected Artifacts per 25-wave run (Fortune 0) are in GDD 5.5 (≈ 2.8 / 2.5 / 2.6 for 1 / 2 / 4 players).
-- **Balance pass:** full suite 2190 passed, 0 failed (+7 over 2183); the same seed-5 smoke, identical to the M6a head
-  (587 kills, 0 errors, 0 warnings). The 19-run matrix is in "Balance pass".
-- The combination of the two (and the 4p / 2p matrix on it) is not measured yet.
+  2202 passed, 0 failed (baseline 2183, +19); the one `ERROR` line in its log is the expected one of
+  `test_shield_hp_is_read_only`. `--fixed-fps 60 --smoke --waves=6 --seed=5`: exit 0, 0 errors, 0 warnings, 6 of 6 waves
+  completed, 6 loot rolls, 587 kills, 2 goblins (211.9 s game time), the same as the merged head.
+- **Artifact supply runs** (start level 40, `--boss-hp=0.05`, seed 5, 0 errors / warnings): the 1p run completed with
+  4,671 kills and 5 Artifacts, the 4p run completed with 13,101 kills and 4 Artifacts; the 2p run was defeated on
+  wave 20, so the 2p row of the GDD 5.5 supply table is an interpolation, not a completed run. The runs are consistent
+  with the computed table, they do not prove it (one run each). The expected Artifacts per 25-wave run (Fortune 0) are
+  in GDD 5.5 (≈ 2.8 / 2.5 / 2.6 for 1 / 2 / 4 players).
+- **Loot roll window** (1920x1080, 4 players, wave 25): of 1263 items (the 63 hand-made ones, uniques, set pieces and
+  trinkets, plus 1200 generated Rare / Epic / Legendary drops) none is scaled (smallest scale 1.000); 1125 keep the
+  full title block, 138 the compact line, none loses it. All five Artifacts show with the title hidden at
+  0.991-1.000 (Skull of the Damned is the lowest); waves 10 and 25 give the same numbers; the Fangs pair shows at 1.0
+  without a title. With `TITLE_MODES` set to the full title only (no collapse) the room is 503 px, the Arcane set
+  0.96 and the Artifacts 0.78-0.82, and the new fit tests fail (74 failures): the collapse is what the tests pin.
+- The 25-wave matrix (4p / 2p / 1p) on this head has not been run: it belongs to the final M6b balance ("Open items
+  for the M6b balance").
 
-#### Boss-fight data points (before the balance pass: contact 4, `coop_hp_per_player` 0.75; `--fixed-fps 60`, natural runs from wave 1)
+#### Boss-fight data points (the shipped values: contact 4, `coop_hp_per_player` 0.75; `--fixed-fps 60`, natural runs from wave 1)
 
 Command: `godot --headless --fixed-fps 60 --path . -- --smoke --waves=25 [--allow-defeat] --seed=S
 --players=N` (the 3 / 1 player runs use the first N classes: warrior, mage, paladin).
 Wave-25 downs = downs at the end minus the cumulative downs after wave 24.
 
-Vor'thalax before the balance pass (base HP 450, contact 4; boss HP = base x wave growth x (1 + 0.75 (n - 1))):
+Vor'thalax (base HP 450, contact 4; boss HP = base x wave growth x (1 + 0.75 (n - 1))):
 
 | Players, seed | Boss HP | `--allow-defeat` (natural defeat ends the run) | Smoke default (a wipe revives everybody) |
 |---|---|---|---|
@@ -2590,8 +2596,8 @@ copy or `--boss-hp` was used, which also scales Morvain):
   faster than the boss co-op HP factor (1 : 2.5 : 3.25), so one base HP cannot give 120-150 s at every
   party size: 450 fits 4 players (118 s) and is about right for 3 (156 s with one revive); the lone bot
   needs ~200 s (and 17 revives). Lowering `coop_hp_per_player` (or the boss damage) is the lever if
-  solo / duo should be shorter; the base HP stays tuned to the 4-bot smoke (the balance pass then raised k to 2.0 and
-  cut the contact damage to 1.5, see "Balance pass").
+  solo / duo should be shorter; the base HP stays tuned to the 4-bot smoke, the rest is for the M6b balance ("Open
+  items for the M6b balance").
 - Morvain (wave 10, 18,214 HP with 4 players): killed after 51-56 s, 1-2 downs; 3 players (14,011 HP)
   43 s, 0 downs; 1 player (5,604 HP) 57-92 s, 0 downs (enrage level 1 at 90 s).
 - `--start-wave=9 --start-level=12` / `--start-wave=24 --start-level=24` heroes have NO gear and no
