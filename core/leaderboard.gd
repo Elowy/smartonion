@@ -2,7 +2,8 @@ class_name Leaderboard
 extends RefCounted
 ## The local leaderboard (GDD 16.1, M6b MODES): per category – (mode, hardcore, party size) – the best
 ## MAX_ENTRIES runs, kept in a small versioned JSON file (user://leaderboard.json). This class is the
-## pure data model plus the file IO; what the end screen shows of it is the MODES package.
+## pure data model plus the file IO; the end screen's texts and model are [method screen_model] and the
+## text helpers under "The end screen's board".
 ##
 ## File format (FORMAT_VERSION 1):
 ##   {"version": 1, "categories": {"normal/standard/2": [entry, ...], "endless/hardcore/4": [...]}}
@@ -221,6 +222,97 @@ static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, 
 	return rank
 
 
+# --- The end screen's board (M6b MODES) -------------------------------------------------------
+
+## What an entry reached: "Wave 31" (an endless run), "Victory" or "Fell on wave 18" (a normal run).
+static func result_text(entry: Dictionary, p_mode: StringName) -> String:
+	var wave := int(entry.get("wave", 0))
+	if p_mode == RunState.MODE_ENDLESS:
+		return "Wave %d" % wave
+	return "Victory" if bool(entry.get("victory", false)) else "Fell on wave %d" % wave
+
+
+## [method result_text] and the run time: "Wave 31 · 18:22", "Victory · 24:10" (the "Best: ..." line).
+static func summary_text(entry: Dictionary, p_mode: StringName) -> String:
+	return "%s · %s" % [result_text(entry, p_mode), RunSummary.format_time(float(entry.get("time", 0.0)))]
+
+
+## The date part of an entry's "YYYY-MM-DD HH:MM:SS".
+static func date_text(entry: Dictionary) -> String:
+	return String(entry.get("date", "")).get_slice(" ", 0)
+
+
+## "Warrior, Mage" for the class ids of an entry (an unknown id is capitalised as is).
+static func party_text(entry: Dictionary) -> String:
+	var names: Array[String] = []
+	for id: Variant in entry.get("classes", []):
+		var data := Db.get_class_data(StringName(String(id)))
+		names.append(data.display_name if data != null else String(id).capitalize())
+	return ", ".join(names)
+
+
+## "4 players" / "1 player".
+static func party_size_text(p_party: int) -> String:
+	var n := clampi(p_party, PARTY_MIN, PARTY_MAX)
+	return "%d player%s" % [n, "" if n == 1 else "s"]
+
+
+## The title of a category: "Endless · Hardcore · 4 players".
+static func category_text(p_mode: StringName, p_hardcore: bool, p_party: int) -> String:
+	return "%s · %s" % [RunState.mode_text(p_mode, p_hardcore), party_size_text(p_party)]
+
+
+## One row of the board: {"rank": "1", "result", "time", "party", "date"} (the end screen's table cells).
+static func row_texts(rank_index: int, entry: Dictionary, p_mode: StringName) -> Dictionary:
+	return {
+		"rank": str(rank_index + 1),
+		"result": result_text(entry, p_mode),
+		"time": RunSummary.format_time(float(entry.get("time", 0.0))),
+		"party": party_text(entry),
+		"date": date_text(entry),
+	}
+
+
+## The "Best: ..." line of the end screen: the best entry of the category ("Best: Wave 31 · 18:22"), plus
+## this run's place when it made the board ("  –  New best!" for the first place, "  –  This run: #3").
+## [param p_rank] is the place [method record_run] returned (-1 = the run is not on the board).
+static func best_line(p_best: Dictionary, p_mode: StringName, p_rank: int = -1) -> String:
+	var line := "Best: %s" % (summary_text(p_best, p_mode) if not p_best.is_empty() else "–")
+	if p_rank == 0:
+		line += "  –  New best!"
+	elif p_rank > 0:
+		line += "  –  This run: #%d" % (p_rank + 1)
+	return line
+
+
+## What the end screen shows of the board after a run: {"mode", "hardcore", "party", "key" (the category),
+## "category_text", "entries" (the category on [param board], best first), "rank" (the run's place in
+## them, -1 = not on the board: it was not written or missed the top 10), "entry" (the run's own entry),
+## "best" ({} = none yet), "line" (the "Best: ..." text), "error" ("" or why the file was not used)}.
+## [param board] is the board read after the run was recorded ([method load_file]).
+static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringName, p_hardcore: bool,
+		p_party: int, p_rank: int) -> Dictionary:
+	var entries := board.entries_for(p_mode, p_hardcore, p_party)
+	var best: Dictionary = entries[0] if not entries.is_empty() else {}
+	var rank := p_rank if p_rank >= 0 and p_rank < entries.size() else -1
+	var line := best_line(best, p_mode, rank)
+	if board.load_error != "":
+		line = "Leaderboard unavailable (%s)" % board.load_error
+	return {
+		"mode": p_mode,
+		"hardcore": p_hardcore,
+		"party": clampi(p_party, PARTY_MIN, PARTY_MAX),
+		"key": category_key(p_mode, p_hardcore, p_party),
+		"category_text": category_text(p_mode, p_hardcore, p_party),
+		"entries": entries,
+		"rank": rank,
+		"entry": entry,
+		"best": best,
+		"line": line,
+		"error": board.load_error,
+	}
+
+
 # --- Internals --------------------------------------------------------------------------------
 
 ## An existing board file that cannot be read: nothing is overwritten (the board is read-only).
@@ -252,11 +344,23 @@ static func _sanitize(raw: Dictionary) -> Dictionary:
 		for e: Variant in raw[key]:
 			if e is Dictionary:
 				list.append(_clean_entry(e))
-		list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return better(a, b, mode))
+		_sort_best_first(list, mode)
 		while list.size() > MAX_ENTRIES:
 			list.pop_back()
 		out[key] = list
 	return out
+
+
+## Sorts [param list] best first, keeping the file's order among equal entries (an equal older entry stays
+## above a newer one, as [method add_entry] put them; Array.sort_custom is not stable).
+static func _sort_best_first(list: Array[Dictionary], p_mode: StringName) -> void:
+	for i in range(1, list.size()):
+		var e := list[i]
+		var j := i - 1
+		while j >= 0 and better(e, list[j], p_mode):
+			list[j + 1] = list[j]
+			j -= 1
+		list[j + 1] = e
 
 
 ## [param e] with exactly the entry fields and their types (missing ones get neutral values; the date

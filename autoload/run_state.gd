@@ -54,8 +54,19 @@ const SALT_ENVIRONMENT := 0x454E56
 const SALT_EVENTS := 0x455654
 const SALT_SHRINES := 0x534852
 const SALT_DUNGEON := 0x44554E
+## The normal run's boss waves and elite wave (the endless mode adds its own beyond wave 25, see the
+## ENDLESS_* constants and [method is_boss_wave] / [method is_elite_wave]).
 const BOSS_WAVES: Array[int] = [10, 25]
 const ELITE_WAVES: Array[int] = [20]
+## Endless waves (M6b MODES): past the 25th wave every 5th wave from the 30th is a boss wave (the bosses
+## alternate, BossData.endless_boss) and the elite-wave rule of wave 20 comes back every 10th wave from
+## the 33rd (33, 43, 53 ...). The waves are also capped at [constant MAX_WAVE_DURATION] seconds.
+const ENDLESS_BOSS_FIRST_WAVE := 30
+const ENDLESS_BOSS_EVERY := 5
+const ENDLESS_ELITE_FIRST_WAVE := 33
+const ENDLESS_ELITE_EVERY := 10
+## The longest wave (s): wave 25's length; endless waves above it stay this long.
+const MAX_WAVE_DURATION := 210.0
 ## The team starts at level 1 (WoW style); the XP curve counts level-ups from here.
 const START_LEVEL := 1
 ## Talent points come from this level on (GDD 7.1: one per level from level 10).
@@ -686,10 +697,11 @@ func tick_run_time(delta: float) -> void:
 # --- Wave / co-op scaling (GDD 9) -------------------------------------------
 
 ## Seconds of wave [param w] (GDD 1): waves 1-10 last 20 + 5 * (w - 1) s, at most 60 s
-## (waves 9 and 10 are 60 s); every wave above 10 adds 10 s (11 = 70 s ... 25 = 210 s).
+## (waves 9 and 10 are 60 s); every wave above 10 adds 10 s (11 = 70 s ... 25 = 210 s). The endless
+## waves above 25 stay at [constant MAX_WAVE_DURATION] (210 s).
 static func wave_duration(w: int) -> float:
 	if w > 10:
-		return 60.0 + 10.0 * (w - 10)
+		return minf(MAX_WAVE_DURATION, 60.0 + 10.0 * (w - 10))
 	return minf(60.0, 20.0 + 5.0 * (w - 1))
 
 
@@ -709,9 +721,29 @@ func coop_damage_mult() -> float:
 	return COOP_DAMAGE_MULTS[clampi(player_count, 1, COOP_DAMAGE_MULTS.size()) - 1]
 
 
+## Wave [param w] is a boss wave: 10 and 25, and in the endless mode (the only way to reach them) every
+## 5th wave from the 30th ([method is_endless_boss_wave]).
 static func is_boss_wave(w: int) -> bool:
-	return w in BOSS_WAVES
+	return w in BOSS_WAVES or is_endless_boss_wave(w)
 
 
+## Wave [param w] is an elite wave: 20, and in the endless mode the 33rd and every 10th wave after it
+## ([method is_endless_elite_wave]).
 static func is_elite_wave(w: int) -> bool:
-	return w in ELITE_WAVES
+	return w in ELITE_WAVES or is_endless_elite_wave(w)
+
+
+## One of the endless mode's extra boss waves: 30, 35, 40 ... (waves above 25 exist only in the endless mode).
+static func is_endless_boss_wave(w: int) -> bool:
+	return w >= ENDLESS_BOSS_FIRST_WAVE and (w - ENDLESS_BOSS_FIRST_WAVE) % ENDLESS_BOSS_EVERY == 0
+
+
+## One of the endless mode's extra elite waves: 33, 43, 53 ...
+static func is_endless_elite_wave(w: int) -> bool:
+	return w >= ENDLESS_ELITE_FIRST_WAVE and (w - ENDLESS_ELITE_FIRST_WAVE) % ENDLESS_ELITE_EVERY == 0
+
+
+## Clearing wave [param w] opens the endless part of the run: the endless mode's wave 25 (the normal run's
+## last wave) does not end the run, it shows the "Endless begins!" banner and wave 26 follows.
+func begins_endless(w: int) -> bool:
+	return is_endless() and w == TOTAL_WAVES

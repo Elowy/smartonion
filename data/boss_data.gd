@@ -21,6 +21,11 @@ extends EnemyData
 ##   rest in code (stun lasts x0.25 [constant Boss.STUN_SHARE], slows land halved, taunt and fear
 ##   are ignored). Leave stun_resist at 0: Enemy.apply_stun would apply it on top of the x0.25.
 
+## The endless mode's boss rotation (M6b MODES): the bosses of wave 30, 35, 40 ... in turn
+## ([method endless_boss]) – Morvain, Vor'thalax, Morvain ... – with the usual HP / damage growth of
+## the wave they appear in.
+const ENDLESS_ROTATION: Array[StringName] = [&"lich_commander_morvain", &"vorthalax"]
+
 ## --boss-hp=X (LaunchOptions.boss_hp): multiplies every boss's max HP. 1 = off. Reset to 1 by
 ## RunState.start_run and re-applied by Main.start_run; [method max_hp_for] reads it.
 static var hp_mult := 1.0
@@ -57,7 +62,8 @@ func _init() -> void:
 
 
 ## The boss of wave [param wave] from Db.bosses (the lowest id when two share a wave; null when
-## there is none – the wave then runs as a normal one).
+## there is none – the wave then runs as a normal one). Past the normal run, the endless mode's boss
+## waves (RunState.is_endless_boss_wave: 30, 35, 40 ...) take [method endless_boss].
 static func for_wave(wave: int) -> BossData:
 	var best: BossData = null
 	for id in Db.bosses:
@@ -66,7 +72,18 @@ static func for_wave(wave: int) -> BossData:
 			continue
 		if best == null or String(b.id) < String(best.id):
 			best = b
+	if best == null and RunState.is_endless_boss_wave(wave):
+		return endless_boss(wave)
 	return best
+
+
+## The boss of the endless boss wave [param wave] (30, 35, 40 ...): [constant ENDLESS_ROTATION] in turn,
+## Morvain on 30, 40, 50 ..., Vor'thalax on 35, 45, 55 ... (null for any other wave).
+static func endless_boss(wave: int) -> BossData:
+	if not RunState.is_endless_boss_wave(wave):
+		return null
+	var turn := floori(float(wave - RunState.ENDLESS_BOSS_FIRST_WAVE) / float(RunState.ENDLESS_BOSS_EVERY))
+	return Db.get_boss(ENDLESS_ROTATION[turn % ENDLESS_ROTATION.size()])
 
 
 ## Max HP at [param wave] for [param players] heroes: base x the wave's usual HP growth x

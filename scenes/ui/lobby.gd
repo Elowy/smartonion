@@ -13,13 +13,27 @@ extends Control
 ##   A toggles ready, START readies, B unreadies or – when not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
+## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
+##   and X toggles Hardcore ([method toggle_hardcore]); the header shows the choice ("Mode: Endless ·
+##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
+##   A change while the start countdown runs un-readies the player who made it, which cancels the countdown
+##   (everybody sees the new mode before the run starts).
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
 signal back_requested
+## A player changed the run mode or the hardcore flag ([method cycle_mode] / [method toggle_hardcore], i.e. Y / X);
+## Main stores it with configure_run. [method set_run_mode] does not emit it.
+signal mode_changed(mode: StringName, hardcore: bool)
 
 const COUNTDOWN_TIME := 3.0
 
+## The run mode (RunState.MODES) and the hardcore flag the next run will use.
+var run_mode: StringName = RunState.MODE_NORMAL
+var hardcore := false
+## "Mode: Endless · Hardcore" in the header, and the HARDCORE badge next to it (visible with the flag).
+var mode_label: Label
+var hardcore_badge: HardcoreBadge
 ## Seconds left of the start countdown; < 0 when not counting down.
 var countdown_left := -1.0
 var cards: Array[LobbyCard] = []
@@ -35,6 +49,7 @@ var _countdown_label: Label
 var _footer_prompts: CenterContainer
 var _footer_key := ""
 var _backdrop: TextureRect
+var _mode_prompts: Control
 
 
 static func create() -> Lobby:
@@ -42,6 +57,48 @@ static func create() -> Lobby:
 	l.name = "Lobby"
 	l._build()
 	return l
+
+
+## Shows [param p_mode] (RunState.MODES; anything else is Normal) and [param p_hardcore] in the header without
+## telling anybody (Main sets the stored choice when it opens the lobby).
+func set_run_mode(p_mode: StringName, p_hardcore: bool) -> void:
+	run_mode = p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
+	hardcore = p_hardcore
+	_refresh_mode()
+
+
+## The next mode of the cycle (Normal -> Endless -> Normal ...), by [param by_slot] (a joined slot; null = nobody:
+## a test or a script). Emits [signal mode_changed].
+func cycle_mode(by_slot: PlayerSlot = null) -> void:
+	var at := RunState.MODES.find(run_mode)
+	run_mode = RunState.MODES[(at + 1) % RunState.MODES.size()]
+	_after_mode_change(by_slot)
+
+
+## Hardcore on / off, by [param by_slot]. Emits [signal mode_changed].
+func toggle_hardcore(by_slot: PlayerSlot = null) -> void:
+	hardcore = not hardcore
+	_after_mode_change(by_slot)
+
+
+## "Mode: Endless · Hardcore" (the header text of the current choice).
+func mode_text() -> String:
+	return "Mode: %s" % RunState.mode_text(run_mode, hardcore)
+
+
+func _after_mode_change(by_slot: PlayerSlot) -> void:
+	if by_slot != null and is_counting_down():
+		by_slot.ready = false  # the countdown stops until everybody has seen the new mode and readied again
+		countdown_left = -1.0
+	_refresh_mode()
+	mode_changed.emit(run_mode, hardcore)
+
+
+func _refresh_mode() -> void:
+	if mode_label != null:
+		mode_label.text = mode_text()
+	if hardcore_badge != null:
+		hardcore_badge.visible = hardcore
 
 
 ## Opacity of the dark backdrop (lower it to let a 3D scene show through).
@@ -84,6 +141,7 @@ func _build() -> void:
 	col.add_child(title)
 	var subtitle := UiTheme.centered_label("Up to four onion heroes  ·  pick a class and ready up", UiTheme.DIM, UiTheme.FONT_BODY + 2)
 	col.add_child(subtitle)
+	col.add_child(_build_mode_row())
 	col.add_child(UiTheme.divider(620))
 
 	var row := UiTheme.hbox(26)
@@ -116,6 +174,28 @@ func _build() -> void:
 	_countdown_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_countdown_label.visible = false
 	add_child(_countdown_label)
+
+
+## The mode header under the subtitle: "Mode: Endless · Hardcore", the HARDCORE badge and (once somebody has
+## joined) the prompts of the two keys.
+func _build_mode_row() -> Control:
+	var row := UiTheme.hbox(18)
+	row.name = "ModeRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	mode_label = UiTheme.centered_label(mode_text(), UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE)
+	mode_label.name = "ModeLabel"
+	row.add_child(mode_label)
+	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_BODY)
+	hardcore_badge.visible = hardcore
+	row.add_child(hardcore_badge)
+	_mode_prompts = UiTheme.prompt_row([
+		[UiGlyph.pad(PlayerInput.Pad.Y, 28.0), "/", UiGlyph.key("C", 28.0), "Mode"],
+		[UiGlyph.pad(PlayerInput.Pad.X, 28.0), "/", UiGlyph.key("R", 28.0), "Hardcore"],
+	], UiTheme.FONT_BODY, UiTheme.TEXT_DIM)
+	_mode_prompts.name = "ModePrompts"
+	_mode_prompts.visible = false
+	row.add_child(_mode_prompts)
+	return row
 
 
 # --- Lifecycle -------------------------------------------------------------------------
@@ -191,6 +271,11 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			return
 	elif inp.just_pressed(PlayerInput.Pad.START):
 		slot.ready = true
+	# Any joined player picks the run's mode: Y cycles Normal / Endless, X toggles Hardcore.
+	if inp.just_pressed(PlayerInput.Pad.Y):
+		cycle_mode(slot)
+	elif inp.just_pressed(PlayerInput.Pad.X):
+		toggle_hardcore(slot)
 	if not slot.ready:
 		var nav := inp.nav_just_pressed()
 		if nav.x != 0:
@@ -227,6 +312,7 @@ func _refresh() -> void:
 	for i in cards.size():
 		cards[i].update_from(PlayerManager.get_slot(i), keyboard_free)
 	var slots := PlayerManager.get_slots()
+	_mode_prompts.visible = not slots.is_empty()  # only a joined player can change the mode
 	var ready_count := 0
 	for s in slots:
 		if s.ready:

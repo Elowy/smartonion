@@ -334,7 +334,7 @@ func test_main_clamps_and_ends_by_the_run_length() -> void:
 	check_eq(main.state, Main.State.WAVE, "playing")
 	main.start_wave(120)
 	check_eq(main.wave, 120, "no upper clamp")
-	check_eq(main._wave_cleared_text(25), "Wave cleared!", "no victory banner past 25")
+	check(main._wave_cleared_text(25) != "Victory!", "no victory banner in the endless mode (MODES: \"Endless begins!\")")
 
 
 ## A second Main run in the same test (the first one is torn down).

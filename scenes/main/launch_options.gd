@@ -45,6 +45,9 @@ extends RefCounted
 ##                        RunState.shrine_chance_override; default: the normal chance)
 ##   --dungeon[=1]        M6b debug hook: the dungeon portal opens after the next wave
 ##                        (RunState.dungeon_forced; --dungeon=0 = off)
+##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
+##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
+##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -110,6 +113,9 @@ var event: StringName = &""
 var shrine_chance := -1.0
 ## --dungeon: the portal opens after the next wave.
 var dungeon := false
+## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
+## --leaderboard, which every run writes.
+var leaderboard_path := ""
 ## Arguments that were not understood (reported once by Main).
 var unknown: Array[String] = []
 
@@ -206,6 +212,11 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.unknown.append(arg)  # (not a number: unset, the normal chance)
 			"--dungeon":
 				o.dungeon = _flag_on(value)
+			"--leaderboard":
+				if value != "":
+					o.leaderboard_path = value
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
