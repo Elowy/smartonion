@@ -260,6 +260,8 @@ func _bot_delay(slot_index: int) -> float:
 
 func _choose(slot: PlayerSlot, choice: LootRoll.Choice) -> void:
 	choices[slot.index] = choice
+	if choice != LootRoll.Choice.UNDECIDED:
+		Audio.play_ui(&"ui_back" if choice == LootRoll.Choice.PASS else &"ui_dice")
 	if roll != null:
 		roll.choose(slot.index, choice)
 
@@ -274,6 +276,8 @@ func _resolve() -> void:
 	var greed_before := RunState.greed_gold
 	roll.resolve(RunState.rng)
 	roll.apply(slots)
+	if roll.winner >= 0 and item != null:
+		Audio.play(&"loot_win")
 	# Statistics (GDD 10.1): count them here unless LootRoll.apply already did.
 	if roll.outcome == &"need" and roll.winner >= 0 \
 			and RunState.need_wins_by_player.get(roll.winner, 0) == wins_before.get(roll.winner, 0):
@@ -479,6 +483,7 @@ func _handle_input(s: PlayerSlot, can_choose: bool = true) -> void:
 			_choose(s, LootRoll.Choice.NEED)
 		else:
 			_flash[s.index] = 1.2
+			Audio.play_ui(&"ui_error")
 	elif inp.just_pressed(PlayerInput.Pad.X):
 		_choose(s, LootRoll.Choice.GREED)
 	elif inp.just_pressed(PlayerInput.Pad.B):

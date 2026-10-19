@@ -180,6 +180,7 @@ func cast(slot_index: int, vote: int) -> void:
 	if not _open or not votes.has(slot_index):
 		return
 	votes[slot_index] = vote
+	Audio.play_ui(&"ui_confirm" if vote == Vote.ACCEPT else &"ui_back")
 	_chip_keys.erase(slot_index)
 	# Shown before the decision: a Decline ends the vote in this call, and update() would not run
 	# the refresh again.

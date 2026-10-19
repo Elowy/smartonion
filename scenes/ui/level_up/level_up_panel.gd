@@ -194,20 +194,29 @@ func handle_input(input: PlayerInput, can_act: bool = true) -> void:
 func move_cursor(step: int) -> void:
 	if hand.is_empty():
 		return
+	var before := cursor
 	cursor = clampi(cursor + step, 0, hand.size() - 1)
+	if cursor != before:
+		Audio.play_ui(&"ui_move")
 	_refresh_cards()
 
 
 func move_replace_cursor(step: int) -> void:
 	var n := replace_slots().size()
 	if n > 0:
+		var before := replace_cursor
 		replace_cursor = clampi(replace_cursor + step, 0, n - 1)
+		if replace_cursor != before:
+			Audio.play_ui(&"ui_move")
 		_refresh_overlay()
 
 
 func move_spec_cursor(step: int) -> void:
 	if spec_ability != null and not spec_ability.specs.is_empty():
+		var before := spec_cursor
 		spec_cursor = clampi(spec_cursor + step, 0, spec_ability.specs.size() - 1)
+		if spec_cursor != before:
+			Audio.play_ui(&"ui_move")
 		_refresh_overlay()
 
 
@@ -237,6 +246,7 @@ func try_reroll() -> bool:
 		show_message("Not enough gold (%d g)" % price, true)
 		return false
 	rerolls += 1
+	Audio.play_ui(&"ui_reroll")
 	hand = LevelUpDeck.draw(player, rng)
 	input_delay = PICK_INPUT_DELAY
 	show_message("Rerolled for %d g" % price)
@@ -247,6 +257,7 @@ func try_reroll() -> bool:
 ## REPLACE: B goes back to the cards (nothing changes).
 func back() -> void:
 	if mode == Mode.REPLACE:
+		Audio.play_ui(&"ui_back")
 		mode = Mode.CARDS
 		replace_card = null
 		refresh()
@@ -270,6 +281,7 @@ func choose_spec(index: int) -> bool:
 		return false
 	if not r.set_spec(spec_ability.id, index):
 		return false
+	Audio.play_ui(&"ui_card_pick")
 	var spec_name := str(spec_ability.specs[index].get("name", "?"))
 	if not history.is_empty():
 		history[history.size() - 1] = "%s: Rank V – %s" % [spec_ability.display_name, spec_name]
@@ -349,6 +361,7 @@ func _apply(card: LevelCard, replace_index: int) -> bool:
 		refresh()
 		return false
 	history.append(_summary(card, was_known, replaced))
+	Audio.play_ui(&"ui_card_pick")
 	var refund := int(result.get("refund", 0))
 	if refund > 0 and replaced != null:
 		show_message("%s replaced: +%d g refund" % [replaced.display_name, refund])
@@ -412,6 +425,8 @@ func tick(delta: float) -> void:
 func show_message(text: String, bad: bool = false) -> void:
 	message = text
 	message_bad = bad
+	if bad:
+		Audio.play_ui(&"ui_error")
 	_message_left = MESSAGE_TIME
 	message_label.text = text
 	message_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.15) if bad else UiTheme.GREEN)

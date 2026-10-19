@@ -116,6 +116,7 @@ func _make_button(text: String, parent: Control) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(420, 74)
 	b.focus_mode = Control.FOCUS_ALL
+	b.focus_entered.connect(_on_button_focused)
 	parent.add_child(b)
 	return b
 
@@ -128,6 +129,12 @@ func _ready() -> void:
 func _on_visibility_changed() -> void:
 	if is_visible_in_tree() and play_button != null and play_button.is_inside_tree():
 		_focus_play.call_deferred()
+
+
+## A button got the focus: the move click (not the first focus, which the menu grabs by itself).
+func _on_button_focused() -> void:
+	if _t > 0.3:
+		Audio.play_ui(&"ui_move")
 
 
 ## Deferred: the menu may already have left the tree (Main switched screens this frame).
@@ -160,10 +167,12 @@ func activate_focused() -> void:
 
 
 func _on_play() -> void:
+	Audio.play_ui(&"ui_confirm")
 	play_pressed.emit()
 
 
 func _on_quit() -> void:
+	Audio.play_ui(&"ui_back")
 	quit_pressed.emit()
 
 

@@ -223,6 +223,7 @@ func move_selection(step: int) -> void:
 func select_slot(index: int) -> void:
 	if index < 0 or index >= rows.size() or index == selected:
 		return
+	Audio.play_ui(&"ui_move")
 	selected = index
 	_hold.clear()
 	_update_selection()
@@ -272,6 +273,7 @@ func try_train(index: int) -> bool:
 	if not Trainer.try_buy_rank(player(), a.id):
 		_say("Not enough gold", "", UiTheme.RED)
 		return false
+	Audio.play_ui(&"ui_buy")
 	var rank := runner().rank_of(a.id)
 	var name_bb := "[color=#%s]%s[/color]" % [UiTheme.GOLD_BRIGHT.to_html(false), a.display_name]
 	_say("%s is now Rank %s  -%s" % [name_bb, AbilityIcon.roman(rank), UiTheme.format_int(price)],
@@ -302,6 +304,7 @@ func choose_spec(index: int) -> bool:
 	var a := chooser.ability
 	if not runner().set_spec(a.id, index):
 		return false
+	Audio.play_ui(&"ui_card_pick")
 	chooser.close()
 	var spec_name := str(a.specs[index].get("name", ""))
 	_say("%s: [color=#%s]%s[/color]" % [a.display_name, AbilityIcon.RANK_SPEC_COLOR.to_html(false), spec_name],
