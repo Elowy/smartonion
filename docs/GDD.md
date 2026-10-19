@@ -3253,8 +3253,11 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 - **Rangsor:** a későbbi hullám a jobb; azonos hullámon a **hosszabb** túlélési idő (győzelemnél a
   **rövidebb** idő). Az Endless menetek és a Normal vereségek hullám, majd hosszabb idő szerint
   rangsorolnak.
-- **Feladás:** a normál menet feladása (Quit to Menu) és egy játékos kilépése nem kerül a listára;
-  Endless menetnél a feladás az elért hullámmal, vereségként felkerül (végképernyő nélkül).
+- **Feladás:** a normál menet feladása (Quit to Menu) nem kerül a listára. Endless menetnél a
+  feladás (vagy az utolsó hős kiesése a kontroller kihúzása miatt) a folyamatban lévő hullámmal,
+  vereségként felkerül (végképernyő nélkül), de csak ha a menetben legalább egy hullámot
+  kitisztítottak: az első harcban feladott (vagy későbbi kezdőhullámról indított és kitisztított
+  hullám nélkül feladott) menet nem eredmény.
 - **Mikor érinti a fájlt:** teszt (alapból) nem olvas, nem ír. Smoke futás a `--leaderboard` nélkül
   sosem írja és nem is olvassa a játékos ranglistáját; a demó / `--view` / képernyőkép-futás mutatja,
   de nem írja. A `--leaderboard=<útvonal>` saját fájlt ad, amelyet **minden** futás ír.
