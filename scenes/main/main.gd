@@ -179,6 +179,10 @@ var _clock: PhysicsClock
 var _loot_seen := 0
 ## players_downed when the wave began (RunState.last_wave_downs at its end).
 var _downs_at_wave_start := 0
+## players_downed when the party entered the dungeon, and the downs taken inside dungeons so far (balance
+## diagnostics: the SMOKE_RESULT "dungeon_downs"; the wave bands of a matrix leave them out).
+var _downs_at_dungeon_start := 0
+var dungeon_downs := 0
 
 
 ## Main for [param p_options] (null = parse the command line in _ready).
@@ -514,6 +518,7 @@ func enter_dungeon() -> void:
 	if arena == null or dungeon != null:
 		return
 	RunState.dungeons_entered += 1
+	_downs_at_dungeon_start = players_downed
 	_set_state(State.DUNGEON)
 	get_tree().paused = false
 	if pause_menu != null:
@@ -579,7 +584,8 @@ func _on_dungeon_finished(success: bool) -> void:
 	if d != null:
 		RunState.dungeon_time += d.total_time
 		RunState.dungeon_rooms_cleared += d.rooms_cleared
-		_log("dungeon %s" % d.summary_text())
+		dungeon_downs += players_downed - _downs_at_dungeon_start
+		_log("dungeon %s; %d downs inside" % [d.summary_text(), players_downed - _downs_at_dungeon_start])
 		_free_node(d)
 	if success:
 		RunState.dungeons_completed += 1
@@ -1289,7 +1295,7 @@ func _finish_smoke(result: String) -> void:
 ## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
 ## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
 ## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
-## inside dungeons).
+## inside dungeons), dungeon_downs (heroes downed inside dungeons; players_downed counts them too).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var outcome := smoke_outcome(result)
@@ -1357,6 +1363,7 @@ func smoke_result(result: String) -> Dictionary:
 		"hazards": environment_hazards.stats() if environment_hazards != null else {},
 		"dungeon_rooms_cleared": RunState.dungeon_rooms_cleared,
 		"dungeon_time": snappedf(RunState.dungeon_time, 0.1),
+		"dungeon_downs": dungeon_downs,
 		"meter": RunSummary.meter_dict(),
 		"taken_by_source": RunSummary.source_damage_dict(),
 		"boss_damage": RunSummary.boss_damage_dict(),

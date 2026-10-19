@@ -113,7 +113,7 @@ func test_the_three_new_enemies_follow_the_design() -> void:
 		check_eq(f.behavior, EnemyData.Behavior.BRUTE, "brute")
 		check_eq(f.first_wave, 12, "from wave 12")
 		check_eq(f.max_hp, 40.0, "hp")
-		check_eq(f.contact_damage, 4.0, "contact")
+		check_eq(f.contact_damage, 2.5, "contact")
 		check_eq(f.move_speed, 1.5, "speed")
 		check_eq(f.radius, 0.9, "radius")
 		check_eq(f.model_scale, 1.6, "scale")

@@ -49,6 +49,13 @@ enum Room { CLEAR, SURVIVE, DEFEND, WARDEN }
 
 ## The waves after which the portal opens (normal, endless and hardcore runs).
 const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
+## Final balance: the dungeon's enemies, its brazier and the Warden are scaled to the cleared wave PLUS this
+## many waves ([method strength_wave]). The portal waves are the party's most comfortable stretch (the bots
+## went through waves 6-15 almost without a down), so at the cleared wave's own strength not one of the 55
+## dungeons of the baseline runs was lost. Measured with 16-wave bot runs (4 portals each): at +4 the full
+## parties cleared 22 of 22, duos 15 of 16, solo heroes 9 of 17; at +8 4 players 10 of 20, duos 4 of 16, solo
+## 3 of 17. +6 is between them (the target: about 50-80% for four players, fewer for a lone hero).
+const STRENGTH_BONUS := 6
 const ROOM_COUNT := 4
 const ROOM_NAMES: Array[String] = ["Clear", "Survive", "Defend", "Warden"]
 const WARDEN_ID := &"dungeon_warden"
@@ -180,6 +187,12 @@ func _init() -> void:
 ## The portal opens after [param p_wave] (6, 9, 12, 15).
 static func is_portal_wave(p_wave: int) -> bool:
 	return p_wave in PORTAL_WAVES
+
+
+## The wave whose growth the dungeon's enemies, brazier and Warden use after the cleared wave [param p_wave]
+## (see STRENGTH_BONUS). Which enemy types appear still follows the cleared wave itself.
+static func strength_wave(p_wave: int) -> int:
+	return maxi(1, p_wave) + STRENGTH_BONUS
 
 
 ## The Skeleton Grunt-based HP of the brazier at [param p_wave] (see BRAZIER_GRUNTS).
@@ -488,7 +501,7 @@ func _hatch(g: PendingGroup) -> void:
 			pos += Vector3(cos(angle), 0.0, sin(angle)) * g.ring * rng.randf_range(0.7, 1.0)
 		pos = arena.clamp_point(pos, g.data.radius + 0.1)
 		pos.y = 0.0
-		var e := Enemy.create(g.data, wave)
+		var e := Enemy.create(g.data, strength_wave(wave))
 		e.drops_loot = false
 		e.position = pos
 		e.died.connect(_on_enemy_died)
@@ -523,7 +536,7 @@ func summon(add_data: EnemyData, count: int, center: Vector3, scatter: float) ->
 		var pos := center + Vector3(cos(angle), 0.0, sin(angle)) * scatter
 		pos = arena.clamp_point(pos, add_data.radius + 0.1)
 		pos.y = 0.0
-		var e := Enemy.create(add_data, wave)
+		var e := Enemy.create(add_data, strength_wave(wave))
 		e.drops_loot = false
 		e.position = pos
 		parent.add_child(e)
@@ -556,7 +569,7 @@ static func _ring_radius(data: EnemyData, count: int) -> float:
 # --- Room 3: the brazier -----------------------------------------------------------------
 
 func _spawn_brazier() -> void:
-	brazier = DungeonBrazier.create(brazier_hp(wave))
+	brazier = DungeonBrazier.create(brazier_hp(strength_wave(wave)))
 	var parent := _spawn_parent()
 	if parent != null:
 		parent.add_child(brazier)
@@ -650,7 +663,7 @@ func _spawn_warden() -> void:
 	var parent := _spawn_parent()
 	if parent == null:
 		return
-	var b := Boss.create(warden_data, wave)
+	var b := Boss.create(warden_data, strength_wave(wave))
 	b.director = self
 	b.drops_loot = false
 	b.position = arena.clamp_point(_warden_point, warden_data.radius * warden_data.model_scale * 0.5 + 0.2)

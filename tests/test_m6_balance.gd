@@ -118,3 +118,40 @@ func test_a_weapon_hit_on_a_boss_is_boss_damage_a_hit_on_a_grunt_is_not() -> voi
 	WeaponRunner.apply_hit(p, grunt, 3.0, false, Vector3.ZERO)
 	check_eq(RunState.boss_damage_by_player.get(0, 0.0), 7.0, "7 on the boss")
 	check(RunState.damage_by_player.get(0, 0.0) > 7.0, "the grunt hit is in the meter: %s" % [RunState.damage_by_player])
+
+
+# --- The tuned numbers (final balance, round 1) -----------------------------------------------------
+# Pinned so a later data change cannot silently undo the measured pass (docs/GDD.md chapter 9).
+
+## The Flesh Golem was 30-74% of everything the heroes took from wave 10 on, from 2% of the enemies.
+func test_the_flesh_golem_hits_softer_than_the_first_draft() -> void:
+	var golem := Db.get_enemy(&"flesh_golem")
+	check_eq(golem.contact_damage, 2.5, "contact 4 -> 2.5")
+	check_eq(golem.hook_damage_ratio, 1.0, "the hook is still 1 x contact")
+	check_eq(golem.attack_cooldown, 6.0, "the hook cadence is unchanged")
+
+
+## Vor'thalax: his hazards are multiples of the contact damage and one-shot the glass classes at 4; the
+## co-op HP factor grows steeper than Morvain's because the party's damage grows faster than its size.
+func test_the_bosses_co_op_hp_factors_and_vorthalax_contact() -> void:
+	var v := Db.get_boss(&"vorthalax")
+	var m := Db.get_boss(&"lich_commander_morvain")
+	check_eq(v.contact_damage, 1.5, "Vor'thalax contact 4 -> 1.5")
+	check_eq(v.coop_hp_per_player, 1.5, "Vor'thalax +150% HP per extra hero")
+	check_eq(m.coop_hp_per_player, 1.25, "Morvain +125% HP per extra hero")
+	check_eq(m.contact_damage, 3.0, "Morvain contact unchanged")
+	var solo := v.max_hp_for(25, 1)
+	check_near(v.max_hp_for(25, 2) / solo, 2.5, 0.0001, "Vor'thalax duo x2.5")
+	check_near(v.max_hp_for(25, 3) / solo, 4.0, 0.0001, "Vor'thalax trio x4")
+	check_near(v.max_hp_for(25, 4) / solo, 5.5, 0.0001, "Vor'thalax four x5.5")
+	check_near(m.max_hp_for(10, 4) / m.max_hp_for(10, 1), 4.75, 0.0001, "Morvain four x4.75")
+	check_near(solo, 450.0 * v.hp_mult_at_wave(25), 0.01, "the solo HP is the base growth")
+
+
+## The dungeon's enemies, brazier and Warden are scaled to the cleared wave plus the bonus (the bots lost not
+## one of 55 dungeons at the cleared wave's own strength); which enemy types appear still follows the cleared wave.
+func test_the_dungeon_is_scaled_a_few_waves_above_the_cleared_wave() -> void:
+	check_eq(Dungeon.STRENGTH_BONUS, 6, "+6 waves")
+	check_eq(Dungeon.strength_wave(6), 12, "after wave 6: wave 12 strength")
+	check_eq(Dungeon.strength_wave(15), 21, "after wave 15: wave 21 strength")
+	check_eq(Dungeon.strength_wave(0), 7, "never below wave 1")
