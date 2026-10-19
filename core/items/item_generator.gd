@@ -704,7 +704,7 @@ static func pick_base(slot: int, usable: ClassData, favour: ClassData, wave: int
 	# one base (jewellery) or the tiers of one armour type, lowest first.
 	var entries: Array[Array] = []
 	var tiers_of: Dictionary[int, Array] = {}
-	for id in Db.item_bases:
+	for id: StringName in Db.item_bases:
 		var base: ItemBase = Db.item_bases[id]
 		if base.slot_type != slot or base.weight <= 0.0 or base.min_wave > wave \
 				or not Db.is_unlocked(base.id):
@@ -717,7 +717,8 @@ static func pick_base(slot: int, usable: ClassData, favour: ClassData, wave: int
 			if not tiers_of.has(base.armor_type):
 				tiers_of[base.armor_type] = []
 			tiers_of[base.armor_type].append(base)
-	var armor_types := tiers_of.keys()
+	var armor_types: Array[int] = []
+	armor_types.assign(tiers_of.keys())
 	armor_types.sort()
 	for armor_type: int in armor_types:
 		var tiers: Array = tiers_of[armor_type]
@@ -725,7 +726,7 @@ static func pick_base(slot: int, usable: ClassData, favour: ClassData, wave: int
 			return a.min_wave < b.min_wave or (a.min_wave == b.min_wave and String(a.id) < String(b.id)))
 		entries.append(tiers)
 	var weights: Array[float] = []
-	for tiers in entries:
+	for tiers: Array in entries:
 		var top: ItemBase = tiers[-1]
 		var own := favour != null and top.armor_type == favour.armor_type
 		weights.append(top.weight * (OWN_ARMOR_WEIGHT if own else 1.0))
