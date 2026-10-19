@@ -183,7 +183,9 @@ func _impact(body: Node3D, at: Vector3) -> void:
 	else:
 		_hit_ids[body.get_instance_id()] = true
 		_apply_hit(body, direction, false)
-		Vfx.hit_spark(at, color)
+		# Players' shots take their weapon's damage school (impact colour and shape) and show a crit.
+		Vfx.hit_spark(at, color, weapon.school if team == TEAM_PLAYERS and weapon != null else &"",
+				is_crit and team == TEAM_PLAYERS)
 	if _pierce_left > 0:
 		_pierce_left -= 1
 	else:

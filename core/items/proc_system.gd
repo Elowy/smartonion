@@ -864,12 +864,12 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			var e := _target_enemy(target, pos)
 			if e != null:
 				e.apply_slow(p.num("pct", 30.0), p.num("duration", DEFAULT_SLOW_DURATION))
-				Vfx.hit_spark(_chest(e), ProcVfx.school_color(&"frost"))
+				Vfx.hit_spark(_chest(e), ProcVfx.school_color(&"frost"), &"frost")
 		&"stun":
 			var e := _target_enemy(target, pos)
 			if e != null:
 				e.apply_stun(p.num("duration", 1.0))
-				Vfx.hit_spark(_chest(e), ProcVfx.school_color(p.school))
+				Vfx.hit_spark(_chest(e), ProcVfx.school_color(p.school), p.school)
 		&"gold":
 			_gold_carry += maxf(0.0, p.num("amount", 1.0))
 			var whole := floori(_gold_carry + 0.000001)
@@ -893,7 +893,7 @@ func _run(p: Proc, target: Node3D, pos: Vector3, weapon: WeaponData) -> void:
 			var e := _target_enemy(target, pos)
 			if e != null:
 				var color := ProcVfx.school_color(p.school)
-				Vfx.hit_spark(_chest(e), color)
+				Vfx.hit_spark(_chest(e), color, p.school)
 				_strike(p, e)
 				_riders(p, e)
 				var ally := _lowest_ally()
@@ -988,7 +988,7 @@ func _bolt(p: Proc, target: Node3D, pos: Vector3) -> void:
 		return
 	var color := ProcVfx.school_color(p.school)
 	ProcVfx.bolt(player.get_chest_position(), _chest(e), color)
-	Vfx.hit_spark(_chest(e), color)
+	Vfx.hit_spark(_chest(e), color, p.school)
 	_strike(p, e)
 	_riders(p, e)
 

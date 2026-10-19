@@ -200,7 +200,7 @@ func riposte(target: Enemy) -> void:
 			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
 	Vfx.slash_arc(player.global_position + Vector3.UP * 0.3, dir, 1.4, 70.0, _slash_color())
 	Audio.play(AudioIds.swing(weapon))
-	Vfx.hit_spark(target.global_position + Vector3.UP * 0.6, _slash_color())
+	Vfx.hit_spark(target.global_position + Vector3.UP * 0.6, _slash_color(), weapon.school, crit)
 	player.face_attack(dir)
 	apply_hit(player, target, dmg, crit, dir * weapon.knockback, weapon.stun_chance,
 			weapon.stun_duration, weapon, true)
@@ -269,7 +269,7 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 		var crit := player.consume_forced_crit() or _bonus_crit(e) \
 				or CombatMath.roll_crit(player.stats, RunState.rng)
 		var dmg := base * (crit_mult if crit else 1.0)
-		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color())
+		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color(), weapon.school, crit)
 		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration,
 				weapon, is_extra, gate.take())
 
