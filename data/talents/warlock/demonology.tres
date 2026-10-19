@@ -50,7 +50,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_demonology_unholy_power"
 display_name = "Pack Command"
-description = "Your demons and other companions deal {pct}% more damage (Imp, Wild Imps, Gloomguard, Cinder Brute, Phantom Wolf)."
+description = "Your demons and other companions deal {pct}% more damage (Imp, brood imps, Gloomguard, Cinder Brute, Phantom Wolf)."
 values = {
 "pct": 3.0
 }
@@ -106,7 +106,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_demonology_wild_imps"
 display_name = "Imp Brood"
-description = "Ember Rain also summons {imps} Wild Imps for {duration} sec. They fight like your Imp for {power}% of its damage (at most {max} at once)."
+description = "Ember Rain also summons {imps} brood imps for {duration} sec. They fight like your Imp for {power}% of its damage (at most {max} at once)."
 values = {
 "duration": 6.0,
 "imps": 2.0,
