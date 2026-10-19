@@ -1430,6 +1430,21 @@ func test_a_smoke_run_with_an_unknown_argument_reports_bad_args() -> void:
 	check(not data.has("unknown_args"), "and names no argument")
 
 
+## A smoke run with a typo ends in Main._ready, before any bot joins or a run starts (exit 1 at once,
+## not after a whole smoke run). Main.quit_app is off here: a quit would end the test process.
+func test_a_smoke_run_with_an_unknown_argument_finishes_at_boot() -> void:
+	UiFakes.reset_players()
+	var typo := LaunchOptions.parse(PackedStringArray(["--smoke", "--env=nope", "--waves=2"]))
+	main = Main.create(typo)
+	main.quit_app = false
+	tree.root.add_child(main)
+	check(main._smoke_done, "the smoke finished during _ready")
+	check_eq(main.quit_code, 1, "exit 1: not a completed run")
+	check_eq(PlayerManager.count(), 0, "no bot joined: no run was started")
+	check(main.arena == null, "no arena was built")
+	check(main.smoke_outcome("completed") == "bad_args", "the result stays bad_args")
+
+
 ## An invalid value is an unknown argument too (the flag is recognised, its value is not).
 func test_invalid_values_are_unknown_arguments() -> void:
 	for bad in ["--mode=nope", "--env=nope", "--event=nope", "--shrine-chance=abc", "--view=nope",

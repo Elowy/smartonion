@@ -170,6 +170,10 @@ var artifact_lines: Array[String] = []
 ## The smoke harness is running (--smoke): it prints SMOKE_RESULT and quits.
 var _smoke_running := false
 var _smoke_done := false
+## false in the unit tests: _quit records the exit code in [member quit_code] and the process goes on.
+var quit_app := true
+## The exit code _quit was asked for (-1 = no quit yet).
+var quit_code := -1
 var _shot_pending := false
 var _view_forced := false
 var _reviving_all := false
@@ -203,6 +207,10 @@ func _ready() -> void:
 		OS.add_logger(_error_counter)
 	for arg in options.unknown:
 		push_warning("Main: unknown command line argument '%s'" % arg)
+	if options.smoke and not options.unknown.is_empty():
+		# A typo would play some other run and still exit 0: the smoke ends now as "bad_args" (exit 1).
+		_finish_smoke("bad_args")
+		return
 	if options.leaderboard_path != "":
 		Leaderboard.path_override = options.leaderboard_path
 	_build_layers()
@@ -1471,7 +1479,9 @@ func _quit(code: int) -> void:
 		OS.remove_logger(_error_counter)
 		_error_counter = null
 	_apply_time_scale(1.0)
-	get_tree().quit(code)
+	quit_code = code
+	if quit_app:
+		get_tree().quit(code)
 
 
 func _log(text: String) -> void:
