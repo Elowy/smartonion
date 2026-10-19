@@ -425,7 +425,7 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	var hp_before := hp
 	hp = maxf(0.0, hp - dmg)
 	# The damage meter counts the HP the hit really took (no overkill).
-	RunState.record_damage_taken(slot_index(), hp_before - hp)
+	RunState.record_damage_taken(slot_index(), hp_before - hp, _damage_source_id(attacker))
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:
 		Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
@@ -443,6 +443,14 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	_thorns(attacker, kind)
 	if not downed and procs != null:
 		procs.on_struck(valid_source, dmg)
+
+
+## Who dealt a hit, for RunState.damage_taken_by_source: the enemy's data id (a boss for its
+## hazards and adds' hits alike), &"environment" for a hit without an enemy (the poison puddle).
+func _damage_source_id(attacker: Enemy) -> StringName:
+	if attacker != null and attacker.data != null:
+		return attacker.data.id
+	return &"environment"
 
 
 ## The damage a hit of [param amount] (after dodge / parry / block) does once armour, Versatility,

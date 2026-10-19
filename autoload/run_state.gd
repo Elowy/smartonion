@@ -76,9 +76,11 @@ const TALENT_START_LEVEL := 10
 ## Enemy damage multiplier by party size (index = players - 1; [method coop_damage_mult],
 ## GDD 9). Smaller parties take softer hits: the fewer heroes, the fewer can revive a downed
 ## one (alone, the first down ends the run) and the more enemies each faces (the +60% count
-## per extra player is less than one more share). About x1.3 per extra player; even a full
-## party stays below the plain EnemyData curve.
-const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.75, 0.95]
+## per extra player is less than one more share). About x1.3 per extra player. Final balance: the
+## full party went from 0.95 to 1.05 (and a trio from 0.75 to 0.8) after the Flesh Golem was softened
+## (at 0.95 the bots' first downs moved from wave ~11 to wave ~20 and six of six full parties cleared; at 1.15
+## two of six cleared, the early waves and the first dungeon already cost downs).
+const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.8, 1.05]
 
 var active := false
 var victory := false
@@ -182,6 +184,15 @@ var healing_by_player: Dictionary[int, float] = {}
 var absorbed_by_player: Dictionary[int, float] = {}
 ## Damage a player took (after mitigation).
 var damage_taken_by_player: Dictionary[int, float] = {}
+## Balance diagnostics: the same damage by what dealt it, {source id (an EnemyData id,
+## &"environment" for the poison puddles, ...): {wave: float}} (see [method record_damage_taken]).
+var damage_taken_by_source: Dictionary = {}
+## Balance diagnostics: the part of [member damage_by_player] that hit a boss (Morvain, Vor'thalax, the
+## Dungeon Warden), SMOKE_RESULT "boss_damage": it shows which class can hurt a boss at all.
+var boss_damage_by_player: Dictionary[int, float] = {}
+## Balance diagnostics: the highest total absorb shield a hero ever carried, as a multiple of its Max HP
+## (SMOKE_RESULT "shield_peak"): it shows whether the shield sources stack out of hand.
+var shield_peak_by_player: Dictionary[int, float] = {}
 ## Revives a player took part in (teammate channel, Word of Glory).
 var revives_by_player: Dictionary[int, int] = {}
 ## Times a player went down.
@@ -322,6 +333,9 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	healing_by_player.clear()
 	absorbed_by_player.clear()
 	damage_taken_by_player.clear()
+	damage_taken_by_source.clear()
+	boss_damage_by_player.clear()
+	shield_peak_by_player.clear()
 	revives_by_player.clear()
 	downs_by_player.clear()
 	bosses_by_player.clear()
@@ -750,9 +764,19 @@ func record_kill(player_index: int) -> void:
 		kills_by_player[player_index] = kills_by_player.get(player_index, 0) + 1
 
 
-func record_damage(player_index: int, amount: float) -> void:
+## The total shield of slot [param player_index] reached [param ratio] x its Max HP (keeps the highest).
+func record_shield_peak(player_index: int, ratio: float) -> void:
+	if player_index >= 0 and ratio > shield_peak_by_player.get(player_index, 0.0):
+		shield_peak_by_player[player_index] = ratio
+
+
+## [param amount] damage slot [param player_index] dealt; [param on_boss] = the target was a boss (also
+## counted in [member boss_damage_by_player]).
+func record_damage(player_index: int, amount: float, on_boss: bool = false) -> void:
 	if player_index >= 0:
 		damage_by_player[player_index] = damage_by_player.get(player_index, 0.0) + amount
+		if on_boss:
+			boss_damage_by_player[player_index] = boss_damage_by_player.get(player_index, 0.0) + amount
 
 
 ## An elite (&"elite"), the Loot Goblin (&"goblin") or a boss (&"boss") died, killed by slot
@@ -785,10 +809,16 @@ func record_absorb(player_index: int, amount: float) -> void:
 		absorbed_by_player[player_index] = absorbed_by_player.get(player_index, 0.0) + amount
 
 
-## [param amount] damage slot [param player_index] took after mitigation.
-func record_damage_taken(player_index: int, amount: float) -> void:
+## [param amount] damage slot [param player_index] took after mitigation. With a
+## [param source_id] (the dealer: an enemy's data id, &"environment" ...) it is also added to
+## [member damage_taken_by_source] under the current wave (balance diagnostics, SMOKE_RESULT).
+func record_damage_taken(player_index: int, amount: float, source_id: StringName = &"") -> void:
 	if player_index >= 0 and amount > 0.0:
 		damage_taken_by_player[player_index] = damage_taken_by_player.get(player_index, 0.0) + amount
+		if source_id != &"":
+			var per_wave: Dictionary = damage_taken_by_source.get(source_id, {})
+			per_wave[wave] = float(per_wave.get(wave, 0.0)) + amount
+			damage_taken_by_source[source_id] = per_wave
 
 
 ## Slot [param player_index] took part in a revive (credited to every reviver).

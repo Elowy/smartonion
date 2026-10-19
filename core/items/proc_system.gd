@@ -489,6 +489,8 @@ func add_shield(amount: float, duration: float, source: StringName = &"", owner_
 		_shields.append(entry)
 	entry.hp += amount
 	entry.left = maxf(entry.left, duration)
+	if player != null and player.stats != null:
+		RunState.record_shield_peak(Player.slot_index_of(player), shield_hp / maxf(1.0, player.max_hp()))
 
 
 ## Removes every absorb shield, named entries included ([method begin_wave], tests).
@@ -578,7 +580,7 @@ func deal_raw(target: Enemy, amount: float, school: StringName, target_bonus: bo
 	var text_pos := target.global_position + Vector3.UP * WeaponRunner.DAMAGE_TEXT_HEIGHT
 	var dealt := minf(amount, maxf(0.0, target.hp))
 	if player.slot != null:
-		RunState.record_damage(player.slot.index, dealt)
+		RunState.record_damage(player.slot.index, dealt, target.is_boss())
 	target.take_damage(amount, false, player)
 	Vfx.damage_number(null, text_pos, amount, ProcVfx.school_color(school), DAMAGE_TEXT_SIZE)
 	# Pet leech (Skull of the Damned): a share of what a pet dealt heals the hero.
