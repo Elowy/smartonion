@@ -7,7 +7,7 @@
 script = ExtResource("2_talent")
 id = &"mage_arcane_arcane_focus"
 display_name = "Arcane Focus"
-description = "Increases your Arcane damage by {pct}% (wand bolts, Arcane Missiles, Blink bursts)."
+description = "Increases your Arcane damage by {pct}% (wand bolts, Arcane Darts, Blink bursts)."
 values = {
 "pct": 3.0
 }
@@ -70,8 +70,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_arcane_concentration"]
 script = ExtResource("2_talent")
 id = &"mage_arcane_arcane_concentration"
-display_name = "Arcane Concentration"
-description = "Your Mana spells (Blizzard) have a {chance}% chance to cost no Mana."
+display_name = "Thrifty Casting"
+description = "Your Mana spells (Hailstorm) have a {chance}% chance to cost no Mana."
 values = {
 "chance": 8.0
 }
@@ -115,8 +115,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_mirror_image"]
 script = ExtResource("2_talent")
 id = &"mage_arcane_mirror_image"
-display_name = "Mirror Image"
-description = "When you Blink, a Mirror Image stays behind for {duration} sec. Enemies within {radius} m chase it instead of you, and it bursts for Arcane damage within {burst_radius} m when it fades. Once every {icd} sec at most."
+display_name = "Phantom Double"
+description = "When you Blink, a Phantom Double stays behind for {duration} sec. Enemies within {radius} m chase it, not you, and it bursts for Arcane damage within {burst_radius} m when it fades. Once every {icd} sec at most."
 values = {
 "burst_radius": 2.5,
 "duration": 3.0,
@@ -182,7 +182,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_arcane_power"]
 script = ExtResource("2_talent")
 id = &"mage_arcane_arcane_power"
-display_name = "Arcane Power"
+display_name = "Overchannel"
 description = "All your damage is increased by {dmg}%, but your Mana spells cost {cost}% more Mana."
 values = {
 "cost": 30.0,
@@ -210,7 +210,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"mage_arcane"
 class_id = &"mage"
-display_name = "Arcane"
+display_name = "Starlore"
 index = 0
 description = "Arcane bolts, Blink tricks, Haste and a deep Mana pool."
 icon = &"arcane_missiles"

@@ -26,7 +26,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_tactical_mastery"]
 script = ExtResource("2_talent")
 id = &"warrior_arms_tactical_mastery"
-display_name = "Tactical Mastery"
+display_name = "Rage Reserve"
 description = "You start every wave with {rage} Rage and generate {regen}% more Rage."
 values = {
 "rage": 5.0,
@@ -76,7 +76,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_deep_wounds"]
 script = ExtResource("2_talent")
 id = &"warrior_arms_deep_wounds"
-display_name = "Deep Wounds"
+display_name = "Gashing Blows"
 description = "Your critical hits make the target bleed for {pct}% of the damage over {duration_fixed} sec."
 values = {
 "duration_fixed": 3.0,
@@ -102,7 +102,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_two_handed_specialization"]
 script = ExtResource("2_talent")
 id = &"warrior_arms_two_handed_specialization"
-display_name = "Two-Handed Specialization"
+display_name = "Two-Hander Prowess"
 description = "While wielding a two-handed weapon you deal {pct}% more damage."
 values = {
 "pct": 5.0
@@ -173,7 +173,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_sudden_death"]
 script = ExtResource("2_talent")
 id = &"warrior_arms_sudden_death"
-display_name = "Sudden Death"
+display_name = "Culling Instinct"
 description = "Your weapon hits have a {chance}% chance to finish Execute's cooldown."
 values = {
 "chance": 3.0
@@ -198,8 +198,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_mortal_strike"]
 script = ExtResource("2_talent")
 id = &"warrior_arms_mortal_strike"
-display_name = "Mortal Strike"
-description = "Every 5th weapon attack (the next one if its target already fell) also strikes for {strike}% weapon damage and leaves a Mortal Wound for {duration} sec: the target heals {heal}% less and takes {taken}% more damage from you."
+display_name = "Ruinous Strike"
+description = "Every 5th weapon attack (the next one if its target already fell) also strikes for {strike}% weapon damage and leaves a Ruinous Wound for {duration} sec: the target heals {heal}% less and takes {taken}% more damage from you."
 values = {
 "duration": 8.0,
 "heal": 50.0,
@@ -227,7 +227,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"warrior_arms"
 class_id = &"warrior"
-display_name = "Arms"
+display_name = "Warblade"
 index = 0
 description = "Two-handed strikes, bleeding wounds and executions."
 icon = &"execute"

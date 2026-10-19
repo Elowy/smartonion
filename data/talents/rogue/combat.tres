@@ -6,7 +6,7 @@
 [sub_resource type="Resource" id="Resource_lightning_reflexes"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_lightning_reflexes"
-display_name = "Lightning Reflexes"
+display_name = "Quicksilver Reflexes"
 description = "Increases your chance to dodge attacks by {dodge}%."
 values = {
 "dodge": 2.0
@@ -26,7 +26,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_combat_potency"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_combat_potency"
-display_name = "Combat Potency"
+display_name = "Battle Verve"
 description = "Your weapon attacks have a {chance}% chance to generate {energy_fixed} Energy."
 values = {
 "chance": 8.0,
@@ -53,7 +53,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_unfair_advantage"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_unfair_advantage"
-display_name = "Unfair Advantage"
+display_name = "Sly Counter"
 description = "Increases your chance to dodge by {dodge}%. When you dodge an attack, you have a {chance}% chance to strike back at once."
 values = {
 "chance": 25.0,
@@ -128,8 +128,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_restless_blades"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_restless_blades"
-display_name = "Restless Blades"
-description = "For each Combo Point Fan of Knives spends, the cooldowns of your other Rogue abilities are reduced by {sec} sec."
+display_name = "Hastening Blades"
+description = "For each Combo Point Knife Bloom spends, the cooldowns of your other Rogue abilities are reduced by {sec} sec."
 values = {
 "sec": 0.2
 }
@@ -152,7 +152,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_hack_and_slash"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_hack_and_slash"
-display_name = "Hack and Slash"
+display_name = "Twin Strike"
 description = "Your weapon hits have a {chance}% chance to strike again at once."
 values = {
 "chance": 4.0
@@ -173,7 +173,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"rogue_combat_blade_tactics"
 display_name = "Blade Tactics"
-description = "Blade Flurry and Killing Spree deal {pct}% more damage and recharge {cd}% faster."
+description = "Cleaving Blades and Cutthroat Rush deal {pct}% more damage and recharge {cd}% faster."
 values = {
 "cd": 6.0,
 "pct": 6.0
@@ -197,7 +197,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_adrenaline_rush"]
 script = ExtResource("2_talent")
 id = &"rogue_combat_adrenaline_rush"
-display_name = "Adrenaline Rush"
+display_name = "Crowd Surge"
 description = "While {enemies} or more enemies are within {radius} m of you, your Energy is generated {regen}% faster and allies within {ally_radius} m gain {haste}% Haste."
 values = {
 "ally_radius": 8.0,
@@ -230,7 +230,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"rogue_combat"
 class_id = &"rogue"
-display_name = "Combat"
+display_name = "Bladework"
 index = 1
 description = "Dual-wielding melee: dodges, Energy and a storm of blades."
 icon = &"blade_flurry"

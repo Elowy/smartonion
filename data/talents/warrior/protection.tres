@@ -26,7 +26,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shield_specialization"]
 script = ExtResource("2_talent")
 id = &"warrior_protection_shield_specialization"
-display_name = "Shield Specialization"
+display_name = "Shield Prowess"
 description = "While you wield a shield, your chance to block is increased by {block}% and your blocks absorb {value}% more damage."
 values = {
 "block": 3.0,
@@ -51,7 +51,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_revenge"]
 script = ExtResource("2_talent")
 id = &"warrior_protection_revenge"
-display_name = "Revenge"
+display_name = "Payback"
 description = "Increases your chance to parry melee attacks by {parry}%. When you block or dodge an attack, you have a {chance}% chance to strike back at once."
 values = {
 "chance": 15.0,
@@ -165,7 +165,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shield_mastery"]
 script = ExtResource("2_talent")
 id = &"warrior_protection_shield_mastery"
-display_name = "Shield Mastery"
+display_name = "Shieldcraft"
 description = "While you wield a shield, you take {pct}% less damage."
 values = {
 "pct": 4.0
@@ -187,8 +187,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_blood_and_thunder"]
 script = ExtResource("2_talent")
 id = &"warrior_protection_blood_and_thunder"
-display_name = "Blood and Thunder"
-description = "Whirlwind and Thunder Clap are {pct}% stronger, and Whirlwind slows the enemies it hits by {slow}% for {slow_duration_fixed} sec."
+display_name = "Whirl and Slam"
+description = "Whirlwind and Ground Slam are {pct}% stronger, and Whirlwind slows the enemies it hits by {slow}% for {slow_duration_fixed} sec."
 values = {
 "pct": 5.0,
 "slow": 10.0,
@@ -249,7 +249,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"warrior_protection"
 class_id = &"warrior"
-display_name = "Protection"
+display_name = "Ironwall"
 index = 2
 description = "Shield, armour and taunts: the wall your allies stand behind."
 icon = &"shield_wall"

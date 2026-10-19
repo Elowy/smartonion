@@ -26,8 +26,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_aura_mastery"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_aura_mastery"
-display_name = "Aura Mastery"
-description = "Increases your Mastery by {mastery}, and your Aura of Devotion reaches {radius} m further."
+display_name = "Aura Reach"
+description = "Increases your Mastery by {mastery}, and your Aura of Fealty reaches {radius} m further."
 values = {
 "mastery": 1.0,
 "radius": 1.0
@@ -55,8 +55,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_eternal_glory"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_eternal_glory"
-display_name = "Eternal Glory"
-description = "Word of Glory has a {chance}% chance to cost no Holy Power."
+display_name = "Boundless Valor"
+description = "Call of Valor has a {chance}% chance to cost no Resolve."
 values = {
 "chance": 8.0
 }
@@ -78,8 +78,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_unyielding_faith"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_unyielding_faith"
-display_name = "Unyielding Faith"
-description = "Every {interval_fixed} sec you have a {chance}% chance to gain 1 Holy Power."
+display_name = "Steadfast Prayer"
+description = "Every {interval_fixed} sec you have a {chance}% chance to gain 1 Resolve."
 values = {
 "chance": 8.0,
 "interval_fixed": 4.0
@@ -106,8 +106,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_lights_grace"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_lights_grace"
-display_name = "Light's Grace"
-description = "Word of Glory heals {pct}% more, and the number of wounded allies it heals is increased by {allies}."
+display_name = "Generous Valor"
+description = "Call of Valor heals {pct}% more, and the number of wounded allies it heals is increased by {allies}."
 values = {
 "allies": 1.0,
 "pct": 8.0
@@ -131,8 +131,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_lights_hammer"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_lights_hammer"
-display_name = "Light's Hammer"
-description = "Consecration is hurled at the feet of the most wounded hero within {range} m who is below {below}% health (otherwise at your feet), and heroes standing in it heal {heal}% of their maximum health every {tick} sec."
+display_name = "Gifted Circle"
+description = "Sacred Circle is hurled at the feet of the most wounded hero within {range} m who is below {below}% health (otherwise at your feet), and heroes standing in it heal {heal}% of their maximum health every {tick} sec."
 values = {
 "below": 80.0,
 "heal": 1.0,
@@ -159,8 +159,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_divine_guardian"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_divine_guardian"
-display_name = "Divine Guardian"
-description = "Heroes inside your Aura of Devotion (you included) take {pct}% less damage."
+display_name = "Warding Presence"
+description = "Heroes inside your Aura of Fealty (you included) take {pct}% less damage."
 values = {
 "pct": 2.0
 }
@@ -183,7 +183,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_purifying_power"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_purifying_power"
-display_name = "Purifying Power"
+display_name = "Sunlit Might"
 description = "Increases your Holy damage by {pct}%."
 values = {
 "pct": 5.0
@@ -202,7 +202,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_holy_shock"]
 script = ExtResource("2_talent")
 id = &"paladin_holy_holy_shock"
-display_name = "Holy Shock"
+display_name = "Radiant Pulse"
 description = "Every {interval} sec: heals the most wounded hero within {range} m below {below}% health (you too) for {heal}% of max health, else smites the nearest enemy in range for {pct}% weapon damage as Holy. Haste shortens the interval."
 values = {
 "below": 90.0,
@@ -236,9 +236,9 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"paladin_holy"
 class_id = &"paladin"
-display_name = "Holy"
+display_name = "Radiance"
 index = 0
-description = "Healing light, Holy Power and the allies at your side."
+description = "Healing light, Resolve and the allies at your side."
 icon = &"word_of_glory"
 color = Color(1, 0.88, 0.45, 1)
 talents = Array[ExtResource("2_talent")]([SubResource("Resource_healing_light"), SubResource("Resource_aura_mastery"), SubResource("Resource_eternal_glory"), SubResource("Resource_unyielding_faith"), SubResource("Resource_lights_grace"), SubResource("Resource_lights_hammer"), SubResource("Resource_divine_guardian"), SubResource("Resource_purifying_power"), SubResource("Resource_holy_shock")])

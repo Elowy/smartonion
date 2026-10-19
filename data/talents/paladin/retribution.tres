@@ -46,8 +46,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_art_of_war"]
 script = ExtResource("2_talent")
 id = &"paladin_retribution_art_of_war"
-display_name = "Art of War"
-description = "Your critical weapon hits have a {chance}% chance to grant 1 Holy Power (at most once per second)."
+display_name = "Rhythm of Battle"
+description = "Your critical weapon hits have a {chance}% chance to grant 1 Resolve (at most once per second)."
 values = {
 "chance": 20.0
 }
@@ -73,8 +73,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_sanctity_of_battle"]
 script = ExtResource("2_talent")
 id = &"paladin_retribution_sanctity_of_battle"
-display_name = "Sanctity of Battle"
-description = "Increases your Holy damage by {pct}%, and Consecration recharges {cd} sec faster."
+display_name = "Sacred Cadence"
+description = "Increases your Holy damage by {pct}%, and Sacred Circle recharges {cd} sec faster."
 values = {
 "cd": 0.5,
 "pct": 4.0
@@ -133,7 +133,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"paladin_retribution_divine_verdict"
 display_name = "Divine Verdict"
-description = "When nobody in range is below {below}% health or needs a revive, Word of Glory strikes the nearest enemy within {range} m (elites and bosses first) for {pct}% weapon damage as Holy."
+description = "When nobody in range is below {below}% health or needs a revive, Call of Valor strikes the nearest enemy within {range} m (elites and bosses first) for {pct}% weapon damage as Holy."
 values = {
 "below": 80.0,
 "pct": 300.0,
@@ -158,8 +158,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_sanctified_retribution"]
 script = ExtResource("2_talent")
 id = &"paladin_retribution_sanctified_retribution"
-display_name = "Sanctified Retribution"
-description = "You and the allies inside your Aura of Devotion deal {pct}% more damage."
+display_name = "Sanctified Fervor"
+description = "You and the allies inside your Aura of Fealty deal {pct}% more damage."
 values = {
 "pct": 2.0
 }
@@ -181,7 +181,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_righteous_vengeance"]
 script = ExtResource("2_talent")
 id = &"paladin_retribution_righteous_vengeance"
-display_name = "Righteous Vengeance"
+display_name = "Branding Strikes"
 description = "Your critical weapon hits also burn the target for {pct}% of the damage as Holy damage over {duration_fixed} sec."
 values = {
 "duration_fixed": 4.0,
@@ -208,7 +208,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_seal_of_command"]
 script = ExtResource("2_talent")
 id = &"paladin_retribution_seal_of_command"
-display_name = "Seal of Command"
+display_name = "Sunbrand"
 description = "Weapon attacks have a {chance}% chance to deal {pct}% of the hit as Holy damage to the target and up to {extra} enemies within {radius} m of it, healing the most wounded hero within {range} m for {heal}% of max health."
 values = {
 "chance": 15.0,
@@ -240,7 +240,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"paladin_retribution"
 class_id = &"paladin"
-display_name = "Retribution"
+display_name = "Verdict"
 index = 2
 description = "Holy strikes, critical blows and the Light's verdict."
 icon = &"divine_storm"

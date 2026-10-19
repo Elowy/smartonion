@@ -6,7 +6,7 @@
 [sub_resource type="Resource" id="Resource_critical_mass"]
 script = ExtResource("2_talent")
 id = &"mage_fire_critical_mass"
-display_name = "Critical Mass"
+display_name = "Fiery Precision"
 description = "Increases your critical strike chance by {crit}%."
 values = {
 "crit": 2.0
@@ -85,7 +85,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_playing_with_fire"]
 script = ExtResource("2_talent")
 id = &"mage_fire_playing_with_fire"
-display_name = "Playing with Fire"
+display_name = "Reckless Flame"
 description = "You deal {dmg}% more damage, but take {taken}% more damage."
 values = {
 "dmg": 3.0,
@@ -107,8 +107,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_living_bomb"]
 script = ExtResource("2_talent")
 id = &"mage_fire_living_bomb"
-display_name = "Living Bomb"
-description = "Fireball's burn becomes a Living Bomb: it explodes for {pct}% of the Fireball's damage within {radius} m when it ends or the enemy dies."
+display_name = "Ticking Ember"
+description = "Fireball's burn is a Ticking Ember: it explodes for {pct}% of Fireball's damage within {radius} m when it ends or the enemy dies."
 values = {
 "pct": 40.0,
 "radius": 2.5
@@ -152,7 +152,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_molten_fury"]
 script = ExtResource("2_talent")
 id = &"mage_fire_molten_fury"
-display_name = "Molten Fury"
+display_name = "Finishing Flame"
 description = "You deal {pct}% more damage to enemies below {hp_fixed}% health."
 values = {
 "hp_fixed": 35.0,
@@ -173,7 +173,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_combustion"]
 script = ExtResource("2_talent")
 id = &"mage_fire_combustion"
-display_name = "Combustion"
+display_name = "Chain Ignition"
 description = "When your weapon attack's first hit crits, up to {targets} enemies (the target and the nearest within {radius} m) burn for {pct}% of the crit's damage over {duration} sec, each at most once every {icd} sec."
 values = {
 "duration": 3.0,
@@ -203,7 +203,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"mage_fire"
 class_id = &"mage"
-display_name = "Fire"
+display_name = "Pyrelore"
 index = 1
 description = "Critical strikes, Ignite and spreading flames."
 icon = &"fireball"
