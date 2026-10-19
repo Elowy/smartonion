@@ -178,12 +178,14 @@ func select(index: int) -> void:
 	if i == selected:
 		return
 	selected = i
+	Audio.play_ui(&"ui_move")
 	refresh()
 
 
 ## Moves the highlight by [param step] rows (wraps).
 func move_selection(step: int) -> void:
 	selected = wrapi(selected + step, 0, rows.size())
+	Audio.play_ui(&"ui_move")
 	refresh()
 
 
@@ -192,6 +194,7 @@ func change_selected(direction: int) -> void:
 	var row := rows[selected]
 	if row.kind == RowKind.OPTION and direction != 0:
 		Settings.step_value(row.key, direction)
+		Audio.play_ui(&"ui_toggle")
 
 
 ## A on the highlighted row: flips a toggle, cycles a choice, presses Reset / Back (volumes: nothing).
@@ -200,11 +203,13 @@ func activate_selected() -> void:
 	match row.kind:
 		RowKind.RESET:
 			Settings.reset_to_defaults()
+			Audio.play_ui(&"ui_confirm")
 		RowKind.BACK:
 			close()
 		_:
 			if GameSettings.option(row.key).kind != SettingOption.Kind.PERCENT:
 				Settings.step_value(row.key, 1)
+				Audio.play_ui(&"ui_toggle")
 
 
 ## Redraws every row from the Settings values and the highlight.

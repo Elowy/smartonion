@@ -126,6 +126,8 @@ func open(slots: Array[PlayerSlot], p_level_ups: int, p_wave: int) -> void:
 	_update_timer()
 	_open = not order.is_empty()
 	show()
+	if _open:
+		Audio.play_ui(&"ui_card_flip")
 	if not _open:
 		finished.emit.call_deferred()
 

@@ -267,6 +267,7 @@ func set_focused(on: bool) -> void:
 func select_item(index: int) -> void:
 	if index < 0 or index >= items.size() or index == selected:
 		return
+	Audio.play_ui(&"ui_move")
 	selected = index
 	row_selected = 0
 	_hold.clear()
@@ -325,6 +326,7 @@ func move_row(step: int) -> void:
 	var i := clampi(row_selected + signi(step), 0, rows.size() - 1)
 	if i == row_selected:
 		return
+	Audio.play_ui(&"ui_move")
 	row_selected = i
 	_hold.clear()
 	_update_selection()
@@ -364,6 +366,7 @@ func try_act(action: Enchanter.Action, index: int = -1) -> bool:
 	if not out.ok:
 		_say(out.reason, "", UiTheme.RED)
 		return false
+	Audio.play_ui(&"ui_buy")
 	_announce(out)
 	refresh()
 	if action == Enchanter.Action.IMBUE and out.index >= 0 and out.index < rows.size():

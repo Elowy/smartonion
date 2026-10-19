@@ -281,7 +281,9 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
 		slot.ready = not slot.ready
+		Audio.play_ui(&"ui_confirm" if slot.ready else &"ui_back")
 	elif inp.just_pressed(PlayerInput.Pad.B):
+		Audio.play_ui(&"ui_back")
 		if slot.ready:
 			slot.ready = false
 		else:
@@ -289,15 +291,19 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			return
 	elif inp.just_pressed(PlayerInput.Pad.START):
 		slot.ready = true
+		Audio.play_ui(&"ui_confirm")
 	# Any joined player picks the run's mode: Y cycles Normal / Endless, X toggles Hardcore.
 	if inp.just_pressed(PlayerInput.Pad.Y):
 		cycle_mode(slot)
+		Audio.play_ui(&"ui_toggle")
 	elif inp.just_pressed(PlayerInput.Pad.X):
 		toggle_hardcore(slot)
+		Audio.play_ui(&"ui_toggle")
 	if not slot.ready:
 		var nav := inp.nav_just_pressed()
 		if nav.x != 0:
 			_cycle_class(slot, nav.x)
+			Audio.play_ui(&"ui_move")
 
 
 func _cycle_class(slot: PlayerSlot, step: int) -> void:

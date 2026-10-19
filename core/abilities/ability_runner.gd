@@ -442,6 +442,7 @@ func _cast_with(index: int, ctx: AbilityContext) -> bool:
 	elif a.resource != &"":
 		get_resource(a.resource).spend(cost)
 	spend_charge(a, ctx)
+	Audio.play(AudioIds.ability(a))
 	ability_cast.emit(index, a)
 	return true
 

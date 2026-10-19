@@ -294,6 +294,7 @@ static func _place_bag(item: ItemInstance, world_pos: Vector3, fallback: Node) -
 	else:
 		bag.position = world_pos
 	parent.add_child(bag)
+	Audio.play(&"item_drop")
 	return bag
 
 

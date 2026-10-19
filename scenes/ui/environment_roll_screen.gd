@@ -209,6 +209,7 @@ func step(delta: float) -> void:
 
 func _enter_hold() -> void:
 	phase = Phase.HOLD
+	Audio.play(&"banner")
 	_hold_left = HOLD_TIME
 	var env := Db.get_environment(winner)
 	title_label.text = "The arena: %s" % (env.display_name if env != null else String(winner))

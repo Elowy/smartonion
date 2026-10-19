@@ -422,6 +422,7 @@ func start_wave(n: int) -> void:
 	_wave_start_msec = Time.get_ticks_msec()
 	# Frame the team first: the opening spawn group picks on-screen points from the camera.
 	arena.camera.snap()
+	Audio.play(&"wave_start")
 	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
@@ -565,11 +566,14 @@ func _on_dungeon_status() -> void:
 
 
 func _on_dungeon_boss_spawned(boss: Boss) -> void:
+	Audio.play(&"boss_spawn")
+	Audio.play_music(&"boss")
 	if hud != null:
 		hud.bind_boss(boss)
 
 
 func _on_dungeon_boss_cleared() -> void:
+	Audio.play_music(&"combat")
 	if hud != null:
 		hud.clear_boss()
 
@@ -634,6 +638,7 @@ func end_run(p_victory: bool) -> void:
 	_record_hero_results()
 	var board := _record_leaderboard(p_victory)
 	_set_state(State.GAME_OVER)
+	Audio.play(&"victory" if p_victory else &"defeat")
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
 	var boss: Boss = wave_director.boss if wave_director != null and not p_victory else null
@@ -978,7 +983,25 @@ static func _free_node(node: Variant) -> void:
 func _set_state(s: State) -> void:
 	state = s
 	_state_time = 0.0
+	_update_music()
 	state_changed.emit(s)
+
+
+## The music of the new state: the menu theme in the menus, combat music on a wave (the boss theme on a
+## boss wave), the tavern theme in the break; the end screen fades it out (its stinger plays instead).
+## The clear banner (WAVE_END) and the boot keep what plays.
+func _update_music() -> void:
+	match state:
+		State.MENU, State.LOBBY:
+			Audio.play_music(&"menu")
+		State.WAVE:
+			Audio.play_music(&"boss" if RunState.is_boss_wave(wave) else &"combat")
+		State.DUNGEON:
+			Audio.play_music(&"combat")
+		State.INTERMISSION:
+			Audio.play_music(&"intermission")
+		State.GAME_OVER:
+			Audio.stop_music(0.6)
 
 
 # --- Signals ------------------------------------------------------------------------
@@ -1024,6 +1047,7 @@ func _on_wave_cleared(n: int) -> void:
 		return
 	if hud != null:
 		hud.show_banner(_wave_cleared_text(n))
+	Audio.play(&"wave_cleared")
 	_set_state(State.WAVE_END)
 
 
@@ -1042,6 +1066,7 @@ func _wave_cleared_text(n: int) -> String:
 
 ## WaveDirector.boss_spawned: the arrival banner.
 func _on_boss_spawned(boss: Boss) -> void:
+	Audio.play(&"boss_spawn")
 	if hud != null and boss.boss_data != null:
 		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
 	_log(boss_arrival_text(boss, wave, players.size()))

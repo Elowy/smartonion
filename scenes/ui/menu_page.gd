@@ -80,6 +80,7 @@ func open(p_slot: PlayerSlot) -> void:
 	_on_open()
 	_fill_prompts()
 	show()
+	Audio.play_ui(&"ui_open")
 
 
 ## Hides the page and tells the menu below ([signal closed]).
@@ -87,6 +88,7 @@ func close() -> void:
 	if not visible:
 		return
 	hide()
+	Audio.play_ui(&"ui_close")
 	closed.emit()
 
 

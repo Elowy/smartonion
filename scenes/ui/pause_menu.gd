@@ -78,6 +78,7 @@ func open(p_slot: PlayerSlot) -> void:
 	_header_key = ""
 	_refresh()
 	_fill_prompts()
+	Audio.play_ui(&"ui_open")
 	show()
 
 
@@ -86,6 +87,7 @@ func move_selection(step: int) -> void:
 	var i := entries.find(selected)
 	selected = entries[wrapi(maxi(i, 0) + step, 0, entries.size())]
 	quit_armed = false
+	Audio.play_ui(&"ui_move")
 	_update_selection()
 
 
@@ -105,6 +107,7 @@ func is_settings_open() -> bool:
 func press_selected() -> void:
 	if selected == Item.QUIT and not quit_armed:
 		quit_armed = true
+		Audio.play_ui(&"ui_confirm")
 		_update_selection()
 		return
 	activate_selected()
@@ -349,6 +352,7 @@ func _close_settings() -> void:
 ## Resumes unless a joined player's controller is unplugged (then the game stays paused).
 func _try_resume() -> void:
 	if not PlayerManager.disconnected_slots().is_empty():
+		Audio.play_ui(&"ui_error")
 		return
 	_resume()
 
@@ -356,6 +360,7 @@ func _try_resume() -> void:
 func _resume() -> void:
 	if not visible:
 		return
+	Audio.play_ui(&"ui_back")
 	hide()
 	resume_requested.emit()
 
@@ -363,6 +368,7 @@ func _resume() -> void:
 func _quit() -> void:
 	if not visible:
 		return
+	Audio.play_ui(&"ui_confirm")
 	hide()
 	quit_to_menu_requested.emit()
 

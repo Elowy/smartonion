@@ -238,8 +238,10 @@ func _handle_input(s: PlayerSlot) -> void:
 	var inp := s.input
 	if inp.just_pressed(PlayerInput.Pad.A):
 		vote.cast(s.index, true)
+		Audio.play_ui(&"ui_confirm")
 	elif inp.just_pressed(PlayerInput.Pad.B):
 		vote.cast(s.index, false)
+		Audio.play_ui(&"ui_back")
 
 
 func _decide() -> void:

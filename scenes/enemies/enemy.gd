@@ -1527,6 +1527,7 @@ func _die(attacker: Node3D) -> void:
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
+	Audio.play(&"enemy_death_boss" if is_boss() else (&"enemy_death_elite" if elite_affix != &"" else &"enemy_death"))
 	if drops_loot:
 		_death_loot(pos, attacker)
 	_on_death_effect()

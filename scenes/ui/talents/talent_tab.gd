@@ -415,6 +415,7 @@ func press_add() -> bool:
 		return false
 	if not s.add(t.id):
 		return false
+	Audio.play_ui(&"ui_confirm")
 	var rank := "%d/%d" % [s.rank_of(t.id), t.max_rank]
 	_say("%s %s" % [_bb_name(t.display_name), rank], "%s %s" % [t.display_name, rank], UiTheme.TEXT)
 	return true
@@ -432,6 +433,7 @@ func press_take_back() -> bool:
 		return false
 	if not s.remove(t.id):
 		return false
+	Audio.play_ui(&"ui_back")
 	var rank := "%d/%d" % [s.rank_of(t.id), t.max_rank]
 	_say("%s back to %s" % [_bb_name(t.display_name), rank], "%s back to %s" % [t.display_name, rank], UiTheme.TEXT)
 	return true
@@ -504,6 +506,7 @@ func select_talent(talent_id: StringName) -> void:
 		return
 	if talent_id == selected_id and not reset_selected:
 		return
+	Audio.play_ui(&"ui_move")
 	selected_id = talent_id
 	reset_selected = false
 	preview_next = false  # Y previews the talent it was pressed on, not the next one selected
@@ -514,6 +517,7 @@ func select_talent(talent_id: StringName) -> void:
 func select_reset() -> void:
 	if reset_selected or tree_views.is_empty():
 		return
+	Audio.play_ui(&"ui_move")
 	reset_selected = true
 	_update_selection()
 
@@ -1014,6 +1018,7 @@ func _do_reset() -> bool:
 		_say(s.reset_block_reason() if s.reset_block_reason() != "" else "Not enough gold", "", UiTheme.RED)
 		refresh()
 		return false
+	Audio.play_ui(&"ui_buy")
 	_say("Talents reset  -%s" % UiTheme.format_int(price), "Talents reset", UiTheme.TEXT, true)
 	# try_reset emitted changed (a refresh while shown); the row and prompts follow either way.
 	_update_reset_row()
