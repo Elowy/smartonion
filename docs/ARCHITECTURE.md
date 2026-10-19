@@ -6,7 +6,10 @@ weapons, collecting gold (shared wallet) and XP (shared level). Between waves a 
 "ready up" screen. Later milestones have their own sections below: M2 items, loot and the
 shop; M3 class resources, abilities and Mastery; M4 level-up cards, ranks and the Trainer; M5
 talents, tier sets, forging, elites, the Loot Goblin and the shared-purse tools; M6a the two
-bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter.
+bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
+Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
+mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
+enchants, hand-made items).
 
 ## Layout
 
@@ -14,28 +17,33 @@ bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage 
 autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state)
 core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
             items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
-            run_summary.gd, run_card.gd (M6a)
+            run_summary.gd, run_card.gd (M6a); leaderboard.gd, shrines.gd, shrine_vote.gd,
+            dungeon/ (M6b)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
-            talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a)
+            talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
+            environments/ shrines/ (M6b)
 scenes/
   main/     Main – game flow state machine                         [integration]
-  arena/    Arena – battlefield, walls, entities root               [visuals]
+  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b)  [visuals]
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
-  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a)  [visuals]
+  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b)  [visuals]
   vfx/      Vfx – fire-and-forget effects                           [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
   talents/  per-class TalentEffect scripts (M5)
   artifacts/  TalentEffect scripts of the Artifact properties (M6a)
   enemies/  Enemy; EliteAffixes, ElitePlate, LootGoblin, GoblinPortal (M5); Boss, PoisonPuddle,
-            HookLine, hazards/ (M6a)                                 [enemies]
+            HookLine, hazards/ (M6a; M6b adds the environment hazards)   [enemies]
+  events/   GuardedChest, DefendTotem, CaravanCart, EventGuards, EventFx, EventTag (M6b)
+  dungeon/  Dungeon, DungeonBrazier (M6b)
   pickups/  Pickup, LootBag (M2)                                     [enemies]
-  waves/    WaveDirector; GoblinSpawner (M5)                         [enemies]
+  waves/    WaveDirector; GoblinSpawner (M5); EventSpawner, EnvironmentHazards (M6b)  [enemies]
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
-            GameOverScreen (+ MeterPage), PauseMenu; items/ shop/ loot/ (M2), level_up/ trainer/ (M4),
-            talents/ purse/ (M5), enchanter/ (M6a)
+            GameOverScreen (+ MeterPage, LeaderboardPage), PauseMenu; items/ shop/ loot/ (M2),
+            level_up/ trainer/ (M4), talents/ purse/ (M5), enchanter/ (M6a), shrine/ dungeon/,
+            EnvironmentRollScreen, HardcoreBadge (M6b)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
             test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
 ```
@@ -50,11 +58,12 @@ not rename or remove the contract members.
 ```
 Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is paused)
 ├── Arena (Node3D, PAUSABLE)   – Arena.current
-│   ├── environment, ground, walls, props
-│   ├── SpiritHealer           – arena.spirit_healer at Arena.SPIRIT_HEALER_POINT (centre)
+│   ├── environment, ground, walls, props (the run's EnvironmentData palette and decor, M6b)
+│   ├── SpiritHealer           – arena.spirit_healer at Arena.SPIRIT_HEALER_POINT (centre); none in a hardcore run
 │   ├── entities (Node3D)      – players, enemies, projectiles, pickups, VFX
 │   └── CameraRig
-├── WaveDirector (Node, PAUSABLE)
+├── WaveDirector (Node, PAUSABLE) – with the GoblinSpawner, EventSpawner and EnvironmentHazards children
+├── Dungeon (Node, PAUSABLE)   – only while State.DUNGEON (M6b)
 ├── HudLayer (CanvasLayer 10, PAUSABLE) / Hud
 ├── MenuLayer (20)          / MainMenu or Lobby
 ├── IntermissionLayer (30)  / Intermission      (ALWAYS)
@@ -63,7 +72,8 @@ Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is pau
 ```
 
 States (`Main.State`): `MENU -> LOBBY -> WAVE -> WAVE_END -> INTERMISSION -> WAVE ... ->
-GAME_OVER -> LOBBY`. Screens are created when their state starts and freed when it ends; the
+GAME_OVER -> LOBBY` (M6b: `INTERMISSION -> DUNGEON -> INTERMISSION` after an accepted portal, `State.DUNGEON`
+appended to the enum). Screens are created when their state starts and freed when it ends; the
 run (arena, director, players, HUD, run screens) is built by `start_run()` and torn down by
 `_teardown_run()`. Transitions triggered by UI signals are connected `CONNECT_DEFERRED`, so
 the new screen never sees the button press that closed the old one.
@@ -72,17 +82,22 @@ the new screen never sees the button press that closed the old one.
    LOBBY, Quit → quit.
 2. **LOBBY** – the Lobby owns `PlayerManager.joining_enabled`. Each slot picks a class (◀ ▶),
    readies with A, leaves with B. All joined players ready → countdown → `start_requested`
-   → run (a new join or an unready cancels the countdown). B with nobody joined → MENU.
+   → (M6b: the "Rolling the arena..." screen, unless smoke / demo / view) → run (a new join, an
+   unready or a mode change cancels the countdown). Any joined player's Y / X change the run mode /
+   Hardcore. B with nobody joined → MENU.
    The join press is swallowed (`PlayerInput.swallow()`): it never also readies the player,
    and navigation waits until the stick is neutral. Slots of unplugged pads are pruned
    (`PlayerManager.prune_disconnected()`) when the lobby opens / resets and every frame
    while it is open, so a dead controller can never block the countdown or Back.
-3. **RUN / WAVE n** – `RunState.start_run(count, seed)`, `Arena.create()`,
+3. **RUN / WAVE n** – `RunState.start_run(count, seed, mode, hardcore, environment)` (M6b), `Arena.create(environment,
+   not hardcore)`,
    `WaveDirector.create(arena)`, one `Player.create(slot)` per slot under `arena.entities`
    (`Main._spawn_player` is the single place a slot becomes a hero – the future M9 loadout
    hook), `hud.bind_players(players)`, `wave_timer_changed → hud.set_wave_time`. Every wave:
    players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
-   return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
+   return), `Shrines.begin_wave` (M6b: the running shrines go live), `wave_director.start_wave(n)`
+   (which also rolls the mid-wave event and starts the environment hazards), `arena.camera.snap()`,
+   "Wave n" banner (with the running shrines under it).
    - Waves 10 and 25 are **boss waves** (M6a): `start_wave` makes no timer and, 2 s after a rune on the ground,
      spawns the `Boss`; the wave ends with its death (see "Bosses, boss waves, elite wave 20, hazards, HUD").
    - A player at 0 HP is **downed**: a ghost that moves at full speed
@@ -118,22 +133,25 @@ the new screen never sees the button press that closed the old one.
      (1 s). Everybody downed at once → GAME_OVER (defeat). Solo: downed = defeat.
 4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
-   move) → if n == 25 (Vor'thalax's death, M6a) → GAME_OVER (victory), else **INTERMISSION** (tree paused,
-   `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
-   `Intermission.open(n, RunState.pending_level_ups)`: loot roll → level-up cards (when levels
-   were gained) → market; players ready with START, bots and unplugged
+   move) → if `RunState.is_final_wave(n)` (n == 25 in the normal mode, Vor'thalax's death, M6a; never in the
+   endless mode, where wave 25 shows "Endless begins!") → GAME_OVER (victory), else **INTERMISSION** (tree
+   paused, `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
+   `Main._after_wave_end`: `Shrines.end_wave`, the shrine roll, the portal roll,
+   `Intermission.open(n, RunState.pending_level_ups)`: loot roll → (M6b) shrine vote → level-up cards (when levels
+   were gained) → (M6b) portal vote → [Dungeon] → market; players ready with START, bots and unplugged
    devices auto-ready; after `Intermission.auto_continue_time` – default
    `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
    everyone is ready) → `pending_level_ups = 0` (the cards resolved them) → wave n+1.
 5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
-   `GameOverScreen.open(victory)` (M6a: two pages, Summary and Damage Meter, awards and the run card, see "Damage
-   meter, end screen, run card"; `Main.end_run` records every hero's result first). A / START → **LOBBY with the
-   same players** (ready again); the main menu only through the lobby's Back.
+   `GameOverScreen.open(victory, board)` (M6a: two pages, Summary and Damage Meter, awards and the run card, see "Damage
+   meter, end screen, run card"; M6b: the Leaderboard page, see the M6b chapter; `Main.end_run` records every hero's
+   result and the leaderboard entry first). A / START → **LOBBY with the same players** (ready again); the main menu
+   only through the lobby's Back.
 6. START on any player's device during WAVE / WAVE_END → PauseMenu (`get_tree().paused`).
    The menu ignores navigation until the stick has been neutral once (`PlayerInput.nav_held()`),
    so a stick held during play cannot move the selection. Resume unpauses; "Quit to Menu"
    needs a second press ("Are you sure? Press again") and then ends the run
-   (`RunState.end_run(false)`) and goes to MENU.
+   (`RunState.end_run(false)`; an endless run with a cleared wave goes on the leaderboard as a defeat) and goes to MENU.
    **Disconnects:** `PlayerManager.device_disconnected` during a run → pause + HUD notice;
    a wave never starts while a joined pad is unplugged (`Main.start_wave` pauses at once).
    While any joined pad is unplugged, START / B / Resume do nothing; the PauseMenu offers
@@ -156,7 +174,8 @@ the new screen never sees the button press that closed the old one.
   current level and on `RunState.leveled_up`, current HP rises by the Max HP gained); the
   real reward is the level-up card picked after the wave (M4 sections below).
 - `WeaponRunner` (one per weapon that `attacks()`): cooldown =
-  `CombatMath.weapon_cooldown`; target = nearest living enemy within `attack_range`.
+  `CombatMath.weapon_cooldown` (M6b: the weapon's own `attack_speed_pct` multiplies with Haste, Epic weapons +10%, see
+  "Content" in the M6b chapter); target = nearest living enemy within `attack_range`.
   - `MELEE_ARC`: every enemy within `attack_range + enemy.radius` and inside `arc_degrees`
     of the swing direction is hit.
   - `PROJECTILE`: spawns `Projectile.create(TEAM_PLAYERS, ...)`; `aoe_radius > 0` explodes.
@@ -185,6 +204,10 @@ the new screen never sees the button press that closed the old one.
     down is defeat) and more enemies per head.
   - Bosses (M6a) take their HP from `BossData.max_hp_for(wave, players)` = `hp_at_wave × (1 + coop_hp_per_player
     (n − 1))` (0.75 for both bosses: x1 / x1.75 / x2.5 / x3.25) instead of `coop_hp_mult`; their damage is the usual growth × `party`.
+  - M6b: a running shrine multiplies the HP, damage and speed read in `Enemy.setup` (and the boss HP in `Boss.create`) by
+    `Shrines.enemy_hp_mult()` / `enemy_damage_mult()` / `enemy_speed_mult()`; all read 1.0 outside a running wave. In the
+    endless mode the waves above 25 use the same growth formulas; an environment hazard's damage is the Skeleton Grunt's
+    `contact_damage_at_wave(wave) × coop_damage_mult()` times the hazard's own factor.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -202,6 +225,8 @@ the new screen never sees the button press that closed the old one.
   enemy slides along touching neighbours and pushes itself out of overlaps
   (`EnemyGrid.crowd_velocity`). In the open field (a per-tick shape query confirms the arena
   interior holds no world collider) an enemy moves directly; near walls it uses move_and_slide.
+  The open-field cache (`Enemy._open_*`) is valid for one physics frame **of one arena at one layout size**
+  (`_open_arena_id`, `_open_size`, M6b: the Dungeon room is a second layout of the same arena).
 - The same grid answers `Projectile` sweeps / explosions (`gather_touching`) and
   `WeaponRunner` targets / melee arcs (`nearest`, `gather_around`): queries widen by the
   enemies' possible drift since the build and test live positions, so results equal a full
@@ -225,7 +250,13 @@ the new screen never sees the button press that closed the old one.
   `Vfx.spawn_telegraph` (red rune with a white-hot core, readable without colour) 1 s before
   the group appears.
 - At most `MAX_ENEMIES` alive. When the timer ends: remaining enemies `despawn()` (no loot),
-  pickups `collect_to_bank()`, `wave_cleared` emitted.
+  pickups `collect_to_bank()`, `wave_cleared` emitted. `stop()` also frees the enemy hazards (`enemy_hazards`) and every
+  event object (`EventSpawner.GROUP`), M6b.
+- **M6b:** the **endless** mode has no last wave (`RunState.total_waves()` = 0): `wave_duration(w)` is capped at
+  `MAX_WAVE_DURATION` 210 s, waves 30, 35, ... are boss waves (Morvain / Vor'thalax in turn) and 33, 43, ... elite-rule waves
+  (static predicates, "Modes" in the M6b chapter). Three children of the director run on their own clocks and generators:
+  the `GoblinSpawner`, the `EventSpawner` (a mid-wave event from wave 4, 30%, never on boss / elite-rule waves) and the
+  `EnvironmentHazards` (the run's hazard, only while the wave runs).
 - Waves 10 and 25 are **boss waves** (`RunState.is_boss_wave` and a `BossData` for the wave in `Db.bosses`): the
   timer is replaced by the boss, the wave ends when it dies, the normal spawn runs at half rate (adds), and there
   are no elites and no Loot Goblin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
@@ -239,7 +270,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 
 | Flag | Meaning |
 |---|---|
-| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable. |
+| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable; a Dungeon Warden is killed 60 s past its enrage (M6b). A smoke run with an unknown argument or an invalid value reports the result `bad_args` (the arguments in `unknown_args`) and exits 1 (M6b). |
 | `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
 | `--classes=a,b,...` | Bot classes in join order (cycled; unknown ids warn and are skipped), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
@@ -256,6 +287,14 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--artifact-chance=X` | M6a test hook: replaces the chance of every Artifact roll (`LootDrops.artifact_chance_override`, 0..1; 0 = never, default off; from wave 10 and the class rule still apply). |
 | `--end-page=NAME` | M6a dev: the page `--view=game_over` / `victory` opens on, `summary` or `meter`. |
 | `--save-card` | M6a dev: saves the run card (needs a display) as soon as the end view is forced; prints `CARD <path>`. |
+| `--mode=normal\|endless` | M6b: the run mode (`RunState.mode`; the lobby's mode select overrides it for human runs). Endless: no last wave, 26+ with bosses every 5th wave from 30. |
+| `--hardcore[=0\|1]` | M6b: a hardcore run (`RunState.hardcore`: no Spirit Healer, `HardcoreBadge`). |
+| `--env=ID` | M6b: forces the arena environment (`forest_ruin`, `cemetery`, `swamp`, `volcano`, `ice_cave`) instead of the seed-derived roll. Smoke runs roll too (seed 5 -> Ice Cave). |
+| `--event=ID` | M6b debug hook: every eligible wave gets that mid-wave event (`guarded_chest`, `defend_totem`, `goblin_caravan` or `chest`, `totem`, `caravan`; `RunState.event_override`). |
+| `--shrine-chance=X` | M6b debug hook: the chance of a shrine at every break (0..1; `RunState.shrine_chance_override`; default 5%). |
+| `--dungeon[=1]` | M6b debug hook: the dungeon portal opens after the next wave once (`RunState.dungeon_forced`; `--dungeon=0` = off). |
+| `--leaderboard=PATH` | M6b dev / test hook: the leaderboard file (`Leaderboard.path_override`; `user://x.json` or a path). Unlike the player's own file, a smoke / demo / `--view` run writes it. |
+| `--end-page=summary\|meter\|leaderboard`, `--view=roll` | M6b: the end screen's Leaderboard page; `--view=roll` opens the "Rolling the arena..." screen over the lobby. |
 
 `SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `first_wave`,
 `last_wave`, `players`, `seed`, `kills`, `gold`,
@@ -272,7 +311,10 @@ adds `elites_spawned`, `elites_killed`, `goblins_spawned`, `goblins_killed`, `go
 over the heroes), `talent_resets`, `set_bonuses` (Σ `SetBonuses.active_count`) and
 `gold_spent` (every `RunState.try_spend_for`). M6a adds `bosses_killed`, `artifacts_dropped`,
 `consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time` and `meter`
-(per slot) (see the M6a chapter). Each cleared wave also prints a
+(per slot) (see the M6a chapter). M6b adds `mode`, `hardcore`, `environment`, `events_spawned`, `events_completed`,
+`shrines_offered`, `shrines_accepted`, `dungeons_entered`, `dungeons_completed`, `dungeons_failed`,
+`dungeon_rooms_cleared`, `dungeon_time`, `hazards` and (only with a bad command line) `unknown_args` (see the M6b chapter).
+Each cleared wave also prints a
 `SMOKE wave n cleared ...` line (M5: `elites killed/spawned, goblin spawned/killed/escaped`),
 and each closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1
 (R bot rerolls so far)`.
@@ -282,7 +324,9 @@ crowded), avoid walls, stay near the team and run to downed teammates within
 and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
 a living teammate instead. A Loot Goblin is never a threat to them; they chase it when nothing
 else is close (M5, "Loot Goblin"). M6a: they sidestep the Flesh Golem's hook, leave boss hazards and poison
-puddles (`BotInput._hazard_steer`) and prioritise the Cultist Acolyte. Between waves bots equip, forge, buy,
+puddles (`BotInput._hazard_steer`; M6b: the environment hazards too) and prioritise the Cultist Acolyte. M6b: they open
+the Guarded Chest, guard the Defend-the-Totem totem, chase the Goblin Caravan's cart (`BotInput._event_steer`) and vote
+on shrines (`ShrineData.bot_accepts`) and the Dungeon portal (`PortalScreen.bot_accepts`). Between waves bots equip, forge, buy,
 train, spend talent points and reroll (M2, M4, M5 sections), and from M6a also enchant, buy consumables and the
 Black Market (M6a chapter).
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
@@ -291,7 +335,8 @@ Black Market (M6a chapter).
 counts `WAVE_END_DELAY` in physics ticks. With the engine flag `--fixed-fps 60` the same
 `--seed` reproduces a smoke run exactly (same kills, gold, downs); without it the camera
 (updated per rendered frame) can shift the on-screen spawn-point preference slightly. M5's
-draw points are listed under "Determinism" in the M5 section.
+draw points are listed under "Determinism" in the M5 section, M6a's under "Determinism (M6a draw points)" and M6b's
+under "Determinism and the seed-5 smoke" (the default run now rolls its environment: `--seed=5` plays the Ice Cave).
 
 Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission,game_over}.png`
 (`--view=lobby --players=3`, `--demo --seed=5 --start-wave=4 --shot-time=12`,
@@ -473,6 +518,10 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
 - `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
   3D scene show through the dark vignette backdrop.
+- M6b UI additions (details in the M6b chapter): the lobby's mode select (Y / X) and the `HardcoreBadge`, the
+  `EnvironmentRollScreen` between the lobby and the run, the shrine and portal votes as Intermission phases
+  (`scenes/ui/shrine/`, `scenes/ui/dungeon/`), the shrine icons and the Dungeon line on the HUD, the event name tags
+  (`EventTag`), and the end screen's mode row, "Best:" line and Leaderboard page (`LeaderboardPage`).
 - M6a UI additions (details in the M6a chapter): the HUD plaque shows a boss frame instead of the timer on boss
   waves, `UnitFrame` the active consumables; the market has the consumables row, the Black Market card and the
   Enchanter tab (`PlayerPanel` tab 4); the loot roll's B button reads Disenchant / Pass (all pass: Dust); the
@@ -1674,7 +1723,7 @@ scenes/ui/        meter_page.gd, meter_bar.gd, run_card_view.gd; enchanter/ (Enc
   the wave and party multipliers) are the first values. The final 25-wave balance is done once, at the end of M6b
   (GDD 9, "Nyitott kérdések M6b-re"; GDD 16). The known pressure points are listed in "Open items for the M6b
   balance" below.
-- Out of scope: M6b (modes, environments, events, the Dungeon portal, content packs, the final balance), GDD 16.
+- Out of scope there: M6b (modes, environments, events, the Dungeon portal, content packs: the next chapter) and the final balance, GDD 16.
 
 ### Foundation hooks
 
@@ -1980,8 +2029,9 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   while a boss lives `defeat with boss <name> alive after S s: P% HP left (phase, enrage level), N
   downs so far` (`Main.boss_arrival_text`, `Main.boss_standing_text`); positions are formatted by
   `Main.format_position` ("(x, y, z)", one decimal, also for the player / boss lines of the screenshot
-  harness, no `-8.400001` noise). Victory is unchanged: `wave >= TOTAL_WAVES` after the
-  wave-cleared pause, which now means Vor'thalax's death.
+  harness, no `-8.400001` noise). Victory was `wave >= TOTAL_WAVES` after the wave-cleared pause, which meant
+  Vor'thalax's death; since M6b it is `RunState.is_final_wave(wave)` (never true in the endless mode, where
+  `RunState.begins_endless` shows "Endless begins!" instead).
 - `CameraRig.boss_points(bosses)`: a living `Boss` (group `bosses`) adds two soft framing points
   (feet, and 0.6 × its model height up the screen) next to the Loot Goblins' (without it the boss sat
   off-screen / under the HUD plaque); the heroes keep priority like they do over the goblins.
@@ -2465,6 +2515,8 @@ describe each side).
 9. **Determinism.** See "Determinism (M6a draw points)" below.
 
 ### Open items for the M6b balance
+
+(M6b added more items to this list: see "Open items for the final balance (M6b)" at the end of the M6b chapter.)
 
 The M6a content made the game harder than M5, and its numbers were **not** re-tuned: a balance round would be
 redone by the M6b content (item packs, modes, events) anyway, so the 25-wave balance is done once, at the end of M6b
