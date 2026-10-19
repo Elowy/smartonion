@@ -44,6 +44,9 @@ static var hp_mult := 1.0
 ## Extra max HP per additional player (GDD 9: x(1 + 0.75 (n - 1)), the boss's own co-op factor
 ## instead of the normal +20% per player).
 @export var coop_hp_per_player := 0.75
+## Extra max HP that grows with the party faster than linearly (a party's damage grows faster than its
+## size): the factor is 1 + coop_hp_per_player (n - 1) + coop_hp_convex (n - 1)(n - 2) / 2.
+@export var coop_hp_convex := 0.0
 
 @export_group("Enrage")
 ## Seconds after its arrival until it enrages (GDD 8: 90).
@@ -90,9 +93,11 @@ static func endless_boss(wave: int) -> BossData:
 
 
 ## Max HP at [param wave] for [param players] heroes: base x the wave's usual HP growth x
-## (1 + [member coop_hp_per_player] (players - 1)) x [member hp_mult] (--boss-hp), at least 1.
+## (1 + [member coop_hp_per_player] (players - 1) + [member coop_hp_convex] (players - 1)(players - 2) / 2)
+## x [member hp_mult] (--boss-hp), at least 1.
 func max_hp_for(wave: int, players: int) -> float:
-	var party := 1.0 + coop_hp_per_player * float(maxi(1, players) - 1)
+	var extra := float(maxi(1, players) - 1)
+	var party := 1.0 + coop_hp_per_player * extra + coop_hp_convex * extra * (extra - 1.0) * 0.5
 	return maxf(1.0, hp_at_wave(wave) * party * hp_mult)
 
 

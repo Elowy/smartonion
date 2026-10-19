@@ -155,6 +155,15 @@ static func boss_damage_dict() -> Dictionary:
 	return out
 
 
+## {slot index as String: ratio} – the SMOKE_RESULT "shield_peak" entry: the highest total absorb shield each
+## hero carried, as a multiple of its Max HP (RunState.shield_peak_by_player), rounded to 0.01.
+static func shield_peak_dict() -> Dictionary:
+	var out := {}
+	for slot_index in RunState.shield_peak_by_player:
+		out[str(slot_index)] = snappedf(float(RunState.shield_peak_by_player[slot_index]), 0.01)
+	return out
+
+
 # --- Pure model -------------------------------------------------------------------------------
 
 ## Fills in the derived fields of [param run] (the run totals: victory, waves_cleared,

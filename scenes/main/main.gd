@@ -1291,7 +1291,8 @@ func _finish_smoke(result: String) -> void:
 ## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
 ## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict),
 ## taken_by_source ({source id: {wave: damage taken}}, RunSummary.source_damage_dict), boss_damage
-## ({slot index: damage dealt to bosses}, RunSummary.boss_damage_dict). M6b keys:
+## ({slot index: damage dealt to bosses}, RunSummary.boss_damage_dict), shield_peak ({slot index: the highest total
+## absorb shield as a multiple of Max HP}, RunSummary.shield_peak_dict). M6b keys:
 ## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
 ## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
 ## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
@@ -1367,6 +1368,7 @@ func smoke_result(result: String) -> Dictionary:
 		"meter": RunSummary.meter_dict(),
 		"taken_by_source": RunSummary.source_damage_dict(),
 		"boss_damage": RunSummary.boss_damage_dict(),
+		"shield_peak": RunSummary.shield_peak_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
 		"seed": options.run_seed(),

@@ -50,12 +50,14 @@ enum Room { CLEAR, SURVIVE, DEFEND, WARDEN }
 ## The waves after which the portal opens (normal, endless and hardcore runs).
 const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
 ## Final balance: the dungeon's enemies, its brazier and the Warden are scaled to the cleared wave PLUS this
-## many waves ([method strength_wave]). The portal waves are the party's most comfortable stretch (the bots
-## went through waves 6-15 almost without a down), so at the cleared wave's own strength not one of the 55
-## dungeons of the baseline runs was lost. Measured with 16-wave bot runs (4 portals each): at +4 the full
-## parties cleared 22 of 22, duos 15 of 16, solo heroes 9 of 17; at +8 4 players 10 of 20, duos 4 of 16, solo
-## 3 of 17. +6 is between them (the target: about 50-80% for four players, fewer for a lone hero).
-const STRENGTH_BONUS := 6
+## many waves for a party of 1, 2, 3, 4 heroes ([method strength_wave]). The portal waves are the party's most
+## comfortable stretch (the bots went through waves 6-15 almost without a down), so at the cleared wave's own
+## strength not one of the 55 dungeons of the baseline runs was lost. Measured with 16-wave bot runs (4 portals
+## each): at +4 the full parties cleared 22 of 22, duos 15 of 16, solo heroes 9 of 17; at +6 duos 10 of 16 and
+## a lone hero 1 of 18 (a lone hero cannot be revived and the dungeon rewards are a large part of its power: the
+## solo runs without them died on waves 10-21); at +8 4 players 10 of 20, duos 4 of 16, solo 3 of 17. The target
+## is about 50-80% for four players and fewer for a lone hero.
+const STRENGTH_BONUS_BY_PLAYERS: Array[int] = [3, 6, 6, 6]
 const ROOM_COUNT := 4
 const ROOM_NAMES: Array[String] = ["Clear", "Survive", "Defend", "Warden"]
 const WARDEN_ID := &"dungeon_warden"
@@ -190,9 +192,11 @@ static func is_portal_wave(p_wave: int) -> bool:
 
 
 ## The wave whose growth the dungeon's enemies, brazier and Warden use after the cleared wave [param p_wave]
-## (see STRENGTH_BONUS). Which enemy types appear still follows the cleared wave itself.
-static func strength_wave(p_wave: int) -> int:
-	return maxi(1, p_wave) + STRENGTH_BONUS
+## for [param players] heroes (-1 = the run's party; see STRENGTH_BONUS_BY_PLAYERS). Which enemy types
+## appear still follows the cleared wave itself.
+static func strength_wave(p_wave: int, players: int = -1) -> int:
+	var n := RunState.player_count if players < 0 else players
+	return maxi(1, p_wave) + STRENGTH_BONUS_BY_PLAYERS[clampi(n, 1, STRENGTH_BONUS_BY_PLAYERS.size()) - 1]
 
 
 ## The Skeleton Grunt-based HP of the brazier at [param p_wave] (see BRAZIER_GRUNTS).

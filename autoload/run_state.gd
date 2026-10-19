@@ -76,9 +76,10 @@ const TALENT_START_LEVEL := 10
 ## Enemy damage multiplier by party size (index = players - 1; [method coop_damage_mult],
 ## GDD 9). Smaller parties take softer hits: the fewer heroes, the fewer can revive a downed
 ## one (alone, the first down ends the run) and the more enemies each faces (the +60% count
-## per extra player is less than one more share). About x1.3 per extra player; even a full
-## party stays below the plain EnemyData curve.
-const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.75, 0.95]
+## per extra player is less than one more share). About x1.3 per extra player. Final balance: the
+## full party went from 0.95 to 1.15 (and a trio from 0.75 to 0.85) after the Flesh Golem was softened
+## (the bots' first downs moved from wave ~11 to wave ~20 and six of six full parties cleared).
+const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.85, 1.15]
 
 var active := false
 var victory := false
@@ -188,6 +189,9 @@ var damage_taken_by_source: Dictionary = {}
 ## Balance diagnostics: the part of [member damage_by_player] that hit a boss (Morvain, Vor'thalax, the
 ## Dungeon Warden), SMOKE_RESULT "boss_damage": it shows which class can hurt a boss at all.
 var boss_damage_by_player: Dictionary[int, float] = {}
+## Balance diagnostics: the highest total absorb shield a hero ever carried, as a multiple of its Max HP
+## (SMOKE_RESULT "shield_peak"): it shows whether the shield sources stack out of hand.
+var shield_peak_by_player: Dictionary[int, float] = {}
 ## Revives a player took part in (teammate channel, Word of Glory).
 var revives_by_player: Dictionary[int, int] = {}
 ## Times a player went down.
@@ -330,6 +334,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	damage_taken_by_player.clear()
 	damage_taken_by_source.clear()
 	boss_damage_by_player.clear()
+	shield_peak_by_player.clear()
 	revives_by_player.clear()
 	downs_by_player.clear()
 	bosses_by_player.clear()
@@ -756,6 +761,12 @@ func record_kill(player_index: int) -> void:
 	kills += 1
 	if player_index >= 0:
 		kills_by_player[player_index] = kills_by_player.get(player_index, 0) + 1
+
+
+## The total shield of slot [param player_index] reached [param ratio] x its Max HP (keeps the highest).
+func record_shield_peak(player_index: int, ratio: float) -> void:
+	if player_index >= 0 and ratio > shield_peak_by_player.get(player_index, 0.0):
+		shield_peak_by_player[player_index] = ratio
 
 
 ## [param amount] damage slot [param player_index] dealt; [param on_boss] = the target was a boss (also
