@@ -14,6 +14,12 @@ func run() -> void:
 			await _live()
 		"onions":
 			await _onions()
+		"equip":
+			await _equip()
+		"sets":
+			await _sets()
+		"equip_game":
+			await _equip_game()
 		"enemies":
 			await _enemies()
 		"weapons":
@@ -172,6 +178,109 @@ func _onions() -> void:
 			"attack": m.play_attack(false)
 	_close_camera(stage, Vector3(0, 0.6, 0), 9.0, 22.0)
 	await _frames(4 if state == "attack" else 20)
+
+
+## Worn armour (GDD 13): armour types x material tiers (--axis=tier, default) or rarities of one
+## armour type (--axis=rarity --armor=0..3 --tier=0..2). --rarity=N sets the rarity of the grid,
+## --back=1 turns the heroes away, --state=hurt|downed.
+func _equip() -> void:
+	var stage := _studio()
+	var axis := _arg("axis", "tier")
+	var rarity := int(_arg("rarity", "2"))
+	var back := _arg("back", "0") == "1"
+	var armors: Array[int] = [ClassData.ArmorType.CLOTH, ClassData.ArmorType.LEATHER, ClassData.ArmorType.MAIL,
+		ClassData.ArmorType.PLATE]
+	var class_ids: Array[StringName] = [&"mage", &"rogue", &"warrior", &"paladin"]
+	var rows := armors.size()
+	var cols := 3
+	if axis == "rarity" or _arg("armor", "") != "":
+		var armor := int(_arg("armor", "3"))
+		var default_class: StringName = class_ids[armor]
+		rows = 1
+		cols = 5 if axis == "rarity" else 3
+		armors = [armor]
+		class_ids = [StringName(_arg("class", String(default_class)))]
+	var only_tier := int(_arg("tier", "-1"))
+	if axis != "rarity" and only_tier >= 0:
+		cols = 1
+	for r in rows:
+		for c in cols:
+			var tier := (c if only_tier < 0 else only_tier) if axis != "rarity" else int(_arg("tier", "2"))
+			var rar := rarity if axis != "rarity" else c
+			var cd := Db.get_class_data(class_ids[r])
+			var m := OnionModel.new()
+			stage.add_child(m)
+			m.setup(cd, PlayerManager.PLAYER_COLORS[(r * cols + c) % PlayerManager.PLAYER_COLORS.size()])
+			m.set_weapons(cd.main_hand, cd.off_hand)
+			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, armors[r], tier, rar),
+				EquipLook.make(EquipLook.Slot.SHOULDERS, armors[r], tier, rar),
+				EquipLook.make(EquipLook.Slot.CHEST, armors[r], tier, rar))
+			m.position = Vector3((c - (cols - 1) * 0.5) * 1.7, 0, (r - (rows - 1) * 0.5) * 1.9)
+			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
+			match _arg("state", ""):
+				"hurt": m.set_hp_ratio(0.15)
+				"downed":
+					m.set_downed(true)
+					m.set_revive_progress(0.6)
+	_close_camera(stage, Vector3(0, 0.6, 0), 8.0 + rows * 3.0, 40.0 if rows > 1 else 22.0)
+	await _frames(20)
+
+
+## The five class tier sets worn complete on their classes, next to the starter look (--back=1).
+func _sets() -> void:
+	var stage := _studio()
+	var ids: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+	var back := _arg("back", "0") == "1"
+	var rarity := int(_arg("rarity", "3"))
+	for r in 2:
+		for i in ids.size():
+			var cd := Db.get_class_data(ids[i])
+			var m := OnionModel.new()
+			stage.add_child(m)
+			m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+			m.set_weapons(cd.main_hand, cd.off_hand)
+			if r == 0:
+				var set_data := Db.set_for_class(ids[i])
+				var sid: StringName = set_data.id if set_data != null else &""
+				m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, cd.armor_type, 1, rarity, sid),
+					EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, 1, rarity, sid),
+					EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, 1, rarity, sid))
+			m.position = Vector3((i - (ids.size() - 1) * 0.5) * 1.7, 0, (r - 0.5) * 2.1)
+			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
+	_close_camera(stage, Vector3(0, 0.6, 0), 12.0, 38.0)
+	await _frames(20)
+
+
+## The gameplay camera (CameraRig) on a few geared heroes: how the armour reads in play.
+## --facing=north|south, --tier=0..2, --rarity=N.
+func _equip_game() -> void:
+	var arena := Arena.create()
+	add_child(arena)
+	var tier := int(_arg("tier", "1"))
+	var rarity := int(_arg("rarity", "3"))
+	var north := _arg("facing", "south") == "north"
+	var ids: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+	var spots: Array[Vector3] = [Vector3(-2.6, 0, 0.6), Vector3(-1.3, 0, -0.6), Vector3(0, 0, 0.7), Vector3(1.3, 0, -0.6),
+		Vector3(2.6, 0, 0.6)]
+	for i in ids.size():
+		var cd := Db.get_class_data(ids[i])
+		var holder := Node3D.new()
+		holder.add_to_group(&"players")
+		arena.entities.add_child(holder)
+		holder.position = spots[i]
+		var m := OnionModel.new()
+		holder.add_child(m)
+		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		m.set_tag("P%d" % (i + 1))
+		m.set_weapons(cd.main_hand, cd.off_hand)
+		if _arg("starter", "0") != "1":
+			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, cd.armor_type, tier, rarity),
+				EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, tier, rarity),
+				EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, tier, rarity))
+		m.set_facing(Vector3(0, 0, -1) if north else Vector3(0.3, 0, 1))
+		m.set_moving(0.0)
+	arena.camera.snap()
+	await _frames(30)
 
 
 func _enemies() -> void:
