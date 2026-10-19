@@ -184,10 +184,26 @@ func test_the_plan_numbers() -> void:
 
 func test_bots_vote_by_the_data() -> void:
 	for id in [&"greed", &"haste", &"learning", &"blood"]:
-		check(Shrines.bot_accepts(_shrine(id)), "bots accept %s" % id)
+		check(Shrines.bot_accepts(_shrine(id), 2), "a party of bots accepts %s" % id)
+		check(Shrines.bot_accepts(_shrine(id), 4), "(four of them too: %s)" % id)
 	for id in [&"fortune", &"gambler"]:
-		check(not Shrines.bot_accepts(_shrine(id)), "bots decline %s" % id)
+		check(not Shrines.bot_accepts(_shrine(id), 4), "bots decline %s" % id)
+		check(not Shrines.bot_accepts(_shrine(id), 1), "(a lone bot too: %s)" % id)
 	check(not Shrines.bot_accepts(null), "nothing to accept")
+	check(not Shrines.bot_accepts(null, 1), "nothing to accept, alone")
+
+
+## Final balance 2: a lone bot cannot be revived, so it declines every shrine whose bane raises the enemies' damage / HP
+## / speed or lowers its own HP (the 1p warrior of seed 21 died on wave 5 to the Greed shrine it accepted).
+func test_a_lone_bot_declines_the_shrines_with_a_hard_bane() -> void:
+	for id in [&"greed", &"haste", &"learning", &"blood"]:
+		check(not _shrine(id).bot_accepts_solo, "%s: not for a lone hero" % id)
+		check(not Shrines.bot_accepts(_shrine(id), 1), "a lone bot declines %s" % id)
+	RunState.start_run(1, 5)
+	check(not Shrines.bot_accepts(_shrine(&"greed")), "the run's own party size (one hero) by default")
+	RunState.start_run(2, 5)
+	check(Shrines.bot_accepts(_shrine(&"greed")), "a duo of bots accepts it")
+	check(ShrineData.new().bot_accepts_solo, "a new shrine is open to a lone hero unless its data says otherwise")
 
 
 func test_card_texts_come_from_the_numbers() -> void:
@@ -955,12 +971,31 @@ func test_nothing_to_vote_on_does_not_open() -> void:
 
 func test_a_slot_without_a_hero_does_not_vote() -> void:
 	_bot("bot:a", &"warrior")
+	_bot("bot:b", &"mage")
 	PlayerManager.join(UiFakes.HumanInput.new("pad:x"), Db.get_class_data(&"rogue"))
 	_screen()
 	screen.open(_shrine(&"greed"), PlayerManager.get_slots())
-	check_eq(screen.voters.size(), 1, "only the hero")
+	check_eq(screen.voters.size(), 2, "only the heroes")
 	_step()
 	check(screen.vote.is_accepted(), "the heroless slot does not block")
+
+
+## Final balance 2: a lone bot declines the timed shrines (their banes make the enemies hit harder / last longer or
+## the hero frailer, and a lone hero cannot be revived); with a second hero in the party the same bot accepts.
+func test_a_lone_bot_declines_greed_and_a_pair_of_bots_accepts_it() -> void:
+	_bot("bot:a", &"warrior")
+	_screen()
+	screen.open(_shrine(&"greed"), PlayerManager.get_slots())
+	_step()
+	check(screen.vote.is_decided() and not screen.vote.is_accepted(), "alone: Greed declined")
+	check_eq(screen.vote.reason, &"declined", "reported as declined")
+	var second := ShrineScreen.create()
+	tree.root.add_child(second)
+	nodes.append(second)
+	_bot("bot:b", &"mage")
+	second.open(_shrine(&"greed"), PlayerManager.get_slots())
+	second.update(DT)
+	check(second.vote.is_accepted(), "two heroes: Greed accepted")
 
 
 func test_a_human_votes_with_a_and_waits_for_the_lockout() -> void:
@@ -1044,6 +1079,8 @@ func test_the_clock_declines_the_undecided() -> void:
 func test_an_unplugged_pad_votes_like_a_bot() -> void:
 	var a := _human("pad:a")
 	a.connected = false
+	var b0 := _human("pad:b0", &"rogue")
+	b0.connected = false
 	_screen()
 	screen.open(_shrine(&"greed"), PlayerManager.get_slots())
 	_step()
@@ -1249,6 +1286,7 @@ func test_the_shrine_comes_after_the_loot_roll() -> void:
 
 func test_an_accepted_shrine_takes_effect_and_is_reported() -> void:
 	_bot("bot:a", &"warrior")
+	_bot("bot:b", &"mage")
 	_make_intermission()
 	RunState.pending_shrine = &"learning"
 	intermission.open(5, 0)
@@ -1366,7 +1404,7 @@ func test_the_break_rolls_a_shrine_and_the_bots_vote_on_it() -> void:
 			slot.input.poll(0.1)
 		main.intermission._process(0.1)
 	check_eq(main.intermission.phase, Intermission.Phase.MARKET, "decided by the bots, then the market")
-	var bots_accept := Shrines.bot_accepts(Db.get_shrine(id))
+	var bots_accept := Shrines.bot_accepts(Db.get_shrine(id), 2)
 	check_eq(RunState.shrines_accepted, 1 if bots_accept else 0, "accepted exactly when the bots' rule says so")
 	check_eq(RunState.has_shrine_effect(id), bots_accept and Db.get_shrine(id).is_timed(), "a timed shrine runs")
 

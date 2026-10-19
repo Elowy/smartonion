@@ -71,9 +71,15 @@ static func roll() -> StringName:
 	return choices[RunState.shrine_rng.randi_range(0, choices.size() - 1)].id
 
 
-## What a bot votes: Accept for the shrines the data marks ([member ShrineData.bot_accepts]).
-static func bot_accepts(data: ShrineData) -> bool:
-	return data != null and data.bot_accepts
+## What a bot votes: Accept for the shrines the data marks ([member ShrineData.bot_accepts]); a lone hero ([param
+## players] 1, -1 = the run's party) only for those marked [member ShrineData.bot_accepts_solo] as well (the timed
+## shrines all raise the enemies' damage / HP / speed or lower the hero's HP, which a hero that cannot be revived
+## does not take on: the 1p warrior of seed 21 died on wave 5 to a Greed shrine).
+static func bot_accepts(data: ShrineData, players: int = -1) -> bool:
+	if data == null or not data.bot_accepts:
+		return false
+	var n := RunState.player_count if players < 0 else players
+	return n > 1 or data.bot_accepts_solo
 
 
 # --- Texts -------------------------------------------------------------------------------------
