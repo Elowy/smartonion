@@ -576,6 +576,10 @@ func apply_equipment() -> void:
 	var off := equipment.off_weapon()
 	if main != main_hand or off != off_hand:
 		equip_weapons(main, off)
+	if model != null:
+		# Worn Head / Shoulders / Chest show on the onion (the model rebuilds only on a change).
+		model.set_equipment(equipment.get_item(Items.EquipSlot.HEAD), equipment.get_item(Items.EquipSlot.SHOULDERS),
+			equipment.get_item(Items.EquipSlot.CHEST))
 	var procs_refreshed := false
 	if bonuses != null:
 		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))

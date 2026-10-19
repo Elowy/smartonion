@@ -10,7 +10,8 @@ extends Resource
 ## ClassData.ArmorType, or Items.NO_ARMOR for neck / ring / trinket.
 @export var armor_type: int = Items.NO_ARMOR
 @export var weight: float = 1.0
-## Visual piece for the onion model (head / shoulders / chest pieces; M7).
+## Visual piece for the onion model (head / shoulders / chest pieces): the silhouette family id of
+## EquipLook.family_of(slot, armour type), e.g. "plate_helm"; a test keeps the two in sync (M7b).
 @export var look: StringName
 ## First wave this base can be generated at (GDD 5.4 / 5.8, M6b). Armour bases of one slot x armour
 ## type are material tiers of each other: min_wave 1 (tier I, the original 32 bases), 9 (tier II)
