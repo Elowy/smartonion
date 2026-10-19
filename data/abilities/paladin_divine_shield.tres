@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"divine_shield"
-display_name = "Divine Shield"
+display_name = "Gilded Halo"
 description = "A golden bubble makes you immune to all damage for {duration} sec."
 class_id = &"paladin"
 school = &"holy"

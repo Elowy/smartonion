@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"blizzard"
-display_name = "Blizzard"
+display_name = "Hailstorm"
 description = "Calls down hail on the densest group of enemies for {duration} sec, dealing Frost damage every {tick} sec and slowing them by {slow}%."
 class_id = &"mage"
 school = &"frost"

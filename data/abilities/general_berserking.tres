@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"berserking"
-display_name = "Berserking"
+display_name = "Savage Haste"
 description = "Go berserk: +{haste}% Haste for {duration} sec."
 class_id = &""
 school = &"physical"
@@ -39,12 +39,12 @@ specs = Array[Dictionary]([{
 "kill_extend_add": 0.5
 },
 "name": "Feeding Frenzy",
-"text": "Every kill while berserking adds 0.5 sec (up to 6 sec)."
+"text": "Every kill while Savage Haste lasts adds 0.5 sec (up to 6 sec)."
 }, {
 "mods": {
 "damage_taken_add": 15.0,
 "haste_add": 25.0
 },
 "name": "Reckless Fury",
-"text": "+25% more Haste, but you take 15% more damage while berserking."
+"text": "+25% more Haste, but you take 15% more damage while Savage Haste lasts."
 }])

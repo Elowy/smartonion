@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"seed_of_corruption"
-display_name = "Seed of Corruption"
+display_name = "Blight Seed"
 description = "Plants a seed in an enemy of the densest group. When the host dies, or after {duration} sec, it bursts for Shadow damage within {radius} m."
 class_id = &"warlock"
 school = &"shadow"

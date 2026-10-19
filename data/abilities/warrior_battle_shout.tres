@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"battle_shout"
-display_name = "Battle Shout"
+display_name = "Battle Roar"
 description = "You and allies within {radius} m deal {bonus}% more damage for {duration} sec."
 class_id = &"warrior"
 school = &"physical"
@@ -37,12 +37,12 @@ specs = Array[Dictionary]([{
 "mods": {
 "guard_add": 15.0
 },
-"name": "Commanding Shout",
+"name": "Commanding Roar",
 "text": "Buffed allies also take 15% less damage."
 }, {
 "mods": {
 "fear_add": 2.0
 },
-"name": "Intimidating Shout",
+"name": "Dread Roar",
 "text": "Enemies within 6 m flee in fear for 2 sec."
 }])

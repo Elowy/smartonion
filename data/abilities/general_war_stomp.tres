@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"war_stomp"
-display_name = "War Stomp"
+display_name = "Crowd Stomp"
 description = "When enemies crowd you, stomp the ground: enemies within {radius} m take {damage_pct}% weapon damage and are stunned for {stun} sec."
 class_id = &""
 school = &"physical"

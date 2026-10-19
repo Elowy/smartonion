@@ -6,8 +6,8 @@
 [resource]
 script = ExtResource("1_script")
 id = &"arcane_missiles"
-display_name = "Arcane Missiles"
-description = "Launches {missiles} arcane missiles at random enemies within range, each dealing Arcane damage (scales with Intellect and Spell Power)."
+display_name = "Arcane Darts"
+description = "Launches {missiles} arcane darts at random enemies within range, each dealing Arcane damage (scales with Intellect and Spell Power)."
 class_id = &"mage"
 school = &"arcane"
 tags = Array[StringName]([&"projectile", &"spell"])
@@ -41,12 +41,12 @@ specs = Array[Dictionary]([{
 "mods": {
 "splash_radius_add": 1.5
 },
-"name": "Arcane Barrage",
+"name": "Burst Darts",
 "text": "Each missile bursts on impact: enemies within 1.5 m take 50% of its damage."
 }, {
 "mods": {
 "focus": true
 },
-"name": "Focused Missiles",
+"name": "Focused Darts",
 "text": "Every missile seeks the toughest enemy in range and deals 40% more damage."
 }])

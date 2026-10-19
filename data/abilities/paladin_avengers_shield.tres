@@ -6,8 +6,8 @@
 [resource]
 script = ExtResource("1_script")
 id = &"avengers_shield"
-display_name = "Avenger's Shield"
-description = "Hurls a holy shield that bounces between {targets} enemies, dealing {damage_pct}% weapon damage as Holy damage (+Spell Power) to each."
+display_name = "Ricochet Shield"
+description = "Hurls a glowing shield that bounces between {targets} enemies, dealing {damage_pct}% weapon damage as Holy damage (+Spell Power) to each."
 class_id = &"paladin"
 school = &"holy"
 tags = Array[StringName]([&"projectile", &"weapon"])

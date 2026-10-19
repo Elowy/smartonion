@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"cheat_death"
-display_name = "Cheat Death"
+display_name = "Narrow Escape"
 description = "Passive: a killing blow leaves you at 1 health instead. You become invulnerable for {invulnerable} sec and recover {heal_max_hp_pct}% of your max health. Once every {cooldown} sec."
 class_id = &"rogue"
 school = &"shadow"

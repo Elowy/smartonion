@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"drain_life"
-display_name = "Drain Life"
+display_name = "Vital Siphon"
 description = "Drains the nearest enemy for {duration} sec, healing you for {heal_pct}% of the Shadow damage. You keep moving; the drain jumps on when the target dies."
 class_id = &"warlock"
 school = &"shadow"
@@ -40,4 +40,4 @@ kind = 0
 card_weight = 1.0
 rank3 = {"duration_add": 1.0}
 rank3_text = "+1 sec channel"
-specs = Array[Dictionary]([{"name": "Soul Siphon", "text": "Drains up to 3 enemies at once.", "mods": {"targets": 3}}, {"name": "Dark Bargain", "text": "Healing beyond full health becomes an absorb shield (up to 50% of your Max HP, 6 sec).", "mods": {"overheal_shield": 50.0}}])
+specs = Array[Dictionary]([{"name": "Threefold Drain", "text": "Drains up to 3 enemies at once.", "mods": {"targets": 3}}, {"name": "Dark Bargain", "text": "Healing beyond full health becomes an absorb shield (up to 50% of your Max HP, 6 sec).", "mods": {"overheal_shield": 50.0}}])
