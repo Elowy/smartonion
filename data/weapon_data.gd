@@ -12,7 +12,7 @@ enum AttackKind { MELEE_ARC, PROJECTILE, NONE }
 @export var id: StringName
 @export var display_name: String
 @export_multiline var description: String
-## sword, axe, mace, dagger, bow, gun, wand, staff, shield, tome
+## sword, axe, mace, dagger, bow, gun, wand, staff, shield, tome; M6b: two_hand_sword, two_hand_mace, orb
 @export var weapon_type: StringName
 @export var hand: Hand = Hand.ONE_HAND
 @export var attack_kind: AttackKind = AttackKind.MELEE_ARC
