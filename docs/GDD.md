@@ -395,7 +395,7 @@ talent (*Ancestral Spirit*) a felélesztést is felgyorsítja.
 
 ---
 
-## 4. Fegyverek (MVP: 10 db; M6b: +3)
+## 4. Fegyverek (13 db: az MVP 10 + az M6b 3)
 
 Slotok: **Main Hand**, **Off Hand**. Kétkezes (2H) fegyver mindkettőt elfoglalja.
 Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkettő támad.
@@ -416,18 +416,30 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 - A fegyverek is **ritkaságot** kapnak (lásd 5.2): magasabb ritkaság = nagyobb alapsebzés + bónusz stat.
 - A bolt minden játékosnak **csak olyan fegyvert kínál, amit a kasztja használhat**.
 
-**M6b: három új fegyver** (a Crossbow, a Polearm és a Fist Weapon az M8-cal jön, 3.7):
+**M6b: három új fegyver** (kész; a Crossbow, a Polearm és a Fist Weapon az M8-cal jön, 3.7):
 
-| Fegyver | Típus | Ki használhatja | Jellemző |
-|---|---|---|---|
-| **Two-Hand Sword** | 2H közelharci | Warrior, Paladin | A One-Hand Sword kétkezes párja |
-| **Two-Hand Mace** | 2H közelharci | Paladin, Warrior | A Mace kétkezes párja |
-| **Orb** | Off Hand | Mage, Warlock | Varázserő-jellegű statok (Spell Power-típus), **nincs automatikus támadása** (mint a Tome-nak) |
+| Fegyver | Típus | Skálázás | Sebesség / Range | Jellemző | Ki használhatja |
+|---|---|---|---|---|---|
+| **Two-Hand Sword** | 2H közelharci | 140% Str | 1,2 mp, 2,7 m, 125°-os ív | alapsebzés 10; a One-Hand Sword kétkezes párja: lassabb, nagyobb hatótáv | Warrior, Paladin |
+| **Two-Hand Mace** | 2H közelharci | 120% Str + 60% Int | 1,6 mp, 2,4 m, 120°-os ív | alapsebzés 13; 15% esély 0,5 mp kábításra, erős hátralökés | Paladin, Warrior |
+| **Orb** | Off Hand | – | – | nincs támadása; +4 Spell Power, +1 Intellect (a Tome-mal azonos költségvetés: 5 pont) | Mage, Warlock |
 
 - Mindhárom a többi fegyverrel azonos szabályok szerint kap ritkaságot, és kovácsolható (4.1).
 - Mindegyiknek van **saját Forge Legendary hatása** (fegyvertípusonként egy, 4.1) és egy
-  **procedurális megjelenése** (primitívekből, a végleges modellek az M7-ben).
-- A sebzés- és skálázási számok kiinduló értékek; az M6b nem hangol (9. fejezet).
+  **procedurális megjelenése** (primitívekből: nagy kardpenge arany kereszttel; hosszú nyelű
+  buzogány kőfejjel és vas pántokkal; arany talpú-ágú foglalat izzó gömbbel; saját
+  ikon-sziluettek és markolat-pózok; a végleges modellek az M7-ben).
+- A két kétkezes fegyver **saját fegyvertípus-azonosítót** kap (`two_hand_sword`,
+  `two_hand_mace`), nem a `sword` / `mace`-t: így a Mage, a Warlock és a Rogue (akiknél a
+  `sword` / `mace` már jártasság) nem kapja meg őket. A Warrior és a Paladin jártasságlistája
+  bővül; az Orb a Mage és a Warlock jártassága.
+- Az **Orb** a Tome útját járja (Off Hand, nincs automatikus támadás, nem fegyver-iskola): kétkezes
+  fegyver mellé nem vehető fel (a hős nem maradhat támadó fegyver nélkül). A **Warlock a Staff-fal
+  (kétkezes) indul**, ezért az Orb (és a Tearglass) csak egykezes főkéz (wand, dagger, sword) mellett
+  vehető fel; a Staff mellett elutasítja („would disarm”), ahogy a Tome-nál. A Mage kezdő fegyvere a
+  wand, neki nincs ilyen korlátja. A generátor az Orbot a Warlocknak is kínálja.
+- A sebzés- és skálázási számok kiinduló értékek, a Two-Hand Axe és a One-Hand Sword / Mace közé
+  állítva; az M6b nem hangol (9. fejezet).
 
 ### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
 
@@ -479,8 +491,37 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 | Common | ×1,0 | – |
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
-| Epic | ×2,2 | +2 stat és **+10% támadási sebesség** (az M6b item-tartalom csomagjában jön, M5-ben és M6a-ban nincs) |
-| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (10 van; az M6b három új fegyvere – Two-Hand Sword, Two-Hand Mace, Orb – még 3-mal bővíti; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+| Epic | ×2,2 | +2 stat és **+10% támadási sebesség** (M6b; a szabály lent) |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (13 van: a 10 mellé az M6b három új fegyvere – Two-Hand Sword, Two-Hand Mace, Orb – hozott 3-at; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+
+**Az Epic fegyver +10% támadási sebessége (M6b, megvalósítva):**
+- Az **Epic támadó fegyver** +10% támadási sebességet kap (a cooldown ÷ 1,1). A passzív off-hand
+  (Shield, Tome, Orb) nem, mert nincs támadása.
+- **Csak az Epic sor** kapja: a Legendary és az Artifact sora nem tartalmazza, és a generált
+  Legendary sem örökli az Epic bónuszt (a ×3,0 sebzés ennél erősebb). A kovácsolt Epic és a
+  kézzel tervezett Epic fegyver (pl. Frostfang) is megkapja, mert ugyanazon a
+  ritkaság-skálázáson megy át. Hogy egy Legendary így lassabban üt, mint az Epic, amelyből
+  kovácsolták, a végső balansz nyitott kérdése (9. fejezet).
+- A bónusz a Haste-tel **szorzódik** (nem additív), és valódi sebességnövekedés: a fegyverhez
+  normált Attack Power / Spell Power és a PPM-esélyek az eredeti cooldownt használják, mint a
+  Haste-nél (az Epic fegyver így kicsit több procot ad percenként).
+- A tooltip a hatásos sebességet mutatja („Speed 0.82” a 0,9 helyett), a DPS-t ehhez számolja, és
+  egy zöld „+10% Attack Speed” sor jelzi. Az érték ritkaságonként egy táblában van, így később egy
+  sor átírásával más ritkaság is kaphat bónuszt.
+
+**Az új fegyverek Forge Legendary hatásai (M6b, megvalósítva):**
+
+| Fegyver | Legendary | Hatás |
+|---|---|---|
+| Two-Hand Sword | **Thistlebrand** | minden 4. találat szögesdárda-félholdat vet: a találat 150%-a fizikai sebzés a célpontra, 40%-os lassítással 3 mp-ig |
+| Two-Hand Mace | **Boulderbloom** | minden 4. találat a földre csap: a találat 70%-a mindenkinek 4 méteren belül (a viselő körül), 50%-os lassítással 3 mp-ig |
+| Orb | **Tearglass** | minden 3. varázslat (a `spell` címkéjű képességek) után az orb szétpattan: 45 Arcane sebzés (+ Spell Power) mindenkinek 3,5 méteren belül, 30%-os lassítással 2 mp-ig |
+
+A Tearglass az első Forge Legendary, amelyik **varázslat-triggert** (`on_cast`) használ: az Orbnak
+nincs találata, ezért fix sebzése van, nem a találat százaléka. „Varázslat” = a `spell`
+címkéjű képesség (a Mage és a Warlock varázslatai, pl. Fireball, Shadow Bolt, Drain Life; a Blink,
+az Ice Barrier, a Fear és a pet-idézések nem). Két Epic Orb / Two-Hand Sword / Two-Hand Mace kovácsolása ezeket adja, mint a
+többi fegyvernél.
 
 **Korlátok:**
 - Legendary fölé nem lehet kovácsolni; a kovácsolt Legendary-t sem lehet tovább kovácsolni.
@@ -614,7 +655,24 @@ A legtöbb item **generált**: alaptípus + ritkaság + WoW-szerű utótag.
 
 Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 
-**M6b:** az utótagok száma 25-re nő (5.8); a példák a 12 alap-utótagot mutatják.
+**M6b:** az utótagok száma 25 (5.8); a fenti példák a 12 alap-utótagot mutatják. A 7 új utótag
+(a meglévő stat-azonosítókkal és a meglévő súlyozással; kész):
+
+| Utótag | Statok (arány) | Súly | Slotok |
+|---|---|---|---|
+| of the Ox | Stamina 0,6 · Armor 0,4 | 1,0 | a 8 páncélslot |
+| of the Lynx | Agility 0,6 · Crit Damage 0,4 | 1,0 | páncél + fegyver |
+| of the Raven | Intellect 0,6 · Cooldown Reduction 0,4 | 0,8 | páncél + fegyver |
+| of Thorns | Thorns 0,6 · Parry 0,4 | 0,8 | bármely |
+| of Mending | Spirit 0,6 · Resource Regen 0,4 | 0,8 | bármely |
+| of the Hunter | Slayer 0,6 · Executioner 0,4 | 0,7 | bármely |
+| of the Magpie | Gold Find 0,6 · Pickup Range 0,4 | 0,7 | bármely |
+
+- Az elsődleges statot (Str / Agi / Int / Stamina) adó utótagok nem kerülnek nyakra vagy gyűrűre
+  (a teszt ellenőrzi).
+- Az **of Mending** a Resource Regen mellé **Spiritet** (60%) ad, nem Healing Done-t: a Healing
+  Done-t csak a Paladin gyógyítása olvassa, a másik négy kasztnál az utótag 60%-a holt stat lett
+  volna; a Spirit minden kasztnál HP-t regenerál.
 
 **Anyag-fokozatok (alaptípusok):** minden páncéltípusnak 3 fokozata van. A magasabb
 fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
@@ -626,15 +684,42 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Mail | Chain | Scaled | Stormforged |
 | Plate | Iron | Steel | Runed |
 
-**M6b – a fokozatok külön alaptípusok:**
+**M6b – a fokozatok külön alaptípusok (kész):**
 - A mai alaptípusok (slotonként és páncéltípusonként egy, összesen 32) az **I. fokozatot**
-  adják; az M6b hozzáadja a **II.** és a **III.** fokozatot (+64): slotonként és
+  adják; az M6b hozzáadta a **II.** és a **III.** fokozatot (+64): slotonként és
   páncéltípusonként 3 alaptípus, összesen **96 páncél-alaptípus**.
 - A II. fokozat a **9.**, a III. a **17. hullámtól** érhető el (az alaptípus `min_wave`
-  adata, `ItemBaseData.min_wave`).
-- **Generálás:** a generátor a hullámon elérhető **legmagasabb fokozatot 70%**, egy
-  **alacsonyabbat 30%** eséllyel választja.
-- Az ékszer-alaptípusok 20-ra (10 Neck, 10 Ring) nőnek (5.8).
+  adata; a GDD korábban `ItemBaseData.min_wave`-nek hívta, a kódban az osztály `ItemBase`).
+- **Generálás:** a generátor **először az eddigi módon páncéltípust választ** (egy súlyozott
+  húzás; a saját kaszt páncéltípusa ×4), **utána** a típus elérhető fokozatai közül a
+  hullámon elérhető **legmagasabbat 70%-ban**, egy **alacsonyabbat 30%-ban** (egyenletesen)
+  választja. Egy fokozatú típusnál (és az ékszernél, ami nem fokozatos) nincs plusz húzás, így a
+  9. hullám alatt, és a korábbi seedekkel generált itemek nem változnak.
+- A fokozat **csak az alaptípus nevét és kinézetét** adja (pl. „Runed Plate Carapace”, „Steel
+  Cuirass”). A statköltségvetés, az implicit Armor és az anyagnév továbbra is a **hullám**
+  anyag-fokozatát követi, nem az alaptípusét; a magasabb fokozatú alaptípus erősebbé tétele
+  balansz-változtatás lenne, ezért nem történt meg (9. fejezet).
+- Az alaptípus neve csak a darab nevét adja (az anyagszó a hullámtól függ, így nincs az
+  alaptípus nevében); a nevek egyediek, kivéve az öt eredeti I. fokozatú főnevet, amelyen két
+  páncéltípus osztozik (Gloves, Belt, Boots, Bracers, Leggings: a generált név az anyagszóval
+  különbözteti meg őket).
+- A II. / III. fokozat alaptípusai (az I. fokozatúak a meglévő 32):
+
+| Slot | Cloth | Leather | Mail | Plate |
+|---|---|---|---|---|
+| Head | Hood / Veil | Headguard / Mask | Bascinet / Great Helm | Sallet / Warhelm |
+| Shoulders | Pelerine / Cape | Epaulets / Spikeguard | Shoulderguards / Mantlet | Shoulderplates / Warplates |
+| Chest | Vestments / Raiment | Jerkin / Brigandine | Haubergeon / Byrnie | Cuirass / Plate Carapace |
+| Wrist | Wristwraps / Bindings | Armlets / Wristguards | Manchettes / Brassards | Armguards / Wristplates |
+| Hands | Mitts / Handwraps | Grips / Handguards | Fingerguards / Knuckleguards | Warfists / Clawgauntlets |
+| Waist | Cord / Cincture | Waistband / Cinch | Clasp / Waistguard | Tassets / Waistplate |
+| Legs | Trousers / Breeches | Chaps / Legwraps | Chausses / Cuisses | Greaves / Kneecops |
+| Feet | Sandals / Treads | Moccasins / Stalkers | Sollerets / Footguards | Warboots / Stompers |
+
+- **Ékszer:** 20 alaptípus (10 Neck, 10 Ring), nem fokozatos (a `min_wave` 1), nincs páncéltípusuk
+  és nincs modell-darabjuk. Neck: Amulet, Choker, Necklace, Pendant + az új **Torque, Locket,
+  Collar, Medallion, Talisman, Lavalier**. Ring: Band, Loop, Ring, Signet + az új **Seal, Hoop,
+  Crest, Bezel, Keeper, Thumb Ring**.
 
 **Teljes névminta:** `[Enchant-előtag] [Anyag] [Alaptípus] [of the Utótag]`
 
@@ -645,7 +730,7 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 ### 5.5 Kézzel tervezett itemek (MVP)
 
-#### Trinketek (10 db, mind kézzel tervezett, proc- vagy aktiválós hatással)
+#### Trinketek (30 db: az eredeti 10 + az M6b 20, mind kézzel tervezett, proc- vagy aktiválós hatással)
 
 | Név | Hatás |
 |---|---|
@@ -662,10 +747,40 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 \* Munkanevek – a végleges nevek nem utalhatnak Blizzard-márkákra (lásd 14. fejezet).
 
-**M6b:** a trinketek száma **30**-ra nő (+20), mind kézzel tervezett, proc- vagy aktiválós
-hatással (5.8).
+**M6b: 20 új trinket (kész, összesen 30).** Mind kézzel tervezett, minden forrásból (shop, loot,
+elite, goblin, boss) az 1. hullámtól kapható, a hatásuk a meglévő proc-szókincsből áll (5.7). A
+statjuk a ritkaságnak megfelelő trinket-keret (Uncommon ≈ 5, Rare ≈ 8, Epic ≈ 11 pont).
 
-#### Legendary itemek (8 db)
+| Név | Ritkaság | Statok | Hatás |
+|---|---|---|---|
+| Bottled Thundercloud | Rare | nature_damage 6, haste 2 | Találatkor láncvillám 3 ellenség között, 13 Nature sebzés egyenként |
+| Wasp-Nest Charm | Uncommon | crit 3, haste 2 | Találatkor darázsraj: 16 Nature sebzés 4 mp alatt, 3× halmozódik |
+| Jar of Leeches | Uncommon | leech 1, stamina 2 | Találatkor 7 Shadow sebzést szív el a célpontból, és ugyanennyit gyógyít neked |
+| Bell of Stillness | Rare | stamina 4, versatility 2 | Találatkor a harang kongat: 1,5 mp kábítás |
+| Warbeat Drum | Epic | haste 4, mastery 4, stamina 3 | Találatkor +4% Haste 6 mp-ig, 5× halmozódik |
+| Carrion Talon | Rare | stamina 4, spirit 2 | Öléskor 12% eséllyel a Max HP 6%-át gyógyítja |
+| Bone Chime | Rare | physical_damage 6, crit 2 | Öléskor 10% eséllyel a csontok szétrobbannak: 16 Physical sebzés 2,5 m-en belül és 40% lassítás 2 mp-ig |
+| Soul Lantern | Rare | spirit 3, stamina 3 | Öléskor 12% eséllyel a Max HP 8%-át elnyelő pajzs 6 mp-ig |
+| Notched Tally Stick | Uncommon | crit 3, haste 2 | Minden ölés +1% Damage 8 mp-ig, 8× halmozódik |
+| Porcupine Quill | Uncommon | thorns 3, armor 1 | Ha eltalálnak, 20% eséllyel 8 Physical sebzés a támadónak és 30% lassítás 2 mp-ig |
+| Beetle Carapace | Rare | armor 2, stamina 3 | Ha eltalálnak, 15% eséllyel +8 Armor 5 mp-ig |
+| Basilisk Eye | Epic | dodge 3, stamina 4, versatility 2 | Ha eltalálnak, 10% eséllyel a támadó 2 mp-ig kábult |
+| Ashfall Feather | Epic | stamina 6, spirit 3 | 30% HP alatt a Max HP 25%-át gyógyítja (hullámonként 1×) |
+| Alarm Whistle | Rare | speed 5, dodge 2 | 35% HP alatt hangrobbanás: 25 sebzés 4 m-en belül és 1,5 mp kábítás (hullámonként 1×) |
+| Smoke Pouch | Uncommon | dodge 2, speed 2 | 40% HP alatt +20% Speed és +15% Dodge 4 mp-ig (20 mp ICD) |
+| Mote Lantern | Rare | holy_damage 6, spell_power 2 | 6 mp-enként 22 Holy sebzés a legközelebbi ellenségnek |
+| Singing Bowl | Rare | stamina 4, resource_regen 3 | 15 mp-enként a Max HP 8%-át elnyelő pajzs 8 mp-ig |
+| Prospector's Pebble | Uncommon | gold_find 10 | 15 mp-enként 2 gold |
+| Wayward Compass | Epic | arcane_damage 8, spell_power 3 | 9 mp-enként 30 Arcane sebzés a körülötted lévő, 3 m-en belüli ellenségeknek |
+| Votive Candle | Rare | holy_damage 5, spirit 2 | Találatkor 12 Holy sebzés a célpontnak, és 5 HP gyógyítás a legsérültebb társnak |
+
+Eloszlás: 6 Uncommon + 10 Rare + 4 Epic az újak között (az összes 30: 9 / 15 / 6). Trigger szerint:
+6 találatkor (on hit), 4 öléskor, 3 amikor eltalálják, 3 alacsony HP-nál, 4 időzített (periodic).
+Új blokk vagy trigger nincs. A *periodic* és az *alacsony HP-s* területi hatások (Wayward Compass,
+Alarm Whistle) mindig a viselő körül hatnak, mert ott nincs találati célpont. A Notched Tally Stick
+**néma** (minden ölésnél halmozódik, ezért nem lebeg felirat a hős fölött).
+
+#### Legendary itemek (25 db: az eredeti 8 + az M6b 17)
 
 | Név | Slot | Hatás |
 |---|---|---|
@@ -678,8 +793,83 @@ hatással (5.8).
 | Sash of Twin Souls | Waist | A második képesség cooldownja −30% |
 | Gauntlets of the Titan | Hands | +20% közelharci sebzés, −10% támadási sebesség |
 
-**M6b:** a Legendary itemek száma **25**-re nő (+17), az újak is kézzel tervezett procokkal
-(5.8). A fegyvertípusonkénti Forge Legendary hatások (4.1) ettől külön készletet adnak.
+**M6b: 17 új Legendary (kész, összesen 25).** Loot-forrásokból (loot, elite, goblin, boss), a
+10. hullámtól; **kasztkorlát nélkül** (a Legendary nem kaszthoz kötött), de kaszt-hangulatúak: a
+statjuk a kaszt fő statját adja, a hatásuk a kaszt stílusához illik. A viselhetőséget a páncéltípus
+adja (mint a meglévő nyolcnál): a ruha (Cloth) mindenkié, a bőr (Leather) a Rogue-é és a lemezeseké,
+a lemez (Plate) csak a Warrioré és a Paladiné. Mind az 5 addig Legendary nélküli slottípus (Neck,
+Chest, Wrist, Legs, Trinket) kapott egyet, így a 12 slottípus mindegyikéhez van Legendary. A
+nyaklánc és a gyűrű nem ad fő statot (5.4). A fegyvertípusonkénti Forge Legendary hatások (4.1)
+ettől külön készletet adnak.
+
+| Név | Slot | Páncél | Kaszt-hangulat | Viselheti | Hatás |
+|---|---|---|---|---|---|
+| Greathelm of the Gilded Oath | Head | Plate | Paladin | Warrior, Paladin | 8 mp-enként a legsérültebb társ Max HP-jának 12%-át gyógyítja |
+| Pauldrons of the Radiant Bulwark | Shoulders | Plate | Paladin | Warrior, Paladin | Ha eltalálnak, 20% eséllyel a Max HP 15%-át elnyelő pajzs 5 mp-ig (8 mp ICD) |
+| Sabatons of the Long March | Feet | Plate | Paladin | Warrior, Paladin | 6 mp-enként 18 Holy sebzés a 3 m-en belüli ellenségeknek és 40% lassítás 2 mp-ig |
+| Breastplate of Unbroken Anger | Chest | Plate | Warrior | Warrior, Paladin | Ha eltalálnak, 40% eséllyel +4% Damage 8 mp-ig, 6× halmozódik |
+| Girdle of the Last Roar | Waist | Plate | Warrior | Warrior, Paladin | 40% HP alatt +25% Damage és +10 Armor 8 mp-ig (hullámonként 1×) |
+| Tearjerker | Main Hand (Two-Hand Axe) | - | Warrior | Warrior | Találatkor 36 Physical sebzés 4 mp alatt (3× halmozódik); a vérző ellenség halálakor a sebek a 3 m-en belüli ellenségekre terjednek |
+| Hood of the Quiet Knife | Head | Leather | Rogue | Rogue, Warrior, Paladin | Öléskor 15% eséllyel +20% Crit és +15% Speed 5 mp-ig |
+| Bracers of the Hidden Blade | Wrist | Leather | Rogue | Rogue, Warrior, Paladin | Találatkor rejtett penge: a célpont a találat 120%-ának megfelelő Physical sebzést kapja (hit_pct: a találattal skálázódik) |
+| Breeches of the Light Fingers | Legs | Leather | Rogue | Rogue, Warrior, Paladin | Öléskor 6% eséllyel 3 gold |
+| Vial of Distilled Adrenaline | Trinket | - | Rogue | all | 25 mp-enként +35% Haste és +15% Damage 8 mp-ig |
+| Amulet of Unspent Wishes | Neck | - | Mage | all | 6 mp-enként arkán varázsnyilak ugranak 4 ellenség között, 20 Arcane sebzés egyenként |
+| Leggings of the Brimming Well | Legs | Cloth | Mage | all | Találatkor +2 Spell Power és +3% Arcane Damage 6 mp-ig, 5× halmozódik |
+| Staff of the Deep Winter | Main Hand (Staff) | - | Mage | Mage, Warlock | Találatkor 24 Frost sebzés és 1,5 mp kábítás (befagyasztás) |
+| Gloves of the Patient Rot | Hands | Cloth | Warlock | all | 6 mp-enként a legközelebbi ellenségbe rothadás: 40 Shadow sebzés 5 mp alatt; a gazdája halálakor a 3 m-en belüli ellenségekre terjed |
+| Robe of the Hollow Pact | Chest | Cloth | Warlock | all | Ha eltalálnak, 20% eséllyel 24 Shadow sebzést szív el a támadóból, és ugyanennyit gyógyít neked |
+| Ring of the Mischievous Imp | Ring | - | Warlock | all | Minden 4. ölésnél az imp tűzgolyói 3 ellenség között ugrálnak, 20 Fire sebzés egyenként |
+| Grimoire of Seeded Doom | Off Hand (Tome) | - | Warlock | Mage, Paladin, Warlock | Találatkor 26 Shadow sebzés a célpontnak és a 3 m-en belülieknek, és 20 DoT 4 mp alatt |
+
+Kaszt-lefedettség (hangulat szerint az új 17-ből): Warrior 3, Paladin 3, Rogue 4, Mage 3,
+Warlock 4. Minden kaszt legalább 8-at viselhet az új 17-ből és legalább 12-t az összes 25-ből, és
+mindegyik megtalálja a fő statját legalább 3 viselhető újon (teszt).
+
+#### Névvel ellátott Rare / Epic itemek (40 db: az eredeti 10 + az M6b 30)
+
+Kézzel tervezett, kasztkorlát nélküli Rare / Epic itemek egyedi névvel és egy-egy hatással. Mindegyik
+egy meglévő proc-blokkot használ (nincs új trigger). Forrás: mind az öt (shop, loot, elit, goblin,
+boss), az 1. hullámtól. Az eredeti 10 (M2): Bramblethorn Bracers, Emberglow Wand, Frostfang,
+Galestride Boots, Grimtusk Cleaver, Helm of the Iron Vigil, Mossweave Leggings, Pendant of the
+Starless Night, Signet of the Dawnwatch, Sunforged Breastplate. Az M6b 30 új darabja:
+
+| Név | Ritkaság | Slot / páncél | Statok | Hatás |
+|---|---|---|---|---|
+| Circlet of Ninefold Skin | Rare | Head / Cloth | +6 Intellect, +4 Stamina | 15 mp-enként +3 gyógyítás (magadnak) |
+| Tunic of the Quiet Bulb | Rare | Chest / Leather | +5 Agility, +5 Stamina | Ölésnél 8% eséllyel +20% Haste 3 mp-ig |
+| Bracers of the Shallot Fold | Rare | Wrist / Cloth | +3 Intellect, +3 Spirit | Ütésnél 20% eséllyel 3 sebzés-pajzs 3 mp-ig |
+| Garlic Clove Pendant | Rare | Neck | +4 Stamina, +3 Spirit | Találatnál 2,5 ppm: 10 Frost sebzés |
+| Ring of the Chive Coil | Rare | Ring | +4 Crit, +3 Haste | Találatnál 2 ppm: 1 extra ütés |
+| Quickstep Boots | Rare | Feet / Leather | +5 Agility, +5 Speed | 12 mp-enként +15% Speed 3 mp-ig |
+| Leggings of the Scaled Skin | Rare | Legs / Mail | +5 Strength, +4 Stamina | Ütéskor 8%: 6 Holy sebzés 2 m-en belül (kör) |
+| Shardbound Gauntlets | Rare | Hands / Mail | +5 Haste, +3 Strength | Találatnál 3 ppm: 9 Arcane sebzés |
+| Cellar Sash | Rare | Waist / Cloth | +5 Intellect, +3 Spirit | Ölésnél 6%: +2 arany |
+| Shoulderpads of Shallow Roots | Rare | Shoulders / Leather | +4 Agility, +4 Stamina | Találatnál 3 ppm: 25% lassítás 2 mp-ig |
+| Splinterwand | Rare | Fegyver (wand) | +5 Intellect, +3 Crit | Találatnál 3 ppm: 8 Arcane sebzés, ugrik 2 célpontra |
+| Ring of the Ember Bulb | Rare | Ring | +4 Versatility, +3 Stamina | Ölésnél 6%: 10 Fire sebzés 2 m-en belül |
+| Cuffs of the Last Breath | Rare | Wrist / Cloth | +3 Spirit, +2 Versatility | 30% HP alatt (hullámonként 1×): 6 sebzés-pajzs 4 mp-ig |
+| Helm of the Brittle Crown | Rare | Head / Mail | +4 Strength, +5 Stamina | 14 mp-enként +3 gyógyítás a legsérültebb szövetségesnek |
+| Breastplate of the Crisp Shell | Rare | Chest / Mail | +5 Strength, +6 Stamina | Ütéskor 15%: 5 Fire visszasebzés |
+| Visor of the Sunward Watch | Epic | Head / Plate | +8 Strength, +8 Stamina | Ütéskor 12%: 8 Holy visszasebzés |
+| Ringmail of the Second Skin | Epic | Chest / Mail | +7 Strength, +7 Stamina, +2 Crit | Ütéskor 9%: 12 Physical sebzés 2,5 m-en belül (kör) |
+| Silken Leggings of the Veil | Epic | Legs / Cloth | +8 Intellect, +6 Spirit | 8 mp-enként +4 gyógyítás a legsérültebb szövetségesnek |
+| Treads of the Nimble Clove | Epic | Feet / Leather | +6 Agility, +4 Crit, +3 Haste | Találatnál 2,5 ppm: extra ütés |
+| Gauntlets of the Cloven Crust | Epic | Hands / Plate | +5 Strength, +6 Stamina, +3 Versatility | Találatnál 2,5 ppm: 12 Holy sebzés + 4 gyógyítás a legsérültebb szövetségesnek |
+| Girdle of the Unyielding Layer | Epic | Waist / Plate | +6 Strength, +7 Stamina | 35% HP alatt (hullámonként 1×): 10 sebzés-pajzs 4 mp-ig |
+| Spaulders of the Hollow Shell | Epic | Shoulders / Mail | +6 Strength, +5 Haste | Ölésnél 15%: +12% Crit 4 mp-ig |
+| Halo of the Pearled Onion | Epic | Head / Cloth | +7 Intellect, +4 Spirit, +2 Versatility | Találatnál 3 ppm: 16 Arcane sebzés |
+| Signet of the Festering Wound | Epic | Ring | +5 Crit, +4 Leech | Találatnál 4 ppm: 8 Shadow sebzés 4 mp alatt, max. 2 halmozódás |
+| Amulet of the Thousand Skins | Epic | Neck | +6 Stamina, +4 Haste | Ütéskor 15%: 4 sebzés-pajzs 4 mp-ig |
+| Wrap of the Blighted Peel | Epic | Wrist / Leather | +5 Agility, +3 Crit | Ölésnél 10%: 12 Nature sebzés 2,5 m-en belül (kör) |
+| Scallion Edge | Epic | Fegyver (sword) | +5 Strength, +3 Crit | Találatnál 3 ppm: 14 Physical sebzés a cél körül 2,5 m-en belül |
+| Shallot Shiv | Epic | Fegyver (dagger) | +6 Agility, +3 Crit | Ölésnél 10%: 3 gyógyítás magadnak |
+| Robe of the Lantern Heart | Epic | Chest / Cloth | +8 Intellect, +4 Spirit, +2 Haste | 15 mp-enként +20% Haste 4 mp-ig |
+| Leathers of the Rooted Dance | Epic | Legs / Leather | +7 Agility, +5 Stamina | Találatnál 3 ppm: 8 Nature sebzés, szívás (gyógyulsz is) |
+
+A Black Market ezeket nem árulja (tier-set darab vagy generált max-roll Epic, 16.1); a Shrine of
+Fortune és a dungeon-jutalom Epic itemei viszont kaphatnak ilyet is (a generátor kézzel tervezett
+Epic-sorsolása).
 
 #### Tier setek (kasztonként 1, Epic ritkaság, 5 darab: Head, Shoulders, Chest, Hands, Legs)
 
@@ -862,7 +1052,7 @@ sor jelzi: „*Classes: Mage*”.
 - **Need:** csak az adott kaszt nyomhat rá.
 - **Ritkaság:** Rare-től felfelé léteznek. A tier set darabok is ilyenek.
 
-**Példák (MVP: kasztonként 4, összesen 20)**
+**Az eredeti 10 (kasztonként 2; az MVP terve kasztonként 4 volt, a többi az M6b-ben készült el)**
 
 | Kaszt | Item | Slot | Hatás |
 |---|---|---|---|
@@ -877,11 +1067,53 @@ sor jelzi: „*Classes: Mage*”.
 | Warlock | Grimoire of the Imp Lord | Off Hand (Tome) | Az Imp +50% sebzés, és tűzlövedéke 2 célpontot ér |
 | Warlock | Soulbinder's Sash | Waist | Minden 8. ölés ad Soul Shardot (12 helyett) |
 
-A többi 10 a fejlesztés közben készül el, ugyanígy: kasztonként 4.
+A többi 30 az M6b-ben készült el, ugyanígy (lent).
 
-**M6b:** kasztonként **8**, összesen **40** kaszt-specifikus item lesz (az M6a-ban 10 van, tehát
-+30). Mind „*Equip:*” sorral módosítja a kaszt képességeit (ability mod), Rare-től felfelé
-(5.8).
+**M6b: kasztonként 8, összesen 40 kaszt-specifikus item (kész**; az M6a-ban 10 volt, tehát +30).
+Mind „*Equip:*” sorral módosítja a kaszt egyik képességét (ability mod), Rare-től felfelé (5.8).
+A kasztonkénti 6 új darab:
+
+| Név | Kaszt | Ritkaság / slot | Statok | Módosítás |
+|---|---|---|---|---|
+| Warhelm of the Standing Shout | Warrior | Epic / Head (Plate) | +7 Strength, +8 Stamina | Battle Shout +5 m sugár |
+| Shoulderguards of the Stubborn Wall | Warrior | Rare / Shoulders (Plate) | +5 Strength, +4 Stamina | Shield Wall +2 mp |
+| Breastplate of Thunderous Echo | Warrior | Epic / Chest (Plate) | +8 Strength, +8 Stamina | Thunder Clap +1 visszhang |
+| Wristguards of the Sundering Edge | Warrior | Rare / Wrist (Plate) | +3 Strength, +3 Crit | Execute küszöb +10% |
+| Legplates of the Bold Leap | Warrior | Rare / Legs (Plate) | +6 Stamina, +3 Strength | Heroic Leap bénítása 1 mp-cel hosszabb |
+| Reaping Greataxe | Warrior | Epic / Fegyver (two-hand axe) | +8 Strength, +4 Crit | Bladestorm −5 mp cooldown |
+| Long Coal Staff | Mage | Epic / Fegyver (staff) | +6 Intellect, +8 Fire Damage | Fireball égése a találat 15%-ával több sebzést okoz |
+| Shoulderwrap of the Glacial Ring | Mage | Rare / Shoulders (Cloth) | +4 Intellect, +4 Stamina | Frost Nova fagyasztás +0,5 mp |
+| Robe of the Tidewoven Veil | Mage | Epic / Chest (Cloth) | +8 Intellect, +5 Stamina | Ice Barrier teljes pajzsa (alap + Intelligencia + Spell Power) +25% |
+| Leggings of the Falling Star | Mage | Epic / Legs (Cloth) | +7 Intellect, +5 Stamina | Meteor bénítása 0,5 mp-cel hosszabb |
+| Cuffs of the Blazing Heart | Mage | Rare / Wrist (Cloth) | +3 Intellect, +3 Haste | Pyroblast égése a találat 10%-ával több sebzést okoz |
+| Gloves of the Quiet Missile | Mage | Rare / Hands (Cloth) | +5 Intellect, +2 Spirit | Arcane Missiles +1 lövedék |
+| Helm of the Holy Hour | Paladin | Epic / Head (Plate) | +7 Strength, +8 Stamina | Avenger's Shield +1 célpont |
+| Pauldrons of the Second Oath | Paladin | Rare / Shoulders (Plate) | +4 Strength, +4 Stamina | Blessing of Kings +4 mp |
+| Cuirass of the Vigilant Dawn | Paladin | Epic / Chest (Plate) | +8 Strength, +9 Stamina | Divine Shield −8 mp cooldown |
+| Vambrace of the Oathstone | Paladin | Rare / Wrist (Plate) | +3 Strength, +2 Versatility | Hammer of Justice +0,5 mp stun |
+| Girdle of Lasting Grace | Paladin | Epic / Waist (Plate) | +6 Strength, +6 Stamina, +3 Crit | Lay on Hands újratöltése 10 mp-cel rövidebb |
+| Legplates of the Endless Storm | Paladin | Rare / Legs (Plate) | +5 Strength, +6 Stamina | Divine Storm +1 hullám |
+| Hood of Quick Blades | Rogue | Epic / Head (Leather) | +7 Agility, +6 Stamina | Blade Flurry +1 célpont |
+| Pauldrons of the Pale Smoke | Rogue | Rare / Shoulders (Leather) | +4 Agility, +4 Crit | Poison Bomb lassítása további +20% |
+| Jerkin of the Last Breath | Rogue | Epic / Chest (Leather) | +8 Agility, +7 Stamina | Cheat Death +5% Max HP gyógyulás |
+| Gloves of the Quick Thrust | Rogue | Rare / Hands (Leather) | +5 Agility, +3 Haste | Killing Spree −3 mp cooldown |
+| Belt of Shifting Shadows | Rogue | Rare / Waist (Leather) | +4 Agility, +4 Stamina | Shadowstep buff +1 mp |
+| Leathers of the Unseen Throw | Rogue | Epic / Legs (Leather) | +7 Agility, +4 Crit | Shuriken Toss +1 shuriken, +3 m hatótáv |
+| Hood of Burning Summons | Warlock | Epic / Head (Cloth) | +7 Intellect, +6 Stamina | Summon Infernal −10 mp cooldown |
+| Mantle of Lingering Curses | Warlock | Rare / Shoulders (Cloth) | +5 Intellect, +3 Spirit | Corruption +2 mp |
+| Robe of the Hollow Star | Warlock | Epic / Chest (Cloth) | +8 Intellect, +8 Stamina | Shadow Bolt +1 átütés |
+| Bracers of the Siphoning Thread | Warlock | Rare / Wrist (Cloth) | +3 Intellect, +3 Crit | Drain Life gyógyítás +20% |
+| Leggings of Dread Steps | Warlock | Rare / Legs (Cloth) | +6 Intellect, +5 Stamina | Fear +1 m sugár |
+| Slippers of the Seeded Path | Warlock | Rare / Feet (Cloth) | +5 Intellect, +3 Haste | Seed of Corruption +1 ugrás |
+
+**Az „Equip:” sor kiszürkülése.** Ha a hős még nem tanulta meg a képességet, az item Equip sora
+szürkén, „(needs <képesség>)” jelzéssel látszik a tooltipben (mint az Artifact-tulajdonságoknál); az
+item attól még felvehető, a módosítás akkor lép életbe, amikor a hős megtanulja a képességet.
+
+**Forrás és súly.** A trinketek és a névvel ellátott itemek mind az öt forrásból (shop, loot, elite,
+goblin, boss) az 1. hullámtól jönnek; a Legendaryk a loot-forrásokból (loot, elite, goblin, boss) a
+10. hullámtól. A kaszt-specifikus itemek a saját kasztjuk dobásában ×3 súlyt kapnak, mint a
+meglévők.
 
 ### 5.6 Backpack
 
@@ -985,10 +1217,53 @@ III ×2, IV ×2,5, V ×3 (az egész értékű statok, pl. „+1 Pierce”, lefel
 A rang szorzója a gold-procnál (Greedy) a gold tört részét átviszi a következő procra, így a
 II. rang procjonként átlagban 1,5 goldot ad.
 
-**M6b – 50 enchant:** a készlet 26 új enchanttal bővül (összesen 50), saját nevekkel, a
-meglévő proc- és bónusz-szókincsen belül (egyetlen új trigger-fajta csak akkor, ha
-elkerülhetetlen). A rangok, a PPM-szabályok és az Enchanter (lent) változatlanok. Az új nevek
-nem utalhatnak Blizzard-márkákra (14. fejezet).
+**M6b – 50 enchant (kész):** a készlet 26 új enchanttal bővült (összesen 50: 16 Equip, 18
+Chance on hit, 8 On kill, 8 When struck), saját nevekkel, a meglévő proc- és bónusz-szókincsen
+belül (új trigger-fajta nem kellett). A rangok (I–V: ×1 … ×3), a PPM-szabályok és az Enchanter
+(lent) változatlanok. A fix számú értékek (sugár, időtartam, célpontszám) **nem skálázódnak** a
+ranggal; a gyógyítás / pajzs a **Max HP százaléka** (a rang a százalékot szorozza), így a teljes
+futamon át értelmes. Az új nevek nem utalhatnak Blizzard-márkákra (14. fejezet).
+
+| Előtag | Típus | Slotok | Min. ritkaság | Hatás (I. rang) | Esély / PPM |
+|---|---|---|---|---|---|
+| Scorching | Equip | Head, Neck, Shoulders, Chest, Hands, Ring, Trinket, Weapon | Uncommon | +10% Fire Damage | - |
+| Glacial | Equip | Head, Neck, Shoulders, Chest, Hands, Ring, Trinket, Weapon | Uncommon | +10% Frost Damage | - |
+| Sweeping | Equip | Head, Shoulders, Chest, Waist, Ring, Trinket | Uncommon | +8% Area Size | - |
+| Quickened | Equip | Head, Neck, Wrist, Waist, Feet, Ring, Trinket | Uncommon | +5% Cooldown Reduction | - |
+| Gilded | Equip | Neck, Wrist, Waist, Feet, Ring, Trinket | Uncommon | +10% Gold Find | - |
+| Spiked | Equip | Shoulders, Chest, Wrist, Waist, Legs, Feet | Uncommon | +3 Thorns (a közelharci támadó 3 sebzést kap vissza) | - |
+| Riposting | Equip | Wrist, Hands, Waist, Ring, Trinket, Weapon | Uncommon | +4% Parry | - |
+| Studious | Equip | Head, Neck, Wrist, Ring, Trinket | Uncommon | +10% XP Gain | - |
+| Rupturing | Chance on hit | Weapon, Ring, Trinket | Rare | A célpont szétreped: 12 Arcane sebzés neki és a 2 m-en belüli ellenségeknek | 2,5 PPM, 2 mp ICD |
+| Warding | Chance on hit | Weapon, Ring, Trinket | Rare | Védőburok: a Max HP 4%-át nyeli el 5 mp-ig | 2 PPM, 6 mp ICD |
+| Soothing | Chance on hit | Weapon, Ring, Trinket | Rare | A legsérültebb társat gyógyítja (a Max HP-jának 3%-a); egyedül magadat | 3 PPM, 3 mp ICD |
+| Concussive | Chance on hit | Weapon, Ring, Trinket | Rare | 1 mp kábítás a célponton | 2 PPM, 5 mp ICD |
+| Rimebound | Chance on hit | Weapon, Ring, Trinket | Rare | Fagyrobbanás a célpont körül: 8 Frost sebzés, 40% lassítás 2 mp-ig, 2,5 m | 2,5 PPM, 3 mp ICD |
+| Smoldering | Chance on hit | Weapon, Ring, Trinket | Rare | Felgyújtja a célpontot: 14 Fire sebzés 4 mp alatt, 2× halmozódik | 4 PPM, 0,5 mp ICD |
+| Frenzied | Chance on hit | Weapon, Ring, Trinket | Rare | +12% Damage 6 mp-ig | 1 PPM, 8 mp ICD |
+| Feasting | On kill | bármelyik slot | Rare | A Max HP 3%-ának visszaállítása | 10%, 1 mp ICD |
+| Rousing | On kill | bármelyik slot | Rare | +12% Haste 4 mp-ig | 8%, 3 mp ICD |
+| Arcing | On kill | bármelyik slot | Rare | A hullától villám ugrik 3 ellenség között, 12 Nature sebzés egyenként | 8%, 1 mp ICD |
+| Gravewarded | On kill | bármelyik slot | Rare | Védőburok: a Max HP 5%-át nyeli el 5 mp-ig | 8%, 4 mp ICD |
+| Wailing | On kill | bármelyik slot | Rare | A hulla sikolt: 10 Shadow sebzés a 3 m-en belüliekre és 1 mp kábítás | 6%, 3 mp ICD |
+| Barbed | When struck | Head, Shoulders, Chest, Weapon | Rare | A támadó 5 Nature sebzést kap, és még 8-at 3 mp alatt (tövisek) | 40%, 1,5 mp ICD |
+| Rallying | When struck | Head, Shoulders, Chest, Weapon | Rare | A Max HP 4%-ának visszaállítása | 12%, 6 mp ICD |
+| Fortifying | When struck | Head, Shoulders, Chest, Weapon | Rare | +4 Armor 5 mp-ig | 15%, 8 mp ICD |
+| Bulwarking | When struck | Head, Shoulders, Chest, Weapon | Rare | Védőburok: a Max HP 6%-át nyeli el 4 mp-ig | 10%, 8 mp ICD |
+| Emberhide | When struck | Head, Shoulders, Chest, Weapon | Rare | Lángcsóva körülötted: 8 Fire sebzés a 2,5 m-en belüli ellenségeknek | 10%, 5 mp ICD |
+| Clinging | When struck | Head, Shoulders, Chest, Weapon | Rare | A támadó 40%-os lassítást kap 3 mp-re | 20%, 4 mp ICD |
+
+- A *Chance on hit* enchantok a fegyver / gyűrű / trinket slotokra, a *When struck* enchantok a
+  Head / Shoulders / Chest / Shield slotokra kerülhetnek (a fenti slot-táblázat szerint), az *On
+  kill* enchantok bármelyikre; az Uncommon itemek csak Equip enchantot kaphatnak. Az Equip és az
+  On kill enchantok a legtöbb slotra illenek, ezért a generált itemeken ők vannak többségben.
+- A *Scorching* (+Fire) és a *Glacial* (+Frost) iskola-enchant minden kasztnál sorsolódik, a
+  Warrior / Rogue / Paladin számára holt stat; ez a végső balansz kérdése (9. fejezet).
+- Egy unique vagy enchant a lebegő szövegét (alapból az item neve / az enchant előtagja) a
+  paramétereiben egy `"label"` kulccsal felülírhatja, az üres `""` = nincs szöveg. Az M6b-ben egyetlen
+  item használja: a Notched Tally Stick (minden ölésnél halmozódik, ezért néma).
+- Az **Enchanter** a 26 új enchantot is sorsolja (a Reroll és az Imbue készlete az összes enchant,
+  amit a slot és a ritkaság enged); az Artifactot továbbra sem módosítja.
 
 **Enchanting – Arcane Dust és az Enchanter (M6a):**
 
@@ -1067,24 +1342,28 @@ Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kas
 
 ### 5.8 Tartalomcél – „sok item”
 
-Az **M6b** adja a teljes item-tartalmat, két kivétellel, amelyek az **M8-ra tolódtak**: a
+Az **M6b** adta a teljes item-tartalmat, két kivétellel, amelyek az **M8-ra tolódtak**: a
 Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
 
-| Kategória | Állapot (M6a) | M6b-cél | M8 után |
+| Kategória | Állapot (M6a) | Állapot (**M6b, kész**) | M8 után |
 |---|---|---|---|
 | Fegyver-alaptípus | 10 | **13** (+ Two-Hand Sword, Two-Hand Mace, Orb) | 16 (+ Crossbow, Polearm, Fist Weapon) |
 | Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 32 (csak az I. fokozat) | **96** (3 fokozat × 32) | 96 |
 | Ékszer-alaptípus (Neck, Ring) | 8 (4 + 4) | **20** (10 Neck, 10 Ring) | 20 |
 | Stat-utótag („of the Bear” …) | 18 | **25** | 25 |
-| Enchantment | 24 | **50** (+26) | 50 |
-| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | **40** (+30) | 40 |
-| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8, +30) | 60+ (kasztonként 8+, az új kasztokkal) |
-| Trinket | 10 | **30** (+20) | 30 |
-| Legendary | 8 | **25** (+17) | 25 |
-| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (az új fegyverekhez) | 16 |
-| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1) | kasztonként 1 + 5 kaszt-független |
+| Enchantment | 24 | **50** (16 Equip, 18 Chance on hit, 8 On kill, 8 When struck) | 50 |
+| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | **40** | 40 |
+| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8) | 60+ (kasztonként 8+, az új kasztokkal) |
+| Trinket | 10 | **30** | 30 |
+| Legendary | 8 | **25** (mind a 12 slottípushoz van) | 25 |
+| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (Thistlebrand, Boulderbloom, Tearglass) | 16 |
+| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1; változatlan) | kasztonként 1 + 5 kaszt-független |
+| Kézzel tervezett összesen (`Db.uniques`) | 63 | **160** (63 + 20 trinket + 17 Legendary + 30 névvel ellátott + 30 kaszt-specifikus; ebből 25 tier-set darab) | – |
+| Artifact | 5 | 5 (változatlan) | kasztonként 1 (+ Hunter, Shaman) |
+| Epic fegyver +10% támadási sebesség (4.1) | – | kész | – |
+| Alaptípus-fokozat (`min_wave`) és a 70% / 30% fokozat-választás (5.4) | – | kész | – |
 
-**Az M6b tartalom-csomagjai**
+**Az M6b tartalom-csomagjai (megvalósítva)**
 
 - **Fegyverek:** három új fegyvertípus – **Two-Hand Sword** (Warrior, Paladin), **Two-Hand
   Mace** (Paladin, Warrior) és **Orb** (Off Hand a Mage-nek és a Warlocknak: varázserő-jellegű
@@ -1092,8 +1371,9 @@ Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
   (fegyvertípusonként egy) és procedurális megjelenés (4. fejezet). A Crossbow, a Polearm és a
   Fist Weapon az M8-cal jön. Az **Epic** fegyverek **+10% támadási sebességet** kapnak (4.1).
 - **Páncél:** a két újabb anyag-fokozat minden slotra és páncéltípusra: a II. a 9., a III. a 17.
-  hullámtól (`ItemBaseData.min_wave`); a generátor az elérhető legmagasabb fokozatot 70%-ban,
-  egy alacsonyabbat 30%-ban választja (5.4). Az eredmény **96** alaptípus.
+  hullámtól (az alaptípus `min_wave` adata); a generátor az elérhető legmagasabb fokozatot
+  70%-ban, egy alacsonyabbat 30%-ban választja (5.4). Az eredmény **96** alaptípus; a fokozat csak
+  a nevet és a kinézetet adja, a statokat nem.
 - **Ékszer és utótag:** 20 ékszer-alaptípus (10 Neck, 10 Ring) és 25 stat-utótag.
 - **Enchantok:** 50 (+26), saját nevekkel, a meglévő proc- és bónusz-szókincsen belül; új
   trigger-fajta csak akkor, ha elkerülhetetlen (5.7).
@@ -1106,7 +1386,11 @@ Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
 - **Kaszt-független tier setek:** az **M8-ra tolódtak**, mert a set-rendszer módosítását
   igénylik (5.5); az M6b-ben a setek kasztonként egy-egy maradnak.
 - **Nevek:** az új itemek és enchantok nevei nem Blizzard-nevek; mindet ellenőrizzük a 14.
-  fejezet listája szerint.
+  fejezet listája szerint, és minden megjelenített név egyedi (a teszt őrzi).
+- **Hol jelennek meg az új itemek:** a generált tartalom (fokozatos alaptípusok, ékszerek, utótagok,
+  enchantok, fegyverek) a boltban, lootban, a Black Marketben, a Shrine of Fortune és a
+  dungeon-jutalom Epic itemein is feltűnik; a kézzel tervezett Epic itemek a Black Market kivételével
+  mindegyiken (16.1). Az Artifactok változatlanok, sosem sorsolódnak ki.
 - A csomagok számai kiinduló értékek: az M6b nem hangol, a végleges balansz a legvégén
   készül (9. fejezet).
 
@@ -2717,8 +3001,17 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **Nem használjuk:** Blizzard-tulajdonnevek (Azeroth, Murloc, Thunderfury, Ashbringer,
   Horde/Alliance stb.), logók, eredeti assetek, a Friz Quadrata font.
 - A dokumentumban `*`-gal jelölt nevek munkanevek, publikálás előtt cserélendők.
-- **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőrizzük,
-  mielőtt bekerül a játékba.
+- **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőriztünk,
+  mielőtt bekerült a játékba. Ellenőrizve, egyik sem Blizzard-név: Thistlebrand, Boulderbloom,
+  Tearglass (Forge Legendary); Two-Hand Sword, Two-Hand Mace, Orb (fegyverek); az új alaptípus-nevek
+  (a 62 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
+  enchant-előtag, a 20 új trinket, a 17 új Legendary, a 60 új névvel ellátott és kaszt-specifikus
+  item. A tesztek ellenőrzik (item-, alaptípus-, utótag-, set-nevek, enchant-előtagok és
+  -leírások tiltott-listája; minden megjelenített név egyedi). Névütközések, amiket a névadáskor
+  kikerültünk: a „Mending” enchant-előtag „Rallying” lett (az „of Mending” utótag miatt), a
+  „Thorned” „Spiked” (az „of Thorns” miatt), a fagy-bot „Staff of the Deep Winter” (a
+  Boulderbloom miatt). A „Rallying Sprint” és a „Spiked Wall” képesség neve közös szót használ az
+  előtagokkal (más névtér, nincs működési ütközés).
 
 ---
 
