@@ -8,6 +8,8 @@ extends Node3D
 ## ([method RunState.add_team_loot]; sparkle + the item's name floats up in the rarity
 ## colour). At wave end the remaining bags are banked too ([method collect_to_bank], called by
 ## WaveDirector.stop()), so loot is never lost. The bag bobs and spins gently.
+## M7b: a new bag pops out in an arc and bounces once (only the model's offset moves – the node is at its
+## gameplay position from the start; [method start_pop], [method Vfx.hop_height]).
 
 ## A living player this close (m, on the ground plane) picks the bag up.
 const PICKUP_RADIUS := 1.0
@@ -17,6 +19,12 @@ const BOB_SPEED := 2.6
 const SPIN_SPEED := 1.4
 ## Seconds the bag and its beam take to pop in.
 const POP_TIME := 0.35
+## M7b: seconds of the toss arc + bounce, the sideways toss distance range (m), the peaks (m).
+const HOP_TIME := 0.7
+const HOP_REACH_MIN := 0.5
+const HOP_REACH_MAX := 0.95
+const HOP_PEAK := 0.95
+const HOP_BOUNCE := 0.22
 
 ## Beam height (m), width (m) and brightness by rarity (Common .. Artifact).
 const BEAM_HEIGHT: Array[float] = [2.2, 3.6, 5.0, 6.5, 8.0, 9.0]
@@ -72,10 +80,14 @@ var item: ItemInstance
 var _collected := false
 var _time := 0.0
 var _age := 0.0
+## M7b: age of the toss (HOP_TIME = finished) and the offset the model starts at.
+var _hop := HOP_TIME
+var _hop_from := Vector2.ZERO
 var _visual: Node3D
 var _beam: MeshInstance3D
 var _glow: MeshInstance3D
 
+static var _fx_rng := RandomNumberGenerator.new()
 static var _beam_shader: Shader
 static var _glow_shader: Shader
 static var _materials: Dictionary[String, ShaderMaterial] = {}
@@ -95,6 +107,7 @@ static func create(p_item: ItemInstance) -> LootBag:
 	b.item = p_item
 	b.add_to_group(&"loot_bags")
 	b._build_visual()
+	b.start_pop()
 	return b
 
 
@@ -105,6 +118,18 @@ static func rarity_color(rarity: int) -> Color:
 
 func is_collected() -> bool:
 	return _collected
+
+
+## M7b: the bag model is tossed out in an arc and bounces once; the bag itself does not move.
+func start_pop() -> void:
+	var a := _fx_rng.randf() * TAU
+	_hop_from = Vector2(cos(a), sin(a)) * _fx_rng.randf_range(HOP_REACH_MIN, HOP_REACH_MAX)
+	_hop = 0.0
+
+
+## True while the toss still runs.
+func is_popping() -> bool:
+	return _hop < HOP_TIME
 
 
 ## [param player] picks the bag up: the item goes to the team loot.
@@ -145,6 +170,13 @@ func _process(delta: float) -> void:
 	_age += delta
 	_visual.position.y = HOVER_HEIGHT + sin(_time * BOB_SPEED) * BOB_HEIGHT
 	_visual.rotate_y(SPIN_SPEED * delta)
+	if _hop < HOP_TIME:
+		_hop = minf(HOP_TIME, _hop + delta)
+		var k := _hop / HOP_TIME
+		var left := Vfx.hop_travel_left(k)
+		_visual.position.x = _hop_from.x * left
+		_visual.position.z = _hop_from.y * left
+		_visual.position.y += Vfx.hop_height(k, HOP_PEAK, HOP_BOUNCE)
 	if _age <= POP_TIME + delta:
 		var k := clampf(_age / POP_TIME, 0.0, 1.0)
 		var eased := 1.0 - pow(1.0 - k, 3.0)

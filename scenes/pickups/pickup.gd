@@ -15,6 +15,10 @@ extends Node3D
 ## with IDLE_STAGGER_THRESHOLD+ pickups around, an idle one only looks every IDLE_CHECK_TICKS
 ## ticks (phases spread by the pickup count when it lands, so the work is spread evenly and
 ## the run stays deterministic).
+## M7b (visual only – the node's own position is where the loot lands, only [member _visual] moves): a
+## new drop pops out in a short arc and bounces once ([method start_pop], [method Vfx.hop_height]); a
+## pickup that is being pulled towards a player leaves a short streak behind it (at most TRAIL_MAX
+## at once).
 
 const COLLECT_DISTANCE := 0.5
 ## Speed (m/s) when a player starts pulling the pickup, acceleration and top speed.
@@ -43,6 +47,19 @@ const COIN_EMISSION := Color(1.0, 0.62, 0.12)
 const GLOW_COLOR := Color(1.0, 0.8, 0.35, 0.42)
 const XP_COLOR := Color(0.45, 0.85, 1.0)
 const GLOW_SIZE := 0.75
+## M7b: seconds of the drop pop, the sideways toss distance range (m), peaks of the arc and the bounce (m).
+const POP_TIME := 0.55
+const POP_REACH_MIN := 0.35
+const POP_REACH_MAX := 0.7
+const POP_PEAK := 0.7
+const POP_BOUNCE := 0.16
+## M7b magnet streak: pickups with one at the same time, its length per m/s of speed (s), width (m), and
+## its length limits (m).
+const TRAIL_MAX := 24
+const TRAIL_SECONDS := 0.05
+const TRAIL_WIDTH := 0.16
+const TRAIL_MIN := 0.25
+const TRAIL_LONGEST := 1.2
 
 var gold := 0
 var xp := 0
@@ -60,7 +77,13 @@ var _is_coin := true
 var _players_serial := -1
 ## Idle ticks left until the next collector check while the stagger is on.
 var _idle_wait := 0
+## M7b: age of the drop pop (POP_TIME = finished / none) and the sideways offset the model starts at.
+var _pop := POP_TIME
+var _pop_from := Vector2.ZERO
+var _trail: MeshInstance3D
 
+static var _trail_count := 0
+static var _fx_rng := RandomNumberGenerator.new()
 static var _coin_mesh: CylinderMesh
 static var _orb_mesh: SphereMesh
 static var _glow_mesh: QuadMesh
@@ -99,6 +122,7 @@ static func drop(parent: Node, p_gold: int, p_xp: int, world_pos: Vector3) -> Pi
 	else:
 		p.position = Vector3(world_pos.x, 0.0, world_pos.z)
 	parent.add_child(p)
+	p.start_pop()
 	return p
 
 
@@ -118,6 +142,29 @@ static func find_merge_host(tree: SceneTree, pos: Vector3, max_dist: float) -> P
 			best_d = d
 			best = p
 	return best
+
+
+## M7b: the model pops out of the ground in an arc and bounces once while the pickup itself already lies at
+## its gameplay position (only the model's offset animates; it lands exactly on the node).
+func start_pop() -> void:
+	var a := _fx_rng.randf() * TAU
+	_pop_from = Vector2(cos(a), sin(a)) * _fx_rng.randf_range(POP_REACH_MIN, POP_REACH_MAX)
+	_pop = 0.0
+
+
+## True while the drop pop still runs.
+func is_popping() -> bool:
+	return _pop < POP_TIME
+
+
+## Pickups with a magnet streak right now (at most TRAIL_MAX).
+static func trail_count() -> int:
+	return _trail_count
+
+
+## True while the magnet streak is shown.
+func has_trail() -> bool:
+	return _trail != null and _trail.visible
 
 
 ## True while the pickup lies on the ground waiting for a collector.
@@ -187,6 +234,12 @@ func _enter_tree() -> void:
 	_idle_wait = get_tree().get_node_count_in_group(&"pickups") % IDLE_CHECK_TICKS
 
 
+func _exit_tree() -> void:
+	if _trail != null:
+		_trail_count = maxi(0, _trail_count - 1)
+		_trail = null
+
+
 func _physics_process(delta: float) -> void:
 	if _collected or not is_inside_tree():
 		return
@@ -202,6 +255,7 @@ func _physics_process(delta: float) -> void:
 		if target == null:
 			return
 		speed = START_SPEED
+		_start_trail()
 	var here := global_position
 	var goal := target.global_position
 	var dx := goal.x - here.x
@@ -226,6 +280,15 @@ func _process(delta: float) -> void:
 	_time += delta
 	_visual.position.y = HOVER_HEIGHT + sin(_time * BOB_SPEED) * BOB_HEIGHT
 	_visual.rotate_y(SPIN_SPEED * delta)
+	if _pop < POP_TIME:
+		_pop = minf(POP_TIME, _pop + delta)
+		var k := _pop / POP_TIME
+		var left := Vfx.hop_travel_left(k)
+		_visual.position.x = _pop_from.x * left
+		_visual.position.z = _pop_from.y * left
+		_visual.position.y += Vfx.hop_height(k, POP_PEAK, POP_BOUNCE)
+	if _trail != null:
+		_update_trail()
 
 
 ## Nearest living player whose pickup range reaches [param here] (from the shared
@@ -270,6 +333,33 @@ func _find_collector_live(here: Vector3) -> Player:
 			best_d = d
 			best = p
 	return best
+
+
+## M7b: a streak behind the pickup while a player pulls it (a few at a time).
+func _start_trail() -> void:
+	if _trail != null or _trail_count >= TRAIL_MAX:
+		return
+	_trail = Vfx.make_streak(COIN_COLOR if _is_coin else XP_COLOR)
+	_trail.position.y = HOVER_HEIGHT
+	_trail.visible = false
+	add_child(_trail)
+	_trail_count += 1
+
+
+func _update_trail() -> void:
+	if target == null or not is_instance_valid(target) or _collected:
+		_trail.visible = false
+		return
+	var here := global_position
+	var dx := target.global_position.x - here.x
+	var dz := target.global_position.z - here.z
+	var dist := sqrt(dx * dx + dz * dz)
+	if dist < 0.05:
+		_trail.visible = false
+		return
+	_trail.visible = true
+	var length := clampf(speed * TRAIL_SECONDS, TRAIL_MIN, TRAIL_LONGEST)
+	Vfx.aim_streak(_trail, Vector3(dx / dist, 0.0, dz / dist), length, TRAIL_WIDTH * _visual.scale.x)
 
 
 func _remove() -> void:
