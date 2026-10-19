@@ -1411,6 +1411,8 @@ func _refresh_side(eq: Equipment, cls: ClassData) -> void:
 		_preview.show_class(cls, slot.color)
 		if _preview.model != null:
 			_preview.model.set_weapons(eq.main_weapon(), eq.off_weapon())
+			_preview.model.set_equipment(eq.get_item(Items.EquipSlot.HEAD), eq.get_item(Items.EquipSlot.SHOULDERS),
+				eq.get_item(Items.EquipSlot.CHEST))
 	else:
 		_spec_label.text = ""
 
