@@ -1,12 +1,14 @@
 class_name PauseMenu
 extends Control
-## Pause overlay (GDD 11): dimmed game, "Paused by P2", Resume / Quit to Menu.
+## Pause overlay (GDD 11): dimmed game, "Paused by P2", Resume / Settings / Quit to Menu.
 ## Only the player who paused navigates (their own input: stick / d-pad, A selects);
 ## that player's B or ANY player's START resumes. process_mode is ALWAYS, Main pauses the tree.
 ## With no pausing slot (null, or the pausing player's controller got unplugged) the keyboard
 ## ui_* actions and any controller drive it.
 ## - The press / stick push that opened the menu is ignored: navigation waits until the stick
 ##   / d-pad has been neutral once (the stick the player was steering with in the game).
+## - "Settings" opens the [SettingsPage] over the menu, driven by the same player (or by anyone in the slot-less
+##   case); the menu waits meanwhile (START does not resume) and B / Back return to it.
 ## - "Quit to Menu" asks for a second press ("Are you sure?"); moving the highlight cancels.
 ## - While a joined player's controller is unplugged the game cannot be resumed (START / B /
 ##   Resume do nothing); the menu offers "Continue without Pn" for each of them instead
@@ -18,17 +20,19 @@ signal quit_to_menu_requested
 ## "Continue without Pn" was chosen for the player whose controller is unplugged.
 signal drop_player_requested(slot: PlayerSlot)
 
-enum Item { RESUME, QUIT }
+## Entry codes (display order: Resume, the "Continue without" offers, Settings, Quit).
+enum Item { RESUME, QUIT, SETTINGS }
 
 ## Entry codes of the "Continue without Pn" buttons are DROP_BASE + the player's slot index.
 const DROP_BASE := 10
+const SETTINGS_TEXT := "Settings"
 const QUIT_TEXT := "Quit to Menu"
 const QUIT_CONFIRM_TEXT := "Are you sure?  Press again"
 
 var slot: PlayerSlot
 ## Code of the highlighted entry: an Item, or DROP_BASE + slot index.
 var selected: int = Item.RESUME
-## Entry codes in display order: Resume, one "Continue without Pn" per unplugged player, Quit.
+## Entry codes in display order: Resume, one "Continue without Pn" per unplugged player, Settings, Quit.
 var entries: Array[int] = []
 ## One button per entry (same order as [member entries]).
 var buttons: Array[Button] = []
@@ -36,11 +40,15 @@ var buttons: Array[Button] = []
 var quit_armed := false
 ## Controller edges for the slot-less fallback. Public for tests.
 var pads := UiPads.new()
+## The Settings page, created the first time it is opened.
+var settings_page: SettingsPage
 
 var _by_label: Label
 var _missing_label: Label
 var _list: VBoxContainer
 var _prompts: CenterContainer
+## The panel with the entries: hidden while the Settings page is open.
+var _center: Control
 ## The press that opened the menu must not also close it (first frame is skipped).
 var _skip_frames := 0
 ## The stick / d-pad was held when the menu opened: no navigation until it is neutral once.
@@ -61,6 +69,7 @@ static func create() -> PauseMenu:
 ## [param p_slot] is the player who paused (only they can navigate; any START resumes).
 func open(p_slot: PlayerSlot) -> void:
 	slot = p_slot
+	_close_settings()
 	selected = Item.RESUME
 	quit_armed = false
 	_skip_frames = 1
@@ -80,6 +89,17 @@ func move_selection(step: int) -> void:
 	_update_selection()
 
 
+## The button of entry [param code] (an Item or DROP_BASE + slot index); null when it is not listed.
+func button_for(code: int) -> Button:
+	var i := entries.find(code)
+	return buttons[i] if i >= 0 else null
+
+
+## True while the Settings page covers the menu.
+func is_settings_open() -> bool:
+	return settings_page != null and settings_page.visible
+
+
 ## What A / a click does: like [method activate_selected], but "Quit to Menu" first asks
 ## "Are you sure?" and only quits on the second press.
 func press_selected() -> void:
@@ -96,6 +116,8 @@ func activate_selected() -> void:
 		_quit()
 	elif selected == Item.RESUME:
 		_try_resume()
+	elif selected == Item.SETTINGS:
+		_open_settings()
 	else:
 		_drop(selected - DROP_BASE)
 
@@ -114,6 +136,7 @@ func _build() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
+	_center = center
 	var panel := UiTheme.panel()
 	var style := UiTheme.stone_style()
 	style.content_margin_left = 54
@@ -210,6 +233,7 @@ func _refresh_entries() -> void:
 	for m in missing:
 		_add_entry(DROP_BASE + m.index, "Continue without %s" % m.label())
 		names.append(m.label())
+	_add_entry(Item.SETTINGS, SETTINGS_TEXT)
 	_add_entry(Item.QUIT, QUIT_TEXT)
 	if not entries.has(selected):
 		selected = Item.RESUME
@@ -225,7 +249,7 @@ func _add_entry(code: int, text: String) -> void:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(420, 72)
+	b.custom_minimum_size = Vector2(420, 68)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_list.add_child(b)
 	buttons.append(b)
@@ -256,6 +280,8 @@ func _process(_delta: float) -> void:
 	if not visible:
 		return
 	_refresh()
+	if is_settings_open():
+		return  # (the page reads its driver's input itself)
 	if _skip_frames > 0:
 		_skip_frames -= 1
 		return
@@ -290,6 +316,34 @@ func _process(_delta: float) -> void:
 		move_selection(1)
 	if Input.is_action_just_pressed(&"ui_accept") or pads.any_just_pressed(JOY_BUTTON_A):
 		press_selected()
+
+
+## Shows the Settings page over the menu, driven by the player who paused (anyone without a working one).
+func _open_settings() -> void:
+	if is_settings_open():
+		return
+	if settings_page == null:
+		settings_page = SettingsPage.create(0.5)
+		settings_page.closed.connect(_on_settings_closed)
+		add_child(settings_page)
+	_center.visible = false
+	settings_page.open(_driver())
+
+
+func _on_settings_closed() -> void:
+	_center.visible = true
+	_skip_frames = 1  # (the B that closed the page must not also resume)
+	_header_key = ""
+	_refresh()
+	_update_selection()
+
+
+## Hides the Settings page without a trace (the menu is being opened again).
+func _close_settings() -> void:
+	if settings_page != null and settings_page.visible:
+		settings_page.hide()
+	if _center != null:
+		_center.visible = true
 
 
 ## Resumes unless a joined player's controller is unplugged (then the game stays paused).

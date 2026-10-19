@@ -294,6 +294,12 @@ static func _build_theme() -> Theme:
 	t.set_constant(&"outline_size", &"ProgressBar", 4)
 	t.set_font_size(&"font_size", &"ProgressBar", FONT_SMALL)
 
+	# Scroll bars (the Credits page): a thin dark trough with a gold-brown grabber.
+	t.set_stylebox(&"scroll", &"VScrollBar", _flat(Color(0.04, 0.035, 0.03, 0.9), Color(0.3, 0.24, 0.14), 1, 4))
+	t.set_stylebox(&"grabber", &"VScrollBar", _flat(GOLD_DARK, GOLD_BORDER, 1, 4))
+	t.set_stylebox(&"grabber_highlight", &"VScrollBar", _flat(GOLD_BORDER, GOLD_BRIGHT, 1, 4))
+	t.set_stylebox(&"grabber_pressed", &"VScrollBar", _flat(GOLD, GOLD_BRIGHT, 1, 4))
+
 	# Parchment tooltips with dark ink.
 	t.set_stylebox(&"panel", &"TooltipPanel", parchment_style())
 	t.set_color(&"font_color", &"TooltipLabel", INK)

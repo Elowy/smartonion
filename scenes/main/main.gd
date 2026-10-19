@@ -5,7 +5,7 @@ extends Node
 ##   MENU -> LOBBY -> RUN [ WAVE -> WAVE_END -> INTERMISSION -> WAVE ... ] -> GAME_OVER -> LOBBY
 ##
 ## - MENU: MainMenu. Nobody has joined there, so entering it clears every PlayerSlot.
-##   Play -> LOBBY, Quit -> quits.
+##   Play -> LOBBY, Quit -> quits; Settings and Credits open their pages inside the menu (M7a).
 ## - LOBBY: Lobby (join, class pick, ready). start_requested -> a run; back -> MENU.
 ## - RUN: Arena + WaveDirector + one Player per slot (Arena.entities) + Hud, Intermission,
 ##   GameOverScreen and PauseMenu. Every wave: players back on the spawn points,
@@ -243,6 +243,11 @@ func _ready() -> void:
 				begin_roll()
 		_:
 			go_to_menu()
+			match options.view:
+				"settings":
+					main_menu.open_settings()
+				"credits":
+					main_menu.open_credits()
 
 
 func _exit_tree() -> void:
