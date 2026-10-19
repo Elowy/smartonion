@@ -298,7 +298,7 @@ func _resurrect(p: Player) -> void:
 	p.res_sickness_left = Player.RES_SICKNESS_TIME
 	Vfx.resurrect_column(feet)
 	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.6, "Resurrected!", Player.HEAL_TEXT_COLOR, 1.2)
-	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 1.1, "Resurrection Sickness",
+	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 1.1, "Wilted",
 			Player.RES_SICKNESS_TEXT_COLOR, 0.9)
 	ghost_count = maxi(0, ghost_count - 1)
 	_flare = 1.0

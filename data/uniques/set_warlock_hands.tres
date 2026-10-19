@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warlock_hands"
-display_name = "Felfire Gloves"
+display_name = "Hexfire Gloves"
 flavor = "Still warm from the last summoning."
 slot_type = 5
 armor_type = 0

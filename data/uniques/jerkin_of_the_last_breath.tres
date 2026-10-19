@@ -22,7 +22,7 @@ unique_params = {
 "heal_max_hp_pct_add": 5.0
 }
 }
-unique_text = "Equip: Your Cheat Death restores 5% more of your Max HP."
+unique_text = "Equip: Your Narrow Escape restores 5% more of your Max HP."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

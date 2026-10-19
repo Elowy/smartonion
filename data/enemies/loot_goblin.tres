@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"loot_goblin"
-display_name = "Loot Goblin"
+display_name = "Coin Gremlin"
 behavior = 0
 max_hp = 30.0
 contact_damage = 0.0

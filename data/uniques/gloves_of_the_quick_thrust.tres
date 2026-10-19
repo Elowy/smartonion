@@ -22,7 +22,7 @@ unique_params = {
 "cooldown_add": -3.0
 }
 }
-unique_text = "Equip: Your Killing Spree has a 3 sec shorter cooldown."
+unique_text = "Equip: Your Cutthroat Rush has a 3 sec shorter cooldown."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

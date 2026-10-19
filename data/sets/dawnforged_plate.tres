@@ -29,5 +29,5 @@ bonuses = Array[Dictionary]([{
 }
 }],
 "pieces": 4,
-"text": "Word of Glory heals every hero within 8 m and restores 10% more of their Max HP."
+"text": "Call of Valor heals every hero within 8 m and restores 10% more of their Max HP."
 }])

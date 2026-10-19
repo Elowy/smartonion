@@ -23,7 +23,7 @@ unique_params = {
 "damage": 18.0,
 "school": "arcane"
 }
-unique_text = "Chance on hit: Fires an arcane missile at the target for 18 Arcane damage."
+unique_text = "Chance on hit: Fires an arcane dart at the target for 18 Arcane damage."
 sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
 min_wave = 10
 weight = 1.0

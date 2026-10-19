@@ -77,7 +77,7 @@ const JINK_ANGLE := 1.2217
 ## Speed share while no player is visible (all downed / stealthed).
 const CALM_SPEED_RATIO := 0.5
 ## Overhead name tag.
-const LABEL_TEXT := "Loot Goblin"
+const LABEL_TEXT := "Coin Gremlin"
 const LABEL_COLOR := Color(1.0, 0.84, 0.3)
 const LABEL_OUTLINE := Color(0.2, 0.12, 0.02)
 const LABEL_LIFT := 0.3

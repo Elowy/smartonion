@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"retribution"
-prefix = "Retribution"
+prefix = "Reprisal"
 kind = 3
 slot_types = Array[int]([0, 2, 3, 11])
 requires_projectile = false

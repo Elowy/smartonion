@@ -22,7 +22,7 @@ unique_params = {
 "pierce_add": 1.0
 }
 }
-unique_text = "Equip: Your Shadow Bolt pierces 1 more enemy."
+unique_text = "Equip: Your Umbral Bolt pierces 1 more enemy."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

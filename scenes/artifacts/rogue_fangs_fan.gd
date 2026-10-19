@@ -41,7 +41,7 @@ func tick(delta: float) -> void:
 
 
 func describe() -> String:
-	var text := "Every %d critical strikes throw a free Fan of Knives" % maxi(1, roundi(num("every", 5.0)))
+	var text := "Every %d critical strikes throw a free Knife Bloom" % maxi(1, roundi(num("every", 5.0)))
 	var cooldown := num("cooldown", 0.0)
 	if cooldown > 0.0:
 		text += ", at most once every %s sec" % String.num(cooldown, 1).trim_suffix(".0")

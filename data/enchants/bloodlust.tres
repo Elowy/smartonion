@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"bloodlust"
-prefix = "Bloodlust"
+prefix = "Warfever"
 kind = 1
 slot_types = Array[int]([11, 9, 10])
 requires_projectile = false
@@ -21,4 +21,4 @@ ppm = 1.0
 chance = 0.0
 icd = 6.0
 school = &"physical"
-description = "Chance on hit: Bloodlust grants +{haste}% Haste for {duration_fixed} sec."
+description = "Chance on hit: Warfever grants +{haste}% Haste for {duration_fixed} sec."
