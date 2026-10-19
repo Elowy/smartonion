@@ -1,7 +1,9 @@
 # Credits
 
-SmartOnion uses the following third-party assets. Every asset is released under CC0 (public domain
-dedication); credit is not required, but it is given here with thanks.
+SmartOnion uses the following third-party assets. The sounds and music are released under CC0 (public
+domain dedication; credit is not required, but it is given here with thanks). The font is released under the
+SIL Open Font License 1.1 and the icons under Creative Commons Attribution 3.0 (credit is required and given
+below).
 
 ## Audio
 
@@ -33,3 +35,26 @@ otherwise).
   https://opengameart.org/content/boss-battle-theme
 - Breaks and market: "Medieval: The Old Tower Inn" (loop version) by RandomMind
   https://opengameart.org/content/medieval-the-old-tower-inn
+
+## Fonts
+
+### Cinzel (SIL Open Font License 1.1)
+
+Titles, headings and buttons are set in Cinzel, Copyright 2020 The Cinzel Project Authors
+(https://github.com/NDISCOVER/Cinzel), released under the SIL Open Font License, Version 1.1:
+https://openfontlicense.org (the licence text is in assets/fonts/OFL.txt). The variable font file comes from
+the Google Fonts repository: https://github.com/google/fonts/tree/main/ofl/cinzel
+
+## Icons
+
+### Game-icons.net (Creative Commons Attribution 3.0)
+
+The ability, talent, talent tree, consumable and shrine pictures are icons from https://game-icons.net, released
+under Creative Commons Attribution 3.0: https://creativecommons.org/licenses/by/3.0/
+
+Icons made by Lorc (http://lorcblog.blogspot.com) and Delapouite (https://delapouite.com), available at
+https://game-icons.net. The icons were scaled, tinted with the school or item colour and outlined; the
+contributors' list and the licence note of the icon archive are in assets/icons/LICENSE.txt.
+
+- Lorc: https://game-icons.net/tags/lorc.html
+- Delapouite: https://game-icons.net/tags/delapouite.html
