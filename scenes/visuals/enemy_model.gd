@@ -155,7 +155,8 @@ func spawn_progress() -> float:
 ## meshes (never copies), the arm pivot / swing, the Pivot scale (data.model_scale) and the node's own
 ## scale (elites), current yaw, head height and the glow part (flames, eyes). Empty before [method setup].
 func corpse_info() -> Dictionary:
-	if _pivot == null or _body == null or _arm == null:
+	# Still rising out of the ground: no corpse (it would pop up to full height for one frame).
+	if _pivot == null or _body == null or _arm == null or is_spawning():
 		return {}
 	var info := {"body": _body.mesh, "arm": _arm.mesh, "material": Mats.base_material(_body),
 			"arm_pivot": _arm_rest, "arm_x": _arm.rotation.x,

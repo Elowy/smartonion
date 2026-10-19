@@ -248,6 +248,16 @@ func test_a_death_leaves_a_visual_only_corpse() -> void:
 	check(is_instance_valid(c) and c.is_inside_tree(), "the corpse outlives the enemy")
 
 
+func test_an_enemy_killed_while_rising_leaves_no_corpse() -> void:
+	var e := _enemy(&"skeleton_grunt", Vector3(2, 0, 1))
+	e.play_spawn_in()
+	check(e.model.is_spawning(), "rising")
+	check(e.model.corpse_info().is_empty(), "no corpse data mid-rise")
+	e.take_damage(1000.0)
+	check(e.is_dead(), "dead")
+	check_eq(_corpses().size(), 0, "no corpse popping up to full height")
+
+
 func _collision_nodes(root: Node) -> Array[Node]:
 	var out: Array[Node] = []
 	var stack: Array[Node] = [root]

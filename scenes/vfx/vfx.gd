@@ -37,9 +37,8 @@ const GROUND_Y := 0.04
 const ARC_LIFT := 0.3
 ## Height (m) of the [method resurrect_column] light shaft.
 const RESURRECT_HEIGHT := 14.0
-## Hit sparks: at most this many per rendered frame (crits may add CRIT_SPARKS_EXTRA), and ordinary
-## ones are dropped while MAX_SPARKS_ALIVE are on screen – a 150-enemy brawl would otherwise spawn
-## hundreds of particle systems a second.
+## Hit sparks: at most this many per rendered frame and MAX_SPARKS_ALIVE on screen (crits may add
+## CRIT_SPARKS_EXTRA to both) – a 150-enemy brawl would otherwise spawn hundreds of particle systems a second.
 const SPARKS_PER_FRAME := 24
 const CRIT_SPARKS_EXTRA := 10
 const MAX_SPARKS_ALIVE := 90
@@ -454,7 +453,7 @@ static func _spark_allowed(crit: bool) -> bool:
 		_spark_used = 0
 	if _spark_used >= SPARKS_PER_FRAME + (CRIT_SPARKS_EXTRA if crit else 0):
 		return false
-	if not crit and _spark_alive >= MAX_SPARKS_ALIVE:
+	if _spark_alive >= MAX_SPARKS_ALIVE + (CRIT_SPARKS_EXTRA if crit else 0):
 		return false
 	_spark_used += 1
 	return true
