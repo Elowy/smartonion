@@ -262,6 +262,7 @@ func start(p_heroes: Array[Player]) -> void:
 	phase = Phase.INTRO
 	phase_time = 0.0
 	room = -1
+	Audio.play(&"portal")
 	announced.emit("Dungeon!", BANNER_COLOR)
 	status_changed.emit()
 
@@ -325,6 +326,7 @@ func _start_room(index: int) -> void:
 			_begin_spawning(DEFEND_DENSITY, DEFEND_CAP, -1)
 		Room.WARDEN:
 			_begin_warden()
+	Audio.play(&"banner")
 	announced.emit("Room %d/%d – %s" % [room + 1, ROOM_COUNT, ROOM_NAMES[room]], BANNER_COLOR)
 	room_started.emit(room)
 	status_changed.emit()
@@ -358,10 +360,12 @@ func _room_done() -> void:
 	if room >= ROOM_COUNT - 1:
 		success = true
 		phase = Phase.OUTRO
+		Audio.play(&"loot_win")
 		announced.emit("Dungeon cleared!", CLEARED_COLOR)
 	else:
 		phase = Phase.PAUSE
 		_heal_heroes(ROOM_HEAL)
+		Audio.play(&"wave_cleared")
 		announced.emit("Room %d cleared!" % (room + 1), CLEARED_COLOR)
 	status_changed.emit()
 
@@ -375,6 +379,7 @@ func _fail(reason: String) -> void:
 	_clear_room_world()
 	phase = Phase.OUTRO
 	phase_time = 0.0
+	Audio.play(&"defeat")
 	announced.emit("Dungeon failed – %s" % reason, FAILED_COLOR)
 	status_changed.emit()
 

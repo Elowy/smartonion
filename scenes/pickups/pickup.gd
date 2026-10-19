@@ -155,6 +155,9 @@ func collect(player: Player) -> void:
 	RunState.add_xp(RunState.scale_xp(gained_xp))
 	var pos := global_position if is_inside_tree() else position
 	Vfx.pickup_sparkle(pos + Vector3.UP * HOVER_HEIGHT)
+	Audio.play(&"gold_pickup" if gold > 0 else &"xp_pickup")
+	if gold > 0 and xp > 0:
+		Audio.play(&"xp_pickup", -2.0)
 	_remove()
 
 

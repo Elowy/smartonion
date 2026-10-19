@@ -319,6 +319,7 @@ static func death_puff(pos: Vector3, color: Color, size: float = 1.0) -> void:
 
 
 static func explosion(pos: Vector3, radius: float, color: Color) -> void:
+	Audio.play(&"explosion", clampf(radius - 2.0, -5.0, 2.0))
 	var fx := _effect(VfxEffect.Kind.EXPLOSION, pos, 0.55)
 	if fx == null:
 		return
@@ -365,6 +366,7 @@ static func spawn_telegraph(pos: Vector3, radius: float, duration: float) -> voi
 
 
 static func level_up_burst(pos: Vector3) -> void:
+	Audio.play(&"level_up")
 	var gold := Color(1.0, 0.82, 0.3)
 	var fx := _effect(VfxEffect.Kind.LEVEL_UP, pos, 1.0)
 	if fx == null:
@@ -414,6 +416,7 @@ static func level_up_burst(pos: Vector3) -> void:
 ## Resurrection (GDD 1): a shaft of golden light from the sky onto [param pos] (the
 ## revived player's feet), a shock ring and rising sparkles.
 static func resurrect_column(pos: Vector3) -> void:
+	Audio.play(&"revive")
 	var fx := _effect(VfxEffect.Kind.RESURRECT, pos, 1.3)
 	if fx == null:
 		return

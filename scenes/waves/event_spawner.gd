@@ -281,6 +281,7 @@ func _spawn_chest(parent: Node) -> void:
 			GuardedChest.GUARD_HP_MULT, parent, director)
 	c.opened.connect(_on_chest_opened)
 	Vfx.explosion(pos + Vector3.UP * 0.4, 1.4, GuardedChest.GOLD)
+	Audio.play(&"banner")
 	announced.emit(CHEST_TEXT, EVENT_COLOR)
 
 
@@ -293,6 +294,7 @@ func _spawn_totem(parent: Node) -> void:
 	t.held.connect(_on_totem_held)
 	t.fell.connect(_on_totem_fell)
 	Vfx.explosion(pos + Vector3.UP * 0.4, 1.6, DefendTotem.COLOR)
+	Audio.play(&"banner")
 	announced.emit(TOTEM_TEXT, TOTEM_COLOR)
 
 
@@ -316,6 +318,7 @@ func _spawn_caravan(parent: Node) -> void:
 	c.plundered.connect(_on_cart_plundered)
 	c.escaped.connect(_on_cart_escaped)
 	Vfx.explosion(from + Vector3.UP * 0.5, 1.6, Color(1.0, 0.82, 0.3))
+	Audio.play(&"banner")
 	announced.emit(CARAVAN_TEXT, EVENT_COLOR)
 
 
@@ -381,6 +384,7 @@ func _on_totem_held(t: DefendTotem) -> void:
 	EventFx.burst(spawn_parent(), at, 0, DefendTotem.reward_xp(_event_wave()), DefendTotem.XP_PILES,
 			DefendTotem.XP_RING)
 	_finish(DEFEND_TOTEM, true)
+	Audio.play(&"loot_win")
 	announced.emit(totem_held_text(), TOTEM_COLOR)
 
 
@@ -391,6 +395,7 @@ func _on_totem_fell(_t: DefendTotem) -> void:
 
 func _on_cart_plundered(_c: CaravanCart, _killer: Player) -> void:
 	_finish(GOBLIN_CARAVAN, true)
+	Audio.play(&"loot_win")
 	announced.emit(CARAVAN_PLUNDERED_TEXT, EVENT_COLOR)
 
 

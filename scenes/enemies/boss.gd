@@ -184,6 +184,7 @@ func _update_enrage() -> void:
 	var top := model.head_height if model != null else 2.0
 	Vfx.floating_text(global_position + Vector3.UP * (top + 0.6),
 			"ENRAGED!" if level == 1 else "ENRAGED x%.2f" % damage_mult, ENRAGE_TEXT_COLOR, 1.3)
+	Audio.play(&"banner")
 	enrage_changed.emit(level)
 
 
@@ -216,6 +217,7 @@ func _update_abilities(delta: float) -> void:
 		if _cast(st.ability):
 			st.casts += 1
 			casts_total += 1
+			Audio.play(&"boss_telegraph")
 			st.left = st.ability.interval_at(phase, boss_data.phase_cooldown_mult)
 			ability_cast.emit(st.ability)
 			if is_dead():
