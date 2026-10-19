@@ -79,7 +79,7 @@ func test_descriptions_show_whole_while_tiers_are_gated() -> void:
 	panel.talents.select_talent(shadowburn)
 	await tree.process_frame
 	await tree.process_frame
-	check_eq(panel.talents.detail_reason.text, "Needs 6 points in Destruction", "Shadowburn's tier is gated")
+	check_eq(panel.talents.detail_reason.text, "Needs 6 points in Cinderfall", "Parting Scorch's tier is gated")
 	var cut: Array[String] = await _cut_descriptions(panel, true)
 	check_eq(cut, [] as Array[String], "level 31, nothing spent: every description shows whole")
 	finished.emit()

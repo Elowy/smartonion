@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"battlegear_of_fury"
-display_name = "Battlegear of Fury"
+display_name = "Ragebound Plate"
 class_id = &"warrior"
 piece_ids = Array[StringName]([&"set_warrior_head", &"set_warrior_shoulders", &"set_warrior_chest", &"set_warrior_hands", &"set_warrior_legs"])
 bonuses = Array[Dictionary]([{

@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"word_of_glory"
-display_name = "Word of Glory"
+display_name = "Call of Valor"
 description = "Heals you and the most wounded ally within 8 m. If an ally within 8 m is down, instantly resurrects them at 40% health instead."
 class_id = &"paladin"
 school = &"holy"
@@ -42,7 +42,7 @@ specs = Array[Dictionary]([{
 "mods": {
 "heal_all": true
 },
-"name": "Light of Dawn",
+"name": "Chorus of Dawn",
 "text": "Heals every hero within 8 m, not just the most wounded ally."
 }, {
 "mods": {

@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"divine_storm"
-display_name = "Divine Storm"
+display_name = "Radiant Whirl"
 description = "A whirling holy strike: enemies within {radius} m take {damage_pct}% weapon damage as Holy damage (+Spell Power), and you and wounded allies within {heal_radius} m are healed for {heal} + {heal_max_hp_pct}% of max HP (+Spell Power)."
 class_id = &"paladin"
 school = &"holy"

@@ -35,5 +35,5 @@ func begin_wave() -> void:
 
 
 func describe() -> String:
-	return "Battle Fury: +%.1f%% damage per 10%% missing health (now +%.1f%%)" % [
+	return "Cornered Fury: +%.1f%% damage per 10%% missing health (now +%.1f%%)" % [
 			maxf(0.0, mastery()) * PCT_PER_POINT, bonus_pct()]

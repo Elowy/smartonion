@@ -486,7 +486,7 @@ func test_no_roll_and_no_draw_below_wave_10() -> void:
 
 func test_chances_by_source_and_fortune() -> void:
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.BOSS, null), 0.15, 0.000001, "boss 15%")
-	check_near(LootDrops.artifact_chance(ItemGenerator.Source.GOBLIN, null), 0.05, 0.000001, "Loot Goblin 5%")
+	check_near(LootDrops.artifact_chance(ItemGenerator.Source.GOBLIN, null), 0.05, 0.000001, "Coin Gremlin 5%")
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.ELITE, null), 0.02, 0.000001, "elite 2%")
 	check_near(LootDrops.artifact_chance(ItemGenerator.Source.LOOT, null), 0.00025, 0.000001, "normal enemy 0.05% / 2 players (this run)")
 	check_eq(LootDrops.artifact_chance(ItemGenerator.Source.SHOP, null), 0.0, "never from the shop")
@@ -595,7 +595,7 @@ func test_the_right_source_counts_boss_over_goblin_over_elite_over_normal() -> v
 	check_eq(LootDrops.kill_artifact_source(normal, S.GOBLIN), S.GOBLIN, "goblin")
 	var goblin := LootGoblin.create(Db.get_enemy(&"loot_goblin"), 10)
 	arena.entities.add_child(goblin)
-	check_eq(LootDrops.kill_artifact_source(goblin, S.LOOT), S.GOBLIN, "the Loot Goblin counts as a goblin")
+	check_eq(LootDrops.kill_artifact_source(goblin, S.LOOT), S.GOBLIN, "the Coin Gremlin counts as a goblin")
 	check_eq(LootDrops.kill_artifact_source(goblin, S.BOSS), S.BOSS, "never lower than the call")
 	# The boss chance applies to a boss killed through the LOOT call.
 	RunState.artifact_pity = 0.0

@@ -433,7 +433,7 @@ func test_enemy_animation_states() -> void:
 func test_loot_goblin_model() -> void:
 	check(&"goblin" in EnemyModel.STYLES, "goblin style")
 	var data := Db.get_enemy(&"loot_goblin")
-	check(data != null, "Loot Goblin data")
+	check(data != null, "Coin Gremlin data")
 	if data == null:
 		return
 	var g := _keep(EnemyModel.new()) as EnemyModel

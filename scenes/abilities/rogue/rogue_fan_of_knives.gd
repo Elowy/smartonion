@@ -48,7 +48,7 @@ const COLD_KNIFE_COLOR := Color(0.95, 0.3, 0.35)
 const COLD_RING_COLOR := Color(0.9, 0.2, 0.25)
 const COLD_RING_ALPHA := 0.35
 const COLD_RING_RADIUS := 1.1
-const COLD_TEXT := "Cold Blood!"
+const COLD_TEXT := "Steel Nerve!"
 ## Restless Blades: a small gold spark on the hero when a recharge was shortened this much (s).
 const RESTLESS_SPARK_MIN := 0.6
 const RESTLESS_SPARK_COLOR := Color(1.0, 0.82, 0.3)

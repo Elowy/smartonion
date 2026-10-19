@@ -44,7 +44,7 @@ func test_every_mage_ability_has_ranks_specs_and_a_filled_description() -> void:
 		for m in placeholder.search_all(a.description):
 			check(a.params.has(m.get_string(1)), "%s: {%s} is a param" % [id, m.get_string(1)])
 		check(a.school in [&"fire", &"frost", &"arcane"], "%s school" % id)
-	check_eq(Db.get_ability(&"blizzard").kind, AbilityData.Kind.CORE, "Blizzard stays core")
+	check_eq(Db.get_ability(&"blizzard").kind, AbilityData.Kind.CORE, "Hailstorm stays core")
 
 
 func test_spell_power_intellect_and_school_damage_scale_the_spells() -> void:
@@ -62,11 +62,11 @@ func test_spell_power_intellect_and_school_damage_scale_the_spells() -> void:
 	check_near(MageSpell.damage_from(_ctx(p, &"arcane_missiles"), &"arcane"), 1.5 + 0.35 * i + 0.4 * 10.0, 0.001,
 			"each missile takes 40% of the Spell Power (many hits)")
 	check_near(MageSpell.damage_from(_ctx(p, &"pyroblast"), &"fire"), (18.0 + 2.5 * i + 2.0 * 10.0) * 1.2, 0.001,
-			"Pyroblast takes double Spell Power")
+			"Magma Bolt takes double Spell Power")
 	check_near(MageSpell.damage_from(_ctx(p, &"meteor"), &"fire", "ground_"), (1.5 + 0.25 * i + 0.5 * 10.0) * 1.2, 0.001,
 			"burning ground: half Spell Power per tick")
 	check_near(MageIceBarrier.shield_amount(_ctx(p, &"ice_barrier")), 4.0 + 0.5 * i + 0.5 * 10.0, 0.001,
-			"Ice Barrier: + Intellect and Spell Power (no damage %)")
+			"Frozen Layer: + Intellect and Spell Power (no damage %)")
 
 
 # --- Fireball -------------------------------------------------------------------------------
@@ -576,7 +576,7 @@ func test_ice_barrier_ice_block_spec() -> void:
 	check(not p.downed, "survived the blow")
 	_step(DT, [p])
 	check(p.invulnerable_left >= 1.5 - DT * 2.0, "encased in ice: immune for 1.5 sec")
-	check(p.get_node_or_null(^"IceBlock") != null, "an ice block around the hero")
+	check(p.get_node_or_null(^"IceBlock") != null, "a glacial cocoon around the hero")
 	var hp := p.hp
 	p.take_damage(5.0, CombatMath.KIND_MELEE, e)
 	check_eq(p.hp, hp, "no damage inside the ice")

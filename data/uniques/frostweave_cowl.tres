@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"frostweave_cowl"
-display_name = "Frostweave Cowl"
+display_name = "Rimeweave Cowl"
 flavor = "Knitted from the first snow of winter."
 slot_type = 0
 armor_type = 0
@@ -22,7 +22,7 @@ unique_params = {
 "radius_pct": 30.0
 }
 }
-unique_text = "Equip: Your Blizzard covers 30% more area."
+unique_text = "Equip: Your Hailstorm covers 30% more area."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

@@ -289,11 +289,11 @@ func test_set_block_for_the_viewers_equipment() -> void:
 	tip.viewer_equipment = eq
 	tip.show_item(chest, warrior)
 	check(tip.find_line("Part of the") == null, "the old one-liner is gone")
-	var header := tip.find_line("Battlegear of Fury (2/5)", true)
+	var header := tip.find_line("Ragebound Plate (2/5)", true)
 	check(header != null and _color(header).is_equal_approx(ItemTooltip.SET_NAME_COLOR), "set name + worn count in gold: %s" % tip.line_texts())
 	# The viewer's own tooltip (panel, shop) has the compact block: the pieces as slot names.
 	check(tip.compact_set(), "a viewer: the compact set block")
-	for piece_name in ["Helm of Fury", "Pauldrons of Fury", "Legplates of Fury"]:
+	for piece_name in ["Ragebound Helm", "Ragebound Pauldrons", "Ragebound Legplates"]:
 		check(_exact(piece_name).is_empty(), "no full piece name %s" % piece_name)
 	for slot_name in ["Head", "Legs"]:
 		var l := _exact(slot_name)
@@ -305,18 +305,18 @@ func test_set_block_for_the_viewers_equipment() -> void:
 	var own := _exact("Chest")
 	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_MISSING),
 		"the shown piece is listed too (grey until worn)")
-	check(_index_of("Battlegear of Fury (2/5)") < _index_of("Head") and _index_of("Head") < _index_of("Shoulders")
+	check(_index_of("Ragebound Plate (2/5)") < _index_of("Head") and _index_of("Head") < _index_of("Shoulders")
 		and _index_of("Shoulders") < _index_of("Legs"), "under the set name, in slot order")
 	var two := tip.find_line("(2) Set: Increases your Rage generation by 10%.", true)
 	check(two != null and _color(two).is_equal_approx(ItemTooltip.ENCHANT_GREEN), "active 2-piece bonus green")
 	var four := tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)
 	check(four != null and _color(four).is_equal_approx(ItemTooltip.DIM), "inactive 4-piece bonus grey")
-	check(_index_of("Classes: Warrior") < _index_of("Battlegear of Fury (2/5)"), "after the Classes line")
+	check(_index_of("Classes: Warrior") < _index_of("Ragebound Plate (2/5)"), "after the Classes line")
 	check(chest.flavor != "" and tip.find_line(chest.flavor) == null, "no flavor text in the compact block")
 	eq.slots[Items.EquipSlot.CHEST] = chest
 	eq.slots[Items.EquipSlot.HANDS] = set_piece(&"warrior", "hands")
 	tip.show_item(chest, warrior)
-	check(tip.find_line("Battlegear of Fury (4/5)", true) != null, "4 worn")
+	check(tip.find_line("Ragebound Plate (4/5)", true) != null, "4 worn")
 	own = _exact("Chest")
 	check(own.size() == 2 and _color(own[1]).is_equal_approx(ItemTooltip.SET_PIECE_WORN), "now worn")
 	four = tip.find_line("(4) Set: Whirlwind has a 30% chance to cost no Rage.", true)

@@ -36,7 +36,7 @@ specs = Array[Dictionary]([{
 "mods": {
 "arc_add": 150.0
 },
-"name": "Sweeping Strikes",
+"name": "Reaping Arc",
 "text": "Execute strikes every enemy in a wide arc in front of you."
 }, {
 "mods": {

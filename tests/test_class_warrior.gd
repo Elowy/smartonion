@@ -97,8 +97,8 @@ func test_class_is_wired() -> void:
 	check_eq(c.abilities.size(), 2, "two core abilities")
 	check_eq(c.abilities[0].id, &"whirlwind", "RT = Whirlwind")
 	check_eq(c.abilities[1].id, &"charge", "LT = Charge")
-	check(c.mastery == WarriorBattleFury, "Battle Fury")
-	check(c.mastery_text.begins_with("Battle Fury"), "Mastery text")
+	check(c.mastery == WarriorBattleFury, "Cornered Fury")
+	check(c.mastery_text.begins_with("Cornered Fury"), "Mastery text")
 	var ww := c.abilities[0]
 	check_eq(ww.resource, &"rage", "Whirlwind costs Rage")
 	check_eq(ww.cost, 40.0, "40 Rage")
@@ -474,7 +474,7 @@ func test_battle_fury_text() -> void:
 	p.stats.set_source(&"mastery", {Stats.MASTERY: 10.0})
 	p.hp = p.max_hp() * 0.5
 	var text := p.abilities.mastery.describe()
-	check(text.contains("Battle Fury") and text.contains("25"), "describes the current bonus: %s" % text)
+	check(text.contains("Cornered Fury") and text.contains("25"), "describes the current bonus: %s" % text)
 
 
 # --- Items --------------------------------------------------------------------------------

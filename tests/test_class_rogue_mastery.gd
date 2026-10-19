@@ -88,7 +88,7 @@ func test_poison_damage_is_mastery_scaled() -> void:
 	rogue.stats.set_source(&"mastery", {Stats.MASTERY: 30.0})
 	mastery.on_hit(enemy, 20.0, true)
 	check_near(mastery.dps_on(enemy), 20.0 * 0.5 / 4.0, 0.001, "+1% per Mastery point")
-	check(mastery.describe().begins_with("Deadly Poison"), "tooltip")
+	check(mastery.describe().begins_with("Lethal Venom"), "tooltip")
 
 
 func test_poison_ticks_for_the_stack_damage_over_four_seconds() -> void:

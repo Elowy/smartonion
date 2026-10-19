@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"shadow_bolt"
-display_name = "Shadow Bolt"
+display_name = "Umbral Bolt"
 description = "Hurls a heavy bolt of shadow at the nearest enemy ({bolts} per cast). Scales with Intellect and Spell Power."
 class_id = &"warlock"
 school = &"shadow"
@@ -32,4 +32,4 @@ kind = 2
 card_weight = 1.0
 rank3 = {"bolts_add": 1}
 rank3_text = "+1 bolt, at the next-nearest enemy"
-specs = Array[Dictionary]([{"name": "Void Lance", "text": "Shadow Bolt pierces up to 3 more enemies.", "mods": {"pierce_add": 3}}, {"name": "Shadow Burst", "text": "Shadow Bolt explodes on impact, hitting every enemy within 2.5 m.", "mods": {"blast_radius": 2.5}}])
+specs = Array[Dictionary]([{"name": "Void Lance", "text": "Umbral Bolt pierces up to 3 more enemies.", "mods": {"pierce_add": 3}}, {"name": "Shadow Burst", "text": "Umbral Bolt explodes on impact, hitting every enemy within 2.5 m.", "mods": {"blast_radius": 2.5}}])

@@ -39,7 +39,7 @@ const SHIELD_DURATION := 6.0
 const HARVEST_AUTO_MIN := 3
 const HARVEST_BEAM_COLOR := Color(0.55, 0.9, 0.35)
 const SCORCH_COLOR := Color(0.7, 0.3, 0.95)
-const SHARD_TEXT := "+1 Soul Shard"
+const SHARD_TEXT := "+1 Pact Shard"
 const SHARD_TEXT_COLOR := Color(0.75, 0.45, 1.0)
 const SHARD_RESOURCE := &"soul_shard"
 

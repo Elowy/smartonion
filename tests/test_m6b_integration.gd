@@ -168,8 +168,8 @@ func test_hardcore_and_the_dungeon_have_no_spirit_healer_anywhere() -> void:
 	check(main.arena.spirit_healer == null and _healers_in_the_arena() == 0, "none in the dungeon")
 	_play_dungeon()
 	check(main.dungeon == null and not main.arena.in_dungeon_layout, "the dungeon is over, the clearing is back")
-	check(main.arena.spirit_healer == null, "and the clearing is still without a Spirit Healer (hardcore)")
-	check_eq(_healers_in_the_arena(), 0, "no Spirit Healer node came back with it")
+	check(main.arena.spirit_healer == null, "and the clearing is still without a Grave Tender (hardcore)")
+	check_eq(_healers_in_the_arena(), 0, "no Grave Tender node came back with it")
 	check_eq(RunState.dungeons_completed, 1, "the dungeon was won")
 
 
@@ -201,7 +201,7 @@ func test_a_normal_run_keeps_its_spirit_healer_through_a_dungeon() -> void:
 	check(main.arena.spirit_healer != null and main.arena.spirit_healer.is_inside_tree(), "back in the clearing")
 	var hero := main.players[0]
 	_down(hero)
-	check("Spirit Healer" in _hint_of(hero), "the ghost is sent to it again")
+	check("Grave Tender" in _hint_of(hero), "the ghost is sent to it again")
 
 
 func test_a_lost_hardcore_dungeon_leaves_the_clearing_as_it_was() -> void:
@@ -217,7 +217,7 @@ func test_a_lost_hardcore_dungeon_leaves_the_clearing_as_it_was() -> void:
 		guard += 1
 	check(main.dungeon == null, "every hero down ends the dungeon")
 	check_eq(RunState.dungeons_failed, 1, "a failed dungeon")
-	check(main.arena.spirit_healer == null and _healers_in_the_arena() == 0, "still no Spirit Healer")
+	check(main.arena.spirit_healer == null and _healers_in_the_arena() == 0, "still no Grave Tender")
 	check(not main.arena.in_dungeon_layout, "the clearing is back")
 	check_eq(main.state, Main.State.INTERMISSION, "the break goes on (the run is not over)")
 
@@ -605,6 +605,6 @@ func test_the_lobbys_mode_choice_reaches_the_run_the_roll_screen_starts() -> voi
 	check_eq(RunState.mode, RunState.MODE_ENDLESS, "endless, as chosen")
 	check(RunState.hardcore, "hardcore, as chosen")
 	check_eq(RunState.environment, winner, "in the arena the roll landed on")
-	check(main.arena.spirit_healer == null, "a hardcore arena without a Spirit Healer")
+	check(main.arena.spirit_healer == null, "a hardcore arena without a Grave Tender")
 	check(main.hud.hardcore_badge.visible, "the HUD shows the badge")
 	check_eq(RunState.total_waves(), 0, "no last wave")

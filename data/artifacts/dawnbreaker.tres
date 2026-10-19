@@ -41,8 +41,8 @@ properties = Array[Dictionary]([{
 }],
 "name": "Hallowed Dawn",
 "needs": "consecration",
-"short": "Consecration heals allies in it for 2% max HP a second.",
-"text": "Consecration heals the allies standing in it for 2% of their max HP every second."
+"short": "Sacred Circle heals allies in it for 2% max HP a second.",
+"text": "Sacred Circle heals the allies standing in it for 2% of their max HP every second."
 }, {
 "effects": [{
 "kind": "ability",
@@ -58,7 +58,7 @@ properties = Array[Dictionary]([{
 }],
 "name": "Dawn's Embrace",
 "needs": "word_of_glory",
-"short": "Word of Glory also shields its target for 15% max HP.",
-"text": "Word of Glory also shields its target for 15% of their max HP."
+"short": "Call of Valor also shields its target for 15% max HP.",
+"text": "Call of Valor also shields its target for 15% of their max HP."
 }])
 weapon_color = Color(1, 0.88, 0.5, 1)

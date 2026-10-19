@@ -169,8 +169,8 @@ func test_learned_ability_data() -> void:
 		check(a.effect != null and a.effect.new() is AbilityEffect, "%s effect" % id)
 		check(a.effect == scripts[id], "%s effect script" % id)
 		_check_rank_data(a)
-	check(Db.get_ability(&"divine_shield").cooldown >= 30.0, "Divine Shield: long cooldown")
-	check(Db.get_ability(&"lay_on_hands").cooldown >= 45.0, "Lay on Hands: long cooldown")
+	check(Db.get_ability(&"divine_shield").cooldown >= 30.0, "Gilded Halo: long cooldown")
+	check(Db.get_ability(&"lay_on_hands").cooldown >= 45.0, "Mending Touch: long cooldown")
 
 
 func test_core_abilities_have_ranks() -> void:
@@ -890,7 +890,7 @@ func test_consecration_ranks_and_specs() -> void:
 	p.abilities.set_cooldown(cons, 0.0)
 	var ally := _ally(1, Vector3(1.0, 0, 0))
 	ally.hp = 2.0
-	check(p.abilities.try_cast(0), "Hallowed Ground")
+	check(p.abilities.try_cast(0), "Healing Circle")
 	areas.clear()
 	for node in tree.get_nodes_in_group(&"ability_areas"):
 		if not node.is_queued_for_deletion():
@@ -938,7 +938,7 @@ func test_word_of_glory_ranks_and_specs() -> void:
 	for h: Player in [a, b, c, p]:
 		h.hp = 2.0
 	hp.set_value(3.0)
-	check(p.abilities.try_cast(1), "Light of Dawn")
+	check(p.abilities.try_cast(1), "Chorus of Dawn")
 	for h: Player in [a, b, c, p]:
 		check(h.hp > 2.0, "%s healed" % h.name)
 	# Holy Bulwark: an absorb shield worth half of the heal.
@@ -968,5 +968,5 @@ func test_bot_paladin_uses_learned_abilities() -> void:
 		p.abilities._physics_process(DT)
 	for id in [&"hammer_of_justice", &"avengers_shield", &"divine_storm", &"blessing_of_kings", &"lay_on_hands"]:
 		check(p.abilities.remaining(p.abilities.slot_of(id)) > 0.0, "bot cast %s" % id)
-	check_eq(p.abilities.remaining(p.abilities.slot_of(&"divine_shield")), 0.0, "healthy bot keeps Divine Shield")
-	check_eq(ally.hp, ally.max_hp(), "Lay on Hands saved the ally")
+	check_eq(p.abilities.remaining(p.abilities.slot_of(&"divine_shield")), 0.0, "healthy bot keeps Gilded Halo")
+	check_eq(ally.hp, ally.max_hp(), "Mending Touch saved the ally")

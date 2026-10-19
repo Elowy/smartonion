@@ -59,7 +59,7 @@ func test_arms_is_the_warrior_reference_tree() -> void:
 	check(arms != null, "warrior_arms in Db")
 	if arms == null:
 		return
-	check(arms.class_id == &"warrior" and arms.index == 0 and arms.display_name == "Arms", "Warrior tree 1")
+	check(arms.class_id == &"warrior" and arms.index == 0 and arms.display_name == "Warblade", "Warrior tree 1")
 	check_eq(arms.talents.size(), 9, "nine talents")
 	var ids: Array[StringName] = []
 	for t in arms.talents:
@@ -67,9 +67,9 @@ func test_arms_is_the_warrior_reference_tree() -> void:
 	check_eq(ids, [&"warrior_arms_deflection", &"warrior_arms_tactical_mastery", &"warrior_arms_improved_charge",
 		&"warrior_arms_deep_wounds", &"warrior_arms_two_handed_specialization", &"warrior_arms_sweeping_blows",
 		&"warrior_arms_impale", &"warrior_arms_sudden_death", &"warrior_arms_mortal_strike"] as Array[StringName], "ids")
-	check_eq(arms.get_talent(&"warrior_arms_impale").prerequisite, &"warrior_arms_deep_wounds", "Impale needs Deep Wounds")
+	check_eq(arms.get_talent(&"warrior_arms_impale").prerequisite, &"warrior_arms_deep_wounds", "Impale needs Gashing Blows")
 	check_eq(arms.get_talent(&"warrior_arms_sweeping_blows").ability, &"whirlwind", "the modifier changes Whirlwind")
-	check(arms.get_talent(&"warrior_arms_mortal_strike").is_capstone(), "Mortal Strike is the capstone")
+	check(arms.get_talent(&"warrior_arms_mortal_strike").is_capstone(), "Ruinous Strike is the capstone")
 	check_eq(arms.get_talent(&"warrior_arms_deflection").text_for_rank(3),
 		"Increases your chance to dodge attacks by 6%.", "rank text")
 
@@ -147,7 +147,7 @@ func test_checker_reports_script_problems() -> void:
 	t = _valid_tree()
 	_rename(t, "warrior_arms")
 	t.talents[8].effects = [{"kind": "script", "script": "res://scenes/talents/warrior/arms_mortal_strike.gd"}]
-	check_eq(tree_problems(t), [] as Array[String], "the real Mortal Strike script passes")
+	check_eq(tree_problems(t), [] as Array[String], "the real Ruinous Strike script passes")
 	_rename(t, "warrior_fury")
 	_expect(t, "file name", "a script of another tree")
 

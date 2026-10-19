@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warlock_chest"
-display_name = "Felfire Robes"
+display_name = "Hexfire Robes"
 flavor = "Fireproof, which is the least you can ask."
 slot_type = 3
 armor_type = 0

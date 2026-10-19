@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"pyroblast"
-display_name = "Pyroblast"
+display_name = "Magma Bolt"
 description = "Gathers a huge fireball for {windup} sec while you keep moving, then hurls it at the toughest enemy in range: heavy Fire damage and a burn for {burn_pct}% more over {burn_duration} sec."
 class_id = &"mage"
 school = &"fire"
@@ -41,13 +41,13 @@ specs = Array[Dictionary]([{
 "mods": {
 "pierce_add": 99
 },
-"name": "Pyroclasm",
+"name": "Piercing Blaze",
 "text": "The fireball burns through every enemy in its path."
 }, {
 "mods": {
 "cooldown_pct": -30.0,
 "windup": 0.0
 },
-"name": "Hot Streak",
-"text": "Pyroblast is cast instantly (no wind-up) and its cooldown is 30% shorter."
+"name": "Quickfire",
+"text": "Magma Bolt is cast instantly (no wind-up) and its cooldown is 30% shorter."
 }])

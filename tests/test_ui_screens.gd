@@ -64,7 +64,7 @@ func test_format_helpers() -> void:
 	check_eq(UiTheme.format_time(65.0), "1:05", "minutes")
 	check_eq(UiTheme.format_time(-1.0), "0", "never negative")
 	check_eq(UiTheme.format_amount(14.2), "15", "hp rounds up")
-	check_eq(UiTheme.resource_name(&"holy_power"), "Holy Power", "resource names")
+	check_eq(UiTheme.resource_name(&"holy_power"), "Resolve", "resource names")
 
 
 func test_glyph_for_keyboard_is_a_key_cap() -> void:

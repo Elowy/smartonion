@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"heroic_leap"
-display_name = "Heroic Leap"
+display_name = "Soaring Slam"
 description = "Leap onto the biggest group of enemies up to 10 m away. The impact deals {damage_pct}% weapon damage to enemies within {radius} m. You cannot be hurt in the air."
 class_id = &"warrior"
 school = &"physical"

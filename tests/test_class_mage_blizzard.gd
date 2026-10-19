@@ -164,6 +164,6 @@ func test_bot_casts_on_its_own() -> void:
 	p.abilities.auto_cast = true
 	_cluster(Vector3(6, 0, 0), 5)
 	Fakes.step(p.abilities, 0.6)
-	check_eq(_areas().size(), 1, "the bot cast one Blizzard")
+	check_eq(_areas().size(), 1, "the bot cast one Hailstorm")
 	Fakes.step(p.abilities, 0.6)
 	check_eq(_areas().size(), 1, "and did not stack another")

@@ -208,5 +208,5 @@ func poisoned_count() -> int:
 
 
 func describe() -> String:
-	return "Deadly Poison: critical hits poison the target for %s%% of the hit's damage over %d sec (stacks up to %d times)." % [
+	return "Lethal Venom: critical hits poison the target for %s%% of the hit's damage over %d sec (stacks up to %d times)." % [
 			String.num(BASE_PCT + PCT_PER_MASTERY * mastery(), 1).trim_suffix(".0"), int(DURATION), max_stacks()]

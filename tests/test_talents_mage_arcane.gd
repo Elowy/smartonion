@@ -92,7 +92,7 @@ func test_arcane_concentration_needs_meditation_and_adds_free_chance() -> void:
 	check_eq(p.talents.add_block_reason(&"mage_arcane_arcane_concentration"), "Requires Arcane Meditation", "prerequisite")
 	_add(p, "mage_arcane_arcane_meditation")
 	_add(p, "mage_arcane_arcane_concentration", 3)
-	check_near(float(_params(p, &"blizzard").get("free_chance", 0.0)), 24.0, 0.0001, "8% per rank on Blizzard (Mana)")
+	check_near(float(_params(p, &"blizzard").get("free_chance", 0.0)), 24.0, 0.0001, "8% per rank on Hailstorm (Mana)")
 	check(not _params(p, &"blink").has("free_chance"), "Blink spends no Mana: untouched")
 
 
@@ -102,7 +102,7 @@ func _free_blizzards(p: Player, casts: int) -> int:
 	var free := 0
 	for i in casts:
 		mana.set_value(mana.max_value())
-		check(p.abilities.try_cast(0), "Blizzard %d" % i)
+		check(p.abilities.try_cast(0), "Hailstorm %d" % i)
 		if is_equal_approx(mana.value, mana.max_value()):
 			free += 1
 	return free
@@ -117,7 +117,7 @@ func test_arcane_concentration_rolls_free_blizzards_on_the_run_rng() -> void:
 	RunState.rng.seed = 777
 	var state := RunState.rng.state
 	var free := _free_blizzards(p, 40)
-	check(free > 0 and free < 40, "some Blizzards are free (%d of 40)" % free)
+	check(free > 0 and free < 40, "some Hailstorms are free (%d of 40)" % free)
 	check_eq(RunState.rng.state, _state_after(state, 40), "one RunState.rng draw per cast")
 	RunState.rng.seed = 777
 	check_eq(_free_blizzards(p, 40), free, "the same seed frees the same casts")
@@ -175,8 +175,8 @@ func test_arcane_power_raises_all_damage_and_mana_costs() -> void:
 	check_near(p.bonuses.damage_mult(null, &"frost", &"dot"), 1.25, 0.0001, "+25% to everything")
 	check_near(p.bonuses.damage_mult(null, &"arcane", &"weapon"), 1.34, 0.0001, "adds to Arcane Focus (1 + 0.09 + 0.25)")
 	var blizzard := _ability(&"blizzard")
-	check_near(p.abilities.cost_of(blizzard), 65.0, 0.0001, "Blizzard costs 65 Mana")
-	check_near(float(_params(p, &"blizzard")["free_chance"]), 24.0, 0.0001, "Arcane Concentration still applies")
+	check_near(p.abilities.cost_of(blizzard), 65.0, 0.0001, "Hailstorm costs 65 Mana")
+	check_near(float(_params(p, &"blizzard")["free_chance"]), 24.0, 0.0001, "Thrifty Casting still applies")
 	check_near(p.abilities.cost_of(_ability(&"blink")), 0.0, 0.0001, "Blink stays free")
 	var mana := p.abilities.get_resource(&"mana")
 	RunState.rng.seed = 5
@@ -200,7 +200,7 @@ func test_mirror_image_params_and_text() -> void:
 	_add(p, "mage_arcane_mirror_image")
 	check_eq(float(_params(p, &"blink")["image_duration"]), 3.0, "3 sec image")
 	check_eq(Db.get_talent(&"mage_arcane_mirror_image").text_for_rank(1),
-		"When you Blink, a Mirror Image stays behind for 3 sec. Enemies within 4 m chase it instead of you, and it bursts for Arcane damage within 2.5 m when it fades. Once every 6 sec at most.",
+		"When you Blink, a Phantom Double stays behind for 3 sec. Enemies within 4 m chase it, not you, and it bursts for Arcane damage within 2.5 m when it fades. Once every 6 sec at most.",
 		"text")
 
 

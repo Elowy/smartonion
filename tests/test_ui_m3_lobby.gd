@@ -47,7 +47,7 @@ func test_card_shows_both_abilities_with_names_and_icons() -> void:
 	a.display_name = "Whirlwind"
 	var b := Fakes.ability(&"charge", &"", 0.0, 8.0)
 	b.display_name = "Charge"
-	var card := _join(UiFakes.HumanInput.new("pad:a"), _class([a, b], "Battle Fury: more damage the lower your health."))
+	var card := _join(UiFakes.HumanInput.new("pad:a"), _class([a, b], "Cornered Fury: more damage the lower your health."))
 	check_eq(card.ability_icons.size(), 2, "two core abilities")
 	check_eq(card.ability_name_labels[0].text, "Whirlwind", "first name")
 	check_eq(card.ability_name_labels[1].text, "Charge", "second name")
@@ -72,9 +72,9 @@ func test_card_prompts_follow_the_device() -> void:
 
 func test_mastery_line_comes_from_class_data() -> void:
 	var abilities: Array[AbilityData] = [Fakes.ability(&"a"), Fakes.ability(&"b")]
-	var card := _join(UiFakes.HumanInput.new("pad:a"), _class(abilities, "Battle Fury: the lower your health, the harder you hit."))
+	var card := _join(UiFakes.HumanInput.new("pad:a"), _class(abilities, "Cornered Fury: the lower your health, the harder you hit."))
 	check(card.mastery_title_label.visible and card.mastery_label.visible, "Mastery shown")
-	check_eq(card.mastery_title_label.text, "Mastery: Battle Fury", "title with the Mastery name")
+	check_eq(card.mastery_title_label.text, "Mastery: Cornered Fury", "title with the Mastery name")
 	check_eq(card.mastery_label.text, "The lower your health, the harder you hit.", "the rest of mastery_text, capitalised")
 	var plain := _join(UiFakes.HumanInput.new("pad:b"), _class(abilities, "Hits harder when hurt."))
 	check_eq(plain.mastery_title_label.text, "Mastery", "no name in the text")
@@ -83,7 +83,7 @@ func test_mastery_line_comes_from_class_data() -> void:
 
 func test_mastery_parts() -> void:
 	check_eq(LobbyCard.mastery_parts("Ignite: crits burn."), ["Ignite", "Crits burn."], "name: text, the body capitalised")
-	check_eq(LobbyCard.mastery_parts("  Aura of Devotion: allies gain Armor: 5.  "), ["Aura of Devotion", "Allies gain Armor: 5."], "first colon only")
+	check_eq(LobbyCard.mastery_parts("  Aura of Fealty: allies gain Armor: 5.  "), ["Aura of Fealty", "Allies gain Armor: 5."], "first colon only")
 	check_eq(LobbyCard.mastery_parts("Fury: +2% damage."), ["Fury", "+2% damage."], "a body not starting with a letter stays")
 	check_eq(LobbyCard.mastery_parts("Allies nearby gain bonuses and then something: else"), ["", "Allies nearby gain bonuses and then something: else"], "a long lead-in is not a name")
 	check_eq(LobbyCard.mastery_parts(""), ["", ""], "empty")

@@ -23,4 +23,4 @@ ppm = 0.0
 chance = 10.0
 icd = 8.0
 school = &"frost"
-description = "When struck: 10% chance to release a Frost Nova that deals {damage} Frost damage and freezes nearby enemies for {stun_fixed} sec."
+description = "When struck: 10% chance to release a Rime Burst that deals {damage} Frost damage and freezes nearby enemies for {stun_fixed} sec."

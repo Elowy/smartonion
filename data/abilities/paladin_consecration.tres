@@ -6,8 +6,8 @@
 [resource]
 script = ExtResource("1_script")
 id = &"consecration"
-display_name = "Consecration"
-description = "Consecrates the ground beneath you for {duration} sec: enemies standing in it take Holy damage every {tick} sec (scales with Strength and Spell Power)."
+display_name = "Sacred Circle"
+description = "Blesses the ground beneath you for {duration} sec: enemies standing in it take Holy damage every {tick} sec (scales with Strength and Spell Power)."
 class_id = &"paladin"
 school = &"holy"
 tags = Array[StringName]([&"aoe", &"ground"])
@@ -44,12 +44,12 @@ specs = Array[Dictionary]([{
 "heal": 0.5,
 "heal_spell_power_scale": 0.25
 },
-"name": "Hallowed Ground",
+"name": "Healing Circle",
 "text": "The ground also heals heroes standing in it for 0.5 HP every 0.5 sec (+Spell Power)."
 }, {
 "mods": {
 "slow": 50.0
 },
 "name": "Binding Ground",
-"text": "Enemies standing in the consecrated ground are slowed by 50%."
+"text": "Enemies standing in the circle are slowed by 50%."
 }])

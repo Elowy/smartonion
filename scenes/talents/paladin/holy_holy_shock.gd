@@ -79,7 +79,7 @@ func begin_wave() -> void:
 
 
 func describe() -> String:
-	return "Holy Shock: every %.1f sec" % interval_now()
+	return "Radiant Pulse: every %.1f sec" % interval_now()
 
 
 ## One shock: heal, else smite, else hold (retry).

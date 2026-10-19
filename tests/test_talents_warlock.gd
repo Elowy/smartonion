@@ -116,24 +116,24 @@ func test_the_three_warlock_trees_are_in_db() -> void:
 		"GDD 7.2 order")
 	var aff := trees[0]
 	check_eq(aff.get_talent(&"warlock_affliction_writhe_in_agony").prerequisite, &"warlock_affliction_curse_of_agony",
-		"Writhe in Agony needs Curse of Agony")
-	check_eq(aff.get_talent(&"warlock_affliction_dark_harvest").ability, &"drain_life", "Dark Harvest changes Drain Life")
-	check(aff.get_talent(UA_ID).is_capstone(), "Unstable Affliction is the capstone")
+		"Spreading Anguish needs Hex of Anguish")
+	check_eq(aff.get_talent(&"warlock_affliction_dark_harvest").ability, &"drain_life", "Dark Harvest changes Vital Siphon")
+	check(aff.get_talent(UA_ID).is_capstone(), "Volatile Blight is the capstone")
 	var demo := trees[1]
 	check_eq(demo.get_talent(&"warlock_demonology_master_demonologist").prerequisite, &"warlock_demonology_unholy_power",
-		"Master Demonologist needs Unholy Power")
-	check_eq(demo.get_talent(&"warlock_demonology_wild_imps").ability, &"rain_of_fire", "Wild Imps change Rain of Fire")
-	check(demo.get_talent(&"warlock_demonology_soul_link").is_capstone(), "Soul Link is the capstone")
+		"Pactmaster needs Pack Command")
+	check_eq(demo.get_talent(&"warlock_demonology_wild_imps").ability, &"rain_of_fire", "Imp Brood changes Ember Rain")
+	check(demo.get_talent(&"warlock_demonology_soul_link").is_capstone(), "Soul Tether is the capstone")
 	check_eq(demo.get_talent(&"warlock_demonology_fel_synergy").text_for_rank(3),
 		"Your demons tend your party: every 5 sec the most wounded hero (you included) heals 4.5% of their Max HP.",
 		"4.5 prints with its decimal")
 	var dest := trees[2]
 	check_eq(dest.get_talent(&"warlock_destruction_ruin").prerequisite, &"warlock_destruction_devastation",
 		"Ruin needs Devastation")
-	check_eq(dest.get_talent(&"warlock_destruction_shadowburn").ability, &"drain_life", "Shadowburn changes Drain Life")
-	check(dest.get_talent(&"warlock_destruction_conflagrate").is_capstone(), "Conflagrate is the capstone")
+	check_eq(dest.get_talent(&"warlock_destruction_shadowburn").ability, &"drain_life", "Parting Scorch changes Vital Siphon")
+	check(dest.get_talent(&"warlock_destruction_conflagrate").is_capstone(), "Lingering Blaze is the capstone")
 	check_eq(aff.get_talent(&"warlock_affliction_curse_of_agony").text_for_rank(3),
-		"Your weapon hits curse their target with Agony: 15% of the hit's damage as Shadow damage over 6 sec. Further hits add to the curse.",
+		"Your weapon hits curse their target with Anguish: 15% of the hit's damage as Shadow damage over 6 sec. Further hits add to the curse.",
 		"rank text")
 
 
@@ -175,9 +175,9 @@ func test_curse_of_agony_curses_from_the_base_amount_of_every_hit() -> void:
 	var p := _warlock()
 	var e := _enemy(Vector3(3, 0, 0))
 	var f := _enemy(Vector3(3.5, 0, 0.5))
-	check_eq(_params(p)["agony_pct"], 0.0, "neutral: no Agony")
+	check_eq(_params(p)["agony_pct"], 0.0, "neutral: no Anguish")
 	_hit(p, e, 10.0, 8.0)
-	check(_aff(p) == null or not _aff(p).has(AGONY, e), "no talent: no Agony")
+	check(_aff(p) == null or not _aff(p).has(AGONY, e), "no talent: no Anguish")
 	_add(p, "curse_of_agony")
 	check_eq(_params(p)["agony_pct"], 5.0, "rank 1: 5% (the cache was dropped on the talent change)")
 	_add(p, "curse_of_agony", 2)
@@ -186,7 +186,7 @@ func test_curse_of_agony_curses_from_the_base_amount_of_every_hit() -> void:
 	_hit(p, e, 10.0, 8.0)
 	_hit(p, f, 10.0, 8.0, false)  # a further enemy of the same attack (pierce / arc)
 	var a := _aff(p).get_affliction(AGONY, e)
-	check(a != null, "Agony on the target")
+	check(a != null, "Anguish on the target")
 	if a == null:
 		return
 	check_near(a.rate, 8.0 * 0.15 / 6.0, 0.0001, "15% of the BASE amount (8, not the dealt 10) over 6 sec")
@@ -197,13 +197,13 @@ func test_curse_of_agony_curses_from_the_base_amount_of_every_hit() -> void:
 	check_eq(RunState.rng.state, state, "no RNG")
 	WFakes.step(_aff(p), 0.5)
 	check_eq(e.hits.size(), 1, "one tick after 0.5 sec")
-	check_near(e.hits[0], 0.2 * 0.5, 0.0001, "0.1 per tick (Demonic Pact 0 at 0 Mastery)")
+	check_near(e.hits[0], 0.2 * 0.5, 0.0001, "0.1 per tick (Ember Pact 0 at 0 Mastery)")
 	check(e.attackers[0] == p, "kill credit to the Warlock")
 	_remove(p, "curse_of_agony", 3)
 	check_eq(_params(p)["agony_pct"], 0.0, "undone")
 	var g := _enemy(Vector3(-3, 0, 0))
 	_hit(p, g, 10.0, 8.0)
-	check(not _aff(p).has(AGONY, g), "no new Agony without the talent")
+	check(not _aff(p).has(AGONY, g), "no new Anguish without the talent")
 
 
 func test_agony_rolls_the_rest_into_a_refresh_and_ticks_as_a_dot_once() -> void:
@@ -221,7 +221,7 @@ func test_agony_rolls_the_rest_into_a_refresh_and_ticks_as_a_dot_once() -> void:
 	p.stats.set_source(&"t", {Stats.MASTERY: 10.0})
 	var before := e.hits.size()
 	WFakes.step(_aff(p), 0.5)
-	check_near(e.hits[before], a.rate * 0.5 * 1.2, 0.001, "Demonic Pact (+20%) once")
+	check_near(e.hits[before], a.rate * 0.5 * 1.2, 0.001, "Ember Pact (+20%) once")
 	check_near(p.outgoing_damage_mult(e, &"shadow", &"dot"), 1.2, 0.0001, "the multiplier of its ticks")
 	WFakes.step(_aff(p), 6.0)
 	check_near(e.total(), 0.6 + 1.8 * 1.2, 0.03, "every point of the curse dealt")
@@ -273,7 +273,7 @@ func test_shadow_mastery_boosts_shadow_damage_and_agony() -> void:
 	var e := _enemy(Vector3(3, 0, 0))
 	_hit(p, e, 10.0, 8.0)
 	WFakes.step(_aff(p), 0.5)
-	check_near(e.hits[0], 0.1 * 1.09, 0.0001, "Agony's Shadow ticks once x 1.09")
+	check_near(e.hits[0], 0.1 * 1.09, 0.0001, "Anguish's Shadow ticks once x 1.09")
 	_remove(p, "shadow_mastery", 3)
 	check_near(p.outgoing_damage_mult(null, &"shadow", &"ability"), 1.0, 0.0001, "undone")
 
@@ -290,7 +290,7 @@ func test_curse_of_exhaustion_slows_every_afflicted_enemy() -> void:
 		check_eq(_params(p)["slow"], 10.0 * rank, "slow at rank %d" % rank)
 		check_near(_aff(p).slow_pct(), 10.0 * rank, 0.0001, "the afflictions read it")
 	_hit(p, e, 10.0, 8.0)
-	check_eq(e.slow_pct, 30.0, "a fresh / refreshed Agony slows 30%")
+	check_eq(e.slow_pct, 30.0, "a fresh / refreshed Anguish slows 30%")
 	_aff(p).corrupt(c, 1.0, 4.0, 0, 0.0)
 	check_eq(c.slow_pct, 30.0, "Corruption too")
 	e.slow_left = 0.0
@@ -343,7 +343,7 @@ func test_dark_harvest_drains_every_afflicted_enemy_in_range() -> void:
 	var effect := _drain(p)
 	check(p.abilities.try_cast(LT), "cast without the modifier")
 	WFakes.step_abilities(p, 2.1)
-	check(b.hits.is_empty() and c.hits.is_empty(), "plain Drain Life drains its target only")
+	check(b.hits.is_empty() and c.hits.is_empty(), "plain Vital Siphon drains its target only")
 	check_eq(effect.harvest_hits, 0, "no harvest")
 	_add(p, "curse_of_agony", 3)
 	_add(p, "improved_drain_life", 3)
@@ -440,7 +440,7 @@ func test_writhe_in_agony_splits_the_rest_of_the_curse() -> void:
 	host.die_now(null)
 	WFakes.step(_aff(p), DT)
 	var got: Array = [a, b, c].filter(func(x: Enemy) -> bool: return _aff(p).has(AGONY, x))
-	check_eq(got.size(), 2, "split between the two nearest without Agony")
+	check_eq(got.size(), 2, "split between the two nearest without Anguish")
 	check(_aff(p).has(AGONY, a) and _aff(p).has(AGONY, c), "A (1 m) and C (1.8 m), not B (2 m)")
 	check(not _aff(p).has(AGONY, out), "not beyond 4 m")
 	var aa := _aff(p).get_affliction(AGONY, a)
@@ -482,7 +482,7 @@ func test_writhe_in_agony_rank_one_and_despawn() -> void:
 	var n1 := _enemy(Vector3(1, 0, 8))
 	var n2 := _enemy(Vector3(0, 0, 9.5))
 	_hit(p, host2, 50.0, 40.0)
-	check(_aff(p).has(AGONY, host2), "Curse of Agony still curses")
+	check(_aff(p).has(AGONY, host2), "Hex of Anguish still curses")
 	host2.die_now(p)
 	WFakes.step(_aff(p), DT)
 	check(not _aff(p).has(AGONY, n1) and not _aff(p).has(AGONY, n2), "the neighbours stay clean")

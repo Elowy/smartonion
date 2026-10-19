@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"blade_flurry"
-display_name = "Blade Flurry"
+display_name = "Cleaving Blades"
 description = "For {duration} sec, your weapon hits also strike other enemies nearby for {damage_pct}% of their damage (extra targets per hit: {targets})."
 class_id = &"rogue"
 school = &"physical"
@@ -32,4 +32,4 @@ kind = 2
 card_weight = 1.0
 rank3 = {"targets_add": 1}
 rank3_text = "Hits strike 1 more extra target"
-specs = Array[Dictionary]([{"name": "Relentless Flurry", "text": "Every kill during Blade Flurry makes it last 1 sec longer (up to 5 sec).", "mods": {"extend_on_kill": 1.0}}, {"name": "Adrenaline Surge", "text": "Blade Flurry also grants 30% Haste while it lasts.", "mods": {"haste_pct_add": 30.0}}])
+specs = Array[Dictionary]([{"name": "Relentless Blades", "text": "Every kill during Cleaving Blades makes it last 1 sec longer (up to 5 sec).", "mods": {"extend_on_kill": 1.0}}, {"name": "Racing Pulse", "text": "Cleaving Blades also grants 30% Haste while it lasts.", "mods": {"haste_pct_add": 30.0}}])

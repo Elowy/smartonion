@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"rain_of_fire"
-display_name = "Rain of Fire"
+display_name = "Ember Rain"
 description = "Rains fire on the densest group of enemies: a {radius} m circle burns everything inside for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
@@ -42,4 +42,4 @@ kind = 0
 card_weight = 1.0
 rank3 = {"radius_add": 1.0}
 rank3_text = "+1 m radius"
-specs = Array[Dictionary]([{"name": "Walking Inferno", "text": "Rain of Fire centres on you and moves with you, and lasts 1 sec longer.", "mods": {"follows": true, "duration_add": 1.0}}, {"name": "Twin Storms", "text": "A second circle of fire falls on the next-densest group.", "mods": {"storms": 2}}])
+specs = Array[Dictionary]([{"name": "Walking Inferno", "text": "Ember Rain centres on you and moves with you, and lasts 1 sec longer.", "mods": {"follows": true, "duration_add": 1.0}}, {"name": "Twin Storms", "text": "A second circle of fire falls on the next-densest group.", "mods": {"storms": 2}}])

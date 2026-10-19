@@ -123,7 +123,7 @@ func _fly(p: Player, seconds: float = 0.7) -> void:
 func _throw_fan(p: Player) -> Array[RogueBlade]:
 	_clear_knives()
 	_energy(p).set_value(100.0)
-	check(p.abilities.try_cast(0), "Fan of Knives cast")
+	check(p.abilities.try_cast(0), "Knife Bloom cast")
 	return _knives(p)
 
 

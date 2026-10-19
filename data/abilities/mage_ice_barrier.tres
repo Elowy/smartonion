@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"ice_barrier"
-display_name = "Ice Barrier"
+display_name = "Frozen Layer"
 description = "Wraps you in ice that absorbs {shield} damage (more with Intellect and Spell Power) until it breaks. Cast again once it is gone."
 class_id = &"mage"
 school = &"frost"
@@ -46,6 +46,6 @@ specs = Array[Dictionary]([{
 "mods": {
 "ice_block_add": 1.5
 },
-"name": "Ice Block",
+"name": "Glacial Cocoon",
 "text": "When the barrier breaks you are encased in ice: immune to damage for 1.5 sec."
 }])

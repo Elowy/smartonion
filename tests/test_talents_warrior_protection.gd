@@ -159,7 +159,7 @@ func test_protection_tree_data() -> void:
 	check(prot != null, "warrior_protection in Db")
 	if prot == null:
 		return
-	check(prot.class_id == &"warrior" and prot.index == 2 and prot.display_name == "Protection", "Warrior tree 3")
+	check(prot.class_id == &"warrior" and prot.index == 2 and prot.display_name == "Ironwall", "Warrior tree 3")
 	var ids: Array[StringName] = []
 	for t in prot.talents:
 		ids.append(t.id)
@@ -170,8 +170,8 @@ func test_protection_tree_data() -> void:
 	var toughness := prot.get_talent(&"warrior_protection_toughness")
 	var spec := prot.get_talent(&"warrior_protection_shield_specialization")
 	check(toughness.tier == 1 and toughness.column == 0, "Toughness: tier 1, column 0 (the style-free start)")
-	check(spec.tier == 1 and spec.column == 1, "Shield Specialization: column 1")
-	check_eq(prot.get_talent(&"warrior_protection_shield_mastery").prerequisite, spec.id, "Shield Mastery needs Shield Specialization")
+	check(spec.tier == 1 and spec.column == 1, "Shield Prowess: column 1")
+	check_eq(prot.get_talent(&"warrior_protection_shield_mastery").prerequisite, spec.id, "Shieldcraft needs Shield Prowess")
 	check_eq(prot.get_talent(&"warrior_protection_challenging_charge").ability, &"charge", "the modifier changes Charge")
 	check(prot.get_talent(UNBREAKABLE_ID).is_capstone(), "Unbreakable is the capstone")
 	check_eq(prot.get_talent(&"warrior_protection_defiance").text_for_rank(3),
@@ -309,7 +309,7 @@ func test_shield_mastery_needs_shield_specialization_and_a_shield() -> void:
 	_add(p, "shield_specialization", 2)
 	_add(p, "revenge", 3)
 	_add(p, "defiance", 1)
-	check_eq(p.talents.add_block_reason(&"warrior_protection_shield_mastery"), "Requires Shield Specialization", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"warrior_protection_shield_mastery"), "Requires Shield Prowess", "prerequisite")
 	_add(p, "shield_specialization")
 	_add(p, "shield_mastery", 3)
 	check_eq(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0, "no shield: nothing")
@@ -332,10 +332,10 @@ func test_blood_and_thunder_powers_whirlwind_and_thunder_clap_and_slows() -> voi
 	check_near(float(params["power"]), 1.15, 0.0001, "Whirlwind +5% power per rank")
 	check_near(float(params["slow"]), 30.0, 0.0001, "and a 10% slow per rank")
 	check_near(float(params["slow_duration"]), 1.5, 0.0001, "for 1.5 sec")
-	check(not p.abilities.knows(&"thunder_clap"), "Thunder Clap not learned")
+	check(not p.abilities.knows(&"thunder_clap"), "Ground Slam not learned")
 	var tc_params := p.abilities.params_for(tc)
-	check_near(float(tc_params["power"]), 1.15, 0.0001, "Thunder Clap +5% power per rank")
-	check_eq(float(tc_params["slow"]), tc_slow, "Thunder Clap's own slow untouched")
+	check_near(float(tc_params["power"]), 1.15, 0.0001, "Ground Slam +5% power per rank")
+	check_eq(float(tc_params["slow"]), tc_slow, "Ground Slam's own slow untouched")
 	var e := _fake(Vector3(1.5, 0, 0))
 	_rage(p).set_value(100.0)
 	check(p.abilities.try_cast(0), "spin")
@@ -508,11 +508,11 @@ func test_unbreakable_defers_to_shield_walls_last_stand() -> void:
 	_to_capstone(p)
 	var u := _unbreakable(p)
 	var slot := p.abilities.learn(Db.get_ability(&"shield_wall"))
-	check(slot >= 0, "learn Shield Wall")
+	check(slot >= 0, "learn Stalwart Guard")
 	var entries: Array[Dictionary] = [{"kind": "ability", "match": {"id": "shield_wall"}, "mods": {"last_stand": true},
 		"rank": 1, "id": "test", "label": "Test"}]
 	p.bonuses.set_effects(&"test", entries)
-	check(p.abilities.try_cast(slot), "Shield Wall with Last Stand")
+	check(p.abilities.try_cast(slot), "Stalwart Guard with Last Stand")
 	var wall := p.abilities.effect_for(p.abilities.slots[slot]) as WarriorShieldWall
 	check(wall.guards_lethal(), "the wall guards lethal hits")
 	_lethal(p)
@@ -554,8 +554,8 @@ func test_protection_bot_path_without_a_shield() -> void:
 	check_eq(path, PROTECTION_PATH, "Protection bot path (talents_warrior.md 5.4)")
 	check_eq(path.find(&"warrior_protection_challenging_charge"), 6, "the modifier is point 7")
 	check_eq(path.find(UNBREAKABLE_ID), 12, "the capstone is point 13")
-	check_eq(p.talents.rank_of(&"warrior_protection_shield_specialization"), 0, "no dead points in Shield Specialization")
-	check_eq(p.talents.rank_of(&"warrior_protection_shield_mastery"), 0, "nor in Shield Mastery")
+	check_eq(p.talents.rank_of(&"warrior_protection_shield_specialization"), 0, "no dead points in Shield Prowess")
+	check_eq(p.talents.rank_of(&"warrior_protection_shield_mastery"), 0, "nor in Shieldcraft")
 	check(_unbreakable(p) != null, "Unbreakable runs")
 
 

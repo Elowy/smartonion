@@ -102,7 +102,7 @@ func cast(ctx: AbilityContext) -> bool:
 	if player.is_inside_tree():
 		Vfx.death_puff(player.global_position + Vector3.UP * 0.6, SMOKE_COLOR, 1.3)
 		_smoke_bomb(player, ctx.num("smoke_radius", 0.0), ctx.num("smoke_stun", 0.0))
-		Vfx.floating_text(player.self_text_position(1.0), "Vanish", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
+		Vfx.floating_text(player.self_text_position(1.0), "Melt Away", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
 	return true
 
 

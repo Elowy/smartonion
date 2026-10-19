@@ -107,7 +107,7 @@ func test_pip_only_class_has_a_trough_of_pips_and_no_bar() -> void:
 	var p := _hero([Fakes.holy_power()], [])
 	check(frame.resource_bar == null, "no bar for a pips-only class")
 	var pips := frame.resource_display.pips_for(&"holy_power")
-	check_eq(pips.count, 3, "Holy Power has three pips")
+	check_eq(pips.count, 3, "Resolve has three pips")
 	check(pips.trough, "the primary pips sit in a trough")
 	p.abilities.get_resource(&"holy_power").add(2.0, false)
 	check_eq(pips.filled, 2, "two lit")
@@ -116,7 +116,7 @@ func test_pip_only_class_has_a_trough_of_pips_and_no_bar() -> void:
 func test_soul_shards_use_the_shard_shape() -> void:
 	_hero([Fakes.resource(&"soul_shard", ResourceData.Display.PIPS, 5.0, Color(0.7, 0.3, 0.95), 1.0)], [])
 	var pips := frame.resource_display.pips_for(&"soul_shard")
-	check(pips.shard, "Soul Shards are crystals")
+	check(pips.shard, "Pact Shards are crystals")
 	check_eq(pips.filled, 1, "starts with the start value")
 
 
@@ -437,7 +437,7 @@ func test_every_class_frame_fits_the_height_limit() -> void:
 		for f: UnitFrame in [frame, _frame_right()]:
 			f.bind(p)
 			check(f.is_downed_shown(), "%s: DOWNED overlay" % class_id)
-			check_eq(f.hint_label.text, "Go to the Spirit Healer", "%s: the Spirit Healer hint" % class_id)
+			check_eq(f.hint_label.text, "Go to the Grave Tender", "%s: the Grave Tender hint" % class_id)
 			var downed := f.get_combined_minimum_size()
 			check(downed.y <= UnitFrame.MAX_HEIGHT, "%s P%d downed: %s px tall" % [class_id, f.index + 1, downed.y])
 			check_eq(downed.y, alive_heights[0], "%s P%d: going down does not change the frame height" % [class_id, f.index + 1])

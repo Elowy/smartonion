@@ -63,44 +63,44 @@ func test_class_data_wiring() -> void:
 	var c := Db.get_class_data(&"paladin")
 	check_eq(c.resources.size(), 1, "one resource")
 	var hp := c.resources[0]
-	check_eq(hp.id, &"holy_power", "Holy Power")
+	check_eq(hp.id, &"holy_power", "Resolve")
 	check_eq(hp.display, ResourceData.Display.PIPS, "pips")
 	check_eq(hp.max_value, 3.0, "0-3 pips")
 	check_eq(hp.gain_per_hits, 5, "+1 every 5th weapon hit")
 	check_eq(hp.gain_per_hits_amount, 1.0, "+1")
 	check_eq(c.abilities.size(), 2, "two core abilities")
 	var cons := c.abilities[RT]
-	check_eq(cons.id, &"consecration", "RT = Consecration")
+	check_eq(cons.id, &"consecration", "RT = Sacred Circle")
 	check_eq(cons.targeting, AbilityData.Targeting.SELF, "under the Paladin")
 	check_eq(cons.cooldown, 10.0, "10 s cooldown")
 	check_eq(cons.school, &"holy", "holy")
 	check_eq(cons.resource, &"", "free")
 	var wog := c.abilities[LT]
-	check_eq(wog.id, &"word_of_glory", "LT = Word of Glory")
-	check_eq(wog.resource, &"holy_power", "spends Holy Power")
-	check_eq(wog.cost, 3.0, "3 Holy Power")
+	check_eq(wog.id, &"word_of_glory", "LT = Call of Valor")
+	check_eq(wog.resource, &"holy_power", "spends Resolve")
+	check_eq(wog.cost, 3.0, "3 Resolve")
 	check_eq(wog.targeting, AbilityData.Targeting.ALLY, "ally targeting")
 	check(bool(wog.params.get("prefer_downed", false)), "prefers downed allies")
 	check_eq(wog.cast_range, 8.0, "8 m")
 	check(c.mastery != null and c.mastery_text != "", "Mastery + text")
 	var p := _paladin()
-	check_eq(p.abilities.cost_of(wog), 3.0, "3 Holy Power without the Libram")
-	check_eq(p.abilities.cooldown_of(wog), 0.0, "no cooldown: Holy Power is the limit")
-	check(p.abilities.mastery is PaladinAuraOfDevotion, "Aura of Devotion")
-	check(p.abilities.effect_for(p.abilities.slots[RT]) is PaladinConsecration, "Consecration effect")
-	check(p.abilities.effect_for(p.abilities.slots[LT]) is PaladinWordOfGlory, "Word of Glory effect")
-	check(p.abilities.mastery.describe().begins_with("Aura of Devotion"), "describe")
+	check_eq(p.abilities.cost_of(wog), 3.0, "3 Resolve without the Hymnal")
+	check_eq(p.abilities.cooldown_of(wog), 0.0, "no cooldown: Resolve is the limit")
+	check(p.abilities.mastery is PaladinAuraOfDevotion, "Aura of Fealty")
+	check(p.abilities.effect_for(p.abilities.slots[RT]) is PaladinConsecration, "Sacred Circle effect")
+	check(p.abilities.effect_for(p.abilities.slots[LT]) is PaladinWordOfGlory, "Call of Valor effect")
+	check(p.abilities.mastery.describe().begins_with("Aura of Fealty"), "describe")
 
 
 func test_class_items_are_ability_mods() -> void:
 	var libram := Db.get_unique(&"libram_of_devotion")
-	check_eq(libram.unique_effect, &"ability_mod", "Libram is an ability mod")
+	check_eq(libram.unique_effect, &"ability_mod", "Hymnal is an ability mod")
 	check_eq(libram.class_restriction, &"paladin", "Paladin only")
-	check_eq(StringName(libram.unique_params["ability"]), &"word_of_glory", "modifies Word of Glory")
+	check_eq(StringName(libram.unique_params["ability"]), &"word_of_glory", "modifies Call of Valor")
 	var sabatons := Db.get_unique(&"sabatons_of_the_dawn")
 	check_eq(sabatons.unique_effect, &"ability_mod", "Sabatons are an ability mod")
 	check_eq(sabatons.class_restriction, &"paladin", "Paladin only")
-	check_eq(StringName(sabatons.unique_params["ability"]), &"consecration", "modifies Consecration")
+	check_eq(StringName(sabatons.unique_params["ability"]), &"consecration", "modifies Sacred Circle")
 
 
 # --- Holy Power -------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ func test_consecration_damages_enemies_inside() -> void:
 	check_near(p.abilities.remaining(RT), 10.0, 0.001, "10 s cooldown")
 	check(not p.abilities.try_cast(RT), "on cooldown")
 	var areas := _areas()
-	check_eq(areas.size(), 1, "one consecrated area")
+	check_eq(areas.size(), 1, "one Sacred Circle area")
 	if areas.is_empty():
 		return
 	var area := areas[0]
@@ -217,7 +217,7 @@ func test_word_of_glory_instantly_revives_downed_ally() -> void:
 	check(ally.downed, "ally downed")
 	var res := _holy_power(p)
 	res.set_value(2.0)
-	check(not p.abilities.try_cast(LT), "needs 3 Holy Power")
+	check(not p.abilities.try_cast(LT), "needs 3 Resolve")
 	res.set_value(3.0)
 	var ctx := p.abilities.build_context(p.abilities.slots[LT])
 	check(ctx.target == ally, "targets the downed ally")
@@ -225,7 +225,7 @@ func test_word_of_glory_instantly_revives_downed_ally() -> void:
 	check(not ally.downed, "instantly revived")
 	check_eq(ally.hp, roundf(ally.max_hp() * 0.4), "at 40% HP")
 	check_near(ally.invulnerable_left, Player.INVULNERABLE_AFTER_REVIVE, 0.001, "revive invulnerability")
-	check_eq(res.value, 0.0, "3 Holy Power spent")
+	check_eq(res.value, 0.0, "3 Resolve spent")
 	check_eq(p.hp, p.max_hp(), "Paladin untouched")
 
 
@@ -251,8 +251,8 @@ func test_word_of_glory_no_revive_beyond_8m() -> void:
 	res.set_value(3.0)
 	var wog := p.abilities.slots[LT]
 	check(PaladinWordOfGlory.revive_target(p.abilities.build_context(wog)) == null, "out of range")
-	check(not p.abilities.try_cast(LT), "nothing to do: no cast (Holy Power kept)")
-	check_eq(res.value, 3.0, "Holy Power kept")
+	check(not p.abilities.try_cast(LT), "nothing to do: no cast (Resolve kept)")
+	check_eq(res.value, 3.0, "Resolve kept")
 	p.hp = 5.0
 	check(p.abilities.try_cast(LT), "heals instead")
 	check(ally.downed, "still downed")
@@ -308,7 +308,7 @@ func test_word_of_glory_revives_another_ghost_when_the_nearest_is_about_to_rise(
 	check(not other.downed, "the other ghost is revived")
 	check(soon.downed, "the nearer ghost is left to the healer")
 	check_eq(p.hp, 5.0, "a revive, not a heal")
-	check_eq(_holy_power(p).value, 0.0, "Holy Power spent on the revive")
+	check_eq(_holy_power(p).value, 0.0, "Resolve spent on the revive")
 	healer._physics_process(0.9)
 	check(not soon.downed, "the healer raised the nearer ghost")
 
@@ -352,8 +352,8 @@ func test_libram_reduces_word_of_glory_cost() -> void:
 	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3.0, 0, 0))
 	_down(ally)
 	_holy_power(p).set_value(2.0)
-	check(p.abilities.is_ready(LT), "HUD: ready with 2 Holy Power")
-	check(p.abilities.try_cast(LT), "cast with 2 Holy Power")
+	check(p.abilities.is_ready(LT), "HUD: ready with 2 Resolve")
+	check(p.abilities.try_cast(LT), "cast with 2 Resolve")
 	check(not ally.downed, "revived")
 	check_eq(_holy_power(p).value, 0.0, "2 spent")
 
@@ -389,7 +389,7 @@ func test_bot_paladin_auto_revives() -> void:
 	_holy_power(p).set_value(3.0)
 	for i in 30:
 		p.abilities._physics_process(DT)
-	check(not ally.downed, "bot revived the ally with Word of Glory")
+	check(not ally.downed, "bot revived the ally with Call of Valor")
 	check_eq(_holy_power(p).value, 0.0, "spent")
 
 

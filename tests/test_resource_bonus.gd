@@ -152,7 +152,7 @@ func test_gain_per_hits_and_kills_never_below_one() -> void:
 	var pal := Fakes.spawn_player(world, 0, &"paladin")
 	var hp := _res(pal, &"holy_power")
 	hp.set_bonus({"gain_per_hits_add": -2.0})
-	check_eq(hp.gain_per_hits(), 3, "5 - 2 hits per Holy Power")
+	check_eq(hp.gain_per_hits(), 3, "5 - 2 hits per Resolve")
 	hp.reset()
 	for i in 2:
 		hp.on_weapon_hit(false)
@@ -213,5 +213,5 @@ func test_shard_bonus_on_the_warlock_private_copy() -> void:
 		p.abilities.on_kill(null)
 	check_eq(shards.value, start, "5 kills: nothing")
 	p.abilities.on_kill(null)
-	check_eq(shards.value, start + 1.0, "6th kill: +1 Soul Shard")
+	check_eq(shards.value, start + 1.0, "6th kill: +1 Pact Shard")
 	check_eq(Db.get_class_data(&"warlock").resources[0].gain_per_kills, 12, "shared data untouched")

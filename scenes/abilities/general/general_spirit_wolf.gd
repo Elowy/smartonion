@@ -57,7 +57,7 @@ func cast(ctx: AbilityContext) -> bool:
 		wolves.append(w)
 		changed = true
 	if changed and player.is_inside_tree():
-		Vfx.floating_text(player.self_text_position(1.0), "Spirit Wolf", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
+		Vfx.floating_text(player.self_text_position(1.0), "Phantom Wolf", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
 	return changed
 
 

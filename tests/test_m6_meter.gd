@@ -105,7 +105,7 @@ func test_a_paladin_heal_is_credited_to_the_paladin() -> void:
 	var ally := Fakes.spawn_player(world, 2, &"warrior", Vector3(2.0, 0, 0))
 	_hurt(ally, 3.0)
 	paladin.abilities.get_resource(&"holy_power").set_value(3.0)
-	check(paladin.abilities.try_cast(1), "Word of Glory heals the wounded ally")
+	check(paladin.abilities.try_cast(1), "Call of Valor heals the wounded ally")
 	check(ally.hp > 3.0, "the ally was healed")
 	check(_healing(0) > 0.0, "credited to the paladin (slot 0): %s" % RunState.healing_by_player)
 	check(not RunState.healing_by_player.has(2), "not to the ally who was healed")
@@ -317,7 +317,7 @@ func test_word_of_glory_revive_is_credited_to_the_caster() -> void:
 	ally.take_damage(1000.0)
 	check(ally.downed, "ally downed")
 	paladin.abilities.get_resource(&"holy_power").set_value(3.0)
-	check(paladin.abilities.try_cast(1), "Word of Glory raises the ally")
+	check(paladin.abilities.try_cast(1), "Call of Valor raises the ally")
 	check(not ally.downed, "revived")
 	check_eq(RunState.revives_by_player, {1: 1} as Dictionary[int, int], "the caster only")
 

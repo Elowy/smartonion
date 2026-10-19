@@ -39,8 +39,8 @@ const SPAWN_MIN_TIME := 3.0
 const SPAWN_MAX_SHARE := 0.35
 ## ... and only if ESCAPE_TIME + this many seconds of the wave remain after it.
 const ESCAPE_MARGIN := 3.0
-const APPEARED_TEXT := "A Loot Goblin appeared!"
-const ESCAPED_TEXT := "The Loot Goblin escaped!"
+const APPEARED_TEXT := "A Coin Gremlin appeared!"
+const ESCAPED_TEXT := "The Coin Gremlin escaped!"
 const APPEARED_COLOR := UiTheme.GOLD
 const ESCAPED_COLOR := Color(0.7, 0.7, 0.72)
 

@@ -104,7 +104,7 @@ func test_goblin_data_and_the_director_never_picks_it() -> void:
 	check(d != null, "res://data/enemies/loot_goblin.tres is loaded")
 	if d == null:
 		return
-	check_eq(d.display_name, "Loot Goblin", "name")
+	check_eq(d.display_name, "Coin Gremlin", "name")
 	check_eq(d.max_hp, 30.0, "30 base HP (~7.5 Skeleton Grunts)")
 	check_eq(d.max_hp / Db.get_enemy(&"skeleton_grunt").max_hp, 7.5, "7.5 grunts")
 	check_eq(d.move_speed, 4.4, "4.4 m/s")
@@ -240,7 +240,7 @@ func test_spawner_brings_one_goblin_at_its_time_and_announces_it() -> void:
 	check_eq(g.wave, 3, "at the wave's strength")
 	check_eq(RunState.goblins_spawned, 1, "counted")
 	check_eq(spawner.pending_time(), -1.0, "nothing pending")
-	check_eq(announcements, [["A Loot Goblin appeared!", UiTheme.GOLD]] as Array[Array], "gold banner")
+	check_eq(announcements, [["A Coin Gremlin appeared!", UiTheme.GOLD]] as Array[Array], "gold banner")
 	EFakes.step_all([director, spawner], 4.0)
 	check_eq(_goblins_alive(), 1, "at most one per wave")
 	check_eq(RunState.goblins_spawned, 1, "still one")
@@ -468,7 +468,7 @@ func test_portal_opens_at_15_s_and_the_goblin_escapes() -> void:
 	check_eq(RunState.goblins_escaped, 1, "escape counted")
 	check_eq(RunState.goblins_killed, 0, "not a kill")
 	check(spawner.goblin == null, "the spawner forgot it")
-	check_eq(announcements.back(), ["The Loot Goblin escaped!", GoblinSpawner.ESCAPED_COLOR], "grey banner")
+	check_eq(announcements.back(), ["The Coin Gremlin escaped!", GoblinSpawner.ESCAPED_COLOR], "grey banner")
 	check(EFakes.live_children_of_type(world, LootBag).is_empty(), "no item")
 	check_eq(_gold_on_ground(), 1, "only the coin of the hit")
 
@@ -565,7 +565,7 @@ func test_name_tag_and_portal_look() -> void:
 	var tag := g.get_node_or_null(^"NameTag") as Label3D
 	check(tag != null and tag == g.label, "a name tag")
 	if tag != null:
-		check_eq(tag.text, "Loot Goblin", "text")
+		check_eq(tag.text, "Coin Gremlin", "text")
 		check(tag.no_depth_test and tag.billboard == BaseMaterial3D.BILLBOARD_ENABLED, "always readable")
 		check(tag.modulate.r > 0.9 and tag.modulate.b < 0.5, "gold")
 		check(tag.position.y > g.model.head_height, "above the head (and sack)")

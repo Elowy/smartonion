@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warrior_hands"
-display_name = "Gauntlets of Fury"
+display_name = "Ragebound Gauntlets"
 flavor = "They clench into fists on their own."
 slot_type = 5
 armor_type = 3

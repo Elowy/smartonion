@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"lay_on_hands"
-display_name = "Lay on Hands"
+display_name = "Mending Touch"
 description = "Fully heals the hero with the lowest health within 15 m (you included). Cannot revive."
 class_id = &"paladin"
 school = &"holy"
@@ -36,7 +36,7 @@ specs = Array[Dictionary]([{
 "mods": {
 "group_heal": 60.0
 },
-"name": "Hands of Mercy",
+"name": "Touch of Many",
 "text": "Instead of one full heal, every hero within 15 m is healed for 60% of their max HP."
 }, {
 "mods": {

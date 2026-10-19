@@ -126,7 +126,7 @@ func test_impale_needs_deep_wounds_and_adds_crit_damage() -> void:
 	_add(p, "tactical_mastery", 3)
 	_add(p, "improved_charge", 3)
 	_add(p, "deep_wounds", 2)
-	check_eq(p.talents.add_block_reason(&"warrior_arms_impale"), "Requires Deep Wounds", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"warrior_arms_impale"), "Requires Gashing Blows", "prerequisite")
 	_add(p, "deep_wounds")
 	_add(p, "impale", 3)
 	check_eq(p.stats.get_raw(Stats.CRIT_DAMAGE), crit_damage + 30.0, "+10% crit damage per rank")
@@ -145,21 +145,21 @@ func test_proc_talents_reach_the_proc_system() -> void:
 	_add(p, "improved_charge", 2)
 	_add(p, "sudden_death", 3)
 	var defs: Array = procs.last_defs.get(PlayerBonuses.SOURCE_TALENTS, [])
-	check_eq(defs.size(), 3, "Deep Wounds, Sweeping Blows, Sudden Death")
+	check_eq(defs.size(), 3, "Gashing Blows, Sweeping Blows, Culling Instinct")
 	var by_id := {}
 	for d: Dictionary in defs:
 		by_id[d["id"]] = d
 	var dw: Dictionary = by_id.get("warrior_arms_deep_wounds", {})
-	check(dw.get("trigger") == "on_crit" and dw.get("effect") == "dot" and dw.get("school") == "physical", "Deep Wounds: a bleed on crits")
+	check(dw.get("trigger") == "on_crit" and dw.get("effect") == "dot" and dw.get("school") == "physical", "Gashing Blows: a bleed on crits")
 	check_eq(dw.get("hit_pct"), 20.0, "10% of the hit per rank")
 	check_eq(dw.get("duration"), 3.0, "over 3 sec")
-	check_eq(dw.get("label"), "Deep Wounds", "named after the talent")
+	check_eq(dw.get("label"), "Gashing Blows", "named after the talent")
 	var sb: Dictionary = by_id.get("warrior_arms_sweeping_blows", {})
 	check(sb.get("trigger") == "on_cast" and sb.get("ability") == "whirlwind" and sb.get("effect") == "buff", "Sweeping Blows: after Whirlwind")
 	check(sb.get("stats", {}).get("extra_attack") == 25.0 and sb.get("duration") == 5.0, "25% extra attacks for 5 sec")
 	check_eq(sb.get("label"), "", "silent")
 	var sd: Dictionary = by_id.get("warrior_arms_sudden_death", {})
-	check(sd.get("trigger") == "on_hit" and sd.get("effect") == "cooldown" and sd.get("ability") == "execute" and sd.get("reset") == true, "Sudden Death resets Execute")
+	check(sd.get("trigger") == "on_hit" and sd.get("effect") == "cooldown" and sd.get("ability") == "execute" and sd.get("reset") == true, "Culling Instinct resets Execute")
 	check_eq(sd.get("chance"), 9.0, "3% per rank")
 
 
@@ -182,7 +182,7 @@ func test_mortal_strike_counts_attacks_and_strikes_every_fifth() -> void:
 	check_near(e.fake_damage_log[0], WarriorKit.weapon_damage(p) * 1.5, 0.0001, "150% weapon damage (built from stats)")
 	check_eq(e.fake_attacker_log[0], p, "dealt by the hero")
 	check_eq(RunState.rng.state, state, "no RNG")
-	check(ms.is_wounded(e), "Mortal Wound")
+	check(ms.is_wounded(e), "Ruinous Wound")
 	check_eq(e.heal_reduction_pct, 50.0, "heals 50% less")
 	check_eq(e.heal_reduction_left, 8.0, "for 8 sec")
 	e.hp = 500.0

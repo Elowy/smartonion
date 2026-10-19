@@ -163,8 +163,8 @@ func test_m4_abilities_are_in_the_warlock_pool() -> void:
 		check_eq(_ability(id).kind, AbilityData.Kind.AUTO, "%s is auto-cast" % id)
 	check_eq(_ability(&"fear").kind, AbilityData.Kind.ACTIVE, "fear is active")
 	var infernal := _ability(&"summon_infernal")
-	check_eq(infernal.kind, AbilityData.Kind.ACTIVE, "infernal is active")
-	check_eq(infernal.resource, &"soul_shard", "infernal costs soul shards")
+	check_eq(infernal.kind, AbilityData.Kind.ACTIVE, "Cinder Brute is active")
+	check_eq(infernal.resource, &"soul_shard", "Cinder Brute costs pact shards")
 	check_eq(infernal.cost, 1.0, "1 shard")
 	check(infernal.cooldown >= 30.0, "long cooldown")
 
@@ -253,7 +253,7 @@ func test_corruption_dot_with_demonic_pact() -> void:
 	check(p.abilities.try_cast(slot), "cast again")
 	_step(aff, 1.0)
 	check_eq(e2.hits.size(), 2, "two ticks")
-	check_near(e2.hits[0], rate * 0.5 * 1.2, 0.001, "x Demonic Pact (10 Mastery)")
+	check_near(e2.hits[0], rate * 0.5 * 1.2, 0.001, "x Ember Pact (10 Mastery)")
 
 
 func test_corruption_spreads_with_its_remaining_time() -> void:
@@ -349,7 +349,7 @@ func test_shadow_bolt_hits_the_nearest_enemy() -> void:
 	check(dmg > WarlockShadowBolt.bolt_damage(StatBlock.new(), _params(p, &"shadow_bolt")) + 10.0, "scales with intellect")
 	_fly(bolt)
 	check_eq(e.hits.size(), 1, "hit")
-	check_near(e.hits[0], dmg, 0.001, "ability damage: no Demonic Pact")
+	check_near(e.hits[0], dmg, 0.001, "ability damage: no Ember Pact")
 	check(e.attackers[0] == p, "kill credit")
 	check_eq(other.hits.size(), 0, "the other one untouched")
 
@@ -439,7 +439,7 @@ func test_seed_ripens_and_needs_a_group() -> void:
 	_step(aff, 6.05)
 	check_eq(aff.bursts, 1, "burst when ripe")
 	check_eq(host.hits.size(), 13, "12 DoT ticks + the burst")
-	check_near(host.hits[0], rate * 0.5 * 1.2, 0.001, "seed DoT x Demonic Pact")
+	check_near(host.hits[0], rate * 0.5 * 1.2, 0.001, "seed DoT x Ember Pact")
 	check(effect.host_for(_ctx(p, &"seed_of_corruption")) != null, "can seed again")
 	aff.plant_seed(lone, 1.0, 6.0, 5.0, 3.0)
 	check(effect.host_for(_ctx(p, &"seed_of_corruption")) != lone, "never a second seed in one host")
@@ -563,31 +563,31 @@ func test_voidwalker_is_summoned_and_taunts() -> void:
 	check(pet.global_position.x > 0.8, "steps between the warlock and the threat")
 	check(pet.attacks >= 1, "punches")
 	var dmg := WarlockVoidwalker.attack_damage(p.stats, _params(p, &"summon_voidwalker"))
-	check_near(e.hits[0], dmg * 1.2, 0.001, "pet damage x Demonic Pact")
+	check_near(e.hits[0], dmg * 1.2, 0.001, "pet damage x Ember Pact")
 	check(e.attackers[0] == p, "kill credit")
 	p.abilities._physics_process(DT)
-	check(effect.pet == pet, "only one voidwalker")
+	check(effect.pet == pet, "only one Gloomguard")
 
 
 func test_voidwalker_torment_and_specs() -> void:
 	var p := _warlock()
 	var slot := _learn(p, &"summon_voidwalker", 5, 1)
 	var effect := _effect(p, &"summon_voidwalker") as WarlockSummonVoidwalker
-	check(not p.abilities.try_cast(slot), "nothing to torment without a pet")
+	check(not p.abilities.try_cast(slot), "nothing to taunt with without a pet")
 	effect.ensure_pet(_ctx(p, &"summon_voidwalker"))
 	var pet := effect.pet
-	check(not effect.wants_auto_cast(_ctx(p, &"summon_voidwalker")), "no enemies: no Torment")
+	check(not effect.wants_auto_cast(_ctx(p, &"summon_voidwalker")), "no enemies: no Menace")
 	var around: Array[MortalEnemy] = []
 	for i in 3:
 		around.append(_enemy(pet.global_position + Vector3(2.0 + i, 0, 1.0)))
 	var out := _enemy(pet.global_position + Vector3(14, 0, 0))
 	check(effect.wants_auto_cast(_ctx(p, &"summon_voidwalker")), "untaunted enemies near it")
-	check(p.abilities.try_cast(slot), "Torment")
+	check(p.abilities.try_cast(slot), "Menace")
 	for e in around:
-		check(e.is_taunted() and e.taunt_target == pet, "taunted onto the voidwalker")
+		check(e.is_taunted() and e.taunt_target == pet, "taunted onto the Gloomguard")
 		check_near(e.taunt_left, 3.0, 0.001, "for 3 s")
-		check(e.is_slowed(), "Consuming Shadows slows")
-		check_eq(e.hits.size(), 1, "Consuming Shadows hurts")
+		check(e.is_slowed(), "Smothering Dark slows")
+		check_eq(e.hits.size(), 1, "Smothering Dark hurts")
 	check(not out.is_taunted(), "out of range")
 	check(not effect.wants_auto_cast(_ctx(p, &"summon_voidwalker")), "all taunted already")
 	var dmg := WarlockVoidwalker.attack_damage(p.stats, _params(p, &"summon_voidwalker"))
@@ -695,7 +695,7 @@ func test_fear_specs_dread_and_cower() -> void:
 			* CombatMath.damage_mult_for(p.stats, &"shadow")
 	check_near(rate, per_second, 0.001, "Dread per second: 3 + 40% Int + 100% SP, not x power")
 	_step(aff, 0.5)
-	check_near(e.hits[0], rate * 0.5 * 1.2, 0.001, "a DoT: Demonic Pact applies")
+	check_near(e.hits[0], rate * 0.5 * 1.2, 0.001, "a DoT: Ember Pact applies")
 	_step(aff, 3.0)
 	check_near(e.total(), per_second * 3.0 * 1.2, 0.01, "the whole fear: 3 s of Dread")
 	check(not aff.has(WarlockAfflictions.DREAD, e), "ends with the fear")
@@ -735,7 +735,7 @@ func test_infernal_lands_stuns_and_smashes() -> void:
 	var impact := WarlockInfernal.impact_damage(p.stats, _params(p, &"summon_infernal"))
 	for e in group:
 		check(e.hits.size() >= 1, "landing burst hits the group")
-		check_near(e.hits[0], impact * 1.2, 0.001, "pet damage x Demonic Pact")
+		check_near(e.hits[0], impact * 1.2, 0.001, "pet damage x Ember Pact")
 		check(e.is_stunned(), "stunned")
 	check_eq(lone.hits.size(), 0, "not the lone one")
 	_step(inf, 2.0)
@@ -790,7 +790,7 @@ func test_infernal_specs() -> void:
 	var near := _enemy(Vector3(3, 0, 30))
 	var slot2 := _learn(p2, &"summon_infernal", 5, 1)
 	p2.abilities.get_resource(&"soul_shard").set_value(1.0)
-	check(p2.abilities.try_cast(slot2), "Abyssal Guardian")
+	check(p2.abilities.try_cast(slot2), "Burning Guardian")
 	var inf2 := (_effect(p2, &"summon_infernal") as WarlockSummonInfernal).infernal
 	check_near(inf2.time_left, 13.0, 0.001, "11 + 2 s")
 	var further := _enemy(inf2.global_position + Vector3(4.5, 0, 0))
@@ -852,7 +852,7 @@ func test_drain_life_power_soul_siphon_and_dark_bargain() -> void:
 	var params := p.abilities.params_for(p.abilities.slots[1])
 	check_near(WarlockDrainLife.tick_damage(p.stats, params), base * 1.5, 0.001, "Ranks II + IV: +50%")
 	check_near(float(params["duration"]), 3.0, 0.001, "Rank III: +1 s")
-	check(p.abilities.set_spec(&"drain_life", 0), "Soul Siphon")
+	check(p.abilities.set_spec(&"drain_life", 0), "Threefold Drain")
 	var enemies: Array[MortalEnemy] = []
 	for i in 4:
 		enemies.append(_enemy(Vector3(2.0 + i, 0, 0)))
@@ -890,15 +890,15 @@ func test_rain_of_fire_bots_keep_the_last_shard_for_the_infernal() -> void:
 	var shards := p.abilities.get_resource(&"soul_shard")
 	shards.set_value(1.0)
 	var rof := p.abilities.effect_for(p.abilities.slots[0])
-	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "no infernal: rain")
+	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "no Cinder Brute: rain")
 	var slot := _learn(p, &"summon_infernal")
-	check(not rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "ready infernal: keep the shard")
-	check(not _effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "4 is too few for the infernal")
+	check(not rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "ready Cinder Brute: keep the shard")
+	check(not _effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "4 is too few for the Cinder Brute")
 	_enemy(Vector3(6.8, 0, -0.5))
-	check(_effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "5: infernal")
+	check(_effect(p, &"summon_infernal").wants_auto_cast(_ctx(p, &"summon_infernal")), "5: Cinder Brute")
 	shards.set_value(2.0)
 	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "two shards: both")
 	shards.set_value(1.0)
 	p.abilities.set_cooldown(_ability(&"summon_infernal"), 30.0)
-	check(p.abilities.remaining(slot) > 0.0, "infernal on cooldown")
-	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "infernal on cooldown: rain")
+	check(p.abilities.remaining(slot) > 0.0, "Cinder Brute on cooldown")
+	check(rof.wants_auto_cast(p.abilities.build_context(p.abilities.slots[0])), "Cinder Brute on cooldown: rain")

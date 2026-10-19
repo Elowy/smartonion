@@ -178,7 +178,7 @@ func test_the_dungeon_layout_has_no_spirit_healer_and_one_environment() -> void:
 	var healer := arena.spirit_healer
 	var home_env := arena.world_environment
 	arena.enter_dungeon_layout()
-	check(arena.spirit_healer == null, "no Spirit Healer inside")
+	check(arena.spirit_healer == null, "no Grave Tender inside")
 	check(not healer.is_processing() or healer.process_mode == Node.PROCESS_MODE_DISABLED, "the healer sleeps")
 	var envs := 0
 	var suns := 0
@@ -500,7 +500,7 @@ func test_the_warden_arrives_after_a_rune_with_the_boss_rules() -> void:
 	var kinds: Array[int] = []
 	for a in w.boss_data.abilities:
 		kinds.append(a.kind)
-	check_eq(kinds, [BossAbility.Kind.FROST_CIRCLES, BossAbility.Kind.SUMMON] as Array[int], "frost circles + raise dead")
+	check_eq(kinds, [BossAbility.Kind.FROST_CIRCLES, BossAbility.Kind.SUMMON] as Array[int], "frost circles + call the fallen")
 	check(Dungeon.WARDEN_ID != &"" and not Db.enemies.has(Dungeon.WARDEN_ID), "never in the random enemy pool")
 	check(BossData.for_wave(10).id == &"lich_commander_morvain", "wave 10 still has Morvain, not the Warden")
 
@@ -518,7 +518,7 @@ func test_the_wardens_raise_dead_and_frost_circles_work_in_the_dungeon() -> void
 			raise = a
 		elif a.kind == BossAbility.Kind.FROST_CIRCLES:
 			frost = a
-	check(w._cast_summon(raise), "Raise Dead cast")
+	check(w._cast_summon(raise), "Call the Fallen cast")
 	check_eq(dungeon.alive_count(), before + raise.count, "four adds came")
 	for node in tree.get_nodes_in_group(&"enemies"):
 		check(not (node as Enemy).drops_loot, "the adds pay nothing")
@@ -544,7 +544,7 @@ func test_killing_the_warden_clears_the_dungeon_and_gives_the_arena_back() -> vo
 	_step(Dungeon.OUTRO_TIME + 0.05)
 	check_eq(finished_with, [true] as Array[bool], "finished(true)")
 	check_eq(dungeon.phase, Dungeon.Phase.DONE, "done")
-	check(not arena.in_dungeon_layout and arena.spirit_healer != null, "the clearing and its Spirit Healer are back")
+	check(not arena.in_dungeon_layout and arena.spirit_healer != null, "the clearing and its Grave Tender are back")
 	check_eq(arena.get_bounds().size, Arena.SIZE, "34 x 22 again")
 
 

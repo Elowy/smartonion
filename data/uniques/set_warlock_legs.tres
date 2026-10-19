@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warlock_legs"
-display_name = "Felfire Leggings"
+display_name = "Hexfire Leggings"
 flavor = "The hem keeps trying to bargain with you."
 slot_type = 7
 armor_type = 0

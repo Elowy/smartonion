@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"warbringers_greaves"
-display_name = "Warbringer's Greaves"
+display_name = "Vanguard's Greaves"
 flavor = "They only know one direction: forward."
 slot_type = 8
 armor_type = 3

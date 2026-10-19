@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"blessing_of_kings"
-display_name = "Blessing of Kings"
+display_name = "Boon of Crowns"
 description = "Every hero gains {stat_pct}% of their own stats (Max HP, Strength, Agility, Intellect, Armor, Spirit, secondary stats, Attack and Spell Power) for {duration} sec."
 class_id = &"paladin"
 school = &"holy"
@@ -35,12 +35,12 @@ specs = Array[Dictionary]([{
 "mods": {
 "might": 10.0
 },
-"name": "Blessing of Might",
+"name": "Boon of Vigor",
 "text": "Blessed heroes also deal 10% more damage."
 }, {
 "mods": {
 "sanctuary": 10.0
 },
-"name": "Blessing of Sanctuary",
+"name": "Boon of Warding",
 "text": "Blessed heroes also take 10% less damage."
 }])

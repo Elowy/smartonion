@@ -13,7 +13,7 @@ func _fan_log(p: Player, e: Fakes.FakeEnemy) -> Array[float]:
 
 func test_the_constants_are_the_tuned_numbers() -> void:
 	check_eq(RogueBlade.BOSS_REPEAT_MULT, 0.4, "a further knife on the same boss deals 40%")
-	check_near(RogueBlade.BOSS_ENVENOM_MULT, 2.0 / 3.0, 0.00001, "an Envenom burst on a boss is two thirds")
+	check_near(RogueBlade.BOSS_ENVENOM_MULT, 2.0 / 3.0, 0.00001, "an Overdose burst on a boss is two thirds")
 
 
 func test_a_normal_big_enemy_takes_every_knife_in_full() -> void:

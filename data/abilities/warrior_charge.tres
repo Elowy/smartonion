@@ -46,7 +46,7 @@ specs = Array[Dictionary]([{
 "impact_pct_add": 150.0,
 "stun_radius_add": 1.0
 },
-"name": "Warbringer",
+"name": "Battering Ram",
 "text": "Every enemy you stun takes 150% weapon damage; +1 m landing radius."
 }, {
 "mods": {

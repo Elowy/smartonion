@@ -294,12 +294,12 @@ func test_ability_tags() -> void:
 		for tag in a.tags:
 			check(tag in BonusVocabulary.TAGS, "%s: known tag %s" % [id, tag])
 	check_eq(Db.get_ability(&"fireball").tags, [&"projectile", &"dot", &"spell"] as Array[StringName], "fireball")
-	check_eq(Db.get_ability(&"thunder_clap").tags, [&"aoe", &"cc", &"weapon"] as Array[StringName], "thunder clap")
+	check_eq(Db.get_ability(&"thunder_clap").tags, [&"aoe", &"cc", &"weapon"] as Array[StringName], "ground slam")
 	var pets := 0
 	for id in Db.abilities:
 		if &"pet" in Db.abilities[id].tags:
 			pets += 1
-	check_eq(pets, 3, "spirit wolf, infernal, voidwalker")
+	check_eq(pets, 3, "phantom wolf, cinder brute, gloomguard")
 
 
 ## Two "zz_test" trees (index 1 given first) + one of another class, registered in Db like
@@ -1226,8 +1226,8 @@ func test_main_applies_the_m5_options_and_wires_the_spawner() -> void:
 	check_eq(main.players[0].talents.points_earned(), 3, "the heroes have the talent points")
 	check(main.goblin_spawner != null and main.goblin_spawner.get_parent() == main.wave_director, "spawner under the director")
 	check_eq(main.goblin_spawner.director, main.wave_director, "knows its director")
-	main.goblin_spawner.announced.emit("A Loot Goblin appeared!", UiTheme.GOLD)
-	check_eq(main.hud.banner_label.text, "A Loot Goblin appeared!", "announcements become banners")
+	main.goblin_spawner.announced.emit("A Coin Gremlin appeared!", UiTheme.GOLD)
+	check_eq(main.hud.banner_label.text, "A Coin Gremlin appeared!", "announcements become banners")
 	var data := main.smoke_result("completed")
 	for key in ["elites_spawned", "elites_killed", "goblins_spawned", "goblins_killed", "goblins_escaped",
 			"weapons_forged", "talent_points_spent", "talent_resets", "set_bonuses", "gold_spent",

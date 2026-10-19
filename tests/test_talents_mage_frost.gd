@@ -22,7 +22,7 @@ func _ice_lance_mage(pos: Vector3 = Vector3.ZERO) -> Player:
 	var p := _mage(pos)
 	_plan(p, FROST_12)
 	_add(p, String(ICE_LANCE))
-	check(_ice_lance(p) != null, "Ice Lance script live")
+	check(_ice_lance(p) != null, "Frost Spike script live")
 	return p
 
 
@@ -30,7 +30,7 @@ func _ice_lance_mage(pos: Vector3 = Vector3.ZERO) -> Player:
 func _storm(p: Player) -> void:
 	var mana := p.abilities.get_resource(&"mana")
 	mana.set_value(mana.max_value())
-	check(p.abilities.try_cast(0), "Blizzard")
+	check(p.abilities.try_cast(0), "Hailstorm")
 
 
 ## Every enemy of [param pack] carries [param p]'s ice.
@@ -77,7 +77,7 @@ func test_ice_armor_adds_armor_and_barrier_power() -> void:
 	check_near(MageIceBarrier.shield_amount(p.abilities.build_context(barrier)), shield * 1.24, 0.0001,
 		"the shield absorbs 24% more")
 	check_eq(Db.get_talent(&"mage_frost_ice_armor").text_for_rank(3),
-		"Increases your Armor by 6, and your Ice Barrier absorbs 24% more damage.", "text")
+		"Increases your Armor by 6, and your Frozen Layer absorbs 24% more damage.", "text")
 	_remove(p, "mage_frost_ice_armor", 3)
 	check_near(p.stats.get_raw(Stats.ARMOR), armor, 0.0001, "undone")
 	check_near(float(_params(p, &"ice_barrier")["power"]), 1.0, 0.0001, "undone")
@@ -123,7 +123,7 @@ func test_chilled_to_the_bone_needs_winters_chill_and_hits_stunned_enemies() -> 
 	var p := _mage()
 	_plan(p, [["mage_frost_piercing_ice", 3], ["mage_frost_ice_armor", 3], ["mage_frost_winters_chill", 2],
 		["mage_frost_improved_blizzard", 1]])
-	check_eq(p.talents.add_block_reason(&"mage_frost_chilled_to_the_bone"), "Requires Winter's Chill", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"mage_frost_chilled_to_the_bone"), "Requires Numbing Cold", "prerequisite")
 	_add(p, "mage_frost_winters_chill")
 	_add(p, "mage_frost_chilled_to_the_bone", 3)
 	var e := _enemy(Vector3(3, 0, 0))
@@ -131,7 +131,7 @@ func test_chilled_to_the_bone_needs_winters_chill_and_hits_stunned_enemies() -> 
 	e.stun_left = 1.0  # a freeze is a stun (any ally's stun counts)
 	check_near(p.bonuses.damage_mult(e, &"arcane", &"weapon"), 1.12, 0.0001, "+4% per rank vs stunned")
 	e.apply_slow(40.0, 2.0)
-	check_near(p.bonuses.damage_mult(e, &"arcane", &"weapon"), 1.21, 0.0001, "+ Winter's Chill when slowed too")
+	check_near(p.bonuses.damage_mult(e, &"arcane", &"weapon"), 1.21, 0.0001, "+ Numbing Cold when slowed too")
 
 
 # --- Deep Freeze -------------------------------------------------------------------------------
@@ -143,7 +143,7 @@ func test_deep_freeze_params_and_text() -> void:
 	_add(p, "mage_frost_deep_freeze")
 	check_eq(float(_params(p, &"blizzard")["end_freeze"]), 1.5, "1.5 sec")
 	check_eq(Db.get_talent(&"mage_frost_deep_freeze").text_for_rank(1),
-		"When your Blizzard ends, every enemy still inside is frozen for 1.5 sec.", "text")
+		"When your Hailstorm ends, every enemy still inside is frozen for 1.5 sec.", "text")
 
 
 func test_deep_freeze_freezes_the_enemies_inside_when_the_storm_ends() -> void:
@@ -196,14 +196,14 @@ func test_flash_freeze_needs_improved_blizzard_params_and_text() -> void:
 	var p := _mage()
 	_plan(p, [["mage_frost_piercing_ice", 3], ["mage_frost_ice_armor", 3], ["mage_frost_improved_blizzard", 2],
 		["mage_frost_winters_chill", 1]])
-	check_eq(p.talents.add_block_reason(&"mage_frost_flash_freeze"), "Requires Improved Blizzard", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"mage_frost_flash_freeze"), "Requires Improved Hailstorm", "prerequisite")
 	_add(p, "mage_frost_improved_blizzard")
 	check_eq(float(_params(p, &"blizzard")["tick_freeze_chance"]), 0.0, "neutral without the talent")
 	_add(p, "mage_frost_flash_freeze", 3)
 	check_near(float(_params(p, &"blizzard")["tick_freeze_chance"]), 12.0, 0.0001, "4% per rank")
 	check_near(float(_params(p, &"blizzard")["tick_freeze"]), 1.0, 0.0001, "1 sec freezes")
 	check_eq(Db.get_talent(&"mage_frost_flash_freeze").text_for_rank(3),
-		"Each tick of your Blizzard has a 12% chance to freeze each enemy inside for 1 sec.", "text")
+		"Each tick of your Hailstorm has a 12% chance to freeze each enemy inside for 1 sec.", "text")
 
 
 func test_flash_freeze_at_full_chance_freezes_everyone_on_the_first_tick() -> void:
@@ -335,7 +335,7 @@ func test_ice_lance_doubles_spells_burns_and_pets_but_not_weapon_or_proc_hits() 
 	var e := _enemy(Vector3(3, 0, 0))
 	check_eq(il.damage_mult(e, &"frost", &"ability"), 1.0, "not frozen")
 	MageSpell.freeze(e, p, 2.0)
-	check_near(il.damage_mult(e, &"frost", &"ability"), 2.0, 0.0001, "Blizzard ticks x2")
+	check_near(il.damage_mult(e, &"frost", &"ability"), 2.0, 0.0001, "Hailstorm ticks x2")
 	check_near(il.damage_mult(e, &"fire", &"dot"), 2.0, 0.0001, "burns x2")
 	check_near(il.damage_mult(e, &"nature", &"pet"), 2.0, 0.0001, "pets x2")
 	check_eq(il.damage_mult(e, &"arcane", &"weapon"), 1.0, "weapon hits get the forced crit instead")

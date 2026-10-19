@@ -20,7 +20,7 @@ extends TalentEffect
 ## Params (not rank-scaled; capstone): duration, icd, ally_radius, ally_crit.
 
 const KEY_PREFIX := "rogue_subtlety_shadow_dance"
-const TEXT := "Shadow Dance!"
+const TEXT := "Dusk Waltz!"
 const GLOW_RADIUS := 1.3
 const GLOW_ALPHA := 0.45
 ## The ground glow pulses this many times per second between GLOW_ALPHA x (1 - GLOW_PULSE)
@@ -104,10 +104,10 @@ func teardown() -> void:
 
 func describe() -> String:
 	if _left > 0.0:
-		return "Shadow Dance: %.1f s" % _left
+		return "Dusk Waltz: %.1f s" % _left
 	if _ready_in > 0.0:
-		return "Shadow Dance: ready in %d s" % ceili(_ready_in)
-	return "Shadow Dance: ready"
+		return "Dusk Waltz: ready in %d s" % ceili(_ready_in)
+	return "Dusk Waltz: ready"
 
 
 ## True while the window is open (tests, UI).

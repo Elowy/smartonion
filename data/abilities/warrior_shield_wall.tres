@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"shield_wall"
-display_name = "Shield Wall"
+display_name = "Stalwart Guard"
 description = "Raise your shield: take {reduction}% less damage for {duration} sec."
 class_id = &"warrior"
 school = &"physical"
@@ -36,11 +36,11 @@ specs = Array[Dictionary]([{
 "last_stand": true
 },
 "name": "Last Stand",
-"text": "While Shield Wall stands, a lethal hit leaves you at 1 HP."
+"text": "While Stalwart Guard stands, a lethal hit leaves you at 1 HP."
 }, {
 "mods": {
 "retaliate_add": 150.0
 },
-"name": "Spiked Wall",
+"name": "Spiked Guard",
 "text": "Enemies that hit you take 150% weapon damage."
 }])

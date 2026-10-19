@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"felfire_raiment"
-display_name = "Felfire Raiment"
+display_name = "Hexfire Raiment"
 class_id = &"warlock"
 piece_ids = Array[StringName]([&"set_warlock_head", &"set_warlock_shoulders", &"set_warlock_chest", &"set_warlock_hands", &"set_warlock_legs"])
 bonuses = Array[Dictionary]([{
@@ -27,5 +27,5 @@ bonuses = Array[Dictionary]([{
 }
 }],
 "pieces": 4,
-"text": "Rain of Fire has a 20% chance to cost no Soul Shard."
+"text": "Ember Rain has a 20% chance to cost no Pact Shard."
 }])

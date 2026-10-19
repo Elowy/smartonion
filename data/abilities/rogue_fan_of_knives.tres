@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"fan_of_knives"
-display_name = "Fan of Knives"
+display_name = "Knife Bloom"
 description = "Throws {knives} knives in every direction, each for {damage_pct}% weapon damage and piercing the first enemy it hits. Spends all Combo Points: +{combo_bonus_pct}% damage per point."
 class_id = &"rogue"
 school = &"physical"
@@ -39,4 +39,4 @@ kind = 0
 card_weight = 1.0
 rank3 = {"knives_add": 2}
 rank3_text = "+2 knives"
-specs = Array[Dictionary]([{"name": "Deadly Fan", "text": "Every knife that hits poisons its target, not only critical hits.", "mods": {"poison_hits": true}}, {"name": "Returning Blades", "text": "Knives fly back after reaching their range, hitting enemies again on the way.", "mods": {"returns": 1}}])
+specs = Array[Dictionary]([{"name": "Deadly Bloom", "text": "Every knife that hits poisons its target, not only critical hits.", "mods": {"poison_hits": true}}, {"name": "Returning Blades", "text": "Knives fly back after reaching their range, hitting enemies again on the way.", "mods": {"returns": 1}}])

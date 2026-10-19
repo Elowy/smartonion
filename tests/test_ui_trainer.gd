@@ -122,7 +122,7 @@ func _mage_with_learned() -> PlayerSlot:
 	var slot := _hero()
 	var r := _runner(slot)
 	check_eq(r.learn(learned(&"fireball", AbilityData.Kind.ACTIVE)), 2, "Fireball learned on RB")
-	check_eq(r.learn(learned(&"frost_nova", AbilityData.Kind.AUTO)), 4, "Frost Nova learned in auto-cast slot 1")
+	check_eq(r.learn(learned(&"rime_burst", AbilityData.Kind.AUTO)), 4, "Rime Burst learned in auto-cast slot 1")
 	return slot
 
 
@@ -142,7 +142,7 @@ func test_lists_core_learned_and_empty_slots() -> void:
 		check_eq(tab.row_for(i).rank_label.text, "I", "core abilities start at Rank I")
 		check(tab.row_for(i).icon.ability == core, "with its icon")
 	check_eq(tab.row_for(2).name_label.text, "Fireball", "RB: the learned Active ability")
-	check_eq(tab.row_for(4).name_label.text, "Frost Nova", "auto-cast 1")
+	check_eq(tab.row_for(4).name_label.text, "Rime Burst", "auto-cast 1")
 	check_eq(tab.row_for(2).price_label.text, "25", "Rank II costs 25 g at wave 1")
 	check_eq(tab.row_for(2).rank_label.text, "I", "the rank column")
 	check_eq(tab.row_for(2).icon.rank, 0, "no rank mark on the row icon (the column shows it)")
@@ -182,7 +182,7 @@ func test_navigation_skips_empty_slots_and_shows_the_detail() -> void:
 	input.release(PlayerInput.Pad.DPAD_UP)
 	input.poll(0.0)
 	check_eq(tab.selected, 4, "and back up")
-	check_eq(tab.detail_name.text, "Frost Nova", "detail: name")
+	check_eq(tab.detail_name.text, "Rime Burst", "detail: name")
 	check_eq(tab.detail_kind.text, "Auto-cast · Fire", "detail: kind and school")
 	check_eq(tab.detail_rank.text, "Rank I", "detail: rank")
 	check_eq(tab.detail_description.text, "Hurls a bolt for 10 damage (1x) every 6 sec.", "description from params_for")
@@ -195,7 +195,7 @@ func test_navigation_skips_empty_slots_and_shows_the_detail() -> void:
 	check_eq(tab.detail_rank.text, "Rank II", "the previewed rank")
 	check(tab.detail_rank.get_theme_color(&"font_color").is_equal_approx(UiTheme.GREEN), "in green (the preview mark)")
 	check_eq(tab.detail_description.text, "Hurls a bolt for 10 damage (1.25x) every 5.4 sec.", "Rank II's numbers")
-	check_eq(_runner(slot).rank_of(&"frost_nova"), 1, "a preview buys nothing")
+	check_eq(_runner(slot).rank_of(&"rime_burst"), 1, "a preview buys nothing")
 	_tap(panel, slot, PlayerInput.Pad.Y)
 	check_eq(tab.detail_description.text, "Hurls a bolt for 10 damage (1x) every 6 sec.", "Y again: back to now")
 
@@ -273,7 +273,7 @@ func test_expensive_rank_needs_a_hold() -> void:
 	RunState.add_gold(85)
 	tab.select_slot(4)
 	_tap(panel, slot, PlayerInput.Pad.A)
-	check_eq(r.rank_of(&"frost_nova"), 2, "25 of 100 g: bought at once")
+	check_eq(r.rank_of(&"rime_burst"), 2, "25 of 100 g: bought at once")
 
 
 func test_hold_is_cancelled_by_b_and_by_moving() -> void:
@@ -450,7 +450,7 @@ func test_buying_a_pinged_rank_clears_only_that_ping() -> void:
 	check_eq(r.rank_of(&"fireball"), 2, "bought")
 	check(not RunState.has_want(slot.index, Trainer.want_key(&"fireball")), "the purchase cleared the ping")
 	check(not tab.row_for(2).want_tag.visible, "and its marker")
-	check(RunState.has_want(slot.index, Trainer.want_key(&"frost_nova")), "the other ping stays")
+	check(RunState.has_want(slot.index, Trainer.want_key(&"rime_burst")), "the other ping stays")
 	check(tab.row_for(4).want_tag.visible, "with its marker")
 	check(RunState.has_want(3, Trainer.want_key(&"fireball")), "P4's ping on their own Fireball stays")
 	check_eq(RunState.spend_log[-1]["label"], "Fireball Rank II", "logged")
@@ -460,7 +460,7 @@ func test_max_rank_and_an_open_specialisation_cannot_be_pinged() -> void:
 	var slot := _mage_with_learned()
 	var r := _runner(slot)
 	r.ranks[&"fireball"] = 5
-	r.ranks[&"frost_nova"] = 5
+	r.ranks[&"rime_burst"] = 5
 	r.set_spec(&"fireball", 0)
 	r.invalidate_params()
 	var panel := _panel(slot)
@@ -471,7 +471,7 @@ func test_max_rank_and_an_open_specialisation_cannot_be_pinged() -> void:
 	check(RunState.wants.is_empty(), "nothing to save gold for")
 	check_eq(panel.last_message, "Fireball is at Rank V", "reason")
 	tab.select_slot(4)
-	check(r.needs_spec(&"frost_nova"), "Frost Nova waits for its specialisation")
+	check(r.needs_spec(&"rime_burst"), "Rime Burst waits for its specialisation")
 	check_eq(tab.ping_block_reason(4), "Choose a specialization – it is free", "the free choice is not pinged")
 	check(not tab.toggle_ping(4), "refused")
 	check(RunState.wants.is_empty(), "still nothing")
@@ -647,7 +647,7 @@ func test_detail_stats_show_cooldown_and_power_and_follow_the_preview() -> void:
 	var r := _runner(slot)
 	var shipped: AbilityData = Db.abilities[&"pyroblast"]
 	r.forget(2)
-	check_eq(r.learn(shipped), 2, "Pyroblast (Active) on RB")
+	check_eq(r.learn(shipped), 2, "Magma Bolt (Active) on RB")
 	tab.select_slot(2)
 	var now_text := tab.detail_description.text
 	var now_stats := tab.detail_stats.text

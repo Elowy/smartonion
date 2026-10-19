@@ -65,7 +65,7 @@ const PLAIN_PANEL := &"PlainPanel"
 
 const RESOURCE_NAMES := {
 	&"rage": "Rage", &"mana": "Mana", &"energy": "Energy",
-	&"holy_power": "Holy Power", &"soul_shard": "Soul Shards",
+	&"holy_power": "Resolve", &"soul_shard": "Pact Shards",
 }
 
 static var _theme: Theme

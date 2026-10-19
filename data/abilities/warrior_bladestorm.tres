@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"bladestorm"
-display_name = "Bladestorm"
+display_name = "Steel Cyclone"
 description = "Become a storm of steel for {duration} sec: enemies within {radius} m take {damage_pct}% weapon damage in total. Nothing can slow you meanwhile."
 class_id = &"warrior"
 school = &"physical"
@@ -37,7 +37,7 @@ specs = Array[Dictionary]([{
 "mods": {
 "ravager": true
 },
-"name": "Ravager",
+"name": "Whirling Axe",
 "text": "Hurl the storm: a whirling axe strikes the biggest group up to 10 m away instead of you."
 }, {
 "mods": {

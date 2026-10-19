@@ -6,8 +6,8 @@
 [sub_resource type="Resource" id="Resource_premeditation"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_premeditation"
-display_name = "Premeditation"
-description = "Vanish also grants {cp} Combo Point(s), and {crits} more of your next weapon hits are guaranteed critical strikes."
+display_name = "Forethought"
+description = "Melt Away also grants {cp} Combo Point(s), and {crits} more of your next weapon hits are guaranteed critical strikes."
 values = {
 "cp": 1.0,
 "crits": 1.0
@@ -42,7 +42,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_enveloping_shadows"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_enveloping_shadows"
-display_name = "Enveloping Shadows"
+display_name = "Veiling Dusk"
 description = "You take {avoid}% less damage from area attacks and projectiles (Avoidance)."
 values = {
 "avoid": 3.0
@@ -62,8 +62,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_master_of_subtlety"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_master_of_subtlety"
-display_name = "Master of Subtlety"
-description = "For {duration_fixed} sec after you Vanish, you deal {pct}% more damage."
+display_name = "Veiled Aggression"
+description = "For {duration_fixed} sec after you Melt Away, you deal {pct}% more damage."
 values = {
 "duration_fixed": 6.0,
 "pct": 4.0
@@ -100,8 +100,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shadow_focus"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_shadow_focus"
-display_name = "Shadow Focus"
-description = "Vanish restores {energy} Energy."
+display_name = "Quiet Mind"
+description = "Melt Away restores {energy} Energy."
 values = {
 "energy": 10.0
 }
@@ -134,7 +134,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_deadened_nerves"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_deadened_nerves"
-display_name = "Deadened Nerves"
+display_name = "Callous Hide"
 description = "You take {pct}% less damage."
 values = {
 "pct": 4.0
@@ -153,7 +153,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_unseen_blades"
 display_name = "Unseen Blades"
-description = "When Vanish ends, you strike from the shadows with a Fan of Knives that costs no Energy (it spends your Combo Points as usual)."
+description = "When Melt Away ends, you strike from the shadows with a Knife Bloom that costs no Energy (it spends your Combo Points as usual)."
 values = {}
 kind = 1
 tier = 3
@@ -175,7 +175,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_find_weakness"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_find_weakness"
-display_name = "Find Weakness"
+display_name = "Opportunist's Eye"
 description = "Your critical weapon hits have a {chance}% chance to make your next weapon hit a guaranteed critical strike."
 values = {
 "chance": 8.0
@@ -201,8 +201,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_sleight_of_hand"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_sleight_of_hand"
-display_name = "Sleight of Hand"
-description = "Shadowstep and Cheat Death are {pct}% stronger and recharge {cd}% faster."
+display_name = "Quick Fingers"
+description = "Duskstep and Narrow Escape are {pct}% stronger and recharge {cd}% faster."
 values = {
 "cd": 6.0,
 "pct": 6.0
@@ -226,8 +226,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shadow_dance"]
 script = ExtResource("2_talent")
 id = &"rogue_subtlety_shadow_dance"
-display_name = "Shadow Dance"
-description = "After you Vanish, every weapon hit you deal for {duration} sec is a critical strike (thrown knives and shuriken too), and allies within {ally_radius} m gain {crit}% critical strike chance for as long. Can happen once every {icd} sec."
+display_name = "Dusk Waltz"
+description = "After you Melt Away, every weapon hit you deal for {duration} sec is a critical strike (thrown knives and shuriken too), and allies within {ally_radius} m gain {crit}% critical strike chance for as long. Can happen once every {icd} sec."
 values = {
 "ally_radius": 8.0,
 "crit": 10.0,
@@ -262,9 +262,9 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"rogue_subtlety"
 class_id = &"rogue"
-display_name = "Subtlety"
+display_name = "Gloaming"
 index = 2
-description = "Vanish, strike from the shadows, and make every hit a critical strike."
+description = "Melt Away, strike from the shadows, and make every hit a critical strike."
 icon = &"vanish"
 color = Color(0.55, 0.4, 0.88, 1)
 talents = Array[ExtResource("2_talent")]([SubResource("Resource_premeditation"), SubResource("Resource_enveloping_shadows"), SubResource("Resource_master_of_subtlety"), SubResource("Resource_shadow_focus"), SubResource("Resource_deadened_nerves"), SubResource("Resource_unseen_blades"), SubResource("Resource_find_weakness"), SubResource("Resource_sleight_of_hand"), SubResource("Resource_shadow_dance")])

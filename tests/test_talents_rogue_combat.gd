@@ -41,11 +41,11 @@ func test_lightning_reflexes_unfair_advantage_and_hack_and_slash_stats() -> void
 	check_eq(_talent(&"rogue_combat_lightning_reflexes").text_for_rank(3),
 			"Increases your chance to dodge attacks by 6%.", "rank text")
 	_add(p, T, "unfair_advantage", 3)
-	check_near(p.stats.get_raw(Stats.DODGE), dodge + 9.0, 0.0001, "Unfair Advantage +1% dodge per rank")
+	check_near(p.stats.get_raw(Stats.DODGE), dodge + 9.0, 0.0001, "Sly Counter +1% dodge per rank")
 	_add(p, T, "aggression", 3)
 	for n in range(1, 4):
 		_add(p, T, "hack_and_slash")
-		check_near(p.stats.get_raw(Stats.EXTRA_ATTACK), extra + 4.0 * n, 0.0001, "Hack and Slash +4 extra attack per rank")
+		check_near(p.stats.get_raw(Stats.EXTRA_ATTACK), extra + 4.0 * n, 0.0001, "Twin Strike +4 extra attack per rank")
 	_reset(p)
 	check_near(p.stats.get_raw(Stats.DODGE), dodge, 0.0001, "reset: dodge back")
 	check_near(p.stats.get_raw(Stats.EXTRA_ATTACK), extra, 0.0001, "reset: extra attack back")
@@ -130,11 +130,11 @@ func test_blade_tactics_changes_blade_flurry_and_killing_spree() -> void:
 	check(not p.abilities.knows(&"blade_flurry"), "not learned: no error, the mods wait")
 	var f := p.abilities.params_for(flurry)
 	var s := p.abilities.params_for(spree)
-	check_near(float(f["power"]), float(base_flurry["power"]) * 1.18, 0.0001, "Blade Flurry +18% power")
-	check_near(float(f["cooldown"]), float(base_flurry["cooldown"]) * 0.82, 0.0001, "Blade Flurry -18% cooldown")
-	check_near(float(s["power"]), float(base_spree["power"]) * 1.18, 0.0001, "Killing Spree +18% power")
-	check_near(float(s["cooldown"]), float(base_spree["cooldown"]) * 0.82, 0.0001, "Killing Spree -18% cooldown")
-	check_near(float(p.abilities.params_for(_vanish(p))["cooldown"]), 15.0, 0.0001, "Vanish untouched")
+	check_near(float(f["power"]), float(base_flurry["power"]) * 1.18, 0.0001, "Cleaving Blades +18% power")
+	check_near(float(f["cooldown"]), float(base_flurry["cooldown"]) * 0.82, 0.0001, "Cleaving Blades -18% cooldown")
+	check_near(float(s["power"]), float(base_spree["power"]) * 1.18, 0.0001, "Cutthroat Rush +18% power")
+	check_near(float(s["cooldown"]), float(base_spree["cooldown"]) * 0.82, 0.0001, "Cutthroat Rush -18% cooldown")
+	check_near(float(p.abilities.params_for(_vanish(p))["cooldown"]), 15.0, 0.0001, "Melt Away untouched")
 
 
 # --- Restless Blades (modifier) ----------------------------------------------------------------
@@ -156,7 +156,7 @@ func test_restless_blades_shortens_the_other_rogue_cooldowns() -> void:
 	check_near(runner.cooldown_left(vanish), 10.0, 0.0001, "a fan at 0 points changes nothing")
 	_combo(p).set_value(5.0)
 	_throw_fan(p)
-	check_near(runner.cooldown_left(vanish), 9.0, 0.0001, "5 points: Vanish 1 sec sooner")
+	check_near(runner.cooldown_left(vanish), 9.0, 0.0001, "5 points: Melt Away 1 sec sooner")
 	check_near(runner.cooldown_left(sprint), 5.0, 0.0001, "Sprint (general) untouched")
 	_combo(p).set_value(3.0)
 	_throw_fan(p)
@@ -170,7 +170,7 @@ func test_restless_blades_returns_one_charge_at_most() -> void:
 	_add(p, T, "restless_blades")
 	var runner := p.abilities
 	var step := Db.get_ability(&"shadowstep")
-	check(runner.learn(step) >= 0, "Shadowstep learned")
+	check(runner.learn(step) >= 0, "Duskstep learned")
 	runner.ranks[&"shadowstep"] = 5
 	runner.specs[&"shadowstep"] = 1
 	runner.invalidate_params()

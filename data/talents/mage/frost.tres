@@ -25,8 +25,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_ice_armor"]
 script = ExtResource("2_talent")
 id = &"mage_frost_ice_armor"
-display_name = "Ice Armor"
-description = "Increases your Armor by {armor}, and your Ice Barrier absorbs {barrier}% more damage."
+display_name = "Rime Plating"
+description = "Increases your Armor by {armor}, and your Frozen Layer absorbs {barrier}% more damage."
 values = {
 "armor": 2.0,
 "barrier": 8.0
@@ -54,8 +54,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_improved_blizzard"]
 script = ExtResource("2_talent")
 id = &"mage_frost_improved_blizzard"
-display_name = "Improved Blizzard"
-description = "Your Blizzard has a {radius}% larger radius and slows enemies by an additional {slow}%."
+display_name = "Improved Hailstorm"
+description = "Your Hailstorm has a {radius}% larger radius and slows enemies by an additional {slow}%."
 values = {
 "radius": 3.0,
 "slow": 10.0
@@ -79,7 +79,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_winters_chill"]
 script = ExtResource("2_talent")
 id = &"mage_frost_winters_chill"
-display_name = "Winter's Chill"
+display_name = "Numbing Cold"
 description = "You deal {pct}% more damage to slowed enemies."
 values = {
 "pct": 3.0
@@ -98,7 +98,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_arctic_winds"]
 script = ExtResource("2_talent")
 id = &"mage_frost_arctic_winds"
-display_name = "Arctic Winds"
+display_name = "Boreal Winds"
 description = "Increases your Frost damage by {frost}% and reduces the damage you take by {taken}%."
 values = {
 "frost": 2.0,
@@ -121,8 +121,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_deep_freeze"]
 script = ExtResource("2_talent")
 id = &"mage_frost_deep_freeze"
-display_name = "Deep Freeze"
-description = "When your Blizzard ends, every enemy still inside is frozen for {freeze} sec."
+display_name = "Glacial Finale"
+description = "When your Hailstorm ends, every enemy still inside is frozen for {freeze} sec."
 values = {
 "freeze": 1.5
 }
@@ -144,8 +144,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_flash_freeze"]
 script = ExtResource("2_talent")
 id = &"mage_frost_flash_freeze"
-display_name = "Flash Freeze"
-description = "Each tick of your Blizzard has a {chance}% chance to freeze each enemy inside for {freeze_fixed} sec."
+display_name = "Snap Freeze"
+description = "Each tick of your Hailstorm has a {chance}% chance to freeze each enemy inside for {freeze_fixed} sec."
 values = {
 "chance": 4.0,
 "freeze_fixed": 1.0
@@ -169,7 +169,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_chilled_to_the_bone"]
 script = ExtResource("2_talent")
 id = &"mage_frost_chilled_to_the_bone"
-display_name = "Chilled to the Bone"
+display_name = "Frozen Marrow"
 description = "You deal {pct}% more damage to frozen and stunned enemies."
 values = {
 "pct": 4.0
@@ -189,7 +189,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_ice_lance"]
 script = ExtResource("2_talent")
 id = &"mage_frost_ice_lance"
-display_name = "Ice Lance"
+display_name = "Frost Spike"
 description = "Frozen enemies take critical damage from all you do: your weapon hits always crit them, and your spells, burns and other hits deal {mult}x damage (plus your Critical Damage bonus)."
 values = {
 "mult": 2.0
@@ -211,9 +211,9 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"mage_frost"
 class_id = &"mage"
-display_name = "Frost"
+display_name = "Rimelore"
 index = 2
-description = "Blizzards, freezes and icy armor."
+description = "Hailstorms, freezes and icy armor."
 icon = &"blizzard"
 color = Color(0.6, 0.86, 1, 1)
 talents = Array[ExtResource("2_talent")]([SubResource("Resource_piercing_ice"), SubResource("Resource_ice_armor"), SubResource("Resource_improved_blizzard"), SubResource("Resource_winters_chill"), SubResource("Resource_arctic_winds"), SubResource("Resource_deep_freeze"), SubResource("Resource_flash_freeze"), SubResource("Resource_chilled_to_the_bone"), SubResource("Resource_ice_lance")])
