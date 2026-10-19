@@ -3055,7 +3055,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőriztünk,
   mielőtt bekerült a játékba. Ellenőrizve, egyik sem Blizzard-név: Thistlebrand, Boulderbloom,
   Tearglass (Forge Legendary); Two-Hand Sword, Two-Hand Mace, Orb (fegyverek); az új alaptípus-nevek
-  (a 62 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
+  (a 64 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
   enchant-előtag, a 20 új trinket, a 17 új Legendary, a 60 új névvel ellátott és kaszt-specifikus
   item. A tesztek ellenőrzik (item-, alaptípus-, utótag-, set-nevek, enchant-előtagok és
   -leírások tiltott-listája; minden megjelenített név egyedi). Névütközések, amiket a névadáskor
