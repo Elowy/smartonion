@@ -3,7 +3,8 @@ extends Control
 ## One talent tree column of the Talents tab (GDD 7.2, architecture §2.2): the tree's name on
 ## top in its colour, five tier rows of TalentNodes (two per row, the capstone centred in
 ## tier 5), the prerequisite arrows (gold once the prerequisite is at max rank, grey before),
-## a dark band over the tiers whose gate this tree has not reached yet, and the points spent in
+## the tree's emblem (its game-icons.net picture, [GameIcons.for_tree]) left of the name, a dark
+## band over the tiers whose gate this tree has not reached yet, and the points spent in
 ## the tree right of the capstone. Everything sits at fixed design positions ([method
 ## node_rect]), so the tab can navigate spatially without a layout pass. The gate numbers of the
 ## tiers (0 / 3 / 6 / 9 / 12, the same in every tree) are on the tab's [TierRail] left of the
@@ -16,6 +17,9 @@ const WIDTH := 128.0
 const HEIGHT := 332.0
 const PAD_X := 6.0
 const TITLE_HEIGHT := 24.0
+## The tree emblem left of the name (a square) and the room it takes from the name.
+const EMBLEM_SIZE := 18.0
+const EMBLEM_ROOM := 22.0
 const GRID_TOP := 28.0
 const ROW_GAP := 13.0
 const TIERS := 5
@@ -43,6 +47,8 @@ var _locked: Array[bool] = [false, false, false, false, false]
 ## Prerequisite arrows: {"from": id, "to": id, "met": bool}.
 var _links: Array[Dictionary] = []
 var _frame: StyleBoxFlat
+## The tree's emblem (null: none, the name takes the whole band).
+var _emblem: Texture2D
 
 
 ## The tier gates (TalentState.TIER_POINTS) left of the trees: one number per tier row, gold
@@ -192,8 +198,11 @@ func _build() -> void:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.add_theme_constant_override(&"outline_size", 4)
 	name_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.75))
-	name_label.position = Vector2(PAD_X - 2.0, 1.0)
-	name_label.size = Vector2(WIDTH - 2.0 * PAD_X + 4.0, TITLE_HEIGHT)
+	_emblem = GameIcons.for_tree(tree)
+	texture_filter = GameIcons.FILTER
+	var room := EMBLEM_ROOM if _emblem != null else 0.0
+	name_label.position = Vector2(PAD_X - 2.0 + room, 1.0)
+	name_label.size = Vector2(WIDTH - 2.0 * PAD_X + 4.0 - room, TITLE_HEIGHT)
 	name_label.add_theme_font_size_override(&"font_size", fitted_name_size(name_label.text, name_label.size.x))
 	add_child(name_label)
 	if tree == null:
@@ -253,6 +262,10 @@ func _draw() -> void:
 	draw_style_box(_frame, rect)
 	draw_rect(Rect2(4.0, 2.0, WIDTH - 8.0, TITLE_HEIGHT - 2.0), Color(tint.darkened(0.6), 0.55))
 	draw_line(Vector2(6.0, TITLE_HEIGHT + 1.0), Vector2(WIDTH - 6.0, TITLE_HEIGHT + 1.0), Color(tint, 0.65), 1.5)
+	if _emblem != null:
+		var emblem_tint := tint.lightened(0.2)
+		GameIcons.draw_silhouette(self, _emblem, Rect2(Vector2(PAD_X, 3.0), Vector2(EMBLEM_SIZE, EMBLEM_SIZE)),
+				GameIcons.gradient_top(emblem_tint), GameIcons.gradient_bottom(emblem_tint), 1.0)
 	for tier in range(2, TIERS + 1):
 		if _locked[tier - 1]:
 			draw_rect(Rect2(3.0, tier_top(tier) - 4.0, WIDTH - 6.0, TalentNode.SIZE + 8.0), Color(0, 0, 0, 0.3))

@@ -2,9 +2,10 @@ class_name ConsumableIcon
 extends Control
 ## Square icon of a consumable (the stall's consumables row, the unit frame's small icons, the
 ## tooltip): a dark slot with a border in the kind's colour (blue for flasks / elixirs, orange for
-## food) and a procedural picture chosen by ConsumableData.icon_id – a round flask, a tall vial, a
-## conical flask, a bowl of stew, onion rings, smoked ribs – in the item's own colours. Unknown ids
-## get a plain round flask in the kind's colour. No textures, no RNG.
+## food) and the picture of ConsumableData.icon_id – the game-icons.net silhouette of
+## data/icons/icon_map.tres ([GameIcons]) tinted with the item's own colour, or, when the map has
+## none, a procedural picture (a round flask, a tall vial, a conical flask, a bowl of stew, onion
+## rings, smoked ribs). Unknown ids get a plain round flask in the kind's colour. No RNG.
 
 const BACKGROUND := Color(0.07, 0.06, 0.055)
 const POTION_BORDER := Color(0.45, 0.72, 1.0)
@@ -12,6 +13,8 @@ const FOOD_BORDER := Color(1.0, 0.72, 0.3)
 const GLASS := Color(0.78, 0.9, 1.0, 0.55)
 const CORK := Color(0.62, 0.42, 0.22)
 const OUTLINE := Color(0.05, 0.03, 0.02, 0.95)
+## Side of a game-icons picture as a share of the slot.
+const PICTURE_SCALE := 0.78
 
 ## Liquid / main colour per icon id.
 const COLORS := {
@@ -32,6 +35,7 @@ static func create(p_data: ConsumableData = null, p_size: float = 40.0) -> Consu
 	icon.name = "ConsumableIcon"
 	icon.custom_minimum_size = Vector2(p_size, p_size)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.texture_filter = GameIcons.FILTER
 	icon.data = p_data
 	return icon
 
@@ -63,8 +67,20 @@ func _draw() -> void:
 	var border := border_color(data)
 	if data != null:
 		draw_rect(r.grow(-2.0), Color(border, 0.1))
-		_draw_picture(data.icon_id, main_color(data))
+		var picture := GameIcons.for_consumable(data)
+		if picture != null:
+			_draw_silhouette(picture, main_color(data))
+		else:
+			_draw_picture(data.icon_id, main_color(data))
 	draw_rect(r, border.darkened(0.15) if data != null else border, false, 2.0)
+
+
+## The game-icons picture, tinted with the item's colour, in the middle of the slot.
+func _draw_silhouette(picture: Texture2D, c: Color) -> void:
+	var m := minf(size.x, size.y)
+	var side := m * PICTURE_SCALE
+	var rect := Rect2((size - Vector2(side, side)) * 0.5, Vector2(side, side))
+	GameIcons.draw_silhouette(self, picture, rect, GameIcons.gradient_top(c), GameIcons.gradient_bottom(c), maxf(1.0, m / 38.0))
 
 
 func _draw_picture(id: StringName, c: Color) -> void:

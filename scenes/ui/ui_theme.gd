@@ -116,6 +116,16 @@ static func bold_font() -> Font:
 	return _bold_font
 
 
+## The largest font size from [param max_size] down to [param min_size] at which [param text] is at most
+## [param width] wide in [param font] (min_size when even that is too wide) – for headings in the wide
+## title font that must stay inside a fixed column.
+static func fitted_font_size(font: Font, text: String, width: float, max_size: int, min_size: int = 14) -> int:
+	for fs in range(max_size, min_size - 1, -1):
+		if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= width:
+			return fs
+	return min_size
+
+
 # --- Styles ----------------------------------------------------------------------
 
 ## Dark stone panel with a gold border (the standard WoW frame).
