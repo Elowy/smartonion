@@ -68,4 +68,4 @@ func dismiss(quiet: bool = false) -> void:
 
 
 func describe() -> String:
-	return "A second, permanent Voidwalker fights at your side."
+	return "A second, permanent Gloomguard fights at your side."
