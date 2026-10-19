@@ -143,6 +143,79 @@ func test_rank_scaling_and_fixed_params() -> void:
 	check(ProcSystem.proc_from_enchant(EnchantRoll.new(Db.get_enchant(&"mighty"))) == null, "equip: no proc")
 
 
+## The number of floating texts reading exactly [param text] in the world.
+func _texts(text: String) -> int:
+	var n := 0
+	for node in world.find_children("*", "Label3D", true, false):
+		if (node as Label3D).text == text:
+			n += 1
+	return n
+
+
+## An on-hit enchant built in code (rank I) with the effect [param params].
+static func _enchant_with(params: Dictionary) -> EnchantData:
+	var e := EnchantData.new()
+	e.id = &"label_probe"
+	e.prefix = "Probing"
+	e.kind = EnchantData.Kind.ON_KILL
+	e.effect = &"buff"
+	e.params = params
+	e.chance = 100.0
+	e.icd = 1.0
+	return e
+
+
+func test_a_label_key_in_unique_params_wins_over_the_item_name() -> void:
+	var stats := {"haste": 1.0}
+	var plain := ProcSystem.proc_from_unique(unique(&"buff", {"trigger": "on_kill", "stats": stats}))
+	check_eq(plain.label, "Test Buff", "no label key: the item's display name")
+	var silent := ProcSystem.proc_from_unique(unique(&"buff", {"trigger": "on_kill", "stats": stats, "label": ""}))
+	check_eq(silent.label, "", "label \"\" is silent")
+	var named := ProcSystem.proc_from_unique(unique(&"buff", {"trigger": "on_kill", "stats": stats, "label": "Tally"}))
+	check_eq(named.label, "Tally", "an own label replaces the item name")
+	check_eq(named.text("label"), "Tally", "the key stays in the params like proc_from_params keeps it")
+
+
+func test_a_label_key_in_enchant_params_wins_over_the_prefix() -> void:
+	var stats := {"haste": 1.0}
+	var plain := ProcSystem.proc_from_enchant(EnchantRoll.new(_enchant_with({"stats": stats}), 1))
+	check_eq(plain.label, "Probing", "no label key: the prefix")
+	var silent := ProcSystem.proc_from_enchant(EnchantRoll.new(_enchant_with({"stats": stats, "label": ""}), 1))
+	check_eq(silent.label, "", "label \"\" is silent")
+	var named := ProcSystem.proc_from_enchant(EnchantRoll.new(_enchant_with({"stats": stats, "label": "Probe"}), 2))
+	check_eq(named.label, "Probe", "an own label replaces the prefix")
+
+
+func test_a_silent_unique_shows_no_floating_text_and_a_plain_one_does() -> void:
+	var p := _hero()
+	var e := _fake(Vector3(3, 0, 0))
+	p.equipment.equip(unique(&"buff", {"trigger": "on_kill", "chance": 100.0, "stats": {"haste": 1.0},
+			"duration": 5.0, "max_stacks": 4}))
+	p.procs.on_kill(e)
+	check_eq(p.stats.get_stat(Stats.HASTE), 1.0, "the buff fired")
+	check_eq(_texts("Test Buff"), 1, "no label key: the item's name floats up")
+	p.equipment.unequip(Items.EquipSlot.TRINKET_1)
+	p.equipment.equip(unique(&"buff", {"trigger": "on_kill", "chance": 100.0, "stats": {"haste": 1.0},
+			"duration": 5.0, "max_stacks": 4, "label": ""}))
+	var before := _texts("Test Buff")
+	p.procs.on_kill(e)
+	check(p.stats.get_stat(Stats.HASTE) > 0.0, "the silent buff fired too")
+	check_eq(_texts("Test Buff"), before, "label \"\": nothing new floats up")
+
+
+func test_notched_tally_stick_stays_silent() -> void:
+	var data := Db.uniques[&"notched_tally_stick"]
+	check(data.unique_params.has("label") and str(data.unique_params["label"]) == "", "authored with label \"\"")
+	var item := ItemGenerator.from_unique(data, 1, false, RunState.rng)
+	check_eq(ProcSystem.proc_from_unique(item).label, "", "its proc is silent")
+	var p := _hero()
+	var e := _fake(Vector3(3, 0, 0))
+	p.equipment.equip(item)
+	p.procs.on_kill(e)
+	check(p.stats.get_stat(Stats.DAMAGE_PCT) > 0.0, "the stack still lands")
+	check_eq(_texts("Notched Tally Stick"), 0, "and the hero shows no text for every kill")
+
+
 func test_refresh_collects_enchants_and_uniques() -> void:
 	var p := _hero()
 	check(p.procs != null and p.procs.name == "Procs" and p.procs.get_parent() == p, "Procs child")

@@ -23,7 +23,8 @@ unique_params = {
 &"damage_pct": 1.0
 },
 "duration": 8.0,
-"max_stacks": 8
+"max_stacks": 8,
+"label": ""
 }
 unique_text = "On kill: Grants 1% Damage for 8 sec. Stacks up to 8 times."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
