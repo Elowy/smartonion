@@ -49,15 +49,18 @@ enum Room { CLEAR, SURVIVE, DEFEND, WARDEN }
 
 ## The waves after which the portal opens (normal, endless and hardcore runs).
 const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
-## Final balance: the dungeon's enemies, its brazier and the Warden are scaled to the cleared wave PLUS this
-## many waves for a party of 1, 2, 3, 4 heroes ([method strength_wave]). The portal waves are the party's most
-## comfortable stretch (the bots went through waves 6-15 almost without a down), so at the cleared wave's own
-## strength not one of the 55 dungeons of the baseline runs was lost. Measured with 16-wave bot runs (4 portals
-## each): at +4 the full parties cleared 22 of 22, duos 15 of 16, solo heroes 9 of 17; at +6 duos 10 of 16 and
-## a lone hero 1 of 18 (a lone hero cannot be revived and the dungeon rewards are a large part of its power: the
-## solo runs without them died on waves 10-21); at +8 4 players 10 of 20, duos 4 of 16, solo 3 of 17. The target
-## is about 50-80% for four players and fewer for a lone hero.
-const STRENGTH_BONUS_BY_PLAYERS: Array[int] = [3, 6, 6, 6]
+## Final balance: the dungeon's enemies, its brazier and the Warden are scaled to the cleared wave TIMES this factor
+## for a party of 1, 2, 3, 4 heroes ([method strength_wave]: waves 6 / 9 / 12 / 15 become 10 / 14 / 19 / 24 for four
+## heroes). The portal waves are the party's most comfortable stretch (the bots went through waves 6-15 almost
+## without a down), so at the cleared wave's own strength not one of the 55 dungeons of the baseline runs was lost.
+## The first measurements used a flat bonus of waves: at +4 the full parties cleared 22 of 22 dungeons, duos 15 of
+## 16, solo heroes 9 of 17; at +6 duos 10 of 16 and a lone hero 1 of 18 (a lone hero cannot be revived and the
+## rewards are a large part of its power: the solo runs without them died on waves 10-21); at +8 4 players 10 of 20,
+## duos 4 of 16, solo 3 of 17. But a flat bonus is too hard at the first portal and too soft at the last: with four
+## heroes the dungeon after wave 6 cost 17-38 downs, the ones after 9 / 12 / 15 only 7 / 7 / 4 on average (the
+## party's power grows faster than the waves), so the bonus grows with the wave. The target is about 50-80% cleared
+## for four heroes and fewer for a lone hero.
+const STRENGTH_MULT_BY_PLAYERS: Array[float] = [1.3, 1.6, 1.6, 1.6]
 const ROOM_COUNT := 4
 const ROOM_NAMES: Array[String] = ["Clear", "Survive", "Defend", "Warden"]
 const WARDEN_ID := &"dungeon_warden"
@@ -192,11 +195,12 @@ static func is_portal_wave(p_wave: int) -> bool:
 
 
 ## The wave whose growth the dungeon's enemies, brazier and Warden use after the cleared wave [param p_wave]
-## for [param players] heroes (-1 = the run's party; see STRENGTH_BONUS_BY_PLAYERS). Which enemy types
+## for [param players] heroes (-1 = the run's party; see STRENGTH_MULT_BY_PLAYERS). Which enemy types
 ## appear still follows the cleared wave itself.
 static func strength_wave(p_wave: int, players: int = -1) -> int:
 	var n := RunState.player_count if players < 0 else players
-	return maxi(1, p_wave) + STRENGTH_BONUS_BY_PLAYERS[clampi(n, 1, STRENGTH_BONUS_BY_PLAYERS.size()) - 1]
+	var factor := STRENGTH_MULT_BY_PLAYERS[clampi(n, 1, STRENGTH_MULT_BY_PLAYERS.size()) - 1]
+	return maxi(1, roundi(float(maxi(1, p_wave)) * factor))
 
 
 ## The Skeleton Grunt-based HP of the brazier at [param p_wave] (see BRAZIER_GRUNTS).
