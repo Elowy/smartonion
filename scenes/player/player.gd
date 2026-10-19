@@ -376,8 +376,11 @@ func begin_wave() -> void:
 ## a cheat-death effect, Thorns (melee) and the when-struck / low-HP procs. A dodge, parry or
 ## block reports to the procs / bonuses (_avoided); talent / set damage-taken entries scale the
 ## damage after the temporary multipliers.
-## [param kind] is one of CombatMath.KIND_*.
-func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null) -> void:
+## [param kind] is one of CombatMath.KIND_*. [param max_hp_share] (> 0): the hit takes at most this share of
+## Max HP once armour etc. are applied (before the absorb shields) – the ground attacks of the bosses use it, so
+## a hero at full health survives any single one (EnemyHazard.MAX_HIT_SHARE).
+func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null,
+		max_hp_share: float = 0.0) -> void:
 	if downed or invulnerable_left > 0.0 or raw <= 0.0:
 		return
 	var rng := RunState.rng
@@ -413,6 +416,8 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		# What the block saved (the hit without it minus the hit with it) counts as absorbed
 		# (damage meter).
 		RunState.record_absorb(slot_index(), _mitigated(raw, kind, valid_source) - dmg)
+	if max_hp_share > 0.0:
+		dmg = minf(dmg, max_hp() * max_hp_share)
 	if procs != null:
 		dmg = procs.absorb(dmg)
 		if dmg <= 0.0:
