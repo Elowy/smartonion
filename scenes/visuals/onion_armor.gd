@@ -662,9 +662,10 @@ static func _leather_chest(k: MeshKit, cloth: MeshKit, acc: MeshKit, look: Equip
 ## stole down the belly, III scalloped hem and a star gem.
 static func _cloth_chest(k: MeshKit, cloth: MeshKit, acc: MeshKit, look: EquipLook, pal: Pal, d: int) -> void:
 	var skirt := PackedVector2Array([Vector2(0.49, 0.065), Vector2(0.46, 0.14), Vector2(0.435, 0.22), Vector2(0.41, 0.3)])
-	cloth.add_lathe(MeshKit.smooth_profile(skirt, 3), Transform3D(), pal.main, 24)
+	var robe := pal.main.lerp(pal.dark, 0.35)
+	cloth.add_lathe(MeshKit.smooth_profile(skirt, 3), Transform3D(), robe, 24)
 	cloth.add_lathe(PackedVector2Array([Vector2(0.492, 0.062), Vector2(0.488, 0.1)]), Transform3D(), pal.trim, 24)
-	_shell(cloth, 0.3, 0.8, 0.03, pal.main, OPEN_FRONT.x, OPEN_FRONT.y)
+	_shell(cloth, 0.3, 0.8, 0.03, robe, OPEN_FRONT.x, OPEN_FRONT.y)
 	_shell(cloth, 0.76, 0.84, 0.045, pal.light, 90.0, 270.0)
 	_edge_stripes(cloth, 0.3, 0.8, 0.04, pal.light)
 	# Sash with two tails.

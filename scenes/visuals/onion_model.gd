@@ -29,6 +29,10 @@ const FLASH_TIME := 0.14
 const SQUASH_TIME := 0.22
 const ATTACK_TIME := 0.24
 const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
+## Peel flaps (angle in degrees from the front, height): on the bulb, and lifted by PEEL_GEAR_LIFT when a
+## chest piece is worn so they stay visible on top of the armour (the low-HP cue must not vanish).
+const PEEL_SPOTS: Array[Vector2] = [Vector2(132.0, 0.46), Vector2(-132.0, 0.6), Vector2(48.0, 0.3)]
+const PEEL_GEAR_LIFT := 0.11
 ## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
 const CAST_BAR_Y := 2.0
 const CAST_BAR_SIZE := Vector2(1.6, 0.3)
@@ -1164,10 +1168,9 @@ func _build_peels() -> void:
 			Vector2(0.045, 0.19), Vector2(0.0, 0.22), Vector2(-0.05, 0.17), Vector2(-0.07, 0.08)])
 		k.add_extrusion(leaf, 0.014, Transform3D(), paper, 0.9)
 		return k.build())
-	var spots := [[150.0, 0.42], [-115.0, 0.58], [48.0, 0.3]]
-	for i in spots.size():
-		var a: float = spots[i][0]
-		var y: float = spots[i][1]
+	for i in PEEL_SPOTS.size():
+		var a := PEEL_SPOTS[i].x
+		var y := PEEL_SPOTS[i].y
 		var pivot := _node("Peel%d" % i, _body)
 		var p := bulb_point(y, a, 0.005)
 		var outward := Vector3(p.x, 0, p.z).normalized()
@@ -1179,6 +1182,14 @@ func _build_peels() -> void:
 		_mesh("Flap", pivot, flap, Mats.toon_vc())
 		pivot.visible = false
 		_peels.append(pivot)
+	_place_peels()
+
+
+## Puts the peel flaps on the bulb, or on top of the armour when a chest piece is worn.
+func _place_peels() -> void:
+	var lift := PEEL_GEAR_LIFT if _looks[EquipLook.Slot.CHEST] != null else 0.0
+	for i in _peels.size():
+		_peels[i].position = bulb_point(PEEL_SPOTS[i].y, PEEL_SPOTS[i].x, 0.005 + lift)
 
 
 func _build_cast_bar() -> void:
@@ -1326,6 +1337,7 @@ func _build_gear() -> void:
 		_accents.append(node)
 	_build_starter_extras(parts)
 	_apply_head_effects(parts[EquipLook.Slot.HEAD])
+	_place_peels()
 	if downed:
 		_apply_downed_look()
 	elif _flash > 0.0:

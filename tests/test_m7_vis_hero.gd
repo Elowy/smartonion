@@ -612,6 +612,26 @@ func test_hit_flash_and_peel_still_work_with_gear() -> void:
 			check(Mats.overlay_amount(c as GeometryInstance3D) > 0.5, "new %s flashes too" % c.name)
 
 
+func test_peel_flaps_ride_on_top_of_a_worn_chest_piece() -> void:
+	var m := _onion(&"warrior")
+	var bare: Array[float] = []
+	for i in 3:
+		var p := (m.get_node("Yaw/Body/Peel%d" % i) as Node3D).position
+		bare.append(Vector2(p.x, p.z).length() - OnionModel.bulb_radius(p.y))
+		check(bare[i] < 0.02, "flap %d sits on the bulb" % i)
+	m.set_looks(null, null, _look(CHEST, ClassData.ArmorType.PLATE, 2, 3))
+	for i in 3:
+		var p := (m.get_node("Yaw/Body/Peel%d" % i) as Node3D).position
+		var out := Vector2(p.x, p.z).length() - OnionModel.bulb_radius(p.y)
+		check(out > 0.1, "flap %d is lifted over the armour (%.3f m)" % [i, out])
+	m.set_hp_ratio(0.1)
+	for i in 3:
+		check((m.get_node("Yaw/Body/Peel%d" % i) as Node3D).visible, "flap %d shows at low HP" % i)
+	m.set_looks(null, null, null)
+	var p0 := (m.get_node("Yaw/Body/Peel0") as Node3D).position
+	check(Vector2(p0.x, p0.z).length() - OnionModel.bulb_radius(p0.y) < 0.02, "back on the bulb without a chest piece")
+
+
 func test_every_gear_mesh_is_below_the_yaw_node() -> void:
 	# Rogue Vanish fades every MeshInstance3D below Yaw: the armour must be in there.
 	var m := _dressed(&"rogue", _suit(ClassData.ArmorType.LEATHER, 2, 4))
