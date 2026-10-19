@@ -16,6 +16,12 @@ const LOW_TIME := 5.0
 const BANNER_IN := 0.22
 const BANNER_HOLD := 1.3
 const BANNER_OUT := 0.55
+## M7b: the boss banner slams in (it drops from BANNER_SLAM_FROM x size and lands in BANNER_SLAM_TIME s,
+## settles in BANNER_SLAM_SETTLE s) and stays a little longer.
+const BANNER_SLAM_FROM := 2.6
+const BANNER_SLAM_TIME := 0.12
+const BANNER_SLAM_SETTLE := 0.12
+const BANNER_SLAM_HOLD := 1.9
 ## Banner: a slim translucent ribbon anchored just below the wave / timer plaque.
 const BANNER_ANCHOR := 0.22
 const BANNER_HEIGHT := 100.0
@@ -195,8 +201,9 @@ func set_wave_time(seconds_left: float) -> void:
 
 
 ## Big centred banner ("Wave 3", "Wave cleared!", "LEVEL UP!"); [param sub_lines] are small lines under it (the wave
-## banner lists the running shrines, M6b), none = the one-line banner.
-func show_banner(text: String, color: Color = UiTheme.GOLD, sub_lines: Array[String] = []) -> void:
+## banner lists the running shrines, M6b), none = the one-line banner. [param slam] (M7b, the boss arrival): the
+## text drops in huge, slams onto the ribbon and settles, and stays longer.
+func show_banner(text: String, color: Color = UiTheme.GOLD, sub_lines: Array[String] = [], slam: bool = false) -> void:
 	banner_label.text = text
 	banner_label.add_theme_color_override(&"font_color", color)
 	_show_banner_sub(sub_lines)
@@ -205,17 +212,25 @@ func show_banner(text: String, color: Color = UiTheme.GOLD, sub_lines: Array[Str
 	_banner.visible = true
 	_banner.modulate.a = 0.0
 	banner_label.pivot_offset = banner_label.size * 0.5
-	banner_label.scale = Vector2.ONE * 1.35
+	banner_label.scale = Vector2.ONE * (BANNER_SLAM_FROM if slam else 1.35)
 	if not is_inside_tree():
 		_banner.modulate.a = 1.0
 		banner_label.scale = Vector2.ONE
 		return
 	_banner_tween = create_tween()
 	_banner_tween.set_parallel(true)
-	_banner_tween.tween_property(_banner, "modulate:a", 1.0, BANNER_IN)
-	_banner_tween.tween_property(banner_label, "scale", Vector2.ONE, BANNER_IN + 0.08) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_banner_tween.chain().tween_interval(BANNER_HOLD)
+	if slam:
+		_banner_tween.tween_property(_banner, "modulate:a", 1.0, BANNER_SLAM_TIME * 0.6)
+		_banner_tween.tween_property(banner_label, "scale", Vector2.ONE * 0.9, BANNER_SLAM_TIME) \
+			.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+		_banner_tween.chain().tween_property(banner_label, "scale", Vector2.ONE, BANNER_SLAM_SETTLE) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_banner_tween.chain().tween_interval(BANNER_SLAM_HOLD)
+	else:
+		_banner_tween.tween_property(_banner, "modulate:a", 1.0, BANNER_IN)
+		_banner_tween.tween_property(banner_label, "scale", Vector2.ONE, BANNER_IN + 0.08) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_banner_tween.chain().tween_interval(BANNER_HOLD)
 	_banner_tween.chain().tween_property(_banner, "modulate:a", 0.0, BANNER_OUT)
 	_banner_tween.chain().tween_callback(_banner.hide)
 

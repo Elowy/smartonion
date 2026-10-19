@@ -474,6 +474,7 @@ func _spawn_group(g: PendingGroup) -> void:
 		else:
 			e.position = pos
 		parent.add_child(e)
+		e.play_spawn_in()
 		spawned_this_wave += 1
 		enemy_spawned.emit(e)
 		if not _running:
@@ -561,6 +562,7 @@ func _spawn_boss() -> void:
 	_boss_dead = false
 	b.died.connect(_on_boss_died)
 	parent.add_child(b)
+	b.play_spawn_in()
 	spawned_this_wave += 1
 	boss_spawned.emit(b)
 	enemy_spawned.emit(b)
@@ -597,6 +599,7 @@ func summon(add_data: EnemyData, count: int, center: Vector3, scatter: float) ->
 		else:
 			e.position = pos
 		parent.add_child(e)
+		e.play_spawn_in()
 		spawned_this_wave += 1
 		Vfx.death_puff(pos + Vector3.UP * 0.4, add_data.color, maxf(0.6, add_data.model_scale))
 		enemy_spawned.emit(e)

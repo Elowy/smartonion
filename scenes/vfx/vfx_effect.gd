@@ -3,7 +3,9 @@ extends Node3D
 ## One fire-and-forget effect spawned by [Vfx]. Animates its children in code (no Tweens,
 ## so tests can step it with _process) and frees itself after [member life] seconds.
 
-enum Kind { TEXT, ARC, SPARK, PUFF, EXPLOSION, TELEGRAPH, LEVEL_UP, SPARKLE, RESURRECT }
+## M7b: ENTRANCE (a boss arrives: main = rune, flash = light column, ring) and REMAINS (a boss died:
+## flash = the lingering glow, ring).
+enum Kind { TEXT, ARC, SPARK, PUFF, EXPLOSION, TELEGRAPH, LEVEL_UP, SPARKLE, RESURRECT, ENTRANCE, REMAINS }
 
 var kind: Kind = Kind.SPARK
 var life := 0.5
@@ -50,6 +52,8 @@ func repop() -> void:
 
 
 func _exit_tree() -> void:
+	if kind == Kind.SPARK:
+		Vfx._spark_alive = maxi(0, Vfx._spark_alive - 1)
 	if kind == Kind.TEXT:
 		Vfx._text_count = maxi(0, Vfx._text_count - 1)
 		if merge_key != 0 and Vfx._merge.get(merge_key) == self:
@@ -85,6 +89,15 @@ func _update(t: float) -> void:
 				flash.scale = Vector3.ONE * lerpf(0.3, 0.9, smoothstep(0.0, 0.25, t))
 				param(flash, &"fx_fade", 1.0 - smoothstep(0.2, 0.7, t))
 			_update_ring(t, 0.4, 2.2)
+		Kind.ENTRANCE:
+			_update_entrance(t)
+		Kind.REMAINS:
+			if flash != null:
+				# A glow that lingers, breathing, over where the boss fell.
+				var breathe := 1.0 + 0.12 * sin(age * 5.0)
+				flash.scale = Vector3.ONE * size * lerpf(0.9, 1.5, smoothstep(0.0, 0.5, t)) * breathe
+				param(flash, &"fx_fade", 1.0 - smoothstep(0.45, 1.0, t))
+			_update_ring(t, size * 0.5, size * 2.4)
 		Kind.EXPLOSION:
 			if flash != null:
 				var e := smoothstep(0.0, Vfx.EXPLOSION_FLASH_TIME, age)
@@ -134,6 +147,23 @@ func _update_telegraph(t: float) -> void:
 	main.rotation.y = age * 0.8
 	param(gi, &"rune_progress", p)
 	param(gi, &"rune_fade", fade * (1.0 + 0.6 * smoothstep(0.85, 1.0, p)))
+
+
+func _update_entrance(t: float) -> void:
+	# The rune flares open and spins while it fades; the light column shoots up, then thins out.
+	if main != null:
+		var d: float = main.get_meta(&"diameter", 1.0)
+		var g := lerpf(0.5, 1.0, 1.0 - pow(1.0 - t, 3.0))
+		main.scale = Vector3(g, 1.0, g) * d
+		main.rotation.y = age * 1.6
+		param(main as GeometryInstance3D, &"rune_progress", 1.0)
+		param(main as GeometryInstance3D, &"rune_fade", (1.0 - smoothstep(0.3, 1.0, t)) * 1.5)
+	if flash != null:
+		var rise := smoothstep(0.0, 0.18, t)
+		var w := size * lerpf(1.0, 0.45, smoothstep(0.2, 1.0, t))
+		flash.scale = Vector3(w, 0.3 + 4.2 * rise, w)
+		param(flash, &"fx_fade", 1.0 - smoothstep(0.25, 0.85, t))
+	_update_ring(t, size * 0.5, size * 2.6)
 
 
 func _update_ring(t: float, from_r: float, to_r: float) -> void:

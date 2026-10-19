@@ -28,6 +28,8 @@ func run() -> void:
 			await _arena_overview()
 		"revive":
 			await _revive()
+		"fx":
+			await _fx()
 		_:
 			await _gameplay()
 	var out := _arg("out", "/tmp/smartonion_showcase.png")
@@ -389,6 +391,176 @@ func _arena_overview() -> void:
 	cam.look_at_from_position(Vector3(0, 48, 36), Vector3(0, 0, -2))
 	cam.make_current()
 	await _frames(int(_arg("frames", "4")))
+
+
+# --- M7b combat juice (VIS-FX) ---------------------------------------------------------------------
+# --view=fx --phase=spawn|death|impacts|loot|boss|banner  (run with the engine flag --fixed-fps 60 so an
+# effect's age after N frames is exact). Each phase poses its things at different stages of their
+# animation so one picture shows the whole motion.
+
+func _fx() -> void:
+	var phase := _arg("phase", "impacts")
+	Vfx.frame_override = 1000
+	match phase:
+		"spawn":
+			await _fx_spawn()
+		"death":
+			await _fx_death()
+		"loot":
+			await _fx_loot()
+		"boss":
+			await _fx_boss()
+		"banner":
+			await _fx_banner()
+		_:
+			await _fx_impacts()
+
+
+## An arena with a close camera aimed at [param at].
+func _fx_arena(at: Vector3, dist: float, pitch_deg: float) -> Arena:
+	var arena := Arena.create()
+	add_child(arena)
+	var cam := Camera3D.new()
+	cam.fov = CLOSE_FOV
+	add_child(cam)
+	var p := deg_to_rad(float(_arg("pitch", str(pitch_deg))))
+	var d := float(_arg("dist", str(dist)))
+	cam.look_at_from_position(at + Vector3(0, sin(p), cos(p)) * d, at)
+	cam.make_current()
+	return arena
+
+
+func _fx_model(arena: Arena, id: StringName, pos: Vector3) -> EnemyModel:
+	var m: EnemyModel
+	var boss := Db.get_boss(id)
+	if boss != null:
+		m = BossModel.new()
+		arena.entities.add_child(m)
+		m.setup(boss)
+	else:
+		m = EnemyModel.new()
+		arena.entities.add_child(m)
+		m.setup(Db.get_enemy(id))
+	m.position = pos
+	m.set_facing(Vector3(0.0, 0.0, 1.0))
+	return m
+
+
+func _fx_spawn() -> void:
+	var arena := _fx_arena(Vector3(0, 0.5, 0), 12.0, 34.0)
+	var ids: Array[StringName] = [&"skeleton_grunt", &"candlekin", &"marsh_gurgler", &"troll_axethrower",
+		&"plague_ghoul", &"cultist_acolyte", &"flesh_golem", &"skeleton_grunt", &"candlekin", &"skeleton_grunt"]
+	var n := ids.size()
+	for i in n:
+		var m := _fx_model(arena, ids[i], Vector3((float(i) - float(n - 1) * 0.5) * 1.55, 0.0, 0.0))
+		m.play_spawn(EnemyModel.SPAWN_TIME)
+		m._process(EnemyModel.SPAWN_TIME * (float(i) + 0.4) / float(n))
+		m.set_process(false)
+	await _frames(6)
+
+
+func _fx_death() -> void:
+	var arena := _fx_arena(Vector3(0, 0.3, 0), 11.0, 36.0)
+	var ids: Array[StringName] = [&"skeleton_grunt", &"skeleton_grunt", &"marsh_gurgler", &"troll_axethrower",
+		&"plague_ghoul", &"cultist_acolyte", &"candlekin", &"skeleton_grunt"]
+	var ages: Array[float] = [0.02, 0.07, 0.13, 0.2, 0.3, 0.42, 0.5, 0.57]
+	var n := ids.size()
+	for i in n:
+		var pos := Vector3((float(i) - float(n - 1) * 0.5) * 1.6, 0.0, 1.6)
+		var m := _fx_model(arena, ids[i], pos)
+		var c := EnemyCorpse.spawn(m, pos, EnemyCorpse.Tier.NORMAL, Vector3(1.0, 0.0, -0.5))
+		if c != null:
+			c._process(ages[i])
+			c.set_process(false)
+		Vfx.frame_override += 1
+		m.queue_free()
+	# An elite (a big flash in its affix colour) and a boss (longer, keeps its glow) in the back row.
+	var elite := _fx_model(arena, &"skeleton_grunt", Vector3(-3.5, 0.0, -2.2))
+	elite.scale = Vector3.ONE * EliteAffixes.MODEL_SCALE
+	var ec := EnemyCorpse.spawn(elite, Vector3(-3.5, 0.0, -2.2), EnemyCorpse.Tier.ELITE, Vector3(1, 0, 0.3), EliteAffixes.COLORS[EliteAffixes.ENRAGED])
+	ec._process(0.1)
+	ec.set_process(false)
+	var boss := _fx_model(arena, &"lich_commander_morvain", Vector3(2.5, 0.0, -2.6))
+	var bc := EnemyCorpse.spawn(boss, Vector3(2.5, 0.0, -2.6), EnemyCorpse.Tier.BOSS, Vector3(-1, 0, 0.4))
+	bc._process(0.55)
+	bc.set_process(false)
+	Vfx.boss_remains(Vector3(2.5, 0.0, -2.6), boss.data.color, 1.0)
+	elite.queue_free()
+	boss.queue_free()
+	Vfx.death_puff(Vector3(-5.4, 0.5, -2.2), Color(0.9, 0.88, 0.78), 1.3)
+	await _frames(8)
+
+
+func _fx_impacts() -> void:
+	var stage := _studio()
+	var schools: Array[StringName] = [&"physical", &"fire", &"frost", &"arcane", &"holy", &"shadow", &"nature"]
+	for row in 2:
+		for i in schools.size():
+			Vfx.frame_override += 1
+			var pos := Vector3((float(i) - 3.0) * 1.35, 0.55, 0.9 - float(row) * 1.7)
+			Vfx.hit_spark(pos, Color(0.95, 0.85, 0.7), schools[i], row == 1)
+	_close_camera(stage, Vector3(0, 0.5, -0.3), 13.0, 38.0)
+	await _frames(int(_arg("frames", "7")))
+
+
+func _fx_loot() -> void:
+	var arena := _fx_arena(Vector3(0, 0.3, 0), 9.0, 38.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	# Gold / XP pickups mid-pop (ages spread over the toss and the bounce).
+	for i in 9:
+		var p := Pickup.drop(arena.entities, 3 if i % 3 != 2 else 0, 2 if i % 3 == 2 else 0,
+				Vector3((float(i) - 4.0) * 0.9, 0.0, 1.9))
+		p.set_physics_process(false)
+		p._process(Pickup.POP_TIME * (float(i) + 0.5) / 9.0)
+		p.set_process(false)
+	# Loot bags of rising rarity, tossed to different heights.
+	var rarities := [Items.Rarity.RARE, Items.Rarity.EPIC, Items.Rarity.LEGENDARY, Items.Rarity.ARTIFACT]
+	for i in rarities.size():
+		var item := ItemInstance.new()
+		item.rarity = rarities[i]
+		var bag := LootDrops.drop_item(item, Vector3((float(i) - 1.5) * 1.8, 0.0, -0.4))
+		bag.set_physics_process(false)
+		bag._process(LootBag.HOP_TIME * (0.18 + 0.22 * float(i)))
+		bag.set_process(false)
+	# Pickups pulled by a player to the left: streaks pointing back along the flight.
+	for i in 6:
+		var p := Pickup.create(2 if i % 2 == 0 else 0, 0 if i % 2 == 0 else 2)
+		arena.entities.add_child(p)
+		p.position = Vector3(-1.0 + float(i) * 0.9, 0.0, -2.6 - float(i % 3) * 0.35)
+		p.set_physics_process(false)
+		p._start_trail()
+		p.speed = 10.0 + 3.0 * float(i)
+		if p._trail != null:
+			p._trail.visible = true
+			Vfx.aim_streak(p._trail, Vector3(-1.0, 0.0, 0.25).normalized(), clampf(p.speed * Pickup.TRAIL_SECONDS, 0.25, 1.2),
+					Pickup.TRAIL_WIDTH)
+		p.set_process(false)
+	await _frames(4)
+
+
+func _fx_boss() -> void:
+	var arena := _fx_arena(Vector3(0, 1.0, 0), 13.0, 36.0)
+	var boss_data := Db.get_boss(&"vorthalax")
+	var pos := Vector3(0, 0, 0)
+	var m := _fx_model(arena, &"vorthalax", pos)
+	m.play_spawn(EnemyModel.SPAWN_TIME_BOSS)
+	m._process(EnemyModel.SPAWN_TIME_BOSS * float(_arg("rise", "0.55")))
+	m.set_process(false)
+	Vfx.boss_entrance(pos, maxf(boss_data.radius * 1.6, 1.2), boss_data.color)
+	# The effect (and its dust particles) run for real: --frames=N at the fixed 60 fps = N / 60 s of age.
+	await _frames(int(_arg("frames", "20")))
+
+
+func _fx_banner() -> void:
+	var arena := Arena.create()
+	add_child(arena)
+	arena.camera.snap()
+	var hud := Hud.create()
+	add_child(hud)
+	await _frames(3)
+	hud.show_banner(Db.get_boss(&"vorthalax").intro_text(), UiTheme.RED, [], true)
+	await _frames(int(_arg("frames", "5")))
 
 
 # --- Helpers -------------------------------------------------------------------
