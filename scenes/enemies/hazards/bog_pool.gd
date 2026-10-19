@@ -12,6 +12,11 @@ extends ArenaHazard
 ## in (FADE_IN, [member look_updates] counts them), and the bubbles swell and pop in a vertex shader on
 ## TIME ([method Mats.bubble]) – five pools used to cost ~0.1 ms of every physics tick re-writing the
 ## ring materials and 25 bubble transforms for a pool that never changes.
+##
+## M7b: the pool's water is a shader of its own ([constant _WATER_CODE]): a deep centre with a shallow,
+## greener edge, slow ripples, drifting glints and a lighter wet edge, all animated on TIME. It keeps the
+## ring shader's uniforms (ring_color, ring_shape, ring_stroke), so the fade-in above writes it exactly as
+## it wrote the plain mud disc; the lime rim ([method marker_color]) stays the pool's marker.
 
 const SLOW_KEY := &"bog_slow"
 const MUD := Color(0.09, 0.08, 0.04)
@@ -28,6 +33,39 @@ const BOT_WEIGHT := 0.5
 const BOT_AVOID_MARGIN := 0.3
 const FADE_IN := 0.4
 const BUBBLES := 5
+
+## The bog water: a filled disc (UV 0..1 on a quad) with the ring shader's uniforms.
+const _WATER_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
+uniform vec4 ring_color = vec4(0.09, 0.08, 0.04, 1.0);
+uniform vec4 ring_shape = vec4(0.93, 1.0, 0.88, 1.0);
+uniform float ring_stroke = 0.0;
+void fragment() {
+	vec2 p = UV * 2.0 - 1.0;
+	float r = length(p);
+	float aa = fwidth(r) * 1.5;
+	float disc = 1.0 - smoothstep(ring_shape.y - aa * 2.0, ring_shape.y, r);
+	// Deep, dark middle; shallower and greener towards the bank.
+	vec3 deep = ring_color.rgb * 0.6 + vec3(0.0, 0.02, 0.03);
+	vec3 shallow = vec3(0.14, 0.21, 0.1);
+	vec3 col = mix(shallow, deep, smoothstep(0.1, 0.85, 1.0 - r));
+	// Slow, wobbling ripples spreading from the middle.
+	vec2 q = p * 3.0;
+	float wobble = (sin(q.x * 1.7 + TIME * 0.3) + sin(q.y * 2.1 - TIME * 0.2)) * 1.6;
+	float ripple = smoothstep(0.55, 1.0, sin(r * 13.0 - TIME * 1.3 + wobble));
+	col += vec3(0.05, 0.1, 0.08) * ripple * (1.0 - r);
+	// Glints sliding over the surface.
+	float g = sin(q.x * 3.7 + sin(q.y * 2.3 + TIME * 0.6) * 1.5 + TIME * 0.7) * sin(q.y * 3.3 - TIME * 0.5 + sin(q.x * 1.9) * 1.2);
+	col += vec3(0.5, 0.78, 0.58) * smoothstep(0.5, 0.95, g) * 0.5 * (1.0 - 0.5 * r);
+	// A lighter wet edge just inside the bank.
+	col += vec3(0.38, 0.5, 0.2) * smoothstep(0.7, 0.93, r) * 0.28;
+	ALBEDO = col;
+	ALPHA = clamp(disc * 0.96, 0.0, 1.0) * ring_color.a;
+}
+"""
+
+static var _water_shader: Shader
 
 var hero_slow := 30.0
 var enemy_slow := 15.0
@@ -76,8 +114,21 @@ func hazard_push(from: Vector3, margin: float = BOT_AVOID_MARGIN) -> Vector2:
 	return EnemyHazard.circle_push(global_position, radius, from, minf(margin, BOT_AVOID_MARGIN)) * BOT_WEIGHT
 
 
+## A new bog water material (the shader is shared; one material per pool, like a ring: the fade-in writes
+## its uniforms).
+static func water_material() -> ShaderMaterial:
+	if _water_shader == null:
+		_water_shader = Shader.new()
+		_water_shader.code = _WATER_CODE
+	var m := ShaderMaterial.new()
+	m.shader = _water_shader
+	m.render_priority = -1
+	return m
+
+
 func _build() -> void:
 	_mud = _ring("Mud", radius * 2.0)
+	_mud.material_override = water_material()
 	_rim = _ring("Rim", radius * 2.0)
 	Mats.set_ring(_mud, MUD, 0.93, 1.0, 0.0)
 	Mats.set_ring(_rim, MUD_RIM, 0.88, 0.99, 0.0)

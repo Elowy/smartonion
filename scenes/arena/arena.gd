@@ -20,6 +20,11 @@ extends Node3D
 ## [method leave_dungeon_layout] puts the clearing back. The playable rectangle of the layout in use
 ## is [member play_size] ([method get_bounds]); SIZE stays the clearing's size for the static
 ## readers that only fall back on it.
+## M7b VIS-ENV (final look): the ground shader is one look per environment ([ArenaGround]; the dungeon
+## room is a crypt), the decor sets add a wall / backdrop ring ([ArenaBackdrop]) and the dungeon a crypt
+## ([ArenaCrypt]), [member ambient] drifts small particles through what the camera shows
+## ([ArenaAmbient]), and [method _grade] sets the light and colour grade (the environment's data; a torch-lit
+## crypt in the dungeon). Visual only.
 
 ## Playable area size in metres (x = width, y = depth along Z).
 const SIZE := Vector2(34.0, 22.0)
@@ -39,107 +44,6 @@ const DECOR_SEED := 20240611
 ## Where the Spirit Healer stands: the arena centre (no decor or props inside the walls).
 const SPIRIT_HEALER_POINT := Vector3.ZERO
 
-const _GROUND_CODE := """
-shader_type spatial;
-render_mode cull_back;
-
-uniform vec4 grass_dark : source_color = vec4(0.2, 0.4, 0.12, 1.0);
-uniform vec4 grass_mid : source_color = vec4(0.33, 0.56, 0.17, 1.0);
-uniform vec4 grass_light : source_color = vec4(0.5, 0.7, 0.23, 1.0);
-uniform vec4 grass_warm : source_color = vec4(0.66, 0.7, 0.26, 1.0);
-uniform vec4 dirt_light : source_color = vec4(0.62, 0.48, 0.3, 1.0);
-uniform vec4 dirt_dark : source_color = vec4(0.42, 0.3, 0.18, 1.0);
-uniform vec4 patches[8];
-uniform int patch_count = 0;
-uniform vec2 arena_half = vec2(17.0, 11.0);
-uniform vec2 road = vec2(0.0, 1.8);
-varying vec3 wpos;
-
-float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-float noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-		mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-float fbm(vec2 p) {
-	float v = 0.0;
-	float a = 0.5;
-	for (int i = 0; i < 4; i++) {
-		v += a * noise(p);
-		p = p * 2.03 + vec2(17.3, 9.1);
-		a *= 0.5;
-	}
-	return v;
-}
-
-void vertex() {
-	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-}
-
-void fragment() {
-	vec2 p = wpos.xz;
-	float big = fbm(p * 0.05);
-	float mid = fbm(p * 0.17 + 3.0);
-	float stroke = noise(vec2(p.x * 0.8 + p.y * 0.35, p.y * 2.4 - p.x * 0.2));
-	vec3 g = mix(grass_dark.rgb, grass_mid.rgb, smoothstep(0.26, 0.52, big));
-	g = mix(g, grass_light.rgb, smoothstep(0.5, 0.74, big + (mid - 0.5) * 0.45) * 0.85);
-	g = mix(g, grass_warm.rgb, smoothstep(0.64, 0.82, mid) * 0.3);
-	g *= 0.92 + 0.14 * stroke;
-	// Clover-like round speckles (one jittered dot per cell, sparse, varied size).
-	vec2 cell = floor(p * 2.2);
-	vec2 dot_center = cell + 0.25 + 0.5 * vec2(hash(cell), hash(cell + 7.1));
-	float dot_r = 0.07 + 0.17 * hash(cell + 3.3);
-	float speck = step(0.86, hash(cell + 1.7)) * (1.0 - smoothstep(dot_r * 0.5, dot_r, length(p * 2.2 - dot_center)));
-	speck *= smoothstep(0.3, 0.6, mid + 0.25 * hash(cell + 4.4));
-	g = mix(g, mix(grass_light.rgb, grass_warm.rgb, hash(cell + 9.0)) * 1.04, speck * 0.28);
-	// Slightly darker, lusher grass along the inside of the walls.
-	vec2 edge = arena_half - abs(p);
-	float inside = step(0.0, min(edge.x, edge.y));
-	g *= 1.0 - inside * (1.0 - smoothstep(0.0, 1.8, min(edge.x, edge.y))) * 0.22;
-	// Dirt patches with noisy edges.
-	float dirt = 0.0;
-	float rim = 0.0;
-	for (int i = 0; i < 8; i++) {
-		if (i >= patch_count) {
-			break;
-		}
-		vec4 pt = patches[i];
-		float d = length((p - pt.xy) * vec2(1.0, 1.25)) / pt.z;
-		d += (fbm(p * 0.75 + pt.w) - 0.5) * 0.6;
-		dirt = max(dirt, 1.0 - smoothstep(0.8, 0.9, d));
-		rim = max(rim, smoothstep(0.75, 0.88, d) * (1.0 - smoothstep(0.9, 1.05, d)));
-	}
-	// Dirt road leaving through the north gate.
-	float rx = road.x + sin(p.y * 0.11) * 2.2 * smoothstep(-arena_half.y, -arena_half.y - 8.0, p.y);
-	float rd = abs(p.x - rx) / road.y + (fbm(p * 0.55) - 0.5) * 0.45;
-	float on_road = (1.0 - smoothstep(0.8, 1.0, rd)) * (1.0 - smoothstep(-arena_half.y - 1.0, -arena_half.y + 0.2, p.y));
-	rim = max(rim, smoothstep(0.75, 0.95, rd) * (1.0 - smoothstep(0.95, 1.2, rd)) * (1.0 - smoothstep(-arena_half.y - 1.0, -arena_half.y + 0.2, p.y)));
-	dirt = max(dirt, on_road);
-	vec3 dc = mix(dirt_dark.rgb, dirt_light.rgb, smoothstep(0.25, 0.7, mid) * 0.75 + stroke * 0.25);
-	vec2 pc = floor(p * 3.0);
-	vec2 pcen = pc + 0.3 + 0.4 * vec2(hash(pc + 2.0), hash(pc + 5.0));
-	float pr = 0.06 + 0.1 * hash(pc + 8.0);
-	float pd = length(p * 3.0 - pcen);
-	float pebble = step(0.84, hash(pc)) * (1.0 - smoothstep(pr * 0.7, pr, pd));
-	float pebble_shadow = step(0.84, hash(pc)) * (1.0 - smoothstep(pr, pr * 1.5, length(p * 3.0 - pcen - vec2(0.05, 0.06))));
-	dc *= 1.0 - 0.18 * max(pebble_shadow - pebble, 0.0);
-	dc = mix(dc, mix(dirt_light.rgb, vec3(0.74, 0.7, 0.62), 0.55) * 1.08, pebble * 0.75);
-	g *= 1.0 - rim * 0.25;
-	ALBEDO = mix(g, dc, dirt);
-	ROUGHNESS = 1.0;
-	SPECULAR = 0.0;
-}
-
-void light() {
-	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
-	DIFFUSE_LIGHT += ndl * mix(1.0, ATTENUATION, 0.72) * LIGHT_COLOR / PI;
-}
-"""
-
 static var current: Arena
 
 var entities: Node3D
@@ -153,6 +57,8 @@ var world_environment: WorldEnvironment
 var ground: MeshInstance3D
 ## The decoration around the playable rectangle (child "Decor").
 var decor: Node3D
+## The environment's ambient particles (child "Ambient"): they drift through what the camera shows.
+var ambient: ArenaAmbient
 ## Dirt patches inside the arena: (x, z, radius, noise seed).
 var dirt_patches: Array[Vector4] = []
 ## Playable size of the layout in use: SIZE, DUNGEON_SIZE while a dungeon layout is up.
@@ -257,11 +163,11 @@ func enter_dungeon_layout(p_environment: EnvironmentData = null, p_size: Vector2
 		return
 	_home = {
 		"size": play_size, "environment": environment, "world_environment": world_environment,
-		"sun": sun, "ground": ground, "walls": walls, "decor": decor, "dirt_patches": dirt_patches,
-		"healer": spirit_healer,
+		"sun": sun, "ground": ground, "walls": walls, "decor": decor, "ambient": ambient,
+		"dirt_patches": dirt_patches, "healer": spirit_healer,
 		"healer_mode": spirit_healer.process_mode if spirit_healer != null else Node.PROCESS_MODE_INHERIT,
 	}
-	for node: Node in [world_environment, sun, ground, walls, decor]:
+	for node: Node in [world_environment, sun, ground, walls, decor, ambient]:
 		if node != null and node.get_parent() == self:
 			remove_child(node)
 	if spirit_healer != null and is_instance_valid(spirit_healer):
@@ -281,6 +187,7 @@ func enter_dungeon_layout(p_environment: EnvironmentData = null, p_size: Vector2
 	decor = _build_decor(rng)
 	decor.name = "Decor"
 	add_child(decor)
+	_build_ambient()
 
 
 ## Puts the clearing back ([method enter_dungeon_layout] undone): the dungeon room's scenery is
@@ -288,7 +195,7 @@ func enter_dungeon_layout(p_environment: EnvironmentData = null, p_size: Vector2
 func leave_dungeon_layout() -> void:
 	if not in_dungeon_layout:
 		return
-	for node: Node in [world_environment, sun, ground, walls, decor]:
+	for node: Node in [world_environment, sun, ground, walls, decor, ambient]:
 		_discard(node)
 	in_dungeon_layout = false
 	play_size = _home["size"]
@@ -298,8 +205,9 @@ func leave_dungeon_layout() -> void:
 	ground = _home["ground"]
 	walls = _home["walls"]
 	decor = _home["decor"]
+	ambient = _home["ambient"]
 	dirt_patches = _home["dirt_patches"]
-	for node: Node in [world_environment, sun, ground, walls, decor]:
+	for node: Node in [world_environment, sun, ground, walls, decor, ambient]:
 		if node != null and is_instance_valid(node):
 			add_child(node)
 	var healer: SpiritHealer = _home["healer"]
@@ -313,7 +221,7 @@ func leave_dungeon_layout() -> void:
 ## with the arena.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE and in_dungeon_layout:
-		for key: String in ["world_environment", "sun", "ground", "walls", "decor"]:
+		for key: String in ["world_environment", "sun", "ground", "walls", "decor", "ambient"]:
 			var node: Node = _home.get(key)
 			if node != null and is_instance_valid(node) and node.get_parent() == null:
 				node.free()
@@ -338,6 +246,7 @@ func _build() -> void:
 	decor = _build_decor(rng)
 	decor.name = "Decor"
 	add_child(decor)
+	_build_ambient()
 	if _with_spirit_healer:
 		# Before the entities: it processes first, so a ghost's cast bar shows this tick's channel.
 		spirit_healer = SpiritHealer.create()
@@ -351,27 +260,28 @@ func _build() -> void:
 
 
 func _build_environment() -> void:
+	var grade := _grade()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = environment.sky_color
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = environment.ambient_color
-	env.ambient_light_energy = environment.ambient_energy
+	env.ambient_light_color = grade["ambient_color"]
+	env.ambient_light_energy = grade["ambient_energy"]
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.tonemap_exposure = 1.0
 	env.fog_enabled = true
-	env.fog_light_color = environment.fog_color
-	env.fog_density = environment.fog_density
+	env.fog_light_color = grade["fog_color"]
+	env.fog_density = grade["fog_density"]
 	env.fog_sky_affect = 0.0
 	env.glow_enabled = true
-	env.glow_intensity = environment.glow_intensity
+	env.glow_intensity = grade["glow_intensity"]
 	env.glow_strength = 1.0
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = 0.95
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.adjustment_enabled = true
-	env.adjustment_saturation = environment.saturation
-	env.adjustment_contrast = environment.contrast
+	env.adjustment_saturation = grade["saturation"]
+	env.adjustment_contrast = grade["contrast"]
 	world_environment = WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = env
@@ -379,8 +289,8 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.rotation_degrees = environment.sun_rotation
-	sun.light_color = environment.sun_color
-	sun.light_energy = environment.sun_energy
+	sun.light_color = grade["sun_color"]
+	sun.light_energy = grade["sun_energy"]
 	sun.shadow_enabled = true
 	sun.shadow_blur = 1.6
 	sun.shadow_bias = 0.04
@@ -390,11 +300,42 @@ func _build_environment() -> void:
 	add_child(sun)
 
 
+## The light and colour grade of the scenery in use: the environment's own data in the clearing; in the
+## dungeon room the same palette pulled towards a torch-lit crypt (dimmer, cooler light from above,
+## thicker warm-dark fog, a stronger bloom). The sky colour stays the environment's.
+func _grade() -> Dictionary:
+	var e := environment
+	var out := {
+		"ambient_color": e.ambient_color, "ambient_energy": e.ambient_energy,
+		"fog_color": e.fog_color, "fog_density": e.fog_density,
+		"sun_color": e.sun_color, "sun_energy": e.sun_energy,
+		"glow_intensity": e.glow_intensity, "saturation": e.saturation, "contrast": e.contrast,
+	}
+	if in_dungeon_layout:
+		out["ambient_color"] = e.ambient_color.lerp(Color(0.52, 0.47, 0.58), 0.6)
+		out["ambient_energy"] = e.ambient_energy * 0.72
+		out["fog_color"] = e.fog_color.lerp(Color(0.1, 0.075, 0.09), 0.65)
+		out["fog_density"] = maxf(e.fog_density, 0.011)
+		out["sun_color"] = e.sun_color.lerp(Color(0.72, 0.76, 1.0), 0.6)
+		out["sun_energy"] = e.sun_energy * 0.62
+		out["glow_intensity"] = maxf(e.glow_intensity, 0.8)
+		out["saturation"] = e.saturation * 0.92
+		out["contrast"] = maxf(e.contrast, 1.1)
+	return out
+
+
 ## The decoration around the playable rectangle for [member environment]'s decor set
 ## (EnvironmentData.decor_id): [method ArenaThemes.build] picks the set (cemetery, swamp, volcano,
 ## ice_cave) and builds the forest ([method ArenaDecor.build]) for every id it does not know.
 func _build_decor(rng: RandomNumberGenerator) -> Node3D:
 	return ArenaThemes.build(self, rng)
+
+
+## The environment's ambient particles (ArenaAmbient), after the decor: they are not part of it (the
+## decor is meshes only, with a draw budget of its own).
+func _build_ambient() -> void:
+	ambient = ArenaAmbient.create(self, ArenaGround.look_for(environment, in_dungeon_layout))
+	add_child(ambient)
 
 
 func _build_ground(rng: RandomNumberGenerator) -> void:
@@ -404,10 +345,8 @@ func _build_ground(rng: RandomNumberGenerator) -> void:
 	for s in spots:
 		var jitter := Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.8, 0.8))
 		dirt_patches.append(Vector4(s.x + jitter.x, s.y + jitter.y, rng.randf_range(1.6, 2.8), rng.randf_range(0.0, 50.0)))
-	var mat := ShaderMaterial.new()
-	var sh := Shader.new()
-	sh.code = _GROUND_CODE
-	mat.shader = sh
+	var look := ArenaGround.look_for(environment, in_dungeon_layout)
+	var mat := ArenaGround.make_material(look)
 	var arr := PackedVector4Array()
 	for p in dirt_patches:
 		arr.append(p)
@@ -424,6 +363,7 @@ func _build_ground(rng: RandomNumberGenerator) -> void:
 	mat.set_shader_parameter("grass_warm", environment.grass_warm)
 	mat.set_shader_parameter("dirt_light", environment.dirt_light)
 	mat.set_shader_parameter("dirt_dark", environment.dirt_dark)
+	ArenaGround.apply_look(mat, look, environment, get_bounds())
 	var plane := PlaneMesh.new()
 	plane.size = get_decor_rect().grow(40.0).size
 	ground = MeshInstance3D.new()

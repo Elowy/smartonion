@@ -44,8 +44,9 @@ func run() -> void:
 # --- Views -------------------------------------------------------------------
 
 func _gameplay() -> void:
-	var arena := Arena.create()
+	var arena := _make_arena()
 	add_child(arena)
+	_enter_dungeon_if_asked(arena)
 	var center := Vector3(float(_arg("x", "0")), 0.0, float(_arg("z", "0")))
 	var spots: Array[Vector3] = [Vector3(-2.2, 0, 0.6), Vector3(-0.6, 0, -1.2), Vector3(1.2, 0, 0.2),
 		Vector3(2.6, 0, -1.0), Vector3(0.4, 0, 1.8)]
@@ -86,9 +87,12 @@ func _gameplay() -> void:
 		onions[1].set_revive_progress(0.45)
 		onions[0].set_hp_ratio(0.3)
 	arena.camera.snap()
+	_force_camera_distance(arena)
+	_env_hazards(arena, center, false)
 	await _frames(20)
 	# Slow time down so the burst is captured mid-flight.
 	Engine.time_scale = 0.05
+	_env_hazards(arena, center, true)
 	Vfx.spawn_telegraph(center + Vector3(-6, 0, -4), 1.2, 1.0)
 	Vfx.spawn_telegraph(center + Vector3(7, 0, 3), 1.0, 1.0)
 	await _frames(3)
@@ -375,18 +379,64 @@ func _revive() -> void:
 
 
 func _arena_overview() -> void:
-	var arena := Arena.create()
+	var arena := _make_arena()
 	add_child(arena)
+	_enter_dungeon_if_asked(arena)
 	var cam := Camera3D.new()
 	cam.fov = 50.0
 	cam.far = 300.0
 	add_child(cam)
 	cam.look_at_from_position(Vector3(0, 48, 36), Vector3(0, 0, -2))
 	cam.make_current()
-	await _frames(4)
+	await _frames(int(_arg("frames", "4")))
 
 
 # --- Helpers -------------------------------------------------------------------
+
+## The arena of --env=<id> (an id of Db.environments; default: the forest clearing).
+func _make_arena() -> Arena:
+	var env := Db.get_environment(StringName(_arg("env", ""))) if _arg("env", "") != "" else null
+	return Arena.create(env)
+
+
+## --hazards=1: the environment's ground hazard on the scene: the swamp's bog pools right away
+## ([param telegraphs] false), the other environments' telegraphs half filled (true).
+func _env_hazards(arena: Arena, center: Vector3, telegraphs: bool) -> void:
+	if _arg("hazards", "0") != "1" or arena.in_dungeon_layout:
+		return
+	match arena.environment.hazard_id:
+		&"bog_pools":
+			if not telegraphs:
+				BogPool.spawn(arena.entities, center + Vector3(-5.5, 0, 2.5), 2.3, 30.0, 15.0, 0)
+				BogPool.spawn(arena.entities, center + Vector3(6.0, 0, -3.0), 2.3, 30.0, 15.0, 1)
+		&"grasping_hands":
+			if telegraphs:
+				GraspingHands.spawn(arena.entities, center + Vector3(-1.0, 0, -4.0), 1.5, 1.0, 1.0, 1.2).age = 0.6
+		&"lava_vents":
+			if telegraphs:
+				LavaEruption.spawn(arena.entities, EnvironmentHazards.LAVA_VENT_POINTS[2], 2.0, 1.0, 1.0).age = 0.6
+		&"falling_icicles":
+			if telegraphs:
+				FallingIcicle.spawn(arena.entities, center + Vector3(-1.0, 0, -4.0), 1.2, 1.0, 1.0, 30.0, 1.5).age = 0.6
+
+
+## --dungeon=1: swaps the arena's scenery for the dungeon room (the run's palette: --env).
+func _enter_dungeon_if_asked(arena: Arena) -> void:
+	if _arg("dungeon", "0") == "1":
+		arena.enter_dungeon_layout(arena.environment)
+		# The Defend room's brazier, a little north of the heroes.
+		var brazier := DungeonBrazier.create(100.0)
+		arena.entities.add_child(brazier)
+		brazier.position = Vector3(0.0, 0.0, -3.2)
+
+
+## --dist=N: holds the gameplay camera at N metres (19.5 = closest, 36 = the farthest zoom-out).
+func _force_camera_distance(arena: Arena) -> void:
+	if _arg("dist", "") == "":
+		return
+	arena.camera.distance = float(_arg("dist", "24"))
+	arena.camera.set_process(false)
+	arena.camera.call(&"_apply")
 
 ## A projectile frozen in flight (no physics: it only shows its look).
 func _projectile(arena: Arena, team: int, style: StringName, color: Color, at: Vector3, dir: Vector3) -> void:

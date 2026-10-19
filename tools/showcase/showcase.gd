@@ -12,9 +12,9 @@ extends SceneTree
 ##   onions    Close line-up of the classes. --state=hurt|downed|walk|attack --back=1
 ##   enemies   Enemy line-up. --state=walk|windup|stun|hit
 ##   weapons   Every weapon model.
-##   arena     High overview of the arena and its decoration.
+##   arena     High overview of the arena and its decoration (--env=<id> --dungeon=1 --frames=N).
 ##   revive    Resurrection visuals: cast bar, channel beam, resurrect column.
-## Common: --out=path.png  --seed=N
+## Common: --out=path.png  --seed=N  (gameplay / arena: --env=<id> --dungeon=1; gameplay: --dist=19.5..36)
 
 
 func _initialize() -> void:

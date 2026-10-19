@@ -18,6 +18,10 @@ const BAR_HEIGHT := 0.2
 const BAR_Y := 2.35
 const FLAME_COLOR := Color(1.0, 0.62, 0.18)
 const FLAME_HURT_COLOR := Color(0.95, 0.2, 0.08)
+## The light the flame throws on the crypt floor and the heroes: a warm orange, wider than the old 7 m (M7b).
+const LIGHT_COLOR := Color(1.0, 0.52, 0.16)
+const LIGHT_RANGE := 9.5
+const LIGHT_ENERGY := 2.4
 const STONE := Color(0.42, 0.4, 0.42)
 const STONE_DARK := Color(0.27, 0.25, 0.28)
 
@@ -84,7 +88,9 @@ func _process(delta: float) -> void:
 		var s := lerpf(0.55, 1.0, ratio) * flicker * (1.0 + 0.25 * _flash)
 		_flame.scale = Vector3(s, s * (1.0 + 0.08 * sin(_time * 7.0)), s)
 	if _glow != null:
-		_glow.light_energy = (0.5 + 1.6 * hp_ratio() if hp > 0.0 else 0.0) * (1.0 + 0.3 * _flash)
+		# (A flame's light never holds still: two incommensurate flickers on top of the HP share.)
+		var flicker := 1.0 + 0.07 * sin(_time * 13.0) + 0.05 * sin(_time * 21.7 + 2.0)
+		_glow.light_energy = (0.5 + (LIGHT_ENERGY - 0.5) * hp_ratio() if hp > 0.0 else 0.0) * (1.0 + 0.3 * _flash) * flicker
 
 
 func _build() -> void:
@@ -102,9 +108,9 @@ func _build() -> void:
 	add_child(_flame)
 	_glow = OmniLight3D.new()
 	_glow.name = "Glow"
-	_glow.light_color = FLAME_COLOR
-	_glow.light_energy = 2.0
-	_glow.omni_range = 7.0
+	_glow.light_color = LIGHT_COLOR
+	_glow.light_energy = LIGHT_ENERGY
+	_glow.omni_range = LIGHT_RANGE
 	_glow.position = Vector3(0.0, 1.5, 0.0)
 	_glow.shadow_enabled = false
 	add_child(_glow)
