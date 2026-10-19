@@ -77,10 +77,12 @@ const TALENT_START_LEVEL := 10
 ## GDD 9). Smaller parties take softer hits: the fewer heroes, the fewer can revive a downed
 ## one (alone, the first down ends the run) and the more enemies each faces (the +60% count
 ## per extra player is less than one more share). About x1.3 per extra player. Final balance: the
-## full party went from 0.95 to 1.05 (and a trio from 0.75 to 0.8) after the Flesh Golem was softened
-## (at 0.95 the bots' first downs moved from wave ~11 to wave ~20 and six of six full parties cleared; at 1.15
-## two of six cleared, the early waves and the first dungeon already cost downs).
-const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.8, 1.05]
+## full party went from 0.95 to 1.05 after the Flesh Golem was softened (at 0.95 the bots' first downs moved
+## from wave ~11 to wave ~20 and six of six full parties cleared; at 1.15 two of six cleared, the early waves and
+## the first dungeon already cost downs). The trio was only interpolated (0.75, then 0.8) until it was measured:
+## at 0.8 twelve of twelve trios cleared with barely a down (5.6 downs per run on waves 20-25 against 26 for the
+## full party, 0.7 for a duo), so it is 0.9.
+const COOP_DAMAGE_MULTS: Array[float] = [0.45, 0.6, 0.9, 1.05]
 
 var active := false
 var victory := false

@@ -52,15 +52,18 @@ const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
 ## Final balance 2: the wave whose HP / damage growth the dungeon's enemies, its brazier and the Warden use, per
 ## portal wave and party size (the entry is [1, 2, 3, 4] heroes; see [method strength_wave]). The portal waves are
 ## the party's most comfortable stretch, so the dungeon is stronger than the cleared wave - by how much depends on
-## the party and on the portal: a flat factor (x1.6) was too hard late (four heroes cleared 1 of 7 dungeons after
-## wave 15, 6 of 10 after wave 12) and a flat bonus too hard early; smaller parties get the gentler numbers
-## (a lone hero cannot be revived and the rewards are a large part of its power). The target is about 50-80% cleared
-## per portal for three and four heroes and a bit fewer for a lone hero.
+## the party and on the portal. Measured with the bots (4 heroes, cleared / entered): a flat factor x1.6 (waves
+## 10 / 14 / 19 / 24) cleared 9/12, 12/12, 6/10 and 1/7 dungeons after the waves 6 / 9 / 12 / 15 (too hard late); the
+## gentle table 9 / 13 / 16 / 19 cleared 9/10, 10/10, 8/8 and 9/9 (about 2 downs inside, too easy), and the trios
+## and duos with it 93% / 92% - so the early portal is the hardest relative to the party (little gear yet), the
+## late ones need a bigger bonus than the middle one. A lone hero cannot be revived and lives off the rewards, so it
+## keeps the smallest numbers; the target is about 50-80% cleared per portal for three and four heroes and a bit fewer
+## for a lone hero.
 const STRENGTH_WAVES: Dictionary[int, Array] = {
-	6: [7, 8, 8, 9],
-	9: [10, 11, 12, 13],
-	12: [13, 14, 15, 16],
-	15: [16, 17, 18, 19],
+	6: [8, 9, 9, 10],
+	9: [12, 14, 14, 15],
+	12: [16, 17, 17, 18],
+	15: [20, 20, 20, 21],
 }
 const ROOM_COUNT := 4
 const ROOM_NAMES: Array[String] = ["Clear", "Survive", "Defend", "Warden"]
