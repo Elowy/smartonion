@@ -716,7 +716,7 @@ static func boss_entrance(pos: Vector3, radius: float, color: Color) -> void:
 	fx.add_child(column)
 	fx.flash = column
 	fx.ring = _ground_ring(fx)
-	var dust := _particles(fx, 20, 1.1, _ball_mesh(), Mats.particle(false))
+	var dust := _particles(fx, 24, 1.1, _ball_mesh(), Mats.particle(false))
 	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	dust.emission_ring_axis = Vector3.UP
 	dust.emission_ring_radius = r * 0.9
@@ -729,12 +729,12 @@ static func boss_entrance(pos: Vector3, radius: float, color: Color) -> void:
 	dust.gravity = Vector3(0, -0.4, 0)
 	dust.damping_min = 0.8
 	dust.damping_max = 1.6
-	dust.scale_amount_min = 1.1
-	dust.scale_amount_max = 2.0
+	dust.scale_amount_min = 1.6
+	dust.scale_amount_max = 2.8
 	dust.scale_amount_curve = _grow_curve()
 	dust.explosiveness = 0.6
-	var tone := color.lerp(Color(0.72, 0.66, 0.58), 0.65)
-	dust.color_ramp = _fade_gradient(Color(tone.r, tone.g, tone.b, 0.8), Color(tone.r, tone.g, tone.b, 0.0))
+	var tone := color.lerp(Color(0.82, 0.76, 0.66), 0.8)
+	dust.color_ramp = _fade_gradient(Color(tone.r, tone.g, tone.b, 0.92), Color(tone.r, tone.g, tone.b, 0.0))
 	_start(fx)
 
 
