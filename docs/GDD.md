@@ -7,7 +7,7 @@
 > hullámos balansz** az M6b utolsó lépése, és még hátravan. Az M6b (módok, környezetek,
 > események, szentélyek, Dungeon-portál, tartalom-csomagok) megvalósult; ahol a kód
 > pontosít a tervhez képest, a 16.1 „pontosítások” blokkjai és az érintett fejezetek ezt
-> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás) kész, az M7b (grafika) folyamatban van, a későbbi mérföldkövek még tervezés. Ez a dokumentum a fejlesztés
+> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás) és az M7b (grafika: betűtípus, ikonok, látszó felszerelés, környezetek, harci effektek) kész, a későbbi mérföldkövek még tervezés. Ez a dokumentum a fejlesztés
 > alapja; minden szám kiinduló érték, a balanszolás során változni fog (az M6b maga nem
 > hangolt: a végleges balansz egyszer, a legvégén készül, lásd 9. és 16. fejezet).
 
@@ -437,7 +437,7 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 - Mindegyiknek van **saját Forge Legendary hatása** (fegyvertípusonként egy, 4.1) és egy
   **procedurális megjelenése** (primitívekből: nagy kardpenge arany kereszttel; hosszú nyelű
   buzogány kőfejjel és vas pántokkal; arany talpú-ágú foglalat izzó gömbbel; saját
-  ikon-sziluettek és markolat-pózok; a végleges modellek az M7b-ben).
+  ikon-sziluettek és markolat-pózok; a modellek az M7b után is procedurálisak, lásd 13. fejezet).
 - A két kétkezes fegyver **saját fegyvertípus-azonosítót** kap (`two_hand_sword`,
   `two_hand_mace`), nem a `sword` / `mace`-t: így a Mage, a Warlock és a Rogue (akiknél a
   `sword` / `mace` már jártasság) nem kapja meg őket. A Warrior és a Paladin jártasságlistája
@@ -3005,20 +3005,18 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - Enyhe toon-shading, rim light, vékony körvonal.
 - **Technika:**
   - Godot 4, **3D low-poly** modellek.
+  - **Döntés (M7b):** a 3D-modellek procedurálisak maradnak: a toon-look saját anyagokkal és primitívekből épített, összevont meshekkel készül; nincs külső 3D-csomag és csontozott (skinned) modell. Indok: egységes stílus, és olcsó a gyengébb gépeken.
   - Kb. 55–60°-os felülnézeti kamera (keskeny FOV vagy ortografikus).
   - A kamera a csapat középpontját követi, és dinamikusan zoomol, hogy mindenki látszódjon.
     Amíg van elesett játékos, a Grave Tender-t is képen tartja (1. fejezet).
   - **Közös képernyő, osztás nélkül:** a kamera egy határig zoomol ki. Utána a képernyő széle
     láthatatlan falként megállítja azt a játékost, aki tovább szaladna. Így senki nem
     tűnhet el a képből.
-- **Assetek (első kör, licencek letöltéskor ellenőrizendők):**
-  - **KayKit** csomagok (Kay Lousberg, CC0): Skeletons, Dungeon Remastered, és a fegyver- /
-    kellékmodellek az Adventurers csomagból (a hősök saját hagyma-modellek).
-  - **Quaternius** (CC0): szörnyek és fantasy kellékek.
-  - Ikonok: **game-icons.net** (CC BY 3.0 – feltüntetéssel), WoW-szerű keretbe és színezésbe
-    rakva.
-  - Hangok: Kenney (CC0), freesound.org (licenc szerint).
-  - Betűtípus: *Cinzel* vagy hasonló, szabadon használható fantasy font.
+- **Assetek (M7b-ben szállítva; a szerzők és a licencek a `CREDITS.md`-ben):**
+  - **Hangok:** Kenney-csomagok (CC0); a zene OpenGameArt-zene (CC0).
+  - **Betűtípus:** *Cinzel* (The Cinzel Project Authors, SIL OFL 1.1), a címekhez.
+  - **Ikonok:** **game-icons.net** (Lorc és Delapouite rajzai, CC BY 3.0 – feltüntetéssel), fehér SVG-ként, a játékban színezve.
+  - **Nincs** KayKit- és Quaternius-modell: a hősök, az ellenségek, a páncélok és a kellékek saját, primitívekből épített modellek (lásd Technika).
 - **A hagyma-hősök kinézete:**
   - **Alap modell:**
     - egyetlen saját low-poly hagymatest (gömbölyű, csúcsos hajtással a tetején, rétegzett
@@ -3031,10 +3029,26 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
     - Paladin: aranysárga hagyma,
     - Rogue: újhagyma (zöld szárral),
     - Warlock: fekete / mogyoróhagyma.
-  - **Látható felszerelés:** a **Head**, **Shoulders**, **Chest** (mellvért / köpeny),
-    **Main Hand** és **Off Hand** cseréje a modellen is látszik.
-    - **Méret:** a vállvértek WoW-osan túlméretezettek.
-    - **Ritkaság-effekt:** az Epic és a Legendary cuccok halványan izzanak.
+  - **Látható felszerelés (M7b):** a **Head**, **Shoulders** és **Chest** (mellvért / köpeny) slot
+    a viselt tárgy páncéltípusát, fokozatát és ritkaságát mutatja; a **Main Hand** és **Off Hand**
+    cseréje a modellen is látszik.
+    - **Slot-szabály:** üres slotnál a kaszt kezdőszettje látszik. Felszerelt tárgy a slot
+      kezdőszettjét teljesen lecseréli (sosem rétegződik); levételkor a kezdőszett visszajön.
+      Indításkor minden hős üres páncél-slottal kezd, így a futam a kaszt kezdőszettjével indul.
+    - **Család (slot × páncéltípus):** vászon (csuklya, vállköpeny, talár), bőr (bőrsapka,
+      vállvédő, bőrmellény), lánc (láncsapka, vállpánt, láncing), lemez (sisak, vállvért, mellvért).
+    - **Fokozat (az anyag):** I: az alapforma és a ritkaság-szegély; II: több részlet (taréj,
+      arcvédő-lemezek, szegecsek); III: a leggazdagabb részletek (szárnyak, nagy tüskék, drágakő,
+      koronapánt, tollazat). Egy set-darab mindig a III. fokozat részleteit kapja.
+    - **Ritkaság és setek:** az Epic és a Legendary darabok felülete a ritkaságuk színével halványan
+      izzik; a Legendary és a set-darabok ezen felül külön fényes kiemelést kapnak (drágakő, izzó gyűrű).
+      Minden kasztnak saját set-színvilága van.
+    - **Egyedi (névvel ellátott) tárgyak:** a családjukat és a ritkaságukat mutatják; saját modell nincs.
+    - **Nem látszik:** a csuklók, kezek, öv, lábszár, lábfej, nyak, gyűrűk és ékszerek; ezek csak a statjaikat adják.
+    - **Frissítés:** felvételnél, levételnél, zsákmánynál, boltban, játékosok közti cserénél,
+      kovácsolásnál és futamindításkor a modell azonnal követi a felszerelést, a karakterpanel
+      előnézete is. A lobbyban a hős a kezdőszettjében áll.
+    - **Méret:** a vállvértek WoW-osan túlméretezettek; a lemez-vállvért a legnagyobb.
   - **Kaszt-kezdőszettek (kinézet):**
     - Warrior: szarvas sisak és hatalmas vállvért,
     - Mage: csúcsos varázslósüveg és köpeny,
@@ -3042,14 +3056,22 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
     - Rogue: csuklya és maszk,
     - Warlock: szarvas csuklya és lila lángok.
   - **Sebződés vizuálisan:** alacsony HP-n a hagyma „hámlik”: héjrétegek repednek le róla.
-    Elesésnél egy meghámozott, könnyező hagymaszellem lesz belőle.
+    A hámló darabok a mellvért fölé emelkednek. Elesésnél egy meghámozott, könnyező hagymaszellem
+    lesz belőle, amely az egész felszerelést elfedi.
   - **Készítés:** a hagymatest és a páncélelemek **saját modellek** (egyszerű low-poly, Blenderben
-    vagy akár Godot primitívekből). A páncélokat csatlakozási pontokra (fej, váll, törzs, kezek)
-    illesztjük, így a felszerelés modulárisan cserélhető.
+    vagy akár Godot primitívekből). A páncélokat csatlakozási pontokra (fej, váll, törzs) illesztjük,
+    így a felszerelés modulárisan cserélhető; a többi slot egyelőre nincs a modellen.
 - **Ellenségek:** maradnak a klasszikus fantasy szörnyek (csontvázak, ghoulok, trollok, démonok).
   A hagyma-hősök és a „komoly” szörnyek közti kontraszt a humor forrása.
 - **UI-téma:** sötét kő és arany keretek, pergamen tooltip, ritkaság-színek a WoW
   konvenciója szerint.
+- **Betű és ikonok (M7b):**
+  - **Címek:** a címek, a fejlécek, a gombok, a nagy számok és a bolti / szintcímkék *Cinzel*-betűvel
+    készülnek; a törzsszöveg, a nevek és a kártyák számai az alapbetűt használják.
+  - **Ikonok:** a képességek, a talentek (és a talentfák fejléce), a fogyóeszközök és a szentélyek
+    game-icons.net sziluettet kapnak a ritkaság- vagy iskolaszínben, a meglévő kereten belül. Ahol
+    nincs kép, a procedurális ikon marad. A stat-kártya ékköve, az item-, fegyver- és slot-ikonok,
+    az enchantok és az artifactok továbbra is procedurálisak.
 - **Arénák** (M6b): menetenként **5 környezet** egyike, a menet elején sorsolva (a „Rolling the
   arena…” animációval, 12. fejezet), a menet végéig megmaradva (16.1):
   - **Forest Ruin** (erdei rom – a mai aréna, veszély nélkül), **Cemetery** (temető),
@@ -3059,17 +3081,29 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - **Megjelenés:** környezetenként saját paletta (ég, köd, ambient fény, nap, talajszínek,
     falszín) és saját kellékkészlet, primitívekből építve: sírkövek, száraz fák és kripta;
     nád, zavaros tavak és mangrove; bazalt és izzó repedések; jégkristályok, hó és oszlopok.
-  - Az aréna **mérete** minden környezetben ugyanaz, a draw-call keret a mai marad (összevont
+  - Az aréna **mérete** minden környezetben ugyanaz, a draw-call keret lényegében a mai (összevont
     meshek / MultiMesh).
   - Az M6b a **tartalmat** adja (paletta, kellékek, veszélyek, sorsolás); a végleges látvány
-    (assetek, shaderek, VFX) az M7b-ben készül.
-  - A **Dungeon** külön, kis arénája (24 × 14 m) a menet környezetének palettáját használja,
-    környezeti veszély nélkül (16.1): a Volcano kürtői ott nem látszanak (a falak elvágnák
-    őket, és nem működnének).
-  - **Mérések (megvalósítva):** a kellékkészletek draw-call kerete a mai marad (13–14
-    összevont mesh az erdő 15-je mellett, a csúcspontok száma legfeljebb az erdő 1,5-szerese);
-    a játéktéren **0,55 m-nél magasabb semmi nem áll** (a teszt őrzi); a végleges látvány az
-    M7b-ben készül.
+    (talaj, környezeti részecskék, animált víz és láva, háttérfal, fényezés) az M7b-ben készült el.
+    Környezetenként:
+    - **Forest Ruin:** a mai talaj lassú, foltos fényjátékkal; levelek és szentjánosbogarak.
+    - **Cemetery:** sötét, feltúrt talaj mohával és kaviccsal, kőlapos út a kapuig; köd és porszemek; a játéktéren kívül lándzsás kerítés kőoszlopokon és ciprusok.
+    - **Swamp:** nedves iszap, algák és tőzeges partok, mozgó csillogású pocsolyák; animált lápvíz; köd és fénylő buborékok; a játéktéren kívül rönkpalánk, függő moha és holtfák.
+    - **Volcano:** bazaltlapok, izzó repedések, a kürtők körül lüktető lávamező; parázs és hamu száll; a kráter peremén bazaltfogak, a fal tövében lávacsíkok.
+    - **Ice Cave:** hó szélcsíkokkal, jégtáblák hajszálrepedésekkel és csúszó napfény-csillanással; hópihék; a játéktéren kívül kettős jégprizma-fal.
+    - **Dungeon (kripta):** 1,6 m-es kockás kőlapok, repedések és meleg fáklyafények; oszlopsor, szarkofágok, csontok és zászlók; a fáklyák lobognak.
+  - A **Dungeon** külön, kis arénája (24 × 14 m) a menet környezetének égboltját használja; a talaját és a díszletét a kripta adja (M7b). Környezeti veszély nélkül (16.1): a Volcano kürtői ott nem látszanak (a falak elvágnák őket, és nem működnének).
+  - **Mérések (megvalósítva):** a draw-call keret lényegében a mai (M7b után környezetenként kb. +4 hívás a háttérfalért és a részecskékért); a kellékkészletek 14–15 összevont meshet használnak az erdő 15-je mellett, a csúcspontok száma legfeljebb az erdő 1,5-szerese; a játéktéren **0,55 m-nél magasabb semmi nem áll** (a teszt őrzi); a végleges látvány kész (M7b).
+
+**Harci effektek (M7b)**
+
+- **Játékmenet:** csak látvány. Nem változtat számot, időzítést, ütközést, kamerát vagy spawn-pontot; a smoke-futam eredménye ugyanaz, mint M7b előtt.
+- **Megjelenés:** az ellenség a földből emelkedik ki (normál 0,45 s, boss 0,9 s); a föld alatti rész rejtve marad.
+- **Halál:** a hulla a megölőjétől elfelé dől, életének első harmadában; 40%-os életnél a földbe süllyed, kisebbedik és elsötétedik. A hullák száma korlátos, a régiek újrahasznosítódnak. Az elit és a boss hulláján az izzó rész megmarad; a boss helyén rövid ideig fénygyűrű és porszemek maradnak.
+- **Becsapódás:** a találati szikrák iskolánként mást mutatnak: fizikai – gyors csíkok; tűz – felszálló parázs; fagy – forgó szilánkok; arkán – pörgő csillagok; szent – felszálló sugarak; árnyék – sötét foszlányok; természet – pörgő levelek. A színük a fegyver vagy a kaszt színéhez igazodik.
+- **Kritikus találat:** nagyobb villanás, hosszabb élet és csillagos szikra-kitörés; a kamerarázkódás nem változik.
+- **Tárgydobás:** a zsákmány ívben pattan ki és egyszer visszapattan; a felszedésre húzott arany és XP fénycsíkot hagy maga után.
+- **Boss-belépő:** rúnafellobbanás, fénypászma, lökéshullám és porfelhő; a boss bemutató bannere nagyot csap le.
 
 **Hang (M7a)**
 
@@ -3175,7 +3209,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Coin Gremlin, közös kassza |
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, módok (Endless, Hardcore, ranglista), környezetek, események, szentélyek, Dungeon-portál, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a (kész) és M6b (a végleges balansz kivételével kész)**, lásd alább |
-| M7 | Csiszolás | **M7a – kész:** hangok (UI, harc, zene), főmenü (Settings, Credits), beállítások, IP-tisztítás (az átnevezési tábla a „Kiadás és IP” részben). **M7b – folyamatban:** grafikai réteg (assetek, shaderek, VFX) |
+| M7 | Csiszolás | **Kész (M7a + M7b).** **M7a:** hangok (UI, harc, zene), főmenü (Settings, Credits), beállítások, IP-tisztítás (az átnevezési tábla a „Kiadás és IP” részben). **M7b:** Cinzel-címek és game-icons.net ikonok, a hősön látszó sisak, váll és mellvért, az öt aréna végleges látványa, harci effektek (13. fejezet) |
 | M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon; az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.8) |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
@@ -3198,7 +3232,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - játékmódok: **Endless** mód, **Hardcore** mód, módválasztás a lobbyban, helyi ranglista
     (16.1; 1., 8., 12. fejezet),
   - az **5 aréna-környezet** saját veszélyekkel és a „Rolling the arena…” sorsoló animáció
-    (13. fejezet, 16.1); a végleges látvány az M7b-ben készül,
+    (13. fejezet, 16.1); a végleges látvány az M7b-ben készült el,
   - **hullám közbeni események** (Guarded Chest, Defend the Totem, Goblin Caravan; 8. fejezet,
     16.1) és **szentélyek** (16.1),
   - a **Dungeon-portál**: 4 termes dungeon és a Dungeon Warden mini-boss (8. fejezet, 16.1),
@@ -3230,7 +3264,7 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
 | **Sebzésmérő és díjak** | WoW-szerű damage meter a menet végén (sebzés, gyógyítás, elnyelt sebzés, kapott sebzés, felélesztések, elesések, ölések) és díjak: „Most Damage”, „Guardian Angel”, „Floor Inspector” stb. – részletek: 12. fejezet | **Kész (M6a)** |
 | **Menet végi összefoglaló kártya** | Megosztható kép („Save card”): kasztok, elért hullám, idő, legjobb itemek, díjak – részletek: 12. fejezet | **Kész (M6a)** |
-| **Véletlen környezet menetenként** | 5 féle aréna-környezet: erdei rom, temető, mocsár, vulkán, jégbarlang – saját veszélyekkel és saját palettával, kellékkészlettel; a menet elején egy „Rolling the arena…” sorsoló animáció (vízszintes kártyasor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **Kész (M6b)** (a tartalom; a végleges látvány: M7b) |
+| **Véletlen környezet menetenként** | 5 féle aréna-környezet: erdei rom, temető, mocsár, vulkán, jégbarlang – saját veszélyekkel és saját palettával, kellékkészlettel; a menet elején egy „Rolling the arena…” sorsoló animáció (vízszintes kártyasor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **Kész (M6b)** (a tartalom); a végleges látvány: **kész (M7b)** |
 | **Hullám közbeni események** | Őrzött kincsesláda (Guarded Chest), megvédendő totem (Defend the Totem), elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **Kész (M6b)** |
 | **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben, és minden játékosnak el kell fogadnia | **Kész (M6b)** |
 | **Végtelen mód (Endless)** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, a 30. hullámtól 5 hullámonként bossal | **Kész (M6b)** |
@@ -3311,7 +3345,7 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 - **Öt környezet** (`EnvironmentData` adat a `data/environments/` mappában), menetenként
   egy: a menet elején sorsolódik, és a menet végéig megmarad. Az aréna **mérete nem
   változik**. A tartalom az M6b-ben készült (paletta, kellékek, veszélyek), a végleges látvány
-  az M7b-ben.
+  az M7b-ben készült el (13. fejezet).
 
   | Környezet | Veszély | Szabály (kiinduló értékek) |
   |---|---|---|
@@ -3869,7 +3903,7 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
 | Vor'thalax | Alap HP 450 (az 1200 elírás volt), érintéses sebzés 4, a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) mint Morvainé; a Flesh Golem érintéses sebzése 4 – a végső balansz az M6b végén, egyszer (8., 9. fejezet) |
 | Módok (M6b) | **Normal** (25 hullám) vagy **Endless** (a 25. hullám után folytatódik, a 30.-tól 5 hullámonként boss; csak vereséggel ér véget), opcionális **Hardcore** (nincs Grave Tender); a lobbyban választható (Y / X); módonként és létszámonként helyi top 10 ranglista (1., 12., 16.1) |
-| Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány az M7b-ben (13., 16.1) |
+| Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány kész (M7b; 13. fejezet) |
 | Események és szentélyek (M6b) | Hullám közbeni esemény a 4. hullámtól, 30% eséllyel, hullámonként legfeljebb egy (Guarded Chest, Defend the Totem, Goblin Caravan); szentély a szünetekben 5% eséllyel, csak egyhangú elfogadással (8., 10.1, 16.1) |
 | Dungeon-portál (M6b) | A 6., 9., 12. és 15. hullám után, csapatszavazással; 4 terem (Clear, Survive, Defend, Warden); siker: hősönként 1 garantált Epic, bukás: a kassza 50%-a elvész, a piac mindkét esetben következik (8., 16.1) |
 | M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8; **megvalósítva**: 13 fegyver, 96 páncél- és 20 ékszer-alaptípus, 25 utótag, 50 enchant, 160 kézzel tervezett item |

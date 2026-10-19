@@ -9,7 +9,7 @@ talents, tier sets, forging, elites, the Coin Gremlin and the shared-purse tools
 bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
 Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
 mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
-enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup.
+enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects).
 
 ## Layout
 
@@ -22,14 +22,16 @@ core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devi
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
             talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
-            environments/ shrines/ (M6b), audio/ (M7a)
+            environments/ shrines/ (M6b), audio/ (M7a), icons/ (M7b)
 scenes/
   main/     Main – game flow state machine                         [integration]
-  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b)  [visuals]
+  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b); ArenaGround,
+            ArenaAmbient, ArenaFx, ArenaBackdrop, ArenaCrypt (M7b)  [visuals]
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
-  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b)  [visuals]
-  vfx/      Vfx – fire-and-forget effects                           [visuals]
+  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b),
+            EquipLook, OnionArmor (M7b)  [visuals]
+  vfx/      Vfx – fire-and-forget effects; EnemyCorpse (M7b)        [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
   talents/  per-class TalentEffect scripts (M5)
@@ -43,7 +45,7 @@ scenes/
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
             GameOverScreen (+ MeterPage, LeaderboardPage), PauseMenu; items/ shop/ loot/ (M2),
             level_up/ trainer/ (M4), talents/ purse/ (M5), enchanter/ (M6a), shrine/ dungeon/,
-            EnvironmentRollScreen, HardcoreBadge (M6b); MenuPage, SettingsPage, CreditsPage, FpsOverlay (M7a)
+            EnvironmentRollScreen, HardcoreBadge (M6b); MenuPage, SettingsPage, CreditsPage, FpsOverlay (M7a), GameIcons (M7b)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
             test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
 ```
@@ -344,7 +346,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
 
 ## Visuals (procedural art)
 
-- No imported assets yet: `MeshKit` merges primitives / lathes / extrusions into one
+- No imported 3D models (M7b keeps the 3D look procedural; the only imported art is the 2D icon set and the title font, see M7b): `MeshKit` merges primitives / lathes / extrusions into one
   vertex-coloured `ArrayMesh` per prop, enemy or weapon (cached by key, shared by every
   instance) drawn with `Mats.toon_vc()`. All toon materials share a few cached shaders
   (two-band toon light, warm rim, inverted-hull outline as `next_pass`; the outline is drawn
@@ -414,17 +416,17 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
 - Art showcase (dev tool, renders a PNG under Xvfb):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
-  (views: gameplay, live, onions, enemies, weapons, arena, revive). Latest gameplay view:
+  (views: gameplay, live, onions, enemies, weapons, arena, revive; M7b adds fx, equip, sets and equip_game, see the M7b chapter). Latest gameplay view:
   `docs/screenshots/visuals_showcase.png`.
 
 ## UI (scenes/ui/)
 
 - Every screen is a full-rect `Control` built in code (`create()`), themed by the cached
   `UiTheme.get_theme()` (WoW look: `UiFrameStyle` stone frames with gold borders, inner
-  shadow and corner studs; parchment tooltips; outlined default font, emboldened via
-  `FontVariation` for titles). Layout is anchors + containers on the 1920x1080
-  `canvas_items` canvas, so it holds at 720p, 4:3 and 21:9. Icons, button glyphs, bars and
-  portraits are drawn procedurally (`UiIcon`, `UiGlyph`, `UiBar`, `UiPortrait`).
+  shadow and corner studs; parchment tooltips; outlined default font; since M7b the titles, headings, buttons and big numbers use Cinzel
+  (`UiTheme.title_font()`). Layout is anchors + containers on the 1920x1080
+  `canvas_items` canvas, so it holds at 720p, 4:3 and 21:9. Button glyphs, bars and
+  portraits are drawn procedurally (`UiIcon`, `UiGlyph`, `UiBar`, `UiPortrait`); the ability, talent, tree, consumable and shrine icons are game-icons.net pictures since M7b (`GameIcons`), with the procedural glyph as the fallback.
 - Input: joined players drive menus only through their own `PlayerSlot.input`. Before anyone
   joined (main menu, empty lobby) Godot's `ui_*` actions are used for keyboard / d-pad focus
   navigation, and `UiPads` reads A / B / START on every controller (the default `ui_accept`
@@ -474,7 +476,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     (`PlayerInput.ability_button(slot)`): controllers RT / LT / RB / LB, keyboard
     LMB / RMB / **Q** (slot 2) / **E** (slot 3); the icon spacing widens when a pill ("LMB")
     is wider than an icon.
-  - `AbilityIcon` (Control, drawn in code, no assets): gold-rimmed square with a procedural
+  - `AbilityIcon` (Control, drawn in code; since M7b a game-icons.net picture where the map has one, see M7b): gold-rimmed square with a procedural
     glyph (`glyph_for`: `AbilityData.icon`, then the id's words, then the school), tinted by
     `AbilityData.color` / school; clockwise cooldown pie (`sweep_polygon`) + seconds
     (`format_cooldown`: one decimal under 3 s), dimmed when off cooldown but unusable (red
@@ -1288,7 +1290,7 @@ scenes/ui/purse/     PurseBoard
   tier rows of `TalentNode`s at fixed positions (`node_rect`, the capstone centred and bigger),
   prerequisite arrows (`links()`, gold once met, routed between the columns so they never
   cross a node), a dark band over locked tiers, the tree's points.
-- `TalentNode`: glyph from `TalentData.icon`, else the modifier's ability (ability / school /
+- `TalentNode`: glyph from `TalentData.icon` (since M7b the talent's own game-icons.net picture where the map has one), else the modifier's ability (ability / school /
   `TalentGlyph` stat glyph), else the kind's `TalentGlyph` (rune, gear, crown); state rim
   (`State` LOCKED / UNAVAILABLE / AVAILABLE / PARTIAL / MAXED), rank pill "2/3" ringed in the
   player's colour while ranks are pending, gear badge on modifiers, gold capstone frame.
@@ -2370,7 +2372,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   the one place that lays out the "P2 wants" tags (stacked card: column from (4, 14); wide card: one row
   at x >= `WIDE_PING_X` (66), y = 6 + `ICON_SIZE`, short "P2" text when the full row does not fit) and
   the overlay draws exactly those rects.
-- `ConsumableCard` (96 high, flexible width), `ConsumableIcon` (procedural: round flask, vial, conical
+- `ConsumableCard` (96 high, flexible width), `ConsumableIcon` (since M7b a tinted silhouette of its picture; procedural otherwise: round flask, vial, conical
   flask, bowl, rings, ribs; border blue for potions / orange for food), `ConsumableTooltip extends
   ItemTooltip` (so `layout_tooltips` places it like an item tooltip; a second tooltip per player,
   `_cons_tooltips`, `_shown_tooltip`), `ShopOfferCard.create_wide` (200x96, `gold_frame`, price at the
@@ -2744,7 +2746,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   The two rules that do change play are the Epic weapons' +10% attack speed (GDD 4.1) and the environment roll: a
   default run now plays a random arena (`--env=forest_ruin` pins the old one). **A seeded number recorded before the
   M6b merges is not comparable with this head** (see "Determinism and the seed-5 smoke").
-- Out of scope: the final balance, the M7b look of the environments, the class-independent tier sets (M8), Crossbow /
+- Out of scope: the final balance, the final look of the environments (done in M7b), the class-independent tier sets (M8), Crossbow /
   Polearm / Fist Weapon (M8).
 
 ### Foundation hooks (autoload/run_state.gd, autoload/db.gd, scenes/main, scenes/ui/intermission.gd)
@@ -2861,8 +2863,8 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   -> Ice Cave): CI covers every environment over seeds; `--env=<id>` pins one.
 - **Decor** (`ArenaThemes.build(arena, rng)` from `Arena._build_decor`, by `decor_id`; the forest for any other id): merged
   vertex-colour meshes (`MeshKit`, `Mats.toon_vc`), tall objects in 4 + 4 chunks the camera can cull, one undergrowth /
-  props / glow mesh, two ground MultiMeshes. Budget (pinned): 13 / 13 / 14 / 13 decor draw calls (cemetery / swamp /
-  volcano / ice) vs the forest's 15, vertices <= 1.5x the forest's. **Invariant (pinned): nothing above 0.55 m stands
+  props / glow mesh, two ground MultiMeshes. Budget (pinned): 14 / 14 / 15 / 14 decor draw calls (cemetery / swamp /
+  volcano / ice; M6b had 13 / 13 / 14 / 13, the M7b Backdrop adds one) vs the forest's 15, limit 16, vertices <= 1.5x the forest's. **Invariant (pinned): nothing above 0.55 m stands
   inside the playable rectangle.** The volcano dresses its six vents (`EnvironmentHazards.LAVA_VENT_POINTS`) inside the
   arena, but only those that fit the layout in use (`ArenaThemes.vents_in(bounds)`, `VENT_CLEARANCE` 1.6 m from the walls:
   all six in the clearing, **none in the dungeon room**, where the vents at +-12 m would be cut in half by the walls and
@@ -3038,8 +3040,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   as a teammate's only while `Dungeon.counts_revives()`.
 - **Arena layout swap** (`scenes/arena/arena.gd`): `DUNGEON_SIZE` 24 x 14, `play_size` (`get_bounds()` follows it),
   `in_dungeon_layout`, `decor`, `wall_boxes_for(size)`, `enter_dungeon_layout(env := null, size := DUNGEON_SIZE)` parks the
-  clearing's WorldEnvironment, sun, ground, walls and decor and builds the room in the run's palette (its own decor generator
-  `DECOR_SEED + 17`), switches the **Grave Tender off** (`process_mode` DISABLED, `spirit_healer = null` meanwhile; a hardcore
+  clearing's WorldEnvironment, sun, ground, walls and decor and builds the room with the crypt ground and dressing (M7b: `ArenaGround`'s crypt look and `ArenaCrypt`; the sky stays the run's environment's), switches the **Grave Tender off** (`process_mode` DISABLED, `spirit_healer = null` meanwhile; a hardcore
   arena has none to restore); entities, camera, `Arena.current` and the heroes stay (heroes cannot be re-parented:
   `Player._exit_tree` tears their abilities down). `leave_dungeon_layout()` restores the same node instances. The environment
   hazards are not part of it (see "Arena environments").
@@ -3398,7 +3399,7 @@ matrix); the GDD 9 list ("Nyitott kérdések M6b-re") carries them all.
 
 ### Known gaps
 
-- The bog pool's rim is drawn under its mud ring (1.3:1 contrast) and the boss circles on the ice floor are unreviewed art calls (M7b).
+- The bog pool's rim is drawn under its mud ring (1.3:1 contrast) and the boss circles on the ice floor are unreviewed art calls (still open after M7b).
 - Breastplate of Unbroken Anger (40% x ICD 0.5 s) still shows its name on every proc (up to 2 floating labels per second); the `"label"` key can silence it.
 - The enchant prefixes Rallying and Spiked share a word with the abilities "Rallying Sprint" (`general_sprint`) and "Spiked Guard" (`warrior_shield_wall`):
   different namespaces, no functional clash.
@@ -3456,7 +3457,7 @@ onto a miss); `test_ui_market_tooltips.gd` `_check_column_apart` (a test fix: it
 
 ## M7a: audio, Settings and Credits, menus, IP cleanup
 
-M7 is split. **M7a** (this chapter, done) adds the sound layer, the Settings and Credits pages with their menu entries, two dev flags, and the removal of Blizzard-derived player-visible names, guarded by a test. **M7b** (graphics: assets, shaders, VFX) is in progress. Everything in M7a is presentation or hardware only: with the default settings the simulation, the `RunState.rng` draws and the smoke result are unchanged.
+M7 is split. **M7a** (this chapter, done) adds the sound layer, the Settings and Credits pages with their menu entries, two dev flags, and the removal of Blizzard-derived player-visible names, guarded by a test. **M7b** (graphics: fonts and icons, visible equipment, the environment look, combat effects) is done, see the M7b chapter below. Everything in M7a is presentation or hardware only: with the default settings the simulation, the `RunState.rng` draws and the smoke result are unchanged.
 
 ### Audio (`autoload/audio.gd`, `data/audio/`, `core/audio_ids.gd`)
 
@@ -3559,4 +3560,156 @@ File `user://settings.cfg` (ConfigFile, written through `settings.cfg.tmp` and a
 - Sounds were chosen by name, duration and pitch, not by ear: a listening pass is advisable (volumes per entry in `sound_bank.tres`; music at -8 / -11 / 0 / -6 dB relative to the files).
 - The boss track starts from silence; the combat track is a decoded MP3, so a tiny loop gap is possible.
 - The export preset must include `CREDITS.md` (see Menus).
-- Graphics (M7b) are in progress: assets, shaders, VFX.
+- Graphics (M7b) are done, see the M7b chapter below.
+
+## M7b: graphics polish (fonts and icons, visible equipment, environment look, combat effects)
+
+M7b is the second half of M7 and is presentation only. It adds a title font (Cinzel) and game-icons.net pictures on the existing frames; it puts the equipped Head, Shoulders and Chest on the onion model; it gives the five arena environments and the dungeon room their final look (ground shader, ambient particles, animated water and lava, light grades, backdrops, crypt dressing); and it adds combat effects (spawn rise, pooled corpses, school-coloured impacts, stronger crits, loot pop, pickup streaks, boss entrance). The 3D look stays procedural (lead decision): no imported 3D model, no skinned mesh, no new light in the arena.
+
+Rules for the whole chapter: visual only. No gameplay number, timing, collision, camera or spawn position changes. Visual randomness uses private `RandomNumberGenerator`s, never `RunState.rng`. The smoke result is identical to the M7a head apart from `real_time` and `perf`. The numbers below were measured under xvfb with llvmpipe (software GL) against the base `c817e6c`; draw calls are the stable measure, frame times are not.
+
+### Fonts (`scenes/ui/ui_theme.gd`, `assets/fonts/`)
+
+- `assets/fonts/Cinzel-VariableFont_wght.ttf` (variable font, weight 400–900, 125 KB) and `assets/fonts/OFL.txt` (Cinzel, Copyright 2020 The Cinzel Project Authors, SIL OFL 1.1). The file is Google Fonts' `Cinzel[wght].ttf`, renamed.
+- `UiTheme.title_font()` is a `FontVariation` over Cinzel with `variation_opentype = {UiTheme.WEIGHT_TAG: 700.0}`. `WEIGHT_TAG` is the integer tag `0x77676874` ("wght"): a string key is silently ignored and the text stays at regular weight. Glyph spacing 1; `fallbacks = [ThemeDB.fallback_font]` covers the glyphs Cinzel lacks (arrows and similar). If the font file is missing, the function falls back to the old emboldened default font.
+- Users: the `TitleLabel`, `HeadingLabel` and `BigNumber` type variations, the Button font, portrait initials, the shop price and SOLD stamp, the level label and the ilvl value. `bold_font()` and the default font (body text, names, card numbers, tooltips) are unchanged. Cinzel draws lower case as small caps; its digits are lining.
+- `UiTheme.fitted_font_size(font, text, width, max, min) -> int` (generic): the largest size from `max` down to `min` at which `text` fits `width`. `ShrineScreen._fill_card` uses it for the shrine name (`NAME_FONT` 40 down to 30, in the `NAME_WIDTH` column). "Shrine of the Gambler" (514 px against a 496 px column) was the only title that overflowed.
+- Widths against the old title font: +0 to 25 %, most for short words. Checked on the main menu, lobby, settings, credits, wave banner and intermission, game over, loot, portal, shrine, environment roll, HUD and level-up.
+
+### Icons (`scenes/ui/game_icons.gd`, `data/icons/`, `assets/icons/`)
+
+- Source: the game-icons.net full SVG archive (white on transparent, CC BY 3.0). Only the 215 SVGs in use are committed: `assets/icons/lorc/*.svg` (167) and `assets/icons/delapouite/*.svg` (48), plus `assets/icons/LICENSE.txt` (the archive's licence and contributor list). Every `.svg.import` has `svg/scale=0.25` (512 px viewBox to 128 px), `mipmaps/generate=true`, `compress/mode=0` (lossless) and `fix_alpha_border`. Controls set `texture_filter = GameIcons.FILTER` (`LINEAR_WITH_MIPMAPS`), so a 128 px picture drawn at 26–96 px stays smooth.
+- `IconMap` (`data/icons/icon_map.gd`, a Resource; data in `data/icons/icon_map.tres`): typed dictionaries from id to texture path. `abilities` (key `AbilityData.icon`, 46 entries), `talents` (`TalentData.id`, 135; distinct inside each class), `trees` (`TalentTreeData.id`, 15), `consumables` (`icon_id`, 7), `shrines` (`icon_id`, 6), `stats` (stat id, 40; for talents and new content without their own entry) and `schools` (7; the fallback for an ability with neither a picture nor a glyph rule). The 256 entries point at 215 distinct pictures; no shipped id falls back.
+- `GameIcons` (`scenes/ui/game_icons.gd`, static): loads the map once and caches one texture per path. `for_ability(a)` (icon id, then id, then the id without its class prefix), `for_school`, `for_stat`, `for_talent(t)` (own entry, then the icon id as ability or stat, then the modifier's ability), `for_tree`, `for_consumable`, `for_shrine`. Lookups never use display names, so the IP rename does not matter. `null` means no picture, and the control keeps its procedural glyph.
+- `GameIcons.draw_silhouette(ci, tex, rect, top, bottom, outline_px)`: eight shifted dark copies as the outline, then the tinted quad with a vertical gradient (`gradient_top(base)` = base lightened 0.62, `gradient_bottom(base)` = base lightened 0.12).
+- Where they show (frames unchanged):
+  - `AbilityIcon` (HUD ability bar, lobby cards, Trainer rows and detail, spec chooser, level-up cards and panel). `AbilityIcon.texture_for` takes the map entry, else the school picture only when no glyph rule matches (`glyph_is_specific`). The picture is drawn in the cached glyph layer at `PICTURE_SCALE` 0.8 of the side, in the school or ability tint; cooldown, rank, cost, charges and prompt are drawn above as before.
+  - `TalentGlyph.texture` and `TalentNode.make_glyph`: the talent's own picture, tinted as its glyph would have been.
+  - `TalentTreeView`: an 18 px tree emblem left of the name; the name gives up `EMBLEM_ROOM` 22 px (the existing `fitted_name_size` keeps names at 12 px or more).
+  - `ConsumableIcon` (shop row, unit frame, tooltip) and `ShrineIcon` (vote card, HUD running-shrine row): a tinted silhouette at 0.78 of the slot, in the item or shrine colour; border, background and badge unchanged.
+- Not changed: the stat level-up card gem, item / weapon / slot icons (`ItemArt`), enchants and artifacts stay procedural. Icon file names are not player-visible; a file named after a brand was left out on purpose.
+- To add an icon: copy the SVG to `assets/icons/<author>/<name>.svg`; `godot --headless --path . --import`; set its `.import` to scale 0.25 with mipmaps and import again; add the id-to-path entry to `data/icons/icon_map.tres`. Only CC BY archive authors qualify. A new author goes into `CREDITS.md`: a test fails for an uncredited author folder or an unused SVG.
+- Cost: 4-player `--demo --seed=5 --start-wave=4` under xvfb, `RENDER_TOTAL_DRAW_CALLS_IN_FRAME` averaged over 40 frames after about 14 s: base 1149 average / 1251 max, now 942 / 1187 (about −18 %: a procedural ability glyph is about 59 canvas draws, a picture is 9). No 3D cost. Memory: 215 textures at 128 × 128 RGBA with mips, about 85 KB each when loaded (only the shown controls load them; the whole set would be about 18 MB). Font 125 KB.
+
+### Visible equipment (`scenes/visuals/equip_look.gd`, `onion_armor.gd`, `onion_model.gd`)
+
+- `EquipLook` (value object): what one worn Head, Shoulders or Chest item looks like. `EquipLook.from_item(item)`, `EquipLook.make(slot, armor, tier, rarity, set_id, unique_id)`; `key()` (cache key and change check), `family()` (`plate_helm`, `cloth_mantle`, … = `ItemBase.look`), `detail()`, `glows()`, `has_accent()`, `is_set()`. Slots: `EquipLook.Slot.HEAD / SHOULDERS / CHEST`. Items with no model part (wrists, hands, belt, legs, feet, neck, rings, trinkets, weapons) give a null look.
+- `OnionArmor` (`onion_armor.gd`): the procedural pieces. `OnionArmor.part(slot, look, class_data)` returns a cached `OnionArmor.Part` (`solid`, `cloth` and `accent` meshes; `glow` / `glow_energy`; `extras`, `brows`, `hides_sprout`, `hides_mouth`). `look == null` is the class starter piece of that slot. The starter code (horned helm, pauldrons, wizard hat, hoods, capes, belts) moved here from `OnionModel`, split per slot, geometry unchanged. `OnionArmor.merged(key, meshes)` merges vertex-coloured meshes (cached). Style tables: `PALETTES` (per armour type and tier), `SET_STYLES` (one kit per tier set), `GENERIC_SET` (sets without a kit; a test checks that every `Db.sets` entry has a style).
+- `OnionModel`: `set_equipment(head, shoulders, chest: ItemInstance)` and `set_looks(head, shoulders, chest: EquipLook)`; `worn_look(slot)`, `equipment_key()`, and `gear_builds` (a rebuild counter for tests and Vanish). `Body/Gear` is a Node3D with `Solid` (plain toon), `Glow<n>` (one per rarity colour, Epic and better), `Cloth` and `Accent<n>` meshes. `setup()` keeps the worn looks, as it does for weapons.
+- **Slot rule:** an equipped item replaces that slot's starter piece entirely (never layered); unequipping brings the starter back. Heroes start with empty armour slots, so a run starts with the class starter look, unchanged from before M7b.
+- **Families** (slot × armour type): cloth cowl / mantle / robe; leather cap / shoulderpads / tunic; mail coif / spaulders / hauberk; plate helm / pauldrons / breastplate. Plate pauldrons are the largest (0.26 m dome against 0.22 m on the starter).
+- **Tier** = `Items.material_tier(item.wave)` (the material word of the name). Tier I: base shape and rarity trim. Tier II: crest fin, cheek plates, studs, lames, tabard. Tier III: swept wings, big spikes, gems, circlet and crescent, feathers, spine spikes. Palettes per armour type and tier. A tier set piece always uses the richest detail.
+- **Rarity:** trim, bands and gems take `WeaponModel.rarity_color(rarity)`. Epic and better draw the pieces with `Mats.toon_vc_glow(colour, 0.14)` (Legendary 0.24; weapons use 0.55). Legendary and set pieces add an unshaded glow accent (`Mats.glow`: gems and a glow ring).
+- **Class colour:** every chest piece has a strip of cloth in the class colour down the back; crests, pauldron tops and mantle drapes use it too.
+- **Head:** a worn head piece hides the eyebrows; a leather mask hides the mouth; the sprout stays visible (only the starter wizard hat hides it). **Chest:** open-front shells over the sides and back, so the face and the class-coloured skin stay visible.
+- **HP peel and ghost:** the peel flaps (`PEEL_SPOTS`) lift by `PEEL_GEAR_LIFT` (0.11 m) when a chest piece is worn. The downed ghost covers every gear mesh (accents hide). Hit flash goes through `Mats.set_overlay`. Vanish fades everything below `Yaw`; `RogueVanish._refade` scans for new meshes only when `gear_builds` changes.
+- **Wiring:** `Player.apply_equipment` runs on every `Equipment.changed` (equip, unequip, loot, shop, trade, forge, run start). `PlayerPanel._refresh_side` (character panel preview) follows the gear. `OnionPreview` (lobby) shows the starter look only. Gear is rebuilt only when `EquipLook.key()` of one of the three slots changes.
+- **Budget:** every part and merged mesh is cached (`MeshKit.cached`, `OnionArmor._parts`); materials come only from `Mats` (`toon_vc`, `toon_vc_glow`, `toon_cloth_vc`, `glow`), with no instance uniforms. A part takes 2–7 ms to build, once per look. Draw calls per hero (visible meshes, outline counted twice): starter look warrior 23 / mage 23 / paladin 25 / rogue 24 / warlock 32 (unchanged). Fully geared at tier III (common / Epic / Legendary / class set): warrior 24 / 24 / 25 / 25, mage 24 / 24 / 25 / 25, paladin 25 / 25 / 26 / 26, rogue 24 / 24 / 25 / 25, warlock 27 / 27 / 28 / 28. Worst case over every armour type, tier and rarity: +2 (warlock: 0). `DRAW_BUDGET = 10` per hero is enforced in `tests/test_m7_vis_hero.gd`.
+- **4-player live run** at wave 5 (`--view=live --players=4 --wave=5 --seed=7`, xvfb, `--fixed-fps 60`): render draw calls base 377, new starter look 375, common suits 381, Epic suits 381, Legendary suits 385; primitives 942k to 988k.
+- **Showcase:** `--view=equip` (armour types × tiers; `--axis=rarity --armor=N`, `--armor=N`, `--tier=N`, `--rarity=N`, `--back=1`, `--state=hurt|downed`); `--view=sets` (the five class sets worn complete, `--rarity=N`, `--back=1`); `--view=equip_game` (the gameplay camera with geared heroes; `--sets=1`, `--starter=1`, `--facing=north|south`, `--tier=N`, `--rarity=N`); `--view=live --geared=0..4` (bots wear a tier III suit of that rarity).
+- **Not done:** hands, feet and waist items on the model; per-unique custom models (uniques use their family and rarity; Legendaries and sets get accents).
+- Tests: `tests/test_m7_vis_hero.gd` (38).
+
+### Environment look (`scenes/arena/arena_ground.gd`, `arena_ambient.gd`, `arena_fx.gd`, `arena_backdrop.gd`, `arena_crypt.gd`)
+
+- `ArenaGround` (`arena_ground.gd`): the ground shader, one look per environment plus the dungeon's crypt look. `look_for(env, in_dungeon)`, `make_material(look)` (one compiled Shader per look, process-wide), `apply_look(...)` (sun direction, accent colour, the volcano's vents, the crypt's torches). The palette uniforms keep their names (`grass_*`, `dirt_*`, `patches`, `patch_count`, `arena_half`, `road`). The old `Arena._GROUND_CODE` is gone.
+- `ArenaAmbient` (`arena_ambient.gd`): ambient particles as `Arena.ambient` (child "Ambient", not part of "Decor").
+- `ArenaFx` (`arena_fx.gd`): twinkling glow meshes and the animated lava (see Effects below).
+- `ArenaBackdrop` (`arena_backdrop.gd`): the wall and backdrop ring outside the playfield, one "Backdrop" mesh in the decor.
+- `ArenaCrypt` (`arena_crypt.gd`): the dungeon room's dressing.
+
+Ground by look:
+- Forest: the old look plus a slow dappled light.
+- Cemetery: dark churned soil, moss, gravel, a flagstone path through the gate.
+- Swamp: wet mud, algae, peat banks, shallow puddles with a moving sheen.
+- Volcano: voronoi basalt plates; some cracks open and glow, pulsing on `TIME`, brighter around the six vents.
+- Ice cave: packed snow with wind ripples, ice sheets with hairline cracks, a sliding sun glint, twinkles.
+- Crypt (dungeon): 1.6 m chequered tiles, bevels, cracks, moss, warm torch pools (`torch_points()`).
+- Water and ice use sums of sines (`wavy_normal`), because a noise gradient or a thresholded value noise shows its grid as blocky highlights. The moss uses fbm. The dirt-patch loop skips the edge noise for patches further than 1.5 radii away, so a pixel pays for the one or two patches near it.
+
+Ambient particles (`ArenaAmbient`: CPUParticles3D, world space, fixed seed):
+- `specs_for(look)`: forest Leaves 44 + Fireflies 16; cemetery Mist 16 + Motes 28; swamp Mist 12 + Glimmers 30 (one atlas texture for glow dots and bubbles); volcano Embers 46 + Ash 40; ice cave Snow 60 + Glints 18; crypt Dust 26.
+- At most 2 draws per environment (1 in the crypt) and at most 100 particles (`MAX_PARTICLES`); the volcano has the most, 86.
+- Unshaded, `render_priority` −3 (mist) or −2, so every ground ring and telegraph (priority −1) draws over them. Mist is faint (alpha at most 0.25) and flat on the ground; leaves, ash and snow start above 3.5 m and are small.
+- `follow(focus, distance)` centres the node on the ground the camera shows and sizes the emission boxes to it; a focus jump of more than 12 m restarts them.
+- `flicker(t)` breathes the volcano's sun (±7.5 %) and ambient (±4.5 %) light around the data values.
+
+Effects (`ArenaFx`):
+- `twinkle(color, speed, dip, blink)`: the decor's glow meshes (Wisps, Fireflies, Sparkles, FloatingEmbers, crypt torches) pulse, blink or twinkle per light. The phase is a hash of the light's place, read from the vertex colour's alpha (`ArenaFx.lit(at)`). No RNG, no instance uniforms.
+- `lava()`: the volcano's "Lava" mesh churns and pulses on `TIME` with a drifting crust. Heat is baked into the vertex colour (alpha 0 is the hot core without crust). Both materials are unshaded ShaderMaterials, cached.
+- GL Compatibility shows only the albedo of an `unshaded` material (EMISSION is ignored), so the `ArenaFx` materials write ALBEDO only. The lit ground shader does use EMISSION (lava cracks, sheen). `BILLBOARD_PARTICLES` drops the particle's scale unless `billboard_keep_scale = true`.
+- Bog pool (`scenes/enemies/hazards/bog_pool.gd`): the water is its own animated shader (`water_material()`: deep centre, shallow edge, ripples, glints, wet edge). It keeps the ring shader's uniforms (`ring_color`, `ring_shape`, `ring_stroke`), so the fade-in code and the tests are unchanged. The lime rim (`marker_color`) is still the marker.
+- Dungeon brazier (`scenes/dungeon/dungeon_brazier.gd`): warm orange light (`LIGHT_COLOR` (1, 0.52, 0.16)), range 9.5 (was 7), energy up to 2.4 (was 2.1), and a flicker on top of the HP share. Still one non-shadow OmniLight3D.
+
+Backdrops (`ArenaBackdrop`):
+- Cemetery: spear fence on stone posts, and cypresses. Swamp: log palisade with hanging moss, and tall snags. Volcano: crater rim of basalt fangs, and `magma_seams()` (lava dashes along the foot of the wall, drawn by the lava mesh). Ice cave: double cliff wall of ice prisms.
+- Full height on the north, west and east sides, blending down to 25 % at the south wall (the camera's side). Nothing stands in front of the north gate. No shadows; its own seeded RNG. `walk_ring` and `height_factor` are shared with the crypt.
+
+Crypt (`ArenaCrypt`): a colonnade of pillars (rows 3 m and 3.5 m apart, beams, a gap at the gate), a 7.5 m back wall with cornice and alcoves, sarcophagi, bones and banners; the "Torches" flames flicker. `torch_points()` (8 places) also feeds the floor shader's warm light pools. Two draws. Everything stands outside the room, so the playable area still has nothing above 0.55 m. `ArenaThemes.build()` returns it while `arena.in_dungeon_layout`.
+
+Light grades (`data/environments/*.tres`; the sky is unchanged in all five):
+
+| Env | Ambient (colour / energy) | Fog (colour / density) | Sun (colour / energy / pitch) | Glow | Sat | Contrast |
+|---|---|---|---|---|---|---|
+| forest_ruin | unchanged | unchanged | unchanged | 0.55 | 1.12 | 1.05 |
+| cemetery | 0.5, 0.54, 0.78 / 0.76 | 0.2, 0.2, 0.34 / 0.008 | 0.7, 0.78, 1 / 0.95 / -47 | 0.7 | 0.92 | 1.08 |
+| swamp | 0.55, 0.62, 0.45 / 0.6 | 0.25, 0.31, 0.15 / 0.012 | 0.96, 0.9, 0.62 / 0.74 / -46 | 0.65 | 0.97 | 1.06 |
+| volcano | 0.62, 0.5, 0.52 / 0.7 | 0.28, 0.1, 0.06 / 0.0075 | 1, 0.62, 0.38 / 0.95 / -46 | 0.8 | 1.0 | 1.12 |
+| ice_cave | 0.68, 0.78, 0.95 / 0.58 | 0.42, 0.56, 0.76 / 0.0065 | 0.78, 0.9, 1 / 0.72 / -60 | 0.65 | 0.93 | 1.06 |
+
+- Ground palettes: cemetery dark soil and moss, swamp olive mud, volcano black basalt, ice cave pale blue-grey snow with deeper blue ice. Every tone passes the marker-contrast test (at least 2:1 against each hazard marker).
+- `Arena._grade()`: the environment's light data in the clearing; in the dungeon a torch-lit crypt grade (ambient ×0.72 towards violet-grey, sun ×0.62 and cooler, fog at least 0.011 warm-dark, glow at least 0.8, contrast at least 1.1). The sky colour stays the environment's.
+- Wiring: `Arena._build_ambient()` and the `ambient` member; the dungeon layout swap (enter, leave, predelete) includes the ambient; the ground is built through `ArenaGround`; `ArenaThemes.build()` adds the backdrop and uses the crypt in the dungeon; glow meshes use `ArenaFx` materials.
+- No new lights (the existing sun, Spirit Healer and brazier lights only); sun shadows unchanged; one WorldEnvironment.
+
+Budgets:
+- Decor draws (instances in "Decor"): forest 15 (unchanged), cemetery 14, swamp 14, volcano 15, ice cave 14. The four sets with a backdrop gained one each (M6b: 13 / 13 / 14 / 13). The limit stays 16; vertices stay far under 1.5 times the forest's.
+- Ambient: 2 draws per environment (1 in the crypt); particles 60 / 44 / 42 / 86 / 78 / 26 (forest, cemetery, swamp, volcano, ice cave, crypt).
+- Render draw calls (`RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME`, 4-player demo, `--fixed-fps 60 --seed=5 --env=<id>`, mean of frames 360–389 = 6 s of game time, xvfb 800 × 450 opengl3; base c817e6c to M7b): forest 1106.7 → 1109.0, cemetery 1104.7 → 1108.7, swamp 1091.7 → 1095.8, volcano 1101.8 → 1106.1, ice cave 1092.3 → 1096.4: +2 to +4 draws per environment (the two particle draws plus the Backdrop), +0.4 % overall. Primitives: forest 924.6k → 924.8k, cemetery 460k → 476k, swamp 639k → 660k, volcano 406k → 423k, ice cave 411k → 425k.
+- Tests: `tests/test_m7_vis_env.gd` (17): bounded ambient particles that never hide telegraphs; follow and box sizing; every ground look compiles (uniform list) and has no instance uniforms; looks by decor set and vents; glow, lava and twinkle materials; bog water; backdrops (outside the arena, low on the south side, deterministic); decor budgets; the crypt (dressing, floor look, grade, one sun, restored on leave); brazier light; data ranges; light grades; the volcano flicker; no gameplay RNG use.
+
+### Combat effects (`scenes/vfx/vfx.gd`, `enemy_corpse.gd`, `scenes/visuals/enemy_model.gd`, `scenes/enemies/enemy.gd`, `scenes/pickups/`)
+
+All of it goes through `Vfx`, `Mats` and `ProcVfx`, capped and pooled where it is hot. Randomness is private to each class. The effects never touch `Enemy.global_position`, the collision layer, mask or shape, the hp or the AI timers (pinned by test).
+
+- **Spawn rise:** `EnemyModel.play_spawn(duration)`, `is_spawning()`, `spawn_progress()`; `SPAWN_TIME` 0.45 s, `SPAWN_TIME_BOSS` 0.9 s, `SPAWN_DEPTH` 1.05 (times the model scale, below the floor), `SPAWN_TURNS` 0.8. Only the pivot's position, yaw and squash move; the ground plane hides the buried part. The start has y-scale 0.55, xz-scale 0.72 and 0.8 turns of extra yaw, eased out with a cubic. `Enemy.play_spawn_in()` is called by the directors right after `add_child` (WaveDirector group, summon and boss; Dungeon group, summon and Warden; EventGuards). A bare `EnemyModel.setup` never rises (tests and showcase).
+- **Corpses:** `EnemyCorpse` (`scenes/vfx/enemy_corpse.gd`) is a visual-only pooled node, `EnemyCorpse.spawn(model, world_pos, tier, away, accent)`, created by `Enemy._spawn_corpse` from `_die` (not from `despawn`). `EnemyModel.corpse_info()` hands over the shared meshes, base material, arm pose and yaw. `Tier { NORMAL, ELITE, BOSS }`: life 0.6 / 0.9 / 1.7 s, white flash 0.14 / 0.2 / 0.4 s (elites and bosses flash in the affix colour). The corpse tips to 1.45 rad away from the killer in the first 32 % of its life (direction = victim − attacker, ±0.35 rad scatter; random when the killer is unknown). From 40 % of its life it sinks 0.95 × scale into the ground, shrinks 25 % and darkens (a Mats overlay in 10 quantised steps, with cached variants: no per-corpse material). Elites and bosses keep the glow part (flame, eyes, crown); only bosses cast shadows. Structure: `Corpse → Pivot → Body, Arm [, Glow]` under one `Corpses` holder of the effect root. No collision, no groups, not an `Enemy`.
+- **Corpse caps:** `MAX_CORPSES` 40 alive at once (a new one recycles the oldest running one); finished corpses are hidden and reused, so there are never more than 40 nodes. `MAX_SPAWNS_PER_FRAME` 8 ordinary corpses per rendered frame; elites and bosses always get one. The budget key is `Vfx.frame_id()`; tests set `Vfx.frame_override`.
+- **Death puffs:** elite and boss death puffs are ×1.3 and ×1.25 (`Enemy._death_puff_mult`). A boss also gets `Vfx.boss_remains` (`VfxEffect.Kind.REMAINS`, 1.8 s): a glow over the spot where it fell, a slow ring and motes.
+- **Impacts:** `Vfx.hit_spark(pos, color, school := &"", crit := false)`; the `SCHOOL_FX` table; `spark_color` and `school_for_color`. The colour is `ProcVfx.SCHOOL_COLORS` (`core/items/proc_vfx.gd`) lerped `SCHOOL_TINT_KEEP` (0.18) towards the caller's colour. Shapes (shared cached meshes `vfx:spark`, `smoke`, `shard`, `star`, `leaf`): physical = quick streaks; fire = rising embers; frost = tumbling shards; arcane = spinning stars; holy = rays floating up; shadow = dark wisps (non-additive); nature = spinning leaves. A legacy call without a school behaves like the physical look. Call sites that pass the school: `WeaponRunner._melee` and `riposte` (weapon school and crit), `Projectile._impact` (player shots) and `ProcSystem` sparks. Ability sparks in a kit's school colour are recognised by colour.
+- **Crit:** flash 0.46 m (was 0.26 m) at full alpha, life +0.1 s, and a star particle node (7 large white-gold stars). Still at most 4 children per effect (flash, sparks, stars = 3). The camera shake is untouched.
+- **Spark throttle:** `SPARKS_PER_FRAME` 24 (crits may add `CRIT_SPARKS_EXTRA` 10); `MAX_SPARKS_ALIVE` 90 for ordinary sparks.
+- **Boss entrance:** `Vfx.boss_entrance(pos, radius, colour)` (`VfxEffect.Kind.ENTRANCE`, 1.5 s), started by `Main._boss_entrance_fx` for the wave boss and the dungeon Warden. Rune flares open (3.2 × radius wide) and spin while they fade; a light shaft rises to 4.5 m and thins; a shock ring runs out; 20 dust particles rise (4 children). The boss itself rises for 0.9 s. One entrance effect per boss.
+- **Banner slam:** `Hud.show_banner(text, color, sub_lines, slam := false)`. With `slam` the banner scales from 2.6 to 0.9 in 0.12 s (quart-in), settles to 1.0 in 0.12 s (back-out) and holds for 1.9 s. The boss intro banner (`Main`, boss spawn) is the one that slams.
+- **Loot pop:** `Vfx.hop_height(k)` arcs to `HOP_PEAK` 0.75 m (pickups 0.7, bags 0.95) up to `HOP_SPLIT` (62 % of the time), then bounces once (0.18 m; pickups 0.16, bags 0.22) and ends at 0. The sideways toss offset (0.35–0.7 m for pickups, 0.5–0.95 m for bags) is gone at the first landing. Pop time: pickups 0.55 s, bags 0.7 s. Only `Visual`'s local position moves (`Pickup`, `LootBag`).
+- **Pickup streak:** `Vfx.make_streak` and `aim_streak`: one flat additive quad per pulled pickup (shared `vfx:quad` mesh, one material per colour). Length = speed × 0.05 s (0.25–1.2 m); at most `Pickup.TRAIL_MAX` (24) at a time.
+- **Numbers** (xvfb, llvmpipe, 1280 × 720, `--fixed-fps 60`, base c817e6c to M7b; probe = a scratch SceneTree that boots Main and samples every rendered frame):
+  - `--demo --start-wave=15 --seed=5` (43 enemies on average): draw calls 1376.7 → 1378.3 (+0.1 %).
+  - `--demo --start-wave=25 --seed=5` (boss wave, entrance and rising boss inside): 1141.7 → 1143.9 (+0.2 %).
+  - Stress (`tools/showcase/stress.gd`: 150 enemies, 12 kills per 6 frames, 20 sparks per frame, every fourth a crit): 2219 → 2094 average draw calls (−5.6 %, from the spark caps).
+  - Micro-benchmarks (headless): `EnemyCorpse.spawn` 33 µs; `Vfx.hit_spark` 89 µs (base 90 µs).
+  - The bounds: at most 40 corpses (about 5 draws each), at most 90 live ordinary sparks, at most 24 pulled-pickup streaks, one entrance effect per boss.
+- Tests: `tests/test_m7_vis_fx.gd` (31). No existing test was edited in M7b.
+
+### Dev tools
+
+- Showcase (`tools/showcase/showcase.gd`, scene in `showcase_scene.gd`): `--view=fx --phase=spawn|death|impacts|loot|boss|banner` (add the engine flag `--fixed-fps 60` before `--path`, so an effect's age after N frames is exact). `--view=arena --env=<id> --dungeon=1 --frames=N` and `--view=gameplay` with `--env=<id>`, `--dungeon=1`, `--dist=19.5..36` and `--hazards=1` show the environments; the equipment views are listed under Visible equipment.
+- Stress (`tools/showcase/stress.gd`, scene `stress_scene.gd`): a perf stress that runs on any commit, so a base and a new tree can be compared. About 150 enemies on screen, a dozen kills every 6 frames (loot, puffs, corpses) and 20 hit sparks per frame; it prints `STRESS ...` lines (render draw calls, objects, process time) over `--frames=N` rendered frames after a 90-frame warm-up:
+
+  ```
+  xvfb-run -a -s "-screen 0 1280x720x24" godot --fixed-fps 60 --path . --resolution 1280x720 \
+      --rendering-driver opengl3 -s res://tools/showcase/stress.gd -- --frames=360
+  ```
+
+### Tests and verification
+
+- Test files: `tests/test_m7_vis_ui.gd` (22: the font file, OFL, Cinzel as the base, the weight tag and bold weight; theme fonts; fallback glyphs; title widths per screen; the icon map (every path exists, 128 px, import parameters, author folders credited, every SVG used); every ability, talent, tree, consumable and shrine resolves; no stale ids; lookup fallback order; controls draw their picture with the glyph as fallback; no instance uniform or shader in `scenes/ui` and `game_icons`), `tests/test_m7_vis_hero.gd` (38), `tests/test_m7_vis_env.gd` (17) and `tests/test_m7_vis_fx.gd` (31).
+- Whole suite on the integrated M7b head: 3051 passed, 0 failed (`godot --headless --path . -s res://tests/run_tests.gd`).
+- Smoke (`--fixed-fps 60 --smoke --waves=3 --seed=5`): completed, 0 errors; the SMOKE_RESULT matches the M7a head apart from `real_time` and `perf`.
+
+### Known gaps
+
+- Hands, feet and waist items are not on the model, and uniques have no custom models.
+- Item, weapon and slot icons, enchant and artifact icons, and the stat-card gem stay procedural.
+- The two M6b art calls (the bog pool rim contrast and the boss circles on the ice floor) are still open after M7b.
+- All frame times were measured under llvmpipe (software GL); the draw-call numbers are the ones to compare.
