@@ -6,6 +6,8 @@ extends Control
 ## &"armor" → a breastplate ...) or the talent's kind when it names nothing (TALENT rune star,
 ## MODIFIER gear, CAPSTONE crown) – plus the Reset row's circular arrow. Ability ids and the
 ## school damage stats are drawn by AbilityIcon itself (TalentNode.make_glyph decides).
+## With a [member texture] (the talent's game-icons.net picture, [GameIcons]) the glyph is that
+## picture as a tinted silhouette instead of the procedural shape; the square stays the same.
 ## The square has no rim: TalentNode draws the state rim over it.
 
 enum Glyph {
@@ -64,6 +66,11 @@ const OUT := AbilityIcon.OUT
 
 var glyph := Glyph.TALENT
 var tint := Color.WHITE
+## The picture drawn instead of the procedural glyph (null = the glyph).
+var texture: Texture2D:
+	set(value):
+		texture = value
+		queue_redraw()
 
 var _bg: StyleBoxFlat
 # Drawing state: every shape is drawn twice, pass 0 = dark outlines, pass 1 = fills (the
@@ -81,6 +88,7 @@ static func create(p_glyph: Glyph, p_size: float) -> TalentGlyph:
 	g.custom_minimum_size = Vector2(p_size, p_size)
 	g.size = Vector2(p_size, p_size)
 	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	g.texture_filter = GameIcons.FILTER
 	return g
 
 
@@ -123,6 +131,11 @@ func _draw() -> void:
 	_c = rect.get_center()
 	_h = sq * 0.5 * GLYPH_SCALE
 	_ow = maxf(1.5, sq / 24.0)
+	if texture != null:
+		var side := sq * AbilityIcon.PICTURE_SCALE
+		GameIcons.draw_silhouette(self, texture, Rect2(_c - Vector2(side, side) * 0.5, Vector2(side, side)),
+				GameIcons.gradient_top(tint), GameIcons.gradient_bottom(tint), maxf(1.0, sq / 38.0))
+		return
 	for p in 2:
 		_pass = p
 		_draw_glyph()

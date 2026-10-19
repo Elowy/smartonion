@@ -68,6 +68,13 @@ const RESOURCE_NAMES := {
 	&"holy_power": "Resolve", &"soul_shard": "Pact Shards",
 }
 
+## The display font (assets/fonts/OFL.txt) and its variable-weight axis.
+const TITLE_FONT_PATH := "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
+## The OpenType tag of the weight axis ("wght") and the weight titles use (400 regular .. 900 black).
+const WEIGHT_TAG := 0x77676874
+const TITLE_WEIGHT := 700.0
+const TITLE_SPACING := 1
+
 static var _theme: Theme
 static var _title_font: FontVariation
 static var _bold_font: FontVariation
@@ -79,13 +86,24 @@ static func get_theme() -> Theme:
 	return _theme
 
 
-## The default font, emboldened and slightly spaced – used for titles and numbers.
+## Cinzel (OFL 1.1, assets/fonts) at its bold weight – the fantasy display face for titles, headings,
+## buttons and big numbers. A variable font: the `wght` axis (400..900) is set through the OpenType
+## variation coordinates, so one file serves every weight. The body font stays the engine's default.
 static func title_font() -> Font:
 	if _title_font == null:
 		_title_font = FontVariation.new()
-		_title_font.base_font = ThemeDB.fallback_font
-		_title_font.variation_embolden = 0.75
-		_title_font.spacing_glyph = 2
+		var cinzel := load(TITLE_FONT_PATH) as Font
+		if cinzel != null:
+			_title_font.base_font = cinzel
+			_title_font.variation_opentype = {WEIGHT_TAG: TITLE_WEIGHT}
+			_title_font.spacing_glyph = TITLE_SPACING
+			# Glyphs Cinzel lacks (arrows, symbols) come from the default font.
+			_title_font.fallbacks = [ThemeDB.fallback_font]
+		else:
+			# (the font file is missing: the old emboldened default font)
+			_title_font.base_font = ThemeDB.fallback_font
+			_title_font.variation_embolden = 0.75
+			_title_font.spacing_glyph = 2
 	return _title_font
 
 
@@ -96,6 +114,16 @@ static func bold_font() -> Font:
 		_bold_font.base_font = ThemeDB.fallback_font
 		_bold_font.variation_embolden = 0.4
 	return _bold_font
+
+
+## The largest font size from [param max_size] down to [param min_size] at which [param text] is at most
+## [param width] wide in [param font] (min_size when even that is too wide) – for headings in the wide
+## title font that must stay inside a fixed column.
+static func fitted_font_size(font: Font, text: String, width: float, max_size: int, min_size: int = 14) -> int:
+	for fs in range(max_size, min_size - 1, -1):
+		if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= width:
+			return fs
+	return min_size
 
 
 # --- Styles ----------------------------------------------------------------------

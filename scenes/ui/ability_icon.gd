@@ -1,10 +1,12 @@
 class_name AbilityIcon
 extends Control
-## One ability slot on the HUD / lobby card / Trainer, drawn in code (no image assets yet): a
-## gold-rimmed square with a procedural glyph picked by AbilityData.icon (falling back to the
-## ability id and then to the school), tinted by AbilityData.color (or the school colour when the
-## data leaves the default white). Every shipped ability id has its own glyph (EXACT_GLYPHS);
-## the token rules and the school are the fallbacks for new content.
+## One ability slot on the HUD / lobby card / Trainer: a gold-rimmed square with the ability's
+## picture – a game-icons.net silhouette from data/icons/icon_map.tres ([GameIcons]; icon id, then
+## ability id, then the school's picture for content without glyph rule) drawn as a tinted
+## silhouette – or, when the map has none, a procedural glyph picked by AbilityData.icon (falling
+## back to the ability id and then to the school). The tint is AbilityData.color (or the school
+## colour when the data leaves the default white). Every shipped ability id has its own glyph
+## (EXACT_GLYPHS); the token rules and the school are the fallbacks for new content.
 ##
 ## State drawn on top of the glyph (all pushed in by the owner, nothing is read from gameplay):
 ##  - cooldown sweep: a dark pie that shrinks clockwise (WoW style) + the seconds left (the
@@ -49,6 +51,8 @@ const FLASH_TIME := 0.32
 const SWEEP_REDRAW_STEP := 0.004
 ## Glyph half-extent as a share of the half icon size.
 const GLYPH_SCALE := 0.74
+## Side of a game-icons picture as a share of the icon's side.
+const PICTURE_SCALE := 0.8
 const OUT := Color(0.05, 0.03, 0.02, 0.95)
 ## Icons narrower than this use the small text sizes (SMALL_FONT).
 const SMALL_ICON := 36.0
@@ -148,6 +152,12 @@ var glyph := Glyph.GENERIC:
 	set(value):
 		glyph = value
 		_queue_base_redraw()
+## The picture drawn instead of the procedural glyph (null = draw the glyph); set by
+## [method set_ability], a talent node sets its own.
+var icon_texture: Texture2D:
+	set(value):
+		icon_texture = value
+		_queue_base_redraw()
 ## Resolved tint (AbilityData.color, or the school colour).
 var icon_color := Color.WHITE:
 	set(value):
@@ -211,6 +221,7 @@ func _init() -> void:
 	_glyph_layer.name = "Glyph"
 	_glyph_layer.icon = self
 	_glyph_layer.show_behind_parent = true
+	_glyph_layer.texture_filter = GameIcons.FILTER
 	_glyph_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glyph_layer.size = Vector2(_side, _side)
 	add_child(_glyph_layer, false, Node.INTERNAL_MODE_FRONT)
@@ -246,6 +257,19 @@ static func color_for(a: AbilityData) -> Color:
 
 ## Which glyph an ability gets: the icon id, then the ability id, then the school.
 static func glyph_for(icon: StringName, school: StringName = &"", id: StringName = &"") -> Glyph:
+	var found := _glyph_rule(icon, id)
+	if found >= 0:
+		return found as Glyph
+	return SCHOOL_GLYPHS.get(school, Glyph.GENERIC)
+
+
+## Whether the icon id or the ability id matches an exact glyph or a token rule (false: [method
+## glyph_for] fell back to the school's glyph).
+static func glyph_is_specific(icon: StringName, id: StringName = &"") -> bool:
+	return _glyph_rule(icon, id) >= 0
+
+
+static func _glyph_rule(icon: StringName, id: StringName) -> int:
 	for key: StringName in [icon, id]:
 		if key == &"":
 			continue
@@ -254,8 +278,19 @@ static func glyph_for(icon: StringName, school: StringName = &"", id: StringName
 			return EXACT_GLYPHS[norm]
 		var found := _match_tokens(String(norm))
 		if found >= 0:
-			return found as Glyph
-	return SCHOOL_GLYPHS.get(school, Glyph.GENERIC)
+			return found
+	return -1
+
+
+## The picture [param a] gets: the map's entry for its icon / id, else (only when no glyph rule
+## matches either) the picture of its school; null keeps the procedural glyph.
+static func texture_for(a: AbilityData) -> Texture2D:
+	if a == null:
+		return null
+	var tex := GameIcons.for_ability(a)
+	if tex == null and not glyph_is_specific(a.icon, a.id):
+		tex = GameIcons.for_school(a.school)
+	return tex
 
 
 static func glyph_for_ability(a: AbilityData) -> Glyph:
@@ -338,10 +373,12 @@ func set_ability(a: AbilityData, p_cost: float = -1.0, p_cost_color: Color = Col
 	ability = a
 	if a != null:
 		glyph = glyph_for_ability(a)
+		icon_texture = texture_for(a)
 		icon_color = color_for(a)
 		cost = p_cost if p_cost >= 0.0 else a.cost
 		cost_color = p_cost_color if p_cost_color.a > 0.0 else icon_color
 	else:
+		icon_texture = null
 		cost = 0.0
 	queue_redraw()
 	_queue_base_redraw()
@@ -479,6 +516,11 @@ func _draw_base(ci: CanvasItem) -> void:
 	_c = rect.get_center()
 	_h = sq * 0.5 * GLYPH_SCALE
 	_ow = maxf(1.5, sq / 24.0)
+	if icon_texture != null:
+		var side := sq * PICTURE_SCALE
+		GameIcons.draw_silhouette(ci, icon_texture, Rect2(_c - Vector2(side, side) * 0.5, Vector2(side, side)),
+				GameIcons.gradient_top(base), GameIcons.gradient_bottom(base), maxf(1.0, sq / 38.0))
+		return
 	_ci = ci
 	for p in 2:
 		_pass = p
