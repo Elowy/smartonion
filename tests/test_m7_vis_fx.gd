@@ -179,6 +179,36 @@ func test_spawn_rise_is_longer_for_bosses_and_a_model_has_no_extra_nodes() -> vo
 			"the rise adds no nodes")
 
 
+func test_the_directors_start_the_spawn_rise() -> void:
+	var d := WaveDirector.create(_arena)
+	_arena.add_child(d)
+	d.start_wave(3)
+	var made: Array[Enemy] = []
+	d.enemy_spawned.connect(func(e: Enemy) -> void: made.append(e))
+	var g := WaveDirector.PendingGroup.new()
+	g.data = Db.get_enemy(&"skeleton_grunt")
+	g.count = 3
+	g.position = Vector3(2, 0, 2)
+	g.ring = 1.5
+	d._spawn_group(g)
+	check_eq(made.size(), 3, "a group spawned")
+	for e in made:
+		check(e.model.is_spawning(), "a group member rises")
+	var adds := d.summon(Db.get_enemy(&"candlekin"), 2, Vector3(-3, 0, 1), 2.0)
+	check_eq(adds.size(), 2, "adds summoned")
+	for e in adds:
+		check(e.model.is_spawning(), "a summoned add rises")
+	d.stop()
+	d.start_wave(10)
+	for i in int((WaveDirector.BOSS_TELEGRAPH_TIME + 0.2) / DT):
+		d._physics_process(DT)
+	check(d.boss != null, "the boss arrived")
+	if d.boss != null:
+		check(d.boss.model.is_spawning(), "the boss rises too")
+		check_near(d.boss.model.spawn_progress(), 0.0, 0.2, "from the start")
+	d.stop()
+
+
 func test_models_without_play_spawn_stay_untouched() -> void:
 	var m := EnemyModel.new()
 	_extra.append(m)
