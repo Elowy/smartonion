@@ -258,7 +258,7 @@ func test_every_fourth_blizzard_has_double_radius() -> void:
 	var radii: Array[float] = []
 	for i in 8:
 		var ctx := p.abilities.build_context(blizzard)
-		check(ctx.target != null, "a target for Blizzard %d" % (i + 1))
+		check(ctx.target != null, "a target for Hailstorm %d" % (i + 1))
 		var before := _areas().size()
 		check(effect.cast(ctx), "cast %d" % (i + 1))
 		var zones := _areas()
@@ -365,7 +365,7 @@ func test_consecration_heals_the_allies_standing_in_it() -> void:
 	var ally_before := ally.hp
 	var away_before := away.hp
 	_fake(Vector3(2.0, 0.0, 0.0))
-	check(p.abilities.try_cast(0), "Consecration")
+	check(p.abilities.try_cast(0), "Sacred Circle")
 	_step(p, 2.0)
 	var healed := ally.hp - ally_before
 	# Heals 2% of max HP per second: about 4 ticks of 1% in 2 s (the first at the cast).
@@ -393,7 +393,7 @@ func test_word_of_glory_also_shields_its_target_for_15_percent_of_max_hp() -> vo
 	var wog := Db.get_ability(&"word_of_glory")
 	var ctx := p.abilities.build_context(wog)
 	check_eq(ctx.num("shield_max_hp_pct"), 15.0, "the param is on")
-	check(p.abilities.effect_for(wog).cast(ctx), "Word of Glory")
+	check(p.abilities.effect_for(wog).cast(ctx), "Call of Valor")
 	check_near(ally.procs.shield_of(PaladinWordOfGlory.ARTIFACT_SHIELD), ally.max_hp() * 0.15, 0.01, "15% of the ally's max HP")
 	check_near(p.procs.shield_of(PaladinWordOfGlory.ARTIFACT_SHIELD), p.max_hp() * 0.15, 0.01, "and of the Paladin's own")
 	# A second cast tops up, it does not stack past the 15%.
@@ -499,9 +499,9 @@ func test_the_fan_property_sleeps_before_three_wave_ends() -> void:
 
 func test_vanish_grants_three_crits_with_the_second_property() -> void:
 	var p := _hero(&"rogue", 6)
-	check_eq(_param(p, &"vanish", "forced_crits"), 3.0, "Vanish: 3 guaranteed crits")
+	check_eq(_param(p, &"vanish", "forced_crits"), 3.0, "Melt Away: 3 guaranteed crits")
 	var vanish := Db.get_ability(&"vanish")
-	check(p.abilities.effect_for(vanish).cast(p.abilities.build_context(vanish)), "Vanish")
+	check(p.abilities.effect_for(vanish).cast(p.abilities.build_context(vanish)), "Melt Away")
 	check_eq(p.forced_crits, 3, "the next 3 hits are crits")
 	var asleep := _hero(&"rogue", 5, 1)
 	check_eq(_param(asleep, &"vanish", "forced_crits"), 1.0, "asleep: the normal 1")
@@ -526,12 +526,12 @@ func test_a_second_permanent_voidwalker_stands_at_the_warlocks_side() -> void:
 	check(script != null, "the script is live after three wave ends")
 	check_eq(_voidwalkers().size(), 0, "nothing summoned in the market")
 	_step(p, 0.1)
-	check_eq(_voidwalkers().size(), 1, "a Voidwalker after the first tick of the wave")
+	check_eq(_voidwalkers().size(), 1, "a Gloomguard after the first tick of the wave")
 	check(script.has_pet(), "the script owns it")
 	_step(p, 3.0)
 	check_eq(_voidwalkers().size(), 1, "and it stays one")
 	var p2 := _plain(&"warlock", 1, Vector3(20.0, 0.0, 0.0))
-	check_eq(_voidwalkers().size(), 1, "an ordinary Warlock's Imp is not a Voidwalker")
+	check_eq(_voidwalkers().size(), 1, "an ordinary Warlock's Imp is not a Gloomguard")
 	p2.free()
 
 
@@ -539,10 +539,10 @@ func test_the_second_voidwalker_taunts_and_stands_next_to_the_ability_one() -> v
 	var p := _hero(&"warlock", 3)
 	p.abilities.learn(Db.get_ability(&"summon_voidwalker"))
 	_step(p, 0.2)
-	check_eq(_voidwalkers().size(), 2, "the ability's Voidwalker and the Artifact's")
+	check_eq(_voidwalkers().size(), 2, "the ability's Gloomguard and the Artifact's")
 	var enemy := _real(Vector3(3.0, 0.0, 0.0))
 	_step(p, 2.0)
-	check(enemy.is_taunted(), "an enemy near them is taunted onto a Voidwalker")
+	check(enemy.is_taunted(), "an enemy near them is taunted onto a Gloomguard")
 	check_eq(p.damage_taken_mults.size(), 0, "no ward from the Artifact's pet")
 
 

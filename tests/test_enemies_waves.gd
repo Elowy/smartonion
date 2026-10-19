@@ -392,4 +392,4 @@ func test_stop_ends_ability_areas() -> void:
 	EFakes.arena_of(world).entities.add_child(area)
 	check(area.is_in_group(&"ability_areas"), "areas join the group")
 	director.stop()
-	check(area.is_queued_for_deletion(), "a Blizzard does not survive the wave")
+	check(area.is_queued_for_deletion(), "a Hailstorm does not survive the wave")

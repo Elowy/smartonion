@@ -115,7 +115,7 @@ func test_living_bot_leaves_a_far_ghost_to_the_spirit_healer() -> void:
 
 func test_ghost_walks_straight_to_the_spirit_healer() -> void:
 	var healer := arena.spirit_healer
-	check(healer != null and healer.is_inside_tree(), "the arena has a Spirit Healer")
+	check(healer != null and healer.is_inside_tree(), "the arena has a Grave Tender")
 	var ghost := _bot_player(&"paladin", Vector3(-8.0, 0.0, 6.0))
 	ghost.downed = true
 	var mate := _bot_player(&"mage", Vector3(-12.0, 0.0, 8.0))
@@ -137,7 +137,7 @@ func test_sick_ghost_seeks_a_teammate_instead_of_the_healer() -> void:
 	ghost.downed = true
 	ghost.res_sickness_left = 8.0
 	_bot_player(&"mage", Vector3(-10.0, 0.0, 0.0))
-	check(_move(ghost).x < -0.9, "Resurrection Sickness: away from the healer, to the teammate")
+	check(_move(ghost).x < -0.9, "Wilted: away from the healer, to the teammate")
 	ghost.res_sickness_left = 0.0
 	check(_move(ghost).x > 0.9, "healthy again: back to the healer")
 

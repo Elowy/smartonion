@@ -368,7 +368,7 @@ func test_dawns_embrace_shield_is_credited_to_the_casting_paladin() -> void:
 	Enemy.invalidate_player_cache()
 	ally.hp = ally.max_hp() * 0.3
 	var wog := Db.get_ability(&"word_of_glory")
-	check(paladin.abilities.effect_for(wog).cast(paladin.abilities.build_context(wog)), "Word of Glory")
+	check(paladin.abilities.effect_for(wog).cast(paladin.abilities.build_context(wog)), "Call of Valor")
 	var shield := ally.procs.shield_of(PaladinWordOfGlory.ARTIFACT_SHIELD)
 	check(shield > 0.0, "the ally has Dawn's Embrace")
 	ally.stats.set_source(&"naked", {Stats.ARMOR: -2.0})

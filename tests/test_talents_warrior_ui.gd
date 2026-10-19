@@ -90,5 +90,5 @@ func test_every_warrior_talent_text_shows_whole_in_the_talents_tab() -> void:
 	# reason (one line less for the text), modifiers may add "You haven't learned X".
 	for t in talents:
 		await _select_and_check(tab, t)
-	check_eq(tab.detail_reason.text, "Needs 12 points in Protection", "the capstone's lock reason shows (last talent)")
+	check_eq(tab.detail_reason.text, "Needs 12 points in Ironwall", "the capstone's lock reason shows (last talent)")
 	finished.emit()

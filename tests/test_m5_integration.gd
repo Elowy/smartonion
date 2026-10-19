@@ -536,7 +536,7 @@ func test_talent_set_and_item_mods_merge_in_whirlwinds_params() -> void:
 	var p := w.abilities.params_for(ww)
 	check_eq(p["cost"], 34.0, "talent: 40 - 3 x 2 Rage")
 	check_near(float(p["power"]), float(base["power"]) * 1.15, 0.0001, "talent: +3 x 5% power on top of the rank")
-	check_eq(p["rage_per_enemy"], 3.0, "talent (modifier): Meat Cleaver")
+	check_eq(p["rage_per_enemy"], 3.0, "talent (modifier): Reaping Spin")
 	check_eq(p["free_chance"], 30.0, "set: 4-piece free chance")
 	check_eq(p["duration"], 2.0, "item: +1 sec")
 	check_eq(p["slow"], 30.0, "item: 30% slow")
@@ -586,7 +586,7 @@ func test_talent_reset_refunds_every_point_removes_every_effect_and_logs_the_pay
 	check_eq(w.stats.get_raw(Stats.CRIT), crit + 6.0, "stats: +6% crit")
 	check_eq(rage.bonus_of("gain_on_crit"), 9.0, "resource: +9 Rage per crit")
 	check_eq(w.abilities.params_for(ww)["cost"], 34.0, "ability: cheaper Whirlwind")
-	check_eq(w.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).size(), 1, "proc: Blood Craze")
+	check_eq(w.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).size(), 1, "proc: Savoured Kills")
 	RunState.add_gold(50)
 	var gold := RunState.gold
 	var price := w.talents.reset_price()

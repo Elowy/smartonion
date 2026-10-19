@@ -105,7 +105,7 @@ func test_a_dodge_avoids_the_whole_hook_with_one_roll() -> void:
 func test_an_invulnerable_or_downed_hero_cannot_be_hooked() -> void:
 	var p := _hero(&"warrior", Vector3.ZERO)
 	p.invulnerable_left = 1.0
-	check(not p.take_hook(4.0, Vector3(10.0, 0.0, 0.0), 3.0), "Divine Shield, a Charge, i-frames: immune")
+	check(not p.take_hook(4.0, Vector3(10.0, 0.0, 0.0), 3.0), "Gilded Halo, a Charge, i-frames: immune")
 	check_eq(p.hp, p.max_hp(), "no damage")
 	check(not p.is_pulled(), "no pull")
 	p.invulnerable_left = 0.0

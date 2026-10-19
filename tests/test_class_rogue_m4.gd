@@ -168,8 +168,8 @@ func test_core_abilities_have_ranks_too() -> void:
 
 
 func test_learning_puts_them_in_the_right_slots() -> void:
-	check_eq(_learn(&"shadowstep"), 2, "Shadowstep -> RB")
-	check_eq(_learn(&"killing_spree"), 3, "Killing Spree -> LB")
+	check_eq(_learn(&"shadowstep"), 2, "Duskstep -> RB")
+	check_eq(_learn(&"killing_spree"), 3, "Cutthroat Rush -> LB")
 	check_eq(_learn(&"shuriken_toss"), 4, "auto slots from 4")
 	check_eq(_learn(&"blade_flurry"), 5, "")
 	check_eq(_learn(&"poison_bomb"), 6, "")
@@ -216,7 +216,7 @@ func test_shuriken_hits_are_weapon_hits() -> void:
 	check(e.fake_crit_log[0], "as a crit")
 	check_eq(e.fake_attacker_log[0], rogue, "credited to the rogue")
 	check_eq(RogueUtil.combo_points(rogue), 1, "a Combo Point")
-	check_eq((rogue.abilities.mastery as RogueMastery).stacks_on(e), 1, "and Deadly Poison")
+	check_eq((rogue.abilities.mastery as RogueMastery).stacks_on(e), 1, "and Lethal Venom")
 
 
 func test_shuriken_auto_casts_only_with_an_enemy_in_range() -> void:
@@ -349,9 +349,9 @@ func test_blade_flurry_echo_uses_the_echo_targets_own_bonus() -> void:
 func test_blade_flurry_echoes_thrown_blades_too() -> void:
 	var a := _enemy(Vector3(0, 0, -3))
 	var b := _enemy(Vector3(1.0, 0, -3))  # between two knives' paths: only echoes reach it
-	check(rogue.abilities.try_cast(_learn(&"blade_flurry")), "flurry")
+	check(rogue.abilities.try_cast(_learn(&"blade_flurry")), "Cleaving Blades")
 	rogue.facing = Vector3.FORWARD
-	check(rogue.abilities.try_cast(0), "Fan of Knives")
+	check(rogue.abilities.try_cast(0), "Knife Bloom")
 	_advance_blades(0.6)
 	check_eq(a.fake_hits(), 1, "a knife hit the first enemy")
 	check_eq(b.fake_hits(), 1, "the knife hit echoed on the second")
@@ -363,10 +363,10 @@ func test_blade_flurry_auto_cast_needs_two_enemies_close() -> void:
 	var slot := _learn(&"blade_flurry")
 	_enemy(Vector3(0, 0, -1.5))
 	_run(0.3)
-	check(not (_effect(&"blade_flurry") as RogueBladeFlurry).is_active(), "one enemy: no flurry")
+	check(not (_effect(&"blade_flurry") as RogueBladeFlurry).is_active(), "one enemy: no Cleaving Blades")
 	_enemy(Vector3(1.0, 0, -1.5))
 	_run(0.3)
-	check((_effect(&"blade_flurry") as RogueBladeFlurry).is_active(), "two: flurry")
+	check((_effect(&"blade_flurry") as RogueBladeFlurry).is_active(), "two: Cleaving Blades")
 	check(rogue.abilities.remaining(slot) > 10.0, "12 s cooldown running")
 
 
@@ -389,7 +389,7 @@ func test_blade_flurry_specs() -> void:
 	var flurry := _effect(&"blade_flurry") as RogueBladeFlurry
 	check(rogue.abilities.try_cast(slot), "cast")
 	rogue.notify_kill(a)
-	check_near(flurry.time_left(), 6.0, 0.001, "Relentless Flurry: a kill adds 1 s")
+	check_near(flurry.time_left(), 6.0, 0.001, "Relentless Blades: a kill adds 1 s")
 	for i in 8:
 		rogue.notify_kill(a)
 	check_near(flurry.time_left(), 10.0, 0.001, "up to 5 s in total")
@@ -398,7 +398,7 @@ func test_blade_flurry_specs() -> void:
 	rogue.abilities.set_cooldown(Db.get_ability(&"blade_flurry"), 0.0)
 	var haste := rogue.stats.get_stat(Stats.HASTE)
 	check(rogue.abilities.try_cast(slot), "cast again")
-	check_near(rogue.stats.get_stat(Stats.HASTE) - haste, 30.0 * 1.5, 0.01, "Adrenaline Surge: 30% x power Haste")
+	check_near(rogue.stats.get_stat(Stats.HASTE) - haste, 30.0 * 1.5, 0.01, "Racing Pulse: 30% x power Haste")
 	rogue.notify_kill(a)
 	check_near(flurry.time_left(), 5.0, 0.001, "no kill extension in this spec")
 	_run(5.05)
@@ -631,7 +631,7 @@ func test_cheat_death_guard_follows_the_slot_and_the_waves() -> void:
 	check(not guard.is_registered(), "")
 	rogue.invulnerable_left = 0.0
 	rogue.take_damage(9999.0)
-	check(rogue.downed, "a forgotten Cheat Death saves nobody")
+	check(rogue.downed, "a forgotten Narrow Escape saves nobody")
 
 
 func test_cheat_death_ranks_and_specs() -> void:
@@ -651,7 +651,7 @@ func test_cheat_death_ranks_and_specs() -> void:
 	rogue.take_damage(9999.0)
 	check(not rogue.downed, "saved")
 	check(rogue.is_stealthed() and rogue.stealth_left >= 2.99, "Shadow Escape: 3 s stealth")
-	check(RogueVanish.of(rogue).is_active(), "shown as the Vanish silhouette")
+	check(RogueVanish.of(rogue).is_active(), "shown as the Melt Away silhouette")
 	check_eq(rogue.forced_crits, 1, "and a guaranteed crit")
 	rogue.abilities.set_spec(&"cheat_death", 1)
 	rogue.begin_wave()
@@ -837,7 +837,7 @@ func test_killing_spree_strikes_are_weapon_hits_and_move_the_rogue() -> void:
 	for crit in e.fake_crit_log:
 		if crit:
 			strikes += 1
-	check_eq(strikes, 8, "a lone enemy takes every strike (the rest are Deadly Poison ticks)")
+	check_eq(strikes, 8, "a lone enemy takes every strike (the rest are Lethal Venom ticks)")
 
 
 func test_killing_spree_needs_an_enemy_and_ends_when_they_are_gone() -> void:
@@ -880,7 +880,7 @@ func test_killing_spree_ranks_and_specs() -> void:
 	_run(3.0)
 	check(not _spree().is_active(), "over")
 	check(rogue.is_stealthed(), "ends in stealth")
-	check(RogueVanish.of(rogue).is_active(), "with the Vanish silhouette")
+	check(RogueVanish.of(rogue).is_active(), "with the Melt Away silhouette")
 
 
 func test_killing_spree_bot_rule_and_clean_up() -> void:
@@ -967,7 +967,7 @@ func test_vanish_ranks_and_specs() -> void:
 	rogue.abilities.set_spec(&"vanish", 0)
 	var near := _enemy(Vector3(0, 0, -3))
 	var far := _enemy(Vector3(0, 0, -6))
-	check(rogue.abilities.try_cast(1), "Smoke Bomb")
+	check(rogue.abilities.try_cast(1), "Smoke Pellet")
 	check_eq(near.fake_stun_count, 1, "stuns the enemies around")
 	check_eq(far.fake_stun_count, 0, "within 4 m")
 	check_eq(rogue.invulnerable_left, 0.0, "no invulnerability in this spec")

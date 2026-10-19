@@ -879,7 +879,7 @@ func test_shield_wall_last_stand_goes_before_an_item_cheat_death() -> void:
 	var p := _hero()
 	var shard := ItemGenerator.from_unique(Db.get_unique(&"shard_of_everfrost"), 1, false, RunState.rng,
 			p.class_data)
-	check(p.equipment.equip(shard), "wears the Shard of Everfrost (cheat death once per wave)")
+	check(p.equipment.equip(shard), "wears the Shard of Everfrost (Narrow Escape once per wave)")
 	var slot := _learn(p, &"shield_wall", 5, 0)
 	var wall := _effect(p, slot) as WarriorShieldWall
 	p.abilities.try_cast(slot)
@@ -1041,9 +1041,9 @@ func test_bladestorm_auto_rule() -> void:
 	var slot3 := _learn(p3, &"bladestorm", 5, 0)
 	_fake(Vector3(38.0, 0.0, 0.0))
 	_fake(Vector3(38.5, 0.0, 1.0))
-	check(not _wants(p3, slot3), "Ravager: two far away")
+	check(not _wants(p3, slot3), "Whirling Axe: two far away")
 	_fake(Vector3(37.5, 0.0, -1.0))
-	check(_wants(p3, slot3), "Ravager: a group of three 8 m away")
+	check(_wants(p3, slot3), "Whirling Axe: a group of three 8 m away")
 
 
 func test_bladestorm_cleanup() -> void:

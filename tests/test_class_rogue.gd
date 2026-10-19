@@ -88,7 +88,7 @@ func test_class_wiring() -> void:
 	check_eq(c.abilities.size(), 2, "two core abilities")
 	check_eq(c.abilities[0].id, &"fan_of_knives", "RT")
 	check_eq(c.abilities[1].id, &"vanish", "LT")
-	check(c.mastery != null and c.mastery_text.begins_with("Deadly Poison"), "Mastery set")
+	check(c.mastery != null and c.mastery_text.begins_with("Lethal Venom"), "Mastery set")
 	for a in c.abilities:
 		check(a.effect != null and a.effect.can_instantiate(), "%s has an effect script" % a.id)
 		check(a.class_id == &"rogue" and a.display_name != "" and a.description != "", "%s texts" % a.id)
@@ -289,8 +289,8 @@ func test_vanish_guarantees_the_next_crit() -> void:
 	EnemyGrid.mark_dirty()
 	var runner := rogue.runner_for(rogue.main_hand)
 	runner.attack(e)
-	check(not e.fake_crit_log[-1], "no crit without Vanish (crit chance 0)")
-	check(rogue.abilities.try_cast(1), "Vanish")
+	check(not e.fake_crit_log[-1], "no crit without Melt Away (crit chance 0)")
+	check(rogue.abilities.try_cast(1), "Melt Away")
 	check_eq(rogue.forced_crits, 1, "one guaranteed crit")
 	runner.attack(e)
 	check(e.fake_crit_log[-1], "the next hit crits")
@@ -453,7 +453,7 @@ func test_vanish_silhouette_survives_hp_and_stat_changes() -> void:
 	rogue.heal(1.0)
 	effect.end()
 	for mi in meshes:
-		check_eq(mi.cast_shadow, shadows[mi], "%s shadow after the second Vanish" % mi.name)
+		check_eq(mi.cast_shadow, shadows[mi], "%s shadow after the second Melt Away" % mi.name)
 
 
 func test_vanish_ends_with_the_wave() -> void:
@@ -466,7 +466,7 @@ func test_vanish_ends_with_the_wave() -> void:
 		shadows.append(mi.cast_shadow)
 	check(rogue.abilities.try_cast(1), "cast")
 	rogue.end_wave()
-	check(not effect.is_active(), "the market shows no Vanish")
+	check(not effect.is_active(), "the market shows no Melt Away")
 	for i in meshes.size():
 		check(meshes[i].material_override == originals[i], "%s solid at the wave end" % meshes[i].name)
 	rogue.begin_wave()
@@ -492,7 +492,7 @@ func test_vanish_ends_when_the_rogue_goes_down() -> void:
 	var ghost: Material = bulb.material_override
 	rogue.take_damage(9999.0)
 	check(rogue.downed, "downed")
-	check(not effect.is_active(), "going down ends Vanish")
+	check(not effect.is_active(), "going down ends Melt Away")
 	check_eq(_ghost_count(ghost), 0, "the downed look replaced the silhouette")
 	rogue.revive()
 	check_eq(_ghost_count(ghost), 0, "no silhouette after the revive")

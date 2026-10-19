@@ -27,7 +27,7 @@ func _dance(p: Player) -> RogueSubtletyShadowDance:
 ## Casts Vanish (its cooldown cleared first).
 func _cast_vanish(p: Player) -> void:
 	p.abilities.set_cooldown(_vanish(p), 0.0)
-	check(p.abilities.try_cast(1), "Vanish cast")
+	check(p.abilities.try_cast(1), "Melt Away cast")
 
 
 func _tick_bonuses(p: Player, seconds: float) -> void:
@@ -44,18 +44,18 @@ func test_premeditation_primes_combo_points_and_crits() -> void:
 	for n in range(1, 4):
 		_add(p, T, "premeditation")
 		var params := p.abilities.params_for(_vanish(p))
-		check_eq(int(params["forced_crits"]), 1 + n, "Vanish's guaranteed crits 1 + %d" % n)
-		check(float(params["auto_offense"]) > 0.0, "bots vanish offensively")
+		check_eq(int(params["forced_crits"]), 1 + n, "Melt Away's guaranteed crits 1 + %d" % n)
+		check(float(params["auto_offense"]) > 0.0, "bots Melt Away offensively")
 		_combo(p).set_value(0.0)
 		p.forced_crits = 0
 		_cast_vanish(p)
 		check_eq(_combo(p).value, float(n), "+%d Combo Point(s) (pips: exact)" % n)
 		check_eq(p.forced_crits, 1 + n, "%d guaranteed crits" % (1 + n))
 	check_eq(_talent(&"rogue_subtlety_premeditation").text_for_rank(2),
-			"Vanish also grants 2 Combo Point(s), and 2 more of your next weapon hits are guaranteed critical strikes.", "rank text")
+			"Melt Away also grants 2 Combo Point(s), and 2 more of your next weapon hits are guaranteed critical strikes.", "rank text")
 	_reset(p)
 	var params := p.abilities.params_for(_vanish(p))
-	check(int(params["forced_crits"]) == 1 and float(params["auto_offense"]) == 0.0, "reset: Vanish neutral again")
+	check(int(params["forced_crits"]) == 1 and float(params["auto_offense"]) == 0.0, "reset: Melt Away neutral again")
 	_combo(p).set_value(0.0)
 	_cast_vanish(p)
 	check_eq(_combo(p).value, 0.0, "no Combo Point without the talent")
@@ -74,18 +74,18 @@ func test_master_of_subtlety_buffs_damage_for_six_seconds() -> void:
 	var p := _rogue()
 	var dmg := p.stats.get_raw(Stats.DAMAGE_PCT)
 	_add(p, T, "enveloping_shadows", 3)
-	check_eq(p.talents.add_block_reason(&"rogue_subtlety_master_of_subtlety"), "Requires Premeditation", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"rogue_subtlety_master_of_subtlety"), "Requires Forethought", "prerequisite")
 	_add(p, T, "premeditation", 3)
 	_add(p, T, "master_of_subtlety", 3)
 	check_eq(_talent(&"rogue_subtlety_master_of_subtlety").text_for_rank(3),
-			"For 6 sec after you Vanish, you deal 12% more damage.", "rank text (_fixed duration)")
+			"For 6 sec after you Melt Away, you deal 12% more damage.", "rank text (_fixed duration)")
 	_cast_vanish(p)
 	check_near(p.stats.get_raw(Stats.DAMAGE_PCT), dmg + 12.0, 0.0001, "+4% damage per rank")
 	p.procs._physics_process(3.0)
 	_cast_vanish(p)
 	check_near(p.stats.get_raw(Stats.DAMAGE_PCT), dmg + 12.0, 0.0001, "a recast refreshes, never stacks")
 	p.procs._physics_process(5.9)
-	check_near(p.stats.get_raw(Stats.DAMAGE_PCT), dmg + 12.0, 0.0001, "6 sec from the last Vanish")
+	check_near(p.stats.get_raw(Stats.DAMAGE_PCT), dmg + 12.0, 0.0001, "6 sec from the last Melt Away")
 	p.procs._physics_process(0.2)
 	check_near(p.stats.get_raw(Stats.DAMAGE_PCT), dmg, 0.0001, "then gone")
 
@@ -98,7 +98,7 @@ func test_shadow_focus_restores_energy_on_vanish() -> void:
 		_energy(p).set_value(0.0)
 		_cast_vanish(p)
 		check_near(_energy(p).value, 10.0 * n, 0.0001, "+10 Energy per rank (%d)" % n)
-	check(float(p.abilities.params_for(_vanish(p))["auto_offense"]) > 0.0, "bots vanish offensively")
+	check(float(p.abilities.params_for(_vanish(p))["auto_offense"]) > 0.0, "bots Melt Away offensively")
 
 
 func test_deadened_nerves_reduces_damage_taken() -> void:
@@ -150,10 +150,10 @@ func test_sleight_of_hand_changes_shadowstep_and_cheat_death() -> void:
 	_add(p, T, "sleight_of_hand", 3)
 	var s := p.abilities.params_for(step)
 	var c := p.abilities.params_for(cheat)
-	check_near(float(s["power"]), float(base_step["power"]) * 1.18, 0.0001, "Shadowstep +18% power")
-	check_near(float(s["cooldown"]), float(base_step["cooldown"]) * 0.82, 0.0001, "Shadowstep -18% cooldown")
-	check_near(float(c["power"]), float(base_cheat["power"]) * 1.18, 0.0001, "Cheat Death +18% power")
-	check_near(float(c["cooldown"]), float(base_cheat["cooldown"]) * 0.82, 0.0001, "Cheat Death -18% cooldown")
+	check_near(float(s["power"]), float(base_step["power"]) * 1.18, 0.0001, "Duskstep +18% power")
+	check_near(float(s["cooldown"]), float(base_step["cooldown"]) * 0.82, 0.0001, "Duskstep -18% cooldown")
+	check_near(float(c["power"]), float(base_cheat["power"]) * 1.18, 0.0001, "Narrow Escape +18% power")
+	check_near(float(c["cooldown"]), float(base_cheat["cooldown"]) * 0.82, 0.0001, "Narrow Escape -18% cooldown")
 
 
 # --- Unseen Blades (modifier) ------------------------------------------------------------------
@@ -167,19 +167,19 @@ func _to_unseen(p: Player) -> void:
 func test_unseen_blades_throws_a_free_fan_when_vanish_ends() -> void:
 	var p := _rogue()
 	_to_unseen(p)
-	check(_talent(&"rogue_subtlety_unseen_blades").ability == &"vanish", "modifier on Vanish")
-	check_eq(float(p.abilities.params_for(_vanish(p))["end_fan"]), 1.0, "the Vanish carries end_fan")
+	check(_talent(&"rogue_subtlety_unseen_blades").ability == &"vanish", "modifier on Melt Away")
+	check_eq(float(p.abilities.params_for(_vanish(p))["end_fan"]), 1.0, "the Melt Away carries end_fan")
 	var casts: Array[StringName] = []
 	p.abilities.ability_cast.connect(func(_i: int, a: AbilityData) -> void: casts.append(a.id))
 	_clear_knives()
 	_cast_vanish(p)
-	check_eq(_combo(p).value, 3.0, "Premeditation primed 3 Combo Points")
+	check_eq(_combo(p).value, 3.0, "Forethought primed 3 Combo Points")
 	check_eq(_energy(p).value, 100.0, "full Energy")
 	_step(p, 1.9)
 	check(_knives(p).is_empty(), "nothing while hidden")
 	_step(p, 0.2)
 	var knives := _knives(p)
-	check_eq(knives.size(), 10, "Vanish ran out: a fan from the shadows")
+	check_eq(knives.size(), 10, "Melt Away ran out: a fan from the shadows")
 	var base := CombatMath.weapon_hit_damage(p.main_hand, p.stats) * 1.1
 	for k in knives:
 		check_near(k.damage, base * 1.6, 0.0001, "the 3 Combo Points are spent on it")
@@ -209,9 +209,9 @@ func test_unseen_blades_needs_the_natural_end() -> void:
 	_cast_vanish(p)
 	_step(p, 1.0)
 	_cast_vanish(p)
-	check(_knives(p).is_empty(), "a recast ends the first Vanish without a fan")
+	check(_knives(p).is_empty(), "a recast ends the first Melt Away without a fan")
 	_step(p, 2.1)
-	check_eq(_knives(p).size(), 10, "only the second Vanish fans")
+	check_eq(_knives(p).size(), 10, "only the second Melt Away fans")
 	check_eq(effect.end_fans, 1, "one fan in all")
 
 
@@ -220,7 +220,7 @@ func test_no_free_fan_without_unseen_blades() -> void:
 	_clear_knives()
 	_cast_vanish(p)
 	_step(p, 2.5)
-	check(_knives(p).is_empty(), "plain Vanish")
+	check(_knives(p).is_empty(), "plain Melt Away")
 	check_eq(_vanish_effect(p).end_fans, 0, "no fan")
 
 
@@ -231,9 +231,9 @@ func test_shadow_dance_makes_every_weapon_hit_crit_for_five_seconds() -> void:
 	_to_capstone(p)
 	var dance := _dance(p)
 	check(dance != null, "the capstone script runs")
-	check(not p.bonuses.crit_forced(null), "nothing before Vanish")
+	check(not p.bonuses.crit_forced(null), "nothing before Melt Away")
 	_cast_vanish(p)
-	check(dance.is_dancing(), "Vanish opens the window")
+	check(dance.is_dancing(), "Melt Away opens the window")
 	check(p.bonuses.crit_forced(null) and p.bonuses.crit_forced(world), "any target, null included")
 	check(p.get_node_or_null("ShadowDanceGlow") != null, "the purple glow under the hero")
 	var e := Fakes.spawn_enemy(world, Vector3(0, 0, -1.2))
@@ -241,7 +241,7 @@ func test_shadow_dance_makes_every_weapon_hit_crit_for_five_seconds() -> void:
 	var runner := p.runner_for(p.main_hand)
 	for i in 6:
 		runner.attack(e)
-	check_eq(p.forced_crits, 0, "Premeditation's banked crits are used first")
+	check_eq(p.forced_crits, 0, "Forethought's banked crits are used first")
 	for c in e.fake_crit_log:
 		check(c, "every dagger hit crits")
 	var state := RunState.rng.state
@@ -270,7 +270,7 @@ func test_shadow_dance_once_per_twelve_seconds_and_only_real_vanishes() -> void:
 	_to_capstone(p)
 	var dance := _dance(p)
 	RogueVanish.shroud(p, 3.0)
-	check(not dance.is_dancing(), "a shroud (Shadow Escape, Untouchable) is no Vanish")
+	check(not dance.is_dancing(), "a shroud (Shadow Escape, Untouchable) is no Melt Away")
 	p.bonuses.on_cast(0, _fan(p))
 	check(not dance.is_dancing(), "other casts do nothing")
 	_cast_vanish(p)
@@ -278,8 +278,8 @@ func test_shadow_dance_once_per_twelve_seconds_and_only_real_vanishes() -> void:
 	_tick_bonuses(p, 6.0)
 	check(not dance.is_dancing(), "closed")
 	_cast_vanish(p)
-	check(not dance.is_dancing() and dance.dances == 1, "a Vanish within 12 sec opens nothing")
-	check(dance.describe().begins_with("Shadow Dance: ready in"), "describe: the cooldown")
+	check(not dance.is_dancing() and dance.dances == 1, "a Melt Away within 12 sec opens nothing")
+	check(dance.describe().begins_with("Dusk Waltz: ready in"), "describe: the cooldown")
 	_tick_bonuses(p, 6.1)
 	check_eq(dance.ready_in(), 0.0, "ready after 12 sec")
 	_cast_vanish(p)
@@ -334,8 +334,8 @@ func test_vanish_bot_rule_offense_with_the_talents() -> void:
 	check(not effect.wants_auto_cast(p.abilities.build_context(vanish)), "without the param: only the low-HP rule")
 	_add(p, T, "premeditation")
 	var ctx := p.abilities.build_context(vanish)
-	check(ctx.num("auto_offense") > 0.0, "Premeditation adds auto_offense")
-	check(effect.wants_auto_cast(ctx), "healthy, in a pack, with Energy: vanish")
+	check(ctx.num("auto_offense") > 0.0, "Forethought adds auto_offense")
+	check(effect.wants_auto_cast(ctx), "healthy, in a pack, with Energy: Melt Away")
 	_energy(p).set_value(40.0)
 	check(not effect.wants_auto_cast(p.abilities.build_context(vanish)), "not without Energy for the fans")
 	_energy(p).set_value(60.0)
@@ -365,7 +365,7 @@ func test_subtlety_bot_path_reaches_the_capstone_at_13() -> void:
 			break
 		path.append(t.id)
 	check_eq(path.size(), 22, "the whole tree")
-	check_eq(path[0], &"rogue_subtlety_premeditation", "Premeditation first (offensive Vanish from point 1)")
+	check_eq(path[0], &"rogue_subtlety_premeditation", "Forethought first (offensive Melt Away from point 1)")
 	check_eq(path[6], &"rogue_subtlety_unseen_blades", "the modifier is point 7")
 	check_eq(path[12], SD_ID, "the capstone is point 13")
-	check_eq(path[13], &"rogue_subtlety_shadow_focus", "then Shadow Focus 3")
+	check_eq(path[13], &"rogue_subtlety_shadow_focus", "then Quiet Mind 3")

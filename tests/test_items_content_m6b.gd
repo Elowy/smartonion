@@ -343,9 +343,9 @@ func test_class_item_text_says_how_much_it_changes() -> void:
 ## The Equip lines that stated an absolute value which the ranks or a spec change, reworded.
 const REWORDED_LINES: Dictionary = {
 	&"wristguards_of_the_sundering_edge": "Equip: Your Execute's threshold is 10% higher.",
-	&"legplates_of_the_bold_leap": "Equip: Your Heroic Leap stuns enemies for 1 sec longer.",
+	&"legplates_of_the_bold_leap": "Equip: Your Soaring Slam stuns enemies for 1 sec longer.",
 	&"pauldrons_of_the_pale_smoke": "Equip: Your Poison Bomb's fumes slow an additional 20%.",
-	&"cuffs_of_the_blazing_heart": "Equip: Your Pyroblast's burn deals 10% more of its hit.",
+	&"cuffs_of_the_blazing_heart": "Equip: Your Magma Bolt's burn deals 10% more of its hit.",
 	&"leggings_of_the_falling_star": "Equip: Your Meteor stuns enemies for 0.5 sec longer.",
 }
 
@@ -384,7 +384,7 @@ func test_girdle_of_lasting_grace_shortens_lay_on_hands_at_rank_one() -> void:
 	# An unconditional cooldown mod: it works without the Rank III shield (shield_max_hp).
 	var p := _fresh_hero(&"paladin")
 	var ability := Db.get_ability(&"lay_on_hands")
-	check(p.abilities.learn(ability) >= 0, "Lay on Hands learned")
+	check(p.abilities.learn(ability) >= 0, "Mending Touch learned")
 	check_eq(p.abilities.rank_of(&"lay_on_hands"), 1, "Rank I")
 	var before := p.abilities.cooldown_of(ability)
 	var rng := RandomNumberGenerator.new()
@@ -408,7 +408,7 @@ func test_leathers_of_the_unseen_throw_adds_a_shuriken() -> void:
 	check(p.equipment.equip(item), "the leathers are worn")
 	var ability := Db.get_ability(&"shuriken_toss")
 	var slot := p.abilities.learn(ability)
-	check(slot >= 0, "Shuriken Toss learned")
+	check(slot >= 0, "Throwing Stars learned")
 	var at_rank := p.abilities.params_at_rank(ability, 1)
 	check_near(float(at_rank["shuriken"]), 4.0, 0.001, "Rank I: 3 + 1 shuriken")
 	check_near(float(at_rank["range"]), 14.0, 0.001, "Rank I: 11 + 3 m range")
@@ -454,7 +454,7 @@ func test_class_item_equip_line_greys_out_until_the_ability_is_learned() -> void
 
 	var slot := PlayerManager.join(ScriptedInput.new("m6b_tip:warrior"), cls)
 	var hero := Player.create(slot)
-	check(not hero.abilities.knows(&"battle_shout"), "precondition: Battle Shout is not learned yet")
+	check(not hero.abilities.knows(&"battle_shout"), "precondition: Battle Roar is not learned yet")
 	var needs_text := "%s (needs %s)" % [data.unique_text, Artifacts.ability_name(&"battle_shout")]
 	var before := _tip(item, cls, hero.equipment)
 	var grey := before.find_line(data.unique_text)
@@ -463,7 +463,7 @@ func test_class_item_equip_line_greys_out_until_the_ability_is_learned() -> void
 			"greyed out while the ability is missing")
 	_free_tip(before)
 
-	check(hero.abilities.learn(Db.get_ability(&"battle_shout")) >= 0, "Battle Shout learned")
+	check(hero.abilities.learn(Db.get_ability(&"battle_shout")) >= 0, "Battle Roar learned")
 	var after := _tip(item, cls, hero.equipment)
 	var learned := after.find_line(data.unique_text, true)
 	check(learned != null, "once learned: the plain Equip line, no suffix")

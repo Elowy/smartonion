@@ -145,14 +145,14 @@ func test_art_of_war_gives_holy_power_on_crits() -> void:
 	_add(p, "divine_strength", 3)
 	_add(p, "art_of_war", 3)
 	var def := _def(p, id)
-	check(def.get("trigger") == "on_crit" and def.get("effect") == "resource" and def.get("resource") == "holy_power", "on_crit Holy Power")
+	check(def.get("trigger") == "on_crit" and def.get("effect") == "resource" and def.get("resource") == "holy_power", "on_crit Resolve")
 	check(def.get("chance") == 60.0 and def.get("icd") == 1.0 and def.get("value") == 1 and def.get("label") == "", "20% per rank, 1 sec icd")
 	_force(p, id)
 	hp.set_value(0.0)
 	p.procs.on_hit(e, 5.0, p.main_hand, false)
 	check_eq(hp.value, 0.0, "a normal hit: nothing")
 	p.procs.on_hit(e, 5.0, p.main_hand, true)
-	check_eq(hp.value, 1.0, "a critical hit: +1 Holy Power")
+	check_eq(hp.value, 1.0, "a critical hit: +1 Resolve")
 	p.procs.on_hit(e, 5.0, p.main_hand, true)
 	check_eq(hp.value, 1.0, "at most once per second")
 	p.procs._physics_process(1.1)
@@ -228,7 +228,7 @@ func test_divine_verdict_strikes_while_the_party_is_healthy() -> void:
 	if e.fake_hits() > 0:
 		check_near(e.fake_damage_log[0], expected, 0.0001, "300% weapon damage + 1.5 SP as Holy")
 	check_near(p.hp, p.max_hp() * 0.85, 0.0001, "85%: no heal")
-	check_eq(hp.value, 0.0, "3 Holy Power spent")
+	check_eq(hp.value, 0.0, "3 Resolve spent")
 	hp.set_value(3.0)
 	ally.hp = ally.max_hp() * 0.6
 	check(p.abilities.try_cast(LT), "cast with a hurt ally")
@@ -244,7 +244,7 @@ func test_divine_verdict_strikes_while_the_party_is_healthy() -> void:
 	e.global_position = Vector3(6.0, 0, 0)
 	EnemyGrid.mark_dirty()
 	check(not p.abilities.can_cast(LT), "no enemy within 4 m and nobody hurt: nothing to do")
-	check(not p.abilities.try_cast(LT) and hp.value == 3.0, "no Holy Power spent")
+	check(not p.abilities.try_cast(LT) and hp.value == 3.0, "no Resolve spent")
 	e.global_position = Vector3(3.0, 0, 0)
 	EnemyGrid.mark_dirty()
 	check(p.abilities.can_cast(LT), "the enemy back within 4 m")
@@ -253,7 +253,7 @@ func test_divine_verdict_strikes_while_the_party_is_healthy() -> void:
 	check_eq(float(params.get("verdict_pct", 0.0)), 0.0, "undone: verdict_pct 0")
 	check(PaladinWordOfGlory.verdict_target(_wog_ctx(p)) == null, "no Verdict target")
 	check(not p.abilities.can_cast(LT), "a healthy party: nothing to do again")
-	check(not p.abilities.try_cast(LT) and hp.value == 3.0 and e.fake_hits() == 1, "no strike, no Holy Power spent")
+	check(not p.abilities.try_cast(LT) and hp.value == 3.0 and e.fake_hits() == 1, "no strike, no Resolve spent")
 
 
 func test_divine_verdict_prefers_elites_and_the_bot_keeps_holy_power_for_revives() -> void:
@@ -272,7 +272,7 @@ func test_divine_verdict_prefers_elites_and_the_bot_keeps_holy_power_for_revives
 	check(effect.wants_auto_cast(_wog_ctx(p)), "bot: a healthy party and an enemy close")
 	var far_ally := _ally(1, Vector3(20.0, 0, 0))
 	_down(far_ally)
-	check(not effect.wants_auto_cast(_wog_ctx(p)), "bot: a teammate is down somewhere – keep the Holy Power")
+	check(not effect.wants_auto_cast(_wog_ctx(p)), "bot: a teammate is down somewhere – keep the Resolve")
 	far_ally.revive(1.0)
 	var hurt := _ally(2, Vector3(-3.0, 0, 0), &"mage")
 	hurt.hp = hurt.max_hp() * 0.4
@@ -307,7 +307,7 @@ func test_righteous_vengeance_burns_on_crits() -> void:
 	check_near(total, 10.0 * 0.3 * p.outgoing_damage_mult(e, &"holy", &"dot"), 0.001, "30% of the hit's base amount")
 	_remove(p, "righteous_vengeance", 3)
 	check(_def(p, id).is_empty(), "undone: no burn proc")
-	check_eq(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).size(), 1, "only Art of War's proc is left")
+	check_eq(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).size(), 1, "only Rhythm of Battle's proc is left")
 	var fresh := _enemy(Vector3(-1.2, 0, 0))
 	p.procs.on_hit(fresh, 10.0, p.main_hand, true)
 	check_eq(p.procs.dot_stacks(fresh, id), 0, "a crit burns nothing after the take-back")
@@ -329,7 +329,7 @@ func test_seal_of_command_strikes_three_enemies_from_the_base_amount() -> void:
 	var far := _enemy(Vector3(4.7, 0, 0))
 	var ally := _ally(1, Vector3(-3.0, 0, 0))
 	ally.hp = ally.max_hp() * 0.5
-	check_near(p.outgoing_damage_mult(e, &"holy", &"proc"), 1.12, 0.0001, "Sanctity of Battle 3/3: +12% Holy")
+	check_near(p.outgoing_damage_mult(e, &"holy", &"proc"), 1.12, 0.0001, "Sacred Cadence 3/3: +12% Holy")
 	_seed_roll(15.0, true)
 	var state := RunState.rng.state
 	p.bonuses.on_hit(e, 10.0, true, true)

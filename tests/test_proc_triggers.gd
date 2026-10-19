@@ -488,7 +488,7 @@ func test_wave_start_every_counts_waves() -> void:
 
 func test_deep_wounds_bleeds_for_ten_percent_per_rank_of_the_crit() -> void:
 	var p := _hero()
-	_give(p, [_talent(DEEP_WOUNDS, 3, "warrior_arms_deep_wounds", "Deep Wounds")] as Array[Dictionary])
+	_give(p, [_talent(DEEP_WOUNDS, 3, "warrior_arms_deep_wounds", "Gashing Blows")] as Array[Dictionary])
 	var e := _fake(Vector3(1.5, 0, 0))
 	p.forced_crits = 1
 	p.weapons[0].attack(e)
@@ -519,7 +519,7 @@ func test_sudden_death_finishes_executes_cooldown() -> void:
 	var p := _hero()
 	check(p.abilities.learn(Db.get_ability(&"execute")) >= 0, "learn Execute")
 	var execute := Db.get_ability(&"execute")
-	_give(p, [_talent(SUDDEN_DEATH, 3, "warrior_arms_sudden_death", "Sudden Death")] as Array[Dictionary])
+	_give(p, [_talent(SUDDEN_DEATH, 3, "warrior_arms_sudden_death", "Culling Instinct")] as Array[Dictionary])
 	var proc: ProcSystem.Proc = p.procs.procs[0]
 	check_eq(proc.chance, 9.0, "3% per rank")
 	var e := _fake(Vector3(30, 0, 0))

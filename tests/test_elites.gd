@@ -181,7 +181,7 @@ func test_roll_affix_covers_every_affix() -> void:
 	check_eq(rng.state, probe.state, "one draw per affix")
 	for a in EliteAffixes.ALL:
 		check_near(float(counts.get(a, 0)) / 4000.0, 0.25, 0.03, "%s ~25%%" % a)
-	check_eq(EliteAffixes.display_name(EliteAffixes.VAMPIRIC, "Troll Axethrower"), "Vampiric Troll Axethrower",
+	check_eq(EliteAffixes.display_name(EliteAffixes.VAMPIRIC, "Troll Hatchet-Hurler"), "Vampiric Troll Hatchet-Hurler",
 			"<Affix> <name>")
 
 

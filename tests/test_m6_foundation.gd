@@ -422,7 +422,7 @@ func test_is_boss_comes_from_the_data() -> void:
 	check(be.is_boss(), "an Enemy made from a BossData")
 	be.free()
 	var goblin := LootGoblin.create(Db.get_enemy(&"loot_goblin"), 5)
-	check(goblin.is_elite() and not goblin.is_boss(), "the Loot Goblin stays an elite, no boss")
+	check(goblin.is_elite() and not goblin.is_boss(), "the Coin Gremlin stays an elite, no boss")
 	goblin.free()
 	var no_data := Enemy.new()
 	check(not no_data.is_boss(), "no data, no boss")

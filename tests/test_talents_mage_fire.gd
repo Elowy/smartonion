@@ -18,7 +18,7 @@ func _combustion_mage(pos: Vector3 = Vector3.ZERO) -> Player:
 	var p := _mage(pos)
 	_plan(p, FIRE_12)
 	_add(p, String(COMBUSTION))
-	check(_combustion(p) != null, "Combustion script live")
+	check(_combustion(p) != null, "Chain Ignition script live")
 	return p
 
 
@@ -73,7 +73,7 @@ func test_empowered_fire_needs_critical_mass_and_adds_mastery() -> void:
 	var before := p.stats.get_raw(Stats.MASTERY)
 	_add(p, "mage_fire_critical_mass", 2)
 	_add(p, "mage_fire_fire_power")
-	check_eq(p.talents.add_block_reason(&"mage_fire_empowered_fire"), "Requires Critical Mass", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"mage_fire_empowered_fire"), "Requires Fiery Precision", "prerequisite")
 	_add(p, "mage_fire_critical_mass")
 	_add(p, "mage_fire_empowered_fire", 3)
 	check_near(p.stats.get_raw(Stats.MASTERY), before + 9.0, 0.0001, "+3 Mastery per rank")
@@ -155,7 +155,7 @@ func test_living_bomb_params_text_and_bot_deferral() -> void:
 	check_eq(float(_params(p, &"fireball")["bomb_pct"]), 40.0, "40% of the hit")
 	check_eq(float(_params(p, &"fireball")["bomb_radius"]), 2.5, "2.5 m")
 	check_eq(lb.text_for_rank(1),
-		"Fireball's burn becomes a Living Bomb: it explodes for 40% of the Fireball's damage within 2.5 m when it ends or the enemy dies.",
+		"Fireball's burn is a Ticking Ember: it explodes for 40% of Fireball's damage within 2.5 m when it ends or the enemy dies.",
 		"text")
 	_learn(p, &"fireball")
 	check(not TalentBot.is_deferred(p, lb), "not deferred once Fireball is slotted")
@@ -186,7 +186,7 @@ func test_living_bomb_explodes_once_when_the_burn_runs_out() -> void:
 	check_near(hit, _spell(p, 6.0, 1.0, &"fire"), 0.0001, "Fireball hit (before the multipliers)")
 	_fly()
 	var burn := _burn(e, p)
-	check(burn != null and burn.is_armed(), "the burn is a Living Bomb")
+	check(burn != null and burn.is_armed(), "the burn is a Ticking Ember")
 	check_near(burn.bomb_damage, hit * 0.4, 0.0001, "40% of the hit")
 	check_near(burn.bomb_radius, 2.5, 0.0001, "2.5 m (Area Size 0)")
 	check(e.died.is_connected(burn._on_enemy_died), "the death is watched")
@@ -258,7 +258,7 @@ func test_living_bomb_keeps_the_bigger_bomb_and_survives_merged_burns() -> void:
 	check(merged == burn and burn.is_armed(), "a merged burn stays armed")
 	check_near(burn.bomb_damage, 8.0, 0.0001, "unchanged by the merge")
 	var plain := MageBolt.new()
-	check_eq(plain.bomb_pct, 0.0, "bolts (Pyroblast, Arcane Missiles) do not arm by default")
+	check_eq(plain.bomb_pct, 0.0, "bolts (Magma Bolt, Arcane Darts) do not arm by default")
 	plain.free()
 
 
@@ -282,7 +282,7 @@ func test_combustion_lights_the_target_and_its_neighbours_on_a_crit() -> void:
 	var far := _enemy(Vector3(3, 0, 4))
 	var state := RunState.rng.state
 	p.bonuses.on_hit(target, 20.0, true, true)
-	check_eq(c.combustions, 1, "one Combustion")
+	check_eq(c.combustions, 1, "one Chain Ignition")
 	check_eq(c.burns, 2, "two burns")
 	check(_burn(target, p) != null, "the target burns")
 	check_near(_burn(target, p).remaining(), 4.0, 0.0001, "20% of the hit's base amount")
@@ -371,7 +371,7 @@ func test_combustion_on_a_real_wand_attack_with_a_forced_crit() -> void:
 	var base := shots[0].damage
 	_fly()
 	check(target.fake_crit_log.size() > 0 and target.fake_crit_log[0], "the target took a crit")
-	check_eq(c.combustions, 1, "Combustion")
+	check_eq(c.combustions, 1, "Chain Ignition")
 	check_near(_burn(target, p).remaining(), base * 0.2, 0.0001, "20% of the crit's base amount (before multipliers)")
 	check(_burn(near, p) != null, "the neighbour burns too")
 	check_eq(p.forced_crits, 0, "the forced crit was used")
@@ -404,7 +404,7 @@ func test_a_downed_mage_starts_no_fires() -> void:
 	var e := _enemy(Vector3(3, 0, 0))
 	_down(p)
 	WeaponRunner.apply_hit(p, e, 20.0, true, Vector3.ZERO, 0.0, 0.5, p.main_hand)
-	check(_burn(e, p) == null and c.combustions == 0, "no Combustion while downed")
+	check(_burn(e, p) == null and c.combustions == 0, "no Chain Ignition while downed")
 
 
 func test_combustion_resets_each_wave_and_tears_down() -> void:
@@ -445,7 +445,7 @@ func test_bots_reach_every_mage_capstone_at_point_thirteen() -> void:
 		check_eq(picks.find(capstones[slot]), 12, "slot %d: capstone at point 13" % slot)
 		check_eq(p.talents.rank_of(capstones[slot]), 1, "slot %d capstone taken" % slot)
 		if slot == 1:
-			check_eq(picks.find(modifiers[slot]), -1, "Fire: Living Bomb is deferred while Fireball is not slotted")
+			check_eq(picks.find(modifiers[slot]), -1, "Fire: Ticking Ember is deferred while Fireball is not slotted")
 			check_eq(picks[21], &"mage_frost_piercing_ice", "the 22nd point goes to the next tree instead")
 		else:
 			check_eq(picks.find(modifiers[slot]), 6, "slot %d: modifier at point 7" % slot)

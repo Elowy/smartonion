@@ -240,7 +240,7 @@ func test_a_downed_bot_does_not_go_for_the_chest() -> void:
 	ghost.downed = true
 	var chest := _chest(Vector3(0.0, 0.0, 0.0), GuardedChest.State.READY)
 	var m := _event(ghost, chest)
-	check(m[0].is_equal_approx(m[1]), "ghosts walk to the Spirit Healer, not the chest")
+	check(m[0].is_equal_approx(m[1]), "ghosts walk to the Grave Tender, not the chest")
 
 
 # --- Bots: the totem ---------------------------------------------------------------------------
