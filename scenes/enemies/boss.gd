@@ -55,8 +55,9 @@ class AbilityState extends RefCounted:
 
 
 var boss_data: BossData
-## The director that spawned it (adds come through it); null in isolated tests.
-var director: WaveDirector
+## The director that spawned it (adds come through its summon(add_data, count, center, scatter)):
+## the WaveDirector of a boss wave, the Dungeon for its Warden; null in isolated tests.
+var director: Node
 var phase := 1
 var enrage_level := 0
 var abilities: Array[AbilityState] = []
@@ -72,7 +73,7 @@ static func create(p_data: EnemyData, p_wave: int) -> Boss:
 	b.add_to_group(&"bosses")  # (the camera frames it, CameraRig.boss_points)
 	b.boss_data = p_data as BossData
 	if b.boss_data != null:
-		b.max_hp = b.boss_data.max_hp_for(b.wave, RunState.player_count)
+		b.max_hp = b.boss_data.max_hp_for(b.wave, RunState.player_count) * Shrines.enemy_hp_mult()
 		b.hp = b.max_hp
 		for a in b.boss_data.abilities:
 			if a == null:
@@ -267,9 +268,10 @@ func _cast_frost_breath(a: BossAbility) -> bool:
 ## Adds around the boss, through the director.
 func _cast_summon(a: BossAbility) -> bool:
 	var add := Db.get_enemy(a.summon_id)
-	if add == null or director == null or not is_instance_valid(director):
+	if add == null or director == null or not is_instance_valid(director) \
+			or not director.has_method(&"summon"):
 		return false
-	director.summon(add, a.count_at(phase), global_position, SUMMON_RING)
+	director.call(&"summon", add, a.count_at(phase), global_position, SUMMON_RING)
 	return true
 
 

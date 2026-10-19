@@ -71,7 +71,8 @@ extends Node
 ##   deal_raw(..., target_bonus = false, &"proc"); a dot takes it as its total and ticks with
 ##   target_bonus = false; a drain heals what it dealt), "max_hp_pct" (heal / shield: % of the
 ##   receiver's Max HP, added to "amount"), "target": "self" | "lowest_ally" (heal, shield),
-##   "label": "" (no floating text of any block).
+##   "label": "" (no floating text of any block; any other string replaces the label – also in
+##   a unique item's params and an enchant's params, which default to the item name / prefix).
 ## - Blocks: cooldown {ability | match, reduce (s) | reset: true} (AbilityRunner.reduce_cooldown:
 ##   one charge back at most / set_cooldown(a, 0)), forced_crit {count} (Player.forced_crits),
 ##   resource {resource: <id> | "primary", value} (ClassResource.add(value, true): Resource
@@ -613,7 +614,8 @@ func dot_stacks(enemy: Node3D, proc_id: StringName) -> int:
 
 # --- Building the list ------------------------------------------------------------------
 
-## The proc of an enchant roll (null for EQUIP enchants).
+## The proc of an enchant roll (null for EQUIP enchants). The label above the hero is the
+## enchant's prefix; a "label" key in its params replaces it ("" = silent).
 static func proc_from_enchant(roll: EnchantRoll, item: ItemInstance = null) -> Proc:
 	if roll == null or roll.enchant == null or not roll.enchant.is_proc():
 		return null
@@ -637,6 +639,8 @@ static func proc_from_enchant(roll: EnchantRoll, item: ItemInstance = null) -> P
 		else:
 			p.params[k] = v
 	p.school = StringName(p.text("school", String(e.school)))
+	if p.params.has("label"):
+		p.label = p.text("label")  # an own "label" wins, even "" (silent), as in proc_from_params
 	p.ppm = e.ppm
 	p.chance = e.chance if e.chance > 0.0 else 100.0
 	p.icd = e.icd
@@ -644,7 +648,8 @@ static func proc_from_enchant(roll: EnchantRoll, item: ItemInstance = null) -> P
 	return p
 
 
-## The proc of a unique item (unique_effect = block id; params as authored).
+## The proc of a unique item (unique_effect = block id; params as authored). The label above
+## the hero is the item's name; a "label" key in its params replaces it ("" = silent).
 static func proc_from_unique(item: ItemInstance) -> Proc:
 	if item == null or item.unique_effect == &"":
 		return null
@@ -655,6 +660,8 @@ static func proc_from_unique(item: ItemInstance) -> Proc:
 	for key in item.unique_params:
 		p.params[String(key)] = item.unique_params[key]
 	p.effect = StringName(p.text("effect", String(item.unique_effect)))
+	if p.params.has("label"):
+		p.label = p.text("label")  # an own "label" wins, even "" (silent), as in proc_from_params
 	p.trigger = StringName(p.text("trigger", String(TRIGGER_EQUIP)))
 	p.school = StringName(p.text("school", "physical"))
 	p.ppm = p.num("ppm")

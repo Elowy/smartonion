@@ -13,9 +13,10 @@ extends Node
 ##   wave_cleared -> WAVE_END ("Wave cleared!" for WAVE_END_DELAY) -> INTERMISSION (tree
 ##   paused: loot roll of RunState.team_loot, the level-up cards for
 ##   RunState.pending_level_ups, then the shared shop + personal panels; the pending level-ups
-##   are cleared when the next wave starts) -> next wave; after wave RunState.TOTAL_WAVES
-##   -> GAME_OVER (victory). Everybody downed at the same time (solo: the player is downed)
-##   -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with the same players.
+##   are cleared when the next wave starts) -> next wave; after wave RunState.total_waves() (25 in
+##   the normal mode, never in the endless one) -> GAME_OVER (victory). Everybody downed at the same
+##   time (solo: the player is downed) -> GAME_OVER (defeat, tree paused). Game Over -> LOBBY with
+##   the same players.
 ## - Any player's START during a wave opens the PauseMenu (get_tree().paused). A controller
 ##   unplugged during a run pauses the wave and shows a HUD notice until it is back (also when
 ##   it is already gone as the next wave is about to start). The game cannot be resumed while a
@@ -35,14 +36,27 @@ extends Node
 ##   after RunState.start_run (which resets them): GoblinSpawner.chance_override,
 ##   EliteAffixes.rate_mult, PlayerPanel.debug_start_tab and the start level
 ##   (RunState.set_start_level, before the heroes spawn).
+## - M6b: the run's mode (normal / endless), hardcore flag and environment come from the launch
+##   options ([method configure_run] is how the lobby changes them) and go into RunState.start_run;
+##   [member RunState.environment] picks the arena's [EnvironmentData] ([method _environment_id]), and
+##   the WaveDirector gets an [EventSpawner] child ([member event_spawner]) next to the GoblinSpawner.
+##   Every "last wave" decision reads RunState.total_waves() / is_final_wave() (0 = endless: the run
+##   ends only in defeat).
+## - M6b dungeon: after wave 6, 9, 12 and 15 (and after the next wave with --dungeon) the break gets a
+##   PORTAL phase ([method _roll_portal]); when the party's vote passes the Intermission hides and
+##   [method enter_dungeon] runs a [Dungeon] (State.DUNGEON: the same arena in a 24 x 14 layout, the HUD
+##   shows "Dungeon – Room n/4"); [method _on_dungeon_finished] pays the reward (DungeonRewards) and gives
+##   the break back to the Intermission, which rolls the Epics and opens the market.
 ## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
-## --start-level, --panel-tab ...): see LaunchOptions. SMOKE_RESULT keys: see smoke_result().
+## --start-level, --panel-tab, --mode, --hardcore, --env, --event ...): see LaunchOptions. SMOKE_RESULT
+## keys: see smoke_result().
 
 signal state_changed(state: State)
 ## A run ended (before the Game Over screen opens).
 signal run_finished(victory: bool)
 
-enum State { BOOT, MENU, LOBBY, WAVE, WAVE_END, INTERMISSION, GAME_OVER }
+## DUNGEON (M6b) is appended: the party is inside a dungeon, between a break's portal vote and its market.
+enum State { BOOT, MENU, LOBBY, WAVE, WAVE_END, INTERMISSION, GAME_OVER, DUNGEON }
 
 ## Seconds (game time) between "Wave cleared!" and the intermission screen.
 const WAVE_END_DELAY := 1.6
@@ -54,6 +68,8 @@ const DEMO_MARKET_TIME := 4.0
 const DEMO_BOT_THINK_TIME := 1.0
 ## Demo mode: seconds a bot "thinks" per level-up card (LevelUpScreen.bot_think_time).
 const DEMO_LEVEL_UP_THINK_TIME := 1.0
+## Demo mode: seconds a bot "thinks" before it votes at the dungeon portal (PortalScreen.bot_think_time).
+const DEMO_PORTAL_THINK_TIME := 1.5
 const LAYER_HUD := 10
 const LAYER_MENU := 20
 const LAYER_INTERMISSION := 30
@@ -72,10 +88,15 @@ const SMOKE_TIMEOUT_EXTRA := 60.0
 ## Game seconds allowed per intermission of a smoke run (the loot roll shows every item's
 ## result for LootRollScreen.RESULT_TIME).
 const SMOKE_INTERMISSION_ALLOWANCE := 12.0
+## Game seconds a dungeon of a smoke run may take: the intro, three timed rooms and the Warden with its
+## enrage (60 s) and the smoke safety after it (Dungeon.SMOKE_BOSS_GRACE), plus the pauses.
+const SMOKE_DUNGEON_ALLOWANCE := 60.0 + 60.0 + Dungeon.SMOKE_BOSS_GRACE + 60.0 + 40.0
 ## Game seconds a boss wave of a smoke run may take on top of its nominal duration: the enrage
 ## (90 s), the safety kill after it (WaveDirector.SMOKE_BOSS_GRACE) and the fight's start.
 const SMOKE_BOSS_ALLOWANCE := 90.0 + WaveDirector.SMOKE_BOSS_GRACE + 30.0
 const DISCONNECT_NOTICE := "%s's controller disconnected – plug it back in to continue"
+## The banner of the endless mode's wave 25 clear (RunState.begins_endless): the run goes on.
+const ENDLESS_BEGINS_TEXT := "Endless begins!"
 
 var options: LaunchOptions
 var state := State.BOOT
@@ -83,6 +104,13 @@ var arena: Arena
 var wave_director: WaveDirector
 ## Child of the WaveDirector (M5): the Loot Goblin's spawner.
 var goblin_spawner: GoblinSpawner
+## Child of the WaveDirector (M6b): the mid-wave event slot (EVENTS package).
+var event_spawner: EventSpawner
+## Child of the WaveDirector (M6b): the arena environment's hazard director (ENV package; a Forest Ruin
+## run has one too, with nothing to do).
+var environment_hazards: EnvironmentHazards
+## The dungeon the party is in (M6b DUNGEON); null outside one.
+var dungeon: Dungeon
 ## The run's players, in slot order (entries are freed when the run is torn down).
 var players: Array[Player] = []
 var hud: Hud
@@ -115,9 +143,16 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
+## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
+## player who left mid-run (drop_player), the slots no longer have them.
+var run_classes: Array[StringName] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
+## The "Rolling the arena..." screen while it is up (M6b ENV), the run seed it fixed (-1 = none yet)
+## and the environment it landed on.
+var roll_screen: EnvironmentRollScreen
+var _roll_seed := -1
 var _layers: Dictionary[int, CanvasLayer] = {}
 var _state_time := 0.0
 var _disconnected: Dictionary[int, bool] = {}
@@ -142,6 +177,8 @@ var _wave_perf := RunPerf.new()
 var _clock: PhysicsClock
 ## RunState.team_loot size last seen (items_looted counts the growth).
 var _loot_seen := 0
+## players_downed when the wave began (RunState.last_wave_downs at its end).
+var _downs_at_wave_start := 0
 
 
 ## Main for [param p_options] (null = parse the command line in _ready).
@@ -166,6 +203,8 @@ func _ready() -> void:
 		OS.add_logger(_error_counter)
 	for arg in options.unknown:
 		push_warning("Main: unknown command line argument '%s'" % arg)
+	if options.leaderboard_path != "":
+		Leaderboard.path_override = options.leaderboard_path
 	_build_layers()
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
@@ -188,6 +227,8 @@ func _ready() -> void:
 			_add_bots()
 			if PlayerManager.count() >= 2:
 				PlayerManager.get_slot(0).ready = true
+			if options.view == "roll":
+				begin_roll()
 		_:
 			go_to_menu()
 
@@ -227,9 +268,11 @@ func go_to_lobby() -> void:
 		lobby = Lobby.create()
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
 		lobby.back_requested.connect(_on_lobby_back, CONNECT_DEFERRED)
+		lobby.mode_changed.connect(configure_run)  # the mode select (Y / X) stores the run settings at once
 		_layers[LAYER_MENU].add_child(lobby)
 	else:
 		lobby.reset()
+	lobby.set_run_mode(options.mode, options.hardcore)  # --mode / --hardcore, or what the party chose last time
 	_set_state(State.LOBBY)
 
 
@@ -244,9 +287,16 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
-	RunState.start_run(slots.size(), options.run_seed())
+	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id())
+	_roll_seed = -1
 	artifact_lines.clear()
+	run_classes.clear()
+	for slot in slots:
+		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
+	RunState.shrine_chance_override = options.shrine_chance
+	RunState.event_override = options.event
+	RunState.dungeon_forced = options.dungeon
 	GoblinSpawner.chance_override = options.goblin_chance
 	EliteAffixes.rate_mult = options.elite_mult
 	BossData.hp_mult = options.boss_hp
@@ -254,7 +304,7 @@ func start_run() -> void:
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
-	first_wave = options.start_wave
+	first_wave = options.clamp_wave(options.start_wave)  # (the lobby may have changed the mode since the parse)
 	wave = 0
 	waves_completed = 0
 	players_downed = 0
@@ -266,12 +316,14 @@ func start_run() -> void:
 	level_cards = 0
 	ranks_trained = 0
 	shop_rerolls = 0
+	_downs_at_wave_start = 0
 	gold_at_last_shop = RunState.gold
 	_loot_seen = RunState.team_loot.size()
 	victory = false
 	perf = RunPerf.new()
 
-	arena = Arena.create()
+	# Hardcore: no Spirit Healer (only a teammate can revive a downed hero).
+	arena = Arena.create(Db.environment_or_default(RunState.environment), not RunState.hardcore)
 	arena.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(arena)
 	wave_director = WaveDirector.create(arena)
@@ -283,6 +335,12 @@ func start_run() -> void:
 	goblin_spawner = GoblinSpawner.create(wave_director)
 	wave_director.add_child(goblin_spawner)
 	goblin_spawner.announced.connect(_on_announced)
+	event_spawner = EventSpawner.create(wave_director)
+	wave_director.add_child(event_spawner)
+	event_spawner.announced.connect(_on_announced)
+	event_spawner.logged.connect(_log)
+	environment_hazards = EnvironmentHazards.create(wave_director, Db.environment_or_default(RunState.environment))
+	wave_director.add_child(environment_hazards)
 
 	hud = Hud.create()
 	_layers[LAYER_HUD].add_child(hud)
@@ -296,11 +354,14 @@ func start_run() -> void:
 	intermission.level_card_picked.connect(_on_level_card_picked)
 	intermission.ranks_trained.connect(_on_ranks_trained)
 	intermission.bot_rerolled.connect(_on_bot_rerolled)
+	intermission.shrine_resolved.connect(_on_shrine_resolved)
+	intermission.portal_accepted.connect(_on_portal_accepted, CONNECT_DEFERRED)
 	# Smoke / demo bots shop and equip upgrades, so the item systems get exercised.
 	intermission.bot_shopping = options.smoke or options.demo
 	intermission.bot_market_time = DEMO_MARKET_TIME if options.demo and not options.smoke else 0.0
 	intermission.loot_screen.bot_think_time = DEMO_BOT_THINK_TIME if options.demo and not options.smoke else 0.0
 	intermission.level_up_screen.bot_think_time = DEMO_LEVEL_UP_THINK_TIME if options.demo and not options.smoke else 0.0
+	intermission.portal_screen.bot_think_time = DEMO_PORTAL_THINK_TIME if options.demo and not options.smoke else 0.0
 	_layers[LAYER_INTERMISSION].add_child(intermission)
 	game_over = GameOverScreen.create()
 	game_over.back_to_menu_requested.connect(_on_game_over_back, CONNECT_DEFERRED)
@@ -317,7 +378,9 @@ func start_run() -> void:
 	hud.bind_players(players)
 	if _run_frame < 0:
 		_run_frame = Engine.get_physics_frames()
-	_log("run started: %d players (%s), first wave %d, seed %d" % [players.size(), _class_list(), first_wave, options.run_seed()])
+	_log("run started: %d players (%s), first wave %d, seed %d, mode %s, environment %s" % [
+		players.size(), _class_list(), first_wave, options.run_seed(), RunState.mode_text(RunState.mode, RunState.hardcore).to_lower(),
+		RunState.environment])
 	start_wave(first_wave)
 
 
@@ -325,7 +388,7 @@ func start_run() -> void:
 func start_wave(n: int) -> void:
 	if arena == null or wave_director == null:
 		return
-	wave = clampi(n, 1, RunState.TOTAL_WAVES)
+	wave = RunState.clamp_wave(n)
 	get_tree().paused = false
 	if intermission != null:
 		intermission.hide()
@@ -335,6 +398,8 @@ func start_wave(n: int) -> void:
 	for p in players:
 		if is_instance_valid(p):
 			p.begin_wave()
+	_begin_shrines()
+	_downs_at_wave_start = players_downed
 	_set_state(State.WAVE)
 	_wave_perf = RunPerf.new()
 	_wave_start_msec = Time.get_ticks_msec()
@@ -343,8 +408,75 @@ func start_wave(n: int) -> void:
 	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
-		hud.show_banner("Final Wave" if wave >= RunState.TOTAL_WAVES else "Wave %d" % wave)
+		# The running shrines (M6b) are listed under the title, with the waves they have left.
+		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, Shrines.banner_lines())
 	_pause_if_pad_missing()
+
+
+## The next run's mode and hardcore flag (the lobby's mode select calls this, through Lobby.mode_changed;
+## --mode / --hardcore set the same fields at launch). An unknown mode plays as normal.
+func configure_run(p_mode: StringName, p_hardcore: bool) -> void:
+	options.mode = p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
+	options.hardcore = p_hardcore
+
+
+## The environment argument of RunState.start_run: --env when given (and known), else &"" so the run
+## rolls its own environment (RunState.roll_environment, after its run seed and environment_rng exist).
+func _environment_id() -> StringName:
+	if options.environment != &"" and Db.get_environment(options.environment) != null:
+		return options.environment
+	return &""
+
+
+## The seed of the next run: the one the roll screen fixed (it showed the environment of that seed),
+## else the launch options' (-1 = a random one).
+func _run_seed() -> int:
+	return _roll_seed if _roll_seed >= 0 else options.run_seed()
+
+
+## Whether a run started from the lobby plays the "Rolling the arena..." screen first: not in smoke,
+## demo, screenshot and forced-view runs, and not while a test switched it off
+## (EnvironmentRollScreen.enabled).
+func plays_roll_screen() -> bool:
+	return EnvironmentRollScreen.enabled and not (options.smoke or options.demo or options.view != "")
+
+
+## Opens the "Rolling the arena..." screen over the lobby: fixes the run's seed (the launch seed, else a
+## random one), shows the environment that seed rolls (--env wins) and starts the run when the reel has
+## come to rest and held. The run then rolls the same environment on its own (RunState.start_run with an
+## empty environment draws the same value from environment_rng), so the screen never decides anything.
+func begin_roll() -> void:
+	if roll_screen != null and is_instance_valid(roll_screen):
+		return
+	_roll_seed = options.run_seed()
+	if _roll_seed < 0:
+		_roll_seed = int(randi() & 0x7FFFFFFF)
+	var winner := _environment_id()
+	if winner == &"":
+		winner = RunState.environment_for_seed(_roll_seed)
+	roll_screen = EnvironmentRollScreen.create(winner)
+	roll_screen.finished.connect(_on_roll_finished, CONNECT_DEFERRED)
+	_layers[LAYER_MENU].add_child(roll_screen)
+
+
+func _on_roll_finished(_environment_id_rolled: StringName) -> void:
+	_free_roll_screen()
+	if state == State.LOBBY and options.view == "":
+		start_run()
+
+
+func _free_roll_screen() -> void:
+	_free_node(roll_screen)
+	roll_screen = null
+
+
+## True when a finished run goes into the leaderboard file (Leaderboard.record_run): not in smoke,
+## demo, screenshot or forced-view runs, whose runs are not the player's – unless --leaderboard names
+## a file of its own for them.
+func writes_leaderboard() -> bool:
+	if options.leaderboard_path != "":
+		return true
+	return not (options.smoke or options.demo or options.view != "" or options.screenshot_path != "")
 
 
 ## Between-wave screen (tree paused): loot roll (if any team loot), then the shared shop and
@@ -370,6 +502,103 @@ func open_intermission() -> void:
 	intermission.open(wave, RunState.pending_level_ups)
 
 
+## The portal vote passed (Intermission.portal_accepted): the party goes into the dungeon.
+func _on_portal_accepted() -> void:
+	if state == State.INTERMISSION:
+		enter_dungeon()
+
+
+## Enters a dungeon scaled to the wave just cleared: the Intermission is hidden, the tree runs again, the
+## HUD shows the dungeon's line and the [Dungeon] takes the arena over until [signal Dungeon.finished].
+func enter_dungeon() -> void:
+	if arena == null or dungeon != null:
+		return
+	RunState.dungeons_entered += 1
+	_set_state(State.DUNGEON)
+	get_tree().paused = false
+	if pause_menu != null:
+		pause_menu.hide()
+	dungeon = Dungeon.create(arena, wave)
+	dungeon.smoke_boss_timeout = options.smoke
+	dungeon.announced.connect(_on_announced)
+	dungeon.status_changed.connect(_on_dungeon_status)
+	dungeon.boss_spawned.connect(_on_dungeon_boss_spawned)
+	dungeon.boss_cleared.connect(_on_dungeon_boss_cleared)
+	dungeon.room_started.connect(_on_dungeon_room_started)
+	dungeon.room_cleared.connect(_on_dungeon_room_cleared)
+	dungeon.finished.connect(_on_dungeon_finished)
+	add_child(dungeon)
+	if hud != null:
+		hud.show()
+	var party: Array[Player] = []
+	for p in players:
+		if is_instance_valid(p):
+			party.append(p)
+	dungeon.start(party)
+	_log("dungeon entered after wave %d at t=%.1f: %d heroes, environment %s" % [wave, _game_time(), party.size(),
+		RunState.environment])
+	_on_dungeon_status()
+	_pause_if_pad_missing()
+
+
+func _on_dungeon_status() -> void:
+	if hud != null and dungeon != null:
+		hud.set_dungeon_status(dungeon.title_text(), dungeon.task_text(), dungeon.seconds_left())
+
+
+func _on_dungeon_boss_spawned(boss: Boss) -> void:
+	if hud != null:
+		hud.bind_boss(boss)
+
+
+func _on_dungeon_boss_cleared() -> void:
+	if hud != null:
+		hud.clear_boss()
+
+
+func _on_dungeon_room_started(index: int) -> void:
+	_log("dungeon room %d/%d (%s) started after %.1f s (t=%.1f)" % [index + 1, Dungeon.ROOM_COUNT,
+		Dungeon.ROOM_NAMES[index], dungeon.total_time if dungeon != null else 0.0, _game_time()])
+
+
+func _on_dungeon_room_cleared(index: int) -> void:
+	if dungeon == null:
+		return
+	var extra := " (the brazier kept %d%% of its HP)" % roundi(dungeon.brazier_left * 100.0) \
+			if index == Dungeon.Room.DEFEND and dungeon.brazier_left >= 0.0 else ""
+	_log("dungeon room %d/%d (%s) cleared in %.1f s: %d / %d standing, %d kills%s" % [index + 1,
+		Dungeon.ROOM_COUNT, Dungeon.ROOM_NAMES[index], dungeon.room_times[-1], living_player_count(),
+		players.size(), dungeon.kills_total, extra])
+
+
+## The dungeon is over (won or lost) and the arena is the clearing again: the reward (or the failure's
+## loss) is paid, the HUD goes back to the break and the Intermission rolls the Epics and opens the market.
+func _on_dungeon_finished(success: bool) -> void:
+	var d := dungeon
+	dungeon = null
+	if d != null:
+		RunState.dungeon_time += d.total_time
+		RunState.dungeon_rooms_cleared += d.rooms_cleared
+		_log("dungeon %s" % d.summary_text())
+		_free_node(d)
+	if success:
+		RunState.dungeons_completed += 1
+		var paid := DungeonRewards.grant_success(wave, PlayerManager.get_slots(), RunState.dungeon_rng)
+		_log("dungeon reward: %d Epics%s, %d gold" % [paid["items"].size(),
+			" + a set piece" if paid["extra"] != null else "", paid["gold"]])
+	else:
+		RunState.dungeons_failed += 1
+		_log("dungeon lost: the purse loses %d gold" % DungeonRewards.apply_failure())
+	if hud != null:
+		hud.clear_boss()
+		hud.clear_dungeon()
+		hud.hide()
+	_set_state(State.INTERMISSION)
+	get_tree().paused = true
+	if intermission != null:
+		intermission.dungeon_returned(success)
+
+
 ## Ends the run: Game Over screen (victory or defeat) over the frozen arena.
 func end_run(p_victory: bool) -> void:
 	if arena == null or state == State.GAME_OVER:
@@ -384,6 +613,7 @@ func end_run(p_victory: bool) -> void:
 		hud.hide()
 	RunState.end_run(p_victory)
 	_record_hero_results()
+	var board := _record_leaderboard(p_victory)
 	_set_state(State.GAME_OVER)
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
@@ -392,11 +622,38 @@ func end_run(p_victory: bool) -> void:
 		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
-		game_over.open(p_victory)
+		game_over.open(p_victory, board)
 	if _smoke_running:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
 		get_tree().create_timer(DEMO_RESTART_DELAY, true).timeout.connect(_on_demo_restart)
+
+
+## The finished run in the leaderboard: its entry (the wave that ended it, the wave play time, the party's
+## classes as the run started ([member run_classes]), victory) goes into the file's category for the run's
+## mode, hardcore flag and party size ([method writes_leaderboard]; Leaderboard.record_run), then the board is
+## read for the end screen
+## (Leaderboard.screen_model: the "Best: ..." line, the top 10 of the category, the run's place). {} when the
+## leaderboard file is off limits: Leaderboard.writes_enabled is false (the unit tests), or a smoke run
+## without a file of its own (--leaderboard) – a smoke run does not even read the player's file.
+func _record_leaderboard(p_victory: bool) -> Dictionary:
+	if not Leaderboard.writes_enabled or (options.smoke and not writes_leaderboard()):
+		return {}
+	var entry := Leaderboard.make_entry(wave, RunState.run_time, run_classes, p_victory)
+	var rank := -1
+	var save_failed := false
+	if writes_leaderboard():
+		var outcome := Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count)
+		rank = int(outcome["rank"])
+		save_failed = bool(outcome["save_failed"])
+	var board := Leaderboard.create()
+	board.load_file()
+	var model := Leaderboard.screen_model(board, entry, RunState.mode, RunState.hardcore, RunState.player_count,
+			rank, save_failed)
+	_log("leaderboard %s: %s" % [model["key"], model["line"]])
+	if save_failed:
+		_log("leaderboard: the run made the board but %s could not be written" % board.path)
+	return model
 
 
 ## How every hero ended the run (standing or down, the best item), taken now because the heroes are
@@ -409,16 +666,27 @@ func _record_hero_results() -> void:
 				RunSummary.best_item(hero.equipment) if valid else null)
 
 
-## Pause Menu "Quit to Menu": abandons the run.
+## Pause Menu "Quit to Menu": abandons the run ([method _record_abandoned_run] decides whether it is a result).
 func quit_to_menu() -> void:
 	if arena != null and RunState.active:
+		_record_abandoned_run()
 		RunState.end_run(false)
 	go_to_menu()
 
 
+## An abandoned run (quit to the menu, or the last hero dropped out, see [method drop_player]) goes into the
+## leaderboard as a defeat on the wave in progress ([member wave]), but only in the endless mode and only after
+## at least one wave was cleared ([member waves_completed]). A run given up in its first fight, or one that only
+## started on a later wave (--start-wave) and was given up before clearing it, is no result: it would be a junk
+## entry with no time played. A normal run that is abandoned is not recorded.
+func _record_abandoned_run() -> void:
+	if RunState.is_endless() and waves_completed > 0:
+		_record_leaderboard(false)
+
+
 ## Opens the PauseMenu for [param by] (null = no player, e.g. a controller was unplugged).
 func pause_game(by: PlayerSlot = null) -> void:
-	if state != State.WAVE and state != State.WAVE_END:
+	if not _is_in_action():
 		return
 	if pause_menu == null or pause_menu.visible:
 		return
@@ -427,7 +695,7 @@ func pause_game(by: PlayerSlot = null) -> void:
 
 
 func resume_game() -> void:
-	var running := state == State.WAVE or state == State.WAVE_END
+	var running := _is_in_action()
 	if running and pause_menu != null and not PlayerManager.disconnected_slots().is_empty():
 		# A joined controller is unplugged: stay paused (the menu offers "Continue without Pn").
 		if not pause_menu.visible:
@@ -458,13 +726,14 @@ func drop_player(slot: PlayerSlot) -> void:
 	_log("%s dropped out (controller unplugged), %d player(s) left" % [slot.label(), PlayerManager.count()])
 	if PlayerManager.count() == 0:
 		if arena != null and RunState.active:
+			_record_abandoned_run()
 			RunState.end_run(false)
 		go_to_lobby()
 		return
 	_show_disconnect_notice()
 	if PlayerManager.disconnected_slots().is_empty():
 		resume_game()
-	elif is_running() and (state == State.WAVE or state == State.WAVE_END):
+	elif is_running() and _is_in_action():
 		pause_game(null)
 	_check_party_wipe()
 
@@ -511,8 +780,13 @@ func _physics_process(delta: float) -> void:
 		_after_wave_end()
 
 
+## A wave, its "Wave cleared!" pause or a dungeon is being played (the pause menu may open).
+func _is_in_action() -> bool:
+	return state == State.WAVE or state == State.WAVE_END or state == State.DUNGEON
+
+
 func _process(_delta: float) -> void:
-	if not get_tree().paused and (state == State.WAVE or state == State.WAVE_END):
+	if not get_tree().paused and _is_in_action():
 		_poll_pause_buttons()
 		if state == State.WAVE:
 			_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
@@ -553,10 +827,53 @@ func _show_disconnect_notice() -> void:
 
 
 func _after_wave_end() -> void:
-	if wave >= RunState.TOTAL_WAVES:
+	if RunState.is_final_wave(wave):
 		end_run(true)
 	else:
+		_roll_shrine()
+		_roll_portal()
 		open_intermission()
+
+
+## SHRINES seam (M6b): the break's shrine roll (RunState.pending_shrine, from RunState.shrine_rng), called
+## on the break path just before open_intermission. The wave that just ended first counts against every
+## running shrine (their effects stop, the expired ones go), then the 5% roll (--shrine-chance) decides whether
+## the SHRINE phase of this break opens. See Shrines.
+func _roll_shrine() -> void:
+	var expired := Shrines.end_wave(players)
+	if not expired.is_empty():
+		_log("shrines expired after wave %d: %s" % [wave, ", ".join(PackedStringArray(expired))])
+	RunState.pending_shrine = Shrines.roll()
+	if RunState.pending_shrine != &"":
+		_log("a shrine waits after wave %d: %s" % [wave, RunState.pending_shrine])
+
+
+## The running shrines' effects (M6b) go live for the wave that starts (start_wave, after the heroes' begin_wave).
+func _begin_shrines() -> void:
+	Shrines.begin_wave(players)
+	if not RunState.shrine_effects.is_empty():
+		_log("wave %d runs under shrines: %s" % [wave, Shrines.effects_log()])
+
+
+## Intermission.shrine_resolved (the SHRINE phase's vote was decided): the smoke log line.
+func _on_shrine_resolved(id: StringName, accepted: bool, reason: StringName) -> void:
+	_log("shrine %s %s (%s); running: %s" % [id, "accepted" if accepted else "declined", reason, Shrines.effects_log()])
+
+
+## DUNGEON (M6b): the break's portal roll, called on the break path just before open_intermission. The
+## portal opens after waves 6, 9, 12 and 15 (Dungeon.is_portal_wave; normal, endless and hardcore runs)
+## and after the next wave when --dungeon forced it (RunState.dungeon_forced, spent by it:
+## RunState.portal_forced tells the bots). No randomness. RunState.last_wave_downs (the heroes downed in
+## the wave just cleared) is the bots' rule after waves 12 and 15.
+func _roll_portal() -> void:
+	RunState.portal_pending = false
+	RunState.portal_forced = false
+	if RunState.dungeon_forced:
+		RunState.dungeon_forced = false
+		RunState.portal_pending = true
+		RunState.portal_forced = true
+	elif Dungeon.is_portal_wave(wave):
+		RunState.portal_pending = true
 
 
 # --- Run building ------------------------------------------------------------------
@@ -595,14 +912,17 @@ func _place_players() -> void:
 func _teardown_run() -> void:
 	if is_inside_tree():
 		get_tree().paused = false
-	for node: Variant in [pause_menu, game_over, intermission, hud, wave_director, arena]:
+	for node: Variant in [pause_menu, game_over, intermission, hud, dungeon, wave_director, arena]:
 		_free_node(node)
+	dungeon = null
 	pause_menu = null
 	game_over = null
 	intermission = null
 	hud = null
 	wave_director = null
 	goblin_spawner = null  # freed with the director
+	event_spawner = null
+	environment_hazards = null  # (freed with the director)
 	arena = null
 	players.clear()
 	_disconnected.clear()
@@ -622,6 +942,7 @@ func _free_main_menu() -> void:
 func _free_lobby() -> void:
 	_free_node(lobby)
 	lobby = null
+	_free_roll_screen()
 
 
 static func _free_node(node: Variant) -> void:
@@ -654,7 +975,11 @@ func _on_menu_quit() -> void:
 
 
 func _on_lobby_start() -> void:
-	if state == State.LOBBY:
+	if state != State.LOBBY:
+		return
+	if plays_roll_screen():
+		begin_roll()
+	else:
 		start_run()
 
 
@@ -667,13 +992,14 @@ func _on_wave_cleared(n: int) -> void:
 	if state != State.WAVE or n != wave:
 		return
 	waves_completed += 1
+	RunState.last_wave_downs = players_downed - _downs_at_wave_start
 	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; elites %d/%d, goblin %d/%d/%d; %s" % [
 		n, (Time.get_ticks_msec() - _wave_start_msec) / 1000.0, RunState.kills, RunState.gold,
 		RunState.level, living_player_count(), players.size(), players_downed, items_looted, items_bought,
 		RunState.elites_killed, RunState.elites_spawned, RunState.goblins_spawned,
 		RunState.goblins_killed, RunState.goblins_escaped, _wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
-		if n >= RunState.TOTAL_WAVES:
+		if RunState.is_final_wave(n):
 			RunState.end_run(true)
 		_finish_smoke("completed")
 		return
@@ -682,11 +1008,13 @@ func _on_wave_cleared(n: int) -> void:
 	_set_state(State.WAVE_END)
 
 
-## The banner of a won wave: "Victory!" after the last one, "<Boss> defeated!" after a boss
-## wave, else "Wave cleared!".
+## The banner of a won wave: "Victory!" after the last one (never in the endless mode, whose wave 25 gives
+## "Endless begins!" instead), "<Boss> defeated!" after a boss wave, else "Wave cleared!".
 func _wave_cleared_text(n: int) -> String:
-	if n >= RunState.TOTAL_WAVES:
+	if RunState.is_final_wave(n):
 		return "Victory!"
+	if RunState.begins_endless(n):
+		return ENDLESS_BEGINS_TEXT
 	# (The boss itself may be freed by now: the definition stays.)
 	if wave_director != null and wave_director.boss_data != null:
 		return "%s defeated!" % wave_director.boss_data.display_name
@@ -810,7 +1138,8 @@ func _on_demo_restart() -> void:
 
 func _on_player_downed_changed(is_downed: bool, _player: Player) -> void:
 	if not is_downed:
-		if state == State.WAVE and not _reviving_all:
+		var in_fight := state == State.WAVE or (state == State.DUNGEON and dungeon != null and dungeon.counts_revives())
+		if in_fight and not _reviving_all:
 			revives += 1
 		return
 	players_downed += 1
@@ -910,6 +1239,10 @@ func _start_smoke() -> void:
 		expected += RunState.wave_duration(w) + WAVE_END_DELAY + 0.5 + SMOKE_INTERMISSION_ALLOWANCE
 		if RunState.is_boss_wave(w):
 			expected += SMOKE_BOSS_ALLOWANCE
+		if Dungeon.is_portal_wave(w) and w < options.last_wave():
+			expected += SMOKE_DUNGEON_ALLOWANCE
+	if options.dungeon:
+		expected += SMOKE_DUNGEON_ALLOWANCE
 	var real := expected / options.effective_time_scale()
 	_smoke_deadline_msec = _start_msec + int((real * SMOKE_TIMEOUT_FACTOR + SMOKE_TIMEOUT_EXTRA) * 1000.0)
 	print("SMOKE start: %d bots, waves %d-%d, seed %d, time scale %.1f, %d physics ticks/s, timeout %.0f s" % [
@@ -926,7 +1259,7 @@ func _finish_smoke(result: String) -> void:
 	for line in meter_lines(data["meter"]):
 		print("SMOKE meter " + line)
 	print("SMOKE_RESULT " + JSON.stringify(data))
-	_quit(0 if result == "completed" and int(data["errors"]) == 0 else 1)
+	_quit(0 if String(data["result"]) == "completed" and int(data["errors"]) == 0 else 1)
 
 
 ## The SMOKE_RESULT payload (see docs/ARCHITECTURE.md "Command line"). M5 keys: elites_spawned,
@@ -935,9 +1268,14 @@ func _finish_smoke(result: String) -> void:
 ## gold_spent (RunState.try_spend_for). M6 keys: bosses_killed, artifacts_dropped,
 ## consumables_bought, black_market_bought, enchants_done, dust_earned, dust_spent, run_time
 ## (seconds of wave play, RunState.tick_run_time), meter ({slot index: {damage, healing, absorbed,
-## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict).
+## taken, revives, downs, kills, bosses, class}} – the damage meter, RunSummary.meter_dict). M6b keys:
+## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
+## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
+## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
+## inside dungeons).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
+	var outcome := smoke_outcome(result)
 	var need_wins := 0
 	for slot_index in RunState.need_wins_by_player:
 		need_wins += RunState.need_wins_by_player[slot_index]
@@ -950,7 +1288,7 @@ func smoke_result(result: String) -> Dictionary:
 			talent_points += p.talents.points_spent()
 		set_bonuses += SetBonuses.active_count(p.equipment)
 	var data := {
-		"result": result,
+		"result": outcome,
 		"waves_completed": waves_completed,
 		"first_wave": first_wave,
 		"last_wave": wave,
@@ -989,6 +1327,19 @@ func smoke_result(result: String) -> Dictionary:
 		"dust_earned": RunState.dust_earned,
 		"dust_spent": RunState.dust_spent,
 		"run_time": snappedf(RunState.run_time, 0.1),
+		"mode": String(RunState.mode),
+		"hardcore": RunState.hardcore,
+		"environment": String(RunState.environment),
+		"events_spawned": RunState.events_spawned,
+		"events_completed": RunState.events_completed,
+		"shrines_offered": RunState.shrines_offered,
+		"shrines_accepted": RunState.shrines_accepted,
+		"dungeons_entered": RunState.dungeons_entered,
+		"dungeons_completed": RunState.dungeons_completed,
+		"dungeons_failed": RunState.dungeons_failed,
+		"hazards": environment_hazards.stats() if environment_hazards != null else {},
+		"dungeon_rooms_cleared": RunState.dungeon_rooms_cleared,
+		"dungeon_time": snappedf(RunState.dungeon_time, 0.1),
 		"meter": RunSummary.meter_dict(),
 		"errors": errors,
 		"warnings": _error_counter.warning_count() if _error_counter != null else 0,
@@ -999,7 +1350,16 @@ func smoke_result(result: String) -> Dictionary:
 	}
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
+	if not options.unknown.is_empty():
+		data["unknown_args"] = options.unknown
 	return data
+
+
+## The result a smoke run reports: "bad_args" when the command line held an argument that was not understood
+## (a typo such as --env=nope would otherwise play a different run, and the run would still exit 0), else
+## [param result] as the run ended. Only a "completed" result without errors exits 0 (see _finish_smoke).
+func smoke_outcome(result: String) -> String:
+	return "bad_args" if not options.unknown.is_empty() else result
 
 
 ## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/item_base.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"plate_shoulderplates"
+display_name = "Shoulderplates"
+slot_type = 2
+armor_type = 3
+weight = 1.0
+look = &"plate_pauldrons"
+min_wave = 9

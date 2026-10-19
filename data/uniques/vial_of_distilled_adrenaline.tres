@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"vial_of_distilled_adrenaline"
+display_name = "Vial of Distilled Adrenaline"
+flavor = "Do not drink before bed. It drinks you."
+slot_type = 10
+armor_type = -1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"crit": 8.0,
+&"haste": 6.0,
+&"mastery": 5.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "periodic",
+"interval": 25.0,
+"stats": {
+&"haste": 35.0,
+&"damage_pct": 15.0
+},
+"duration": 8.0
+}
+unique_text = "Every 25 sec: Adrenaline surges, granting 35% Haste and 15% Damage for 8 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

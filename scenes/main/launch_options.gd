@@ -4,16 +4,18 @@ extends RefCounted
 ## Parsed once by Main; see docs/ARCHITECTURE.md "Command line".
 ##
 ##   --smoke              4 bots, menus skipped, time scale 4, plays --waves=N waves, prints
-##                        "SMOKE_RESULT {json}" and quits (exit 1 on errors / defeat / stall)
+##                        "SMOKE_RESULT {json}" and quits (exit 1 on errors / defeat / stall, and on
+##                        an unknown argument: the result is "bad_args", the arguments in "unknown_args")
 ##   --demo               bots at normal speed, endless (for screenshots / attract mode)
 ##   --players=N          bot count (1..4, default 4)
 ##   --classes=a,b,...    bot classes in join order (cycled; default: Db.class_ids)
 ##   --waves=N            smoke: waves to play (default 3)
-##   --start-wave=N       first wave of the run (1..25)
+##   --start-wave=N       first wave of the run (1..25; endless: 1..99)
 ##   --seed=N             RunState / bot seed
 ##   --screenshot=PATH    saves a PNG after --shot-time seconds of game time, then quits
 ##   --shot-time=S        seconds after the run starts (after boot for menu / lobby views)
-##   --view=NAME          dev: reach a screen for a screenshot – menu, lobby, game,
+##   --view=NAME          dev: reach a screen for a screenshot – menu, lobby, roll (the "Rolling the
+##                        arena..." screen, --env picks the card it lands on), game,
 ##                        intermission, game_over, victory, pause
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
@@ -31,9 +33,24 @@ extends RefCounted
 ##   --artifact-chance=X  M6 debug hook: overrides the Artifact drop chance of every roll (0..1,
 ##                        LootDrops.artifact_chance_override; default: off, the normal chances)
 ##   --end-page=NAME      dev: the page the end screen opens on with --view=game_over / victory –
-##                        summary (default) or meter (the Damage Meter; screenshots)
+##                        summary (default), meter (the Damage Meter) or leaderboard (the M6b board;
+##                        screenshots)
 ##   --save-card          dev: the end screen saves the run card (user://cards/run_<date>.png) as
 ##                        soon as --view forces it, prints "CARD <path>" and keeps going (screenshots)
+##   --mode=NAME          M6b: the run mode – normal (default) or endless (RunState.mode; the lobby's
+##                        mode select overrides it for human runs)
+##   --hardcore           M6b: a hardcore run (RunState.hardcore: no Spirit Healer)
+##   --env=ID             M6b: forces the arena environment (an id of Db.environments, e.g.
+##                        forest_ruin) instead of the roll
+##   --event=ID           M6b debug hook: every eligible wave gets that mid-wave event (guarded_chest,
+##                        defend_totem, goblin_caravan – or chest, totem, caravan; RunState.event_override)
+##   --shrine-chance=X    M6b debug hook: the chance of a shrine at every break (0..1;
+##                        RunState.shrine_chance_override; default: the normal chance)
+##   --dungeon[=1]        M6b debug hook: the dungeon portal opens after the next wave
+##                        (RunState.dungeon_forced; --dungeon=0 = off)
+##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
+##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
+##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -43,14 +60,19 @@ const SMOKE_SEED := 1
 const DEFAULT_SHOT_TIME := 8.0
 ## Views that need a running game (bots are added and a run starts right away).
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
-const VIEWS: Array[String] = ["menu", "lobby", "game", "intermission", "game_over", "victory", "pause"]
+const VIEWS: Array[String] = ["menu", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
 ## --panel-tab values (PlayerPanel.TAB_IDS).
 const PANEL_TABS: Array[String] = ["character", "trainer", "talents", "enchanter"]
 ## --start-level ceiling (far beyond a full run).
 const MAX_START_LEVEL := 99
+## --start-wave ceiling of the endless mode (far beyond what the bots survive).
+const MAX_ENDLESS_START_WAVE := 99
 ## --boss-hp range (a boss with ~0 HP or an unkillable one is no test).
 const MIN_BOSS_HP_MULT := 0.01
 const MAX_BOSS_HP_MULT := 100.0
+## Values that switch a boolean flag (--hardcore=0, --dungeon=No ...) off, compared lower-cased. A bare
+## switch, or any other value, switches it on.
+const FLAG_OFF_VALUES: Array[String] = ["0", "false", "no", "off"]
 
 var smoke := false
 var demo := false
@@ -83,8 +105,28 @@ var artifact_chance := -1.0
 var end_page := ""
 ## --save-card: the forced end screen saves the run card right away.
 var save_card := false
-## Arguments that were not understood (reported once by Main).
+## The run mode (--mode; RunState.MODES) and the hardcore flag (--hardcore) of the next run.
+var mode: StringName = RunState.MODE_NORMAL
+var hardcore := false
+## "" = the environment is rolled; else the forced id (--env, validated against Db.environments).
+var environment: StringName = &""
+## "" = events roll normally; else the forced event (--event, EventSpawner.EVENT_IDS).
+var event: StringName = &""
+## < 0 = the normal shrine chance; else the chance at every break (--shrine-chance).
+var shrine_chance := -1.0
+## --dungeon: the portal opens after the next wave.
+var dungeon := false
+## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
+## --leaderboard, which every run writes.
+var leaderboard_path := ""
+## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
+## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
+
+
+## A boolean flag's value: on, unless it is one of FLAG_OFF_VALUES (case-insensitive).
+static func _flag_on(value: String) -> bool:
+	return not (value.to_lower() in FLAG_OFF_VALUES)
 
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
@@ -110,7 +152,7 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 			"--waves":
 				o.waves = maxi(1, value.to_int())
 			"--start-wave":
-				o.start_wave = clampi(value.to_int(), 1, RunState.TOTAL_WAVES)
+				o.start_wave = maxi(1, value.to_int())  # (clamped to the mode's length below)
 			"--seed":
 				o.seed_value = maxi(0, value.to_int())
 			"--screenshot":
@@ -150,10 +192,41 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.unknown.append(arg)
 			"--save-card":
 				o.save_card = true
+			"--mode":
+				if StringName(value) in RunState.MODES:
+					o.mode = StringName(value)
+				else:
+					o.unknown.append(arg)
+			"--hardcore":
+				o.hardcore = _flag_on(value)
+			"--env":
+				if Db.get_environment(StringName(value)) != null:
+					o.environment = StringName(value)
+				else:
+					o.unknown.append(arg)
+			"--event":
+				var event_id := EventSpawner.parse_id(value)
+				if event_id != &"":
+					o.event = event_id
+				else:
+					o.unknown.append(arg)
+			"--shrine-chance":
+				if value.is_valid_float():
+					o.shrine_chance = clampf(value.to_float(), 0.0, 1.0)
+				else:
+					o.unknown.append(arg)  # (not a number: unset, the normal chance)
+			"--dungeon":
+				o.dungeon = _flag_on(value)
+			"--leaderboard":
+				if value != "":
+					o.leaderboard_path = value
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
 					o.unknown.append(arg)
+	o.start_wave = o.clamp_wave(o.start_wave)
 	return o
 
 
@@ -164,21 +237,28 @@ func starts_run() -> bool:
 
 ## Bots join automatically (run views, or the lobby view to fill the cards).
 func uses_bots() -> bool:
-	return starts_run() or view == "lobby"
+	return starts_run() or view == "lobby" or view == "roll"
 
 
 ## The screen Main boots into: &"menu", &"lobby" or &"run".
 func boot_state() -> StringName:
 	if starts_run():
 		return &"run"
-	if view == "lobby":
+	if view == "lobby" or view == "roll":
 		return &"lobby"
 	return &"menu"
 
 
-## Last wave a smoke run plays (start_wave + waves - 1, at most RunState.TOTAL_WAVES).
+## [param w] as a wave number of this launch's mode: 1 .. 25 (normal), 1 .. MAX_ENDLESS_START_WAVE
+## (endless).
+func clamp_wave(w: int) -> int:
+	var total := RunState.waves_for_mode(mode)
+	return clampi(w, 1, total if total > 0 else MAX_ENDLESS_START_WAVE)
+
+
+## Last wave a smoke run plays (start_wave + waves - 1, at most the mode's last wave).
 func last_wave() -> int:
-	return clampi(start_wave + waves - 1, start_wave, RunState.TOTAL_WAVES)
+	return maxi(start_wave, clamp_wave(start_wave + waves - 1))
 
 
 ## Screens stay open for a screenshot (the auto-continue of bots is ignored).

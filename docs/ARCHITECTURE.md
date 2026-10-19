@@ -6,7 +6,10 @@ weapons, collecting gold (shared wallet) and XP (shared level). Between waves a 
 "ready up" screen. Later milestones have their own sections below: M2 items, loot and the
 shop; M3 class resources, abilities and Mastery; M4 level-up cards, ranks and the Trainer; M5
 talents, tier sets, forging, elites, the Loot Goblin and the shared-purse tools; M6a the two
-bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter.
+bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
+Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
+mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
+enchants, hand-made items).
 
 ## Layout
 
@@ -14,28 +17,33 @@ bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage 
 autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state)
 core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
             items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
-            run_summary.gd, run_card.gd (M6a)
+            run_summary.gd, run_card.gd (M6a); leaderboard.gd, shrines.gd, shrine_vote.gd,
+            dungeon/ (M6b)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
-            talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a)
+            talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
+            environments/ shrines/ (M6b)
 scenes/
   main/     Main – game flow state machine                         [integration]
-  arena/    Arena – battlefield, walls, entities root               [visuals]
+  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b)  [visuals]
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
-  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a)  [visuals]
+  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b)  [visuals]
   vfx/      Vfx – fire-and-forget effects                           [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
   talents/  per-class TalentEffect scripts (M5)
   artifacts/  TalentEffect scripts of the Artifact properties (M6a)
   enemies/  Enemy; EliteAffixes, ElitePlate, LootGoblin, GoblinPortal (M5); Boss, PoisonPuddle,
-            HookLine, hazards/ (M6a)                                 [enemies]
+            HookLine, hazards/ (M6a; M6b adds the environment hazards)   [enemies]
+  events/   GuardedChest, DefendTotem, CaravanCart, EventGuards, EventFx, EventTag (M6b)
+  dungeon/  Dungeon, DungeonBrazier (M6b)
   pickups/  Pickup, LootBag (M2)                                     [enemies]
-  waves/    WaveDirector; GoblinSpawner (M5)                         [enemies]
+  waves/    WaveDirector; GoblinSpawner (M5); EventSpawner, EnvironmentHazards (M6b)  [enemies]
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
-            GameOverScreen (+ MeterPage), PauseMenu; items/ shop/ loot/ (M2), level_up/ trainer/ (M4),
-            talents/ purse/ (M5), enchanter/ (M6a)
+            GameOverScreen (+ MeterPage, LeaderboardPage), PauseMenu; items/ shop/ loot/ (M2),
+            level_up/ trainer/ (M4), talents/ purse/ (M5), enchanter/ (M6a), shrine/ dungeon/,
+            EnvironmentRollScreen, HardcoreBadge (M6b)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
             test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
 ```
@@ -50,11 +58,12 @@ not rename or remove the contract members.
 ```
 Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is paused)
 ├── Arena (Node3D, PAUSABLE)   – Arena.current
-│   ├── environment, ground, walls, props
-│   ├── SpiritHealer           – arena.spirit_healer at Arena.SPIRIT_HEALER_POINT (centre)
+│   ├── environment, ground, walls, props (the run's EnvironmentData palette and decor, M6b)
+│   ├── SpiritHealer           – arena.spirit_healer at Arena.SPIRIT_HEALER_POINT (centre); none in a hardcore run
 │   ├── entities (Node3D)      – players, enemies, projectiles, pickups, VFX
 │   └── CameraRig
-├── WaveDirector (Node, PAUSABLE)
+├── WaveDirector (Node, PAUSABLE) – with the GoblinSpawner, EventSpawner and EnvironmentHazards children
+├── Dungeon (Node, PAUSABLE)   – only while State.DUNGEON (M6b)
 ├── HudLayer (CanvasLayer 10, PAUSABLE) / Hud
 ├── MenuLayer (20)          / MainMenu or Lobby
 ├── IntermissionLayer (30)  / Intermission      (ALWAYS)
@@ -63,7 +72,8 @@ Main (Node, PROCESS_MODE_ALWAYS – drives the dev harness while the tree is pau
 ```
 
 States (`Main.State`): `MENU -> LOBBY -> WAVE -> WAVE_END -> INTERMISSION -> WAVE ... ->
-GAME_OVER -> LOBBY`. Screens are created when their state starts and freed when it ends; the
+GAME_OVER -> LOBBY` (M6b: `INTERMISSION -> DUNGEON -> INTERMISSION` after an accepted portal, `State.DUNGEON`
+appended to the enum). Screens are created when their state starts and freed when it ends; the
 run (arena, director, players, HUD, run screens) is built by `start_run()` and torn down by
 `_teardown_run()`. Transitions triggered by UI signals are connected `CONNECT_DEFERRED`, so
 the new screen never sees the button press that closed the old one.
@@ -72,17 +82,22 @@ the new screen never sees the button press that closed the old one.
    LOBBY, Quit → quit.
 2. **LOBBY** – the Lobby owns `PlayerManager.joining_enabled`. Each slot picks a class (◀ ▶),
    readies with A, leaves with B. All joined players ready → countdown → `start_requested`
-   → run (a new join or an unready cancels the countdown). B with nobody joined → MENU.
+   → (M6b: the "Rolling the arena..." screen, unless smoke / demo / view) → run (a new join, an
+   unready or a mode change cancels the countdown). Any joined player's Y / X change the run mode /
+   Hardcore. B with nobody joined → MENU.
    The join press is swallowed (`PlayerInput.swallow()`): it never also readies the player,
    and navigation waits until the stick is neutral. Slots of unplugged pads are pruned
    (`PlayerManager.prune_disconnected()`) when the lobby opens / resets and every frame
    while it is open, so a dead controller can never block the countdown or Back.
-3. **RUN / WAVE n** – `RunState.start_run(count, seed)`, `Arena.create()`,
+3. **RUN / WAVE n** – `RunState.start_run(count, seed, mode, hardcore, environment)` (M6b), `Arena.create(environment,
+   not hardcore)`,
    `WaveDirector.create(arena)`, one `Player.create(slot)` per slot under `arena.entities`
    (`Main._spawn_player` is the single place a slot becomes a hero – the future M9 loadout
    hook), `hud.bind_players(players)`, `wave_timer_changed → hud.set_wave_time`. Every wave:
    players back on `arena.get_player_spawn_points()`, `player.begin_wave()` (heal / 50%
-   return), `wave_director.start_wave(n)`, `arena.camera.snap()`, "Wave n" banner.
+   return), `Shrines.begin_wave` (M6b: the running shrines go live), `wave_director.start_wave(n)`
+   (which also rolls the mid-wave event and starts the environment hazards), `arena.camera.snap()`,
+   "Wave n" banner (with the running shrines under it).
    - Waves 10 and 25 are **boss waves** (M6a): `start_wave` makes no timer and, 2 s after a rune on the ground,
      spawns the `Boss`; the wave ends with its death (see "Bosses, boss waves, elite wave 20, hazards, HUD").
    - A player at 0 HP is **downed**: a ghost that moves at full speed
@@ -118,22 +133,25 @@ the new screen never sees the button press that closed the old one.
      (1 s). Everybody downed at once → GAME_OVER (defeat). Solo: downed = defeat.
 4. **wave_cleared** (the director already stopped: enemies despawned, loot banked) →
    **WAVE_END** ("Wave cleared!" banner, `Main.WAVE_END_DELAY` = 1.6 s, players can still
-   move) → if n == 25 (Vor'thalax's death, M6a) → GAME_OVER (victory), else **INTERMISSION** (tree paused,
-   `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
-   `Intermission.open(n, RunState.pending_level_ups)`: loot roll → level-up cards (when levels
-   were gained) → market; players ready with START, bots and unplugged
+   move) → if `RunState.is_final_wave(n)` (n == 25 in the normal mode, Vor'thalax's death, M6a; never in the
+   endless mode, where wave 25 shows "Endless begins!") → GAME_OVER (victory), else **INTERMISSION** (tree
+   paused, `Player.end_wave()` on every hero – abilities / Mastery drop auras and buffs –,
+   `Main._after_wave_end`: `Shrines.end_wave`, the shrine roll, the portal roll,
+   `Intermission.open(n, RunState.pending_level_ups)`: loot roll → (M6b) shrine vote → level-up cards (when levels
+   were gained) → (M6b) portal vote → [Dungeon] → market; players ready with START, bots and unplugged
    devices auto-ready; after `Intermission.auto_continue_time` – default
    `AUTO_CONTINUE_TIME` = 60 s, ≤ 0 switches it off – the next wave starts even if not
    everyone is ready) → `pending_level_ups = 0` (the cards resolved them) → wave n+1.
 5. **GAME_OVER** – `RunState.end_run(victory)`, tree paused, HUD hidden,
-   `GameOverScreen.open(victory)` (M6a: two pages, Summary and Damage Meter, awards and the run card, see "Damage
-   meter, end screen, run card"; `Main.end_run` records every hero's result first). A / START → **LOBBY with the
-   same players** (ready again); the main menu only through the lobby's Back.
+   `GameOverScreen.open(victory, board)` (M6a: two pages, Summary and Damage Meter, awards and the run card, see "Damage
+   meter, end screen, run card"; M6b: the Leaderboard page, see the M6b chapter; `Main.end_run` records every hero's
+   result and the leaderboard entry first). A / START → **LOBBY with the same players** (ready again); the main menu
+   only through the lobby's Back.
 6. START on any player's device during WAVE / WAVE_END → PauseMenu (`get_tree().paused`).
    The menu ignores navigation until the stick has been neutral once (`PlayerInput.nav_held()`),
    so a stick held during play cannot move the selection. Resume unpauses; "Quit to Menu"
    needs a second press ("Are you sure? Press again") and then ends the run
-   (`RunState.end_run(false)`) and goes to MENU.
+   (`RunState.end_run(false)`; an endless run with a cleared wave goes on the leaderboard as a defeat) and goes to MENU.
    **Disconnects:** `PlayerManager.device_disconnected` during a run → pause + HUD notice;
    a wave never starts while a joined pad is unplugged (`Main.start_wave` pauses at once).
    While any joined pad is unplugged, START / B / Resume do nothing; the PauseMenu offers
@@ -156,7 +174,8 @@ the new screen never sees the button press that closed the old one.
   current level and on `RunState.leveled_up`, current HP rises by the Max HP gained); the
   real reward is the level-up card picked after the wave (M4 sections below).
 - `WeaponRunner` (one per weapon that `attacks()`): cooldown =
-  `CombatMath.weapon_cooldown`; target = nearest living enemy within `attack_range`.
+  `CombatMath.weapon_cooldown` (M6b: the weapon's own `attack_speed_pct` multiplies with Haste, Epic weapons +10%, see
+  "Content" in the M6b chapter); target = nearest living enemy within `attack_range`.
   - `MELEE_ARC`: every enemy within `attack_range + enemy.radius` and inside `arc_degrees`
     of the swing direction is hit.
   - `PROJECTILE`: spawns `Projectile.create(TEAM_PLAYERS, ...)`; `aoe_radius > 0` explodes.
@@ -185,6 +204,10 @@ the new screen never sees the button press that closed the old one.
     down is defeat) and more enemies per head.
   - Bosses (M6a) take their HP from `BossData.max_hp_for(wave, players)` = `hp_at_wave × (1 + coop_hp_per_player
     (n − 1))` (0.75 for both bosses: x1 / x1.75 / x2.5 / x3.25) instead of `coop_hp_mult`; their damage is the usual growth × `party`.
+  - M6b: a running shrine multiplies the HP, damage and speed read in `Enemy.setup` (and the boss HP in `Boss.create`) by
+    `Shrines.enemy_hp_mult()` / `enemy_damage_mult()` / `enemy_speed_mult()`; all read 1.0 outside a running wave. In the
+    endless mode the waves above 25 use the same growth formulas; an environment hazard's damage is the Skeleton Grunt's
+    `contact_damage_at_wave(wave) × coop_damage_mult()` times the hazard's own factor.
 - On death: `RunState.record_kill(killer_index)`, a `Pickup.create(data.gold, data.xp)` drops,
   `died` is emitted. Damage dealt by players is recorded with `RunState.record_damage`
   (`WeaponRunner.apply_hit`: only the HP the enemy had left, overkill does not count).
@@ -202,6 +225,8 @@ the new screen never sees the button press that closed the old one.
   enemy slides along touching neighbours and pushes itself out of overlaps
   (`EnemyGrid.crowd_velocity`). In the open field (a per-tick shape query confirms the arena
   interior holds no world collider) an enemy moves directly; near walls it uses move_and_slide.
+  The open-field cache (`Enemy._open_*`) is valid for one physics frame **of one arena at one layout size**
+  (`_open_arena_id`, `_open_size`, M6b: the Dungeon room is a second layout of the same arena).
 - The same grid answers `Projectile` sweeps / explosions (`gather_touching`) and
   `WeaponRunner` targets / melee arcs (`nearest`, `gather_around`): queries widen by the
   enemies' possible drift since the build and test live positions, so results equal a full
@@ -225,7 +250,13 @@ the new screen never sees the button press that closed the old one.
   `Vfx.spawn_telegraph` (red rune with a white-hot core, readable without colour) 1 s before
   the group appears.
 - At most `MAX_ENEMIES` alive. When the timer ends: remaining enemies `despawn()` (no loot),
-  pickups `collect_to_bank()`, `wave_cleared` emitted.
+  pickups `collect_to_bank()`, `wave_cleared` emitted. `stop()` also frees the enemy hazards (`enemy_hazards`) and every
+  event object (`EventSpawner.GROUP`), M6b.
+- **M6b:** the **endless** mode has no last wave (`RunState.total_waves()` = 0): `wave_duration(w)` is capped at
+  `MAX_WAVE_DURATION` 210 s, waves 30, 35, ... are boss waves (Morvain / Vor'thalax in turn) and 33, 43, ... elite-rule waves
+  (static predicates, "Modes" in the M6b chapter). Three children of the director react to `wave_started`: the
+  `GoblinSpawner` (M5), the `EventSpawner` (a mid-wave event from wave 4, 30%, never on boss / elite-rule waves; its own
+  `event_rng`) and the `EnvironmentHazards` (the run's hazard, only while the wave runs; its own `environment_rng`).
 - Waves 10 and 25 are **boss waves** (`RunState.is_boss_wave` and a `BossData` for the wave in `Db.bosses`): the
   timer is replaced by the boss, the wave ends when it dies, the normal spawn runs at half rate (adds), and there
   are no elites and no Loot Goblin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
@@ -239,7 +270,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 
 | Flag | Meaning |
 |---|---|
-| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable. |
+| `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable; a Dungeon Warden is killed 60 s past its enrage (M6b). A smoke run with an unknown argument or an invalid value reports the result `bad_args` (the arguments in `unknown_args`) and exits 1 (M6b). |
 | `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
 | `--classes=a,b,...` | Bot classes in join order (cycled; unknown ids warn and are skipped), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
@@ -256,6 +287,14 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--artifact-chance=X` | M6a test hook: replaces the chance of every Artifact roll (`LootDrops.artifact_chance_override`, 0..1; 0 = never, default off; from wave 10 and the class rule still apply). |
 | `--end-page=NAME` | M6a dev: the page `--view=game_over` / `victory` opens on, `summary` or `meter`. |
 | `--save-card` | M6a dev: saves the run card (needs a display) as soon as the end view is forced; prints `CARD <path>`. |
+| `--mode=normal\|endless` | M6b: the run mode (`RunState.mode`; the lobby's mode select overrides it for human runs). Endless: no last wave, 26+ with bosses every 5th wave from 30. |
+| `--hardcore[=0\|1]` | M6b: a hardcore run (`RunState.hardcore`: no Spirit Healer, `HardcoreBadge`). |
+| `--env=ID` | M6b: forces the arena environment (`forest_ruin`, `cemetery`, `swamp`, `volcano`, `ice_cave`) instead of the seed-derived roll. Smoke runs roll too (seed 5 -> Ice Cave). |
+| `--event=ID` | M6b debug hook: every eligible wave gets that mid-wave event (`guarded_chest`, `defend_totem`, `goblin_caravan` or `chest`, `totem`, `caravan`; `RunState.event_override`). |
+| `--shrine-chance=X` | M6b debug hook: the chance of a shrine at every break (0..1; `RunState.shrine_chance_override`; default 5%). |
+| `--dungeon[=1]` | M6b debug hook: the dungeon portal opens after the next wave once (`RunState.dungeon_forced`; `--dungeon=0` = off). |
+| `--leaderboard=PATH` | M6b dev / test hook: the leaderboard file (`Leaderboard.path_override`; `user://x.json` or a path). Unlike the player's own file, a smoke / demo / `--view` run writes it. |
+| `--end-page=summary\|meter\|leaderboard`, `--view=roll` | M6b: the end screen's Leaderboard page; `--view=roll` opens the "Rolling the arena..." screen over the lobby. |
 
 `SMOKE_RESULT` keys: `result` (completed / defeat / timeout), `waves_completed`, `first_wave`,
 `last_wave`, `players`, `seed`, `kills`, `gold`,
@@ -272,7 +311,10 @@ adds `elites_spawned`, `elites_killed`, `goblins_spawned`, `goblins_killed`, `go
 over the heroes), `talent_resets`, `set_bonuses` (Σ `SetBonuses.active_count`) and
 `gold_spent` (every `RunState.try_spend_for`). M6a adds `bosses_killed`, `artifacts_dropped`,
 `consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time` and `meter`
-(per slot) (see the M6a chapter). Each cleared wave also prints a
+(per slot) (see the M6a chapter). M6b adds `mode`, `hardcore`, `environment`, `events_spawned`, `events_completed`,
+`shrines_offered`, `shrines_accepted`, `dungeons_entered`, `dungeons_completed`, `dungeons_failed`,
+`dungeon_rooms_cleared`, `dungeon_time`, `hazards` and (only with a bad command line) `unknown_args` (see the M6b chapter).
+Each cleared wave also prints a
 `SMOKE wave n cleared ...` line (M5: `elites killed/spawned, goblin spawned/killed/escaped`),
 and each closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1
 (R bot rerolls so far)`.
@@ -282,7 +324,9 @@ crowded), avoid walls, stay near the team and run to downed teammates within
 and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
 a living teammate instead. A Loot Goblin is never a threat to them; they chase it when nothing
 else is close (M5, "Loot Goblin"). M6a: they sidestep the Flesh Golem's hook, leave boss hazards and poison
-puddles (`BotInput._hazard_steer`) and prioritise the Cultist Acolyte. Between waves bots equip, forge, buy,
+puddles (`BotInput._hazard_steer`; M6b: the environment hazards too) and prioritise the Cultist Acolyte. M6b: they open
+the Guarded Chest, guard the Defend-the-Totem totem, chase the Goblin Caravan's cart (`BotInput._event_steer`) and vote
+on shrines (`ShrineData.bot_accepts`) and the Dungeon portal (`PortalScreen.bot_accepts`). Between waves bots equip, forge, buy,
 train, spend talent points and reroll (M2, M4, M5 sections), and from M6a also enchant, buy consumables and the
 Black Market (M6a chapter).
 **Determinism:** bots decide in `BotInput.think(delta)`, called by
@@ -291,7 +335,8 @@ Black Market (M6a chapter).
 counts `WAVE_END_DELAY` in physics ticks. With the engine flag `--fixed-fps 60` the same
 `--seed` reproduces a smoke run exactly (same kills, gold, downs); without it the camera
 (updated per rendered frame) can shift the on-screen spawn-point preference slightly. M5's
-draw points are listed under "Determinism" in the M5 section.
+draw points are listed under "Determinism" in the M5 section, M6a's under "Determinism (M6a draw points)" and M6b's
+under "Determinism and the seed-5 smoke" (the default run now rolls its environment: `--seed=5` plays the Ice Cave).
 
 Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission,game_over}.png`
 (`--view=lobby --players=3`, `--demo --seed=5 --start-wave=4 --shot-time=12`,
@@ -473,6 +518,10 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   also run with `process_mode` ALWAYS, so Main may pause the tree behind them.
 - `set_backdrop_opacity(alpha)` on MainMenu / Lobby / Intermission / GameOverScreen lets the
   3D scene show through the dark vignette backdrop.
+- M6b UI additions (details in the M6b chapter): the lobby's mode select (Y / X) and the `HardcoreBadge`, the
+  `EnvironmentRollScreen` between the lobby and the run, the shrine and portal votes as Intermission phases
+  (`scenes/ui/shrine/`, `scenes/ui/dungeon/`), the shrine icons and the Dungeon line on the HUD, the event name tags
+  (`EventTag`), and the end screen's mode row, "Best:" line and Leaderboard page (`LeaderboardPage`).
 - M6a UI additions (details in the M6a chapter): the HUD plaque shows a boss frame instead of the timer on boss
   waves, `UnitFrame` the active consumables; the market has the consumables row, the Black Market card and the
   Enchanter tab (`PlayerPanel` tab 4); the loot roll's B button reads Disenchant / Pass (all pass: Dust); the
@@ -1674,7 +1723,7 @@ scenes/ui/        meter_page.gd, meter_bar.gd, run_card_view.gd; enchanter/ (Enc
   the wave and party multipliers) are the first values. The final 25-wave balance is done once, at the end of M6b
   (GDD 9, "Nyitott kérdések M6b-re"; GDD 16). The known pressure points are listed in "Open items for the M6b
   balance" below.
-- Out of scope: M6b (modes, environments, events, the Dungeon portal, content packs, the final balance), GDD 16.
+- Out of scope there: M6b (modes, environments, events, the Dungeon portal, content packs: the next chapter) and the final balance, GDD 16.
 
 ### Foundation hooks
 
@@ -1980,8 +2029,9 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   while a boss lives `defeat with boss <name> alive after S s: P% HP left (phase, enrage level), N
   downs so far` (`Main.boss_arrival_text`, `Main.boss_standing_text`); positions are formatted by
   `Main.format_position` ("(x, y, z)", one decimal, also for the player / boss lines of the screenshot
-  harness, no `-8.400001` noise). Victory is unchanged: `wave >= TOTAL_WAVES` after the
-  wave-cleared pause, which now means Vor'thalax's death.
+  harness, no `-8.400001` noise). Victory was `wave >= TOTAL_WAVES` after the wave-cleared pause, which meant
+  Vor'thalax's death; since M6b it is `RunState.is_final_wave(wave)` (never true in the endless mode, where
+  `RunState.begins_endless` shows "Endless begins!" instead).
 - `CameraRig.boss_points(bosses)`: a living `Boss` (group `bosses`) adds two soft framing points
   (feet, and 0.6 × its model height up the screen) next to the Loot Goblins' (without it the boss sat
   off-screen / under the HUD plaque); the heroes keep priority like they do over the goblins.
@@ -2466,6 +2516,8 @@ describe each side).
 
 ### Open items for the M6b balance
 
+(M6b added more items to this list: see "Open items for the final balance (M6b)" at the end of the M6b chapter.)
+
 The M6a content made the game harder than M5, and its numbers were **not** re-tuned: a balance round would be
 redone by the M6b content (item packs, modes, events) anyway, so the 25-wave balance is done once, at the end of M6b
 (GDD 9 "Nyitott kérdések M6b-re", GDD 16). These are the pressure points the merged head's runs showed (the numbers
@@ -2638,3 +2690,743 @@ loot roll's title-block collapse (`TITLE_MODES` = full only) fails a test):
 | `tests/test_m6_meter.gd`, `_credit.gd`, `_ui.gd` | the recorders, the caster credit at every heal / shield / revive call site through the real code, the end screen, the awards, the run card |
 | `tests/test_m6_followup.gd` | the follow-up fixes: the market header names no seconds before a boss wave (waves 10 and 25, the other waves keep their line, the open market screen), `Enchanter.best_weapon` skipping Artifacts and `bot_target` (the weapon, else the best Epic+ armour / off-hand; the Fangs pair counts as two Artifacts; a bot holding an Artifact enchants its armour; a bot with a normal weapon still enchants the weapon first), the rescue stand beside a downed teammate (`test_a_bot_beside_a_downed_teammate_*`: stands still without a hazard, leaves a puddle / a boss circle it stands in, ignores a far one), a bot reroll that redraws an affordable Black Market upgrade buys it |
 | `tests/test_m6_integration.gd` | the "Cross-system contracts" above: the puddle as a bot hazard and `WaveDirector.stop()`, the Acolyte beside a real boss, a boss kill in the meter, one Artifact roll per boss, Dawn's Embrace credit, consumable / Black Market / enchant spends in the purse board, Artifacts never sold / disenchanted / enchanted / dusted, the Enchanter tab greying them |
+
+## M6b: modes, environments, events, shrines, the Dungeon, content
+
+```
+core/              leaderboard.gd (Leaderboard), shrines.gd (Shrines), shrine_vote.gd (ShrineVote)
+core/dungeon/      dungeon_rewards.gd (DungeonRewards)
+data/              environment_data.gd (EnvironmentData), shrine_data.gd (ShrineData)
+data/environments/ forest_ruin / cemetery / swamp / volcano / ice_cave .tres
+data/shrines/      greed / haste / learning / blood / fortune / gambler .tres
+data/bosses/       dungeon_warden.tres (BossData, boss_wave 0)
+scenes/arena/      arena_themes.gd (ArenaThemes: the four decor sets)
+scenes/dungeon/    dungeon.gd (Dungeon), dungeon_brazier.gd (DungeonBrazier)
+scenes/enemies/hazards/  arena_hazard.gd (ArenaHazard), grasping_hands.gd, bog_pool.gd, lava_eruption.gd, falling_icicle.gd
+scenes/events/     event_fx.gd, event_tag.gd (EventTag), event_guards.gd, guarded_chest.gd, defend_totem.gd, caravan_cart.gd
+scenes/ui/         hardcore_badge.gd, leaderboard_page.gd, environment_roll_screen.gd
+scenes/ui/dungeon/ portal_screen.gd (PortalScreen);   scenes/ui/shrine/  shrine_screen.gd, shrine_icon.gd
+scenes/visuals/    cart_model.gd (CartModel)
+scenes/waves/      event_spawner.gd (EventSpawner), environment_hazards.gd (EnvironmentHazards)
+data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content files (see "Content")
+```
+
+- Built as a foundation (P0-B: the shared hooks and the GDD decisions), five feature packages (modes, environments,
+  events, shrines, the Dungeon) and three content packages (weapons + armour tiers + jewellery + suffixes, enchants +
+  trinkets + Legendaries, named + class items), merged one by one (`git merge --no-ff`, import + the full suite after
+  each), cross-checked by integration tests and fixed. "How the packages fit together" lists the rules that hold
+  between them, "Content" the data and the few code hooks, "Validation" the numbers.
+- **No balance in M6b.** Every number (event HP and rewards, shrine effects, hazard damage, Dungeon rooms, the new
+  items) is a first value; the one final 25-wave balance comes after this chapter (GDD 9, "Nyitott kérdések M6b-re").
+  The two rules that do change play are the Epic weapons' +10% attack speed (GDD 4.1) and the environment roll: a
+  default run now plays a random arena (`--env=forest_ruin` pins the old one). **A seeded number recorded before the
+  M6b merges is not comparable with this head** (see "Determinism and the seed-5 smoke").
+- Out of scope: the final balance, the M7 look of the environments, the class-independent tier sets (M8), Crossbow /
+  Polearm / Fist Weapon (M8).
+
+### Foundation hooks (autoload/run_state.gd, autoload/db.gd, scenes/main, scenes/ui/intermission.gd)
+
+- `RunState.mode` (`MODE_NORMAL` / `MODE_ENDLESS`, `MODES`), `hardcore: bool`, `environment: StringName`
+  (`DEFAULT_ENVIRONMENT` = `&"forest_ruin"`). `start_run(player_count, seed := -1, mode := MODE_NORMAL, hardcore :=
+  false, environment := DEFAULT_ENVIRONMENT)`: an unknown mode plays as normal; an **empty** environment argument is
+  **rolled** ("Arena environments").
+- **`total_waves()`** is the run length: 25 (normal, `TOTAL_WAVES`), `ENDLESS_WAVES` = 0 = unbounded. Helpers:
+  `waves_for_mode(mode)`, `is_endless()`, `is_final_wave(w)`, `clamp_wave(w)`, `count_text(n)` ("12 / 25" or "12"),
+  `wave_progress_text(w)`, `mode_text(mode, hardcore)` ("Normal", "Endless · Hardcore"). **Nothing outside RunState
+  reads the `TOTAL_WAVES` constant** (Main, Hud, Intermission, GameOverScreen, RunSummary, RunCard, LaunchOptions use
+  the helpers); the M6a "Victory is `wave >= TOTAL_WAVES`" is now `is_final_wave` plus `begins_endless` (below).
+- **Sub-RNGs**: `run_seed` and four own generators `environment_rng`, `event_rng`, `shrine_rng`, `dungeon_rng`
+  (`sub_rng(SALT_*)`, seeded with `derived_seed(run_seed, salt)`, SplitMix64). They never touch `RunState.rng`.
+- Counters (reset by `start_run`, in SMOKE_RESULT): `events_spawned`, `events_completed`, `shrines_offered`,
+  `shrines_accepted`, `dungeons_entered`, `dungeons_completed`, `dungeons_failed`, `dungeon_rooms_cleared`,
+  `dungeon_time`. State: `pending_shrine`, `shrine_effects`, `shrine_effects_live`, `shrine_xp_remainder`,
+  `gold_gain_log`, `portal_pending`, `portal_forced`, `last_wave_downs`. Debug overrides (reset by `start_run`, set by
+  `Main.start_run` from the flags): `shrine_chance_override` (-1 = off), `event_override`, `dungeon_forced`.
+- **Intermission phases**: `enum Phase { CLOSED, LOOT, SHRINE, LEVEL_UP, PORTAL, MARKET }` in the order they run.
+  `open()` calls `_enter_phase(Phase.LOOT)`, which walks `next_phase()` until `wants_phase(p)` (LOOT: team loot; SHRINE:
+  `RunState.pending_shrine` and somebody has a hero; LEVEL_UP: pending level-ups and a picker; PORTAL:
+  `RunState.portal_pending` and somebody has a hero; MARKET always). With nothing pending the chain is LOOT, LEVEL_UP,
+  MARKET as before. After a dungeon the chain is LOOT (its Epics) -> MARKET. `_on_player_left` shrinks the vote of the
+  SHRINE / PORTAL phase a leaver was in.
+- **Environments**: `EnvironmentData extends Resource` (id, names, `roll_weight`, `decor_id`, `hazard_id` / `hazard_name`
+  / `hazard_text`, `card_color`, sky / fog / ambient / sun, ground tones, road, `wall_tint`; **every default is the
+  Forest Ruin**, the five files list only what differs). `Db.environments`, `Db.environment_ids` (`ENVIRONMENT_ORDER` =
+  forest_ruin, cemetery, swamp, volcano, ice_cave), `get_environment(id)`, `environment_or_default(id)`.
+  `Arena.create(environment := null, spirit_healer := true, size := SIZE)`: null = the forest, `spirit_healer := false`
+  leaves `Arena.spirit_healer` null (every consumer is null-safe), `Arena.environment` is never null. `Arena.SIZE`
+  (34 x 22) is the clearing's size for every environment.
+- The test runner switches three things off through script objects (it is compiled before the autoloads exist and must
+  not name their classes): `Leaderboard.writes_enabled`, `EnvironmentRollScreen.enabled`, `Shrines.base_chance` (= 0).
+- Flags: `--mode=normal|endless`, `--hardcore[=0|1]`, `--env=<id>`, `--event=<id|chest|totem|caravan>`,
+  `--shrine-chance=X`, `--dungeon[=0|1]`, `--leaderboard=PATH`, `--end-page=summary|meter|leaderboard`, `--view=roll`.
+  Bad values are `unknown` (`LaunchOptions.unknown`, also an invalid value such as `--env=nope`): a **smoke run with an
+  unknown argument reports the result `bad_args`, lists them as `unknown_args` in SMOKE_RESULT and exits 1** (only a
+  `completed` result without errors exits 0; the run is still played to its end, `Main.smoke_outcome`). `--start-wave` is
+  clamped after the whole line is parsed (1..25 normal, 1..99 endless: `MAX_ENDLESS_START_WAVE`).
+- SMOKE_RESULT M6b keys: `mode`, `hardcore`, `environment`, `events_spawned`, `events_completed`, `shrines_offered`,
+  `shrines_accepted`, `dungeons_entered`, `dungeons_completed`, `dungeons_failed`, `dungeon_rooms_cleared`,
+  `dungeon_time` (seconds inside dungeons), `hazards` (`{id, laid, hero_hits, hero_damage, enemy_hits, enemy_damage,
+  enemy_kills}`, `{}` without a director). The first smoke log line ends ", mode normal, environment ice_cave".
+
+### Modes: Endless, Hardcore, lobby, leaderboard
+
+- **Endless rules are static functions of the wave number** (waves above 25 exist only in the endless mode):
+  `RunState.is_boss_wave(w)` = `w in BOSS_WAVES` (10, 25) or `is_endless_boss_wave(w)` (30, 35, 40 ...);
+  `is_elite_wave(w)` = `w in ELITE_WAVES` (20) or `is_endless_elite_wave(w)` (33, 43, 53 ...); `wave_duration(w)` is
+  capped at `MAX_WAVE_DURATION` 210 s (wave 25's length); `BossData.for_wave(w)` matches `boss_wave` exactly (10 / 25,
+  nothing for `w <= 0`) and then `endless_boss(w)`: `BossData.ENDLESS_ROTATION` (an explicit id list, so the Dungeon
+  Warden never joins) in turn, `(w - 30) / 5` even = Morvain, odd = Vor'thalax, HP / damage by the usual wave growth.
+  `RunState.begins_endless(w)` (endless and wave 25): `Main._wave_cleared_text` returns `ENDLESS_BEGINS_TEXT` ("Endless
+  begins!") instead of "Victory!", then the market and wave 26. Market header, HUD tag, boss frame, the smoke time
+  budget and the Event / Goblin spawners need nothing of their own (they read the static predicates).
+- **Hardcore**: `Main.start_run` builds `Arena.create(env, not RunState.hardcore)` (no `Arena.spirit_healer`); a downed
+  hero still returns at the next wave start with 50% HP; bots walk to teammates / rescue as before. `HardcoreBadge`
+  (`HardcoreBadge.create(font_size)`, a red pill) in the lobby header, the HUD (`Hud.hardcore_badge`, first row of the
+  wave plaque, no room in a normal run) and the end screen (`GameOverScreen.hardcore_badge`). **One ghost hint**:
+  `UnitFrame.TEAMMATE_HINT` ("Only a teammate can revive you") is shown for a downed hero whenever there is no Spirit
+  Healer to go to (`RunState.hardcore`, also with no arena at all, or an arena without a healer: the dungeon);
+  Resurrection Sickness still wins, a normal clearing keeps "Go to the Spirit Healer".
+- **Lobby mode select** (`scenes/ui/lobby.gd`): `Lobby.run_mode`, `Lobby.hardcore`, `cycle_mode(by_slot)`,
+  `toggle_hardcore(by_slot)`, `mode_text()` ("Mode: Endless · Hardcore"), `set_run_mode`, signal `mode_changed(mode,
+  hardcore)` -> `Main.configure_run`; `Main.go_to_lobby` shows `options.mode / hardcore` every time. Any joined slot's
+  `Pad.Y` cycles the mode, `Pad.X` toggles Hardcore (keyboard C / R); a change during the start countdown un-readies the
+  player who made it (cancels the countdown). The block sits at the right end of the title row (no extra height); line 2
+  holds the two key prompts, dim until somebody joined. `Main.start_run` takes `first_wave =
+  options.clamp_wave(options.start_wave)` (the lobby may change the mode after the parse).
+- **Leaderboard** (`core/leaderboard.gd`, `scenes/main/main.gd`, `scenes/ui/game_over.gd`, `scenes/ui/leaderboard_page.gd`):
+  - File `user://leaderboard.json` `{"version": 1, "categories": {key: [entry...]}}`, key `category_key(mode, hardcore,
+    party)` ("normal/standard/2", "endless/hardcore/4"), at most `MAX_ENTRIES` 10 entries, entry `{wave, time, classes,
+    date, victory}`. A missing file is an empty board; a broken one goes to `<path>.corrupt`; a file of a newer version
+    leaves the board empty and `read_only` (never overwritten). Writing goes through `<path>.tmp` + rename.
+    `record_run(entry, mode, hardcore, party)` returns `{"rank": int, "save_failed": bool}` (`save_failed` only when the
+    entry made the board but could not be written).
+  - **Ranking (`Leaderboard.better`)**: endless entries and normal defeats rank by the later wave, then the **longer**
+    time survived on it; normal victories by the **shorter** time. `_sanitize` sorts (entry, file index) pairs with
+    `sort_custom` (O(n log n); equal entries keep the file's order, so the highlighted index is the new entry; a
+    3000-entry file loads in ~100 ms).
+  - `Main.end_run` -> `Main._record_leaderboard(victory)`: entry = `make_entry(Main.wave, RunState.run_time,
+    run_classes, victory)` (`wave` = the wave that ended the run, `time` = wave play time: **the dungeon's time is not in
+    it**, `run_time` ticks in `State.WAVE` only; `Main.run_classes` = the party's class ids snapshotted in `start_run`),
+    then the board is read and `Leaderboard.screen_model(...)` is handed to `GameOverScreen.open(victory, board)`.
+    `Main._record_abandoned_run()` (from `Main.quit_to_menu`, and from `Main.drop_player` when the last hero drops out)
+    records an **endless** run as a defeat on the wave in progress (`Main.wave`, no end screen), but only after at least
+    one cleared wave (`Main.waves_completed > 0`: a run given up in its first fight, or started on a later `--start-wave`
+    and given up before clearing one, would be a junk "Wave 1" entry with no time played); a normal run that is
+    abandoned records nothing.
+  - **When the file is touched**: `Leaderboard.writes_enabled == false` (unit tests) -> no read, no write, model `{}`.
+    A smoke run without `--leaderboard` -> `{}` too (it never even reads the player's file; `Main.writes_leaderboard`).
+    Demo / `--view` / screenshot runs read and show the board but write nothing. `--leaderboard=PATH` points it at a file
+    of its own and makes **every** run write it.
+  - End screen: `GameOverScreen.Page { SUMMARY, METER, LEADERBOARD }`; the Summary has the "Best: ..." line
+    (`best_label`) and, under the subtitle, **the mode row** (`mode_row`: always shown, it holds `environment_label`
+    "Arena: Cemetery" in the environment's colour; for an endless or hardcore run `mode_label` "Endless mode" / "Normal
+    mode" and the `hardcore_badge` join it; subtitle and mode row are one VBox group with a 2 px gap, so the worst-case
+    endless + hardcore page still fits 1080 px; the arena name first sat in the tab row and was cut to "Arena: Forest
+    R..."). `LeaderboardPage` (`create()`, `fill(model)`, `cell_text(place, column)`): category title, exactly 10 places
+    (#, Result, Time, Party, Date, "This run"), the run's row gold-framed, a note line ("New entry: place 5 of 10." /
+    "This run did not reach the top 10." / "No runs recorded in this category yet." / "The leaderboard is not recorded
+    in this session." / the error text of an unusable file / "Could not save the leaderboard." in red).
+    `GameOverScreen.environment_text(id)`; `RunCard.model` carries `"environment"` (card line "Normal mode  ·  Cemetery").
+
+### Arena environments
+
+- **Roll**: `RunState.roll_environment()` (from `start_run` for an empty argument) = `pick_environment(environment_rng)`: a
+  weighted draw (`roll_weight`; 0 never wins) over `Db.environment_ids`, exactly **one** `environment_rng` draw per rolled
+  run (a forced `--env` draws nothing; the hazards continue that stream). `RunState.environment_for_seed(seed)` is the
+  same draw from a generator seeded like `environment_rng`, so the roll is a function of the run seed alone and the roll
+  screen can show it before the run exists. `RunState.environment_roller` is the test seam. **Smoke runs roll too** (seed 5
+  -> Ice Cave): CI covers every environment over seeds; `--env=<id>` pins one.
+- **Decor** (`ArenaThemes.build(arena, rng)` from `Arena._build_decor`, by `decor_id`; the forest for any other id): merged
+  vertex-colour meshes (`MeshKit`, `Mats.toon_vc`), tall objects in 4 + 4 chunks the camera can cull, one undergrowth /
+  props / glow mesh, two ground MultiMeshes. Budget (pinned): 13 / 13 / 14 / 13 decor draw calls (cemetery / swamp /
+  volcano / ice) vs the forest's 15, vertices <= 1.5x the forest's. **Invariant (pinned): nothing above 0.55 m stands
+  inside the playable rectangle.** The volcano dresses its six vents (`EnvironmentHazards.LAVA_VENT_POINTS`) inside the
+  arena, but only those that fit the layout in use (`ArenaThemes.vents_in(bounds)`, `VENT_CLEARANCE` 1.6 m from the walls:
+  all six in the clearing, **none in the dungeon room**, where the vents at +-12 m would be cut in half by the walls and
+  read as hazards that do not exist there). All decor reads `arena.get_bounds()`, so it follows `Arena.play_size`.
+- **Hazards**: `EnvironmentHazards` (Node, child of the WaveDirector like the Goblin / Event spawners;
+  `Main.environment_hazards`, one per run, the forest's does nothing) listens to `wave_started` / `wave_cleared`, runs its
+  own clock only while `director.is_running()` and lays `ArenaHazard`s (`EnemyHazard`s: group `enemy_hazards`, telegraph ->
+  strike, `hazard_push` for the bots, freed by `WaveDirector.stop()`) under the arena's entities. All randomness from
+  `environment_rng`. "Grunt damage" = `skeleton_grunt.contact_damage_at_wave(wave) x coop_damage_mult()`.
+
+  | hazard | class | rule |
+  |---|---|---|
+  | `grasping_hands` (Cemetery) | `GraspingHands` | every 9 s (first at 4.05 s): 2-3 circles r 1.5, each under a different hero (extras 1.6-2.8 m beside one), 1 s telegraph, 0.5x grunt damage + `Player.apply_root(1.2)` |
+  | `bog_pools` (Swamp) | `BogPool` | 5 pools r 2.3 for the whole wave, the same places all run (>= 4.5 m from the middle, >= 3 m from walls, >= 6 m apart); heroes -30% Speed (`bog_slow`, 0.35 s linger), enemies -15%; no damage |
+  | `lava_vents` (Volcano) | `LavaEruption` | 6 fixed vents, each every 8 s (first eruptions spread over the first interval), 1 s telegraph, r 2, 1.5x grunt damage to heroes AND enemies (no kill credit; kills count for the run) |
+  | `falling_icicles` (Ice Cave) | `FallingIcicle` | every 7 s (first 3.15 s): 3 circles r 1.2, 0.8-3.2 m from a hero, 1 s telegraph, 1x grunt damage + 30% Speed chill 1.5 s (`ice_chill`, separate from Morvain's `boss_chill`) |
+
+  Boss waves (`RunState.is_boss_wave`, the endless ones too): rate x0.5 (intervals double; the Swamp lays 3 of its 5
+  pools). `Player.apply_root` / `is_rooted()` / `rooted_left`: no walking, attacks and casts untouched; cleared by
+  `begin_wave`, `_go_down` and `EnvironmentHazards.end_wave()`. Wave end: `WaveDirector.stop()` frees the hazards,
+  `end_wave()` clears `bog_slow` / `ice_chill` and roots. **A hazard works only inside a running wave** (`_running` and
+  `director.is_running()`): never in a break, never in a dungeon. `stats()` -> the SMOKE `hazards` entry.
+- **Markers against the floor**: every hazard's marker keeps >= 2.0:1 WCAG contrast (`ArenaHazard.contrast_ratio`,
+  `MIN_MARKER_CONTRAST`, `marker_color()`, `EnvironmentData.floor_colors()`; pinned for every hazard x every ground tone of
+  its own environment). The Ice Cave's icicle ring is deep blue (`FallingIcicle.MARKER` (0.03, 0.13, 0.52) at 76-100%
+  alpha, the ring shader's dark outline pass, darker 50% fill) because pale frost blue on pale snow measured 1.1:1. Known,
+  left alone (art call): the bog pool's rim is drawn under its mud ring (1.3:1; a pool is no telegraph and reads as a dark
+  oval).
+- **Bog pool cost**: a pool writes its two ring materials only while it fades in (`BogPool.look_updates`), the bubbles swell
+  in a vertex shader on `TIME` (`Mats.bubble(color)`; the phase hashes the bubble's world XZ: instance uniforms are no
+  option in the Compatibility renderer); it scans the heroes every third tick (`HERO_SCAN_TICKS`). Swamp-vs-forest physics
+  tick gap 0.17 -> 0.10 ms (what remains: two scans per pool, the bots' `hazard_push`, slowed enemies living longer).
+- **"Rolling the arena..."** (`EnvironmentRollScreen`, a full-screen Control on Main's menu layer): a reel of cards (the list
+  x 7, 340 x 500 px, painted art per decor set) decelerates (`progress_at(t) = 1 - (1 - t / 3.5)^3.4`, `SPIN_TIME` 3.5 s)
+  and lands on the winner, holds `HOLD_TIME` 1 s ("The arena: <name>" + the hazard rule in `result_label`, 1500 px wide,
+  wrapped, at most 2 lines, below the reel), then `finished(environment_id)` once. Any joined player's A / START skips
+  (ignored for the first `SKIP_GRACE` 0.6 s). `Main.plays_roll_screen()` is false in smoke, demo, any `--view` and when
+  `EnvironmentRollScreen.enabled` is false; `begin_roll()` fixes the run seed (`options.run_seed()` or a random 31-bit
+  one), the winner is `--env` else `environment_for_seed(seed)`; `_run_seed()` hands that seed to `start_run` once;
+  `_on_roll_finished` starts the run when the state is still LOBBY. The run then rolls the card the screen showed by
+  construction. `--view=roll` opens the screen over the lobby for screenshots.
+
+### Mid-wave events
+
+- **EventSpawner** (`scenes/waves/event_spawner.gd`), child of the WaveDirector. `is_eligible_wave(w)` = `w >= FIRST_WAVE`
+  (4), not a boss wave, not an elite-rule wave (so **never** on 10, 20, 25 and, in endless, 30, 35 ..., 33, 43 ...);
+  `chance_for(w)` = `CHANCE` 0.3 (1.0 with `RunState.event_override`); `roll_wave(w)` draws all on `event_rng`: the chance
+  (unless 1), the kind (unless `--event`), the start share (`START_MIN_SHARE` .. `START_MAX_SHARE`, 0.2 .. 0.4 of the
+  wave). `start_event(id)` -> `_spawn_event(id)` builds it (`RunState.events_spawned`), `end_wave()` settles it. State:
+  `chest`, `totem`, `cart`, `active_kind`, `result` (`&""`, `&"completed"`, `&"failed"`), signal `event_finished(kind,
+  success)`; `_finish` counts `RunState.events_completed`. An open event is settled as failed at the wave end / next roll;
+  `WaveDirector.stop()` frees every node in the group `EventSpawner.GROUP` (`&"event_objects"`) and despawns the guards /
+  the cart, so **nothing of an event follows the party into a break or a dungeon**.
+- Placement: `_event_point(min_distance)` follows `WaveDirector.find_spawn_point` (on screen outside the HUD, >=
+  `min_distance` from every hero and the Spirit Healer if there is one) drawn from `event_rng`: chest
+  `CHEST_HERO_DISTANCE` 10 m (clamped `POST_RADIUS + 0.4` from the walls), totem `TOTEM_HERO_DISTANCE` 4 m; the cart's side
+  and lane (`LANE_MARGIN` 3.5 m) from `event_rng` too. Everything else (`Enemy.setup`, the item) uses `RunState.rng`.
+  `grunt_hp(wave)` = a Skeleton Grunt's `hp_at_wave x coop_hp_mult()` (the yardstick of the totem x30 and the cart x40).
+  Banners: "A guarded chest appeared!" / "The chest was opened!" / "Defend the totem!" / "The totem holds!  +15% damage" /
+  "The totem fell" / "A goblin caravan is crossing!" / "The caravan was plundered!" / "The caravan got away".
+- `GuardedChest` (LOCKED -> READY -> OPEN, `OPEN_TIME` 1.5 s, a living hero within `OPEN_RADIUS` 2 m adds time, nobody
+  drains it at the same speed): 4 guards x2 HP, no affix, on a 2.8 m ring, posted (taunted onto their posts every 0.2 s
+  until alerted: a hero within `AGGRO_RADIUS` 9 m, a guard hurt, or `alert()`); reward `LootDrops.drop_event_item` (Rare+
+  loot bag, outside the drop cap, no Artifact roll) + `reward_gold` = 10 x `LootGoblin.average_gold(wave)` in 8 coins.
+  `EventGuards` builds plain `Enemy.create` enemies.
+- `DefendTotem`: 30 x grunt HP, 20 s; ACTIVE lures enemies within `LURE_RADIUS` 8 m (not bosses, goblins, carts, or enemies
+  taunted by something living) and they bite it with their contact damage (1 s cooldown); 0 HP = FALLEN, 20 s = HELD (inert
+  until the wave ends): `reward_xp` = 25 x `average_xp(wave)` in 8 orbs + the team buff `{damage, +15%, id "event_totem"}`
+  under the `PlayerBonuses` source `&"event"` (cleared at the wave end / next roll; shrines use `&"shrine"`, consumables
+  `&"consumable"`: no clash).
+- `CaravanCart extends Enemy` (`create_route(...)`, built in code from a Skeleton Grunt `EnemyData` copy: max HP x40, no
+  damage, radius 1, knockback / stun immune, spawn weight 0): walks a straight lane between the short sides in <= 25 s
+  (`CROSS_TIME`, shortened to fit the wave, >= `MIN_CROSS_TIME` 15 s, ends `CROSS_END_MARGIN` 2 s before it; `EDGE_MARGIN`
+  1.8 m from the walls), ignores taunt and fear, slowable; `ESCAPE_REACH` 0.4 m = escaped (nothing paid); killed = 40 x
+  average gold in 10 coins + a Rare item (no drop / Artifact roll). 3 escort guards (`EventGuards`, alerted by a hit on
+  the cart). `CartModel` is its look.
+- Loot: `LootDrops.drop_event_item(source, pos, opener := null, rarity := -1) -> LootBag` (not counted in
+  `loot_drops_this_wave`).
+- Camera: `CameraRig.event_points(objects)` makes each event target a soft framing point (like the goblin / a boss). Bots
+  (`BotInput._event_steer`, group `EventSpawner.GROUP`): camp at a locked chest (`CHEST_CAMP_DISTANCE` 7 m, no enemy within
+  `CROWD_RADIUS`), go to an openable one and hold still on it, return to an ACTIVE totem when beyond `GUARD_RADIUS - 1`
+  (6 - 1 m) with `TOTEM_PULL_BASE + excess x TOTEM_PULL_SLOPE` (<= `TOTEM_PULL_MAX`) and, beyond `GUARD_RADIUS` itself, with
+  at least `TOTEM_PULL_LEAD` (2) more than their kite push (a hazard switches that floor off: a hazard still outranks the
+  guard, as do a hook sidestep and a rescue run), while the enemies taunted onto the totem do not kite a bot that is beyond
+  `totem_limit()` = `DefendTotem.GUARD_RADIUS - TOTEM_PULL_MARGIN` = 5 m (`BotInput._lured_by`; they walk to the totem, not
+  after the bot, yet still count as enemies around and for the rescue-run safety check), chase the cart from 40 m. No RNG.
+  Measured with a scratch probe in real frames (`--smoke --event=totem --players=4 --env=forest_ruin --fixed-fps 60`),
+  hero-seconds beyond 6 m while alive, before -> after: seed 3 wave 14 89.0% -> 15.2%, seed 2 wave 9 41.5% -> 13.7%, seed 5
+  wave 9 26.1% -> 1.5%, seed 4 wave 8 58.0% -> 4.4%, 3 bots seed 8 wave 9 78.2% -> 16.5%; what is left is the walk in from
+  the start, the walk back from the Spirit Healer after a revive (it stands 9-15 m from the totem) and rescue runs.
+- **Name tags** (`EventFx.label` makes an `EventTag extends Label3D`, fixed-size billboard: the chest's, totem's and cart's):
+  every rendered frame the tag slides inside `CameraRig.get_safe_screen_rect()` (the HUD-safe ground rectangle projected
+  onto the screen: the largest axis-aligned rectangle inside the projection, clipped to the viewport) with
+  `LootGoblin.clamp_tag_in(screen, size, area, TAG_SCREEN_PAD)`, sized with `LootGoblin.label_screen_size` (multi-line
+  aware; the goblin's own `clamp_tag` / `tag_screen_size` delegate to them and keep their behaviour). In the middle of the
+  view the tag stays at its home above the object; near the edge of the free area, with the object in a corner under a unit
+  frame or off screen, it slides along the edge and points the way.
+- **Log lines**: `EventSpawner.logged(text)` (a signal) replaces `print("EVENT ...")`; `Main.start_run` connects it to `_log`,
+  so the lines show only in smoke / demo / view runs with the `SMOKE ` / `MAIN ` prefix (`SMOKE EVENT guarded_chest (wave
+  5): started at 12.3 s` / `... completed at 14.2 s`). A plain run and the unit tests print nothing.
+- Interplays: a running **shrine** makes event enemies (guards, the cart: ordinary `Enemy.setup` enemies) tougher too, the
+  totem (own HP rule) not; flat event rewards are not scaled by a shrine. An **environment hazard** hurts / slows the guards
+  and the cart like any enemy.
+
+### Shrines
+
+- `ShrineData` (id, name, flavour, `waves` 3 = timed / 0 = instant, `icon_id`, `color`, `bot_accepts`; timed: `gold_pct`,
+  `xp_pct`, `enemy_damage_pct`, `enemy_hp_pct`, `enemy_speed_pct`, `hero_effects` (BonusVocabulary entries; `stats_pct`
+  works); instant: `give_epic`, `purse_loss_pct`, `gamble_chance` / `gamble_win_pct` / `gamble_lose_pct`). Six files:
+  Greed (gold +30 / enemy damage +20), Haste (hero haste +15 / enemy speed +15), Learning (XP +50 / enemy HP +25), Blood
+  (hero damage +20, max HP -20), Fortune (an Epic per hero, purse -25%), the Gambler (50%: win half the purse, else lose
+  half). Greed / Haste / Learning / Blood are `bot_accepts`. `Db.SHRINE_ORDER`, `Db.shrines`, `Db.get_shrine(id)`.
+- **Roll** (`Shrines.roll()`, called by `Main._roll_shrine()` on the break path before the portal roll): `Shrines.chance()`
+  = `--shrine-chance` (clamped 0..1) else `Shrines.base_chance` (= `CHANCE` 5%); draws only from `shrine_rng`: the chance
+  (no draw for 0 or 1), then the pick among `Shrines.available()` (the pool without the timed shrines that run now).
+  `Main._roll_shrine()` first calls `Shrines.end_wave(players)`: the wave that just ended counts against every running
+  shrine. Nothing knows the wave number, so **endless breaks roll too**; the last wave of a normal run has no break.
+- **Effects only live inside a wave**: `RunState.shrine_effects` `[{id, waves_left}]` (`add_shrine_effect`,
+  `tick_shrine_effects`, `has_shrine_effect`, `shrine_waves_left`, signal `shrines_changed`); `Shrines.begin_wave(players)`
+  (from `Main.start_wave` via `_begin_shrines`, after the heroes' `begin_wave`) sets `shrine_effects_live`;
+  `Shrines.end_wave(players)` clears it, takes the hero effects off and ticks. Every multiplier (`gold_mult`, `xp_mult`,
+  `enemy_damage_mult`, `enemy_hp_mult`, `enemy_speed_mult`) reads 1.0 outside a wave, so the market and **a dungeon never see
+  a shrine, and a dungeon is not a wave for the countdown**. `waves_left` counts the waves still to be played, the running
+  one included (the HUD badge). Several running shrines multiply; a running timed shrine is not offered again.
+- Where the multipliers are read: `Enemy.setup` (HP, contact / projectile damage, speed), `Boss.create` (boss HP),
+  `Pickup.collect` / `collect_to_bank` (gold through `Shrines.gold_find_pct`, which folds the bonus into the collector's Gold
+  Find so the fraction stays per slot; XP through `RunState.scale_xp`, which keeps `shrine_xp_remainder`). Hero side:
+  `Shrines.apply_to_hero` / `clear_hero` use the `PlayerBonuses` source `&"shrine"`.
+- **Accept** (`Shrines.accept(data, slots) -> {"lines"}`): a timed shrine joins `shrine_effects`; an instant one acts at once,
+  in this order: the purse loss (`RunState.try_spend_for(amount, -1, &"shrine", name)`, rounded down), the Gambler's coin
+  (win: `RunState.add_gold_logged(amount, -1, name)` + `gold_gain_log`, lose: the same spend), Fortune's items (one usable
+  Epic per hero with a hero, `ItemGenerator.generate(Source.LOOT, ...)`; a full backpack sells it, all sales in **one** line
+  "Backpacks full: 3 items sold for 201 gold"). Coin and items draw from `shrine_rng`. Texts come from the numbers
+  (`boon_lines`, `bane_lines`, `duration_text`, `effect_text` "Shrine of Greed: +30% gold, enemies +20% damage · 2 waves
+  left", `effects_log`); the purse lines say "empty" only at 0 gold and "too small" otherwise; the Haste bane reads "Enemies
+  move 15% faster".
+- **Vote**: `ShrineVote` (pure data; `VOTE_TIME` 15 s; all voters must accept; one Decline declines; an Accept may turn into
+  a Decline; the clock declines the undecided; `remove_voter` may complete it or end it as "nobody"). `ShrineScreen` (the
+  SHRINE phase): the card (`ShrineIcon`, name, duration, flavour, BOON / BANE in green / red), a timer bar, one chip per
+  voter, A Accept / B Decline, `INPUT_LOCKOUT` 0.4 s, bots vote by `bot_accepts` (at once; demo: `bot_think_time`; with a
+  human present at least `MIN_BOT_DELAY` 0.9 s), an unplugged pad votes like a bot. The result shows 2.4 s (0 s when only
+  bots voted and the screen is not slowed). `Intermission`: `_start_shrine` counts `shrines_offered`, `_on_shrine_decided`
+  counts `shrines_accepted`, applies `Shrines.accept` and emits `shrine_resolved(id, accepted, reason)`; the SHRINE phase sits
+  between LOOT and LEVEL_UP.
+- HUD: `shrine_row` under the gold (`ShrineIcon`, 40 px, picture per `icon_id`, a round badge with the waves left;
+  `Hud.shown_shrines()`); the wave banner lists the running shrines under its title (`Shrines.banner_lines()` ->
+  `Hud.show_banner(text, color, sub_lines)`, one 32 px line per shrine). Smoke log lines (no keys): "a shrine waits after
+  wave N: <id>", "shrine <id> accepted (accepted); running: ...", "wave N runs under shrines: ...", "shrines expired after
+  wave N: ...".
+- Determinism: shrines never touch `RunState.rng`. `shrine_rng` order per break: the chance, the pick; per accepted instant
+  shrine: the coin, then Fortune's items hero by hero.
+
+### The Dungeon
+
+- Flow: `Main._after_wave_end -> _roll_shrine, _roll_portal, open_intermission`; Intermission LOOT -> SHRINE -> LEVEL_UP ->
+  PORTAL (vote) -> [dungeon] -> LOOT (the Epics) -> MARKET; `Main.State.INTERMISSION -> DUNGEON -> INTERMISSION`
+  (`State.DUNGEON` appended to the enum).
+- `Main._roll_portal()` (no randomness): `RunState.portal_pending` after waves **6, 9, 12, 15** (`Dungeon.is_portal_wave`; every
+  mode, so never after 26+) or after the next wave once with `--dungeon` (`RunState.dungeon_forced`, spent by it,
+  `portal_forced` true for that break). `RunState.last_wave_downs` (heroes downed in the wave just cleared) feeds the bots' rule.
+- **PORTAL phase** (`PortalScreen`, `VOTE_TIME` 20 s, `INPUT_LOCKOUT` 0.5 s): all voters accept -> `decided(true)`, any decline /
+  the timeout -> `decided(false)`, nobody left -> skip; an unplugged human abstains, a leaver takes the vote along. Bots
+  (`PortalScreen.bot_accepts(wave, downs, forced)`): yes after 6 and 9 and whenever forced, after 12 / 15 only when nobody was
+  downed in that wave; demo `Main.DEMO_PORTAL_THINK_TIME` 1.5 s. Chips: pending = neutral `UiTheme.GOLD_BORDER`, green =
+  Accept, red = Decline, the slot colour on the name only; `cast()` refreshes its chip. Accepted: `Intermission` sets
+  `_in_dungeon`, hides itself, emits `portal_accepted` (connected `CONNECT_DEFERRED`); the screen idles, **the market
+  countdown does not run inside** and starts with its full time after.
+- `Main.enter_dungeon()`: `RunState.dungeons_entered`, `State.DUNGEON` (`_is_in_action()` = WAVE / WAVE_END / DUNGEON: pause
+  menu, pause button, `drop_player`), the tree unpaused, a `Dungeon` child for the cleared `wave`. `_on_dungeon_finished(success)`:
+  counters (`dungeon_time`, `dungeon_rooms_cleared`, `dungeons_completed` / `_failed`), the payout, `hud.clear_dungeon()`, the
+  tree paused, `Intermission.dungeon_returned(success)`: with items in `RunState.team_loot` the Need / Greed / Pass roll runs
+  and then the market opens (`_loot_to_market`), else the market at once. `Main._teardown_run` frees the dungeon. Revives count
+  as a teammate's only while `Dungeon.counts_revives()`.
+- **Arena layout swap** (`scenes/arena/arena.gd`): `DUNGEON_SIZE` 24 x 14, `play_size` (`get_bounds()` follows it),
+  `in_dungeon_layout`, `decor`, `wall_boxes_for(size)`, `enter_dungeon_layout(env := null, size := DUNGEON_SIZE)` parks the
+  clearing's WorldEnvironment, sun, ground, walls and decor and builds the room in the run's palette (its own decor generator
+  `DECOR_SEED + 17`), switches the **Spirit Healer off** (`process_mode` DISABLED, `spirit_healer = null` meanwhile; a hardcore
+  arena has none to restore); entities, camera, `Arena.current` and the heroes stay (heroes cannot be re-parented:
+  `Player._exit_tree` tears their abilities down). `leave_dungeon_layout()` restores the same node instances. The environment
+  hazards are not part of it (see "Arena environments").
+- `Dungeon` (`scenes/dungeon/dungeon.gd`, PAUSABLE): phases INTRO 2 s -> ROOM -> PAUSE 3 s (heals `ROOM_HEAL` 30%) ... -> OUTRO
+  2.5 s. `start` runs `Player.begin_wave()` on each hero (Artifacts do not grow; the whole reset also re-arms the `wave_start` procs and keeps their "every N" counters counting, so a dungeon entry counts as a wave start for them: no current content authors that trigger); `_leave` ends their effects without
+  `Player.end_wave()`, revives the downed at 50%, restores the layout. Enemies: the cleared wave's eligible set,
+  `Enemy.drops_loot = false` (kills count, no gold / XP / item / Artifact). Rooms: 1 CLEAR 25 kills (cap 12 alive, 1.5x rate),
+  2 SURVIVE 25 s (cap 30, 2.5x), 3 DEFEND 20 s (cap 24, 2x) with the `DungeonBrazier` (30 x grunt HP; enemies within 9 m are
+  taunted onto it and bite it; 0 HP = failed), 4 WARDEN. Fail: every hero down or the brazier destroyed (the dungeon, not the
+  run). Warden: `data/bosses/dungeon_warden.tres` (`boss_wave` 0, base HP 120, Frost Circles + Raise Dead, phase 2 at 50%,
+  enrage at 60 s, no loot / gold, `Boss.director` is a plain Node with `summon(...)`); smoke safety kills a Warden
+  `Dungeon.SMOKE_BOSS_GRACE` 60 s past its enrage. HUD: `Hud.set_dungeon_status(title, task, seconds_left)` / `clear_dungeon()` /
+  `is_dungeon_shown()`.
+- Rewards (`DungeonRewards`): success = one usable Epic per hero into `team_loot`, 50% a tier-set piece, `GOLD_MULT` 20 x average
+  gold; failure = `floor(gold x 0.5)` leaves the purse (spend-log entry `dungeon`, not in `gold_spent`). Randomness: `dungeon_rng`
+  (groups, places, rewards) + `Enemy.setup`'s `RunState.rng` draws.
+- SMOKE: `Main.SMOKE_DUNGEON_ALLOWANCE` 280 game s (60 + 60 + the Warden's grace + 60 + 40) is added to the deadline per portal wave
+  below the last one (and once for `--dungeon`). Log lines: "dungeon entered after wave N ...", "dungeon room k/4 (Name) started /
+  cleared ...", "dungeon cleared|failed ...", "dungeon reward: ...".
+
+### How the packages fit together (integration contracts)
+
+The rules that hold between the packages (found and pinned by `tests/test_m6b_integration.gd`, 24 tests; the sections
+above describe each side).
+
+| rule | where it is enforced |
+|---|---|
+| No Spirit Healer in a hardcore run **or** a dungeon; one hint text | `Arena.create(env, not hardcore)`, `Arena.enter_dungeon_layout`, `UnitFrame.TEAMMATE_HINT` |
+| Portal only after 6 / 9 / 12 / 15 (endless too, never after 26+); `--dungeon` forces one | `Dungeon.is_portal_wave`, `Main._roll_portal` |
+| Events never on boss / elite-rule waves (endless too), no event object outside a wave | `EventSpawner.is_eligible_wave`, `WaveDirector.stop()` |
+| No environment hazard (and no vent decor) in a dungeon | `EnvironmentHazards` gated on a running wave; `ArenaThemes.vents_in` |
+| Shrine effects live only in a wave; a dungeon is not a wave; effects survive it | `Shrines.begin_wave / end_wave`, `Main._begin_shrines` |
+| Dungeon time is not run time (no leaderboard time, no shrine tick) | `Main._physics_process` ticks `run_time` in `State.WAVE` only |
+| Smoke runs never write (or read) the player's leaderboard | `Main.writes_leaderboard`, `Main._record_leaderboard` |
+| Gameplay RNG untouched by the packages | four sub-RNGs (`environment`, `event`, `shrine`, `dungeon`); `RunState.rng` only in `Enemy.setup` etc. |
+| Static caches must not outlive their arena | `Enemy._open_*` keyed on arena + size, `Enemy.invalidate_player_cache()` |
+
+Also pinned there: a break with a shrine, a level-up and a portal runs SHRINE -> LEVEL_UP -> PORTAL -> (dungeon, its Epics roll)
+-> MARKET; shrines roll and run in endless waves past 25; every M6b launch flag parses together in any order; the HUD carries
+the HARDCORE badge, the shrine icons and the dungeon line at once; the lobby's mode choice reaches the run the roll screen
+starts; a smoke run (dungeon, endless quit) never writes the player's leaderboard.
+
+What the integration of the five feature packages changed in code (each with a test in `test_m6b_integration.gd` or the file
+named):
+
+1. **One `UnitFrame.TEAMMATE_HINT`**, replacing MODES' `HARDCORE_HINT` and DUNGEON's constant of the same text.
+2. **`Enemy`'s open-field cache** (`_open_*`, the collider-free interior used by the fast move path) is valid for one physics
+   frame **of one arena at one layout size** (`_open_arena_id`, `_open_size`; `Enemy.invalidate_player_cache()` forgets it
+   too). It was keyed on the frame only, so the dungeon's 24 x 14 m room measured in the same frame left its bounds (+-12 m)
+   to the next arena. Production frames always advance between a dungeon and the next wave; the **tests** run many tests in
+   one engine frame, and a stale +-12 m made `Enemy` fall back to `move_and_slide()`, which in a non-physics frame steps with
+   the *process* delta (load-dependent): the events test "the cart crosses the arena" moved 10.5 of 15.2 m in about half of
+   the full-suite runs. Verified by a probe (poisoned cache in an idle frame: 18.3 m instead of 15.0), fixed, 4 full-suite
+   runs in a row clean.
+3. **Lava vents are not dressed in the dungeon room** (`ArenaThemes.vents_in`, see "Arena environments").
+4. Merge conflicts were all "keep both": `tests/run_tests.gd` (the roll-screen switch of ENV + the shrine-chance switch of
+   SHRINES), `scenes/main/main.gd` (fields `environment_hazards` + `dungeon`; the `shrine_resolved` + `portal_accepted`
+   connections; `_begin_shrines()` + `_downs_at_wave_start`; the SMOKE keys `hazards` + `dungeon_*`),
+   `scenes/ui/intermission.gd` (signals `shrine_resolved` + `portal_accepted`; `shrine_screen.close()` +
+   `portal_screen.close()`), `scenes/ui/unit_frame.gd` (item 1).
+5. **EVENTS review fix-ups** (four commits, each with tests that fail without it): the bots guard the totem, the name tags clamp
+   to the safe screen rectangle, the log lines go through `EventSpawner.logged`, and literal-value tests for aggro 9 m, chest
+   hero distance 10 m, open radius 2 m and totem hero distance 4 m (the constants and the behaviour at 8.9 / 9.1 m, 1.9 /
+   2.1 m, and a scripted arena point 0.4 m inside / outside 10 m and 4 m).
+
+### Content: what is code and what is data
+
+Three content packages (CONTENT-W: weapons, armour tiers, jewellery, suffixes; CONTENT-FX: enchants, trinkets, Legendaries;
+CONTENT-ITEMS: named and class items) on top of the features. The content itself is data; the code hooks are few and each
+has tests.
+
+- **CONTENT-W**: `WeaponData.attack_speed_pct` / `effective_cooldown()`, `Items.WEAPON_RARITY_ATTACK_SPEED`,
+  `ItemInstance.scaled_weapon`, `CombatMath.weapon_cooldown`, `ItemTooltip` (Speed, `+N% Attack Speed`, weapon type names),
+  `ShopOfferCard.type_text`, `ItemBase.min_wave`, `ItemGenerator.pick_base` / `BASE_TOP_TIER_CHANCE`, procedural art
+  (`WeaponModel`, `OnionModel.grip_pose`, `ItemArt`), `tools/item_report.gd` (runs headless, reports the new content).
+- **CONTENT-ITEMS**: `ItemTooltip.unique_needs()` and the "(needs <Ability>)" Equip line.
+- **Integration**: the `"label"` key in unique / enchant params (`ProcSystem.proc_from_unique` / `proc_from_enchant`).
+- CONTENT-DATA and CONTENT-FX changed **no** `.gd` outside `tests/` and `tools/`.
+
+| folder | new files | total | notes |
+|---|---|---|---|
+| `data/weapons/` | 3 | **13** | `two_hand_sword`, `two_hand_mace`, `orb`; proficiency strings added to the Warrior / Paladin (`two_hand_sword`, `two_hand_mace`) and Mage / Warlock (`orb`) `data/classes/*.tres` |
+| `data/forge/` | 3 | **13** | `legendary_two_hand_sword` (Thistlebrand), `legendary_two_hand_mace` (Boulderbloom), `legendary_orb` (Tearglass); found by `Forge.legendaries()` (folder scan) |
+| `data/item_bases/` | 76 | **116** | 64 armour tier II / III bases (62 CONTENT-DATA + the 2 CONTENT-W examples `plate_cuirass`, `plate_carapace`) + 12 jewellery; 96 armour + 20 jewellery in all |
+| `data/affixes/` | 7 | **25** | `ox, lynx, raven, thorns, mending, hunter, magpie` |
+| `data/enchants/` | 26 | **50** | 16 Equip, 18 Chance on hit, 8 On kill, 8 When struck |
+| `data/uniques/` | 97 | **160** | 20 trinkets + 17 Legendaries (FX), 30 named Rare / Epic + 30 class items (ITEMS); by kind: 30 trinkets, 25 Legendaries, 40 named, 40 class items, 25 tier-set pieces |
+| `data/artifacts/` | 0 | 5 | unchanged |
+
+Names: an armour base `display_name` is the piece noun only (no material word; the material comes from `Items.MATERIAL_NAMES` by
+wave), every base name is unique except the five original tier I nouns that two armour types share (Gloves, Belt, Boots,
+Bracers, Leggings); display names are unique across all content (`test_display_names_are_unique_across_all_content`).
+
+#### Weapons, tiers and the generator (CONTENT-W)
+
+- `WeaponData` (data/weapon_data.gd): `attack_speed_pct: float = 0.0` (percent on top of Haste; NOT authored in `.tres`
+  files), `attack_speed_mult() -> float` (1 + pct / 100) and `effective_cooldown() -> float` (cooldown / attack_speed_mult(),
+  what the tooltip shows). `cooldown` stays the base that Attack / Spell Power (`CombatMath.weapon_power_bonus`), PPM chances
+  (`ProcSystem.on_hit`) and `GeneralKit.weapon_damage` are normalised to.
+- `Items.WEAPON_RARITY_ATTACK_SPEED: Array[float]` (per rarity, percent; `[0, 0, 0, 10, 0, 0]`), next to
+  `WEAPON_RARITY_DAMAGE`. `ItemInstance.scaled_weapon(base, rarity)` sets `attack_speed_pct` from that table for attacking
+  weapons only (`base.attacks()`); every weapon item (generated, forged, hand-made via `from_unique`) goes through it.
+  Artifact weapons are scaled at rarity 5 and get none. `CombatMath.weapon_cooldown(weapon, stats)` = `max(0.08,
+  weapon.cooldown / max(0.2, stats.attack_speed_mult() * weapon.attack_speed_mult()))`; `WeaponRunner.cooldown()` (main and off
+  hand, wave-start phase) goes through it, so nothing else changed.
+- `ItemTooltip`: `_weapon_lines` shows `effective_cooldown()` as Speed and a green `+N% Attack Speed` line when
+  `attack_speed_pct > 0`; `weapon_dps` (also the bots' `item_score` and the upgrade badges) divides by
+  `effective_cooldown()`. `WEAPON_TYPE_NAMES` gained `two_hand_sword` ("2H Sword"), `two_hand_mace` ("2H Mace"), `orb`
+  ("Orb"). `ShopOfferCard.type_text` reads that table and adds " (2H)" only when the name does not already start with "2H"
+  (so "2H Sword", "Axe (2H)"). `ItemInstance.unusable_reason` uses `ItemTooltip.type_text`, so a Mage refused the Two-Hand
+  Sword reads "Cannot use 2H Sword" (the same noun as the red type line).
+- `ItemBase` (data/items/item_base.gd): `min_wave: int = 1`. `ItemGenerator.pick_base(slot, usable, favour, wave, rng)`
+  replaces the private `_pick_base(slot, usable, favour, rng)` (public: tests call it). Contract:
+  - candidates: `base.weight > 0`, unlocked, `min_wave <= wave`, armour not heavier than `usable`'s type;
+  - entries: every jewellery base alone (Db order), then one entry per armour type (ascending ArmorType) holding that type's
+    tiers sorted by `(min_wave, String(id))`;
+  - draw 1 (always): `_pick_index` over the entries, weight = top tier's `weight` x `OWN_ARMOR_WEIGHT` (4) for `favour`'s
+    armour type: identical to the old draw while every group has one base;
+  - draw 2 (only for a group with 2+ tiers): `rng.randf() < BASE_TOP_TIER_CHANCE (0.7)` takes the top tier, else the lower
+    one; draw 3 (only with 2+ lower tiers): `rng.randi_range(0, lower - 1)` uniform among the lower ones.
+  - Pitfall found by a test: never compare `StringName`s with `<` (it compares pointers, not text); the sort uses
+    `String(a.id) < String(b.id)`.
+- A tier changes the base **name and look only**; the stat frame comes from the wave budget (`ItemGenerator.tier_multiplier`,
+  +10% / +20%, as for the material word). Making higher tier bases stronger would be a balance change and was not done.
+- Forge: nothing changed in `forge.gd`. The three new Legendary files follow `ForgeLegendaryData`; the Orb one is the first on
+  the `on_cast` trigger with a `match` filter (BonusVocabulary requires exactly one of `ability` / `match` for `on_cast`; no
+  `hit_pct`, a fixed `damage`).
+- Weapons: no new flag. `attack_kind = NONE` + `hand = OFF_HAND` is the passive off-hand path (`Equipment.is_attacking_weapon`,
+  `equip_disarms`, `Player.equip_weapons` bonus-stat source `weapon:off`); the Orb uses it as the Tome does, so it is refused
+  beside a two-hander ("would disarm") and a Warlock holding its starting Staff cannot equip it.
+- Visuals: `WeaponModel` `TYPES` + `reach()` + `_build_mesh` for `two_hand_sword` (greatsword), `two_hand_mace` (maul), `orb`
+  (cradle + a glowing sphere as the gem: `ORB_RADIUS`, `ORB_CENTER`, `_gem_info` / `_gem_mesh`); `OnionModel.grip_pose` has poses
+  for the three types (the 2H weapons sit in the main hand like the axe, the orb in the off hand like the tome); `ItemArt`:
+  shapes `two_hand_sword` (`_greatsword`), `two_hand_mace` (`_maul`), `orb` (`_orb`) in `WEAPON_SHAPES` and `draw_shape`.
+
+#### Hand-made items and enchants (CONTENT-FX, CONTENT-ITEMS)
+
+- **No new trigger, no new block, no new stat id.** Uniques use the triggers `on_hit`, `on_kill`, `when_struck`, `low_hp`,
+  `periodic` and the blocks `bolt chain dot nova explode buff heal drain stun gold shield reflect smite_heal` (named items also
+  `extra_attack`, `slow`), plus keys that already existed: `max_hp_pct` (heal / shield: % of the receiver's Max HP, written
+  with `"amount": 0.0` because the unique test requires the `amount` key), `hit_pct` (Bracers of the Hidden Blade: 120% of
+  the hit; its `damage` 14 is only the key `_check_effect` requires, `hit_pct` overrides it), `every` (Ring of the
+  Mischievous Imp: `chance` 100 + `every` 4 = every 4th kill), `spread`, `max_stacks`, `per_wave`, and the rider keys `slow` /
+  `stun` / `dot` on damaging blocks, and now `label`. Every key of every new unique is in `BonusVocabulary.PROC_KEYS` (test).
+- **Class items** (`unique_effect = &"ability_mod"`) carry `unique_params = {"ability": <real id of the class>, "mods": {...}}`.
+  Mod keys used: `<param>_add` for cooldown, duration, buff_duration, shield_duration, radius, range, echoes, targets, pulses,
+  pierce, chain, missiles, stun, freeze, threshold, heal_pct, heal_max_hp_pct, burn_pct, slow_pct, shuriken, and `<param>_pct`
+  for `power_pct` (Ice Barrier: the whole absorb, via `power`) only. Every key names a parameter the ability reads through
+  `params_at_rank` (checked for all 30 by `test_items_content_m6b.gd`). Effect-level checks: Ice Barrier x1.25, Fireball burn
+  share 0.50 -> 0.65 of the hit, Lay on Hands cooldown 60 -> 50 at Rank I, four Shuriken Toss stars. Review fix-ups: Robe of
+  the Tidewoven Veil scales the whole Ice Barrier (`power_pct` 25, was `shield_pct`), Long Coal Staff adds burn damage
+  (`burn_pct_add` 15, was a duration that lowered the burn rate), Girdle of Lasting Grace shortens the cooldown unconditionally
+  (`cooldown_add` -10), five Equip lines say "longer" / "more" instead of absolute values, Leathers of the Unseen Throw adds a
+  shuriken (`shuriken_add` 1, `range_add` 3 kept).
+- **`ItemTooltip.unique_needs(item, hero)`** returns the ability of an ability-mod item the viewing hero has not learned (null hero
+  = nothing missing); `_rebuild` then prints the Equip line as "<text> (needs <Ability>)" in `ItemTooltip.DIM` instead of
+  `ENCHANT_GREEN`. `Artifacts.hero_knows` / `Artifacts.ability_name` do the lookup (shared with the Artifact properties).
+- **The `"label"` key** (`086c3e9`): `Proc.label` is the text floated above the hero when a label-producing block fires (buff,
+  shield, cheat_death, cooldown, forced_crit, resource, heal of talent / set procs). Defaults: a talent / set proc takes its
+  entry's name, an **enchant proc its prefix, a unique its display name**. In all three builders (`proc_from_params`,
+  `proc_from_enchant`, `proc_from_unique`) a **`"label"` key in the params wins, even `""` (silent)**; without the key nothing
+  changes. Only the Notched Tally Stick uses it (`"label": ""`: it stacks on every kill). Polish candidate: Breastplate of
+  Unbroken Anger (40% x ICD 0.5 s: up to 2 labels per second when hit a lot). Tests (`tests/test_procs.gd`, +4, all red before
+  the fix): `test_a_label_key_in_unique_params_wins_over_the_item_name`, `test_a_label_key_in_enchant_params_wins_over_the_prefix`,
+  `test_a_silent_unique_shows_no_floating_text_and_a_plain_one_does`, `test_notched_tally_stick_stays_silent`.
+- Weapons of the hand-made items reuse existing bases (`wand`, `sword`, `dagger`, `staff`, `two_hand_axe`); Staff of the Deep
+  Winter and Tearjerker are the main-hand Legendaries. Rarity budget: Uncommon trinket ~5 points, Rare ~8, Epic ~11.
+- Texts: all new unique texts are at most 127 characters (main-hand weapons at most 112); the content tests guard it (unique
+  text <= 130, main-hand weapon <= 115, enchant line at rank III <= 120) because of the tooltip-height test.
+- **Gotchas found while writing the tests**: `periodic` / `low_hp` procs have **no hit target**: `nova` / `explode` (also with
+  `"at": "target"`) then centre on the wearer, while `bolt` / `chain` / `dot` / `drain` / `slow` / `stun` / `smite_heal` use
+  the nearest enemy within 9 m and wait (retry every 0.25 s) while there is none (Wayward Compass is therefore a `periodic
+  explode` around the wearer). A DoT re-proc inside its own duration only refreshes it (`stacks` 1 = the cap), the unused
+  remainder is lost: Gloves of the Patient Rot has interval 6 s / duration 5 s so the rot is never refreshed early; one big
+  `_physics_process(delta)` also ticks the DoT with that delta in the same step, so tests that look at DoT totals step in 1/60 s.
+  `on_kill` procs carry the corpse as their target: a `chain` / `bolt` / `drain` then starts at the nearest *living* enemy
+  within 9 m of the corpse, an area block centres on the corpse (Arcing, Wailing, Bone Chime).
+- **Enchant balance of the pool** (FX alone, a temporary report script, 10 000 generated items, seed 20261010, waves 1-25, all
+  sources): 6075 items carry enchants; 7234 enchant rolls: 3447 from the 24 old, 3787 (52.4%) from the 26 new (26 of 50
+  kinds, so the share is proportional); every one of the 50 enchants rolled at least once, the rarest new one is Soothing (43
+  rolls). By kind: Equip 3550, On kill 2146, On hit 1019, When struck 519 (Equip and On kill fit every slot; Uncommon items
+  take only Equip). The "no balance tuning" rule left all weights alone, the pool simply has 26 more entries. 367 Legendary
+  drops over **all 25** Legendaries (266 of them the new 17, each new one 9-24 times); 457 trinket drops over all 30 trinkets
+  (285 of them new).
+
+#### How the features use the new content
+
+- **Black Market** (`BlackMarket.roll`): 40% a max-roll Epic from `ItemGenerator.generate(Source.LOOT, ...)` (hand-made Epics and
+  set pieces are skipped by design), otherwise a tier-set piece. So the new **generated** content reaches it (tier bases,
+  jewellery, suffixes, enchants, weapons); the 60 new hand-made items do not, by the Black Market's own rule.
+- **Shrine of Fortune** (`Shrines._give_epics`) and **dungeon rewards** (`DungeonRewards.epic_for`) both call
+  `ItemGenerator.generate(Source.LOOT, wave, rng, {rarity: EPIC, usable_by, class_data, ...})`: they get the generated content
+  **and** the hand-made Epics (named and class items).
+- **Enchanter**: `reroll_pool` / `imbue_pool` run over all of `Db.enchants`, so the 26 new enchants are in the pools as soon as
+  `enchant_fits` allows. **Artifacts** are untouched (no file, no code, no pool); the Enchanter refuses them.
+- **Tooltips**: the Black Market card, the loot roll window and the shop show the new weapon lines / "(needs X)" lines through
+  the same `ItemTooltip`; the suite's tooltip-height tests (`test_m6_artifacts_fit`, `test_ui_market_tooltips`) stay green
+  with all 160 uniques.
+
+#### Tools
+
+`tools/item_report.gd` did not run headless before CONTENT-W (its typed `Array[ItemInstance]` / `Array[ClassData]` annotations made
+the `-s` main script compile `ItemGenerator` -> `Db` before the autoloads exist, and after the compile error it hung without
+quitting). The annotations are now `Array` / `Variant`: `godot --headless --path . -s res://tools/item_report.gd -- --count=N`. It
+prints the content header (`Content: 116 bases, 25 suffixes, 13 weapons, 50 enchants, 160 uniques`), the generated weapons by base
+(13) and armour by base material tier (I / II / III and which tier bases), the Epic attack-speed count, the jewellery bases seen
+(20 of 20), the per-suffix counts (25 of 25), the enchant and hand-made distributions. Merged head, 3000 items, seed 20261010: 647
+weapons (orb 38, two_hand_mace 44, two_hand_sword 53), every Epic attacking weapon has the attack speed (89 of 89), armour tier I
+816 / II 388 / III 294, 20 of 20 jewellery bases, 25 of 25 suffixes, 129 of 160 uniques seen (hand-made rolls are about 5% of the
+generations; the 31 unseen are Rare / Epic named and class items and a few old ones, and every hand-made item is proven reachable
+by `test_every_hand_made_item_can_be_rolled_from_one_of_its_sources` and the Epic roll tests).
+
+### Determinism and the seed-5 smoke (M6b draw points)
+
+Everything goes through `RunState.rng` or a private generator seeded from the run seed; `--fixed-fps 60` plus `--seed` is
+bit-identical per run (three runs of the merged head gave identical results in every `SMOKE_RESULT` key except `perf` /
+`real_time` / `run_time`).
+
+- The roll of the environment is one `environment_rng` draw, so the hazards' stream and everything after it is a function of the
+  seed; a forced `--env` draws nothing, so it plays another stream than the same seed's unforced run. Events, shrines and the
+  Dungeon draw from their own generators (see the sections above); the packages never touch `RunState.rng` except through
+  `Enemy.setup` and the item generator.
+- `ItemGenerator.pick_base`: the first draw is the old weighted pick over the entries (one `_pick_index` per call); the tier draws
+  (`randf` 0.7, then `randi_range` among lower tiers) happen **only for an armour group with 2+ available tiers**, i.e. from
+  wave 9, so below wave 9 and for jewellery the draw count is the old one. The Epic +10% attack speed, the `"label"` key and the
+  tooltips use no rng.
+- **What moves a seeded run:** the new content in the weighted pools (suffixes, enchants, weapons). The code changes alone are
+  neutral: a scratch copy of the merged tree with only the 212 newly added data files removed (3 weapons, 76 item bases, 7
+  suffixes, 26 enchants, 97 uniques, 3 Forge Legendaries) reproduces the pre-content numbers **exactly**. Adding the categories
+  back one at a time: item bases (tier II / III + jewellery) and hand-made uniques change **nothing** (a different base only
+  renames an item: the draw count and every stat roll stay the same); suffixes (612 kills / 239 gold), enchants (604 / 265) and
+  weapons with their Forge Legendaries (612 / 217) each shift the numbers, because they enter weighted picks that decide the
+  stats and enchants of generated items (and, for the weapons, what a bot buys and forges). The Epic +10% attack speed did not come
+  into play in the six waves (no Epic attacking weapon was equipped).
+- `godot --headless --fixed-fps 60 --path . -- --smoke --waves=6 --seed=5` (4 bots), exit 0, 0 errors, 0 warnings in every run:
+
+  | | M6a head (Forest Ruin, no roll) | M6b features head `23c971f` (Ice Cave) | merged head (Ice Cave) |
+  |---|---|---|---|
+  | kills / gold / level | 587 / - / 7 | 603 / 223 / 7 | **607 / 215 / 7** |
+  | items looted / bought | - | 11 / 25 | 12 / 25 |
+  | weapons forged | - | 0 | 1 |
+  | goblins spawned / killed | 2 / - | 1 / 1 | 0 / 0 |
+  | events spawned / completed | - | 2 / 2 | 2 / 2 |
+  | game time | 211.9 s | 214.7 s | 216.0 s |
+
+  Wave 1 of the merged head is bit-identical to the features head (52 kills, 52 gold, 1 looted, 0 bought, the same market carry);
+  the first difference is wave 2 (120 vs 119 kills): the shop offers made at the end of wave 1 already draw from the larger
+  pools. The Loot Goblin spawn of wave 3 (1 -> 0) is a `RunState.rng` draw that moved with it, not a rule change. The same
+  command with `--env=forest_ruin` gives 595 kills (1 goblin, gold 178). **Every smoke or balance number recorded before the
+  content merge is not comparable with this head**; the 587 of the M6a chapter belongs to the Forest Ruin default of that time,
+  the 603 of the features head to the Ice Cave roll.
+
+### Validation (M6b)
+
+All runs headless, GL Compatibility; `--fixed-fps 60` where bit-identical results matter.
+
+**Features** (the five feature packages merged onto `eac32c0` = PR #9 head, `--no-ff`, import + full suite after each):
+
+| step | merged | suite after it |
+|---|---|---|
+| 0 | `m6b-base` (P0-B hooks + the GDD-B decisions) | 2274 passed |
+| 1 | MODES `e0dae42` | 2330 |
+| 2 | ENV `578c7e0` | 2386 |
+| 3 | SHRINES `b235ed3` | 2482 |
+| 4 | EVENTS `9d76c72` (its four review fix-ups afterwards) | 2525 |
+| 5 | DUNGEON `2f4a2ca` | 2621 passed, 3 failed -> fixed -> 2625 |
+| 6 | the integration tests and fixes ("How the packages fit together") | **2649 passed, 0 failed** (two runs in a row; the only `ERROR` line is the expected `ProcSystem.shield_hp` test, the only `WARNING` the Warden-data-missing test) |
+
+Late fixes on the features branch (each with tests): the arena name moved into the end screen's mode row, an endless run given up
+or dropped after a cleared wave goes on the board, a smoke run with an unknown argument reports `bad_args` and exits 1, the
+Dungeon entry documented as a wave start for `wave_start` procs. Head `23c971f`: 2678 passed.
+
+- `--fixed-fps 60 --smoke --waves=6 --seed=5` (features head `d5449f7`): exit 0, 0 errors, 0 warnings, Ice Cave, 603 kills, 223 gold,
+  level 7, 2 events (2 completed), 84 icicles laid (2 hero hits); bit-identical to the run before the last two changes.
+- `--smoke --waves=16 --seed=5 --players=4 --shrine-chance=0.5 --dungeon=1` (the command as recorded, no `--fixed-fps`: without it
+  the counts differ run to run, because spawn points follow the camera): completed, 0 errors / 0 warnings, 6357 kills, 5 events (5 won), 8 shrines offered (3
+  accepted), **5 dungeons entered and won** (after waves 1 (forced), 6, 9, 12, 15; 20 rooms, 377 s inside), 405 icicles laid and 0 hero
+  hits, 0 wipes; an earlier run of the same line: events 7/7, shrines 8/3, dungeons 4/4.
+- `--smoke --mode=endless --hardcore --start-wave=24 --start-level=30 --waves=8 --seed=5 --players=4 --shrine-chance=0.5
+  --dungeon=1`: completed (waves 24-31), 0 errors / 0 warnings; 2 events spawned (0 won), 4 shrines offered (2 accepted), the forced
+  dungeon after wave 24 entered and **failed** (all heroes down after 11 s), 530 wipes revived by the smoke runner (level-30 heroes in
+  starting gear against waves 24+ and a hazard that hit them 392 times for 27k damage). No balance conclusion should be drawn from it.
+- Extra smokes, all exit 0 / 0 errors / 0 warnings: swamp + caravan + `--shrine-chance=1` + forced dungeon (4 waves: the event won, 3
+  shrines / 2 accepted, dungeon 4 / 4 rooms, 20 pools laid, no hero hit); cemetery + hardcore + totem (waves 4-10: 6 events won, 3
+  dungeons won, 1 shrine accepted, 82 hands laid, 2 hero hits); volcano endless from wave 14 (the portal of wave 15 was declined by
+  the bots' rule: somebody was downed; 336 vents erupted, 602 enemy hits for 11k damage, 4 enemy kills); ice cave endless hardcore
+  from wave 29 with 2 heroes (a boss wave and an elite-rule wave: completed). **No `leaderboard.json` appeared in the player's user
+  directory after any smoke run.**
+- Screenshots (1920 x 1080, xvfb): a hardcore endless Volcano dungeon with the HARDCORE badge, "Dungeon - Room 3/4", the Learning
+  shrine icon with its 3 waves and no vents / hazards in the room; a hardcore wave with a downed Mage reading "Only a teammate can
+  revive you"; the endless hardcore Cemetery end screen, Summary and Leaderboard pages.
+
+**Content** (the three content branches merged onto the features head `23c971f`, `--no-ff`, import + full suite after each):
+
+| step | merged | conflicts | suite after it |
+|---|---|---|---|
+| 0 | the features head `23c971f` (baseline) | - | 2678 passed |
+| 1 | CONTENT-W + CONTENT-DATA -> `f9d8ca0` | none | 2721 |
+| 2 | CONTENT-FX -> `2a14668` | none | 2801 |
+| 3 | CONTENT-ITEMS -> `cb20f36` | 2 test files (count pins) | 2820 |
+| 4 | label fix `086c3e9` (+4 tests) + content integration tests `b28af3b` (+12) + comment fix `706b16b` | - | **2836 passed, 0 failed** |
+
+The two conflicts were count pins: `tests/test_items_gen_content.gd` `test_unique_counts` (trinkets 30, Legendaries 25, named exactly 40,
+class items exactly 8 per class) and `tests/test_m6_artifacts_core.gd` (`Db.uniques.size()` = 160 = the real file count: 63 (M6a) + 20 + 17 +
+30 + 30). `scenes/ui/items/item_tooltip.gd` (W's Speed lines, ITEMS' "(needs X)" line) auto-merged and was checked by reading and by the
+suite; `tools/item_report.gd` was changed by the W / DATA branch only. No SCRIPT ERROR in the final run; the only `ERROR` line is the expected
+`ProcSystem.shield_hp is read-only` one of `test_shield_hp_is_read_only` (a `ProcSystem` write; it is not `warrior_execute.gd`, whose line writes
+the *Enemy's* own field), the only `WARNING`s the expected ones of the Warden-data test and of the two unknown-argument tests.
+
+- `--fixed-fps 60 --smoke --waves=6 --seed=5`: see the table in "Determinism and the seed-5 smoke" (607 kills, exit 0, 0 errors).
+- `--fixed-fps 60 --smoke --waves=16 --seed=5 --players=4 --shrine-chance=0.5 --dungeon=1`: exit 0, 0 errors, 0 warnings, 16 / 16 waves,
+  5900 kills, level 17, 86 items looted / 74 bought, 5 weapons forged, 8 shrines offered / 3 accepted, 4 / 4 dungeons cleared (0 failed), 8
+  Enchanter actions, 1 boss, 2 downs / 2 revives, no wipe (Ice Cave).
+- Mutation checks of `test_m6b_content_integration.gd` (each mutation made the named tests fail, then reverted): a duplicated display name,
+  a unique with an enchant's id, an enchant with weight 0, all tier II / III bases moved to `min_wave` 99, a unique without sources, all new
+  jewellery bases with weight 0.
+- Tooltip-height sensitivity (re-run after every merge of item content): `test_m6_artifacts_fit.gd::test_no_ordinary_wave_25_item_is_scaled_or_loses_its_title`
+  opens every hand-made unique as a wave-25 Legendary (two *random* enchants under the unique text) in the loot roll window and wants the title
+  block never hidden. Tearjerker's first 152-character text made it one line taller than every old Legendary (612 px vs 583 px) in some
+  random-enchant draws, so all new texts are short. With the two longest enchants (Shadowflame + Wailing) under every Legendary the tallest
+  tooltip is 583 px = the old Bulwark / Stormcaller; it stays green with all 160 uniques.
+
+### Open items for the final balance (M6b)
+
+No balance work was done in the M6b packages; the numbers are starting values. These continue "Open items for the M6b balance" of the M6a chapter
+(the Flesh Golem, wave 20, Vor'thalax by party size, solo / duo survival, Artifact supply, hero HP against the damage curve, how to read a smoke
+matrix); the GDD 9 list ("Nyitott kérdések M6b-re") carries them all.
+
+1. **Epic-only attack speed vs Legendary.** The +10% is on the Epic row only (`Items.WEAPON_RARITY_ATTACK_SPEED = [0, 0, 0, 10, 0, 0]`), so a
+   Legendary swings slower than the Epic it is forged from (Speed 0.82 becomes 0.90 on a sword). In a DPS probe (all primaries at 40) the Legendary's
+   plain-attack DPS is equal to or below the Epic's for dagger (104.0 vs 107.4), wand (86.7 vs 89.5), staff (78.0 vs 80.5), bow (76.7 vs 77.5), sword
+   (64.4 vs 65.0) and mace (62.7 vs 63.4), and about +0.3% for the gun, axe and both new two-handers. Decide: keep Epic-only and say so in GDD 4.1 (done),
+   or Epic+ (`[0, 0, 0, 10, 10, 10]`, a one-line edit; `test_forged_and_hand_made_epics_keep_the_bonus_and_legendaries_do_not` then needs flipping). The bonus
+   is a real speed gain that multiplies with Haste and also lifts the Attack / Spell Power part of the DPS (power per hit is normalised to the base
+   cooldown); PPM procs and ability damage normalisation keep the base cooldown, so an Epic weapon gets slightly more procs per minute (as with Haste).
+2. **Shields stack without a cap.** Shields from different procs add up; M6b raises the shield sources from 1 to 8 (Warding, Bulwarking, Gravewarded, Soul
+   Lantern, Singing Bowl, ...): consider a per-hero total cap (e.g. 50% Max HP).
+3. **School bias of Scorching / Glacial.** The +Fire / +Frost Equip enchants roll on every class (a dead stat for Warrior / Rogue / Paladin): consider a
+   class school bias in `power_enchant_weight`.
+4. **Rarity inversion.** Epic Girdle of the Unyielding Layer (10 absorb / 4 s at 35% HP) against Legendary Bulwark of the Last Stand (8 / 3 s at 25%); Rare
+   Cuffs of the Last Breath is close to the Legendary.
+5. **Orb.** Stats (+4 Spell Power, +1 Intellect) are a starting value at the Tome's budget; the bots' `item_score` weights Spell Power at 1.0, so a Mage
+   bot still prefers a Tome (2 Int x 3 + 3 Crit) over an Orb. The Warlock starts with the two-handed Staff, so an Orb (and the Tearglass Legendary) needs a
+   one-handed main hand first (wand, dagger or sword); a Staff in hand refuses it with "would disarm", as for the Tome. The generator still offers Orbs to Warlocks.
+6. **Gold income.** Prospector's Pebble (2 gold / 15 s, about +10 gold per wave) and Breeches of the Light Fingers (6% x 3 gold per kill, Gold Find 20, about
+   +10% of a kill's gold) add some income against the late-game purse.
+7. **Untuned content.** The two-hander numbers sit between the One-Hand Sword / Mace and the Two-Hand Axe in damage per second (Sword 8.3 + 1.17 Str per s, Mace
+   8.1 + 0.75 Str + 0.38 Int per s, Axe 8.0 + 1.07 Str per s); armour tiers change names and looks only; the new suffixes' weights and shares are untuned (the stat
+   prices of `ox` (Armor 2.0), `magpie` (Gold Find 0.5) and `thorns` / `hunter` (default 1.0) are the existing ones; `mending` pairs Resource Regen (40%) with
+   **Spirit** (60%) instead of Healing Done, because Healing Done is read by `PaladinKit.heal_amount` only, and Spirit costs 1.5 budget points per point); the hand-made
+   proc numbers are flat (late-wave flat damage procs are weak by design) except Bracers of the Hidden Blade (`hit_pct`) and the heals / shields (`max_hp_pct`).
+8. **Seeded baselines.** Every smoke / balance number recorded before the content merge is not comparable with this head (see "Determinism and the seed-5
+   smoke"); the pre-merge numbers are reproducible only with the new data files removed. The 25-wave matrix (4p / 2p / 1p) has to be run on this head.
+9. **The new systems' numbers** (event HP and rewards, the 30% / 5% chances, shrine effects, hazard damage and rates, Dungeon room rates, brazier HP, Warden,
+   rewards and the fail price, Endless / Hardcore difficulty past wave 25) are starting values, tuned together with the rest.
+
+### Known gaps
+
+- The bog pool's rim is drawn under its mud ring (1.3:1 contrast) and the boss circles on the ice floor are unreviewed art calls (M7).
+- Breastplate of Unbroken Anger (40% x ICD 0.5 s) still shows its name on every proc (up to 2 floating labels per second); the `"label"` key can silence it.
+- The enchant prefixes Rallying and Spiked share a word with the abilities "Rallying Sprint" (`general_sprint`) and "Spiked Wall" (`warrior_shield_wall`):
+  different namespaces, no functional clash.
+- The Black Market sells generated max-roll Epics and tier-set pieces only, so the 15 named + 14 class Epics of CONTENT-ITEMS and the 4 Epic trinkets of
+  CONTENT-FX reach the player through shop / loot / elite / goblin / boss, the Shrine of Fortune and the dungeon rewards, not through the Black Market.
+- A dungeon entry counts as a wave start for `wave_start` procs (no content uses that trigger).
+
+### M6b tests
+
+Each new behaviour has a test that fails without it (the new tests were mutation-checked). The full suite is **2836 passed, 0 failed** (2274 at the
+foundation, 2678 at the features head). The runner counts a test that dies on a SCRIPT ERROR (e.g. `float(null)`) as passed: read the log's SCRIPT ERROR
+lines. Tests that touch the board set `Leaderboard.writes_enabled = true` and `Leaderboard.path_override` (a temp file named per process); a test of the
+roll screen sets `EnvironmentRollScreen.enabled` and restores it.
+
+| File | Tests | Covers |
+|---|---|---|
+| `tests/test_m6b_foundation.gd` | 74 | total_waves, run settings, sub-RNGs, `Arena.create`, Db environments, the EventSpawner slot, the phase chain, Leaderboard core, flags, SMOKE keys, `bad_args` |
+| `tests/test_m6b_modes.gd` | 59 | endless rules, hardcore, lobby mode select, leaderboard flow (abandoned runs included) and end screen |
+| `tests/test_m6b_env.gd` | 57 | roll, decor budget, hazards, markers, roll screen, end-screen label |
+| `tests/test_m6b_events.gd` / `_events_bots.gd` / `_events_tags.gd` | 42 / 16 / 8 | the three events (+ log routing, literal numbers), camera points, bot play (totem guarding with a swarm), name-tag clamp |
+| `tests/test_m6b_shrines.gd` | 96 | pool, vote, roll, effects, screen, phase, HUD, break path |
+| `tests/test_m6b_dungeon_core.gd` / `_dungeon_ui.gd` | 49 / 50 | arena layout, rooms, Warden, rewards / portal vote, Intermission handoff, HUD, Main flow |
+| `tests/test_m6b_integration.gd` | 24 | the cross-feature rules above |
+| `tests/test_m6_weapons.gd` | 20 | the three weapons' data, proficiencies, Orb equip rules (never with a two-hander; a Warlock's Staff refuses it, "would disarm"), two-handers replace the shield, generator offers, models and icons, the three Forge Legendaries firing (Tearglass on `on_cast`), Epic attack speed rule / cooldown / attack rate / forged and hand-made Epics, the refusal text "Cannot use 2H Sword" |
+| `tests/test_m6_item_tiers.gd` | 11 | `min_wave` data, tier availability by wave, the 70% / 15% / 15% split, armour-type weights unchanged, `usable_by`, determinism and draw counts, a 3-tier synthetic slot, tie-break by id, no base -> null, generated chest names |
+| `tests/test_m6_content_data.gd` | 11 | the lists hold the GDD counts (96 armour, 20 jewellery, 25 suffixes); each new base / jewellery / suffix loads with valid fields (slot, armour type, tier wave, weight, unique piece names without material words, no trademarks, tier I model piece); exactly one base per slot x armour type x tier; every new base is rolled at its wave (not before); every new suffix is rolled on its slot and puts its stats on a Rare item |
+| `tests/test_content_fx_enchants.gd` | 32 | 50 enchants / per-kind counts; field validity of the 26 (prefix, slots, kind rules, ICD range, school, tooltip placeholders at all five ranks, line length, trademarks); equip numbers x rank and their effect in the combat math (school damage, Area Size, Cooldown Reduction on a real ability, Gold Find, Thorns on a real melee hit, Parry, XP); each of the 18 proc enchants forced through its real trigger and the effect checked against its tooltip; the documented PPM / chance rates by statistics; every new enchant fits an item and is rolled by the generator (3000 items); the prefixes are Rallying and Spiked without a suffix echo |
+| `tests/test_content_fx_uniques.gd` | 47 | ids / counts / unique display names (also against every Artifact and Forge Legendary name); field validity of the 20 trinkets and 17 Legendaries (slot, armour type, rarity, sources, `min_wave`, vocabulary, `PROC_KEYS`, tooltip phrase, text length, every number of the params in the tooltip, trademarks); Legendaries cover all 12 slot types and the 5 that had none; class coverage; generator scaling and 2 random enchants; all 25 Legendaries and all 30 trinkets drop (1500 / 2400 rolls); one test per effect (37) through its trigger with exact damage; statistical rates; the Staff of the Deep Winter flavour |
+| `tests/test_content_fx_fight.gd` | 1 | three heroes wear all 37 new hand-made effects and the 26 enchants through a 24 s simulated fight (the `test_procs_smoke.gd` engine): 0 errors, at least 25 different new procs fire |
+| `tests/test_items_content_m6b.gd` | 17 | loading and fields, Rare / Epic rules, class usability, ability targets, mod keys vs params, the text's numbers equal the mods' (exact set), relative wording, the reworded lines, the mods reaching `params_at_rank` through `Equipment.equip`, the Equip line (green; DIM "(needs X)" until learned), Lay on Hands and Shuriken Toss counts, every named proc firing (forced roll) |
+| `tests/test_items_content_m6b_effects.gd` | 2 | Mage spells: Ice Barrier x1.25 and the Fireball burn share |
+| `tests/test_m6b_content_integration.gd` | 12 | the content cross-checks (below) |
+| `tests/test_procs.gd` | +4 | the `"label"` key |
+| `tests/test_ui_items.gd` | +1 | `test_epic_weapon_tooltip_shows_the_attack_speed_bonus` |
+
+`test_m6b_content_integration.gd` (all new): `test_ids_match_the_files_so_no_two_files_share_an_id` (`Db` dictionary size == number of `.tres` files for
+uniques / enchants / item bases / suffixes / weapons / artifacts / Forge Legendaries; every unique id == its file name), `test_proc_ids_do_not_clash_between_uniques_artifacts_and_enchants`
+(ProcSystem keys `fire_count` and DoT stacks by the proc id), `test_display_names_are_unique_across_all_content` (case-insensitive: uniques, Artifacts (+ the Fangs pair name),
+Forge Legendaries, weapons, item bases, sets; enchant prefixes and suffix phrases unique among themselves and no prefix equals an item name; the only allowed repeats are the five
+original tier I nouns), `test_the_merged_totals` (13 weapons, 13 Forge Legendaries, 116 item bases (96 armour + 20 jewellery), 25 suffixes, 50 enchants (24 + 26), 160 uniques, 5 Artifacts),
+`test_every_hand_made_item_can_be_rolled_from_one_of_its_sources`, `test_black_market_max_rolls_carry_the_new_content` (500 rolls at wave 20: always an Epic, never an Artifact),
+`test_shrine_of_fortune_epics_carry_the_new_content` (150 seeds x 4 heroes), `test_dungeon_rewards_carry_the_new_content` (600 rolls), `test_the_epic_features_roll_the_new_hand_made_epics` (all 15
+new named Epics come up, each class gets its class items), `test_the_enchanter_can_reroll_into_every_new_enchant` (all 26 in the `Enchanter.reroll_pool` of some Epic item),
+`test_enchanter_rerolls_land_on_new_enchants_and_keep_artifacts_out` (120 real rerolls; every Artifact refused with `REASON_ARTIFACT`),
+`test_artifacts_are_unchanged_by_the_content_packages` (1500 normal rolls never produce an Artifact).
+
+Pins changed (final values): `test_data_and_state.gd` `Db.weapons.size()` 10 -> **13**; `test_items_gen_content.gd` `test_armor_and_jewellery_bases` = exactly one tier I
+(`min_wave` 1) base per slot x armour type (32), at most one base per slot x type x tier, `min_wave` in {1, 9, 17}, jewellery `min_wave` 1, **96 armour bases, 10 neck, 10 ring,
+116 item bases**, `test_suffixes` = **25**, `test_unique_counts` as above, `test_no_blizzard_trademarks` also scans every enchant `prefix` and `description`;
+`test_m6_artifacts_core.gd` `Db.uniques.size()` = **160**; `test_m6_shopsinks_core.gd` `test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic` (the per-item "two
+enchants" assertion became "one enchant each, at most 3 misses in 300 rolls": `MAX_ROLL_TRIES` = 12 at ~40% each, and the new base tiers moved the fixed seed's rng path
+onto a miss); `test_ui_market_tooltips.gd` `_check_column_apart` (a test fix: it compared the bottom tooltip's free plan with the top tooltip without
+`PlayerPanel.TOOLTIP_NEIGHBOUR_GAP`, 8 px, although `_tooltip_plan` moves a tooltip that would come closer than the gap; which Legendary pairs get compared depends on the
+`Db.uniques` order); `test_forge.gd` loops over `Db.weapons`, so it already covers the 13 Legendaries; `test_procs.gd` keeps its list of the 24 original enchants.

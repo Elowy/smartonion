@@ -8,7 +8,8 @@ extends PanelContainer
 ## RB / LB learned Active abilities with this player's button prompts, then the 2 x 2 cluster of
 ## learned Auto-cast abilities behind a gear mark; cooldown sweep, dimming and rank pips on
 ## every icon) and a DOWNED overlay over the bars: the revive progress (teammates' or the Spirit
-## Healer's, whichever is further along) and the hint "Go to the Spirit Healer".
+## Healer's, whichever is further along) and the hint "Go to the Spirit Healer" (or, in a level
+## without a Spirit Healer, the dungeon, "Only a teammate can revive you").
 ## Right-hand frames (P2, P4) are mirrored: portrait on the outside edge, icons on the inside.
 ## Learned abilities make the frame wider (towards the screen centre), never taller.
 ## M6: the hero's active consumables (flask / elixir, food – Player.consumables_active) show as
@@ -35,6 +36,9 @@ const PANEL_ALPHA := 0.8
 const SMALL_FONT := 18
 ## Shown while downed: what a ghost should do (GDD 1 – 1 s in the healer's circle = full HP).
 const GHOST_HINT := "Go to the Spirit Healer"
+## Shown while downed where no Spirit Healer waits (M6b: a hardcore run's clearing, the dungeon): a teammate
+## has to revive the hero.
+const TEAMMATE_HINT := "Only a teammate can revive you"
 const WAITING_HINT := "Spirit Healer: %d s"
 const SICKNESS_HINT := "Resurrection Sickness: %d s"
 ## Hint text and revive bar fill (pale spirit blue while the Spirit Healer channels).
@@ -282,16 +286,20 @@ func _on_downed_changed(is_downed: bool) -> void:
 
 
 ## The ghost hint: Resurrection Sickness time left, else the Spirit Healer's next pulse
-## ("Spirit Healer: 7 s" while waiting in its circle, "Go to the Spirit Healer (7 s)" else).
+## ("Spirit Healer: 7 s" while waiting in its circle, "Go to the Spirit Healer (7 s)" else). Where there is no
+## Spirit Healer - a hardcore run, or an arena without one (the dungeon) - it is [constant TEAMMATE_HINT].
 func _update_hint() -> void:
+	var arena: Arena = Arena.current if is_instance_valid(Arena.current) else null
+	var healer: SpiritHealer = arena.spirit_healer if arena != null else null
+	var has_healer := healer != null and is_instance_valid(healer)
 	var text := GHOST_HINT
 	var color := GHOST_HINT_COLOR
-	var healer: SpiritHealer = Arena.current.spirit_healer \
-			if Arena.current != null and is_instance_valid(Arena.current) else null
 	if player.res_sickness_left > 0.0:
 		text = SICKNESS_HINT % ceili(player.res_sickness_left)
 		color = Player.RES_SICKNESS_TEXT_COLOR
-	elif healer != null and is_instance_valid(healer):
+	elif RunState.hardcore or (arena != null and not has_healer):
+		text = TEAMMATE_HINT
+	elif has_healer:
 		var secs := ceili(maxf(0.0, healer.pulse_left))
 		text = (WAITING_HINT % secs) if player.healer_channel > 0.0 else (GHOST_HINT + " (%d s)" % secs)
 	if hint_label.text != text:

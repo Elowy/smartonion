@@ -444,22 +444,37 @@ func keep_tag_on_screen() -> void:
 ## on a viewport [param view_height] px tall: fixed-size text, so it does not depend on the
 ## depth.
 func tag_screen_size(view_height: float, fov: float) -> Vector2:
-	if label == null:
+	return label_screen_size(label, view_height, fov)
+
+
+## The size on screen (px) of a fixed-size [Label3D] under a perspective camera of vertical [param fov]
+## (degrees) on a viewport [param view_height] px tall (any number of lines): what [method tag_screen_size]
+## measures, shared with the mid-wave events' name tags ([EventTag]).
+static func label_screen_size(tag: Label3D, view_height: float, fov: float) -> Vector2:
+	if tag == null:
 		return Vector2.ZERO
-	var font := label.font if label.font != null else ThemeDB.fallback_font
-	var text := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.font_size)
-	text += Vector2.ONE * float(label.outline_size)
-	return text * label.pixel_size * view_height / (2.0 * tan(deg_to_rad(fov) * 0.5))
+	var font := tag.font if tag.font != null else ThemeDB.fallback_font
+	var text := font.get_multiline_string_size(tag.text, HORIZONTAL_ALIGNMENT_LEFT, -1, tag.font_size)
+	text += Vector2.ONE * float(tag.outline_size)
+	return text * tag.pixel_size * view_height / (2.0 * tan(deg_to_rad(fov) * 0.5))
 
 
 ## Where a tag of [param size] (px) anchored at its bottom centre [param screen] goes so that
 ## it stays [param pad] px inside a [param view] px viewport (screen y grows down).
 static func clamp_tag(screen: Vector2, size: Vector2, view: Vector2, pad: float) -> Vector2:
+	return clamp_tag_in(screen, size, Rect2(Vector2.ZERO, view), pad)
+
+
+## [method clamp_tag] for any screen rectangle [param area] (px): the event tags keep inside the part of
+## the screen the HUD leaves free ([method CameraRig.get_safe_screen_rect]). An area too small for the
+## tag centres the tag on that axis.
+static func clamp_tag_in(screen: Vector2, size: Vector2, area: Rect2, pad: float) -> Vector2:
 	var half_w := size.x * 0.5
-	var x0 := pad + half_w
-	var x1 := view.x - pad - half_w
-	var y0 := pad + size.y
-	var y1 := view.y - pad
+	var x0 := area.position.x + pad + half_w
+	var x1 := area.end.x - pad - half_w
+	var y0 := area.position.y + pad + size.y
+	var y1 := area.end.y - pad
+	var centre := area.get_center()
 	return Vector2(
-		clampf(screen.x, x0, x1) if x0 <= x1 else view.x * 0.5,
-		clampf(screen.y, y0, y1) if y0 <= y1 else view.y * 0.5)
+		clampf(screen.x, x0, x1) if x0 <= x1 else centre.x,
+		clampf(screen.y, y0, y1) if y0 <= y1 else centre.y)

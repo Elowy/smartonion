@@ -16,6 +16,8 @@ extends PanelContainer
 ## price (an Artifact is never sold); a pair (Fangs of the Shadow) says it equips with its other
 ## piece. See Artifacts.property_rows. Shown to a viewer (viewer_equipment set: the player panels,
 ## the shop) the block is compact (compact_artifact).
+## A class item's Equip line (an ability mod) greys out the same way when the viewing hero has
+## not learned its ability: "Equip: … (needs Battle Shout)" in DIM (see unique_needs).
 ## A set piece shown to a viewer (viewer_equipment set: the player panels, the shop) gets the
 ## compact set block – the pieces as their slot names on one line ("Head  Shoulders  Chest …")
 ## and no flavor text – so the tooltip stays readable inside a 4-player corner panel at 720p.
@@ -75,6 +77,7 @@ const SET_UPGRADE_TOLERANCE := 0.3
 const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
 	&"gun": "Gun", &"wand": "Wand", &"staff": "Staff", &"shield": "Shield", &"tome": "Tome",
+	&"two_hand_sword": "2H Sword", &"two_hand_mace": "2H Mace", &"orb": "Orb",
 }
 
 var item: ItemInstance
@@ -285,7 +288,7 @@ static func weapon_dps(p_item: ItemInstance, primary: StringName = &"", primary_
 	var dmg := w.base_damage
 	if primary != &"":
 		dmg += float(w.scaling.get(primary, 0.0)) * primary_value
-	var dps := dmg / maxf(0.08, w.cooldown)
+	var dps := dmg / maxf(0.08, w.effective_cooldown())
 	if with_companion and p_item.companion != null:
 		dps += weapon_dps(p_item.companion, primary, primary_value)
 	return dps
@@ -605,7 +608,11 @@ func _rebuild() -> void:
 		if text != "":
 			_line(text, ENCHANT_GREEN)
 	if item.unique_text != "":
-		_line(item.unique_text, ENCHANT_GREEN)
+		var needs := unique_needs(item, _viewer_hero())
+		if needs == &"":
+			_line(item.unique_text, ENCHANT_GREEN)
+		else:
+			_line("%s (needs %s)" % [item.unique_text, Artifacts.ability_name(needs)], DIM)
 	if item.is_artifact():
 		_artifact_block()
 	if item.set_id != &"":
@@ -666,11 +673,25 @@ func _viewer_hero() -> Player:
 	return fallback if viewer_equipment == null else null
 
 
+## The ability an ability-mod item's Equip line needs ("" = none): the item's ability when
+## [param hero] (the hero looking at the tooltip) has not learned it. Null [param hero] = nobody
+## to ask, so nothing is missing (as for an Artifact property's "(needs Whirlwind)").
+static func unique_needs(p_item: ItemInstance, hero: Player) -> StringName:
+	if p_item == null or p_item.unique_effect != &"ability_mod" or hero == null:
+		return &""
+	var ability_id := StringName(p_item.unique_params.get("ability", ""))
+	if ability_id == &"" or Artifacts.hero_knows(hero, ability_id):
+		return &""
+	return ability_id
+
+
 func _weapon_lines(w: WeaponData) -> void:
 	if w.attacks():
-		_pair("%s Damage" % fmt_number(w.base_damage), "Speed %.2f" % w.cooldown, WHITE, WHITE)
+		_pair("%s Damage" % fmt_number(w.base_damage), "Speed %.2f" % w.effective_cooldown(), WHITE, WHITE)
 		# (This weapon alone: the pair's other dagger has its own tooltip, the comparison counts both.)
 		_line("(%s damage per second)" % fmt_number(weapon_dps(item, &"", 0.0, false), 1), WHITE)
+		if w.attack_speed_pct > 0.0:
+			_line("+%s%% Attack Speed" % fmt_number(w.attack_speed_pct), ENCHANT_GREEN)
 		var parts := PackedStringArray()
 		for stat: StringName in _ordered(w.scaling.keys()):
 			parts.append("%s %d%%" % [Stats.display_name(stat), roundi(float(w.scaling[stat]) * 100.0)])

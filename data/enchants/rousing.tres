@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"rousing"
+prefix = "Rousing"
+kind = 2
+slot_types = Array[int]([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+requires_projectile = false
+min_rarity = 2
+weight = 0.9
+equip_stats = Dictionary[StringName, float]({})
+effect = &"buff"
+params = {
+"haste": 12.0,
+"duration_fixed": 4.0
+}
+ppm = 0.0
+chance = 8.0
+icd = 3.0
+school = &"physical"
+description = "On kill: 8% chance to gain +{haste}% Haste for {duration_fixed} sec."

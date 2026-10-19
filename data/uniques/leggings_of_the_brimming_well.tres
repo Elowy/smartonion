@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"leggings_of_the_brimming_well"
+display_name = "Leggings of the Brimming Well"
+flavor = "Bottomless, in the way a well is: eventually you hear the splash."
+slot_type = 7
+armor_type = 0
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"intellect": 10.0,
+&"spell_power": 5.0,
+&"resource_regen": 12.0,
+&"haste": 4.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "on_hit",
+"ppm": 8.0,
+"icd": 0.5,
+"stats": {
+&"spell_power": 2.0,
+&"arcane_damage": 3.0
+},
+"duration": 6.0,
+"max_stacks": 5
+}
+unique_text = "Chance on hit: The well overflows, granting 2 Spell Power and 3% Arcane Damage for 6 sec. Stacks up to 5 times."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

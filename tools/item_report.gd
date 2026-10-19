@@ -47,9 +47,9 @@ func _run() -> void:
 		db.uniques.size()])
 	_print_tables()
 
-	var items: Array[ItemInstance] = []
+	var items: Array = []
 	var item_sources: Array[int] = []
-	var classes: Array[ClassData] = []
+	var classes: Array = []
 	for id in db.class_ids:
 		classes.append(db.get_class_data(id))
 	for source in SOURCE_SHARE:
@@ -61,7 +61,7 @@ func _run() -> void:
 			var options := {}
 			if source == Source.SHOP and not classes.is_empty() and i % 2 == 0:
 				options[&"class_data"] = classes[i % classes.size()]
-			var item: ItemInstance = gen.generate(source, wave, rng, options)
+			var item: Variant = gen.generate(source, wave, rng, options)
 			if item != null:
 				items.append(item)
 				item_sources.append(source)
@@ -71,6 +71,7 @@ func _run() -> void:
 	_print_slots(items)
 	_print_enchants(items)
 	_print_uniques(items)
+	_print_bases(items)
 	_print_prices(items)
 	_print_samples(items)
 	_print_class_bias(rng, classes)
@@ -92,7 +93,7 @@ func _print_tables() -> void:
 	print(line)
 
 
-func _print_rarity_by_source(items: Array[ItemInstance], sources: Array[int]) -> void:
+func _print_rarity_by_source(items: Array, sources: Array[int]) -> void:
 	print("-- Rarity distribution by source (all waves) --")
 	for source in SOURCE_NAMES.size():
 		var counts: Array[int] = [0, 0, 0, 0, 0, 0]
@@ -110,7 +111,7 @@ func _print_rarity_by_source(items: Array[ItemInstance], sources: Array[int]) ->
 	print("")
 
 
-func _print_budgets(items: Array[ItemInstance]) -> void:
+func _print_budgets(items: Array) -> void:
 	print("-- Generated (non-unique) items per rarity: budget, spent, stat lines, ilvl --")
 	for r in RARITIES:
 		var n := 0
@@ -126,7 +127,7 @@ func _print_budgets(items: Array[ItemInstance]) -> void:
 			var b: float = gen.stat_budget(item.rarity, item.slot_type, item.wave, item.looted,
 					item.weapon)
 			budget += b
-			var rolled := item.stats.duplicate()
+			var rolled: Dictionary = item.stats.duplicate()
 			var implicit: int = gen.implicit_armor(item.armor_type, item.slot_type, item.wave)
 			if implicit > 0:
 				rolled[Stats.ARMOR] = rolled.get(Stats.ARMOR, 0.0) - implicit
@@ -145,7 +146,7 @@ func _print_budgets(items: Array[ItemInstance]) -> void:
 	print("")
 
 
-func _print_slots(items: Array[ItemInstance]) -> void:
+func _print_slots(items: Array) -> void:
 	var counts := {}
 	for item in items:
 		var key: String = Items.SLOT_NAMES[item.slot_type]
@@ -156,7 +157,7 @@ func _print_slots(items: Array[ItemInstance]) -> void:
 	print("-- Slots --\n%s\n" % ", ".join(parts))
 
 
-func _print_enchants(items: Array[ItemInstance]) -> void:
+func _print_enchants(items: Array) -> void:
 	print("-- Enchants (hand-made items below Legendary have none and are left out) --")
 	for r in RARITIES:
 		var n := 0
@@ -192,7 +193,7 @@ func _print_enchants(items: Array[ItemInstance]) -> void:
 	print("Ranks I/II/III/IV/V: %d / %d / %d / %d / %d\n" % ranks)
 
 
-func _print_uniques(items: Array[ItemInstance]) -> void:
+func _print_uniques(items: Array) -> void:
 	print("-- Hand-made items --")
 	var by_rarity: Array[int] = [0, 0, 0, 0, 0, 0]
 	var n_rarity: Array[int] = [0, 0, 0, 0, 0, 0]
@@ -218,7 +219,68 @@ func _print_uniques(items: Array[ItemInstance]) -> void:
 		("  never: " + ", ".join(never)) if not never.is_empty() else ""])
 
 
-func _print_prices(items: Array[ItemInstance]) -> void:
+## Which weapon bases and armour base tiers (ItemBase.min_wave) the generated items use.
+func _print_bases(items: Array) -> void:
+	print("-- Generated weapons by base (hand-made weapons left out) --")
+	var by_weapon := {}
+	var weapons := 0
+	var epic := 0
+	var epic_fast := 0
+	for item in items:
+		if item.unique or not item.is_weapon():
+			continue
+		weapons += 1
+		by_weapon[item.source_id] = by_weapon.get(item.source_id, 0) + 1
+		if item.rarity == Items.Rarity.EPIC and item.weapon.attacks():
+			epic += 1
+			if item.weapon.attack_speed_pct > 0.0:
+				epic_fast += 1
+	var parts: PackedStringArray = []
+	var ids: Array = db.weapons.keys()
+	ids.sort()
+	for id in ids:
+		parts.append("%s %d (%.1f%%)" % [id, by_weapon.get(id, 0), 100.0 * by_weapon.get(id, 0) / maxi(1, weapons)])
+	print("%d weapons: %s" % [weapons, ", ".join(parts)])
+	print("Epic attacking weapons: %d, with +attack speed: %d\n" % [epic, epic_fast])
+	print("-- Generated armour by base material tier (min_wave 1 / 9 / 17) --")
+	var tiers: Array[int] = [0, 0, 0]
+	var by_tier_base := {}
+	for item in items:
+		if item.unique or item.is_weapon() or not (item.slot_type in Items.ARMOR_SLOTS) or not db.item_bases.has(item.source_id):
+			continue
+		var base: Variant = db.item_bases[item.source_id]
+		var tier: int = [1, 9, 17].find(base.min_wave)
+		if tier >= 0:
+			tiers[tier] += 1
+		if base.min_wave > 1:
+			by_tier_base[base.id] = by_tier_base.get(base.id, 0) + 1
+	print("Tier I %d, tier II %d, tier III %d  (bases above tier I seen: %s)\n" % [tiers[0], tiers[1], tiers[2], by_tier_base])
+	# Jewellery bases and stat suffixes (a generated item carries one suffix; matched by its name).
+	var jewel_total := 0
+	for id in db.item_bases:
+		if db.item_bases[id].slot_type in [Items.SlotType.NECK, Items.SlotType.RING]:
+			jewel_total += 1
+	var jewel_seen := {}
+	var by_suffix := {}
+	for item in items:
+		if item.unique:
+			continue
+		if item.slot_type in [Items.SlotType.NECK, Items.SlotType.RING] and db.item_bases.has(item.source_id):
+			jewel_seen[item.source_id] = true
+		for id in db.affixes:
+			if item.display_name.ends_with(db.affixes[id].suffix):
+				by_suffix[id] = by_suffix.get(id, 0) + 1
+				break
+	print("Jewellery bases seen: %d of %d" % [jewel_seen.size(), jewel_total])
+	var suffix_ids := by_suffix.keys()
+	suffix_ids.sort_custom(func(a: StringName, b: StringName) -> bool: return by_suffix[a] > by_suffix[b])
+	var suffix_parts: PackedStringArray = []
+	for id in suffix_ids:
+		suffix_parts.append("%s %d" % [id, by_suffix[id]])
+	print("By suffix (%d of %d seen): %s\n" % [by_suffix.size(), db.affixes.size(), ", ".join(suffix_parts)])
+
+
+func _print_prices(items: Array) -> void:
 	print("-- Prices (buy) --")
 	for r in RARITIES:
 		var lo := 1 << 30
@@ -239,12 +301,12 @@ func _print_prices(items: Array[ItemInstance]) -> void:
 	print("")
 
 
-func _print_samples(items: Array[ItemInstance]) -> void:
+func _print_samples(items: Array) -> void:
 	print("-- Samples --")
 	var shown := 0
 	var step := maxi(1, items.size() / 12)
 	for i in range(0, items.size(), step):
-		var item := items[i]
+		var item: Variant = items[i]
 		var stats: PackedStringArray = []
 		for stat in item.all_stats():
 			stats.append("%s %s" % [Stats.format_value(stat, item.all_stats()[stat]), Stats.display_name(stat)])
@@ -261,13 +323,13 @@ func _print_samples(items: Array[ItemInstance]) -> void:
 	print("")
 
 
-func _print_class_bias(rng: RandomNumberGenerator, classes: Array[ClassData]) -> void:
+func _print_class_bias(rng: RandomNumberGenerator, classes: Array) -> void:
 	print("-- Shop class bias (&\"class_data\"): share usable by the class --")
 	var parts: PackedStringArray = []
 	for c in classes:
 		var usable := 0
 		for i in 400:
-			var item: ItemInstance = gen.generate(Source.SHOP, 1 + i % 25, rng, {&"class_data": c})
+			var item: Variant = gen.generate(Source.SHOP, 1 + i % 25, rng, {&"class_data": c})
 			if item.can_be_used_by(c):
 				usable += 1
 		parts.append("%s %.0f%%" % [c.id, usable / 4.0])

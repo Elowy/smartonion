@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"smoke_pouch"
+display_name = "Smoke Pouch"
+flavor = "Contains smoke. Allegedly."
+slot_type = 10
+armor_type = -1
+rarity = 1
+stats = Dictionary[StringName, float]({
+&"dodge": 2.0,
+&"speed": 2.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 40.0,
+"icd": 20.0,
+"stats": {
+&"speed": 20.0,
+&"dodge": 15.0
+},
+"duration": 4.0
+}
+unique_text = "Equip: When you fall below 40% health, gain 20% Speed and 15% Dodge for 4 sec."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ShrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/shrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"fortune"
+display_name = "Shrine of Fortune"
+description = "Four-leaf clover grows out of the altar. Luck is a gift, but the shrine keeps a tithe."
+waves = 0
+icon_id = &"fortune"
+color = Color(0.5, 0.92, 0.35, 1)
+bot_accepts = false
+give_epic = true
+purse_loss_pct = 25.0

@@ -20,8 +20,11 @@ const RARITY_COLORS: Array[Color] = [
 ]
 ## Rarity from which a weapon glows faintly (GDD 13: epic and legendary).
 const GLOW_RARITY := 3
+## The orb's glowing core: radius and height above the handle.
+const ORB_RADIUS := 0.15
+const ORB_CENTER := 0.27
 const TYPES: Array[StringName] = [&"sword", &"axe", &"mace", &"dagger", &"bow", &"gun", &"wand",
-	&"staff", &"shield", &"tome"]
+	&"staff", &"shield", &"tome", &"two_hand_sword", &"two_hand_mace", &"orb"]
 
 
 ## Builds a small primitive mesh for [param weapon] (by weapon_type, coloured by weapon.color).
@@ -64,6 +67,9 @@ static func reach(weapon_type: StringName) -> float:
 		&"staff": return 0.9
 		&"shield": return 0.3
 		&"tome": return 0.18
+		&"two_hand_sword": return 1.22
+		&"two_hand_mace": return 1.0
+		&"orb": return 0.4
 	return 0.5
 
 
@@ -89,6 +95,11 @@ static func _gem_info(type: StringName, color: Color) -> Dictionary:
 			return {"color": Color(0.55, 0.85, 1.0), "pos": Vector3(0, 0.02, -0.04)}
 		&"sword":
 			return {"color": Color(1.0, 0.25, 0.2), "pos": Vector3(0, 0.17, -0.04)}
+		&"two_hand_sword":
+			return {"color": Color(1.0, 0.25, 0.2), "pos": Vector3(0, 0.27, -0.045)}
+		&"orb":
+			# The orb itself is the glowing gem (the body mesh is only its cradle).
+			return {"color": color.lightened(0.3), "pos": Vector3(0, ORB_CENTER, 0)}
 	return {}
 
 
@@ -102,6 +113,10 @@ static func _gem_mesh(type: StringName) -> Mesh:
 				Vector2(-0.045, 0)]), 0.012, Transform3D(), Color.WHITE)
 		&"sword":
 			kit.add_sphere(0.028, Transform3D(), Color.WHITE, 8, 4)
+		&"two_hand_sword":
+			kit.add_sphere(0.034, Transform3D(), Color.WHITE, 8, 4)
+		&"orb":
+			kit.add_sphere(ORB_RADIUS, Transform3D(), Color.WHITE, 16, 8)
 		_:
 			# Faceted gem: a squashed octahedron.
 			kit.add_sphere(0.05, MeshKit.xf(Vector3.ZERO, Vector3.ZERO, Vector3(1, 1.4, 1)), Color.WHITE, 4, 2)
@@ -121,6 +136,9 @@ static func _build_mesh(type: StringName, c: Color) -> Mesh:
 		&"staff": _staff(k, c)
 		&"shield": _shield(k, c)
 		&"tome": _tome(k, c)
+		&"two_hand_sword": _two_hand_sword(k, c)
+		&"two_hand_mace": _two_hand_mace(k, c)
+		&"orb": _orb(k, c)
 		_: _generic(k, c)
 	return k.build()
 
@@ -260,6 +278,51 @@ static func _tome(k: MeshKit, c: Color) -> void:
 		for sy: float in [-1.0, 1.0]:
 			k.add_box(Vector3(0.05, 0.05, 0.085), MeshKit.xf(Vector3(0.11 * sx, 0.145 * sy, 0)), GOLD)
 	k.add_torus(0.05, 0.075, MeshKit.xf(Vector3(0, 0.02, -0.038), Vector3(90, 0, 0), Vector3(1, 1, 0.3)), GOLD, 12, 4)
+
+
+## The greatsword: the sword's lines, a long two-handed grip and a broad, long blade.
+static func _two_hand_sword(k: MeshKit, c: Color) -> void:
+	k.add_sphere(0.055, MeshKit.xf(Vector3(0, -0.12, 0)), GOLD, 10, 5)
+	k.add_cylinder(0.03, 0.034, 0.36, MeshKit.xf(Vector3(0, 0.06, 0)), LEATHER, 8)
+	k.add_torus(0.03, 0.045, MeshKit.xf(Vector3(0, -0.04, 0)), DARK_GOLD, 8, 4)
+	k.add_torus(0.03, 0.045, MeshKit.xf(Vector3(0, 0.16, 0)), DARK_GOLD, 8, 4)
+	k.add_box(Vector3(0.44, 0.065, 0.09), MeshKit.xf(Vector3(0, 0.27, 0)), GOLD)
+	k.add_sphere(0.05, MeshKit.xf(Vector3(0.225, 0.3, 0)), GOLD, 8, 4)
+	k.add_sphere(0.05, MeshKit.xf(Vector3(-0.225, 0.3, 0)), GOLD, 8, 4)
+	var blade := PackedVector2Array([Vector2(-0.085, 0.29), Vector2(0.085, 0.29), Vector2(0.078, 1.0),
+		Vector2(0.0, 1.22), Vector2(-0.078, 1.0)])
+	k.add_extrusion(blade, 0.036, Transform3D(), c, 0.8)
+	k.add_box(Vector3(0.026, 0.72, 0.042), MeshKit.xf(Vector3(0, 0.66, 0)), c.darkened(0.3))
+
+
+## The maul: a long wooden haft and a heavy stone-and-iron head.
+static func _two_hand_mace(k: MeshKit, c: Color) -> void:
+	k.add_sphere(0.045, MeshKit.xf(Vector3(0, -0.36, 0)), IRON, 8, 4)
+	k.add_cylinder(0.034, 0.038, 1.12, MeshKit.xf(Vector3(0, 0.2, 0)), WOOD, 8)
+	k.add_cylinder(0.044, 0.044, 0.2, MeshKit.xf(Vector3(0, -0.02, 0)), LEATHER, 8)
+	k.add_torus(0.036, 0.062, MeshKit.xf(Vector3(0, 0.62, 0)), GOLD, 10, 4)
+	k.add_box(Vector3(0.3, 0.3, 0.3), MeshKit.xf(Vector3(0, 0.82, 0), Vector3(0, 45, 0)), c)
+	for sy: float in [-1.0, 1.0]:
+		k.add_box(Vector3(0.34, 0.05, 0.34), MeshKit.xf(Vector3(0, 0.82 + 0.17 * sy, 0), Vector3(0, 45, 0)), IRON)
+	var head := Vector3(0, 0.82, 0)
+	for i in 4:
+		var a := PI * 0.25 + TAU * i / 4.0
+		var dir := Vector3(sin(a), 0, cos(a))
+		k.add_segment(head + dir * 0.14, head + dir * 0.27, 0.04, 0.0, c.darkened(0.25), 6)
+	k.add_cylinder(0.0, 0.04, 0.12, MeshKit.xf(Vector3(0, 1.05, 0)), GOLD, 6)
+
+
+## The orb: a small cradle (cup, three prongs, a ring) – the glowing sphere is the gem.
+static func _orb(k: MeshKit, c: Color) -> void:
+	k.add_cylinder(0.05, 0.034, 0.1, MeshKit.xf(Vector3(0, 0.0, 0)), LEATHER, 8)
+	k.add_cylinder(0.075, 0.05, 0.05, MeshKit.xf(Vector3(0, 0.07, 0)), GOLD, 10)
+	for i in 3:
+		var a := TAU * i / 3.0
+		var d := Vector3(sin(a), 0, cos(a))
+		var prong := PackedVector3Array([Vector3(0, 0.08, 0) + d * 0.075, Vector3(0, 0.18, 0) + d * 0.165,
+			Vector3(0, 0.34, 0) + d * 0.165, Vector3(0, 0.42, 0) + d * 0.08])
+		k.add_tube(prong, 0.014, 0.01, GOLD, 6)
+	k.add_torus(0.2, 0.23, MeshKit.xf(Vector3(0, ORB_CENTER, 0), Vector3(25, 0, 12)), c.lightened(0.2), 16, 5)
 
 
 static func _generic(k: MeshKit, c: Color) -> void:

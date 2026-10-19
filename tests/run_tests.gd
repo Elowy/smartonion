@@ -15,6 +15,19 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Tests never touch the player's leaderboard file (a test that exercises Leaderboard.record_run
+	# sets Leaderboard.path_override to a temp path and switches writing on itself). Set through the
+	# script object: naming the class here would compile it (and the autoloads it needs) before the
+	# autoloads exist.
+	var leaderboard: GDScript = load("res://core/leaderboard.gd")
+	leaderboard.set(&"writes_enabled", false)
+	# The lobby's "Rolling the arena..." screen (4.5 s) is off in tests; a test of the screen switches it on.
+	var roll_screen: GDScript = load("res://scenes/ui/environment_roll_screen.gd")
+	roll_screen.set(&"enabled", false)
+	# No shrine at a break unless a test asks for one (--shrine-chance / RunState.shrine_chance_override): a
+	# random 5% shrine would turn every Main flow test that follows a wave into a flake.
+	var shrines: GDScript = load("res://core/shrines.gd")
+	shrines.set(&"base_chance", 0.0)
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

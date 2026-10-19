@@ -50,6 +50,9 @@ const MATERIAL_NAMES := {
 const RARITY_NAMES: Array[String] = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Artifact"]
 ## Base damage multiplier of weapons by rarity (GDD 4.1).
 const WEAPON_RARITY_DAMAGE: Array[float] = [1.0, 1.3, 1.7, 2.2, 3.0, 3.0]
+## Attack speed bonus (percent, WeaponData.attack_speed_pct) of attacking weapons by rarity
+## (GDD 4.1: Epic +10%; the other rows have none).
+const WEAPON_RARITY_ATTACK_SPEED: Array[float] = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0]
 ## Sell value share of the buy price (GDD 5.6) and the Greed sale share (GDD 10.1).
 const SELL_SHARE := 0.35
 const GREED_SHARE := 0.5

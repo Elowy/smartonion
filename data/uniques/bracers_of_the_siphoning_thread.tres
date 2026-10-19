@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"bracers_of_the_siphoning_thread"
+display_name = "Bracers of the Siphoning Thread"
+flavor = "Waste not, want not."
+slot_type = 4
+armor_type = 0
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 3.0,
+&"crit": 3.0
+})
+class_restriction = &"warlock"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "drain_life",
+"mods": {
+"heal_pct_add": 20.0
+}
+}
+unique_text = "Equip: Your Drain Life heals you for 20% more."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

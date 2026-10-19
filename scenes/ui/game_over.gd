@@ -1,6 +1,9 @@
 class_name GameOverScreen
 extends Control
-## End-of-run screen (GDD 1, M6): "Victory!" (gold) or "Defeat" (red) over two pages. Summary:
+## End-of-run screen (GDD 1, M6): "Victory!" (gold) or "Defeat" (red) over three pages (M6b adds the
+## Leaderboard: [LeaderboardPage], the local top 10 of the run's category with this run highlighted; the
+## Summary shows the "Best: ..." line under its table, and the mode row under the subtitle holds the arena
+## name, plus the mode and the HARDCORE badge in an endless / hardcore run). Summary:
 ## waves cleared, total kills, gold earned, team level, the run time and one row per player (class,
 ## kills, damage; the top damage dealer gets a crown). Damage Meter ([MeterPage]): bars per stat
 ## and hero in the class colours and, in co-op, the Awards ([RunSummary]). After INPUT_DELAY, on
@@ -17,30 +20,43 @@ signal card_saved(path: String)
 
 ## Seconds before input is accepted (players are usually still mashing buttons).
 const INPUT_DELAY := 1.0
-enum Page { SUMMARY, METER }
-const PAGE_NAMES: Array[String] = ["Summary", "Damage Meter"]
+enum Page { SUMMARY, METER, LEADERBOARD }
+const PAGE_NAMES: Array[String] = ["Summary", "Damage Meter", "Leaderboard"]
 ## --end-page values (LaunchOptions).
-const PAGE_IDS: Array[String] = ["summary", "meter"]
+const PAGE_IDS: Array[String] = ["summary", "meter", "leaderboard"]
 ## The longest "Saved to ..." line (characters): a longer path keeps its end (folder + file name).
 const MAX_STATUS_CHARS := 72
 
 var victory := false
 var title_label: Label
 var subtitle_label: Label
+## The arena of the run (M6b ENV): "Arena: Cemetery", in the environment's colour, in the mode row under the
+## subtitle, where it has the panel's whole width (in the tab row it was cut to "Arena: Forest R...").
+var environment_label: Label
 var waves_value: Label
 var kills_value: Label
 var gold_value: Label
 var level_value: Label
 var time_value: Label
 var rows_box: VBoxContainer
-## The page shown (Page.SUMMARY / Page.METER).
+## The page shown (Page.SUMMARY / Page.METER / Page.LEADERBOARD).
 var page := Page.SUMMARY
 ## The framed panel in the middle (tests measure it).
 var panel: PanelContainer
 var summary_page: Control
 var meter_page: MeterPage
-## Holds both pages; as tall as the taller one (see [method _fit_pages]).
+var leaderboard_page: LeaderboardPage
+## Holds the pages; as tall as the tallest one (see [method _fit_pages]).
 var page_box: MarginContainer
+## M6b: the leaderboard model of this run ([method Leaderboard.screen_model]; {} = no board, see [method open]).
+var board: Dictionary = {}
+## M6b: the mode row under the subtitle: the arena name ([member environment_label]) and, beside it, "Endless
+## mode" / "Normal mode" and the HARDCORE badge (an endless or a hardcore run only). The "Best: ..." line sits
+## under the Summary's hero table.
+var mode_row: HBoxContainer
+var mode_label: Label
+var hardcore_badge: HardcoreBadge
+var best_label: Label
 ## The line under the prompts ("Saved to ..." after X).
 var status_label: Label
 ## The tab labels, one per page.
@@ -62,9 +78,12 @@ static func create() -> GameOverScreen:
 	return g
 
 
-## Fills in the end-of-run summary from RunState (victory / defeat, waves, kills, gold).
-func open(p_victory: bool) -> void:
+## Fills in the end-of-run summary from RunState (victory / defeat, waves, kills, gold). [param p_board] is
+## the run's leaderboard model ([method Leaderboard.screen_model], what Main reads after recording the
+## run); {} = no board (the leaderboard file is not in use).
+func open(p_victory: bool, p_board: Dictionary = {}) -> void:
 	victory = p_victory
+	board = p_board
 	_t = 0.0
 	_done = false
 	_set_status("")
@@ -78,18 +97,22 @@ func open(p_victory: bool) -> void:
 
 ## Number of waves the team survived.
 static func waves_cleared(p_victory: bool) -> int:
-	return RunState.TOTAL_WAVES if p_victory else clampi(RunState.wave - 1, 0, RunState.TOTAL_WAVES)
+	var total := RunState.total_waves()
+	if p_victory:
+		return total if total > 0 else maxi(RunState.wave, 0)
+	return clampi(RunState.wave - 1, 0, total) if total > 0 else maxi(RunState.wave - 1, 0)
 
 
 func set_backdrop_opacity(alpha: float) -> void:
 	_backdrop.modulate.a = alpha
 
 
-## Shows page [param p_page] (Page.SUMMARY / Page.METER).
+## Shows page [param p_page] (Page.SUMMARY / Page.METER / Page.LEADERBOARD).
 func set_page(p_page: Page) -> void:
 	page = p_page
 	summary_page.visible = page == Page.SUMMARY
 	meter_page.visible = page == Page.METER
+	leaderboard_page.visible = page == Page.LEADERBOARD
 	for i in tab_labels.size():
 		var active := i == int(page)
 		tab_labels[i].add_theme_color_override(&"font_color", UiTheme.GOLD if active else UiTheme.TEXT_DIM)
@@ -101,7 +124,7 @@ func switch_page(step: int) -> void:
 	set_page(clampi(int(page) + signi(step), 0, PAGE_NAMES.size() - 1) as Page)
 
 
-## Page index for an --end-page name ("summary" / "meter"; anything else: the Summary).
+## Page index for an --end-page name ("summary" / "meter" / "leaderboard"; anything else: the Summary).
 static func page_from_name(page_name: String) -> Page:
 	var at := PAGE_IDS.find(page_name)
 	return (at if at >= 0 else Page.SUMMARY) as Page
@@ -146,6 +169,19 @@ static func saved_text(full_path: String) -> String:
 	return "Saved to ...%s" % tail
 
 
+## The arena label of the end screen: "Arena: Cemetery" ("" for an id nobody knows).
+static func environment_text(id: StringName) -> String:
+	var env := Db.get_environment(id)
+	return "Arena: %s" % env.display_name if env != null else ""
+
+
+func _fill_environment() -> void:
+	environment_label.text = environment_text(RunState.environment)
+	var env := Db.get_environment(RunState.environment)
+	environment_label.add_theme_color_override(&"font_color",
+			env.card_color.lerp(Color.WHITE, 0.25) if env != null else UiTheme.TEXT_DIM)
+
+
 func _set_status(text: String, color: Color = UiTheme.TEXT_DIM) -> void:
 	if status_label == null:
 		return
@@ -179,8 +215,24 @@ func _build() -> void:
 	title_label = UiTheme.centered_label("Victory!", UiTheme.TITLE, 110)
 	title_label.add_theme_constant_override(&"outline_size", 18)
 	col.add_child(title_label)
+	# The subtitle and the mode row are one group with a tight gap. The mode row always shows (it holds the arena
+	# name); the mode and the badge are hidden in a normal run, and in an endless / hardcore run the arena name
+	# joins that row on the same line, so the worst-case panel still fits 1080 px.
+	var head := UiTheme.vbox(2)
+	col.add_child(head)
 	subtitle_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_LARGE)
-	col.add_child(subtitle_label)
+	head.add_child(subtitle_label)
+	mode_row = UiTheme.hbox(14)
+	mode_row.name = "ModeRow"
+	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	mode_label = UiTheme.centered_label("", UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
+	mode_row.add_child(mode_label)
+	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_BODY - 2)
+	mode_row.add_child(hardcore_badge)
+	environment_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY)
+	environment_label.name = "ArenaLabel"
+	mode_row.add_child(environment_label)
+	head.add_child(mode_row)
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
 
@@ -210,9 +262,14 @@ func _build() -> void:
 		UiTheme.label("Kills", UiTheme.SMALL), UiTheme.label("Damage", UiTheme.SMALL), Control.new()]))
 	rows_box = UiTheme.vbox(6)
 	tcol.add_child(rows_box)
+	best_label = UiTheme.centered_label(" ", UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
+	best_label.name = "BestLabel"
+	summary_page.add_child(best_label)
 
 	meter_page = MeterPage.create()
 	page_box.add_child(meter_page)
+	leaderboard_page = LeaderboardPage.create()
+	page_box.add_child(leaderboard_page)
 
 	_prompt = UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.LB), UiGlyph.pad(PlayerInput.Pad.RB), "/", UiGlyph.key("Q"), UiGlyph.key("E"),
@@ -228,7 +285,7 @@ func _build() -> void:
 	visible = false
 
 
-## "LB  Summary | Damage Meter  RB": the active page's name is gold.
+## "LB  Summary | Damage Meter | Leaderboard  RB": the active page's name is gold.
 func _build_tabs() -> Control:
 	var row := UiTheme.hbox(28)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -280,18 +337,22 @@ func _fill() -> void:
 	if victory:
 		title_label.text = "Victory!"
 		title_label.add_theme_color_override(&"font_color", UiTheme.GOLD)
-		subtitle_label.text = "All %d waves survived – the onions prevail!" % RunState.TOTAL_WAVES
+		var survived := "All %d waves survived" % RunState.total_waves() if RunState.total_waves() > 0 \
+				else "%d waves survived" % waves_cleared(true)
+		subtitle_label.text = survived + " – the onions prevail!"
 	else:
 		title_label.text = "Defeat"
 		title_label.add_theme_color_override(&"font_color", UiTheme.RED)
 		subtitle_label.text = "The party was peeled on wave %d. Dry your tears and try again." % maxi(RunState.wave, 1)
-	waves_value.text = "%d / %d" % [waves_cleared(victory), RunState.TOTAL_WAVES]
+	_fill_environment()
+	waves_value.text = RunState.count_text(waves_cleared(victory))
 	kills_value.text = UiTheme.format_int(RunState.kills)
 	gold_value.text = UiTheme.format_int(RunState.gold_earned)
 	gold_value.add_theme_color_override(&"font_color", UiTheme.GOLD)
 	level_value.text = str(RunState.level)
 	time_value.text = RunSummary.format_time(RunState.run_time)
 	meter_page.fill(RunSummary.collect(victory))
+	_fill_mode_and_board()
 
 	for c in rows_box.get_children():
 		rows_box.remove_child(c)
@@ -311,11 +372,23 @@ func _fill() -> void:
 	_fit_pages()
 
 
-## Sizes [member page_box] to the taller page (the Damage Meter grows by a second row of Awards, the
+## M6b: the mode and the HARDCORE badge of the mode row under the subtitle (an endless or a hardcore run only),
+## the "Best: ..." line of the Summary and the Leaderboard page, from [member board] and RunState.
+func _fill_mode_and_board() -> void:
+	mode_label.visible = RunState.is_endless() or RunState.hardcore
+	mode_label.text = "%s mode" % RunState.mode_text(RunState.mode)
+	hardcore_badge.visible = RunState.hardcore
+	leaderboard_page.fill(board)
+	best_label.visible = not board.is_empty()
+	best_label.text = String(board.get("line", " "))
+	best_label.add_theme_color_override(&"font_color", UiTheme.GOLD_BRIGHT if int(board.get("rank", -1)) == 0 else UiTheme.GOLD)
+
+
+## Sizes [member page_box] to the tallest page (the Damage Meter grows by a second row of Awards, the
 ## Summary by more hero rows ...). Hidden pages still know their minimum size.
 func _fit_pages() -> void:
-	page_box.custom_minimum_size = Vector2(0.0, maxf(summary_page.get_combined_minimum_size().y,
-			meter_page.get_combined_minimum_size().y))
+	page_box.custom_minimum_size = Vector2(0.0, maxf(maxf(summary_page.get_combined_minimum_size().y,
+			meter_page.get_combined_minimum_size().y), leaderboard_page.get_combined_minimum_size().y))
 
 
 func _player_row(s: PlayerSlot, mvp: bool) -> Control:

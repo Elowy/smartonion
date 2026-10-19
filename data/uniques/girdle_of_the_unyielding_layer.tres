@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"girdle_of_the_unyielding_layer"
+display_name = "Girdle of the Unyielding Layer"
+flavor = "Layer after layer, and still it stands."
+slot_type = 6
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 6.0,
+&"stamina": 7.0
+})
+class_restriction = &""
+unique_effect = &"shield"
+unique_params = {
+"trigger": "low_hp",
+"threshold": 35.0,
+"per_wave": 1,
+"amount": 10.0,
+"duration": 4.0
+}
+unique_text = "Equip: When you fall below 35% health, a barrier absorbs 10 damage for 4 sec. Once per wave."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

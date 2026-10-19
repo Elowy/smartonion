@@ -466,6 +466,7 @@ func test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic() -> void:
 	rng.seed = 31
 	var sets := 0
 	var maxed := 0
+	var two_enchants := 0
 	var team: Array[StringName] = [&"warrior", &"mage", &"rogue"]
 	for i in 300:
 		var item := BlackMarket.roll(18, slots, rng)
@@ -476,7 +477,12 @@ func test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic() -> void:
 			check(set_data != null and set_data.class_id in team, "the piece is for a team class: %s" % item.set_id)
 		else:
 			maxed += 1
-			check(item.enchants.size() >= 2, "a max-roll Epic has two enchants: %s" % item.display_name)
+			# MAX_ROLL_TRIES looks for two enchants (each try about 40%), then keeps the best: every
+			# max-roll has an enchant and almost all have two. Counted, not per item: a fixed seed
+			# may hit the rare miss (0.6 ^ 12), which the black market allows by design.
+			check(item.enchants.size() >= 1, "a max-roll Epic has an enchant: %s" % item.display_name)
+			if item.enchants.size() >= 2:
+				two_enchants += 1
 			check(item.looted, "rolled with the loot budget")
 			var usable := false
 			for c in team:
@@ -485,6 +491,7 @@ func test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic() -> void:
 		check_eq(item.buy_price, ItemGenerator.price_for(Items.Rarity.EPIC, 18), "Epic value")
 	check(sets > 120 and sets < 240, "about 60%% set pieces (%d of 300)" % sets)
 	check(maxed > 60, "about 40%% max-roll Epics (%d of 300)" % maxed)
+	check(two_enchants >= maxed - 3, "max-roll Epics with two enchants (%d of %d)" % [two_enchants, maxed])
 
 
 func test_a_set_piece_is_not_looted_but_a_max_roll_epic_is() -> void:

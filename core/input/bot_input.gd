@@ -28,6 +28,16 @@ extends ScriptedInput
 ## - Flesh Golem hook (M6): a living bot standing in a telegraphed hook line sidesteps out of
 ##   it – for HOOK_DODGE_CHANCE of the hooks (decided once per hook with the bot's own RNG; the
 ##   others catch it like a human who looked away).
+## - Mid-wave events (M6b, GDD 16.1 "Botok"; [method _event_steer], nodes of the group
+##   EventSpawner.GROUP): the guards of a Guarded Chest / the caravan's escort are enemies like any
+##   other; a bot without an enemy around walks up to the locked chest's camp (CHEST_CAMP_DISTANCE),
+##   goes to the opened-up chest as soon as its guards are dead and stands on it until it opens
+##   (a hazard still moves it); it keeps within DefendTotem.GUARD_RADIUS of the Defend-the-Totem
+##   totem; and it chases the [CaravanCart] like a Loot Goblin (never a threat), from
+##   CART_ENGAGE_DISTANCE. A bot beyond the totem's pull limit comes back even through a swarm: the
+##   enemies the totem lured (taunted onto it) do not kite it away ([method _lured_by]) and the pull
+##   outweighs what is left of the kite push ([method _totem_pull]); a hazard's push, a hook sidestep
+##   and a rescue run to a downed teammate still outrank the guard. No RNG.
 
 ## Ranged bots keep this far (m) from enemies.
 const KITE_DISTANCE := 6.0
@@ -77,6 +87,26 @@ const PRIORITY_CHASE_WEIGHT := 1.8
 ## it counts as being in the line.
 const HOOK_DODGE_CHANCE := 0.6
 const HOOK_DODGE_MARGIN := 0.8
+## Events (M6b): a locked chest pulls a bot without an enemy around until it is this close (m) – inside the
+## guards' aggro (EventGuards.AGGRO_RADIUS) – with CAMP_PULL_WEIGHT; a READY chest pulls with
+## CHEST_PULL_WEIGHT and a bot that is within CHEST_HOLD_DISTANCE of it stands still (the chest opens
+## after 1.5 s within GuardedChest.OPEN_RADIUS).
+const CHEST_CAMP_DISTANCE := 7.0
+const CAMP_PULL_WEIGHT := 2.0
+const CHEST_PULL_WEIGHT := 3.0
+const CHEST_HOLD_DISTANCE := 1.0
+## The totem's guards start to be pulled back this far (m) inside DefendTotem.GUARD_RADIUS, with
+## TOTEM_PULL_BASE + the excess (m) x TOTEM_PULL_SLOPE, at most TOTEM_PULL_MAX.
+const TOTEM_PULL_MARGIN := 1.0
+const TOTEM_PULL_BASE := 3.0
+const TOTEM_PULL_SLOPE := 2.0
+const TOTEM_PULL_MAX := 8.0
+## A bot beyond the pull limit is drawn back with at least this much more than the kite push of the
+## enemies left around it (the ones that do not go for the totem), so it never stalls outside.
+const TOTEM_PULL_LEAD := 2.0
+## The cart is chased from this far (m), with this weight (a goblin chase weighs GOBLIN_CHASE_WEIGHT).
+const CART_ENGAGE_DISTANCE := 40.0
+const CART_CHASE_WEIGHT := 2.0
 
 var body: Node3D
 var _wander := Vector2.ZERO
@@ -87,6 +117,8 @@ var _rng := RandomNumberGenerator.new()
 ## aiming at the bot at once do not re-roll each other every tick; pruned in [method think].
 var _hook_serials: Dictionary[int, int] = {}
 var _hook_dodges: Dictionary[int, bool] = {}
+## Set by [method _event_steer]: the bot stands on an openable chest and holds still.
+var _event_hold := false
 
 
 func _init(p_key: String = "bot", p_seed: int = 0) -> void:
@@ -112,9 +144,16 @@ func think(delta: float) -> void:
 	var crowd := 0
 	var goblin_dist := INF
 	var to_goblin := Vector2.ZERO
+	var cart_dist := INF
+	var to_cart := Vector2.ZERO
 	var priority_dist := INF
 	var to_priority := Vector2.ZERO
 	var hook_escape := Vector2.ZERO
+	# Beyond the pull limit of an ACTIVE totem the enemies that are busy with it (taunted onto it) are
+	# kept apart in lured: they count as enemies around but do not kite the bot away from the totem.
+	var totem := _active_totem() if alive else null
+	var returning := totem != null and _beyond_totem_limit(pos, totem)
+	var lured: Array[Vector2] = []
 	for e in tree.get_nodes_in_group(&"enemies"):
 		var n := e as Node3D
 		if n == null:
@@ -129,6 +168,12 @@ func think(delta: float) -> void:
 				goblin_dist = dist
 				to_goblin = -d / dist
 			continue
+		if n is CaravanCart:
+			# The caravan's cart (M6b): never hurts, worth a fortune – a chase target, not a threat.
+			if dist < cart_dist:
+				cart_dist = dist
+				to_cart = -d / dist
+			continue
 		var enemy := n as Enemy
 		if enemy != null:
 			if enemy.is_priority_target() and dist < priority_dist:
@@ -138,7 +183,10 @@ func think(delta: float) -> void:
 				var out := enemy.hook_escape_dir(body.global_position, HOOK_DODGE_MARGIN)
 				if out != Vector3.ZERO and _wants_dodge(enemy):
 					hook_escape += Vector2(out.x, out.z)
-		enemies.append(d)
+		if returning and enemy != null and _lured_by(enemy, totem):
+			lured.append(d)
+		else:
+			enemies.append(d)
 		if dist < CROWD_RADIUS:
 			crowd += 1
 		if dist < nearest_enemy:
@@ -154,6 +202,7 @@ func think(delta: float) -> void:
 		if dist < keep:
 			# Same push at the keep distance's edge whatever the keep distance is.
 			steer += d / dist * (keep - dist) * (KITE_DISTANCE / keep)
+	var kite_push := steer.length()
 	var hazard := _hazard_steer(pos) if alive else Vector2.ZERO
 	steer += hazard * HAZARD_WEIGHT
 	# A ghost walks straight to the Spirit Healer (enemies ignore ghosts) and waits there.
@@ -172,7 +221,7 @@ func think(delta: float) -> void:
 		return
 	# Living bots go to downed teammates close by, ghosts (no healer) to living ones (GDD 1).
 	var buddy := _nearest_teammate(pos, not alive, RESCUE_RANGE if alive else HELP_RANGE)
-	if buddy.is_finite() and alive and not _safe_rescue(pos, buddy, enemies):
+	if buddy.is_finite() and alive and not _safe_rescue(pos, buddy, enemies, lured):
 		buddy = Vector2.INF
 	if buddy.is_finite():
 		var to := buddy - pos
@@ -195,6 +244,18 @@ func think(delta: float) -> void:
 		var chase_keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE)
 		if goblin_dist > chase_keep:
 			steer += to_goblin * GOBLIN_CHASE_WEIGHT
+	if alive and crowd == 0 and _hp_ratio() >= RETREAT_HP_RATIO and cart_dist < CART_ENGAGE_DISTANCE:
+		var cart_keep := clampf(_reach() * MELEE_KEEP_RATIO, MIN_KEEP_DISTANCE, KITE_DISTANCE)
+		if cart_dist > cart_keep:
+			steer += to_cart * CART_CHASE_WEIGHT
+	# Mid-wave events: the chest, the totem (a bot standing on an openable chest stays put unless a
+	# hazard moves it).
+	_event_hold = false
+	if alive:
+		steer += _event_steer(pos, crowd, kite_push if hazard == Vector2.ZERO else 0.0)
+	if _event_hold and hazard == Vector2.ZERO:
+		move = Vector2.ZERO
+		return
 	var best_loot := Vector2.ZERO
 	var best_dist := 9.0
 	for p in tree.get_nodes_in_group(&"pickups"):
@@ -228,6 +289,90 @@ func _hazard_steer(pos: Vector2) -> Vector2:
 		if node.has_method(&"hazard_push"):
 			out += node.call(&"hazard_push", from) as Vector2
 	return out
+
+
+## The pull of the mid-wave events' objects (nodes of EventSpawner.GROUP) on a living bot at
+## [param pos] (XZ), with [param crowd] enemies within CROWD_RADIUS of it: a locked [GuardedChest] draws a
+## bot with nobody around and enough HP up to CHEST_CAMP_DISTANCE; an openable one draws it all the way
+## and, within CHEST_HOLD_DISTANCE, sets [member _event_hold] (the bot stands still while it opens); the
+## [DefendTotem] draws a bot that strays beyond DefendTotem.GUARD_RADIUS - TOTEM_PULL_MARGIN back
+## (the harder the further out; beyond the radius at least TOTEM_PULL_LEAD more than the [param kite_push]
+## of the enemies around, 0 = no such floor). Zero when no event object is around.
+func _event_steer(pos: Vector2, crowd: int, kite_push: float = 0.0) -> Vector2:
+	_event_hold = false
+	var tree := body.get_tree()
+	if tree.get_node_count_in_group(EventSpawner.GROUP) == 0:
+		return Vector2.ZERO
+	var out := Vector2.ZERO
+	for node in tree.get_nodes_in_group(EventSpawner.GROUP):
+		if not is_instance_valid(node) or not (node as Node).is_inside_tree():
+			continue
+		var chest := node as GuardedChest
+		if chest != null and not chest.is_open():
+			out += _chest_pull(chest, pos, crowd)
+			continue
+		var totem := node as DefendTotem
+		if totem != null and totem.is_active():
+			out += _totem_pull(totem, pos, kite_push)
+	return out
+
+
+func _chest_pull(chest: GuardedChest, pos: Vector2, crowd: int) -> Vector2:
+	var to := Vector2(chest.global_position.x, chest.global_position.z) - pos
+	var dist := to.length()
+	if chest.is_ready():
+		if dist <= CHEST_HOLD_DISTANCE:
+			_event_hold = true
+			return Vector2.ZERO
+		return to / dist * CHEST_PULL_WEIGHT
+	if crowd == 0 and _hp_ratio() >= RETREAT_HP_RATIO and dist > CHEST_CAMP_DISTANCE:
+		return to / dist * CAMP_PULL_WEIGHT
+	return Vector2.ZERO
+
+
+## The pull of an ACTIVE [param totem] on a bot at [param pos]: TOTEM_PULL_BASE + the excess x TOTEM_PULL_SLOPE
+## past [method totem_limit], at most TOTEM_PULL_MAX – but a bot beyond the guard radius itself is pulled
+## with at least TOTEM_PULL_LEAD more than [param kite_push] (the length of its kite push from the enemies
+## around), so the enemies it kites from never keep it out there.
+func _totem_pull(totem: DefendTotem, pos: Vector2, kite_push: float = 0.0) -> Vector2:
+	var to := Vector2(totem.global_position.x, totem.global_position.z) - pos
+	var dist := to.length()
+	var limit := totem_limit()
+	if dist <= limit or dist < 0.001:
+		return Vector2.ZERO
+	var pull := minf(TOTEM_PULL_BASE + (dist - limit) * TOTEM_PULL_SLOPE, TOTEM_PULL_MAX)
+	if dist > DefendTotem.GUARD_RADIUS:
+		pull = maxf(pull, kite_push + TOTEM_PULL_LEAD)
+	return to / dist * pull
+
+
+## How far (m) from an ACTIVE totem a bot is still left alone: DefendTotem.GUARD_RADIUS less the margin.
+## Beyond it the totem pulls the bot back and the enemies busy with the totem stop kiting it.
+static func totem_limit() -> float:
+	return DefendTotem.GUARD_RADIUS - TOTEM_PULL_MARGIN
+
+
+## The ACTIVE Defend-the-Totem totem of the event group, null when there is none (a held or fallen one
+## needs no guards).
+func _active_totem() -> DefendTotem:
+	var tree := body.get_tree()
+	if tree.get_node_count_in_group(EventSpawner.GROUP) == 0:
+		return null
+	for node in tree.get_nodes_in_group(EventSpawner.GROUP):
+		var totem := node as DefendTotem
+		if totem != null and totem.is_inside_tree() and totem.is_active():
+			return totem
+	return null
+
+
+## Whether [param pos] (XZ) lies beyond [method totem_limit] from [param totem].
+static func _beyond_totem_limit(pos: Vector2, totem: DefendTotem) -> bool:
+	return pos.distance_to(Vector2(totem.global_position.x, totem.global_position.z)) > totem_limit()
+
+
+## Whether [param enemy] is walking to [param totem] (the totem's lure taunted it onto it).
+static func _lured_by(enemy: Enemy, totem: DefendTotem) -> bool:
+	return enemy.taunt_target == totem and enemy.is_taunted()
 
 
 ## The nearest living priority target (Cultist Acolyte) whose centre is within [param reach] m of
@@ -283,15 +428,16 @@ func _reach() -> float:
 
 ## True when a rescue run to [param ghost] looks survivable: the rescuer is healthy enough
 ## and few enemies stand near the ghost. [param enemies] holds (pos - enemy position).
-func _safe_rescue(pos: Vector2, ghost: Vector2, enemies: Array[Vector2]) -> bool:
+func _safe_rescue(pos: Vector2, ghost: Vector2, enemies: Array[Vector2], more: Array[Vector2] = []) -> bool:
 	if _hp_ratio() < RESCUE_MIN_HP_RATIO:
 		return false
 	var threats := 0
-	for d in enemies:
-		if (pos - d).distance_to(ghost) < RESCUE_THREAT_RADIUS:
-			threats += 1
-			if threats > RESCUE_MAX_THREATS:
-				return false
+	for list in [enemies, more]:
+		for d: Vector2 in list:
+			if (pos - d).distance_to(ghost) < RESCUE_THREAT_RADIUS:
+				threats += 1
+				if threats > RESCUE_MAX_THREATS:
+					return false
 	return true
 
 

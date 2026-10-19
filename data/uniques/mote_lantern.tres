@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mote_lantern"
+display_name = "Mote Lantern"
+flavor = "It follows you home. It does not pay rent."
+slot_type = 10
+armor_type = -1
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"holy_damage": 6.0,
+&"spell_power": 2.0
+})
+class_restriction = &""
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "periodic",
+"interval": 6.0,
+"damage": 22.0,
+"school": "holy"
+}
+unique_text = "Every 6 sec: A mote of light strikes the nearest enemy for 22 Holy damage."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

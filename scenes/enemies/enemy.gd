@@ -215,6 +215,10 @@ var attack_cooldown_mult := 1.0
 var damage_mult := 1.0
 ## The elite's nameplate / look (null for normal enemies).
 var elite_plate: ElitePlate
+## False for the dungeon's enemies (M6b): a death still counts as a kill (and leaves its
+## [member EnemyData.death_effect]) but pays no gold / XP and rolls no item or Artifact – the dungeon
+## has its own rewards ([DungeonRewards]).
+var drops_loot := true
 
 var _dead := false
 var _move_velocity := Vector3.ZERO
@@ -265,8 +269,13 @@ var hook_serial := 0
 var _hook_target: Player
 var _hook_line: HookLine
 
-# Open-field fast path (see OPEN_FIELD_MARGIN): the collider-free interior of this tick.
+# Open-field fast path (see OPEN_FIELD_MARGIN): the collider-free interior of this tick. It is valid for
+# one physics frame of one arena layout: _open_arena_id / _open_size name the Arena (instance) and the
+# playable size it was measured for, so a new arena or a dungeon layout swap inside the same frame (a test,
+# Main.enter_dungeon) never reuses the old one's bounds.
 static var _open_frame := -1
+static var _open_arena_id := 0
+static var _open_size := Vector2.ZERO
 static var _open_ok := false
 static var _open_min_x := 0.0
 static var _open_max_x := 0.0
@@ -300,12 +309,15 @@ static func setup(e: Enemy, p_data: EnemyData, p_wave: int) -> Enemy:
 		return e
 	e.name = String(p_data.id).to_pascal_case() if p_data.id != &"" else "Enemy"
 	e.radius = p_data.radius
-	e.max_hp = maxf(1.0, p_data.hp_at_wave(e.wave) * RunState.coop_hp_mult())
+	# A running shrine (M6b: Shrines) makes every enemy of its waves tougher: x1 when none does.
+	e.max_hp = maxf(1.0, p_data.hp_at_wave(e.wave) * RunState.coop_hp_mult() * Shrines.enemy_hp_mult())
 	e.hp = e.max_hp
-	e.contact_damage = p_data.contact_damage_at_wave(e.wave) * RunState.coop_damage_mult()
-	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave) * RunState.coop_damage_mult()
+	var shrine_damage := Shrines.enemy_damage_mult()
+	e.contact_damage = p_data.contact_damage_at_wave(e.wave) * RunState.coop_damage_mult() * shrine_damage
+	e.projectile_damage = p_data.projectile_damage_at_wave(e.wave) * RunState.coop_damage_mult() * shrine_damage
 	var rng := RunState.rng
-	e.move_speed = p_data.move_speed * (1.0 + rng.randf_range(-MOVE_SPEED_JITTER, MOVE_SPEED_JITTER))
+	e.move_speed = p_data.move_speed * (1.0 + rng.randf_range(-MOVE_SPEED_JITTER, MOVE_SPEED_JITTER)) \
+			* Shrines.enemy_speed_mult()
 	e._weave_phase = rng.randf() * TAU
 	e._strafe_sign = 1.0 if rng.randf() < 0.5 else -1.0
 	e._strafe_left = rng.randf_range(STRAFE_SWITCH_MIN, STRAFE_SWITCH_MAX)
@@ -707,10 +719,11 @@ static func cached_players(tree: SceneTree) -> Array[Player]:
 
 
 ## Forces the next [method cached_players] call (and [LivingPlayers] snapshot) to rebuild
-## the list (tests).
+## the list, and the next move to measure the arena's open field again (tests).
 static func invalidate_player_cache() -> void:
 	_player_cache_frame = -1
 	_player_cache_count = -1
+	_open_frame = -1
 	LivingPlayers.mark_dirty()
 
 
@@ -1422,7 +1435,7 @@ func _apply_movement(delta: float, here: Vector3, stunned: bool) -> void:
 		return
 	var nx := here.x + velocity.x * delta
 	var nz := here.z + velocity.z * delta
-	if _open_frame != Engine.get_physics_frames():
+	if _open_frame != Engine.get_physics_frames() or not _open_field_is_of_current_arena():
 		_update_open_field(self)
 	var m := radius + OPEN_FIELD_MARGIN
 	if _open_ok and here.y == 0.0 and nx - m >= _open_min_x and nx + m <= _open_max_x \
@@ -1441,11 +1454,21 @@ func _apply_movement(delta: float, here: Vector3, stunned: bool) -> void:
 		global_position = fixed
 
 
+## The cached open field was measured for the arena that is current now, at its current layout size.
+static func _open_field_is_of_current_arena() -> bool:
+	var arena := Arena.current
+	if arena == null or not is_instance_valid(arena):
+		return _open_arena_id == 0
+	return arena.get_instance_id() == _open_arena_id and arena.play_size == _open_size
+
+
 ## Once per physics tick: is the arena interior (inside the walls) free of world colliders?
 static func _update_open_field(e: Enemy) -> void:
 	_open_frame = Engine.get_physics_frames()
 	_open_ok = false
 	var arena := Arena.current
+	_open_arena_id = arena.get_instance_id() if arena != null and is_instance_valid(arena) else 0
+	_open_size = arena.play_size if _open_arena_id != 0 else Vector2.ZERO
 	if arena == null or not arena.is_inside_tree() or not e.is_inside_tree():
 		return
 	var world := e.get_world_3d()
@@ -1504,7 +1527,8 @@ func _die(attacker: Node3D) -> void:
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
 		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
-	_death_loot(pos, attacker)
+	if drops_loot:
+		_death_loot(pos, attacker)
 	_on_death_effect()
 	_leave_world()
 	died.emit(self, killer_index)

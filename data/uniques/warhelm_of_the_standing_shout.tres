@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"warhelm_of_the_standing_shout"
+display_name = "Warhelm of the Standing Shout"
+flavor = "The roar starts before the visor closes."
+slot_type = 0
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"strength": 7.0,
+&"stamina": 8.0
+})
+class_restriction = &"warrior"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "battle_shout",
+"mods": {
+"radius_add": 5.0
+}
+}
+unique_text = "Equip: Your Battle Shout reaches 5 m further."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

@@ -13,7 +13,8 @@ extends Node3D
 ## not fit with them (a narrow screen), the view only leans towards it, and it never limits
 ## where a player may walk ([method get_walk_rect]). M6: a living boss (group &"bosses", [Boss])
 ## is framed the same way ([method boss_points], also an "extra"), so its telegraphs and the
-## adds it raises stay in sight.
+## adds it raises stay in sight. M6b: so is the target of a mid-wave event (group
+## EventSpawner.GROUP: the chest, the totem, the caravan's cart – [method event_points]).
 ##
 ## The rig node sits at the look-at point on the ground; [member camera] is offset back and
 ## up along the pitch. Framing math is static (see [method compute_framing]) and unit tested.
@@ -213,7 +214,8 @@ func _goblin_points() -> Array[Vector3]:
 		return out
 	var goblins := get_tree().get_nodes_in_group(&"loot_goblins")
 	var bosses := get_tree().get_nodes_in_group(&"bosses")
-	if goblins.is_empty() and bosses.is_empty():
+	var events := get_tree().get_nodes_in_group(EventSpawner.GROUP)
+	if goblins.is_empty() and bosses.is_empty() and events.is_empty():
 		return out
 	var living: Array[Node3D] = []
 	var ghosts: Array[Node3D] = []
@@ -222,6 +224,21 @@ func _goblin_points() -> Array[Vector3]:
 		return out
 	out = goblin_points(goblins)
 	out.append_array(boss_points(bosses))
+	out.append_array(event_points(events))
+	return out
+
+
+## Ground points of the mid-wave [param events]' objects (the group EventSpawner.GROUP: the Guarded Chest,
+## the totem, the caravan's cart) the camera frames as soft points, like the Loot Goblin: whatever an
+## object's event_frame_points() answers (nothing once the chest is open, the totem done or the cart
+## gone).
+static func event_points(events: Array[Node]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for node in events:
+		if node == null or not is_instance_valid(node) or not node.has_method(&"event_frame_points"):
+			continue
+		var pts: Array[Vector3] = node.call(&"event_frame_points")
+		out.append_array(pts)
 	return out
 
 
@@ -348,6 +365,33 @@ static func safe_ground_rect(center: Vector3, dist: float, aspect: float) -> Rec
 ## [method safe_ground_rect] of the current (smoothed) view.
 func get_safe_ground_rect() -> Rect2:
 	return safe_ground_rect(focus, distance, _aspect())
+
+
+## [method get_safe_ground_rect] on the screen (px): the largest axis-aligned rectangle inside the
+## projection of the safe ground rectangle, within the viewport. Name tags of the mid-wave events
+## stay inside it, so they are never cut off or hidden under the HUD ([EventTag]).
+func get_safe_screen_rect() -> Rect2:
+	return safe_screen_rect(camera, get_safe_ground_rect())
+
+
+## The screen rectangle (px) inside the projection of the ground rectangle [param ground] (XZ) as
+## [param cam] sees it: the ground's corners are projected, the far edge and the near edge give the
+## top and the bottom, the narrower of the two give the left and the right. Clipped to the
+## viewport; the whole viewport when [param ground] is empty or [param cam] is orthogonal.
+static func safe_screen_rect(cam: Camera3D, ground: Rect2) -> Rect2:
+	var view := cam.get_viewport().get_visible_rect()
+	if ground.size.x <= 0.0 or ground.size.y <= 0.0 or cam.projection != Camera3D.PROJECTION_PERSPECTIVE:
+		return view
+	var tl := cam.unproject_position(Vector3(ground.position.x, 0.0, ground.position.y))
+	var tr := cam.unproject_position(Vector3(ground.end.x, 0.0, ground.position.y))
+	var bl := cam.unproject_position(Vector3(ground.position.x, 0.0, ground.end.y))
+	var br := cam.unproject_position(Vector3(ground.end.x, 0.0, ground.end.y))
+	var x0 := maxf(tl.x, bl.x)
+	var x1 := minf(tr.x, br.x)
+	var y0 := maxf(tl.y, tr.y)
+	var y1 := minf(bl.y, br.y)
+	var rect := Rect2(x0, y0, maxf(x1 - x0, 0.0), maxf(y1 - y0, 0.0))
+	return view.intersection(rect) if rect.size.x > 0.0 and rect.size.y > 0.0 else view
 
 
 ## Where a framed player may stand so the whole team still fits on one screen together

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AffixData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/affix_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hunter"
+suffix = "of the Hunter"
+stats = Array[StringName]([&"slayer", &"executioner"])
+shares = Array[float]([0.6, 0.4])
+weight = 0.7
+slot_types = Array[int]([])

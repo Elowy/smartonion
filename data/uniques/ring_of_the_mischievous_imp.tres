@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ring_of_the_mischievous_imp"
+display_name = "Ring of the Mischievous Imp"
+flavor = "The imp insists it is helping."
+slot_type = 9
+armor_type = -1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"fire_damage": 12.0,
+&"crit": 5.0,
+&"haste": 5.0
+})
+class_restriction = &""
+unique_effect = &"chain"
+unique_params = {
+"trigger": "on_kill",
+"chance": 100.0,
+"every": 4,
+"icd": 0.5,
+"damage": 20.0,
+"targets": 3,
+"school": "fire"
+}
+unique_text = "Every 4th kill: Your imp hurls fireballs that leap between 3 enemies for 20 Fire damage each."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

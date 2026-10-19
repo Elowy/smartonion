@@ -139,7 +139,13 @@ func _real_hero(index: int, class_id: StringName, pos: Vector3) -> Player:
 
 func test_boss_data_files_are_loaded_by_db() -> void:
 	check(Db.bosses.has(MORVAIN) and Db.bosses.has(VORTHALAX), "both bosses in Db.bosses")
-	check_eq(Db.bosses.size(), 2, "two bosses")
+	# (M6b: the Dungeon Warden – a mini-boss of no wave, boss_wave 0 – is the third BossData.)
+	check_eq(Db.bosses.size(), 3, "two wave bosses and the Dungeon Warden")
+	var wave_bosses := 0
+	for id in Db.bosses:
+		if Db.bosses[id].boss_wave > 0:
+			wave_bosses += 1
+	check_eq(wave_bosses, 2, "two of them belong to a wave")
 	for id in Db.bosses:
 		check(not Db.enemies.has(id), "%s is not in the random enemy pool" % id)
 		check(Db.bosses[id].is_boss, "%s is_boss" % id)

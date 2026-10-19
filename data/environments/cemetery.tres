@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnvironmentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/environment_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cemetery"
+display_name = "Cemetery"
+description = "A moonlit graveyard behind a crumbling wall. The dead do not rest here, and neither do the onions."
+roll_weight = 1.0
+decor_id = &"cemetery"
+hazard_id = &"grasping_hands"
+hazard_name = "Grasping Hands"
+hazard_text = "Every few seconds bony hands claw out of the ground under the heroes. Leave the circle or be rooted."
+card_color = Color(0.62, 0.55, 0.9, 1)
+sky_color = Color(0.18, 0.16, 0.27, 1)
+ambient_color = Color(0.62, 0.62, 0.8, 1)
+ambient_energy = 0.68
+fog_color = Color(0.32, 0.31, 0.44, 1)
+fog_density = 0.007
+sun_color = Color(0.78, 0.84, 1, 1)
+sun_energy = 0.95
+sun_rotation = Vector3(-55, -120, 0)
+glow_intensity = 0.65
+saturation = 0.95
+contrast = 1.08
+grass_dark = Color(0.14, 0.2, 0.16, 1)
+grass_mid = Color(0.21, 0.29, 0.21, 1)
+grass_light = Color(0.3, 0.38, 0.28, 1)
+grass_warm = Color(0.36, 0.39, 0.29, 1)
+dirt_light = Color(0.46, 0.43, 0.42, 1)
+dirt_dark = Color(0.28, 0.26, 0.27, 1)
+has_road = true
+road_width = 1.7
+wall_tint = Color(0.78, 0.8, 0.95, 1)

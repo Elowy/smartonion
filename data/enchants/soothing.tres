@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnchantData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/enchant_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"soothing"
+prefix = "Soothing"
+kind = 1
+slot_types = Array[int]([11, 9, 10])
+requires_projectile = false
+min_rarity = 2
+weight = 0.8
+equip_stats = Dictionary[StringName, float]({})
+effect = &"heal"
+params = {
+"max_hp_pct": 3.0,
+"target": "lowest_ally"
+}
+ppm = 3.0
+chance = 0.0
+icd = 3.0
+school = &"holy"
+description = "Chance on hit: Heals the most wounded ally for {max_hp_pct}% of their Max HP."

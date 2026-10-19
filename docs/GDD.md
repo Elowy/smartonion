@@ -3,9 +3,13 @@
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
 > fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
-> Státusz: **M0–M6a kész** (a 16. fejezet szerint; az M6b és a későbbi mérföldkövek még
-> tervezés). Ez a dokumentum a fejlesztés alapja; minden szám kiinduló érték, a balanszolás
-> során változni fog.
+> Státusz: **M0–M6b kész** (a 16. fejezet szerint), egyetlen kivétellel: a **végleges 25
+> hullámos balansz** az M6b utolsó lépése, és még hátravan. Az M6b (módok, környezetek,
+> események, szentélyek, Dungeon-portál, tartalom-csomagok) megvalósult; ahol a kód
+> pontosít a tervhez képest, a 16.1 „pontosítások” blokkjai és az érintett fejezetek ezt
+> rögzítik. Az M7 és a későbbi mérföldkövek még tervezés. Ez a dokumentum a fejlesztés
+> alapja; minden szám kiinduló érték, a balanszolás során változni fog (az M6b maga nem
+> hangolt: a végleges balansz egyszer, a legvégén készül, lásd 9. és 16. fejezet).
 
 ---
 
@@ -21,7 +25,8 @@
 | Co-op | Helyi, **1–4 játékos**, kontrollerrel (+1 opcionális billentyű+egér) |
 | Fegyverek | **WoW-szerű: Main Hand + Off Hand** (kétkezes fegyver mindkét slotot foglalja) |
 | Aktív képességek | **Igen**, kasztonként saját erőforrással (Rage, Mana, Energy, Holy Power, Soul Shard) |
-| Menet hossza | **25 hullám** |
+| Menet hossza | **25 hullám** (Normal mód); az **Endless** módban a 25. hullám után folytatható (M6b, lásd 16.1) |
+| Módok (M6b) | **Normal** vagy **Endless**, opcionálisan **Hardcore** (nincs Spirit Healer); a lobbyban választható, módonként helyi ranglista (16.1) |
 | Nehézség | Egyelőre **egy** (Normal), adatvezérelten bővíthető (lásd 9.1) |
 | Szintlépés | **5 kártya, abilityk és statok keverve**, 1 választható; goldért rerollolható; az abilityk **goldért fejleszthetők** (lásd 6. fejezet) |
 | Talentek | WoW-szerű **talentfák** (kasztonként 3); a **10. szinttől szintenként 1 talentpont**, a hullámok között költhető (lásd 7. fejezet) |
@@ -36,33 +41,55 @@
 ## 1. Játékmenet-ciklus
 
 ```
-Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
-  → [ Hullám (harc) → Loot roll (Need / Greed / Pass) → Szintlépés (ability / stat)
-      → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25
-  → Győzelem / Vereség képernyő (összegzés, Damage Meter, díjak, run kártya)
+Főmenü → Csatlakozás (Press A to join) → Kasztválasztás + módválasztás (Normal / Endless, Hardcore)
+  → Aréna sorsolása („Rolling the arena…”, 12. fejezet)
+  → [ Hullám (harc; esetleg egy esemény) → Loot roll (Need / Greed / Pass)
+      → (Szentély, 5% eséllyel) → Szintlépés (ability / stat)
+      → (Dungeon-portál a 6., 9., 12., 15. hullám után)
+      → Bolt + Trainer + Talents + Karakterpanel → Ready ] × 25   (Endless: a 25. után tovább)
+  → Győzelem / Vereség képernyő (összegzés, Damage Meter, díjak, run kártya, ranglista)
 ```
 
-- **Egy menet = 25 hullám.**
+- **Egy menet = 25 hullám** (Normal mód). Az **Endless** mód a 25. hullám után is folytatódik
+  (lásd lent és 16.1); a menet hossza ezentúl a módból jön, nem egy beégetett 25-ös szám.
 - Hullámhossz:
   - **1–10. hullám:** `20 + 5 × (hullám − 1)` másodperc, legfeljebb 60 mp (a 9–10. hullám 60 mp).
   - **A 10. hullám felett hullámonként +10 mp:** 11. = 70 mp, 15. = 110 mp, 20. = 160 mp,
     25. = 210 mp.
+  - **Endless módban a 26. hullámtól** a hullámhossz **legfeljebb 210 mp** (a 25. hullám
+    hossza a plafon).
   - Egy teljes menet így kb. **42 perc** harc (a két boss-hullámot a képlet szerinti hosszal
     számolva; valójában a boss legyőzése dönt), plusz a hullámok közötti idő.
 - **Különleges hullámok** (részletek: 8. fejezet):
   - **10.** – boss-hullám: Lich Commander Morvain (mini-raid boss),
   - **20.** – elit-hullám (minden ellenség elit-affixet kap, de csak ×1,5 HP-val),
-  - **25.** – végső boss: Vor'thalax, the Burning Tyrant; a halála a menet győzelme.
+  - **25.** – végső boss: Vor'thalax, the Burning Tyrant; Normal módban a halála a menet
+    győzelme, **Endless módban** nem ér véget a menet: „*Endless begins!*” szalag, és jön a
+    26. hullám.
+  - **Endless, 26. hullám fölött:** minden 5. hullám boss-hullám a 30.-tól, váltakozva
+    Morvain (30., 40., …) és Vor'thalax (35., 45., …); a 20. hullám elit-szabálya a 33., 43.,
+    53. … hullámon ismétlődik.
+  - **Az Endless szabályai a hullámszám függvényei** (M6b, megvalósítva): a boss
+    `(hullám − 30) / 5` párossága szerint Morvain vagy Vor'thalax, HP-ja és sebzése a szokásos
+    hullám-növekedést követi. A boss-hullámokon és az elit-szabályú hullámokon **nincs
+    esemény**; a **Dungeon-portál** az Endlessben is csak a 6., 9., 12., 15. hullám után nyílik
+    (a 26.-tól nincs); a **szentélyek** és az **események** a 25. hullám után is ugyanúgy
+    működnek.
 
   A boss-hullámon a fenti hullámhossz nem érvényes: a hullám **a boss halálával ér véget**
   (nincs időkorlát, de 90 mp után Enrage). Közben a normál ellenségek a szokásos spawn-ráta
   50%-ával tovább érkeznek.
 - Hullám közben a karakterek **automatikusan támadnak** a fegyvereikkel a legközelebbi
   ellenségre; a játékos **mozog** és **képességeket** használ.
+- **Hullám közbeni esemény** (M6b): a 4. hullámtól, 30% eséllyel egy hullámban legfeljebb egy
+  esemény jön – őrzött láda, megvédendő totem vagy Goblin karaván (16.1).
 - A hullám végén a földön maradt gold és XP automatikusan begyűjtődik.
 - Hullám után: **loot roll** a hullámban szerzett itemekre (közös képernyőn) →
-  szintlépés-választások (ability vagy stat) → bolt / trainer / talents / karakterpanel
-  → minden játékos „Ready” → következő hullám.
+  (M6b: 5% eséllyel **szentély**) → szintlépés-választások (ability vagy stat) →
+  (M6b: a 6., 9., 12., 15. hullám után **Dungeon-portál**) → bolt / trainer / talents /
+  karakterpanel → minden játékos „Ready” → következő hullám.
+- **Aréna-környezet** (M6b): a menet elején 5 környezet egyike sorsolódik ki, és a menet
+  végéig megmarad (13. fejezet és 16.1).
 
 ### Elesés és halál (co-op)
 
@@ -124,6 +151,18 @@ Főmenü → Csatlakozás (Press A to join) → Kasztválasztás
 - Ha a hullám végéig nem élesztik fel, a következő hullám elején **50% HP-val** visszatér.
 - Ha **mindenki** elesik egyszerre → a menet véget ér.
 - Egyjátékos módban az elesés = halál (mint a Brotatóban).
+- **Hardcore mód** (M6b, a lobbyban kapcsolható; részletek: 16.1):
+  - **Nincs Spirit Healer:** az aréna nem hozza létre, így csak a társak tudnak feléleszteni
+    (5 mp-es csatornázás, Word of Glory).
+  - Az elesett hős keretén a „Go to the Spirit Healer …” helyett a „*Only a teammate can
+    revive you*” felirat áll. Ugyanez a felirat áll a **Dungeonban** is, ahol szintén nincs
+    Spirit Healer (a Resurrection Sickness felirata előbbre való; a normál tisztáson marad a
+    „Go to the Spirit Healer”).
+  - Aki a hullám végéig nem kap segítséget, a **következő hullám elején** így is visszatér
+    (50% HP-val), mint Normalban.
+  - A **HARDCORE jelvény** a lobbyban (a fejlécben), a HUD-on (a hullám-tábla első sora) és
+    a végképernyőn (a felirat alatti sor) látszik (12. fejezet).
+  - **Szóló Hardcore = szóló Normal:** egyedül az első elesés amúgy is a menet vége.
 
 ---
 
@@ -224,7 +263,7 @@ Minden kaszt tartalmaz:
 | Szerep | Közelharci bruiser |
 | Páncél | Plate |
 | Kezdőfegyver | One-Hand Sword |
-| Jártasság | Minden közelharci fegyver, Shield, kétkezes fegyverek, **Dual Wield** |
+| Jártasság | Minden közelharci fegyver (az M6b-től a Two-Hand Sword és a Two-Hand Mace is), Shield, kétkezes fegyverek, **Dual Wield** |
 | Alap | +5 Max HP, +2 Armor, **−5% Speed** |
 | Erőforrás | **Rage** (0–100): +4 / kiosztott találat, +10 / elszenvedett találat, −3 / mp ha nincs találat |
 | Képesség 1 | **Whirlwind** – 40 Rage: körkörös csapás, 150% fegyversebzés a környező ellenségekre |
@@ -237,7 +276,7 @@ Minden kaszt tartalmaz:
 | Szerep | Távolsági varázsló, AoE |
 | Páncél | Cloth |
 | Kezdőfegyver | Wand |
-| Jártasság | Wand, Staff, One-Hand Sword, Dagger, Off-hand Tome |
+| Jártasság | Wand, Staff, One-Hand Sword, Dagger, Off-hand Tome, Off-hand Orb (M6b) |
 | Alap | **−3 Max HP**, **−2 Armor**, +3 Intellect |
 | Erőforrás | **Mana** (100 + 2 × Int), +10 / mp (Haste-tel nő) |
 | Képesség 1 | **Blizzard** – 50 Mana: jégeső a legsűrűbb ellenségcsoportra, 3 mp, lassít |
@@ -250,7 +289,7 @@ Minden kaszt tartalmaz:
 | Szerep | Tank / támogató – **co-op erősség** |
 | Páncél | Plate |
 | Kezdőfegyver | Mace + Shield |
-| Jártasság | Sword, Mace, kétkezes Sword / Mace, Shield, Off-hand Tome |
+| Jártasság | Sword, Mace, kétkezes Sword / Mace (Two-Hand Sword, Two-Hand Mace – M6b), Shield, Off-hand Tome |
 | Alap | +3 Max HP, +3 Armor, **−10% sebzés** |
 | Erőforrás | **Holy Power** (0–3 pip): +1 minden 5. fegyvertalálat után |
 | Képesség 1 | **Consecration** – 10 mp CD: megszentelt föld a lába alatt, 4 mp-ig sebez |
@@ -276,7 +315,7 @@ Minden kaszt tartalmaz:
 | Szerep | DoT és pet (idéző) |
 | Páncél | Cloth |
 | Kezdőfegyver | Staff |
-| Jártasság | Wand, Staff, Dagger, One-Hand Sword, Off-hand Tome |
+| Jártasság | Wand, Staff, Dagger, One-Hand Sword, Off-hand Tome, Off-hand Orb (M6b) |
 | Alap | Állandó **Imp** pet (Intellect-tel skálázódó tűzlövedékek), **−2 Armor**, **−5% Speed** |
 | Erőforrás | **Soul Shard** (0–5): +1 minden 12. ölés után |
 | Képesség 1 | **Rain of Fire** – 1 Soul Shard: tűzeső a legsűrűbb csoportra, 4 mp |
@@ -356,7 +395,7 @@ talent (*Ancestral Spirit*) a felélesztést is felgyorsítja.
 
 ---
 
-## 4. Fegyverek (MVP: 10 db)
+## 4. Fegyverek (13 db: az MVP 10 + az M6b 3)
 
 Slotok: **Main Hand**, **Off Hand**. Kétkezes (2H) fegyver mindkettőt elfoglalja.
 Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkettő támad.
@@ -376,6 +415,31 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 
 - A fegyverek is **ritkaságot** kapnak (lásd 5.2): magasabb ritkaság = nagyobb alapsebzés + bónusz stat.
 - A bolt minden játékosnak **csak olyan fegyvert kínál, amit a kasztja használhat**.
+
+**M6b: három új fegyver** (kész; a Crossbow, a Polearm és a Fist Weapon az M8-cal jön, 3.7):
+
+| Fegyver | Típus | Skálázás | Sebesség / Range | Jellemző | Ki használhatja |
+|---|---|---|---|---|---|
+| **Two-Hand Sword** | 2H közelharci | 140% Str | 1,2 mp, 2,7 m, 125°-os ív | alapsebzés 10; a One-Hand Sword kétkezes párja: lassabb, nagyobb hatótáv | Warrior, Paladin |
+| **Two-Hand Mace** | 2H közelharci | 120% Str + 60% Int | 1,6 mp, 2,4 m, 120°-os ív | alapsebzés 13; 15% esély 0,5 mp kábításra, erős hátralökés | Paladin, Warrior |
+| **Orb** | Off Hand | – | – | nincs támadása; +4 Spell Power, +1 Intellect (a Tome-mal azonos költségvetés: 5 pont) | Mage, Warlock |
+
+- Mindhárom a többi fegyverrel azonos szabályok szerint kap ritkaságot, és kovácsolható (4.1).
+- Mindegyiknek van **saját Forge Legendary hatása** (fegyvertípusonként egy, 4.1) és egy
+  **procedurális megjelenése** (primitívekből: nagy kardpenge arany kereszttel; hosszú nyelű
+  buzogány kőfejjel és vas pántokkal; arany talpú-ágú foglalat izzó gömbbel; saját
+  ikon-sziluettek és markolat-pózok; a végleges modellek az M7-ben).
+- A két kétkezes fegyver **saját fegyvertípus-azonosítót** kap (`two_hand_sword`,
+  `two_hand_mace`), nem a `sword` / `mace`-t: így a Mage, a Warlock és a Rogue (akiknél a
+  `sword` / `mace` már jártasság) nem kapja meg őket. A Warrior és a Paladin jártasságlistája
+  bővül; az Orb a Mage és a Warlock jártassága.
+- Az **Orb** a Tome útját járja (Off Hand, nincs automatikus támadás, nem fegyver-iskola): kétkezes
+  fegyver mellé nem vehető fel (a hős nem maradhat támadó fegyver nélkül). A **Warlock a Staff-fal
+  (kétkezes) indul**, ezért az Orb (és a Tearglass) csak egykezes főkéz (wand, dagger, sword) mellett
+  vehető fel; a Staff mellett elutasítja („would disarm”), ahogy a Tome-nál. A Mage kezdő fegyvere a
+  wand, neki nincs ilyen korlátja. A generátor az Orbot a Warlocknak is kínálja.
+- A sebzés- és skálázási számok kiinduló értékek, a Two-Hand Axe és a One-Hand Sword / Mace közé
+  állítva; az M6b nem hangol (9. fejezet).
 
 ### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
 
@@ -427,8 +491,37 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 | Common | ×1,0 | – |
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
-| Epic | ×2,2 | +2 stat (a „+10% támadási sebesség” az M6b item-tartalom passzában jön, M5-ben nincs) |
-| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – 10 kézzel tervezett hatás, fegyvertípusonként egy (pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+| Epic | ×2,2 | +2 stat és **+10% támadási sebesség** (M6b; a szabály lent) |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (13 van: a 10 mellé az M6b három új fegyvere – Two-Hand Sword, Two-Hand Mace, Orb – hozott 3-at; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+
+**Az Epic fegyver +10% támadási sebessége (M6b, megvalósítva):**
+- Az **Epic támadó fegyver** +10% támadási sebességet kap (a cooldown ÷ 1,1). A passzív off-hand
+  (Shield, Tome, Orb) nem, mert nincs támadása.
+- **Csak az Epic sor** kapja: a Legendary és az Artifact sora nem tartalmazza, és a generált
+  Legendary sem örökli az Epic bónuszt (a ×3,0 sebzés ennél erősebb). A kovácsolt Epic és a
+  kézzel tervezett Epic fegyver (pl. Frostfang) is megkapja, mert ugyanazon a
+  ritkaság-skálázáson megy át. Hogy egy Legendary így lassabban üt, mint az Epic, amelyből
+  kovácsolták, a végső balansz nyitott kérdése (9. fejezet).
+- A bónusz a Haste-tel **szorzódik** (nem additív), és valódi sebességnövekedés: a fegyverhez
+  normált Attack Power / Spell Power és a PPM-esélyek az eredeti cooldownt használják, mint a
+  Haste-nél (az Epic fegyver így kicsit több procot ad percenként).
+- A tooltip a hatásos sebességet mutatja („Speed 0.82” a 0,9 helyett), a DPS-t ehhez számolja, és
+  egy zöld „+10% Attack Speed” sor jelzi. Az érték ritkaságonként egy táblában van, így később egy
+  sor átírásával más ritkaság is kaphat bónuszt.
+
+**Az új fegyverek Forge Legendary hatásai (M6b, megvalósítva):**
+
+| Fegyver | Legendary | Hatás |
+|---|---|---|
+| Two-Hand Sword | **Thistlebrand** | minden 4. találat szögesdárda-félholdat vet: a találat 150%-a fizikai sebzés a célpontra, 40%-os lassítással 3 mp-ig |
+| Two-Hand Mace | **Boulderbloom** | minden 4. találat a földre csap: a találat 70%-a mindenkinek 4 méteren belül (a viselő körül), 50%-os lassítással 3 mp-ig |
+| Orb | **Tearglass** | minden 3. varázslat (a `spell` címkéjű képességek) után az orb szétpattan: 45 Arcane sebzés (+ Spell Power) mindenkinek 3,5 méteren belül, 30%-os lassítással 2 mp-ig |
+
+A Tearglass az első Forge Legendary, amelyik **varázslat-triggert** (`on_cast`) használ: az Orbnak
+nincs találata, ezért fix sebzése van, nem a találat százaléka. „Varázslat” = a `spell`
+címkéjű képesség (a Mage és a Warlock varázslatai, pl. Fireball, Shadow Bolt, Drain Life; a Blink,
+az Ice Barrier, a Fear és a pet-idézések nem). Két Epic Orb / Two-Hand Sword / Two-Hand Mace kovácsolása ezeket adja, mint a
+többi fegyvernél.
 
 **Korlátok:**
 - Legendary fölé nem lehet kovácsolni; a kovácsolt Legendary-t sem lehet tovább kovácsolni.
@@ -562,6 +655,25 @@ A legtöbb item **generált**: alaptípus + ritkaság + WoW-szerű utótag.
 
 Epic ritkaságtól fölfelé egy plusz másodlagos stat kerül rá.
 
+**M6b:** az utótagok száma 25 (5.8); a fenti példák a 12 alap-utótagot mutatják. A 7 új utótag
+(a meglévő stat-azonosítókkal és a meglévő súlyozással; kész):
+
+| Utótag | Statok (arány) | Súly | Slotok |
+|---|---|---|---|
+| of the Ox | Stamina 0,6 · Armor 0,4 | 1,0 | a 8 páncélslot |
+| of the Lynx | Agility 0,6 · Crit Damage 0,4 | 1,0 | páncél + fegyver |
+| of the Raven | Intellect 0,6 · Cooldown Reduction 0,4 | 0,8 | páncél + fegyver |
+| of Thorns | Thorns 0,6 · Parry 0,4 | 0,8 | bármely |
+| of Mending | Spirit 0,6 · Resource Regen 0,4 | 0,8 | bármely |
+| of the Hunter | Slayer 0,6 · Executioner 0,4 | 0,7 | bármely |
+| of the Magpie | Gold Find 0,6 · Pickup Range 0,4 | 0,7 | bármely |
+
+- Az elsődleges statot (Str / Agi / Int / Stamina) adó utótagok nem kerülnek nyakra vagy gyűrűre
+  (a teszt ellenőrzi).
+- Az **of Mending** a Resource Regen mellé **Spiritet** (60%) ad, nem Healing Done-t: a Healing
+  Done-t csak a Paladin gyógyítása olvassa, a másik négy kasztnál az utótag 60%-a holt stat lett
+  volna; a Spirit minden kasztnál HP-t regenerál.
+
 **Anyag-fokozatok (alaptípusok):** minden páncéltípusnak 3 fokozata van. A magasabb
 fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
@@ -572,6 +684,43 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Mail | Chain | Scaled | Stormforged |
 | Plate | Iron | Steel | Runed |
 
+**M6b – a fokozatok külön alaptípusok (kész):**
+- A mai alaptípusok (slotonként és páncéltípusonként egy, összesen 32) az **I. fokozatot**
+  adják; az M6b hozzáadta a **II.** és a **III.** fokozatot (+64): slotonként és
+  páncéltípusonként 3 alaptípus, összesen **96 páncél-alaptípus**.
+- A II. fokozat a **9.**, a III. a **17. hullámtól** érhető el (az alaptípus `min_wave`
+  adata; a GDD korábban `ItemBaseData.min_wave`-nek hívta, a kódban az osztály `ItemBase`).
+- **Generálás:** a generátor **először az eddigi módon páncéltípust választ** (egy súlyozott
+  húzás; a saját kaszt páncéltípusa ×4), **utána** a típus elérhető fokozatai közül a
+  hullámon elérhető **legmagasabbat 70%-ban**, egy **alacsonyabbat 30%-ban** (egyenletesen)
+  választja. Egy fokozatú típusnál (és az ékszernél, ami nem fokozatos) nincs plusz húzás, így a
+  9. hullám alatt, és a korábbi seedekkel generált itemek nem változnak.
+- A fokozat **csak az alaptípus nevét és kinézetét** adja (pl. „Runed Plate Carapace”, „Steel
+  Cuirass”). A statköltségvetés, az implicit Armor és az anyagnév továbbra is a **hullám**
+  anyag-fokozatát követi, nem az alaptípusét; a magasabb fokozatú alaptípus erősebbé tétele
+  balansz-változtatás lenne, ezért nem történt meg (9. fejezet).
+- Az alaptípus neve csak a darab nevét adja (az anyagszó a hullámtól függ, így nincs az
+  alaptípus nevében); a nevek egyediek, kivéve az öt eredeti I. fokozatú főnevet, amelyen két
+  páncéltípus osztozik (Gloves, Belt, Boots, Bracers, Leggings: a generált név az anyagszóval
+  különbözteti meg őket).
+- A II. / III. fokozat alaptípusai (az I. fokozatúak a meglévő 32):
+
+| Slot | Cloth | Leather | Mail | Plate |
+|---|---|---|---|---|
+| Head | Hood / Veil | Headguard / Mask | Bascinet / Great Helm | Sallet / Warhelm |
+| Shoulders | Pelerine / Cape | Epaulets / Spikeguard | Shoulderguards / Mantlet | Shoulderplates / Warplates |
+| Chest | Vestments / Raiment | Jerkin / Brigandine | Haubergeon / Byrnie | Cuirass / Plate Carapace |
+| Wrist | Wristwraps / Bindings | Armlets / Wristguards | Manchettes / Brassards | Armguards / Wristplates |
+| Hands | Mitts / Handwraps | Grips / Handguards | Fingerguards / Knuckleguards | Warfists / Clawgauntlets |
+| Waist | Cord / Cincture | Waistband / Cinch | Clasp / Waistguard | Tassets / Waistplate |
+| Legs | Trousers / Breeches | Chaps / Legwraps | Chausses / Cuisses | Greaves / Kneecops |
+| Feet | Sandals / Treads | Moccasins / Stalkers | Sollerets / Footguards | Warboots / Stompers |
+
+- **Ékszer:** 20 alaptípus (10 Neck, 10 Ring), nem fokozatos (a `min_wave` 1), nincs páncéltípusuk
+  és nincs modell-darabjuk. Neck: Amulet, Choker, Necklace, Pendant + az új **Torque, Locket,
+  Collar, Medallion, Talisman, Lavalier**. Ring: Band, Loop, Ring, Signet + az új **Seal, Hoop,
+  Crest, Bezel, Keeper, Thumb Ring**.
+
 **Teljes névminta:** `[Enchant-előtag] [Anyag] [Alaptípus] [of the Utótag]`
 
 > Példa: *Blazing Runed Plate Helm of the Bear* (Epic, Looted)
@@ -581,7 +730,7 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 ### 5.5 Kézzel tervezett itemek (MVP)
 
-#### Trinketek (10 db, mind kézzel tervezett, proc- vagy aktiválós hatással)
+#### Trinketek (30 db: az eredeti 10 + az M6b 20, mind kézzel tervezett, proc- vagy aktiválós hatással)
 
 | Név | Hatás |
 |---|---|
@@ -598,7 +747,40 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 
 \* Munkanevek – a végleges nevek nem utalhatnak Blizzard-márkákra (lásd 14. fejezet).
 
-#### Legendary itemek (8 db)
+**M6b: 20 új trinket (kész, összesen 30).** Mind kézzel tervezett, minden forrásból (shop, loot,
+elite, goblin, boss) az 1. hullámtól kapható, a hatásuk a meglévő proc-szókincsből áll (5.7). A
+statjuk a ritkaságnak megfelelő trinket-keret (Uncommon ≈ 5, Rare ≈ 8, Epic ≈ 11 pont).
+
+| Név | Ritkaság | Statok | Hatás |
+|---|---|---|---|
+| Bottled Thundercloud | Rare | nature_damage 6, haste 2 | Találatkor láncvillám 3 ellenség között, 13 Nature sebzés egyenként |
+| Wasp-Nest Charm | Uncommon | crit 3, haste 2 | Találatkor darázsraj: 16 Nature sebzés 4 mp alatt, 3× halmozódik |
+| Jar of Leeches | Uncommon | leech 1, stamina 2 | Találatkor 7 Shadow sebzést szív el a célpontból, és ugyanennyit gyógyít neked |
+| Bell of Stillness | Rare | stamina 4, versatility 2 | Találatkor a harang kongat: 1,5 mp kábítás |
+| Warbeat Drum | Epic | haste 4, mastery 4, stamina 3 | Találatkor +4% Haste 6 mp-ig, 5× halmozódik |
+| Carrion Talon | Rare | stamina 4, spirit 2 | Öléskor 12% eséllyel a Max HP 6%-át gyógyítja |
+| Bone Chime | Rare | physical_damage 6, crit 2 | Öléskor 10% eséllyel a csontok szétrobbannak: 16 Physical sebzés 2,5 m-en belül és 40% lassítás 2 mp-ig |
+| Soul Lantern | Rare | spirit 3, stamina 3 | Öléskor 12% eséllyel a Max HP 8%-át elnyelő pajzs 6 mp-ig |
+| Notched Tally Stick | Uncommon | crit 3, haste 2 | Minden ölés +1% Damage 8 mp-ig, 8× halmozódik |
+| Porcupine Quill | Uncommon | thorns 3, armor 1 | Ha eltalálnak, 20% eséllyel 8 Physical sebzés a támadónak és 30% lassítás 2 mp-ig |
+| Beetle Carapace | Rare | armor 2, stamina 3 | Ha eltalálnak, 15% eséllyel +8 Armor 5 mp-ig |
+| Basilisk Eye | Epic | dodge 3, stamina 4, versatility 2 | Ha eltalálnak, 10% eséllyel a támadó 2 mp-ig kábult |
+| Ashfall Feather | Epic | stamina 6, spirit 3 | 30% HP alatt a Max HP 25%-át gyógyítja (hullámonként 1×) |
+| Alarm Whistle | Rare | speed 5, dodge 2 | 35% HP alatt hangrobbanás: 25 sebzés 4 m-en belül és 1,5 mp kábítás (hullámonként 1×) |
+| Smoke Pouch | Uncommon | dodge 2, speed 2 | 40% HP alatt +20% Speed és +15% Dodge 4 mp-ig (20 mp ICD) |
+| Mote Lantern | Rare | holy_damage 6, spell_power 2 | 6 mp-enként 22 Holy sebzés a legközelebbi ellenségnek |
+| Singing Bowl | Rare | stamina 4, resource_regen 3 | 15 mp-enként a Max HP 8%-át elnyelő pajzs 8 mp-ig |
+| Prospector's Pebble | Uncommon | gold_find 10 | 15 mp-enként 2 gold |
+| Wayward Compass | Epic | arcane_damage 8, spell_power 3 | 9 mp-enként 30 Arcane sebzés a körülötted lévő, 3 m-en belüli ellenségeknek |
+| Votive Candle | Rare | holy_damage 5, spirit 2 | Találatkor 12 Holy sebzés a célpontnak, és 5 HP gyógyítás a legsérültebb társnak |
+
+Eloszlás: 6 Uncommon + 10 Rare + 4 Epic az újak között (az összes 30: 9 / 15 / 6). Trigger szerint:
+6 találatkor (on hit), 4 öléskor, 3 amikor eltalálják, 3 alacsony HP-nál, 4 időzített (periodic).
+Új blokk vagy trigger nincs. A *periodic* és az *alacsony HP-s* területi hatások (Wayward Compass,
+Alarm Whistle) mindig a viselő körül hatnak, mert ott nincs találati célpont. A Notched Tally Stick
+**néma** (minden ölésnél halmozódik, ezért nem lebeg felirat a hős fölött).
+
+#### Legendary itemek (25 db: az eredeti 8 + az M6b 17)
 
 | Név | Slot | Hatás |
 |---|---|---|
@@ -611,6 +793,84 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Sash of Twin Souls | Waist | A második képesség cooldownja −30% |
 | Gauntlets of the Titan | Hands | +20% közelharci sebzés, −10% támadási sebesség |
 
+**M6b: 17 új Legendary (kész, összesen 25).** Loot-forrásokból (loot, elite, goblin, boss), a
+10. hullámtól; **kasztkorlát nélkül** (a Legendary nem kaszthoz kötött), de kaszt-hangulatúak: a
+statjuk a kaszt fő statját adja, a hatásuk a kaszt stílusához illik. A viselhetőséget a páncéltípus
+adja (mint a meglévő nyolcnál): a ruha (Cloth) mindenkié, a bőr (Leather) a Rogue-é és a lemezeseké,
+a lemez (Plate) csak a Warrioré és a Paladiné. Mind az 5 addig Legendary nélküli slottípus (Neck,
+Chest, Wrist, Legs, Trinket) kapott egyet, így a 12 slottípus mindegyikéhez van Legendary. A
+nyaklánc és a gyűrű nem ad fő statot (5.4). A fegyvertípusonkénti Forge Legendary hatások (4.1)
+ettől külön készletet adnak.
+
+| Név | Slot | Páncél | Kaszt-hangulat | Viselheti | Hatás |
+|---|---|---|---|---|---|
+| Greathelm of the Gilded Oath | Head | Plate | Paladin | Warrior, Paladin | 8 mp-enként a legsérültebb társ Max HP-jának 12%-át gyógyítja |
+| Pauldrons of the Radiant Bulwark | Shoulders | Plate | Paladin | Warrior, Paladin | Ha eltalálnak, 20% eséllyel a Max HP 15%-át elnyelő pajzs 5 mp-ig (8 mp ICD) |
+| Sabatons of the Long March | Feet | Plate | Paladin | Warrior, Paladin | 6 mp-enként 18 Holy sebzés a 3 m-en belüli ellenségeknek és 40% lassítás 2 mp-ig |
+| Breastplate of Unbroken Anger | Chest | Plate | Warrior | Warrior, Paladin | Ha eltalálnak, 40% eséllyel +4% Damage 8 mp-ig, 6× halmozódik |
+| Girdle of the Last Roar | Waist | Plate | Warrior | Warrior, Paladin | 40% HP alatt +25% Damage és +10 Armor 8 mp-ig (hullámonként 1×) |
+| Tearjerker | Main Hand (Two-Hand Axe) | - | Warrior | Warrior | Találatkor 36 Physical sebzés 4 mp alatt (3× halmozódik); a vérző ellenség halálakor a sebek a 3 m-en belüli ellenségekre terjednek |
+| Hood of the Quiet Knife | Head | Leather | Rogue | Rogue, Warrior, Paladin | Öléskor 15% eséllyel +20% Crit és +15% Speed 5 mp-ig |
+| Bracers of the Hidden Blade | Wrist | Leather | Rogue | Rogue, Warrior, Paladin | Találatkor rejtett penge: a célpont a találat 120%-ának megfelelő Physical sebzést kapja (hit_pct: a találattal skálázódik) |
+| Breeches of the Light Fingers | Legs | Leather | Rogue | Rogue, Warrior, Paladin | Öléskor 6% eséllyel 3 gold |
+| Vial of Distilled Adrenaline | Trinket | - | Rogue | all | 25 mp-enként +35% Haste és +15% Damage 8 mp-ig |
+| Amulet of Unspent Wishes | Neck | - | Mage | all | 6 mp-enként arkán varázsnyilak ugranak 4 ellenség között, 20 Arcane sebzés egyenként |
+| Leggings of the Brimming Well | Legs | Cloth | Mage | all | Találatkor +2 Spell Power és +3% Arcane Damage 6 mp-ig, 5× halmozódik |
+| Staff of the Deep Winter | Main Hand (Staff) | - | Mage | Mage, Warlock | Találatkor 24 Frost sebzés és 1,5 mp kábítás (befagyasztás) |
+| Gloves of the Patient Rot | Hands | Cloth | Warlock | all | 6 mp-enként a legközelebbi ellenségbe rothadás: 40 Shadow sebzés 5 mp alatt; a gazdája halálakor a 3 m-en belüli ellenségekre terjed |
+| Robe of the Hollow Pact | Chest | Cloth | Warlock | all | Ha eltalálnak, 20% eséllyel 24 Shadow sebzést szív el a támadóból, és ugyanennyit gyógyít neked |
+| Ring of the Mischievous Imp | Ring | - | Warlock | all | Minden 4. ölésnél az imp tűzgolyói 3 ellenség között ugrálnak, 20 Fire sebzés egyenként |
+| Grimoire of Seeded Doom | Off Hand (Tome) | - | Warlock | Mage, Paladin, Warlock | Találatkor 26 Shadow sebzés a célpontnak és a 3 m-en belülieknek, és 20 DoT 4 mp alatt |
+
+Kaszt-lefedettség (hangulat szerint az új 17-ből): Warrior 3, Paladin 3, Rogue 4, Mage 3,
+Warlock 4. Minden kaszt legalább 8-at viselhet az új 17-ből és legalább 12-t az összes 25-ből, és
+mindegyik megtalálja a fő statját legalább 3 viselhető újon (teszt).
+
+#### Névvel ellátott Rare / Epic itemek (40 db: az eredeti 10 + az M6b 30)
+
+Kézzel tervezett, kasztkorlát nélküli Rare / Epic itemek egyedi névvel és egy-egy hatással. Mindegyik
+egy meglévő proc-blokkot használ (nincs új trigger). Forrás: mind az öt (shop, loot, elit, goblin,
+boss), az 1. hullámtól. Az eredeti 10 (M2): Bramblethorn Bracers, Emberglow Wand, Frostfang,
+Galestride Boots, Grimtusk Cleaver, Helm of the Iron Vigil, Mossweave Leggings, Pendant of the
+Starless Night, Signet of the Dawnwatch, Sunforged Breastplate. Az M6b 30 új darabja:
+
+| Név | Ritkaság | Slot / páncél | Statok | Hatás |
+|---|---|---|---|---|
+| Circlet of Ninefold Skin | Rare | Head / Cloth | +6 Intellect, +4 Stamina | 15 mp-enként +3 gyógyítás (magadnak) |
+| Tunic of the Quiet Bulb | Rare | Chest / Leather | +5 Agility, +5 Stamina | Ölésnél 8% eséllyel +20% Haste 3 mp-ig |
+| Bracers of the Shallot Fold | Rare | Wrist / Cloth | +3 Intellect, +3 Spirit | Ütésnél 20% eséllyel 3 sebzés-pajzs 3 mp-ig |
+| Garlic Clove Pendant | Rare | Neck | +4 Stamina, +3 Spirit | Találatnál 2,5 ppm: 10 Frost sebzés |
+| Ring of the Chive Coil | Rare | Ring | +4 Crit, +3 Haste | Találatnál 2 ppm: 1 extra ütés |
+| Quickstep Boots | Rare | Feet / Leather | +5 Agility, +5 Speed | 12 mp-enként +15% Speed 3 mp-ig |
+| Leggings of the Scaled Skin | Rare | Legs / Mail | +5 Strength, +4 Stamina | Ütéskor 8%: 6 Holy sebzés 2 m-en belül (kör) |
+| Shardbound Gauntlets | Rare | Hands / Mail | +5 Haste, +3 Strength | Találatnál 3 ppm: 9 Arcane sebzés |
+| Cellar Sash | Rare | Waist / Cloth | +5 Intellect, +3 Spirit | Ölésnél 6%: +2 arany |
+| Shoulderpads of Shallow Roots | Rare | Shoulders / Leather | +4 Agility, +4 Stamina | Találatnál 3 ppm: 25% lassítás 2 mp-ig |
+| Splinterwand | Rare | Fegyver (wand) | +5 Intellect, +3 Crit | Találatnál 3 ppm: 8 Arcane sebzés, ugrik 2 célpontra |
+| Ring of the Ember Bulb | Rare | Ring | +4 Versatility, +3 Stamina | Ölésnél 6%: 10 Fire sebzés 2 m-en belül |
+| Cuffs of the Last Breath | Rare | Wrist / Cloth | +3 Spirit, +2 Versatility | 30% HP alatt (hullámonként 1×): 6 sebzés-pajzs 4 mp-ig |
+| Helm of the Brittle Crown | Rare | Head / Mail | +4 Strength, +5 Stamina | 14 mp-enként +3 gyógyítás a legsérültebb szövetségesnek |
+| Breastplate of the Crisp Shell | Rare | Chest / Mail | +5 Strength, +6 Stamina | Ütéskor 15%: 5 Fire visszasebzés |
+| Visor of the Sunward Watch | Epic | Head / Plate | +8 Strength, +8 Stamina | Ütéskor 12%: 8 Holy visszasebzés |
+| Ringmail of the Second Skin | Epic | Chest / Mail | +7 Strength, +7 Stamina, +2 Crit | Ütéskor 9%: 12 Physical sebzés 2,5 m-en belül (kör) |
+| Silken Leggings of the Veil | Epic | Legs / Cloth | +8 Intellect, +6 Spirit | 8 mp-enként +4 gyógyítás a legsérültebb szövetségesnek |
+| Treads of the Nimble Clove | Epic | Feet / Leather | +6 Agility, +4 Crit, +3 Haste | Találatnál 2,5 ppm: extra ütés |
+| Gauntlets of the Cloven Crust | Epic | Hands / Plate | +5 Strength, +6 Stamina, +3 Versatility | Találatnál 2,5 ppm: 12 Holy sebzés + 4 gyógyítás a legsérültebb szövetségesnek |
+| Girdle of the Unyielding Layer | Epic | Waist / Plate | +6 Strength, +7 Stamina | 35% HP alatt (hullámonként 1×): 10 sebzés-pajzs 4 mp-ig |
+| Spaulders of the Hollow Shell | Epic | Shoulders / Mail | +6 Strength, +5 Haste | Ölésnél 15%: +12% Crit 4 mp-ig |
+| Halo of the Pearled Onion | Epic | Head / Cloth | +7 Intellect, +4 Spirit, +2 Versatility | Találatnál 3 ppm: 16 Arcane sebzés |
+| Signet of the Festering Wound | Epic | Ring | +5 Crit, +4 Leech | Találatnál 4 ppm: 8 Shadow sebzés 4 mp alatt, max. 2 halmozódás |
+| Amulet of the Thousand Skins | Epic | Neck | +6 Stamina, +4 Haste | Ütéskor 15%: 4 sebzés-pajzs 4 mp-ig |
+| Wrap of the Blighted Peel | Epic | Wrist / Leather | +5 Agility, +3 Crit | Ölésnél 10%: 12 Nature sebzés 2,5 m-en belül (kör) |
+| Scallion Edge | Epic | Fegyver (sword) | +5 Strength, +3 Crit | Találatnál 3 ppm: 14 Physical sebzés a cél körül 2,5 m-en belül |
+| Shallot Shiv | Epic | Fegyver (dagger) | +6 Agility, +3 Crit | Ölésnél 10%: 3 gyógyítás magadnak |
+| Robe of the Lantern Heart | Epic | Chest / Cloth | +8 Intellect, +4 Spirit, +2 Haste | 15 mp-enként +20% Haste 4 mp-ig |
+| Leathers of the Rooted Dance | Epic | Legs / Leather | +7 Agility, +5 Stamina | Találatnál 3 ppm: 8 Nature sebzés, szívás (gyógyulsz is) |
+
+A Black Market ezeket nem árulja (tier-set darab vagy generált max-roll Epic, 16.1); a Shrine of
+Fortune és a dungeon-jutalom Epic itemei viszont kaphatnak ilyet is (a generátor kézzel tervezett
+Epic-sorsolása).
+
 #### Tier setek (kasztonként 1, Epic ritkaság, 5 darab: Head, Shoulders, Chest, Hands, Legs)
 
 | Kaszt | Set | 2 darab | 4 darab |
@@ -622,6 +882,10 @@ fokozat a későbbi hullámokban jelenik meg, és +10% / +20% stat-keretet ad.
 | Warlock | Felfire Raiment | +10% pet-sebzés | A Rain of Fire 20%-ban nem fogyaszt Soul Shardot |
 | Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
 | Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Chain Lightning +2 célpontot ér |
+
+> **M6b-ből M8-ra tolva:** a **kaszt-független tier setek** (5.8) – ezek a set-rendszer
+> módosítását igénylik (a rendszer ma kasztonként egy setet feltételez), ezért az M8-cal
+> jönnek, nem az M6b-vel. Az M6b-ben a tier setek kasztonként egy-egy marad.
 
 - **Nevek:** a Paladin, a Rogue és a Warlock setje új nevet kapott (korábban Lightforged
   Plate, Shadowcraft Garb, Felheart Raiment), mert azok WoW-setek, illetve -kifejezések
@@ -788,7 +1052,7 @@ sor jelzi: „*Classes: Mage*”.
 - **Need:** csak az adott kaszt nyomhat rá.
 - **Ritkaság:** Rare-től felfelé léteznek. A tier set darabok is ilyenek.
 
-**Példák (MVP: kasztonként 4, összesen 20)**
+**Az eredeti 10 (kasztonként 2; az MVP terve kasztonként 4 volt, a többi az M6b-ben készült el)**
 
 | Kaszt | Item | Slot | Hatás |
 |---|---|---|---|
@@ -803,7 +1067,53 @@ sor jelzi: „*Classes: Mage*”.
 | Warlock | Grimoire of the Imp Lord | Off Hand (Tome) | Az Imp +50% sebzés, és tűzlövedéke 2 célpontot ér |
 | Warlock | Soulbinder's Sash | Waist | Minden 8. ölés ad Soul Shardot (12 helyett) |
 
-A többi 10 a fejlesztés közben készül el, ugyanígy: kasztonként 4.
+A többi 30 az M6b-ben készült el, ugyanígy (lent).
+
+**M6b: kasztonként 8, összesen 40 kaszt-specifikus item (kész**; az M6a-ban 10 volt, tehát +30).
+Mind „*Equip:*” sorral módosítja a kaszt egyik képességét (ability mod), Rare-től felfelé (5.8).
+A kasztonkénti 6 új darab:
+
+| Név | Kaszt | Ritkaság / slot | Statok | Módosítás |
+|---|---|---|---|---|
+| Warhelm of the Standing Shout | Warrior | Epic / Head (Plate) | +7 Strength, +8 Stamina | Battle Shout +5 m sugár |
+| Shoulderguards of the Stubborn Wall | Warrior | Rare / Shoulders (Plate) | +5 Strength, +4 Stamina | Shield Wall +2 mp |
+| Breastplate of Thunderous Echo | Warrior | Epic / Chest (Plate) | +8 Strength, +8 Stamina | Thunder Clap +1 visszhang |
+| Wristguards of the Sundering Edge | Warrior | Rare / Wrist (Plate) | +3 Strength, +3 Crit | Execute küszöb +10% |
+| Legplates of the Bold Leap | Warrior | Rare / Legs (Plate) | +6 Stamina, +3 Strength | Heroic Leap bénítása 1 mp-cel hosszabb |
+| Reaping Greataxe | Warrior | Epic / Fegyver (two-hand axe) | +8 Strength, +4 Crit | Bladestorm −5 mp cooldown |
+| Long Coal Staff | Mage | Epic / Fegyver (staff) | +6 Intellect, +8 Fire Damage | Fireball égése a találat 15%-ával több sebzést okoz |
+| Shoulderwrap of the Glacial Ring | Mage | Rare / Shoulders (Cloth) | +4 Intellect, +4 Stamina | Frost Nova fagyasztás +0,5 mp |
+| Robe of the Tidewoven Veil | Mage | Epic / Chest (Cloth) | +8 Intellect, +5 Stamina | Ice Barrier teljes pajzsa (alap + Intelligencia + Spell Power) +25% |
+| Leggings of the Falling Star | Mage | Epic / Legs (Cloth) | +7 Intellect, +5 Stamina | Meteor bénítása 0,5 mp-cel hosszabb |
+| Cuffs of the Blazing Heart | Mage | Rare / Wrist (Cloth) | +3 Intellect, +3 Haste | Pyroblast égése a találat 10%-ával több sebzést okoz |
+| Gloves of the Quiet Missile | Mage | Rare / Hands (Cloth) | +5 Intellect, +2 Spirit | Arcane Missiles +1 lövedék |
+| Helm of the Holy Hour | Paladin | Epic / Head (Plate) | +7 Strength, +8 Stamina | Avenger's Shield +1 célpont |
+| Pauldrons of the Second Oath | Paladin | Rare / Shoulders (Plate) | +4 Strength, +4 Stamina | Blessing of Kings +4 mp |
+| Cuirass of the Vigilant Dawn | Paladin | Epic / Chest (Plate) | +8 Strength, +9 Stamina | Divine Shield −8 mp cooldown |
+| Vambrace of the Oathstone | Paladin | Rare / Wrist (Plate) | +3 Strength, +2 Versatility | Hammer of Justice +0,5 mp stun |
+| Girdle of Lasting Grace | Paladin | Epic / Waist (Plate) | +6 Strength, +6 Stamina, +3 Crit | Lay on Hands újratöltése 10 mp-cel rövidebb |
+| Legplates of the Endless Storm | Paladin | Rare / Legs (Plate) | +5 Strength, +6 Stamina | Divine Storm +1 hullám |
+| Hood of Quick Blades | Rogue | Epic / Head (Leather) | +7 Agility, +6 Stamina | Blade Flurry +1 célpont |
+| Pauldrons of the Pale Smoke | Rogue | Rare / Shoulders (Leather) | +4 Agility, +4 Crit | Poison Bomb lassítása további +20% |
+| Jerkin of the Last Breath | Rogue | Epic / Chest (Leather) | +8 Agility, +7 Stamina | Cheat Death +5% Max HP gyógyulás |
+| Gloves of the Quick Thrust | Rogue | Rare / Hands (Leather) | +5 Agility, +3 Haste | Killing Spree −3 mp cooldown |
+| Belt of Shifting Shadows | Rogue | Rare / Waist (Leather) | +4 Agility, +4 Stamina | Shadowstep buff +1 mp |
+| Leathers of the Unseen Throw | Rogue | Epic / Legs (Leather) | +7 Agility, +4 Crit | Shuriken Toss +1 shuriken, +3 m hatótáv |
+| Hood of Burning Summons | Warlock | Epic / Head (Cloth) | +7 Intellect, +6 Stamina | Summon Infernal −10 mp cooldown |
+| Mantle of Lingering Curses | Warlock | Rare / Shoulders (Cloth) | +5 Intellect, +3 Spirit | Corruption +2 mp |
+| Robe of the Hollow Star | Warlock | Epic / Chest (Cloth) | +8 Intellect, +8 Stamina | Shadow Bolt +1 átütés |
+| Bracers of the Siphoning Thread | Warlock | Rare / Wrist (Cloth) | +3 Intellect, +3 Crit | Drain Life gyógyítás +20% |
+| Leggings of Dread Steps | Warlock | Rare / Legs (Cloth) | +6 Intellect, +5 Stamina | Fear +1 m sugár |
+| Slippers of the Seeded Path | Warlock | Rare / Feet (Cloth) | +5 Intellect, +3 Haste | Seed of Corruption +1 ugrás |
+
+**Az „Equip:” sor kiszürkülése.** Ha a hős még nem tanulta meg a képességet, az item Equip sora
+szürkén, „(needs <képesség>)” jelzéssel látszik a tooltipben (mint az Artifact-tulajdonságoknál); az
+item attól még felvehető, a módosítás akkor lép életbe, amikor a hős megtanulja a képességet.
+
+**Forrás és súly.** A trinketek és a névvel ellátott itemek mind az öt forrásból (shop, loot, elite,
+goblin, boss) az 1. hullámtól jönnek; a Legendaryk a loot-forrásokból (loot, elite, goblin, boss) a
+10. hullámtól. A kaszt-specifikus itemek a saját kasztjuk dobásában ×3 súlyt kapnak, mint a
+meglévők.
 
 ### 5.6 Backpack
 
@@ -907,6 +1217,54 @@ III ×2, IV ×2,5, V ×3 (az egész értékű statok, pl. „+1 Pierce”, lefel
 A rang szorzója a gold-procnál (Greedy) a gold tört részét átviszi a következő procra, így a
 II. rang procjonként átlagban 1,5 goldot ad.
 
+**M6b – 50 enchant (kész):** a készlet 26 új enchanttal bővült (összesen 50: 16 Equip, 18
+Chance on hit, 8 On kill, 8 When struck), saját nevekkel, a meglévő proc- és bónusz-szókincsen
+belül (új trigger-fajta nem kellett). A rangok (I–V: ×1 … ×3), a PPM-szabályok és az Enchanter
+(lent) változatlanok. A fix számú értékek (sugár, időtartam, célpontszám) **nem skálázódnak** a
+ranggal; a gyógyítás / pajzs a **Max HP százaléka** (a rang a százalékot szorozza), így a teljes
+futamon át értelmes. Az új nevek nem utalhatnak Blizzard-márkákra (14. fejezet).
+
+| Előtag | Típus | Slotok | Min. ritkaság | Hatás (I. rang) | Esély / PPM |
+|---|---|---|---|---|---|
+| Scorching | Equip | Head, Neck, Shoulders, Chest, Hands, Ring, Trinket, Weapon | Uncommon | +10% Fire Damage | - |
+| Glacial | Equip | Head, Neck, Shoulders, Chest, Hands, Ring, Trinket, Weapon | Uncommon | +10% Frost Damage | - |
+| Sweeping | Equip | Head, Shoulders, Chest, Waist, Ring, Trinket | Uncommon | +8% Area Size | - |
+| Quickened | Equip | Head, Neck, Wrist, Waist, Feet, Ring, Trinket | Uncommon | +5% Cooldown Reduction | - |
+| Gilded | Equip | Neck, Wrist, Waist, Feet, Ring, Trinket | Uncommon | +10% Gold Find | - |
+| Spiked | Equip | Shoulders, Chest, Wrist, Waist, Legs, Feet | Uncommon | +3 Thorns (a közelharci támadó 3 sebzést kap vissza) | - |
+| Riposting | Equip | Wrist, Hands, Waist, Ring, Trinket, Weapon | Uncommon | +4% Parry | - |
+| Studious | Equip | Head, Neck, Wrist, Ring, Trinket | Uncommon | +10% XP Gain | - |
+| Rupturing | Chance on hit | Weapon, Ring, Trinket | Rare | A célpont szétreped: 12 Arcane sebzés neki és a 2 m-en belüli ellenségeknek | 2,5 PPM, 2 mp ICD |
+| Warding | Chance on hit | Weapon, Ring, Trinket | Rare | Védőburok: a Max HP 4%-át nyeli el 5 mp-ig | 2 PPM, 6 mp ICD |
+| Soothing | Chance on hit | Weapon, Ring, Trinket | Rare | A legsérültebb társat gyógyítja (a Max HP-jának 3%-a); egyedül magadat | 3 PPM, 3 mp ICD |
+| Concussive | Chance on hit | Weapon, Ring, Trinket | Rare | 1 mp kábítás a célponton | 2 PPM, 5 mp ICD |
+| Rimebound | Chance on hit | Weapon, Ring, Trinket | Rare | Fagyrobbanás a célpont körül: 8 Frost sebzés, 40% lassítás 2 mp-ig, 2,5 m | 2,5 PPM, 3 mp ICD |
+| Smoldering | Chance on hit | Weapon, Ring, Trinket | Rare | Felgyújtja a célpontot: 14 Fire sebzés 4 mp alatt, 2× halmozódik | 4 PPM, 0,5 mp ICD |
+| Frenzied | Chance on hit | Weapon, Ring, Trinket | Rare | +12% Damage 6 mp-ig | 1 PPM, 8 mp ICD |
+| Feasting | On kill | bármelyik slot | Rare | A Max HP 3%-ának visszaállítása | 10%, 1 mp ICD |
+| Rousing | On kill | bármelyik slot | Rare | +12% Haste 4 mp-ig | 8%, 3 mp ICD |
+| Arcing | On kill | bármelyik slot | Rare | A hullától villám ugrik 3 ellenség között, 12 Nature sebzés egyenként | 8%, 1 mp ICD |
+| Gravewarded | On kill | bármelyik slot | Rare | Védőburok: a Max HP 5%-át nyeli el 5 mp-ig | 8%, 4 mp ICD |
+| Wailing | On kill | bármelyik slot | Rare | A hulla sikolt: 10 Shadow sebzés a 3 m-en belüliekre és 1 mp kábítás | 6%, 3 mp ICD |
+| Barbed | When struck | Head, Shoulders, Chest, Weapon | Rare | A támadó 5 Nature sebzést kap, és még 8-at 3 mp alatt (tövisek) | 40%, 1,5 mp ICD |
+| Rallying | When struck | Head, Shoulders, Chest, Weapon | Rare | A Max HP 4%-ának visszaállítása | 12%, 6 mp ICD |
+| Fortifying | When struck | Head, Shoulders, Chest, Weapon | Rare | +4 Armor 5 mp-ig | 15%, 8 mp ICD |
+| Bulwarking | When struck | Head, Shoulders, Chest, Weapon | Rare | Védőburok: a Max HP 6%-át nyeli el 4 mp-ig | 10%, 8 mp ICD |
+| Emberhide | When struck | Head, Shoulders, Chest, Weapon | Rare | Lángcsóva körülötted: 8 Fire sebzés a 2,5 m-en belüli ellenségeknek | 10%, 5 mp ICD |
+| Clinging | When struck | Head, Shoulders, Chest, Weapon | Rare | A támadó 40%-os lassítást kap 3 mp-re | 20%, 4 mp ICD |
+
+- A *Chance on hit* enchantok a fegyver / gyűrű / trinket slotokra, a *When struck* enchantok a
+  Head / Shoulders / Chest / Shield slotokra kerülhetnek (a fenti slot-táblázat szerint), az *On
+  kill* enchantok bármelyikre; az Uncommon itemek csak Equip enchantot kaphatnak. Az Equip és az
+  On kill enchantok a legtöbb slotra illenek, ezért a generált itemeken ők vannak többségben.
+- A *Scorching* (+Fire) és a *Glacial* (+Frost) iskola-enchant minden kasztnál sorsolódik, a
+  Warrior / Rogue / Paladin számára holt stat; ez a végső balansz kérdése (9. fejezet).
+- Egy unique vagy enchant a lebegő szövegét (alapból az item neve / az enchant előtagja) a
+  paramétereiben egy `"label"` kulccsal felülírhatja, az üres `""` = nincs szöveg. Az M6b-ben egyetlen
+  item használja: a Notched Tally Stick (minden ölésnél halmozódik, ezért néma).
+- Az **Enchanter** a 26 új enchantot is sorsolja (a Reroll és az Imbue készlete az összes enchant,
+  amit a slot és a ritkaság enged); az Artifactot továbbra sem módosítja.
+
 **Enchanting – Arcane Dust és az Enchanter (M6a):**
 
 Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kassza-táblán látszik
@@ -984,18 +1342,57 @@ Az **Arcane Dust** a csapat **második közös pénzneme**: a gold mellett a kas
 
 ### 5.8 Tartalomcél – „sok item”
 
-| Kategória | MVP (M2) | Teljes játék (M6b+) |
-|---|---|---|
-| Fegyver-alaptípus | 10 | 16 (+ kétkezes kard, kétkezes buzogány, polearm, fist weapon, crossbow, orb) |
-| Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 60 | 150+ |
-| Ékszer-alaptípus (Neck, Ring) | 8 | 20 |
-| Stat-utótag („of the Bear” …) | 12 | 25 |
-| Enchantment | 24 | 50+ |
-| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | 40 |
-| Kaszt-specifikus itemek | 20 (kasztonként 4) | 60+ (kasztonként 8+) |
-| Trinket | 10 | 30 |
-| Legendary | 8 | 25 |
-| Tier set | 5 (kasztonként 1) | 10 (+5 kaszt-független) |
+Az **M6b** adta a teljes item-tartalmat, két kivétellel, amelyek az **M8-ra tolódtak**: a
+Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
+
+| Kategória | Állapot (M6a) | Állapot (**M6b, kész**) | M8 után |
+|---|---|---|---|
+| Fegyver-alaptípus | 10 | **13** (+ Two-Hand Sword, Two-Hand Mace, Orb) | 16 (+ Crossbow, Polearm, Fist Weapon) |
+| Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 32 (csak az I. fokozat) | **96** (3 fokozat × 32) | 96 |
+| Ékszer-alaptípus (Neck, Ring) | 8 (4 + 4) | **20** (10 Neck, 10 Ring) | 20 |
+| Stat-utótag („of the Bear” …) | 18 | **25** | 25 |
+| Enchantment | 24 | **50** (16 Equip, 18 Chance on hit, 8 On kill, 8 When struck) | 50 |
+| Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | **40** | 40 |
+| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8) | 60+ (kasztonként 8+, az új kasztokkal) |
+| Trinket | 10 | **30** | 30 |
+| Legendary | 8 | **25** (mind a 12 slottípushoz van) | 25 |
+| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (Thistlebrand, Boulderbloom, Tearglass) | 16 |
+| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1; változatlan) | kasztonként 1 + 5 kaszt-független |
+| Kézzel tervezett összesen (`Db.uniques`) | 63 | **160** (63 + 20 trinket + 17 Legendary + 30 névvel ellátott + 30 kaszt-specifikus; ebből 25 tier-set darab) | – |
+| Artifact | 5 | 5 (változatlan) | kasztonként 1 (+ Hunter, Shaman) |
+| Epic fegyver +10% támadási sebesség (4.1) | – | kész | – |
+| Alaptípus-fokozat (`min_wave`) és a 70% / 30% fokozat-választás (5.4) | – | kész | – |
+
+**Az M6b tartalom-csomagjai (megvalósítva)**
+
+- **Fegyverek:** három új fegyvertípus – **Two-Hand Sword** (Warrior, Paladin), **Two-Hand
+  Mace** (Paladin, Warrior) és **Orb** (Off Hand a Mage-nek és a Warlocknak: varázserő-jellegű
+  statok, nincs automatikus támadás) –, mindegyikhez saját Forge Legendary hatás
+  (fegyvertípusonként egy) és procedurális megjelenés (4. fejezet). A Crossbow, a Polearm és a
+  Fist Weapon az M8-cal jön. Az **Epic** fegyverek **+10% támadási sebességet** kapnak (4.1).
+- **Páncél:** a két újabb anyag-fokozat minden slotra és páncéltípusra: a II. a 9., a III. a 17.
+  hullámtól (az alaptípus `min_wave` adata); a generátor az elérhető legmagasabb fokozatot
+  70%-ban, egy alacsonyabbat 30%-ban választja (5.4). Az eredmény **96** alaptípus; a fokozat csak
+  a nevet és a kinézetet adja, a statokat nem.
+- **Ékszer és utótag:** 20 ékszer-alaptípus (10 Neck, 10 Ring) és 25 stat-utótag.
+- **Enchantok:** 50 (+26), saját nevekkel, a meglévő proc- és bónusz-szókincsen belül; új
+  trigger-fajta csak akkor, ha elkerülhetetlen (5.7).
+- **Kézzel tervezett itemek:**
+  - névvel ellátott Rare / Epic: 40 (+30);
+  - kaszt-specifikus: kasztonként 8 = 40 (+30), „*Equip:*” sorral módosítják a kaszt
+    képességeit (5.5);
+  - trinket: 30 (+20);
+  - Legendary: 25 (+17), kézzel tervezett procokkal.
+- **Kaszt-független tier setek:** az **M8-ra tolódtak**, mert a set-rendszer módosítását
+  igénylik (5.5); az M6b-ben a setek kasztonként egy-egy maradnak.
+- **Nevek:** az új itemek és enchantok nevei nem Blizzard-nevek; mindet ellenőrizzük a 14.
+  fejezet listája szerint, és minden megjelenített név egyedi (a teszt őrzi).
+- **Hol jelennek meg az új itemek:** a generált tartalom (fokozatos alaptípusok, ékszerek, utótagok,
+  enchantok, fegyverek) a boltban, lootban, a Black Marketben, a Shrine of Fortune és a
+  dungeon-jutalom Epic itemein is feltűnik; a kézzel tervezett Epic itemek a Black Market kivételével
+  mindegyiken (16.1). Az Artifactok változatlanok, sosem sorsolódnak ki.
+- A csomagok számai kiinduló értékek: az M6b nem hangol, a végleges balansz a legvégén
+  készül (9. fejezet).
 
 A generált alaptípusok, utótagok és enchantok kombinációjából **több ezer** különböző
 item jön ki. A kézzel tervezett itemek adják a „hűha, ez leesett!” pillanatokat.
@@ -1690,6 +2087,7 @@ nagy részét adja, ezért a végső balansz nyitott kérdése (9. fejezet, „N
     igazi eliteké). Nem számít elitnek: a Slayer és az Execute elit-prioritása nem hat rájuk.
   - Az igazi elitek (3× HP, elit-jutalom) várható száma ezen a hullámon a **kétszeres**.
   - Nincs boss, és Loot Goblin sem jön (lásd lent).
+  - **Endless módban** (M6b) ez a szabály a **33., 43., 53. …** hullámon ismétlődik (16.1).
   - A botoknak a 20. hullám kiugró nyomást jelent (az elit-affixes golemek és Axethrowerek);
     hogy mennyire legyen kemény, a végső balansz nyitott kérdése (9. fejezet, „Nyitott
     kérdések M6b-re”).
@@ -1735,9 +2133,45 @@ nagy részét adja, ezért a végső balansz nyitott kérdése (9. fejezet, „N
 - **Co-op:** a csapatnak össze kell hangolnia, hogy körbezárják (pl. Frost Nova,
   Hammer of Justice, Charge, Blizzard lassítása).
 
+**Esemény-ellenségek és -célpontok** (M6b)
+
+A hullám közbeni események (16.1) szereplői. A számok kiinduló értékek (nincs hangolás); a
+„grunt HP” a Skeleton Grunt HP-ja az adott hullámon (a szokásos hullám-növekedéssel, 9.
+fejezet).
+
+- **Guarded Chest – őrök:** 4 őr a láda körül, az adott hullámon jogosult ellenségtípusok
+  közül, **×2 HP**-val és **affix nélkül**. Az őrök a láda körül egy 2,8 m sugarú körön
+  **posztjukon állnak**, és nem indulnak a hősök után, amíg egy hős 9 m-en belülre nem ér
+  valamelyikükhöz, vagy valamelyikük sebzést nem kap (pl. távoli lövés); ekkor az egész
+  csoport egyszerre támad.
+- **Defend the Totem – totem:** szövetséges célpont. HP-ja **30 × grunt HP** a csapatméret
+  szerinti HP-szorzóval (9. fejezet); a „grunt HP” amennyi egy Skeleton Grunt HP-ja
+  ténylegesen. A **8 m-en belüli** ellenségeket a totem magához csalogatja, azok a hősök
+  helyett rá támadnak, és a szokásos érintés-sebzésükkel (az elit szorzójával, 1 mp-es
+  újratöltéssel) harapják; az elkábított vagy megfélemlített nem harap. Nem csalogat bosszt,
+  Loot Goblint és kordét, és azt sem, akit egy hős vagy pet éppen magára vett. A
+  **teljesített** totem a hullám végéig áll, de már nem csalogat és nem sebződik.
+- **Goblin Caravan – kordé:** HP-ja **40 × grunt HP** (a csapatszorzóval); egyenes sávban
+  megy az aréna két rövid oldala között (a faltól 1,8 m-re indul és ér célba), ~25 mp alatt;
+  nem sebez, nem kábítható, nem lökhető, a taunt és a megfélemlítés nem hat rá, lassítható
+  (Frost Nova, Blizzard). 3 őr kíséri, amíg egy hős a közelükbe nem ér vagy a kordét el nem
+  találják. Ha a hullámból kevesebb idő marad 27 mp-nél, az átkelés rövidül (a hullám vége
+  előtt 2 mp-cel ér át, legalább 15 mp alatt). Megölve gold-özönt és egy Rare itemet dob
+  (10.1); a túloldalon elszökik („*The caravan got away*”).
+- **Futó szentély és környezeti veszély:** mivel az őrök és a kordé szokásos ellenségek, a
+  **futó szentélyek** (HP / sebzés / sebesség) őket is erősítik, a környezeti veszélyek pedig
+  sebzik / lassítják őket; a totem saját HP-szabályú, a szentély nem hat rá. A fix
+  esemény-jutalmakat a szentély nem szorozza.
+- **Kamera és botok:** a kamera az esemény célpontját is képen tartja. A botok az őrökkel
+  normálisan harcolnak, kinyitják a ládát, a totem 6 m-es körzetében maradnak, és a kordét
+  üldözik, ha nincs ellenség a közelben (a pontos viselkedés: 16.1, „Hullám közbeni
+  események – pontosítások”).
+- **Dungeon Warden:** lásd a Bossok alatt.
+
 **Bossok** (M6a)
 
-Boss-hullám a **10.** és a **25.** hullám. A számok kiinduló értékek, a balanszolás során
+Boss-hullám a **10.** és a **25.** hullám (M6b: Endless módban a 30.-tól minden 5. hullám is,
+lásd a „Győzelem” pontot és a 16.1-et). A számok kiinduló értékek, a balanszolás során
 változnak. Közös szabályok:
 
 - **A boss az időzítő helyett:** a hullám a **boss halálával ér véget** (nincs időkorlát). A
@@ -1782,11 +2216,19 @@ változnak. Közös szabályok:
   sebzésébe.
 - **Győzelem:** Vor'thalax halála a 25. hullámon: „Victory!” szalag, 1,6 mp, majd a győzelmi
   képernyő. A másik boss-hullám végén a szalag „<Boss neve> defeated!”.
+  - **Endless módban** (M6b) Vor'thalax halála nem zárja le a menetet: „*Endless begins!*”
+    szalag, és jön a 26. hullám.
+  - Endlessben a **30. hullámtól minden 5. hullám** boss-hullám: **Morvain** a 30., 40., …,
+    **Vor'thalax** a 35., 45., … hullámon, ugyanazokkal a képességekkel és szabályokkal,
+    a szokásos hullám-skálázással. A menet itt csak vereséggel ér véget.
 - **Veszélyzónák és a botok:** a boss köreit, kúpját, mezőit, meteorjait és a Plague Ghoul
   tócsáját a botok veszélyzónának tekintik: a sugarán + 0,9 m-en belül kifelé tolják magukat
   (a közepéből a pálya közepe felé; ártalmatlan vagy lejárt zóna nem tol). A Meteor körébe a
   bot-csapat beáll (a sebzés megoszlik), a magányos hős kilép belőle (4× kap 8× helyett). A
   hullám vége minden ellenség-veszélyzónát eltüntet.
+  - **M6b:** az aréna-környezetek veszélyei (Grasping Hands, lápfoltok, lávakürtők, Falling
+    Icicles; 16.1) is ellenség-veszélyzónák: a botok kikerülik őket, és a hullám vége
+    eltünteti őket.
 - **Fejlesztői biztosíték (csak `--smoke`):** ha egy boss a saját enrage-e után 120 mp-pel még
   él (tehát 210 mp-nél), meghal („SMOKE boss timeout” sor), hogy a futás mindig véget érjen.
   Egy lezárt smoke-futás tehát nem bizonyítja, hogy a boss legyőzhető.
@@ -1828,12 +2270,26 @@ sebzés 4)
   kasztonként nagyon eltér), és a boss minden területi támadása és érintése a késői
   hullámok sebzés-szorzójával érkezik. A végső balansz az M6b-é (9. fejezet).
 
+**Dungeon Warden** (mini-boss, M6b – a Dungeon 4. terme, 16.1)
+
+- **Adat:** `BossData`, **alap HP 120**; a HP a boss-szabályokat követi (a „Boss HP” pont: az
+  adott hullám szokásos ellenség-HP-szorzója, a létszám szerinti boss-szorzó), a kitisztított
+  hullám szerint skálázva.
+- **Képességei** a boss-veszélyekből újrahasznosítottak: **Frost Circles** és **Raise Dead**
+  (Morvain, lásd fent).
+- **Enrage 60 mp-nél** (a boss-hullámok 90 mp-es Enrage-e helyett).
+- A Warden legyőzése zárja a dungeont (siker és jutalom: 16.1, 10.1).
+- A számok kiinduló értékek, az M6b-ben nincs hangolás.
+
 ---
 
 ## 9. Hullámok és skálázás
 
-- **25 hullám**; a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
+- **25 hullám** (Normal mód); a hullámhossz az 1. fejezet képlete szerint (a 10. hullám felett +10 mp hullámonként).
   A két boss-hullámot (10., 25.) a boss halála zárja, nem az időzítő (8. fejezet, „Bossok”).
+  - **Endless módban** (M6b) a 26. hullámtól a hullámhossz legfeljebb 210 mp, az ellenségek
+    növekedési képletei (alább) változatlanul folytatódnak; a 30.-tól minden 5. hullám
+    boss-hullám, a 33., 43., … hullám elit-hullám (1. fejezet, 16.1).
 
 - **Ellenség HP és sebzés:** hullámonként nő. A h. hullámon (n = h − 1):
   - HP-szorzó: `(1 + 0,12 × n) × 1,22^n`;
@@ -1889,6 +2345,21 @@ sebzés 4)
   bossok kiinduló számai változatlanok. A végleges 25 hullámos balansz **egyszer, az M6b
   végén** készül (16. fejezet), az összes M6b-s tartalommal (item-csomagok, módok, események)
   együtt, hogy ne kétszer kelljen hangolni.
+  - **Az M6b nem hangolt:** egyik csomagja sem (módok, környezeti veszélyek, események,
+    szentélyek, Dungeon, item-tartalom) módosította a hullám- és sebzés-görbét, a
+    csapatlétszám-szorzót vagy a meglévő tartalom számait; ahol egy csomag új értéket írt elő
+    (pl. az Epic fegyverek +10% támadási sebessége, 4.1), azt a megfelelő fejezet rögzíti. Az
+    új elemek számai (16.1, 8. fejezet) kiinduló értékek; a végső balansz mindet **egyszer, a
+    legvégén** hangolja, a lenti nyitott pontokkal együtt.
+  - **A régebbi mérések nem összehasonlíthatók az M6b-s fejjel.** A kód változásai önmagukban
+    semlegesek a seedelt futásra (a tartalom nélküli másolat pontosan a régi számokat adja), de az
+    új utótagok, enchantok és fegyverek a súlyozott sorsolásokba kerültek, ami a generált itemeket
+    (és a botok vásárlását) eltolja; az alapértelmezett menet ráadásul már **sorsolja a
+    környezetét** (a `--seed=5` az Ice Cave-et játssza). Példa, `godot --headless --fixed-fps 60
+    --path . -- --smoke --waves=6 --seed=5`: az M6a fejen 587 gyilkolás (Forest Ruin, még sorsolás
+    nélkül), az M6b funkciók után 603 (Ice Cave), a tartalom-csomagok után 607 (gold 215, 1 kovácsolt
+    fegyver). A régi számokat csak az új adatfájlok nélkül lehet újra előállítani; a végső
+    balansz-mátrixot ezért az M6b-s fejen újra kell futtatni.
   - **Nyitott kérdések M6b-re** (az ismert nyomáspontok; számszerű célok és mérések a
     végső balanszban készülnek):
     - **Flesh Golem sebzése:** az érintéses sebzése (4) és a horog (1×) a bot-futásokban a
@@ -1914,6 +2385,48 @@ sebzés 4)
       Artifact kevesebb késői fegyversebzést jelent).
     - **A késői kassza:** az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market;
       16.1) célozták; hogy elég jól elviszik-e a goldot, a végső balanszban dől el.
+    - **Az M6b új rendszereinek kiinduló számai:** az eseményeké (HP-szorzók, jutalmak, a 30%-os
+      esély), a szentélyeké (hatások, az 5%-os esély), a környezeti veszélyeké (sebzés, gyakoriság), a
+      Dungeoné (terem-ráták, a parázstartó HP-ja, a Warden, a jutalom, a bukás ára), az Endless
+      (26+ hullám, Hardcore) nehézsége: mind kiinduló érték, és a végső balansz egyszerre hangolja a
+      többivel. A botok a 16 hullámos smoke-futásokban szinte minden eseményt teljesítettek és a
+      Dungeonokat megnyerték, a fejlesztői szintre állított Endless Hardcore futás viszont tömeges
+      elesést mutatott (a hősök kezdő felszerelésben), amiből balansz-következtetés nem vonható le.
+    - **Az M6b tartalom-áttekintéseiből gyűlt tételek** (az item-tartalom a számokat nem
+      hangolta):
+      - **Pajzsok halmozódása:** a különböző procokból érkező pajzsok korlát nélkül, összeadódva
+        halmozódnak; az M6b a pajzsforrások számát 1-ről 8-ra növelte (Warding, Bulwarking,
+        Gravewarded, Soul Lantern, Singing Bowl, …), ezért hős-szintű összes-plafon (pl. a Max HP
+        50%-a) mérlegelendő.
+      - **Iskola-torzítás:** a Scorching (+Fire) és a Glacial (+Frost) Equip-enchant minden
+        kasztra sorsolódik, a Warrior / Rogue / Paladin számára holt stat; egy kaszt-iskola
+        torzítás a `power_enchant_weight`-ben (a generátor Attack Power / Spell Power súlyozása
+        mintájára) megoldhatja.
+      - **Epic-only támadási sebesség:** a +10% csak az Epic sort illeti (4.1), így egy Legendary
+        lassabban üt, mint az Epic, amelyből kovácsolták (a kardnál az Epic ütési ideje 0,82 mp, a
+        Legendaryé 0,90 mp). A DPS-próbában (minden elsődleges stat 40) a Legendary sima
+        támadásának DPS-e a tőrnél (104,0 az Epic 107,4-e ellen), a varázspálcánál (86,7 / 89,5), a
+        Staffnál (78,0 / 80,5), az íjnál (76,7 / 77,5), a kardnál (64,4 / 65,0) és a buzogánynál
+        (62,7 / 63,4) az Epicével egyenlő vagy alatta van, a pisztolynál, a baltánál és a két új
+        kétkezesnél kb. +0,3%: a Legendary így csak a hatását, +3 statját és 2 enchantját éri.
+        Döntés: marad az Epic-only (és a 4.1 kimondja), vagy Epic+ (`[0, 0, 0, 10, 10, 10]`,
+        egysoros átírás).
+      - **Ritkaság-inverzió:** az Epic Girdle of the Unyielding Layer (35% HP alatt 10 elnyelés 4
+        mp-ig) erősebb a Legendary Bulwark of the Last Stand-nél (25% HP alatt 8 elnyelés 3 mp-ig);
+        a Rare Cuffs of the Last Breath is közel áll a Legendaryhoz.
+      - **Orb:** a statjai (+4 Spell Power, +1 Intellect) kiinduló értékek; a botok az item_score-ban
+        a Spell Powert 1,0-val számolják, így egy Mage bot a Tome-ot (2 Int + 3 Crit) az Orbnál
+        többre tartja. A Warlock a kétkezes Staff-fal indul, ezért az Orb (és a Tearglass) csak
+        egykezes főkéz mellett vehető fel, a generátor mégis kínálja neki.
+      - **Gold-bevétel:** a gold-find trinketek (Prospector's Pebble: 2 gold / 15 mp, kb. +10
+        gold hullámonként) és a Breeches of the Light Fingers (6% × 3 gold ölésenként + Gold Find
+        20, kb. +10% egy ölés goldjából) a késői kasszához adnak; a goldsinkek (16.1) mellett kell
+        mérni.
+      - **Nem hangolt tartalom:** az új utótagok (súlyok, arányok), a hand-made procok lapos
+        számai (kivéve a Bracers of the Hidden Blade `hit_pct`-jét és a Max HP-arányos
+        gyógyítást / pajzsot), a kétkezes fegyverek számai és a magasabb fokozatú páncél-alaptípusok
+        (csak név és kinézet) kiinduló értékek; a késői hullámokban a lapos sebzésű procok
+        tervezetten gyengék.
     - **Módszertan:** egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a
       smoke-biztosíték 210 mp-nél megöli): a mátrix olvasásakor a „TIMEOUT” sorokat külön kell
       számolni. Egy adat-módosítás is átrendezi az RNG-t, ezért az egyes seedek párjai
@@ -1949,6 +2462,11 @@ sebzés 4)
 - **Mi kerül a kasszába:**
   - **Eladás** (a vételár 35%-a).
   - **Gold Find:** annak a játékosnak a Gold Find-ja számít, aki felszedi a goldot.
+  - **M6b – esemény, Dungeon, szentély:** a Guarded Chest (10×), a Goblin Caravan (40×) és a
+    sikeres Dungeon (20×) a **hullám átlagos ellenség-goldjának** többszörösét adja (16.1,
+    10.1); a **Shrine of Greed** +30%-ot ad a felszedett goldra, a **Shrine of Fortune** és
+    a **Shrine of the Gambler** közvetlenül a kasszát változtatja (−25%, illetve ×1,5 / ×0,5);
+    a Dungeon bukása a kassza 50%-át viszi el.
 - **Ellenségenkénti gold:** 1 alap, elit 10, boss 50, Loot Goblin lásd 8. fejezet.
 
 **Koordinációs eszközök (hogy a közös kassza ne okozzon káoszt)**
@@ -1997,6 +2515,8 @@ sebzés 4)
 **XP**
 
 - **Közös XP-sáv:** az egész csapat egyszerre lép szintet, mindenki kap választást.
+- **M6b:** a sikeres **Defend the Totem** a hullám átlagos ellenség-XP-jének 25-szörösét adja,
+  a **Shrine of Learning** +50% XP-t 3 hullámig (16.1).
 
 **Item-loot:** lásd **10.1** (Need / Greed / Pass).
 
@@ -2053,6 +2573,17 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 | Loot Goblin | garantált 1 | Rare+, 25% eséllyel Epic+ |
 | Boss (10. és 25. hullám) | **játékosonként 1** | Epic+, 20% eséllyel Legendary |
 | Artifact (ritka) | lásd 5.5: boss 15% (bossonként egyszer), goblin 5%, elit 2%, normál 0,05% ÷ játékosszám – a 10. hullámtól | Artifact |
+| Guarded Chest (M6b esemény) | a láda kinyitásakor 1 (+ 10× átlagos ellenség-gold) | Rare+ |
+| Goblin Caravan (M6b esemény) | a kordé megölésekor 1 (+ 40× átlagos ellenség-gold) | Rare |
+| Dungeon (M6b), sikeres | **játékosonként 1** (+ 50% eséllyel 1 extra tier set-darab a csapat egy kasztjának; + 20× átlagos ellenség-gold) | Epic |
+| Shrine of Fortune (M6b) | **játékosonként 1**, azonnal, ingyen (16.1) | Epic |
+
+Az események itemei a hullám végi Need / Greed / Pass dobásra mennek, mint minden drop; a
+Guarded Chest itemje **a normál drop hullámlimitjén kívül** esik (Artifact-dobás nélkül). Az
+esemény-itemek is lootzsákként esnek le, és ha senki sem veszi fel, a hullám vége a csapat közös
+lootjába teszi (mint minden zsákot). A Dungeon itemeinek dobása a dungeon **után**, még a piac
+előtt történik. A Dungeon ellenségei **nem** adnak goldot, XP-t, itemet, Artifactot (a Dungeonnak
+saját jutalma van), de az ölések a sebzésmérőbe és a menet-statisztikába beleszámítanak.
 
 **A földön**
 
@@ -2142,6 +2673,9 @@ A bolt megmarad, de **a legerősebb itemek lootból jönnek**. A csapatnak a hul
 
 **Loot roll közben:** A = Need, X = Greed, B = Pass, Y = Greed all remaining.
 
+**Lobbyban** (M6b): Y = mód léptetése (Normal ↔ Endless), X = Hardcore ki / be – bármelyik
+játékos megteheti. **Szentély-szavazáskor:** A = Accept, B = Decline.
+
 **Gombfeliratok:** a játék felismeri a kontroller típusát, és ahhoz igazítja a feliratokat:
 - Xbox: A B X Y,
 - PlayStation: ✕ ○ □ △,
@@ -2171,6 +2705,26 @@ indulnak.
 **Csatlakozási képernyő**
 
 - 4 hely; „Press A to join”; kasztválasztás karakter-előnézettel.
+- **Módválasztás** (M6b): **bármelyik csatlakozott játékos** az **Y**-nal (billentyűzeten C)
+  léptet a módok között (Normal ↔ Endless), és az **X**-szel (R) kapcsolja a **Hardcore**-t.
+  A választás a fejléc **jobb szélén** áll a cím sorában („*Mode: Endless · Hardcore*”,
+  mellette Hardcore-nál a HARDCORE jelvény), alatta a két gomb felirata; amíg senki nem
+  csatlakozott, halványan. A fejléc magassága nem nő. Visszaszámlálás közben a módváltás a váltó
+  játékost „nem kész”-re állítja, ezzel megszakítja a visszaszámlálást. A választás a következő
+  menetekre is megmarad (16.1).
+- **Sorsoló képernyő** („*Rolling the arena…*”, M6b): az indítás (a visszaszámlálás) után, a
+  menet előtt:
+  - a környezet-kártyák **vízszintes sora** (a lista 7 ismétlésben; festett kép, név,
+    veszély-név, leírás) ease-out módon ~3,5 mp alatt lassul, és a kisorsolt kártyán áll meg,
+    amely aranykeretet kap;
+  - **1 mp szünet**, a cím „*The arena: <név>*”, alatta a veszély szabálya **legfeljebb két
+    sorban**; ezután indul a menet;
+  - **bármelyik játékos A / START gombja átugorja** (az első 0,6 mp-ben nem);
+  - a képernyő a **futás magjához tartozó** környezetet mutatja (a környezetet a futásmagból
+    számolt külön véletlenszám-generátor első húzása adja), így a kártya és a futás környezete
+    szükségképpen egyezik;
+  - smoke-futásban, demóban, `--view` futásban és tesztben kimarad; a `--env=<id>` az eredményt
+    (a kártyát is) kényszeríti.
 
 **Harci HUD**
 
@@ -2192,6 +2746,24 @@ indulnak.
   „ENRAGED” felirat (8. fejezet).
 - **Alul:** közös XP-sáv (WoW-lila).
 - **Lebegő számok:** sebzés, krit (nagyobb, sárga), gyógyítás (zöld).
+- **M6b kiegészítések:**
+  - **HARDCORE jelvény** a HUD-n, ha a menet Hardcore módú: a felső tábla első sora (normál
+    menetben nincs rá hely lefoglalva).
+  - **Szentély-ikonok:** az aktív szentély-hatásokat (16.1) kis ikonok mutatják az arany alatt
+    (Greed: érmék, Haste: villám, Learning: könyv, Blood: csepp, Fortune: lóhere, Gambler:
+    kocka; 40 px), a hátralévő hullámok számával egy kerek jelvényen. A hullám-szalag a címe
+    alatt soronként kiírja a futó szentélyeket („*Shrine of Greed: +30% gold, enemies +20%
+    damage · 2 waves left*”).
+  - **Esemény-szalag és névcédula:** a hullám közbeni esemény indulását szalag jelzi, és a kamera
+    az esemény célpontját is képen tartja (16.1). Az esemény célpontján fix méretű **névcédula**
+    áll (ládán „*Guarded Chest / N guards left*”, majd „*Stand here to open*”; totemen „*Totem /
+    Hold 14 s*” + HP-sáv; kordén „*Goblin Caravan*” + HP-sáv). A cédula mindig a képernyőn és a
+    HUD alatt / mellett marad: a kép szélén vagy sarokban a szabad terület széle mentén csúszik, és
+    az objektum felé mutat.
+  - **Dungeon:** a dungeonban a HUD hullámsora „*Dungeon – Room 2/4*”, alatta a terem
+    feladata („*Kill enemies 12 / 25*”, „*Survive*”, „*Defend the brazier (80%)*”); az időzített
+    termekben az időzítő helyén a terem visszaszámlálója áll, a Warden termében a boss-keret
+    (16.1).
 
 **Loot roll képernyő (közös)**
 
@@ -2220,9 +2792,18 @@ indulnak.
 
 - **Sorrend:**
   1. loot roll (közös),
-  2. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
-  3. közös bolt + személyes panelek egyszerre,
-  4. Ready.
+  2. (M6b) **szentély** – 5% eséllyel, közös kártya, szavazással,
+  3. szintlépési kártyák (mindenki a sajátját, a saját negyedében),
+  4. (M6b) **Dungeon-portál** – a 6., 9., 12. és 15. hullám után, csapatszavazással; belépés
+     esetén a dungeon, utána a jutalom-dobás,
+  5. közös bolt + személyes panelek egyszerre,
+  6. Ready.
+- **Szentély-kártya** (M6b): a szentély neve, az áldása és az átka; minden játékos szavaz:
+  **Accept (A)** vagy **Decline (B)**. Csak az egyhangú elfogadás lép életbe; egy elutasítás
+  vagy a **15 mp-es** időkorlát lejárta elutasítás (16.1).
+- **Portál-szavazás** (M6b): „*A dungeon portal has opened!*” felirat és csapatszavazás; ha
+  mindenki elfogadta, a csapat belép, egy elutasítás vagy a **20 mp-es** időkorlát kihagyja
+  (16.1).
 - **Fejléc:** a következő hullám sora: „Next up: Wave 4 of 25  ·  60 seconds”; a boss-hullám
   előtt másodperc nélkül („Next up: Wave 10 of 25 – Boss wave! (ends when the boss falls)”, 8.
   fejezet), az elit 20. hullám előtt „… seconds  –  Elite wave!” (piros).
@@ -2369,6 +2950,22 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
     rövidíti mappahatáron (a fájlnév és az utolsó mappák maradnak, pl. „Saved to
     …/SmartOnion/cards/run_2026-10-14_15-20-11.png”), így a panel nem szélesedik; a teljes
     útvonal a naplóba kerül. Hiba esetén „The card could not be saved.”.
+- **M6b kiegészítések a végképernyőn:**
+  - **Három oldal:** Summary, Damage Meter és **Leaderboard** (LB / RB, Q / E).
+  - **Mód-sor:** a felirat alatt (a felirattal egy szoros csoportban) mindig áll egy sor, amely
+    a környezetet mutatja a környezet színében („*Arena: Cemetery*”); Endless vagy Hardcore
+    menetnél ugyanebben a sorban előtte az „*Endless mode*” / „*Normal mode*” felirat és a HARDCORE
+    jelvény is áll, így a legmagasabb (Endless + Hardcore) panel is elfér 1080 px magasan.
+    A run kártya jobb felső sora „*Normal mode  ·  Cemetery*”.
+  - **Best sor:** a Summary a hős-tábla alatt a „*Best: …*” sort mutatja („Best: Wave 31 ·
+    18:22”; Normalnál „Best: Victory · 24:10” / „Best: Fell on wave 18 · 9:40”); új
+    helyezésnél „  –  New best!” az első helyen, egyébként „  –  This run: #3”.
+  - **Ranglista oldal:** a menet kategóriájának (pl. „Endless · Hardcore · 4 players”) 10 helyét
+    listázza: #, Result („Wave 31” / „Victory” / „Fell on wave 18”), Time, Party (kasztnevek),
+    Date; az üres helyek kötőjelesek, az új bejegyzés sora arany keretes, „This run”
+    jelzéssel, alatta megjegyzés-sor („*New entry: place 5 of 10.*” / „*This run did not reach
+    the top 10.*” / „*No runs recorded in this category yet.*” / „*The leaderboard is not
+    recorded in this session.*” / „*Could not save the leaderboard.*” pirossal, 16.1).
 
 ---
 
@@ -2425,10 +3022,26 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   A hagyma-hősök és a „komoly” szörnyek közti kontraszt a humor forrása.
 - **UI-téma:** sötét kő és arany keretek, pergamen tooltip, ritkaság-színek a WoW
   konvenciója szerint.
-- **Arénák:** menetenként **5 környezet** egyike, a menet elején sorsolva, a menet végéig
-  megmaradva (16.1): **temető, mocsár, vulkán, jégbarlang, erdei rom**. Mindegyiknek saját
-  veszélyei vannak (tartalom: M6b, látvány: M7). Az MVP-ben egyetlen aréna van: egy erdei
-  tisztás.
+- **Arénák** (M6b): menetenként **5 környezet** egyike, a menet elején sorsolva (a „Rolling the
+  arena…” animációval, 12. fejezet), a menet végéig megmaradva (16.1):
+  - **Forest Ruin** (erdei rom – a mai aréna, veszély nélkül), **Cemetery** (temető),
+    **Swamp** (mocsár), **Volcano** (vulkán), **Ice Cave** (jégbarlang).
+  - Mindegyiknek saját **veszélye** van (Grasping Hands, lápfoltok, lávakürtők, Falling
+    Icicles; a szabályokat a 16.1 táblázata adja).
+  - **Megjelenés:** környezetenként saját paletta (ég, köd, ambient fény, nap, talajszínek,
+    falszín) és saját kellékkészlet, primitívekből építve: sírkövek, száraz fák és kripta;
+    nád, zavaros tavak és mangrove; bazalt és izzó repedések; jégkristályok, hó és oszlopok.
+  - Az aréna **mérete** minden környezetben ugyanaz, a draw-call keret a mai marad (összevont
+    meshek / MultiMesh).
+  - Az M6b a **tartalmat** adja (paletta, kellékek, veszélyek, sorsolás); a végleges látvány
+    (assetek, shaderek, VFX) az M7-ben készül.
+  - A **Dungeon** külön, kis arénája (24 × 14 m) a menet környezetének palettáját használja,
+    környezeti veszély nélkül (16.1): a Volcano kürtői ott nem látszanak (a falak elvágnák
+    őket, és nem működnének).
+  - **Mérések (megvalósítva):** a kellékkészletek draw-call kerete a mai marad (13–14
+    összevont mesh az erdő 15-je mellett, a csúcspontok száma legfeljebb az erdő 1,5-szerese);
+    a játéktéren **0,55 m-nél magasabb semmi nem áll** (a teszt őrzi); a végleges látvány az
+    M7-ben készül.
 
 ---
 
@@ -2439,6 +3052,17 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **Nem használjuk:** Blizzard-tulajdonnevek (Azeroth, Murloc, Thunderfury, Ashbringer,
   Horde/Alliance stb.), logók, eredeti assetek, a Friz Quadrata font.
 - A dokumentumban `*`-gal jelölt nevek munkanevek, publikálás előtt cserélendők.
+- **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőriztünk,
+  mielőtt bekerült a játékba. Ellenőrizve, egyik sem Blizzard-név: Thistlebrand, Boulderbloom,
+  Tearglass (Forge Legendary); Two-Hand Sword, Two-Hand Mace, Orb (fegyverek); az új alaptípus-nevek
+  (a 62 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
+  enchant-előtag, a 20 új trinket, a 17 új Legendary, a 60 új névvel ellátott és kaszt-specifikus
+  item. A tesztek ellenőrzik (item-, alaptípus-, utótag-, set-nevek, enchant-előtagok és
+  -leírások tiltott-listája; minden megjelenített név egyedi). Névütközések, amiket a névadáskor
+  kikerültünk: a „Mending” enchant-előtag „Rallying” lett (az „of Mending” utótag miatt), a
+  „Thorned” „Spiked” (az „of Thorns” miatt), a fagy-bot „Staff of the Deep Winter” (a
+  Boulderbloom miatt). A „Rallying Sprint” és a „Spiked Wall” képesség neve közös szót használ az
+  előtagokkal (más névtér, nincs működési ütközés).
 
 ---
 
@@ -2453,13 +3077,16 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
 - `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
 - `SetData`, `EnemyData`, `WaveData`, `BossData`, `ConsumableData`, `DifficultyData`.
+- `EnvironmentData` (M6b): az aréna-környezetek (paletta, kellékkészlet, veszély; 16.1);
+  `ShrineData` (M6b): a szentélyek (áldás, átok, időtartam; 16.1). Az alaptípus kódbeli osztálya
+  `ItemBase` (a fenti `ItemData` alaptípus-fele; M6b: `min_wave`, 5.4).
 
 **Fő rendszerek**
 
 | Rendszer | Feladat |
 |---|---|
 | `PlayerManager` | Eszközök (kontroller / billentyűzet) játékoshoz rendelése, csatlakozás / kilépés |
-| `RunState` | Hullámszám, közös kassza, közös XP, játékosállapotok |
+| `RunState` | Hullámszám, közös kassza, közös XP, játékosállapotok; M6b-től a mód (Normal / Endless, a menet hossza ebből jön), a Hardcore, a környezet és az aktív szentély-hatások |
 | `StatBlock` | Alapstatok + módosítók (item, ability, talent, buff) → végső statok |
 | `CombatSystem` | Sebzés képlete, krit, DoT, gyógyítás, procok |
 | `AbilitySystem` | Erőforrások, cooldownok, slotok, rangok, auto-cast, képességek végrehajtása |
@@ -2471,6 +3098,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | `LootRoll` | Need / Greed / Pass dobások, kiértékelés, backpackbe tétel / eladás |
 | `ProcSystem` | Találat- / ölés- / sebződés-események, PPM-esélyek, belső cooldownok, proc-hatások |
 | `ShopSystem` | Ajánlatok, lock, reroll, árak |
+| `EventSpawner` / `EnvironmentHazards` / `Shrines` / `Dungeon` (M6b) | A hullám közbeni események, a környezeti veszélyek, a szentélyek és a Dungeon-portál (16.1); mind saját véletlenszám-generátort használ, a `RunState.rng`-hez nem nyúl |
+| `Leaderboard` (M6b) | A helyi ranglista modellje és fájl-I/O-ja (`user://leaderboard.json`, 16.1) |
 | `Inventory` / `Equipment` | Backpack, slotok, set-bónuszok, Armor Specialization |
 | UI | Játékosonkénti panelek |
 
@@ -2478,7 +3107,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 
 ```
 /project.godot
-/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ bosses/ consumables/ waves/ difficulties/
+/data/        classes/ abilities/ talents/ weapons/ items/ affixes/ sets/ enemies/ bosses/ consumables/ waves/ difficulties/ environments/
 /scenes/      main/ arena/ player/ enemies/ ui/
 /scripts/     systems/ abilities/ ai/
 /assets/      models/ textures/ icons/ audio/ fonts/
@@ -2491,6 +3120,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **automatikus mentés minden hullám végén** (a teljes menet állapota: hullám, kassza,
   XP, játékosok felszerelése, abilityk, talentek), így egy 25 hullámos menet félbehagyható és
   folytatható;
+- a **helyi ranglista** (M6b): `user://leaderboard.json`, verziózott, kategóriánként (mód,
+  Hardcore, játékosszám) top 10 (16.1);
 - a fő profil meta-progressziója (17. fejezet).
 
 ---
@@ -2505,9 +3136,9 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M3 | Kasztok | 5 kaszt, erőforrások, 2-2 alap képesség, Mastery |
 | M4 | Abilityk | Szintlépés (ability- és stat-kártyák), ability-slotok, auto-cast, Trainer és rangok |
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Loot Goblin, közös kassza |
-| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a és M6b**, lásd alább |
+| M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, módok (Endless, Hardcore, ranglista), környezetek, események, szentélyek, Dungeon-portál, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a (kész) és M6b (a végleges balansz kivételével kész)**, lásd alább |
 | M7 | Csiszolás | Grafikai réteg (assetek, shaderek, VFX), hangok, menük, beállítások |
-| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon |
+| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon; az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.8) |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
 **Az M6 két részben jön**
@@ -2524,57 +3155,361 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
   - a Damage Meter, a díjak és a run kártya (12. fejezet),
   - balansz-kör **nincs**: az új tartalom a játékot nehezebbé tette, a hangolás egyszer, az
     M6b végén készül (9. fejezet).
-- **M6b** – a tartalom és a módok:
-  - játékmódok: Végtelen mód, Hardcore mód, módválasztó képernyő, helyi ranglista,
-  - az 5 aréna-környezet saját veszélyekkel és a sorsoló animáció,
-  - hullám közbeni események és szentélyek,
-  - a Dungeon-portál,
-  - a tartalom-csomagok (5.8): fegyver-alaptípusok +3 (a Crossbow, a Polearm és a Fist Weapon
-    az M8-cal jön), páncél- és ékszer-alaptípusok, utótagok, 50 enchant, névvel ellátott és
-    kaszt-specifikus itemek, 30 trinket, 25 legendary,
-  - a végleges 25 hullámos balansz (Normal), **egyszer, a legvégén**, az összes M6b-s
-    tartalommal együtt. A nyitott pontok (9. fejezet, „Nyitott kérdések M6b-re”): a Flesh
+- **M6b** – a tartalom és a módok (**kész, a végleges balansz kivételével**; a részletek a
+  16.1-ben és a hivatkozott fejezetekben):
+  - játékmódok: **Endless** mód, **Hardcore** mód, módválasztás a lobbyban, helyi ranglista
+    (16.1; 1., 8., 12. fejezet),
+  - az **5 aréna-környezet** saját veszélyekkel és a „Rolling the arena…” sorsoló animáció
+    (13. fejezet, 16.1); a végleges látvány az M7-ben készül,
+  - **hullám közbeni események** (Guarded Chest, Defend the Totem, Goblin Caravan; 8. fejezet,
+    16.1) és **szentélyek** (16.1),
+  - a **Dungeon-portál**: 4 termes dungeon és a Dungeon Warden mini-boss (8. fejezet, 16.1),
+  - a **tartalom-csomagok** (5.8): fegyver-alaptípusok +3 (**Two-Hand Sword**, **Two-Hand
+    Mace**, **Orb**; a Crossbow, a Polearm és a Fist Weapon az M8-cal jön), páncél- és
+    ékszer-alaptípusok, utótagok, 50 enchant, névvel ellátott és kaszt-specifikus itemek,
+    30 trinket, 25 legendary; a kaszt-független tier setek az **M8-ra tolódtak** (a
+    set-rendszer módosítását igénylik),
+  - **az M6b egyik csomagja sem hangolt számokat:** minden szám az itt rögzített kiinduló
+    érték, a meglévő értékek változatlanok (9. fejezet). Mivel az új tartalom a súlyozott
+    sorsolásokba (utótagok, enchantok, fegyverek) is bekerült, az M6b előtt mért seedelt
+    baseline-ok (smoke, balansz) a mai fejjel **nem összehasonlíthatók** (9. fejezet),
+  - **hátravan:** a végleges 25 hullámos balansz (Normal), **egyszer, a legvégén**, az összes
+    M6b-s tartalommal együtt. A nyitott pontok (9. fejezet, „Nyitott kérdések M6b-re”): a Flesh
     Golem sebzése, a 20. hullám elit-hulláma, Vor'thalax kill-ideje létszám szerint, a szóló
-    és duó hősök túlélése, az Artifact-kínálat (÷ játékosszám, 5.5).
+    és duó hősök túlélése, az Artifact-kínálat (÷ játékosszám, 5.5), és az M6b tartalom-
+    áttekintéseiből gyűlt tételek (pajzs-halmozódás, Epic-only támadási sebesség, ritkaság-
+    inverziók, Orb, gold-find trinketek, iskola-torzítás; lásd 9. fejezet).
 
 ### 16.1 Jóváhagyott ötletek (backlog)
 
 A playtest után elfogadott bővítések, a tervezett mérföldkővel (az M6 két része: **M6a** és
-**M6b**, lásd fent). A részletek a megvalósításkor kerülnek a megfelelő fejezetbe.
+**M6b**, lásd fent). A részletek a megvalósításkor kerülnek a megfelelő fejezetbe; az **M6b**
+elemei **megvalósultak** (alább a terv, majd a „pontosítások” blokkja arról, ahogy a kód
+működik; a számok kiinduló értékek, az M6b nem hangolt).
 
 | Ötlet | Mit jelent | Mérföldkő |
 |---|---|---|
 | **Szellem-lassítás** | Az elesett játékos felélesztési körében (ahol a társ felélesztést csatornáz) az ellenségek **33%-kal lassabbak**, így a felélesztő nem marad védtelen | **Kész (M5)** – 1. fejezet, „Elesés és halál” |
 | **Sebzésmérő és díjak** | WoW-szerű damage meter a menet végén (sebzés, gyógyítás, elnyelt sebzés, kapott sebzés, felélesztések, elesések, ölések) és díjak: „Most Damage”, „Guardian Angel”, „Floor Inspector” stb. – részletek: 12. fejezet | **Kész (M6a)** |
 | **Menet végi összefoglaló kártya** | Megosztható kép („Save card”): kasztok, elért hullám, idő, legjobb itemek, díjak – részletek: 12. fejezet | **Kész (M6a)** |
-| **Véletlen környezet menetenként** | 5 féle aréna-környezet: temető, mocsár, vulkán, jégbarlang, erdei rom – saját veszélyekkel; a menet elején egy „láda-nyitás” animáció (pörgő sor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **M6b** (tartalom), M7 (látvány) |
-| **Hullám közbeni események** | Őrzött kincsesláda, megvédendő totem, elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **M6b** |
-| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben | **M6b** |
-| **Végtelen mód** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, helyi ranglistával | **M6b** |
-| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **M6b** |
-| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **M6b** |
+| **Véletlen környezet menetenként** | 5 féle aréna-környezet: erdei rom, temető, mocsár, vulkán, jégbarlang – saját veszélyekkel és saját palettával, kellékkészlettel; a menet elején egy „Rolling the arena…” sorsoló animáció (vízszintes kártyasor, mint egy skin-nyitás) sorsolja ki, és a menet végéig az marad | **Kész (M6b)** (a tartalom; a végleges látvány: M7) |
+| **Hullám közbeni események** | Őrzött kincsesláda (Guarded Chest), megvédendő totem (Defend the Totem), elfogandó „Goblin karaván” – véletlenszerűen, jutalommal | **Kész (M6b)** |
+| **Szentélyek a hullámok között** | Kockázat / jutalom választás (pl. „+30% gold, de az ellenségek +20% sebzést okoznak 3 hullámig”); **csak 5% eséllyel** jelenik meg egy szünetben, és minden játékosnak el kell fogadnia | **Kész (M6b)** |
+| **Végtelen mód (Endless)** | A 25. hullám után folytatható, egyre nehezebb hullámokkal, a 30. hullámtól 5 hullámonként bossal | **Kész (M6b)** |
+| **Hardcore mód** | Nincs Spirit Healer: csak a társak tudnak feléleszteni | **Kész (M6b)** |
+| **Módválasztás és helyi ranglista** | A lobbyban választható mód (Normal / Endless) és Hardcore-kapcsoló; módonként, létszámonként helyi top 10 | **Kész (M6b)** |
+| **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **Kész (M6b)** |
+| **Item-tartalom csomagok** | 3 új fegyver (Two-Hand Sword, Two-Hand Mace, Orb), 96 páncél- és 20 ékszer-alaptípus (anyag-fokozatok), 25 utótag, 50 enchant, 40 névvel ellátott és 40 kaszt-specifikus item, 30 trinket, 25 Legendary (5.8) | **Kész (M6b)** |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
-| **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
+| **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
+| **Meta-progresszió bővítések** | Önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
+
+**Játékmódok: Endless és Hardcore (M6b)**
+
+- **Módválasztás:** a lobbyban **bármelyik játékos** az **Y**-nal léptet a módok között
+  (**Normal** ↔ **Endless**), és az **X**-szel kapcsolja a **Hardcore**-t; a két kapcsoló
+  független. A lobby fejlécében mindig látszik az aktuális választás („*Mode: Endless ·
+  Hardcore*”, 12. fejezet). Indítási kapcsolók: `--mode=normal|endless`, `--hardcore`.
+- **A menet hossza a módból jön:** Normal 25 hullám, Endless korlátlan (a kódban
+  `RunState.total_waves()`: 25, illetve 0 = korlátlan; az „utolsó hullám” Endlessben sosem
+  igaz). Nincs több beégetett 25-ös szám.
+- **Endless:**
+  - **Indulás:** a 25. hullámon Vor'thalax halála **nem** zárja le a menetet: „*Endless
+    begins!*” szalag, és jön a 26. hullám. (Normalban ez továbbra is a győzelem.)
+  - **A 26. hullámtól:** a hullámhossz legfeljebb **210 mp**, az ellenségek növekedési
+    képletei változatlanul folytatódnak (9. fejezet).
+  - **Bossok:** a 30. hullámtól **minden 5. hullám** boss-hullám, váltakozva **Morvain** (30.,
+    40., …) és **Vor'thalax** (35., 45., …), a szokásos hullám-skálázással (8. fejezet).
+  - **Elit-hullám:** a 20. hullám szabálya a **33., 43., 53. …** hullámon ismétlődik.
+  - A bolt és a piac a szokásos módon működik (a szentély és a Dungeon-portál szabályai lent).
+  - A menet **csak vereséggel ér véget**; a ranglista az elért hullámot rögzíti.
+- **Hardcore:**
+  - **Nincs Spirit Healer** (az aréna nem hozza létre): csak a társak tudnak feléleszteni.
+  - Az elesett hős keretén a Spirit Healerhez irányító felirat helyett: „*Only a teammate can
+    revive you*”.
+  - Az elesett hősök a **következő hullám elején** így is visszatérnek (50% HP-val), mint
+    Normalban.
+  - **HARDCORE jelvény** a HUD-n, a lobbyban és a végképernyőn; **külön ranglista-kategória**.
+  - **Szóló Hardcore = szóló Normal:** egyedül az első elesés amúgy is a menet vége.
+
+**Helyi ranglista (M6b)**
+
+- **Hol:** helyi fájl, `user://leaderboard.json`, verziózott formátummal.
+- **Kategóriák:** minden (mód, Hardcore, játékosszám) hármasra külön **top 10**.
+- **Egy bejegyzés:** az elért hullám (Endless) vagy a győzelem ideje (Normal), a kasztok, a
+  dátum és hogy győzelem volt-e.
+- **Mikor ír:** a menet végén. Smoke-futás, demó és teszt **nem ír**, hacsak egy teszt nem állít
+  be ideiglenes útvonalat.
+- **Végképernyő:** a „*Best: …*” sor és a menet kategóriájának táblája, az új bejegyzés
+  kiemelve (12. fejezet).
+- **Felépítés:** tiszta adatmodell és egy fájl-I/O segéd; ideiglenes útvonalon tesztelhető.
+
+**Helyi ranglista – pontosítások (M6b, megvalósítva)**
+
+- **A bejegyzés** `{wave, time, classes, date, victory}`: a `wave` a menetet lezáró hullám
+  (győzelemnél az utolsó megnyert), a `time` a hullámokban töltött idő (**a Dungeon nélkül**: a
+  menet órája csak hullám közben jár). Kategóriánként legfeljebb 10 bejegyzés.
+- **Rangsor:** a későbbi hullám a jobb; azonos hullámon a **hosszabb** túlélési idő (győzelemnél a
+  **rövidebb** idő). Az Endless menetek és a Normal vereségek hullám, majd hosszabb idő szerint
+  rangsorolnak.
+- **Feladás:** a normál menet feladása (Quit to Menu) nem kerül a listára. Endless menetnél a
+  feladás (vagy az utolsó hős kiesése a kontroller kihúzása miatt) a folyamatban lévő hullámmal,
+  vereségként felkerül (végképernyő nélkül), de csak ha a menetben legalább egy hullámot
+  kitisztítottak: az első harcban feladott (vagy későbbi kezdőhullámról indított és kitisztított
+  hullám nélkül feladott) menet nem eredmény.
+- **Mikor érinti a fájlt:** teszt (alapból) nem olvas, nem ír. Smoke futás a `--leaderboard` nélkül
+  sosem írja és nem is olvassa a játékos ranglistáját; a demó / `--view` / képernyőkép-futás mutatja,
+  de nem írja. A `--leaderboard=<útvonal>` saját fájlt ad, amelyet **minden** futás ír.
+- **Sérült fájl:** hiányzó fájl = üres lista; törött fájl `.corrupt` néven félreáll; újabb verziójú
+  fájlt a játék nem ír felül (a lista üres és csak olvasható); az írás ideiglenes fájlon és
+  átnevezéssel történik. Ha a bejegyzés felkerült, de a mentés nem sikerült, a Leaderboard oldal
+  pirosan jelzi.
+
+**Aréna-környezetek és a sorsoló animáció (M6b)**
+
+- **Öt környezet** (`EnvironmentData` adat a `data/environments/` mappában), menetenként
+  egy: a menet elején sorsolódik, és a menet végéig megmarad. Az aréna **mérete nem
+  változik**. A tartalom az M6b-ben készült (paletta, kellékek, veszélyek), a végleges látvány
+  az M7-ben.
+
+  | Környezet | Veszély | Szabály (kiinduló értékek) |
+  |---|---|---|
+  | **Forest Ruin** (erdei rom) | – | A mai aréna, nincs veszély |
+  | **Cemetery** (temető) | **Grasping Hands** | ~9 mp-enként 2–3 jelzett kör (1,5 m sugarú) jelenik meg a hősök alatt; 1 mp figyelmeztetés után a kezek 1,2 mp-re **gyökerezik** a hőst, és a grunt-érintéses sebzés 0,5-szörösét okozzák |
+  | **Swamp** (mocsár) | **Bog pools** | Menetenként 5, a helyükön álló lápfolt: bent a hősök mozgássebessége **−30%**, az ellenségeké **−15%** |
+  | **Volcano** (vulkán) | **Lava vents** | 6 fix kürtő, mindegyik ~8 mp-enként kitör (1 mp figyelmeztetés, 2 m sugár); a grunt-érintéses sebzés 1,5-szeresét okozza a hősöknek **és az ellenségeknek** |
+  | **Ice Cave** (jégbarlang) | **Falling Icicles** | ~7 mp-enként 3 jelzett kör (1,2 m sugarú) a hősök közelében; a grunt-érintéses sebzés 1-szerese és 30% lassítás 1,5 mp-re |
+
+- **Veszélyek közös szabályai:**
+  - A „grunt-érintéses sebzés” a Skeleton Grunt érintéses sebzése az adott hullámon: a hullám
+    ellenség-sebzés növekedését és a csapatlétszám-sebzésszorzót is használja (9. fejezet).
+  - **Boss-hullámon** a veszélyek **fele gyakorisággal** futnak.
+  - Minden veszély ellenség-veszélyzónának számít: a botok kikerülik, és a hullám vége
+    eltünteti (8. fejezet, „Veszélyzónák és a botok”).
+- **Megjelenés:** környezetenként saját **paletta** (ég, köd, ambient fény, nap, talajszínek,
+  falszín) és saját **kellékkészlet**, primitívekből építve:
+  - Cemetery: sírkövek, száraz fák, kripta;
+  - Swamp: nád, zavaros tavak, mangrove;
+  - Volcano: bazalt, izzó repedések;
+  - Ice Cave: jégkristályok, hó, oszlopok;
+  - Forest Ruin: a mai kinézet.
+
+  A draw-call keret a mai marad (összevont meshek / MultiMesh).
+- **Sorsolás:** a menet futásmagjából számolt **külön véletlenszám-generátorral** történik.
+- **Sorsoló animáció:** a lobbyban az indítás után a „*Rolling the arena…*” képernyő:
+  - a környezet-kártyák **vízszintes sora** (ismétlődve) ~3,5 mp alatt lassul, és a
+    kisorsolt kártyán áll meg;
+  - 1 mp szünet, majd indul a menet;
+  - smoke-futásban, demóban és tesztben kimarad.
+- **Kijelzés:** a környezetet a run kártya és a végképernyő is mutatja (12. fejezet).
+- Debug: `--env=<id>` a kisorsolt környezetet kényszeríti.
+
+**Aréna-környezetek – pontosítások (M6b, megvalósítva)**
+
+- **Sorsolás:** a menet környezete a futásmagból számolt külön generátor **első** húzása
+  (súlyozva, `roll_weight`; a 0 súlyú sosem nyer); smoke-futásban is sorsolódik (a `--env`
+  kényszeríti), így a CI a magokon át az összes környezetet lefedi (az `--smoke --seed=5` az
+  Ice Cave-et játssza; `--env=forest_ruin` a régi arénát).
+- **Grasping Hands:** az első kéz-kör ~4 mp-nél jelenik meg, utána 9 mpenként; a körök mindig
+  **különböző hősök alatt** vannak (véletlen sorrendben); ha kevesebb a hős, mint a kör, a többlet
+  1,6–2,8 m-re a hős mellett. Gyökerezés alatt a hős **támadhat és varázsolhat**, csak járni nem tud;
+  a becsukódott kezek nem sebeznek újra, a botok sem kerülik őket.
+- **Swamp:** a lápfolt 2,3 m sugarú; menetenként ugyanaz az 5 hely (az első hullámnál sorsolódnak: a
+  középtől ≥ 4,5 m, faltól ≥ 3 m, egymástól ≥ 6 m); **boss-hullámon 3 folt** van; a lassítás a
+  kilépés után még 0,35 mp-ig tart; a botok enyhén kerülik; nem sebez.
+- **Volcano:** a 6 kürtő **fix helyen** áll (±12 / 0 m x, ±6 / ±8 m z körül) és az aréna-tisztáson
+  mindig látszik; az első kitörések az első 8 mp-es ciklusra szétosztva indulnak; az ellenségek
+  sebzése nem ad kill-krediteket, de a menet kill-számlálójába beleszámít.
+- **Ice Cave:** a kör a hőstől 0,8–3,2 m-re jelenik meg, hősönként egy, körbejárva; az első jégcsap
+  ~3 mp-nél esik; a lassítás külön hatás (`ice_chill`) a Morvain-féle fagyás mellett; a
+  jégcsap-kör **sötétkék** (sötét körvonallal).
+- **Olvashatóság:** minden veszély jelölőjének a **saját környezete talajától** legalább **2:1
+  fényerő-kontrasztot** (WCAG) kell tartania a talaj minden tónusához képest; a teszt őrzi. A lápfolt
+  a sötét ovális alakjáról olvasható (nem figyelmeztető kör).
+- **Hatókör:** minden veszély a **hullám végén** eltűnik, és a rajtuk lévő hatás (lassítás,
+  gyökerezés) véget ér. **Veszély csak futó hullámban van: a szünetben és a Dungeonban nincs.**
+  Boss-hullámokon (az Endless 30., 35. … hullámán is) a veszélyek fele gyakorisággal működnek.
+
+**Hullám közbeni események (M6b)**
+
+- **Mikor:** a **4. hullámtól**; **soha** nem boss-hullámon, a 20. hullámon és az elit-szabályú
+  hullámokon (Endlessben a 33., 43., 53. …); minden jogosult hullámon **30%** eséllyel, egy
+  hullámban **legfeljebb egy**. Az esemény saját véletlenszám-generátorral sorsolódik, a hullám
+  **20–40%-ánál** indul, szalag jelzi, és a kamera a célpontot is képen tartja.
+- **Guarded Chest** (őrzött láda):
+  - A láda körül **4 őr** áll: az adott hullámon jogosult ellenségtípusok, ×2 HP-val,
+    affix nélkül.
+  - Ha az őrök meghaltak, a ládánál **1,5 mp-ig** álló hős kinyitja.
+  - **Jutalom:** egy **Rare+** item (a hullám végi Need / Greed / Pass dobásra megy, nem számít
+    a normál drop hullámlimitjébe) + a hullám átlagos ellenség-goldjának **10-szerese**.
+  - Ha nem nyitják ki, a hullám végén eltűnik.
+- **Defend the Totem** (megvédendő totem):
+  - Egy szövetséges totem; HP-ja a hullám Skeleton Gruntja HP-jának **30-szorosa** a csapatméret
+    szerinti HP-szorzóval (9. fejezet). A **8 m-en belüli** ellenségek rá támadnak.
+  - Ha **20 mp-ig** életben marad: minden hős **+15% sebzést** kap a hullám végéig, és a csapat
+    a hullám átlagos ellenség-XP-jének **25-szörösét** kapja.
+  - Ha elesik, nincs semmi jutalom.
+- **Goblin Caravan** (Goblin karaván):
+  - Egy kordé **3 őrrel**, ami ~25 mp alatt átkel az arénán a szélétől a széléig; a kordé
+    HP-ja a hullám Skeleton Gruntja HP-jának **40-szerese**.
+  - **Megölve:** a hullám átlagos ellenség-goldjának **40-szeresét** szórja szét, és egy
+    **Rare** itemet ad.
+  - A túloldalon elszökik: „*The caravan got away*”.
+- **Botok:** az esemény őreivel a szokásos módon harcolnak, kinyitják a ládát, a totemet
+  őrzik (6 m-en belül maradnak), és a kordét üldözik, ha nincs ellenség a közelben.
+- **Jutalmak és ellenségek részletei:** 8. fejezet (esemény-ellenségek), 10.1 (loot).
+
+**Hullám közbeni események – pontosítások (M6b, megvalósítva)**
+
+- **Hely:** a láda legalább 10 m-re kerül a hősöktől (a falaktól annyira, hogy az őrök köre elférjen),
+  a totem legalább 4 m-re; mindkettő lehetőleg a képernyőn, a HUD-on kívül. Az esemény fajtáját,
+  kezdési idejét, az őrök típusát, a kordé oldalát és sávját az esemény saját generátora sorsolja (a
+  menet-maggal reprodukálható); a láda és a totem pontos helye a hősök aktuális állásától is függ.
+  Esemény csak a 4. hullámtól van, a boss- és elit-szabályú hullámokon soha.
+- **Guarded Chest:** a nyitás előrehaladása nem nullázódik, ha a hős kilép a 2 m-es körzetből:
+  ugyanolyan gyorsan csökken (a leütött hős nem számít). Az item lootzsák a láda előtt (a Need /
+  Greed / Pass dobás a hullám végén); az arany érmékben hullik a láda körül.
+- **Defend the Totem:** a +15% sebzés a hullám végéig tart (a hullám végén, illetve a következő
+  hullám sorsolásakor lekerül); az XP-t a hősök felszedik, a fel nem szedettet a hullám vége a közös
+  sávba írja.
+- **Goblin Caravan:** a megölt kordé az aranyat érmékben szórja szét, az itemet (Rare, nem
+  Artifact-dobás) lootzsákban; a „*The caravan got away*” szürke szalag, jutalom nélkül.
+- **Szalagok (angolul):** *A guarded chest appeared!* / *The chest was opened!* · *Defend the
+  totem!* / *The totem holds!  +15% damage* / *The totem fell* · *A goblin caravan is crossing!* /
+  *The caravan was plundered!* / *The caravan got away*.
+- **Botok:** a nyitható ládához teljes erővel mennek, és ráállva nem mozognak (csak veszély tolja el
+  őket); a zárt láda táborához (7 m) is odamennek, ha nincs körülöttük ellenség és elég HP-juk
+  van; a totemtől 5 m fölött visszahúzza őket (minél távolabb, annál erősebben; a 6 m-en kívüli bot
+  a körülötte maradt ellenségek hátrálási tolásánál is erősebben; a totemre csalt ellenségek elől az
+  5 m-en kívüli bot nem hátrál – ők a totemhez mennek, nem a botokhoz); a kordét 40 m-ről
+  üldözik, ha 3 m-en belül nincs ellenség, és nem hátrálnak előle. Veszély, horog-kitérés és
+  felélesztési futás a totem-őrzésnél előbbre való.
+- **Debug:** `--event=<id>` a rövid neveket is érti (`chest`, `totem`, `caravan`); minden esemény
+  naplósort ír (a Main naplóján át, csak smoke / demo / view futásban: `SMOKE EVENT …`).
+
+**Szentélyek a szünetekben (M6b)**
+
+- **Mikor:** minden szünetben **5%** eséllyel (a menet utolsó hulláma után nem), saját
+  véletlenszám-generátorral. A szünet új fázisa a **SHRINE**, a loot roll és a szintlépés
+  **között** (12. fejezet).
+- **Szavazás:** egy kártya mutatja a szentély áldását és átkát; **minden játékos** szavaz:
+  **Accept (A)** vagy **Decline (B)**. Csak akkor lép életbe, ha **mindenki elfogadta**; egy
+  elutasítás vagy a **15 mp-es** időkorlát lejárta elutasítás.
+- **Hatások** (a „3 hullámig” hatások a következő 3 hullámra szólnak):
+
+  | Szentély | Áldás | Átok |
+  |---|---|---|
+  | **Shrine of Greed** | +30% felszedett gold (3 hullámig) | az ellenségek +20% sebzést okoznak |
+  | **Shrine of Haste** | +15% Haste (3 hullámig) | az ellenségek +15% sebessége |
+  | **Shrine of Learning** | +50% XP (3 hullámig) | az ellenségek +25% HP-ja |
+  | **Shrine of Blood** | +20% sebzés (3 hullámig) | −20% Max HP |
+  | **Shrine of Fortune** | minden hős kap egy **Epic** itemet, azonnal | a kassza **25%-át** azonnal elveszti |
+  | **Shrine of the Gambler** | 50% eséllyel a kassza ×1,5 | különben a kassza ×0,5 (azonnal) |
+
+- **HUD:** az aktív szentély-hatásokat kis ikonok mutatják, a hátralévő hullámok számával.
+- **Botok:** a Greed, Haste, Learning és Blood szentélyt elfogadják, a Fortune-t és a Gamblert
+  elutasítják.
+- Debug: `--shrine-chance=X` felülírja az 5%-os esélyt.
+
+**Szentélyek a szünetekben – pontosítások (M6b, megvalósítva)**
+
+- **A hatások csak hullám közben élnek:** a gold- és XP-bónusz, az ellenségek erősödése, a hősök
+  bónuszai a hullám elejétől a végéig érvényesek; a szünetben, a boltban és a **Dungeonban nem**, és a
+  Dungeon **nem hullám**: nem számol le egyet sem a szentély hátralévő hullámaiból, de a szentély a
+  Dungeon után a következő hullámban újra él. A „3 hullám” az elfogadás utáni következő 3 **hullám**;
+  a HUD-jelvény a még lejátszandó hullámok száma (a futóval együtt).
+- A szünet sorrendje: loot → **szentély** → szintlépés kártyák → **portál** (→ Dungeon → a Dungeon
+  Epic-jeinek Need / Greed / Pass dobása) → piac. A szentély az **Endlessben** is 5% eséllyel jelenik
+  meg minden szünetben (a 26. hullám után is); a normál menet utolsó hulláma után nincs szünet.
+- **Egy már futó, időzített szentély nem jelenik meg újra** (a Fortune és a Gambler bármikor); több
+  futó szentély hatása összeszorzódik.
+- **Gold- és XP-bónusz:** a felszedett (és a hullám végén bankolt) goldra / XP-re vonatkozik; a töredék
+  nem vész el. Fix jutalmakra (esemény, Greed-eladás, Gambler) nem hat. A **boss HP-ját** is növeli a
+  Learning.
+- **Fortune:** először a kassza 25%-a (lefelé kerekítve) elvész, aztán minden hős kap egy, az osztálya
+  által használható **Epic** itemet; tele hátizsáknál az item azonnal eladódik (Greed-érték), **egy
+  közös sorban** („*Backpacks full: 3 items sold for 201 gold*”). **Gambler:** 50%-os érme; nyerés: a
+  kassza fele jön hozzá, vesztés: a fele elvész. A „*purse is empty*” csak 0 goldnál áll, kis
+  kasszánál „*too small*”.
+- **Szavazás:** A = Accept, B = Decline; az Accept visszavonható B-vel, a Decline végleges és azonnal
+  elutasítja. 0,4 mp-ig a gombok nem számítanak. A kapcsolat nélküli kontroller botként szavaz. Emberi
+  játékos mellett a botok legalább ~1 mp-et várnak. A döntés ~2,4 mp-ig látszik („Accepted by
+  everyone” / „P2 declined – the shrine fades” / „Time ran out – the shrine fades”), csak botokkal
+  azonnal megy tovább a szünet.
+- A Haste hátránya „*Enemies move 15% faster*” (az előjel az irány; lassító szentélynél „slower”).
+- A teszt-futtató az alap 5%-ot 0-ra állítja; a tesztek a `--shrine-chance` megfelelőjét használják.
 
 **Dungeon-portál (M6b)**
 
-- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után**: a hullámok közti szünetben
-  portál nyílik az arénában.
-- **Opcionális:** a csapat közösen dönt, belép-e (mint a bolti rerollnál, mindenki szavaz).
-  Ha nem lépnek be, a menet a szokásos módon folytatódik.
-- **Belül:** 3–4 kisebb, zárt terem egymás után, mindegyikben egy feladattal (takarítás,
-  túlélés, valami megvédése), a végén egy **mini-boss**. A harcrendszer és az aréna-technika
-  ugyanaz, mint a menetben.
-- **Szabályok:** nincs Spirit Healer, csak a társak tudnak feléleszteni.
-- **Siker:** nagyobb esély tier set-darabra, garantált Epic item (Need / Greed / Pass), később
-  Artifact-esély is.
-- **Bukás** (mindenki elesett): a dungeon véget ér, a csapat elveszíti a közös kassza
-  **50%-át**, és a menet a következő hullámmal folytatódik (a hullám elején mindenki feléled).
+- **Mikor:** fix időpontban, a **6., 9., 12. és 15. hullám után** (Normalban, Endlessben és
+  Hardcore módban is): a szünetben, a szintlépés **után** és a piac **előtt** (PORTAL fázis)
+  a „*A dungeon portal has opened!*” felirat jelenik meg.
+- **Opcionális, csapatszavazással:** mindenki szavaz (Accept / Decline). Ha **mindenki**
+  elfogadta, a csapat belép; egy elutasítás vagy a **20 mp-es** időkorlát lejárta kihagyja, és a
+  menet a piaccal folytatódik.
+- **Belül:** külön, kis aréna (**24 × 14 m**, a menet környezetének palettájával, környezeti
+  veszély nélkül); **4 terem** egymás után, mindegyik rövid, forgatókönyves harc a menet
+  jogosult ellenségeivel, a kitisztított hullám szerint skálázva. A harcrendszer és az
+  aréna-technika ugyanaz, mint a menetben.
+
+  | # | Terem | Feladat |
+  |---|---|---|
+  | 1 | **Clear** | 25 ellenség megölése |
+  | 2 | **Survive** | 25 mp sűrű spawn túlélése |
+  | 3 | **Defend** | egy parázstartó (brazier) életben tartása 20 mp-ig |
+  | 4 | **Warden** | mini-boss: a **Dungeon Warden** (8. fejezet) |
+
+  A termek között **3 mp-es** „*Room cleared*” szünet van, ami a hősök Max HP-jának **30%-át**
+  gyógyítja.
+- **Szabályok:** nincs Spirit Healer, a társak élesztenek; ha **mindenki** elesik, a dungeon
+  bukás. A piac időzítője a dungeon alatt **áll**.
+- **Siker:** minden hős kap egy **garantált Epic** itemet (a dungeon után Need / Greed / Pass
+  dobás), **50% eséllyel** egy extra tier set-darabot a csapat egyik kasztjának, és a
+  kitisztított hullám átlagos ellenség-goldjának **20-szorosát** kapja a csapat (10.1).
+- **Bukás:** a közös kassza **50%-át** elveszíti a csapat, és visszatér a piacra (mindenki
+  feléled, mint egy hullám elején).
+- **Akárhogy is végződik, a piac következik.**
+- **HUD:** „*Dungeon – Room 2/4 · <feladat>*” és a terem-feladat állása; a sebzésmérő és a
+  menet-statisztikák a dungeon sebzését is számolják.
+- **Botok:** a 6. és a 9. hullám után belépnek; a 12. és a 15. után csak akkor, ha az előző
+  hullámban senki sem esett el.
 - **Szerepek:** a kasztok úgy működnek, mint a menetben; külön tank / healer / DPS
   hangsúly nincs.
 - **Később (M10, ha az M6b-s változat bevált):** külön Dungeon mód a főmenüből, egymásba
   nyíló termekkel és több bosszal.
+- Debug: `--dungeon=1` a következő hullám után portált nyit.
+
+**Dungeon-portál – pontosítások (M6b, megvalósítva)**
+
+- **Mikor:** a 6., 9., 12., 15. hullám után (Normal, Endless, Hardcore; az Endless 26.-tól már nem),
+  vagy `--dungeon=1` esetén a következő hullám után egyszer. **Szavazás:** A (Accept) / B (Decline),
+  20 mp; mindenkinek igent kell mondania. A bot a 6. és 9. hullám után, valamint `--dungeon` esetén
+  igent szavaz, a 12. és 15. után csak akkor, ha az adott hullámban senki sem esett el. A
+  lecsatlakoztatott kontrollerű játékos tartózkodik; aki kilép, magával viszi a szavazatát; ha nincs
+  szavazó, a portál kimarad. A szavazó-jelvények kerete semleges (arany), amíg nem szavazott; zöld =
+  Accept, piros = Decline.
+- **Belépés / kilépés:** a hősök mintha hullám kezdődne: teljes HP, az elesettek 50%-kal térnek
+  vissza; a Dungeon után szintén (az elesettek 50%-kal), a hullámvégi hatások lejárnak. Az
+  Artifactok **nem** nőnek a Dungeonnal. A piac időzítője csak a piac nyitásakor indul. A Dungeon ideje
+  **nem számít bele** a menet idejébe (run time, így a ranglista idejébe sem).
+- **Ellenségek / termek:** a kitisztított hullám jogosult ellenségei; 1 Clear (25 ölés; max. 12
+  egyszerre; 1,5× ráta), 2 Survive (25 mp; max. 30; 2,5×), 3 Defend (a parázstartó 20 mp-ig; max. 24;
+  2×), 4 Warden. A parázstartó HP-ja **30 Skeleton Grunt** HP-ja az adott hullámon (a csapat
+  HP-szorzójával); a 9 m-en belüli ellenségek ráközelítenek, és másodpercenként mindegyik a saját
+  érintéses sebzését viszi le róla; ha elfogy, a Dungeon **bukás**. A termek között 3 mp szünet, ami
+  minden élő hős Max HP-jának 30%-át gyógyítja; az elesettek lent maradnak (nincs Spirit Healer),
+  csapattárs éleszti őket („*Only a teammate can revive you*”).
+- **Dungeon Warden:** alap HP 120, érintés 3, sebesség 1,9, Frost Circles (7 mp) + Raise Dead (12 mp, 4
+  Skeleton Grunt, a 2. fázisban 6), 2. fázis 50%-nál (×0,7 cooldown), Enrage **60 mp**; nem ad
+  boss-itemet és -goldot (a smoke-biztosíték 60 mp-pel az enrage után megöli).
+- **Siker:** hősönként 1 garantált Epic (a hős kasztja használhatja), 50% eséllyel egy extra tier
+  set-darab (lehetőleg olyan, ami még hiányzik), és 20 × a hullám átlagos ellenség-goldja; a
+  Need / Greed / Pass dobás a Dungeon után van, a piac előtt. **Bukás:** mindenki elesett vagy a
+  parázstartó megsemmisült; a kassza fele (lefelé kerekítve) elvész (a vásárlás-statisztikában nem
+  szerepel), mindenki feléled.
+- **Környezet a Dungeonban:** a szoba a menet környezetének palettájában készül, **környezeti veszély
+  nélkül**; a Spirit Healer a Dungeon alatt nincs (Hardcore-ban a tisztáson sincs).
 
 **Goldsinkek (M6a)**
 
@@ -2764,13 +3699,39 @@ ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
 - verziózott mentés,
 - profilhoz köthető beállítások.
 
+### 17.8 Bővítések a legeslegvégére
+
+Elfogadott ötletek, amelyek **minden más után** (M9 és a Remote Play Together után) jönnek.
+Ugyanaz az elv, mint a 17. fejezetben: új lehetőségek, nem nyers erő.
+
+- **Önkéntes nehezítések (Heat-szerű):** menet előtt a csapat apró nehezítéseket választhat
+  (pl. „+20% ellenség-sebesség”, „nincs Spirit Healer”, „1 bolti ajánlattal kevesebb”);
+  mindegyik több Valort és Class XP-t ad. Finomabb skála, mint a Heroic / Mythic.
+- **Heti kihívás:** fix seed, fix környezet, 1–2 előre megadott nehezítés, saját ranglista és
+  plusz Valor; később online is (Remote Play Together).
+- **Receptkönyv (Cooking / Alchemy):** a menetekben ritka receptek esnek, amelyek véglegesen
+  bővítik a bolti fogyóeszköz-sor kínálatát (több választék, nem erősebb hős).
+- **Hagymafajták:** az Onion Patch kertjében a menetekből hozott magok „nőnek”, és új
+  megjelenést nyitnak (Shallot, Red Onion, Leek, Spring Onion …) – csak kozmetika.
+- **Kezdőfegyver-választék:** Class Level mérföldkövek új indulófegyvereket nyitnak
+  kasztonként (pl. Warrior kétkezes karddal, Mage Orbbal) – új játékstílus, nem erő.
+- **Bestiárium (Onion Almanac):** ellenségenkénti ölésszám, rövid leírás, mérföldkövekért
+  címek és keretek; a bossok és az események is bekerülnek.
+- **Mini-petek:** nem harcoló kis kísérők, gyűjthetők a Loot Goblintól, bossoktól és
+  dungeonokból – kozmetika.
+- **Paragon-szintek:** a 30-as Class Level fölött végtelen szintek, csak kozmetikai
+  jutalommal (keretek, portré-díszek).
+
 ---
 
 ## 18. Nyitott kérdések
 
 Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a Flesh Golem
 sebzése, a 20. hullám, Vor'thalax kill-ideje létszám szerint, a duók és a szóló hősök
-túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon) a
+túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon) és az
+M6b tartalom-áttekintéseiből gyűlt tételek (a pajzsok halmozódása, a Scorching / Glacial
+iskola-torzítása, az Epic-only támadási sebesség és a Legendary, a ritkaság-inverziók, az Orb
+statjai és a Mage bot Tome-választása, a gold-find trinketek, az új rendszerek kiinduló számai) a
 9. fejezetben vannak („Nyitott kérdések M6b-re”); az ütemezésük a 16. fejezet **M6b**
 listájában található: ezeket az M6b végleges balansza kezeli, egyszer, a legvégén. A késői
 kasszát az M6a goldsinkjei célozták (16.1).
@@ -2805,3 +3766,10 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
 | Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
 | Vor'thalax | Alap HP 450 (az 1200 elírás volt), érintéses sebzés 4, a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) mint Morvainé; a Flesh Golem érintéses sebzése 4 – a végső balansz az M6b végén, egyszer (8., 9. fejezet) |
+| Módok (M6b) | **Normal** (25 hullám) vagy **Endless** (a 25. hullám után folytatódik, a 30.-tól 5 hullámonként boss; csak vereséggel ér véget), opcionális **Hardcore** (nincs Spirit Healer); a lobbyban választható (Y / X); módonként és létszámonként helyi top 10 ranglista (1., 12., 16.1) |
+| Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány az M7-ben (13., 16.1) |
+| Események és szentélyek (M6b) | Hullám közbeni esemény a 4. hullámtól, 30% eséllyel, hullámonként legfeljebb egy (Guarded Chest, Defend the Totem, Goblin Caravan); szentély a szünetekben 5% eséllyel, csak egyhangú elfogadással (8., 10.1, 16.1) |
+| Dungeon-portál (M6b) | A 6., 9., 12. és 15. hullám után, csapatszavazással; 4 terem (Clear, Survive, Defend, Warden); siker: hősönként 1 garantált Epic, bukás: a kassza 50%-a elvész, a piac mindkét esetben következik (8., 16.1) |
+| M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8; **megvalósítva**: 13 fegyver, 96 páncél- és 20 ékszer-alaptípus, 25 utótag, 50 enchant, 160 kézzel tervezett item |
+| M6b megvalósítás | Kész (a végleges balansz kivételével): az 1–13., 16.1 és 5.8 fejezet írja le, ahogy a kód működik; az Epic fegyverek +10% támadási sebességet kapnak (4.1), a környezet alapból sorsolódik (smoke-ban is) |
+| M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangolt; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |

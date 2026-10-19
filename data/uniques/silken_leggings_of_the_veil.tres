@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"silken_leggings_of_the_veil"
+display_name = "Silken Leggings of the Veil"
+flavor = "Thin enough to see through, thick enough to heal through."
+slot_type = 7
+armor_type = 0
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 8.0,
+&"spirit": 6.0
+})
+class_restriction = &""
+unique_effect = &"heal"
+unique_params = {
+"trigger": "periodic",
+"interval": 8.0,
+"amount": 4.0,
+"target": "lowest_ally"
+}
+unique_text = "Every 8 sec: Veiled light heals your most wounded ally for 4."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

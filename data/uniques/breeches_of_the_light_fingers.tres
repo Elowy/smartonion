@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"breeches_of_the_light_fingers"
+display_name = "Breeches of the Light Fingers"
+flavor = "A fine pair of pockets, with legs attached."
+slot_type = 7
+armor_type = 1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"agility": 8.0,
+&"crit": 5.0,
+&"gold_find": 20.0,
+&"fortune": 8.0
+})
+class_restriction = &""
+unique_effect = &"gold"
+unique_params = {
+"trigger": "on_kill",
+"chance": 6.0,
+"icd": 1.0,
+"amount": 3.0
+}
+unique_text = "On kill: 6% chance to pick a pocket for 3 gold."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

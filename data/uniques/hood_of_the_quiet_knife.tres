@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hood_of_the_quiet_knife"
+display_name = "Hood of the Quiet Knife"
+flavor = "Seen by nobody. Remembered by even fewer."
+slot_type = 0
+armor_type = 1
+rarity = 4
+stats = Dictionary[StringName, float]({
+&"agility": 9.0,
+&"crit": 7.0,
+&"dodge": 4.0
+})
+class_restriction = &""
+unique_effect = &"buff"
+unique_params = {
+"trigger": "on_kill",
+"chance": 15.0,
+"icd": 4.0,
+"stats": {
+&"crit": 20.0,
+&"speed": 15.0
+},
+"duration": 5.0
+}
+unique_text = "On kill: 15% chance to melt into the shadows, gaining 20% Critical Strike and 15% Speed for 5 sec."
+sources = Array[StringName]([&"loot", &"elite", &"goblin", &"boss"])
+min_wave = 10
+weight = 1.0

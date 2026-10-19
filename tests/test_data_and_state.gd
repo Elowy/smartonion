@@ -11,7 +11,7 @@ func after_each() -> void:
 
 func test_launch_content_loads() -> void:
 	check_eq(Db.class_ids, [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"] as Array[StringName], "class order")
-	check_eq(Db.weapons.size(), 10, "weapon count")
+	check_eq(Db.weapons.size(), 13, "weapon count")
 	check(Db.enemies.size() >= 4, "at least 4 enemies")
 	for id in Db.class_ids:
 		var c := Db.get_class_data(id)
