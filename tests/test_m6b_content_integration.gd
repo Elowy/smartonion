@@ -20,7 +20,7 @@ const NEW_ENCHANTS: Array[StringName] = [
 	&"rousing", &"rupturing", &"scorching", &"smoldering", &"soothing", &"spiked", &"studious", &"sweeping",
 	&"wailing", &"warding",
 ]
-## The Epic hand-made items of CONTENT-ITEMS (class items by class) and CONTENT-FX (named / trinket).
+## The Epic hand-made items of CONTENT-ITEMS: the class items by class, and the class-free named ones.
 const NEW_CLASS_EPICS := {
 	&"warrior": [&"warhelm_of_the_standing_shout", &"breastplate_of_thunderous_echo", &"reaping_greataxe"],
 	&"mage": [&"leggings_of_the_falling_star", &"long_coal_staff", &"robe_of_the_tidewoven_veil"],
