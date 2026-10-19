@@ -568,6 +568,7 @@ func _on_dungeon_status() -> void:
 func _on_dungeon_boss_spawned(boss: Boss) -> void:
 	Audio.play(&"boss_spawn")
 	Audio.play_music(&"boss")
+	_boss_entrance_fx(boss)
 	if hud != null:
 		hud.bind_boss(boss)
 
@@ -1067,10 +1068,20 @@ func _wave_cleared_text(n: int) -> String:
 ## WaveDirector.boss_spawned: the arrival banner.
 func _on_boss_spawned(boss: Boss) -> void:
 	Audio.play(&"boss_spawn")
+	_boss_entrance_fx(boss)
 	if hud != null and boss.boss_data != null:
-		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
+		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED, [], true)
 	_log(boss_arrival_text(boss, wave, players.size()))
 	_log(heroes_defence_text(players))
+
+
+## M7b: the visual side of a boss's arrival (rune flare, light shaft, shock ring, dust); the boss itself
+## already rises out of the ground (EnemyModel.play_spawn). Presentation only.
+func _boss_entrance_fx(boss: Boss) -> void:
+	if boss == null or not is_instance_valid(boss) or not boss.is_inside_tree():
+		return
+	Vfx.boss_entrance(boss.global_position, maxf(boss.radius * 1.6, 1.2),
+			boss.data.color if boss.data != null else UiTheme.RED)
 
 
 ## The smoke-log line of a boss's arrival.
