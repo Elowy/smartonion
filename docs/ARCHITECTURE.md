@@ -687,9 +687,32 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
     top tooltip is gone or no longer reaches it.
   - Shop tooltips keep clear of such a panel tooltip: `Intermission` hands the visible ones that
     reach out of their panel (`PlayerPanel.outside_tooltip_rect`) to
-    `ShopPanel.tooltip_obstacles`, and `ShopPanel.layout_tooltips` counts a spot over one
-    `COVER_WEIGHT` (4) times its overlap, like covering the hovered card. The panels lay out
-    before the shop each frame (they come first in the tree).
+    `ShopPanel.tooltip_obstacles`, and `ShopPanel.layout_tooltips` does not take a spot over one
+    (or over the hovered card) while a free spot exists; in the last-resort overlap below it
+    counts `COVER_WEIGHT` (4) times its area. The panels lay out before the shop each frame
+    (they come first in the tree).
+  - **Shop tooltips never overlap each other** (`ShopPanel.layout_tooltips` → `_solve`; M6b
+    review fix: in a 4-player market P3's 457 px tall trinket tooltip had no spot beside its card
+    or in a 232 px free band that was clear of P1's and took the least overlap, about 30 px).
+    A spot is free when it overlaps no placed shop tooltip, no panel tooltip obstacle and not
+    the hovered card. The player who acted last is placed first (the full-size spot), the others
+    take what is left, each one (`_find_spot`) at the largest of `TOOLTIP_SCALES` (0.82, 0.72,
+    0.62, 0.54) that has a free spot: (1) the preferred spots (`_candidates`: beside the card,
+    above / below it, the bands), (2) when none is free at any scale, any free spot on the stall
+    or in a band that lines up with an area edge or another tooltip's edge (`_free_spots`, 6 px
+    away; the one nearest to the card). When one tooltip would still overlap, **all** are laid
+    out again one scale step smaller (`_layout_pass` with a cap; the tallest placed first), down
+    to the second smallest scale. At the smallest scale every order of placing them
+    (`_permutations`, at most 4! = 24) is tried until all are free; only when none is do they
+    stay at 0.54 with the least overlap (the only case where tooltips overlap: four tall
+    tooltips – a Legendary with the comparison block is ~400 px tall at 0.54 – do not fit the
+    688 px stall). `layout_tooltips` computes nothing while its inputs (shown tooltips and their
+    size, cursors, cards, areas, panel obstacles) equal the last call's (`_layout_key`).
+    Measured (tests `test_ui_market_tooltip_layout`, real Intermission, seeds 1-8 x waves
+    15 / 18 / 22 / 25 x classes mixes, 1920 x 1080 and 1280 x 720): the markets as they open: 0
+    of 64 with an overlap (old layout 24 of 64), smallest scale 0.54; crowded (random cursors,
+    all four on one card, one player on every card): 8 of 2048 layouts overlap, all at 0.54
+    (old layout 976 of 2048). A layout costs about 0.35 ms on average (worst about 6 ms).
   - A shop tooltip whose content changes is measured at once (`ItemTooltip.layout_now`: the
     containers sort top-down and the wrapped lines report their real height) and placed in
     that same frame; `PlayerPanel` measures its tooltip the same way. The tooltip is rebuilt
