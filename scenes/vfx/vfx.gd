@@ -64,16 +64,16 @@ const SCHOOL_FX := {
 			"damp": Vector2(6.0, 9.0), "scale": Vector2(0.7, 1.2), "life": 0.28, "additive": true,
 			"flash": 0.9, "spin": 0.0, "up": false},
 	&"fire": {"mesh": &"ember", "count": 9, "speed": Vector2(1.6, 4.0), "gravity": 3.5,
-			"damp": Vector2(2.0, 4.0), "scale": Vector2(0.28, 0.5), "life": 0.38, "additive": true,
+			"damp": Vector2(2.0, 4.0), "scale": Vector2(0.28, 0.5), "life": 0.38, "additive": false,
 			"flash": 1.0, "spin": 0.0, "up": true},
 	&"frost": {"mesh": &"shard", "count": 8, "speed": Vector2(2.5, 5.5), "gravity": -7.0,
 			"damp": Vector2(3.0, 6.0), "scale": Vector2(0.8, 1.4), "life": 0.34, "additive": false,
 			"flash": 0.8, "spin": 300.0, "up": false},
 	&"arcane": {"mesh": &"star", "count": 9, "speed": Vector2(2.0, 5.0), "gravity": 0.0,
-			"damp": Vector2(3.0, 5.0), "scale": Vector2(1.0, 1.7), "life": 0.4, "additive": true,
+			"damp": Vector2(3.0, 5.0), "scale": Vector2(1.0, 1.7), "life": 0.4, "additive": false,
 			"flash": 0.95, "spin": 520.0, "up": false},
 	&"holy": {"mesh": &"streak", "count": 7, "speed": Vector2(1.5, 3.2), "gravity": 5.0,
-			"damp": Vector2(2.0, 3.0), "scale": Vector2(0.8, 1.3), "life": 0.42, "additive": true,
+			"damp": Vector2(2.0, 3.0), "scale": Vector2(0.8, 1.3), "life": 0.42, "additive": false,
 			"flash": 1.0, "spin": 0.0, "up": true},
 	&"shadow": {"mesh": &"ball", "count": 8, "speed": Vector2(1.0, 2.8), "gravity": 1.5,
 			"damp": Vector2(2.5, 4.0), "scale": Vector2(0.5, 0.9), "life": 0.45, "additive": false,
@@ -211,16 +211,16 @@ void fragment() {
 """
 
 ## Pickup magnet streak (a flat quad on the ground plane, head at -Z = UV.y 0): bright at the head, fading to
-## the tail, soft at the sides.
+## the tail, soft at the sides (alpha-blended: additive would wash out on the bright meadow).
 const _TRAIL_CODE := """
 shader_type spatial;
-render_mode unshaded, cull_disabled, depth_draw_never, blend_add, shadows_disabled;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
 uniform vec4 trail_color = vec4(1.0);
 void fragment() {
 	float along = clamp(UV.y, 0.0, 1.0);
 	float across = clamp(1.0 - abs(UV.x - 0.5) * 2.0, 0.0, 1.0);
-	ALBEDO = mix(trail_color.rgb, vec3(1.0), (1.0 - along) * 0.5);
-	ALPHA = clamp(pow(1.0 - along, 1.5) * pow(across, 0.7) * trail_color.a, 0.0, 1.0);
+	ALBEDO = mix(trail_color.rgb, vec3(1.0), pow(1.0 - along, 3.0) * 0.45);
+	ALPHA = clamp(pow(1.0 - along, 1.3) * pow(across, 0.6) * trail_color.a, 0.0, 1.0);
 }
 """
 
@@ -386,11 +386,11 @@ static func hit_spark(pos: Vector3, color: Color, school: StringName = &"", crit
 	if spin > 0.0:
 		p.angular_velocity_min = -spin
 		p.angular_velocity_max = spin
-	var head := tint.lerp(Color.WHITE, 0.5) if additive else tint.darkened(0.15)
+	var head := tint.lerp(Color.WHITE, 0.5) if additive else tint.lerp(Color.WHITE, 0.2)
 	p.color_ramp = _fade_gradient(Color(head.r, head.g, head.b, 1.0), Color(tint.r, tint.g, tint.b, 0.0))
 	if crit:
 		# The star burst of a critical hit: a few big white-gold stars flying out.
-		var stars := _particles(fx, 7, 0.34, _star_mesh(), Mats.particle(true))
+		var stars := _particles(fx, 7, 0.34, _crit_star_mesh(), Mats.particle(false))
 		stars.direction = Vector3.UP
 		stars.spread = 180.0
 		stars.initial_velocity_min = 4.5
@@ -398,11 +398,11 @@ static func hit_spark(pos: Vector3, color: Color, school: StringName = &"", crit
 		stars.gravity = Vector3(0, -2.0, 0)
 		stars.damping_min = 5.0
 		stars.damping_max = 8.0
-		stars.scale_amount_min = 2.0
-		stars.scale_amount_max = 3.2
+		stars.scale_amount_min = 0.9
+		stars.scale_amount_max = 1.5
 		stars.angular_velocity_min = -600.0
 		stars.angular_velocity_max = 600.0
-		stars.color_ramp = _fade_gradient(Color(1.0, 0.97, 0.75), Color(tint.r, tint.g, tint.b, 0.0))
+		stars.color_ramp = _fade_gradient(Color(1.0, 0.93, 0.5), Color(tint.r, tint.g, tint.b, 0.0))
 	_start(fx)
 
 
@@ -964,6 +964,16 @@ static func _star_mesh() -> Mesh:
 	return MeshKit.cached("vfx:star", func() -> Mesh:
 		var k := MeshKit.new()
 		k.add_sphere(0.07, MeshKit.xf(Vector3.ZERO, Vector3(0, 0, 45), Vector3(1.0, 1.0, 0.35)), Color.WHITE, 4, 2)
+		return k.build())
+
+
+## Crit star: three thin crossed bars (a "jack") – reads as a sparkle from any angle, so it needs no billboard.
+static func _crit_star_mesh() -> Mesh:
+	return MeshKit.cached("vfx:crit_star", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_box(Vector3(0.34, 0.05, 0.05), MeshKit.xf(Vector3.ZERO, Vector3(0, 0, 45)), Color.WHITE)
+		k.add_box(Vector3(0.34, 0.05, 0.05), MeshKit.xf(Vector3.ZERO, Vector3(0, 0, -45)), Color.WHITE)
+		k.add_box(Vector3(0.05, 0.05, 0.34), Transform3D(), Color.WHITE)
 		return k.build())
 
 

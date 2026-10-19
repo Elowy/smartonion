@@ -455,7 +455,7 @@ func test_crit_sparks_are_bigger_and_burst_into_stars() -> void:
 	check(crit.life > normal.life, "lasts a little longer")
 	var stars := 0
 	for c in crit.get_children():
-		if c is CPUParticles3D and (c as CPUParticles3D).mesh == Vfx._star_mesh():
+		if c is CPUParticles3D and (c as CPUParticles3D).mesh == Vfx._crit_star_mesh():
 			stars += 1
 	check_eq(stars, 1, "one star particle node")
 	_run_effects(1.0)

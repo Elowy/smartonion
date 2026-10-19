@@ -14,6 +14,8 @@ extends SceneTree
 ##   weapons   Every weapon model.
 ##   arena     High overview of the arena and its decoration.
 ##   revive    Resurrection visuals: cast bar, channel beam, resurrect column.
+##   fx        M7b combat juice, --phase=spawn|death|impacts|loot|boss|banner (add the engine flag
+##             --fixed-fps 60 before --path so an effect's age after N frames is exact).
 ## Common: --out=path.png  --seed=N
 
 

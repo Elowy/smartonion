@@ -56,10 +56,10 @@ const POP_BOUNCE := 0.16
 ## M7b magnet streak: pickups with one at the same time, its length per m/s of speed (s), width (m), and
 ## its length limits (m).
 const TRAIL_MAX := 24
-const TRAIL_SECONDS := 0.05
-const TRAIL_WIDTH := 0.16
+const TRAIL_SECONDS := 0.07
+const TRAIL_WIDTH := 0.24
 const TRAIL_MIN := 0.25
-const TRAIL_LONGEST := 1.2
+const TRAIL_LONGEST := 1.5
 
 var gold := 0
 var xp := 0
