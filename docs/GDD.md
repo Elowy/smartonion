@@ -2345,12 +2345,21 @@ sebzés 4)
   bossok kiinduló számai változatlanok. A végleges 25 hullámos balansz **egyszer, az M6b
   végén** készül (16. fejezet), az összes M6b-s tartalommal (item-csomagok, módok, események)
   együtt, hogy ne kétszer kelljen hangolni.
-  - **Az M6b nem hangol:** egyik csomagja sem (módok, környezeti veszélyek, események,
-    szentélyek, Dungeon, item-tartalom) módosítja a hullám- és sebzés-görbét, a
-    csapatlétszám-szorzót vagy a meglévő tartalom számait; ahol egy csomag új értéket ír elő
+  - **Az M6b nem hangolt:** egyik csomagja sem (módok, környezeti veszélyek, események,
+    szentélyek, Dungeon, item-tartalom) módosította a hullám- és sebzés-görbét, a
+    csapatlétszám-szorzót vagy a meglévő tartalom számait; ahol egy csomag új értéket írt elő
     (pl. az Epic fegyverek +10% támadási sebessége, 4.1), azt a megfelelő fejezet rögzíti. Az
     új elemek számai (16.1, 8. fejezet) kiinduló értékek; a végső balansz mindet **egyszer, a
     legvégén** hangolja, a lenti nyitott pontokkal együtt.
+  - **A régebbi mérések nem összehasonlíthatók az M6b-s fejjel.** A kód változásai önmagukban
+    semlegesek a seedelt futásra (a tartalom nélküli másolat pontosan a régi számokat adja), de az
+    új utótagok, enchantok és fegyverek a súlyozott sorsolásokba kerültek, ami a generált itemeket
+    (és a botok vásárlását) eltolja; az alapértelmezett menet ráadásul már **sorsolja a
+    környezetét** (a `--seed=5` az Ice Cave-et játssza). Példa, `godot --headless --fixed-fps 60
+    --path . -- --smoke --waves=6 --seed=5`: az M6a fejen 587 gyilkolás (Forest Ruin, még sorsolás
+    nélkül), az M6b funkciók után 603 (Ice Cave), a tartalom-csomagok után 607 (gold 215, 1 kovácsolt
+    fegyver). A régi számokat csak az új adatfájlok nélkül lehet újra előállítani; a végső
+    balansz-mátrixot ezért az M6b-s fejen újra kell futtatni.
   - **Nyitott kérdések M6b-re** (az ismert nyomáspontok; számszerű célok és mérések a
     végső balanszban készülnek):
     - **Flesh Golem sebzése:** az érintéses sebzése (4) és a horog (1×) a bot-futásokban a
@@ -2376,6 +2385,48 @@ sebzés 4)
       Artifact kevesebb késői fegyversebzést jelent).
     - **A késői kassza:** az **M6a** goldsinkjei (Enchanter, fogyóeszközök, Black Market;
       16.1) célozták; hogy elég jól elviszik-e a goldot, a végső balanszban dől el.
+    - **Az M6b új rendszereinek kiinduló számai:** az eseményeké (HP-szorzók, jutalmak, a 30%-os
+      esély), a szentélyeké (hatások, az 5%-os esély), a környezeti veszélyeké (sebzés, gyakoriság), a
+      Dungeoné (terem-ráták, a parázstartó HP-ja, a Warden, a jutalom, a bukás ára), az Endless
+      (26+ hullám, Hardcore) nehézsége: mind kiinduló érték, és a végső balansz egyszerre hangolja a
+      többivel. A botok a 16 hullámos smoke-futásokban szinte minden eseményt teljesítettek és a
+      Dungeonokat megnyerték, a fejlesztői szintre állított Endless Hardcore futás viszont tömeges
+      elesést mutatott (a hősök kezdő felszerelésben), amiből balansz-következtetés nem vonható le.
+    - **Az M6b tartalom-áttekintéseiből gyűlt tételek** (az item-tartalom a számokat nem
+      hangolta):
+      - **Pajzsok halmozódása:** a különböző procokból érkező pajzsok korlát nélkül, összeadódva
+        halmozódnak; az M6b a pajzsforrások számát 1-ről 8-ra növelte (Warding, Bulwarking,
+        Gravewarded, Soul Lantern, Singing Bowl, …), ezért hős-szintű összes-plafon (pl. a Max HP
+        50%-a) mérlegelendő.
+      - **Iskola-torzítás:** a Scorching (+Fire) és a Glacial (+Frost) Equip-enchant minden
+        kasztra sorsolódik, a Warrior / Rogue / Paladin számára holt stat; egy kaszt-iskola
+        torzítás a `power_enchant_weight`-ben (a generátor Attack Power / Spell Power súlyozása
+        mintájára) megoldhatja.
+      - **Epic-only támadási sebesség:** a +10% csak az Epic sort illeti (4.1), így egy Legendary
+        lassabban üt, mint az Epic, amelyből kovácsolták (a kardnál az Epic ütési ideje 0,82 mp, a
+        Legendaryé 0,90 mp). A DPS-próbában (minden elsődleges stat 40) a Legendary sima
+        támadásának DPS-e a tőrnél (104,0 az Epic 107,4-e ellen), a varázspálcánál (86,7 / 89,5), a
+        Staffnál (78,0 / 80,5), az íjnál (76,7 / 77,5), a kardnál (64,4 / 65,0) és a buzogánynál
+        (62,7 / 63,4) az Epicével egyenlő vagy alatta van, a pisztolynál, a baltánál és a két új
+        kétkezesnél kb. +0,3%: a Legendary így csak a hatását, +3 statját és 2 enchantját éri.
+        Döntés: marad az Epic-only (és a 4.1 kimondja), vagy Epic+ (`[0, 0, 0, 10, 10, 10]`,
+        egysoros átírás).
+      - **Ritkaság-inverzió:** az Epic Girdle of the Unyielding Layer (35% HP alatt 10 elnyelés 4
+        mp-ig) erősebb a Legendary Bulwark of the Last Stand-nél (25% HP alatt 8 elnyelés 3 mp-ig);
+        a Rare Cuffs of the Last Breath is közel áll a Legendaryhoz.
+      - **Orb:** a statjai (+4 Spell Power, +1 Intellect) kiinduló értékek; a botok az item_score-ban
+        a Spell Powert 1,0-val számolják, így egy Mage bot a Tome-ot (2 Int + 3 Crit) az Orbnál
+        többre tartja. A Warlock a kétkezes Staff-fal indul, ezért az Orb (és a Tearglass) csak
+        egykezes főkéz mellett vehető fel, a generátor mégis kínálja neki.
+      - **Gold-bevétel:** a gold-find trinketek (Prospector's Pebble: 2 gold / 15 mp, kb. +10
+        gold hullámonként) és a Breeches of the Light Fingers (6% × 3 gold ölésenként + Gold Find
+        20, kb. +10% egy ölés goldjából) a késői kasszához adnak; a goldsinkek (16.1) mellett kell
+        mérni.
+      - **Nem hangolt tartalom:** az új utótagok (súlyok, arányok), a hand-made procok lapos
+        számai (kivéve a Bracers of the Hidden Blade `hit_pct`-jét és a Max HP-arányos
+        gyógyítást / pajzsot), a kétkezes fegyverek számai és a magasabb fokozatú páncél-alaptípusok
+        (csak név és kinézet) kiinduló értékek; a késői hullámokban a lapos sebzésű procok
+        tervezetten gyengék.
     - **Módszertan:** egy smoke „végigért” nem bizonyítja, hogy a boss legyőzhető (a
       smoke-biztosíték 210 mp-nél megöli): a mátrix olvasásakor a „TIMEOUT” sorokat külön kell
       számolni. Egy adat-módosítás is átrendezi az RNG-t, ezért az egyes seedek párjai
@@ -3026,7 +3077,9 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - `AbilityData`: típus (Active / Auto), iskola-tag, rangok, specializációk, kaszt-kötés.
 - `TalentTreeData` / `TalentData`: tierek, pontlimitek, előfeltételek, hatások.
 - `SetData`, `EnemyData`, `WaveData`, `BossData`, `ConsumableData`, `DifficultyData`.
-- `EnvironmentData` (M6b): az aréna-környezetek (paletta, kellékkészlet, veszély; 16.1).
+- `EnvironmentData` (M6b): az aréna-környezetek (paletta, kellékkészlet, veszély; 16.1);
+  `ShrineData` (M6b): a szentélyek (áldás, átok, időtartam; 16.1). Az alaptípus kódbeli osztálya
+  `ItemBase` (a fenti `ItemData` alaptípus-fele; M6b: `min_wave`, 5.4).
 
 **Fő rendszerek**
 
@@ -3045,6 +3098,8 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | `LootRoll` | Need / Greed / Pass dobások, kiértékelés, backpackbe tétel / eladás |
 | `ProcSystem` | Találat- / ölés- / sebződés-események, PPM-esélyek, belső cooldownok, proc-hatások |
 | `ShopSystem` | Ajánlatok, lock, reroll, árak |
+| `EventSpawner` / `EnvironmentHazards` / `Shrines` / `Dungeon` (M6b) | A hullám közbeni események, a környezeti veszélyek, a szentélyek és a Dungeon-portál (16.1); mind saját véletlenszám-generátort használ, a `RunState.rng`-hez nem nyúl |
+| `Leaderboard` (M6b) | A helyi ranglista modellje és fájl-I/O-ja (`user://leaderboard.json`, 16.1) |
 | `Inventory` / `Equipment` | Backpack, slotok, set-bónuszok, Armor Specialization |
 | UI | Játékosonkénti panelek |
 
@@ -3670,7 +3725,10 @@ Ugyanaz az elv, mint a 17. fejezetben: új lehetőségek, nem nyers erő.
 
 Tervezési kérdés jelenleg nincs nyitva. Az M6b-re átvitt **hangolási** kérdések (a Flesh Golem
 sebzése, a 20. hullám, Vor'thalax kill-ideje létszám szerint, a duók és a szóló hősök
-túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon) a
+túlélése, az Artifact-kínálat, a hős-HP és az ellenség-sebzés viszonya a késői hullámokon) és az
+M6b tartalom-áttekintéseiből gyűlt tételek (a pajzsok halmozódása, a Scorching / Glacial
+iskola-torzítása, az Epic-only támadási sebesség és a Legendary, a ritkaság-inverziók, az Orb
+statjai és a Mage bot Tome-választása, a gold-find trinketek, az új rendszerek kiinduló számai) a
 9. fejezetben vannak („Nyitott kérdések M6b-re”); az ütemezésük a 16. fejezet **M6b**
 listájában található: ezeket az M6b végleges balansza kezeli, egyszer, a legvégén. A késői
 kasszát az M6a goldsinkjei célozták (16.1).
@@ -3709,5 +3767,6 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány az M7-ben (13., 16.1) |
 | Események és szentélyek (M6b) | Hullám közbeni esemény a 4. hullámtól, 30% eséllyel, hullámonként legfeljebb egy (Guarded Chest, Defend the Totem, Goblin Caravan); szentély a szünetekben 5% eséllyel, csak egyhangú elfogadással (8., 10.1, 16.1) |
 | Dungeon-portál (M6b) | A 6., 9., 12. és 15. hullám után, csapatszavazással; 4 terem (Clear, Survive, Defend, Warden); siker: hősönként 1 garantált Epic, bukás: a kassza 50%-a elvész, a piac mindkét esetben következik (8., 16.1) |
-| M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8 |
-| M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangol; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |
+| M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8; **megvalósítva**: 13 fegyver, 96 páncél- és 20 ékszer-alaptípus, 25 utótag, 50 enchant, 160 kézzel tervezett item |
+| M6b megvalósítás | Kész (a végleges balansz kivételével): az 1–13., 16.1 és 5.8 fejezet írja le, ahogy a kód működik; az Epic fegyverek +10% támadási sebességet kapnak (4.1), a környezet alapból sorsolódik (smoke-ban is) |
+| M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangolt; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |
