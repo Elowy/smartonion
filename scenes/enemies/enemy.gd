@@ -359,6 +359,13 @@ func is_dead() -> bool:
 	return _dead or hp <= 0.0
 
 
+## M7b: the model rises out of the ground (swirl; bosses slower). Visual only – the body, collision and AI
+## timing are untouched. Called by the directors right after the enemy entered the tree.
+func play_spawn_in() -> void:
+	if model != null and is_instance_valid(model):
+		model.play_spawn(EnemyModel.SPAWN_TIME_BOSS if is_boss() else EnemyModel.SPAWN_TIME)
+
+
 func is_stunned() -> bool:
 	return stun_left > 0.0
 
@@ -1526,7 +1533,8 @@ func _die(attacker: Node3D) -> void:
 	RunState.record_kill(killer_index)
 	var pos := global_position if is_inside_tree() else position
 	if data != null:
-		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale)
+		Vfx.death_puff(pos + Vector3.UP * 0.5 * data.model_scale, data.color, data.model_scale * _death_puff_mult())
+	_spawn_corpse(pos, attacker)
 	Audio.play(&"enemy_death_boss" if is_boss() else (&"enemy_death_elite" if elite_affix != &"" else &"enemy_death"))
 	if drops_loot:
 		_death_loot(pos, attacker)
@@ -1538,6 +1546,32 @@ func _die(attacker: Node3D) -> void:
 	if killer != null and is_instance_valid(killer):
 		killer.notify_kill(self)
 	queue_free()
+
+
+## M7b: elites and bosses die with a bigger puff.
+func _death_puff_mult() -> float:
+	if is_boss():
+		return 1.25
+	return 1.3 if elite_affix != &"" and not elite_lite else 1.0
+
+
+## M7b: the visual-only corpse ([EnemyCorpse]: tips over away from the killer, flashes, sinks and fades;
+## elites and bosses get a bigger one, a boss also a lingering glow). Nothing of it is gameplay.
+func _spawn_corpse(pos: Vector3, attacker: Node3D) -> void:
+	if model == null or not is_instance_valid(model):
+		return
+	var away := Vector3.ZERO
+	if attacker != null and is_instance_valid(attacker) and attacker.is_inside_tree():
+		away = pos - attacker.global_position
+	var tier := EnemyCorpse.Tier.NORMAL
+	if is_boss():
+		tier = EnemyCorpse.Tier.BOSS
+	elif elite_affix != &"" and not elite_lite:
+		tier = EnemyCorpse.Tier.ELITE
+	var accent: Color = EliteAffixes.COLORS.get(elite_affix, Color.WHITE)
+	EnemyCorpse.spawn(model, pos, tier, away, accent)
+	if tier == EnemyCorpse.Tier.BOSS and data != null:
+		Vfx.boss_remains(pos, data.color, radius)
 
 
 ## Virtual (M6): what this enemy leaves behind when it dies. Called from [method _die] after the
