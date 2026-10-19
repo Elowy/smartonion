@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 Db="*res://autoload/db.gd"
 PlayerManager="*res://autoload/player_manager.gd"
 RunState="*res://autoload/run_state.gd"
+Audio="*res://autoload/audio.gd"
 
 [display]
 

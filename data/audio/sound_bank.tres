@@ -1,0 +1,1009 @@
+[gd_resource type="Resource" script_class="SoundBank" load_steps=211 format=3]
+
+[ext_resource type="Script" path="res://data/audio/sound_bank.gd" id="1_bank"]
+[ext_resource type="Script" path="res://data/audio/sound_def.gd" id="2_def"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/uiaudio_rollover2.ogg" id="s1"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/uiaudio_rollover3.ogg" id="s2"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_confirmation_001.ogg" id="s3"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_confirmation_003.ogg" id="s4"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_back_001.ogg" id="s5"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_back_002.ogg" id="s6"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_error_001.ogg" id="s7"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_error_004.ogg" id="s8"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_open_001.ogg" id="s9"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_open_002.ogg" id="s10"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_close_001.ogg" id="s11"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_close_002.ogg" id="s12"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/uiaudio_click2.ogg" id="s13"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/uiaudio_click3.ogg" id="s14"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_toggle_001.ogg" id="s15"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_toggle_002.ogg" id="s16"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_maximize_004.ogg" id="s17"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_card-slide-1.ogg" id="s18"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_card-slide-2.ogg" id="s19"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_card-slide-3.ogg" id="s20"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_card-place-1.ogg" id="s21"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_card-place-2.ogg" id="s22"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_dice-throw-1.ogg" id="s23"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_dice-throw-2.ogg" id="s24"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_dice-throw-3.ogg" id="s25"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_dice-shake-2_t70.ogg" id="s26"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_dice-shake-3_t70.ogg" id="s27"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_handleCoins2.ogg" id="s28"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_chips-handle-3.ogg" id="s29"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_handleCoins_t50.ogg" id="s30"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_chips-handle-4.ogg" id="s31"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_metalLatch.ogg" id="s32"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_beltHandle1.ogg" id="s33"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_beltHandle2.ogg" id="s34"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_drawKnife1.ogg" id="s35"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_drawKnife3.ogg" id="s36"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_cloth2.ogg" id="s37"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_knifeSlice.ogg" id="s38"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_knifeSlice2.ogg" id="s39"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_drawKnife2.ogg" id="s40"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_chop.ogg" id="s41"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_cloth3.ogg" id="s42"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_pluck_001.ogg" id="s43"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_pluck_002.ogg" id="s44"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserSmall_000.ogg" id="s45"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserSmall_001.ogg" id="s46"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserSmall_003.ogg" id="s47"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_000_t50.ogg" id="s48"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_001_t50.ogg" id="s49"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_002_t50.ogg" id="s50"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_thrusterFire_000_t60.ogg" id="s51"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_thrusterFire_001_t60.ogg" id="s52"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_thrusterFire_002_t60.ogg" id="s53"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactGlass_light_000.ogg" id="s54"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactGlass_light_001.ogg" id="s55"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactGlass_light_002.ogg" id="s56"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_000_t70.ogg" id="s57"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_001_t70.ogg" id="s58"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_slime_000.ogg" id="s59"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_slime_001_t50.ogg" id="s60"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_cloth1.ogg" id="s61"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_cloth4.ogg" id="s62"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_medium_000.ogg" id="s63"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_medium_001.ogg" id="s64"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_medium_002.ogg" id="s65"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactSoft_medium_000.ogg" id="s66"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactSoft_medium_001.ogg" id="s67"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactMetal_light_000.ogg" id="s68"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactMetal_light_001.ogg" id="s69"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_light_000.ogg" id="s70"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactSoft_heavy_000.ogg" id="s71"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactSoft_heavy_001.ogg" id="s72"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactSoft_heavy_002.ogg" id="s73"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_heavy_000.ogg" id="s74"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_heavy_001.ogg" id="s75"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_lowFrequency_explosion_001.ogg" id="s76"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_heavy_000.ogg" id="s77"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_heavy_001.ogg" id="s78"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPunch_heavy_002.ogg" id="s79"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactWood_heavy_000.ogg" id="s80"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactWood_heavy_001.ogg" id="s81"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_PIZZI15.ogg" id="s82"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_PIZZI02.ogg" id="s83"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactMetal_light_002.ogg" id="s84"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactMetal_light_003.ogg" id="s85"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_medium_000.ogg" id="s86"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_medium_001.ogg" id="s87"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_chip-lay-1.ogg" id="s88"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_chip-lay-2.ogg" id="s89"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/casino_chip-lay-3.ogg" id="s90"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_glass_002.ogg" id="s91"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_glass_003.ogg" id="s92"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_glass_005.ogg" id="s93"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_drop_002.ogg" id="s94"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_drop_003.ogg" id="s95"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_STEEL10.ogg" id="s96"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_creak1.ogg" id="s97"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_explosionCrunch_000_t100.ogg" id="s98"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_explosionCrunch_001_t100.ogg" id="s99"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_explosionCrunch_002_t100.ogg" id="s100"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_heavy_002.ogg" id="s101"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactPlate_heavy_003.ogg" id="s102"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactWood_heavy_002.ogg" id="s103"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactMining_001.ogg" id="s104"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_thrusterFire_003_t80.ogg" id="s105"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_thrusterFire_004_t80.ogg" id="s106"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactGlass_heavy_000.ogg" id="s107"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactGlass_heavy_001.ogg" id="s108"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_003_t80.ogg" id="s109"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_004_t80.ogg" id="s110"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_001_t90.ogg" id="s111"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_003_t90.ogg" id="s112"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserLarge_000.ogg" id="s113"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserLarge_001.ogg" id="s114"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_handleSmallLeather.ogg" id="s115"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_confirmation_004.ogg" id="s116"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_glass_004_t50.ogg" id="s117"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_forceField_001_t80.ogg" id="s118"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_maximize_005.ogg" id="s119"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/iface_maximize_006.ogg" id="s120"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/rpg_clothBelt.ogg" id="s121"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_003_t70.ogg" id="s122"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_000.ogg" id="s123"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_PIZZI10.ogg" id="s124"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_STEEL02.ogg" id="s125"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_STEEL01.ogg" id="s126"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_lowFrequency_explosion_000_t160.ogg" id="s127"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_laserLarge_002.ogg" id="s128"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_PIZZI12.ogg" id="s129"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/jingle_jingles_PIZZI14.ogg" id="s130"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/impact_impactBell_heavy_003.ogg" id="s131"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/scifi_doorOpen_001.ogg" id="s132"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/music_menu.ogg" id="s133"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/music_combat.ogg" id="s134"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/music_intermission.ogg" id="s135"]
+[ext_resource type="AudioStream" path="res://assets/audio/music/music_boss.ogg" id="s136"]
+
+[sub_resource type="Resource" id="def_ui_move"]
+script = ExtResource("2_def")
+id = &"ui_move"
+streams = Array[AudioStream]([ExtResource("s1"), ExtResource("s2")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.04
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_confirm"]
+script = ExtResource("2_def")
+id = &"ui_confirm"
+streams = Array[AudioStream]([ExtResource("s3"), ExtResource("s4")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.06
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_back"]
+script = ExtResource("2_def")
+id = &"ui_back"
+streams = Array[AudioStream]([ExtResource("s5"), ExtResource("s6")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.06
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_error"]
+script = ExtResource("2_def")
+id = &"ui_error"
+streams = Array[AudioStream]([ExtResource("s7"), ExtResource("s8")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_open"]
+script = ExtResource("2_def")
+id = &"ui_open"
+streams = Array[AudioStream]([ExtResource("s9"), ExtResource("s10")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_close"]
+script = ExtResource("2_def")
+id = &"ui_close"
+streams = Array[AudioStream]([ExtResource("s11"), ExtResource("s12")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_tab"]
+script = ExtResource("2_def")
+id = &"ui_tab"
+streams = Array[AudioStream]([ExtResource("s13"), ExtResource("s14")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.04
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_toggle"]
+script = ExtResource("2_def")
+id = &"ui_toggle"
+streams = Array[AudioStream]([ExtResource("s15"), ExtResource("s16")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 2
+min_interval = 0.05
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_join"]
+script = ExtResource("2_def")
+id = &"ui_join"
+streams = Array[AudioStream]([ExtResource("s17")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.02
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_card_flip"]
+script = ExtResource("2_def")
+id = &"ui_card_flip"
+streams = Array[AudioStream]([ExtResource("s18"), ExtResource("s19"), ExtResource("s20")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.08
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_card_pick"]
+script = ExtResource("2_def")
+id = &"ui_card_pick"
+streams = Array[AudioStream]([ExtResource("s21"), ExtResource("s22")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_dice"]
+script = ExtResource("2_def")
+id = &"ui_dice"
+streams = Array[AudioStream]([ExtResource("s23"), ExtResource("s24"), ExtResource("s25")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.15
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_reroll"]
+script = ExtResource("2_def")
+id = &"ui_reroll"
+streams = Array[AudioStream]([ExtResource("s26"), ExtResource("s27")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 1
+min_interval = 0.2
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_buy"]
+script = ExtResource("2_def")
+id = &"ui_buy"
+streams = Array[AudioStream]([ExtResource("s28"), ExtResource("s29")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.08
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_sell"]
+script = ExtResource("2_def")
+id = &"ui_sell"
+streams = Array[AudioStream]([ExtResource("s30"), ExtResource("s31")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.08
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_ui_equip"]
+script = ExtResource("2_def")
+id = &"ui_equip"
+streams = Array[AudioStream]([ExtResource("s32"), ExtResource("s33"), ExtResource("s34")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.08
+priority = 0
+bus = &"UI"
+
+[sub_resource type="Resource" id="def_swing_light"]
+script = ExtResource("2_def")
+id = &"swing_light"
+streams = Array[AudioStream]([ExtResource("s35"), ExtResource("s36"), ExtResource("s37")])
+volume_db = -3.0
+pitch = 1.15
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.05
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_swing_blade"]
+script = ExtResource("2_def")
+id = &"swing_blade"
+streams = Array[AudioStream]([ExtResource("s38"), ExtResource("s39"), ExtResource("s40")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.05
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_swing_heavy"]
+script = ExtResource("2_def")
+id = &"swing_heavy"
+streams = Array[AudioStream]([ExtResource("s41"), ExtResource("s42")])
+volume_db = -6.0
+pitch = 0.85
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_shot_bow"]
+script = ExtResource("2_def")
+id = &"shot_bow"
+streams = Array[AudioStream]([ExtResource("s43"), ExtResource("s44")])
+volume_db = -5.0
+pitch = 1.0
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.05
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_shot_gun"]
+script = ExtResource("2_def")
+id = &"shot_gun"
+streams = Array[AudioStream]([ExtResource("s45"), ExtResource("s46"), ExtResource("s47")])
+volume_db = -12.0
+pitch = 1.0
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.05
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_arcane"]
+script = ExtResource("2_def")
+id = &"cast_arcane"
+streams = Array[AudioStream]([ExtResource("s48"), ExtResource("s49"), ExtResource("s50")])
+volume_db = -13.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_fire"]
+script = ExtResource("2_def")
+id = &"cast_fire"
+streams = Array[AudioStream]([ExtResource("s51"), ExtResource("s52"), ExtResource("s53")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_frost"]
+script = ExtResource("2_def")
+id = &"cast_frost"
+streams = Array[AudioStream]([ExtResource("s54"), ExtResource("s55"), ExtResource("s56")])
+volume_db = -10.0
+pitch = 1.2
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_holy"]
+script = ExtResource("2_def")
+id = &"cast_holy"
+streams = Array[AudioStream]([ExtResource("s57"), ExtResource("s58")])
+volume_db = -16.0
+pitch = 1.5
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.08
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_shadow"]
+script = ExtResource("2_def")
+id = &"cast_shadow"
+streams = Array[AudioStream]([ExtResource("s59"), ExtResource("s60")])
+volume_db = -10.0
+pitch = 0.8
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_cast_nature"]
+script = ExtResource("2_def")
+id = &"cast_nature"
+streams = Array[AudioStream]([ExtResource("s61"), ExtResource("s62")])
+volume_db = -5.0
+pitch = 1.1
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_hit"]
+script = ExtResource("2_def")
+id = &"hit"
+streams = Array[AudioStream]([ExtResource("s63"), ExtResource("s64"), ExtResource("s65"), ExtResource("s66"), ExtResource("s67")])
+volume_db = -12.0
+pitch = 1.0
+pitch_variation = 0.12
+max_voices = 6
+min_interval = 0.03
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_hit_crit"]
+script = ExtResource("2_def")
+id = &"hit_crit"
+streams = Array[AudioStream]([ExtResource("s68"), ExtResource("s69"), ExtResource("s70")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_enemy_death"]
+script = ExtResource("2_def")
+id = &"enemy_death"
+streams = Array[AudioStream]([ExtResource("s71"), ExtResource("s72"), ExtResource("s73")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.1
+max_voices = 4
+min_interval = 0.04
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_enemy_death_elite"]
+script = ExtResource("2_def")
+id = &"enemy_death_elite"
+streams = Array[AudioStream]([ExtResource("s74"), ExtResource("s75")])
+volume_db = -5.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.12
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_enemy_death_boss"]
+script = ExtResource("2_def")
+id = &"enemy_death_boss"
+streams = Array[AudioStream]([ExtResource("s76")])
+volume_db = -2.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 1
+min_interval = 0.5
+priority = 3
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_hero_hurt"]
+script = ExtResource("2_def")
+id = &"hero_hurt"
+streams = Array[AudioStream]([ExtResource("s77"), ExtResource("s78"), ExtResource("s79")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.12
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_hero_down"]
+script = ExtResource("2_def")
+id = &"hero_down"
+streams = Array[AudioStream]([ExtResource("s80"), ExtResource("s81")])
+volume_db = -3.0
+pitch = 0.8
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.3
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_revive"]
+script = ExtResource("2_def")
+id = &"revive"
+streams = Array[AudioStream]([ExtResource("s82")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 2
+min_interval = 0.3
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_level_up"]
+script = ExtResource("2_def")
+id = &"level_up"
+streams = Array[AudioStream]([ExtResource("s83")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.5
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_dodge"]
+script = ExtResource("2_def")
+id = &"dodge"
+streams = Array[AudioStream]([ExtResource("s37"), ExtResource("s62")])
+volume_db = -6.0
+pitch = 1.2
+pitch_variation = 0.06
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_parry"]
+script = ExtResource("2_def")
+id = &"parry"
+streams = Array[AudioStream]([ExtResource("s84"), ExtResource("s85")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_block"]
+script = ExtResource("2_def")
+id = &"block"
+streams = Array[AudioStream]([ExtResource("s86"), ExtResource("s87")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.1
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_gold_pickup"]
+script = ExtResource("2_def")
+id = &"gold_pickup"
+streams = Array[AudioStream]([ExtResource("s88"), ExtResource("s89"), ExtResource("s90")])
+volume_db = -10.0
+pitch = 1.1
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.04
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_xp_pickup"]
+script = ExtResource("2_def")
+id = &"xp_pickup"
+streams = Array[AudioStream]([ExtResource("s91"), ExtResource("s92"), ExtResource("s93")])
+volume_db = -20.0
+pitch = 1.2
+pitch_variation = 0.1
+max_voices = 2
+min_interval = 0.09
+priority = 0
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_item_drop"]
+script = ExtResource("2_def")
+id = &"item_drop"
+streams = Array[AudioStream]([ExtResource("s94"), ExtResource("s95")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.1
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_loot_win"]
+script = ExtResource("2_def")
+id = &"loot_win"
+streams = Array[AudioStream]([ExtResource("s96")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.3
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_chest_open"]
+script = ExtResource("2_def")
+id = &"chest_open"
+streams = Array[AudioStream]([ExtResource("s32"), ExtResource("s97")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 1
+min_interval = 0.3
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_explosion"]
+script = ExtResource("2_def")
+id = &"explosion"
+streams = Array[AudioStream]([ExtResource("s98"), ExtResource("s99"), ExtResource("s100")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.08
+max_voices = 3
+min_interval = 0.07
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_physical"]
+script = ExtResource("2_def")
+id = &"ability_physical"
+streams = Array[AudioStream]([ExtResource("s101"), ExtResource("s102"), ExtResource("s38")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_aoe"]
+script = ExtResource("2_def")
+id = &"ability_aoe"
+streams = Array[AudioStream]([ExtResource("s103"), ExtResource("s104")])
+volume_db = -6.0
+pitch = 0.9
+pitch_variation = 0.06
+max_voices = 2
+min_interval = 0.08
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_fire"]
+script = ExtResource("2_def")
+id = &"ability_fire"
+streams = Array[AudioStream]([ExtResource("s105"), ExtResource("s106")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_frost"]
+script = ExtResource("2_def")
+id = &"ability_frost"
+streams = Array[AudioStream]([ExtResource("s107"), ExtResource("s108")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_arcane"]
+script = ExtResource("2_def")
+id = &"ability_arcane"
+streams = Array[AudioStream]([ExtResource("s109"), ExtResource("s110")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_holy"]
+script = ExtResource("2_def")
+id = &"ability_holy"
+streams = Array[AudioStream]([ExtResource("s111"), ExtResource("s112")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.08
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_shadow"]
+script = ExtResource("2_def")
+id = &"ability_shadow"
+streams = Array[AudioStream]([ExtResource("s113"), ExtResource("s114")])
+volume_db = -13.0
+pitch = 0.7
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_nature"]
+script = ExtResource("2_def")
+id = &"ability_nature"
+streams = Array[AudioStream]([ExtResource("s61"), ExtResource("s115")])
+volume_db = -4.0
+pitch = 0.9
+pitch_variation = 0.06
+max_voices = 3
+min_interval = 0.06
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_heal"]
+script = ExtResource("2_def")
+id = &"ability_heal"
+streams = Array[AudioStream]([ExtResource("s116"), ExtResource("s117")])
+volume_db = -10.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.15
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_shield"]
+script = ExtResource("2_def")
+id = &"ability_shield"
+streams = Array[AudioStream]([ExtResource("s118"), ExtResource("s86")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.1
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_buff"]
+script = ExtResource("2_def")
+id = &"ability_buff"
+streams = Array[AudioStream]([ExtResource("s119"), ExtResource("s120")])
+volume_db = -11.0
+pitch = 1.0
+pitch_variation = 0.04
+max_voices = 2
+min_interval = 0.15
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_move"]
+script = ExtResource("2_def")
+id = &"ability_move"
+streams = Array[AudioStream]([ExtResource("s61"), ExtResource("s42"), ExtResource("s121")])
+volume_db = -5.0
+pitch = 1.2
+pitch_variation = 0.06
+max_voices = 2
+min_interval = 0.08
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_ability_summon"]
+script = ExtResource("2_def")
+id = &"ability_summon"
+streams = Array[AudioStream]([ExtResource("s59"), ExtResource("s122")])
+volume_db = -9.0
+pitch = 1.0
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.15
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_wave_start"]
+script = ExtResource("2_def")
+id = &"wave_start"
+streams = Array[AudioStream]([ExtResource("s123")])
+volume_db = -5.0
+pitch = 1.0
+pitch_variation = 0.02
+max_voices = 1
+min_interval = 1.0
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_wave_cleared"]
+script = ExtResource("2_def")
+id = &"wave_cleared"
+streams = Array[AudioStream]([ExtResource("s124")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 1.0
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_victory"]
+script = ExtResource("2_def")
+id = &"victory"
+streams = Array[AudioStream]([ExtResource("s125")])
+volume_db = -4.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 1.0
+priority = 3
+bus = &"Music"
+
+[sub_resource type="Resource" id="def_defeat"]
+script = ExtResource("2_def")
+id = &"defeat"
+streams = Array[AudioStream]([ExtResource("s126")])
+volume_db = -4.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 1.0
+priority = 3
+bus = &"Music"
+
+[sub_resource type="Resource" id="def_boss_spawn"]
+script = ExtResource("2_def")
+id = &"boss_spawn"
+streams = Array[AudioStream]([ExtResource("s127")])
+volume_db = -3.0
+pitch = 1.0
+pitch_variation = 0.02
+max_voices = 1
+min_interval = 1.0
+priority = 3
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_boss_telegraph"]
+script = ExtResource("2_def")
+id = &"boss_telegraph"
+streams = Array[AudioStream]([ExtResource("s114"), ExtResource("s128")])
+volume_db = -12.0
+pitch = 0.8
+pitch_variation = 0.05
+max_voices = 2
+min_interval = 0.3
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_goblin_appear"]
+script = ExtResource("2_def")
+id = &"goblin_appear"
+streams = Array[AudioStream]([ExtResource("s129")])
+volume_db = -4.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 1.0
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_goblin_escape"]
+script = ExtResource("2_def")
+id = &"goblin_escape"
+streams = Array[AudioStream]([ExtResource("s130")])
+volume_db = -5.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 1.0
+priority = 2
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_banner"]
+script = ExtResource("2_def")
+id = &"banner"
+streams = Array[AudioStream]([ExtResource("s131")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 1
+min_interval = 0.5
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_portal"]
+script = ExtResource("2_def")
+id = &"portal"
+streams = Array[AudioStream]([ExtResource("s132")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.03
+max_voices = 1
+min_interval = 0.5
+priority = 1
+bus = &"SFX"
+
+[sub_resource type="Resource" id="def_music_menu"]
+script = ExtResource("2_def")
+id = &"menu"
+streams = Array[AudioStream]([ExtResource("s133")])
+volume_db = -8.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.0
+priority = 0
+bus = &"Music"
+
+[sub_resource type="Resource" id="def_music_combat"]
+script = ExtResource("2_def")
+id = &"combat"
+streams = Array[AudioStream]([ExtResource("s134")])
+volume_db = -11.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.0
+priority = 0
+bus = &"Music"
+
+[sub_resource type="Resource" id="def_music_intermission"]
+script = ExtResource("2_def")
+id = &"intermission"
+streams = Array[AudioStream]([ExtResource("s135")])
+volume_db = 0.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.0
+priority = 0
+bus = &"Music"
+
+[sub_resource type="Resource" id="def_music_boss"]
+script = ExtResource("2_def")
+id = &"boss"
+streams = Array[AudioStream]([ExtResource("s136")])
+volume_db = -6.0
+pitch = 1.0
+pitch_variation = 0.0
+max_voices = 1
+min_interval = 0.0
+priority = 0
+bus = &"Music"
+
+[resource]
+script = ExtResource("1_bank")
+sounds = Array[ExtResource("2_def")]([SubResource("def_ui_move"), SubResource("def_ui_confirm"), SubResource("def_ui_back"), SubResource("def_ui_error"), SubResource("def_ui_open"), SubResource("def_ui_close"), SubResource("def_ui_tab"), SubResource("def_ui_toggle"), SubResource("def_ui_join"), SubResource("def_ui_card_flip"), SubResource("def_ui_card_pick"), SubResource("def_ui_dice"), SubResource("def_ui_reroll"), SubResource("def_ui_buy"), SubResource("def_ui_sell"), SubResource("def_ui_equip"), SubResource("def_swing_light"), SubResource("def_swing_blade"), SubResource("def_swing_heavy"), SubResource("def_shot_bow"), SubResource("def_shot_gun"), SubResource("def_cast_arcane"), SubResource("def_cast_fire"), SubResource("def_cast_frost"), SubResource("def_cast_holy"), SubResource("def_cast_shadow"), SubResource("def_cast_nature"), SubResource("def_hit"), SubResource("def_hit_crit"), SubResource("def_enemy_death"), SubResource("def_enemy_death_elite"), SubResource("def_enemy_death_boss"), SubResource("def_hero_hurt"), SubResource("def_hero_down"), SubResource("def_revive"), SubResource("def_level_up"), SubResource("def_dodge"), SubResource("def_parry"), SubResource("def_block"), SubResource("def_gold_pickup"), SubResource("def_xp_pickup"), SubResource("def_item_drop"), SubResource("def_loot_win"), SubResource("def_chest_open"), SubResource("def_explosion"), SubResource("def_ability_physical"), SubResource("def_ability_aoe"), SubResource("def_ability_fire"), SubResource("def_ability_frost"), SubResource("def_ability_arcane"), SubResource("def_ability_holy"), SubResource("def_ability_shadow"), SubResource("def_ability_nature"), SubResource("def_ability_heal"), SubResource("def_ability_shield"), SubResource("def_ability_buff"), SubResource("def_ability_move"), SubResource("def_ability_summon"), SubResource("def_wave_start"), SubResource("def_wave_cleared"), SubResource("def_victory"), SubResource("def_defeat"), SubResource("def_boss_spawn"), SubResource("def_boss_telegraph"), SubResource("def_goblin_appear"), SubResource("def_goblin_escape"), SubResource("def_banner"), SubResource("def_portal")])
+music = Array[ExtResource("2_def")]([SubResource("def_music_menu"), SubResource("def_music_combat"), SubResource("def_music_intermission"), SubResource("def_music_boss")])
