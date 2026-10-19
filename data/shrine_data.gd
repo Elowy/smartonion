@@ -25,6 +25,10 @@ extends Resource
 @export var color := Color(0.9, 0.75, 0.3)
 ## Bots vote Accept for this shrine (else Decline).
 @export var bot_accepts := true
+## Bots vote Accept for this shrine when they are the only hero (else Decline even if [member bot_accepts]): a lone
+## hero cannot be revived, so a bane that makes the enemies hit harder or last longer (or the hero frailer) costs
+## more than the boon pays. Final balance 2.
+@export var bot_accepts_solo := true
 
 # --- Timed effects (percent; 0 = none) ---------------------------------------------------------
 ## Gold the pickups give (+30 = x1.3).

@@ -148,21 +148,24 @@ func test_the_flesh_golem_hits_softer_than_the_first_draft() -> void:
 
 
 ## Vor'thalax: his hazards are multiples of the contact damage and one-shot the glass classes at 4. His co-op HP
-## factor is convex (x1 / x1.5 / x3 / x5.5): the party's damage grows faster than its size, and a party without a
-## Rogue (80-90% of the bosses' damage in the bot runs) could not kill the linear x2.5 duo boss at all.
+## factor is convex (x1 / x1.5 / x2.7 / x4.6): the party's damage grows faster than its size, and a party without a
+## Rogue (80-90% of the bosses' damage in the bot runs) could not kill the linear x2.5 duo boss at all. Final
+## balance 2: the convex term went from 1.0 (x3 / x5.5) to 0.7 once the Rogue's boss damage was trimmed (Fan of
+## Knives against a boss, the Fangs' free fans) - four heroes with a Rogue whose gear was ordinary then needed over
+## 210 s in 3 of 10 runs.
 func test_the_bosses_co_op_hp_factors_and_vorthalax_contact() -> void:
 	var v := Db.get_boss(&"vorthalax")
 	var m := Db.get_boss(&"lich_commander_morvain")
 	check_eq(v.contact_damage, 1.5, "Vor'thalax contact 4 -> 1.5")
 	check_eq(v.coop_hp_per_player, 0.5, "Vor'thalax +50% HP per extra hero ...")
-	check_eq(v.coop_hp_convex, 1.0, "... plus +100% per pair of extra heroes")
+	check_eq(v.coop_hp_convex, 0.7, "... plus +70% per pair of extra heroes")
 	check_eq(m.coop_hp_per_player, 1.25, "Morvain +125% HP per extra hero")
 	check_eq(m.coop_hp_convex, 0.0, "Morvain stays linear")
 	check_eq(m.contact_damage, 3.0, "Morvain contact unchanged")
 	var solo := v.max_hp_for(25, 1)
 	check_near(v.max_hp_for(25, 2) / solo, 1.5, 0.0001, "Vor'thalax duo x1.5")
-	check_near(v.max_hp_for(25, 3) / solo, 3.0, 0.0001, "Vor'thalax trio x3")
-	check_near(v.max_hp_for(25, 4) / solo, 5.5, 0.0001, "Vor'thalax four x5.5")
+	check_near(v.max_hp_for(25, 3) / solo, 2.7, 0.0001, "Vor'thalax trio x2.7")
+	check_near(v.max_hp_for(25, 4) / solo, 4.6, 0.0001, "Vor'thalax four x4.6")
 	check_near(m.max_hp_for(10, 2) / m.max_hp_for(10, 1), 2.25, 0.0001, "Morvain duo x2.25")
 	check_near(m.max_hp_for(10, 4) / m.max_hp_for(10, 1), 4.75, 0.0001, "Morvain four x4.75")
 	check_near(solo, 450.0 * v.hp_mult_at_wave(25), 0.01, "the solo HP is the base growth")
@@ -171,24 +174,39 @@ func test_the_bosses_co_op_hp_factors_and_vorthalax_contact() -> void:
 ## The enemy damage by party size: the full party was raised once the golem was softened and the bots' first downs
 ## had moved from wave ~11 to wave ~20.
 func test_the_co_op_damage_factors() -> void:
-	check_eq(RunState.COOP_DAMAGE_MULTS, [0.45, 0.6, 0.8, 1.05] as Array[float], "1 / 2 / 3 / 4 heroes")
+	check_eq(RunState.COOP_DAMAGE_MULTS, [0.45, 0.6, 0.9, 1.05] as Array[float], "1 / 2 / 3 / 4 heroes")
 
 
-## The dungeon's enemies, brazier and Warden are scaled to the cleared wave times a factor by party size (the bots
-## lost not one of 55 dungeons at the cleared wave's own strength; the first portal was far harder than the last
-## with a flat bonus, a lone hero keeps a smaller factor because it cannot be revived and needs the rewards);
-## which enemy types appear still follows the cleared wave.
-func test_the_dungeon_is_scaled_above_the_cleared_wave_and_more_so_later() -> void:
-	check_eq(Dungeon.STRENGTH_MULT_BY_PLAYERS, [1.3, 1.6, 1.6, 1.6] as Array[float], "x1.3 solo, x1.6 for 2-4 heroes")
-	check_eq(Dungeon.strength_wave(6, 4), 10, "four heroes after wave 6: wave 10 strength")
-	check_eq(Dungeon.strength_wave(9, 4), 14, "after wave 9: wave 14")
-	check_eq(Dungeon.strength_wave(12, 4), 19, "after wave 12: wave 19")
-	check_eq(Dungeon.strength_wave(15, 4), 24, "after wave 15: wave 24")
-	check_eq(Dungeon.strength_wave(15, 2), 24, "a duo the same")
-	check_eq(Dungeon.strength_wave(6, 1), 8, "a lone hero after wave 6: wave 8 strength")
-	check_eq(Dungeon.strength_wave(15, 1), 20, "a lone hero after wave 15: wave 20 strength")
-	check_eq(Dungeon.strength_wave(0, 4), 2, "never below wave 1")
-	check_eq(Dungeon.strength_wave(9, 9), 14, "more than four: the four-hero factor")
-	check(Dungeon.strength_wave(6, 4) > 6 and Dungeon.strength_wave(15, 4) - 15 > Dungeon.strength_wave(6, 4) - 6, "the bonus grows with the wave")
+## The dungeon's enemies, brazier and Warden are scaled to a wave read from a table per portal wave and party size
+## (final balance 2: the flat x1.6 / x1.3 was too hard at the late portals; the bots lost not one of 55 dungeons at
+## the cleared wave's own strength); which enemy types appear still follows the cleared wave.
+func test_the_dungeon_is_scaled_above_the_cleared_wave_by_portal_and_party() -> void:
+	var expected := {
+		6: [7, 10, 10, 10],
+		9: [11, 14, 14, 16],
+		12: [15, 17, 18, 20],
+		15: [18, 21, 22, 23],
+	}
+	for portal: int in expected:
+		for n in range(1, 5):
+			check_eq(Dungeon.strength_wave(portal, n), expected[portal][n - 1], "portal %d, %d hero(es)" % [portal, n])
+	check_eq(Dungeon.strength_wave(15, 4), 23, "four heroes after wave 15: wave 23 strength")
+	check_eq(Dungeon.strength_wave(9, 9), 16, "more than four: the four-hero row")
+	check_eq(Dungeon.strength_wave(9, 0), 11, "fewer than one: the lone hero's row")
+	for portal in Dungeon.PORTAL_WAVES:
+		check(Dungeon.STRENGTH_WAVES.has(portal), "a row for portal %d" % portal)
+		for n in range(1, 4):
+			check(int(Dungeon.STRENGTH_WAVES[portal][n - 1]) <= int(Dungeon.STRENGTH_WAVES[portal][n]),
+					"a bigger party never gets an easier dungeon (portal %d, %d -> %d)" % [portal, n, n + 1])
+	for n in range(1, 5):
+		var last := 0
+		for portal in Dungeon.PORTAL_WAVES:
+			var s: int = Dungeon.strength_wave(portal, n)
+			check(s > portal and s > last, "stronger than the cleared wave and than the portal before (%d heroes, portal %d)" % [n, portal])
+			last = s
+	check_eq(Dungeon.strength_wave(7, 4), 12, "a wave between two portals: the bonus is interpolated (+4 -> +7: 7 + 5, rounded)")
+	check_eq(Dungeon.strength_wave(1, 4), 5, "before the first portal: its bonus (+4)")
+	check_eq(Dungeon.strength_wave(0, 4), 5, "never below wave 1")
+	check_eq(Dungeon.strength_wave(20, 4), 28, "after the last portal: its bonus (+8)")
 	RunState.start_run(2, 1)
 	check_eq(Dungeon.strength_wave(9), 14, "the run's own party size by default")

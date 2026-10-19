@@ -443,9 +443,37 @@ func test_every_fifth_crit_throws_a_free_fan_of_knives() -> void:
 	check_eq(fangs.crits, 0, "the count starts over")
 	check_eq(energy.value, before, "it cost no Energy")
 	check_eq(p.abilities.cooldown_left(Db.get_ability(&"fan_of_knives")), cooldown, "and started no cooldown")
+	fangs.tick(3.1)
 	for i in 5:
 		fangs.on_hit(null, 5.0, true, true)
 	check_eq(fangs.fans, 2, "every fifth again")
+
+
+## Final balance 2: the free fans have a cooldown (3 s), a fifth crit inside it waits.
+func test_the_free_fan_has_a_cooldown_and_a_waiting_fifth_crit_throws_after_it() -> void:
+	var p := _hero(&"rogue", 3)
+	_fake(Vector3(3.0, 0.0, 0.0))
+	var fangs := p.bonuses.script_for(&"artifact:fangs_of_the_shadow:0") as ArtifactRogueFangsFan
+	check_eq(fangs.num("cooldown"), 3.0, "the artifact data says 3 s")
+	for i in 5:
+		fangs.on_hit(null, 5.0, true, true)
+	check_eq(fangs.fans, 1, "the first fan")
+	check_near(fangs.cooldown_left, 3.0, 0.0001, "the cooldown runs")
+	for i in 12:
+		fangs.on_hit(null, 5.0, true, true)
+	check_eq(fangs.fans, 1, "twelve more crits inside the cooldown throw nothing")
+	check_eq(fangs.crits, 5, "the count waits at 'ready'")
+	fangs.tick(2.0)
+	fangs.on_hit(null, 5.0, true, true)
+	check_eq(fangs.fans, 1, "still 1 s of the cooldown left")
+	fangs.tick(1.1)
+	check_eq(fangs.cooldown_left, 0.0, "the cooldown is over")
+	fangs.on_hit(null, 5.0, false, true)
+	check_eq(fangs.fans, 1, "a plain hit does not throw it")
+	fangs.on_hit(null, 5.0, true, true)
+	check_eq(fangs.fans, 2, "the next crit throws the waiting fan")
+	check_eq(fangs.crits, 0, "and the count starts over")
+	check(fangs.describe().contains("at most once every 3 sec"), "the description names the cooldown: %s" % fangs.describe())
 
 
 func test_a_free_fan_really_throws_knives() -> void:

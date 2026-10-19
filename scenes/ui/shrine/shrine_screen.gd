@@ -230,7 +230,7 @@ func _auto_vote(s: PlayerSlot, delta: float, humans_present: bool) -> void:
 		_bot_wait[s.index] = float(_bot_wait.get(s.index, wait)) - delta
 		if float(_bot_wait[s.index]) > 0.0:
 			return
-	vote.cast(s.index, Shrines.bot_accepts(data))
+	vote.cast(s.index, Shrines.bot_accepts(data, vote.voters.size()))
 
 
 ## A = Accept, B = Decline (a first press counts, an Accept may still turn into a Decline).

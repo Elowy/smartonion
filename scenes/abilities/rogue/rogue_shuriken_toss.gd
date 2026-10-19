@@ -104,6 +104,7 @@ static func throw_volley(player: Player, dir: Vector3, params: Dictionary, targe
 	var pierce := maxi(0, roundi(float(params.get("pierce", 0.0))))
 	var origin := player.global_position
 	var gate := WeaponRunner.ProcGate.new()
+	var boss_hits: Dictionary[int, int] = {}
 	for i in count:
 		var angle := 0.0
 		if count > 1:
@@ -114,6 +115,7 @@ static func throw_volley(player: Player, dir: Vector3, params: Dictionary, targe
 				speed, reach, pierce, COLOR, RogueBlade.Look.SHURIKEN)
 		star.knockback = KNOCKBACK
 		star.proc_gate = gate
+		star.boss_hits = boss_hits
 		parent.add_child(star)
 		star.global_position = origin + Vector3.UP * Player.CHEST_HEIGHT + shot * (Player.RADIUS + 0.15)
 	player.face_attack(dir)
