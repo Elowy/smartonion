@@ -56,6 +56,7 @@ const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
 ##   four heroes  x1.6 flat (10 / 14 / 19 / 24)  9/12, 12/12, 6/10, 1/7   (too hard late)
 ##                9 / 13 / 16 / 19               9/10, 10/10, 8/8, 9/9   (too easy)
 ##                10 / 15 / 18 / 21              8/10, 9/10, 8/9, 8/9    (still 87%: revives are free in a full party)
+##                10 / 17 / 20 / 23 (16 waves)   6/8, 3/8, 5/8, 4/6      (60%, only the second portal was too hard)
 ##   a lone hero  7 / 10 / 13 / 16               9/10, 9/10, 9/9, 8/8
 ##                8 / 12 / 16 / 20               6/10, 5/10, 5/6, 3/6    (and the runs that lost the first two dungeons
 ##                                                died on waves 10-12: a lone hero lives off the rewards)
@@ -63,9 +64,9 @@ const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
 ## first (the party has gear by then), and a lone hero keeps the small numbers. The target is about 50-80% cleared per
 ## portal for three and four heroes and a bit fewer for a lone hero.
 const STRENGTH_WAVES: Dictionary[int, Array] = {
-	6: [7, 9, 10, 10],
-	9: [11, 14, 14, 17],
-	12: [15, 17, 17, 20],
+	6: [7, 10, 10, 10],
+	9: [11, 14, 14, 16],
+	12: [15, 17, 18, 20],
 	15: [18, 21, 22, 23],
 }
 const ROOM_COUNT := 4

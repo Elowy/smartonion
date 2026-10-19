@@ -182,16 +182,16 @@ func test_the_co_op_damage_factors() -> void:
 ## the cleared wave's own strength); which enemy types appear still follows the cleared wave.
 func test_the_dungeon_is_scaled_above_the_cleared_wave_by_portal_and_party() -> void:
 	var expected := {
-		6: [7, 9, 10, 10],
-		9: [11, 14, 14, 17],
-		12: [15, 17, 17, 20],
+		6: [7, 10, 10, 10],
+		9: [11, 14, 14, 16],
+		12: [15, 17, 18, 20],
 		15: [18, 21, 22, 23],
 	}
 	for portal: int in expected:
 		for n in range(1, 5):
 			check_eq(Dungeon.strength_wave(portal, n), expected[portal][n - 1], "portal %d, %d hero(es)" % [portal, n])
 	check_eq(Dungeon.strength_wave(15, 4), 23, "four heroes after wave 15: wave 23 strength")
-	check_eq(Dungeon.strength_wave(9, 9), 17, "more than four: the four-hero row")
+	check_eq(Dungeon.strength_wave(9, 9), 16, "more than four: the four-hero row")
 	check_eq(Dungeon.strength_wave(9, 0), 11, "fewer than one: the lone hero's row")
 	for portal in Dungeon.PORTAL_WAVES:
 		check(Dungeon.STRENGTH_WAVES.has(portal), "a row for portal %d" % portal)
@@ -204,7 +204,7 @@ func test_the_dungeon_is_scaled_above_the_cleared_wave_by_portal_and_party() -> 
 			var s: int = Dungeon.strength_wave(portal, n)
 			check(s > portal and s > last, "stronger than the cleared wave and than the portal before (%d heroes, portal %d)" % [n, portal])
 			last = s
-	check_eq(Dungeon.strength_wave(7, 4), 12, "a wave between two portals: the bonus is interpolated (+4 -> +8: 7 + 5.33, rounded)")
+	check_eq(Dungeon.strength_wave(7, 4), 12, "a wave between two portals: the bonus is interpolated (+4 -> +7: 7 + 5, rounded)")
 	check_eq(Dungeon.strength_wave(1, 4), 5, "before the first portal: its bonus (+4)")
 	check_eq(Dungeon.strength_wave(0, 4), 5, "never below wave 1")
 	check_eq(Dungeon.strength_wave(20, 4), 28, "after the last portal: its bonus (+8)")
