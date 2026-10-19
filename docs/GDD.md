@@ -3270,7 +3270,7 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 
 - **Öt környezet** (`EnvironmentData` adat a `data/environments/` mappában), menetenként
   egy: a menet elején sorsolódik, és a menet végéig megmarad. Az aréna **mérete nem
-  változik**. A tartalom az M6b-ben készül (paletta, kellékek, veszélyek), a végleges látvány
+  változik**. A tartalom az M6b-ben készült (paletta, kellékek, veszélyek), a végleges látvány
   az M7-ben.
 
   | Környezet | Veszély | Szabály (kiinduló értékek) |

@@ -254,9 +254,9 @@ the new screen never sees the button press that closed the old one.
   event object (`EventSpawner.GROUP`), M6b.
 - **M6b:** the **endless** mode has no last wave (`RunState.total_waves()` = 0): `wave_duration(w)` is capped at
   `MAX_WAVE_DURATION` 210 s, waves 30, 35, ... are boss waves (Morvain / Vor'thalax in turn) and 33, 43, ... elite-rule waves
-  (static predicates, "Modes" in the M6b chapter). Three children of the director run on their own clocks and generators:
-  the `GoblinSpawner`, the `EventSpawner` (a mid-wave event from wave 4, 30%, never on boss / elite-rule waves) and the
-  `EnvironmentHazards` (the run's hazard, only while the wave runs).
+  (static predicates, "Modes" in the M6b chapter). Three children of the director react to `wave_started`: the
+  `GoblinSpawner` (M5), the `EventSpawner` (a mid-wave event from wave 4, 30%, never on boss / elite-rule waves; its own
+  `event_rng`) and the `EnvironmentHazards` (the run's hazard, only while the wave runs; its own `environment_rng`).
 - Waves 10 and 25 are **boss waves** (`RunState.is_boss_wave` and a `BossData` for the wave in `Db.bosses`): the
   timer is replaced by the boss, the wave ends when it dies, the normal spawn runs at half rate (adds), and there
   are no elites and no Loot Goblin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
