@@ -9,7 +9,7 @@ extends Node
 ## the run's environment palette, no environment hazard, no Spirit Healer): the heroes, the camera,
 ## Arena.current and the fighting systems stay exactly as in a wave, only the scenery is swapped, and
 ## [method _leave] puts it back. Enemies are the run's eligible ones ([method
-## WaveDirector.eligible_enemies]) scaled to the cleared wave ([member wave]); they pay nothing
+## WaveDirector.eligible_enemies]) scaled to [method strength_wave] of the cleared wave ([member wave]); they pay nothing
 ## ([member Enemy.drops_loot] is false) – the dungeon has its own rewards, [DungeonRewards].
 ##
 ##   1 CLEAR   – kill CLEAR_KILLS (25) enemies; they come in telegraphed groups, at most CLEAR_CAP alive.

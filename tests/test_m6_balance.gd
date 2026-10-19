@@ -1,6 +1,6 @@
 extends TestCase
-## M6a balance pass (BALANCE package): the damage-by-source diagnostics the pass is measured with,
-## and the tuned numbers it ended on (so a later data change cannot silently undo them).
+## Final balance pass: the diagnostics the pass is measured with (damage taken by source, damage dealt to
+## bosses, the shield peak) and the tuned numbers it ended on (so a later data change cannot silently undo them).
 
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const Fakes := preload("res://tests/player_fakes.gd")

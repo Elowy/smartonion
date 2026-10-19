@@ -41,8 +41,8 @@ static var hp_mult := 1.0
 ## Factor on every ability interval in phase 2 (an ability's own interval_p2 wins).
 @export var phase_cooldown_mult := 1.0
 @export var abilities: Array[BossAbility] = []
-## Extra max HP per additional player (GDD 9: x(1 + 0.75 (n - 1)), the boss's own co-op factor
-## instead of the normal +20% per player).
+## Extra max HP per additional player (GDD 9: x(1 + k (n - 1)), the boss's own co-op factor
+## instead of the normal +20% per player; Morvain 1.25, Vor'thalax 0.5 plus [member coop_hp_convex]).
 @export var coop_hp_per_player := 0.75
 ## Extra max HP that grows with the party faster than linearly (a party's damage grows faster than its
 ## size): the factor is 1 + coop_hp_per_player (n - 1) + coop_hp_convex (n - 1)(n - 2) / 2.
