@@ -488,7 +488,7 @@ func _free_roll_screen() -> void:
 func writes_leaderboard() -> bool:
 	if options.leaderboard_path != "":
 		return true
-	return not (options.smoke or options.demo or options.view != "" or options.screenshot_path != "")
+	return not options.is_automated()
 
 
 ## Between-wave screen (tree paused): loot roll (if any team loot), then the shared shop and

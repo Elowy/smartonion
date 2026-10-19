@@ -164,9 +164,12 @@ static func floating_text(pos: Vector3, text: String, color: Color, size: float 
 
 
 ## A damage number on [param target] (merge key: hits on the same target within
-## MERGE_WINDOW add up on one number that pops again; null never merges). A crit merged into
+## MERGE_WINDOW add up on one number that pops again; null never merges). Nothing is drawn when the
+## Damage Numbers setting is off. A crit merged into
 ## a normal number upgrades it to [param color] / [param size].
 static func damage_number(target: Object, pos: Vector3, amount: float, color: Color, size: float) -> void:
+	if not Settings.damage_numbers_enabled():
+		return
 	var key := target.get_instance_id() if target != null and is_instance_valid(target) else 0
 	if key != 0 and _merge.has(key):
 		var live: VfxEffect = _merge[key]
