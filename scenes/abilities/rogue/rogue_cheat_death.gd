@@ -124,7 +124,7 @@ func _on_lethal_hit() -> bool:
 	_pending_burst = float(params.get("burst_pct", 0.0)) > 0.0
 	if _player.is_inside_tree():
 		RogueVfx.cheat_death(_player.global_position)
-		Vfx.floating_text(_player.self_text_position(1.0) + Vector3.UP * 0.4, "Cheat Death", TEXT_COLOR,
+		Vfx.floating_text(_player.self_text_position(1.0) + Vector3.UP * 0.4, "Narrow Escape", TEXT_COLOR,
 				Player.SELF_TEXT_SIZE * 1.15, 0.0)
 	return true
 

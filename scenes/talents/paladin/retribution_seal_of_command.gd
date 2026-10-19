@@ -57,7 +57,7 @@ func on_hit(target: Node3D, damage: float, _is_crit: bool, first: bool) -> void:
 
 
 func describe() -> String:
-	return "Seal of Command: %d%% chance per attack" % roundi(_chance)
+	return "Sunbrand: %d%% chance per attack" % roundi(_chance)
 
 
 ## The strike on [param e] and its neighbours for [param amount] each, then the heal.

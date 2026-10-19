@@ -114,7 +114,7 @@ func cast(ctx: AbilityContext) -> bool:
 		Vfx.resurrect_column(hero.global_position)
 		if hero != p:
 			ProcVfx.beam(p.get_chest_position(), hero.get_chest_position(), PaladinKit.HOLY_COLOR)
-	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.8, "Lay on Hands", PaladinKit.HOLY_COLOR, 0.9)
+	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.8, "Mending Touch", PaladinKit.HOLY_COLOR, 0.9)
 	return true
 
 

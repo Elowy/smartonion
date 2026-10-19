@@ -91,7 +91,7 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Holy Shield: %d%% block, retaliation and ally shields" % roundi(player.block_chance() if player != null else 0.0)
+	return "Gleaming Shield: %d%% block, retaliation and ally shields" % roundi(player.block_chance() if player != null else 0.0)
 
 
 ## The most wounded ally in range gets (or tops up) the Paladin's absorb shield.

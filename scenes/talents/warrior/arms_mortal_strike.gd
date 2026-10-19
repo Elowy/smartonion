@@ -98,7 +98,7 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Mortal Strike: %d / %d attacks" % [attacks, _every]
+	return "Ruinous Strike: %d / %d attacks" % [attacks, _every]
 
 
 func _strike(e: Enemy) -> void:

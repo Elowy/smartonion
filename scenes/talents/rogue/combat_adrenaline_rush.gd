@@ -23,7 +23,7 @@ const SELF_KEY := &"rogue_combat_adrenaline_rush"
 const COLOR := Color(1.0, 0.9, 0.2)
 const RING_ALPHA := 0.35
 const RING_RADIUS := 1.2
-const TEXT := "Adrenaline Rush"
+const TEXT := "Crowd Surge"
 
 ## True while the rush is on (tests, UI).
 var active := false
@@ -101,8 +101,8 @@ func teardown() -> void:
 
 func describe() -> String:
 	if active:
-		return "Adrenaline Rush: active"
-	return "Adrenaline Rush: needs %d enemies within %s m" % [_min_enemies, TalentData.format_number(_radius)]
+		return "Crowd Surge: active"
+	return "Crowd Surge: needs %d enemies within %s m" % [_min_enemies, TalentData.format_number(_radius)]
 
 
 ## Heroes currently given this Rogue's Haste (tests).

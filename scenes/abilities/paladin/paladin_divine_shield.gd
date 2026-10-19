@@ -91,7 +91,7 @@ func cast(ctx: AbilityContext) -> bool:
 		_aura_radius = ctx.num("aura_radius", DEFAULT_AURA_RADIUS) * CombatMath.area_mult(p.stats)
 		_aura_tick = maxf(0.1, ctx.num("aura_tick", 0.5))
 		_aura_timer = 0.0
-	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.8, "Divine Shield", PaladinKit.HOLY_COLOR, 0.9)
+	Vfx.floating_text(p.get_chest_position() + Vector3.UP * 0.8, "Gilded Halo", PaladinKit.HOLY_COLOR, 0.9)
 	return true
 
 
