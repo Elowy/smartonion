@@ -128,6 +128,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var slow_duration := ctx.num("cold_blood_slow_duration", 0.0) if cold else 0.0
 	var envenom_pct := maxf(0.0, ctx.num("envenom_pct", 0.0))
 	var envenomed: Dictionary[int, bool] = {}
+	var boss_hits: Dictionary[int, int] = {}
 	var speed := ctx.num("speed", 16.0)
 	var reach := ctx.num("range", 7.0)
 	var pierce := maxi(0, roundi(ctx.num("pierce", 0.0)))
@@ -146,6 +147,7 @@ func cast(ctx: AbilityContext) -> bool:
 				speed, reach, pierce, color)
 		knife.knockback = KNIFE_KNOCKBACK
 		knife.proc_gate = gate
+		knife.boss_hits = boss_hits
 		knife.returns = returns
 		knife.poison_hits = poison_hits
 		if envenom_pct > 0.0:
