@@ -129,6 +129,8 @@ func _live() -> void:
 	var arena := Arena.create()
 	add_child(arena)
 	var offset := int(_arg("classoff", "0"))
+	# --geared=N (0..4): every hero wears a tier III Head / Shoulders / Chest suit of that rarity.
+	var geared := int(_arg("geared", "-1"))
 	for i in count:
 		PlayerManager.add_bot(Db.class_ids[(i + offset) % Db.class_ids.size()], 11 + i)
 	var spawns := arena.get_player_spawn_points(count)
@@ -138,6 +140,8 @@ func _live() -> void:
 		arena.entities.add_child(p)
 		p.global_position = spawns[i]
 		p.begin_wave()
+		if geared >= 0:
+			_wear_suit(p, geared)
 		i += 1
 	var director := WaveDirector.create(arena)
 	add_child(director)
@@ -152,6 +156,19 @@ func _live() -> void:
 	Engine.time_scale = 1.0
 	await _frames(3)
 	print("showcase: %d enemies alive" % get_tree().get_nodes_in_group(&"enemies").size())
+
+
+## Puts a tier III suit of [param rarity] (armour type of the class) on [param p] through its Equipment.
+func _wear_suit(p: Player, rarity: int) -> void:
+	for slot_type: Items.SlotType in [Items.SlotType.HEAD, Items.SlotType.SHOULDERS, Items.SlotType.CHEST]:
+		var item := ItemInstance.new()
+		item.display_name = "Showcase piece"
+		item.slot_type = slot_type
+		item.armor_type = p.class_data.armor_type
+		item.rarity = rarity
+		item.wave = 17
+		item.item_level = Items.item_level(17, rarity, false)
+		p.equipment.equip(item)
 
 
 func _onions() -> void:
@@ -252,7 +269,7 @@ func _sets() -> void:
 
 
 ## The gameplay camera (CameraRig) on a few geared heroes: how the armour reads in play.
-## --facing=north|south, --tier=0..2, --rarity=N.
+## --facing=north|south, --tier=0..2, --rarity=N, --sets=1 (class set kits), --starter=1 (no gear).
 func _equip_game() -> void:
 	var arena := Arena.create()
 	add_child(arena)
@@ -273,10 +290,12 @@ func _equip_game() -> void:
 		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
 		m.set_tag("P%d" % (i + 1))
 		m.set_weapons(cd.main_hand, cd.off_hand)
+		var set_data := Db.set_for_class(ids[i]) if _arg("sets", "0") == "1" else null
+		var set_id: StringName = set_data.id if set_data != null else &""
 		if _arg("starter", "0") != "1":
-			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, cd.armor_type, tier, rarity),
-				EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, tier, rarity),
-				EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, tier, rarity))
+			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, cd.armor_type, tier, rarity, set_id),
+				EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, tier, rarity, set_id),
+				EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, tier, rarity, set_id))
 		m.set_facing(Vector3(0, 0, -1) if north else Vector3(0.3, 0, 1))
 		m.set_moving(0.0)
 	arena.camera.snap()
