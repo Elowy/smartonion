@@ -29,6 +29,7 @@ properties = Array[Dictionary]([{
 "effects": [{
 "kind": "script",
 "params": {
+"cooldown": 3.0,
 "every": 5
 },
 "requires": {
@@ -38,8 +39,8 @@ properties = Array[Dictionary]([{
 }],
 "name": "Shadow's Bite",
 "needs": "fan_of_knives",
-"short": "Every 5th crit throws a free Fan of Knives.",
-"text": "Every 5th critical strike throws a free Fan of Knives."
+"short": "Every 5th crit throws a free Fan of Knives (max. every 3 s).",
+"text": "Every 5th critical strike throws a free Fan of Knives, at most once every 3 seconds."
 }, {
 "effects": [{
 "kind": "ability",
