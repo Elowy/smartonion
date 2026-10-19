@@ -191,6 +191,8 @@ func set_markdown(markdown: String) -> void:
 	# (the first "# Credits" would only repeat the page title)
 	if not lines.is_empty() and int(lines[0]["kind"]) == Line.TITLE and String(lines[0]["text"]).to_lower() == "credits":
 		lines.pop_front()
+		while not lines.is_empty() and int(lines[0]["kind"]) == Line.GAP:
+			lines.pop_front()
 	for entry in lines:
 		_add_line(int(entry["kind"]) as Line, String(entry["text"]))
 	scroll.scroll_vertical = 0
@@ -268,8 +270,8 @@ func _on_held(dir: Vector2i, delta: float) -> void:
 		scroll_by(float(dir.y) * SCROLL_SPEED * delta)
 
 
-func _prompt_items(_a: Array, b: Array) -> Array:
+func _prompt_items() -> Array:
 	return [
 		[UiGlyph.nav(28.0, true), "Scroll"],
-		b + ["Back"],
+		_glyphs(PlayerInput.Pad.B) + ["Back"],
 	]

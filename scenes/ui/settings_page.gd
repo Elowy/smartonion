@@ -259,12 +259,12 @@ func _on_accept() -> void:
 	activate_selected()
 
 
-func _prompt_items(a: Array, b: Array) -> Array:
+func _prompt_items() -> Array:
 	return [
 		[UiGlyph.nav(28.0, true), "Choose"],
 		[UiGlyph.nav(28.0), "Change"],
-		a + ["Select"],
-		b + ["Back"],
+		_glyphs(PlayerInput.Pad.A) + ["Select"],
+		_glyphs(PlayerInput.Pad.B) + ["Back"],
 	]
 
 

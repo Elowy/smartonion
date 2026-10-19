@@ -32,7 +32,8 @@ func _human(key: String) -> UiFakes.HumanInput:
 func test_processes_while_paused_and_starts_hidden() -> void:
 	check_eq(menu.process_mode, Node.PROCESS_MODE_ALWAYS, "runs while the tree is paused")
 	check(not menu.visible, "hidden until opened")
-	check_eq(menu.buttons.size(), 2, "Resume / Quit to Menu")
+	check_eq(menu.buttons.size(), 3, "Resume / Settings / Quit to Menu")
+	check_eq(menu.entries, [PauseMenu.Item.RESUME, PauseMenu.Item.SETTINGS, PauseMenu.Item.QUIT] as Array[int], "in that order")
 
 
 func test_navigate_and_quit() -> void:
@@ -42,7 +43,9 @@ func test_navigate_and_quit() -> void:
 	check_eq(menu.selected, PauseMenu.Item.RESUME, "Resume selected first")
 	UiFakes.step(menu)
 	UiFakes.nudge(menu, a, Vector2.DOWN)
-	check_eq(menu.selected, PauseMenu.Item.QUIT, "down -> Quit to Menu")
+	check_eq(menu.selected, PauseMenu.Item.SETTINGS, "down -> Settings")
+	UiFakes.nudge(menu, a, Vector2.DOWN)
+	check_eq(menu.selected, PauseMenu.Item.QUIT, "down again -> Quit to Menu")
 	UiFakes.nudge(menu, a, Vector2.DOWN)
 	check_eq(menu.selected, PauseMenu.Item.RESUME, "wraps around")
 	UiFakes.nudge(menu, a, Vector2.UP)
@@ -107,6 +110,6 @@ func test_open_without_slot_uses_any_controller() -> void:
 	check_eq(resumes, 1, "any controller's A on Resume")
 	menu.open(null)
 	UiFakes.step(menu)
-	menu.move_selection(1)
+	menu.move_selection(2)
 	menu.activate_selected()
 	check_eq(quits, 1, "activate_selected on Quit")

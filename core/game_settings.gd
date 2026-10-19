@@ -197,7 +197,9 @@ func load_file() -> Error:
 	if err != OK:
 		return err
 	for o in options():
-		set_value(o.key, o.from_file(cfg.get_value(o.section.to_lower(), String(o.key), null)))
+		var section := o.section.to_lower()
+		var raw: Variant = cfg.get_value(section, String(o.key)) if cfg.has_section_key(section, String(o.key)) else null
+		set_value(o.key, o.from_file(raw))
 	return OK
 
 

@@ -121,8 +121,9 @@ func _on_accept() -> void:
 	pass
 
 
-## The prompt row: [param a] and [param b] are the parts of the A and B prompts (glyphs, see [method _glyphs]).
-func _prompt_items(_a: Array, _b: Array) -> Array:
+## The prompt row: one [glyphs..., "text"] list per prompt (build the glyphs with [method _glyphs]; only
+## the ones that are returned may be created, a glyph that is not added to the tree is never freed).
+func _prompt_items() -> Array:
 	return []
 
 
@@ -134,8 +135,7 @@ func _fill_prompts() -> void:
 	for c in _prompts.get_children():
 		_prompts.remove_child(c)
 		c.queue_free()
-	var items := _prompt_items(_glyphs(PlayerInput.Pad.A), _glyphs(PlayerInput.Pad.B))
-	_prompts.add_child(UiTheme.prompt_row(items, UiTheme.FONT_BODY - 1, UiTheme.TEXT_DIM))
+	_prompts.add_child(UiTheme.prompt_row(_prompt_items(), UiTheme.FONT_BODY - 1, UiTheme.TEXT_DIM))
 
 
 ## The glyph(s) naming [param button]: the driver's own device, or a controller button plus the key that does
