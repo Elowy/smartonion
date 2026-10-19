@@ -68,6 +68,26 @@ static func godot_markdown() -> String:
 	for line in Engine.get_license_text().strip_edges().split("\n"):
 		var row := line.strip_edges()
 		text += ("> %s\n" % row) if row != "" else ">\n"
+	return text + third_party_markdown()
+
+
+## The engine's third-party notices (also required when shipping): every component Godot bundles with its
+## copyright lines and licence, then the full text of each licence, as small print.
+static func third_party_markdown() -> String:
+	var text := "\n## Third-party components in Godot Engine\n\n"
+	for info: Dictionary in Engine.get_copyright_info():
+		text += "> %s\n" % String(info.get("name", ""))
+		for part: Dictionary in info.get("parts", []):
+			for line: String in part.get("copyright", PackedStringArray()):
+				text += "> © %s\n" % line
+			text += "> License: %s\n" % String(part.get("license", ""))
+		text += ">\n"
+	var licenses: Dictionary = Engine.get_license_info()
+	for license_name: String in licenses:
+		text += "\n### %s\n\n" % license_name
+		for line in String(licenses[license_name]).strip_edges().split("\n"):
+			var row := line.strip_edges()
+			text += ("> %s\n" % row) if row != "" else ">\n"
 	return text
 
 

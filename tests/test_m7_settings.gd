@@ -547,6 +547,8 @@ func test_credits_fall_back_to_the_built_in_text() -> void:
 	check("godotengine.org" in md, "the Godot site")
 	check("Permission is hereby granted" in md, "and the engine's MIT licence text")
 	check("Godot Engine contributors" in md, "with its copyright line")
+	check("Third-party components in Godot Engine" in md, "the engine's third-party notices follow")
+	check("FreeType" in md and "Expat" in md, "with the bundled components and their licence texts")
 	var page := _add(CreditsPage.create(0.4, "res://no_such_credits_file.md")) as CreditsPage
 	var texts: Array[String] = []
 	for l in page.lines:
