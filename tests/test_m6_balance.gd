@@ -93,3 +93,28 @@ func test_the_heroes_defence_line_shows_hp_and_the_share_of_a_raw_hit() -> void:
 	check(line.begins_with("heroes: P1 warrior %.0f HP (takes %.0f%% of a raw hit)" % [w.max_hp(), share_w]), line)
 	check("P2 mage" in line, "every hero is listed: " + line)
 	check_eq(Main.heroes_defence_text([] as Array[Player]), "heroes: ", "nobody: just the prefix")
+
+
+# --- Damage on bosses (diagnostics) ----------------------------------------------------------------
+
+func test_boss_damage_is_booked_per_hero_and_cleared_with_the_run() -> void:
+	RunState.record_damage(0, 10.0)
+	RunState.record_damage(0, 5.0, true)
+	RunState.record_damage(1, 7.0, true)
+	check_eq(RunState.damage_by_player[0], 15.0, "the boss hit counts for the meter too")
+	check_eq(RunState.boss_damage_by_player[0], 5.0, "only the boss part")
+	check_eq(RunSummary.boss_damage_dict(), {"0": 5.0, "1": 7.0}, "string keys")
+	RunState.start_run(1, 5)
+	check(RunState.boss_damage_by_player.is_empty(), "a new run starts clean")
+
+
+func test_a_weapon_hit_on_a_boss_is_boss_damage_a_hit_on_a_grunt_is_not() -> void:
+	var p := _hero(&"warrior", Vector3.ZERO)
+	var boss := Boss.create(Db.get_boss(&"lich_commander_morvain"), 10)
+	arena.entities.add_child(boss)
+	var grunt := Enemy.create(Db.get_enemy(&"skeleton_grunt"), 10)
+	arena.entities.add_child(grunt)
+	WeaponRunner.apply_hit(p, boss, 7.0, false, Vector3.ZERO)
+	WeaponRunner.apply_hit(p, grunt, 3.0, false, Vector3.ZERO)
+	check_eq(RunState.boss_damage_by_player.get(0, 0.0), 7.0, "7 on the boss")
+	check(RunState.damage_by_player.get(0, 0.0) > 7.0, "the grunt hit is in the meter: %s" % [RunState.damage_by_player])

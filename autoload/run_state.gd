@@ -185,6 +185,9 @@ var damage_taken_by_player: Dictionary[int, float] = {}
 ## Balance diagnostics: the same damage by what dealt it, {source id (an EnemyData id,
 ## &"environment" for the poison puddles, ...): {wave: float}} (see [method record_damage_taken]).
 var damage_taken_by_source: Dictionary = {}
+## Balance diagnostics: the part of [member damage_by_player] that hit a boss (Morvain, Vor'thalax, the
+## Dungeon Warden), SMOKE_RESULT "boss_damage": it shows which class can hurt a boss at all.
+var boss_damage_by_player: Dictionary[int, float] = {}
 ## Revives a player took part in (teammate channel, Word of Glory).
 var revives_by_player: Dictionary[int, int] = {}
 ## Times a player went down.
@@ -326,6 +329,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	absorbed_by_player.clear()
 	damage_taken_by_player.clear()
 	damage_taken_by_source.clear()
+	boss_damage_by_player.clear()
 	revives_by_player.clear()
 	downs_by_player.clear()
 	bosses_by_player.clear()
@@ -754,9 +758,13 @@ func record_kill(player_index: int) -> void:
 		kills_by_player[player_index] = kills_by_player.get(player_index, 0) + 1
 
 
-func record_damage(player_index: int, amount: float) -> void:
+## [param amount] damage slot [param player_index] dealt; [param on_boss] = the target was a boss (also
+## counted in [member boss_damage_by_player]).
+func record_damage(player_index: int, amount: float, on_boss: bool = false) -> void:
 	if player_index >= 0:
 		damage_by_player[player_index] = damage_by_player.get(player_index, 0.0) + amount
+		if on_boss:
+			boss_damage_by_player[player_index] = boss_damage_by_player.get(player_index, 0.0) + amount
 
 
 ## An elite (&"elite"), the Loot Goblin (&"goblin") or a boss (&"boss") died, killed by slot

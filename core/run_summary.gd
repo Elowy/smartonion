@@ -146,6 +146,15 @@ static func source_damage_dict() -> Dictionary:
 	return out
 
 
+## {slot index as String: damage} – the SMOKE_RESULT "boss_damage" entry: what each hero dealt to bosses
+## (RunState.boss_damage_by_player), rounded to 0.1. Balance diagnostics.
+static func boss_damage_dict() -> Dictionary:
+	var out := {}
+	for slot_index in RunState.boss_damage_by_player:
+		out[str(slot_index)] = snappedf(float(RunState.boss_damage_by_player[slot_index]), 0.1)
+	return out
+
+
 # --- Pure model -------------------------------------------------------------------------------
 
 ## Fills in the derived fields of [param run] (the run totals: victory, waves_cleared,
