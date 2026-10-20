@@ -26,10 +26,7 @@ const TREES_PER_CLASS := 3
 ## when its content lands; test_m8_foundation fails on a line whose content already exists, so none
 ## is forgotten, and a class missing a part that is NOT listed fails its completeness check.
 ## Parts: artifact, set, items, trees. Inert while the class has no data.
-const PENDING: Array[String] = [
-	# TALENTS packages: the three talent trees.
-	"hunter:trees",
-]
+const PENDING: Array[String] = []
 
 
 ## The non-set hand-made items restricted to [param class_id] (its "class items").

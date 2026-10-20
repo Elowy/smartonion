@@ -4,6 +4,8 @@ extends TestCase
 ## resolves to a shared 128 px texture, the controls draw them (procedural glyphs stay the fallback),
 ## and the credits name the font and the icon authors.
 
+const Rules := preload("res://tests/content_rules.gd")
+
 const FONT_PATH := "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
 const ICON_DIR := "res://assets/icons"
 ## Ids that are allowed to have no picture (they keep their procedural glyph). Empty: every shipped id has one.

@@ -1,0 +1,224 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_keen_eyes"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_keen_eyes"
+display_name = "Keen Eyes"
+description = "Increases your Critical Strike chance by {crit}%."
+values = {
+"crit": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"crit"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_heavy_shafts"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_heavy_shafts"
+display_name = "Heavy Shafts"
+description = "Your weapon hits deal {pct}% more damage."
+values = {
+"pct": 3.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"source": "weapon"
+}])
+
+[sub_resource type="Resource" id="Resource_fletchers_edge"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_fletchers_edge"
+display_name = "Fletcher's Edge"
+description = "Your critical strikes deal {cd}% more damage."
+values = {
+"cd": 8.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"crit_damage"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"crit_damage": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_calm_breath"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_calm_breath"
+display_name = "Calm Breath"
+description = "Your Focus regenerates {regen} per second faster."
+values = {
+"regen": 1.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "resource",
+"regen_per_second_add": 1.0,
+"resource": "focus"
+}])
+
+[sub_resource type="Resource" id="Resource_opening_shot"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_opening_shot"
+display_name = "Opening Shot"
+description = "Your weapon hits deal {pct}% more damage to enemies above {hp_fixed}% health."
+values = {
+"hp_fixed": 70.0,
+"pct": 5.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"slayer"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 5.0,
+"source": "weapon",
+"target": "above_pct",
+"target_pct": 70.0
+}])
+
+[sub_resource type="Resource" id="Resource_finishing_arrow"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_finishing_arrow"
+display_name = "Finishing Arrow"
+description = "Long Shot deals {pct}% more damage to enemies below {hp_fixed}% health."
+values = {
+"hp_fixed": 35.0,
+"pct": 60.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"long_shot"
+icon = &"long_shot"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "long_shot"
+},
+"mods": {
+"execute_bonus_add": 60.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_quickening_aim"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_quickening_aim"
+display_name = "Quickening Aim"
+description = "After a critical strike you gain {haste}% Haste for {duration_fixed} sec, stacking up to {stacks_fixed} times."
+values = {
+"duration_fixed": 4.0,
+"haste": 1.0,
+"stacks_fixed": 5.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"hunter_sharpshot_fletchers_edge"
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"duration": 4.0,
+"effect": "buff",
+"label": "",
+"max_stacks": 5,
+"stats": {
+"haste": 1.0
+},
+"trigger": "on_crit"
+},
+"scale": ["stats"]
+}])
+
+[sub_resource type="Resource" id="Resource_skewering_shots"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_skewering_shots"
+display_name = "Skewering Shots"
+description = "Increases the Pierce of your arrows by {pierce}."
+values = {
+"pierce": 1.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+prerequisite = &"hunter_sharpshot_heavy_shafts"
+icon = &"pierce"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"pierce": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_steady_aura"]
+script = ExtResource("2_talent")
+id = &"hunter_sharpshot_steady_aura"
+display_name = "Steady Aura"
+description = "Heroes within {radius} m of you (you included) deal {pct}% more damage, and Long Shot recharges twice as fast."
+values = {
+"pct": 5.0,
+"radius": 8.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage_pct": 5.0,
+"interval": 0.25,
+"radius": 8.0
+},
+"script": "res://scenes/talents/hunter/sharpshot_steady_aura.gd"
+}, {
+"kind": "ability",
+"match": {
+"id": "long_shot"
+},
+"mods": {
+"cooldown_pct": -50.0
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"hunter_sharpshot"
+class_id = &"hunter"
+display_name = "Sharpshot"
+index = 1
+description = "Bow, Long Shot and critical hits."
+icon = &"long_shot"
+color = Color(0.35, 0.65, 0.9, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_keen_eyes"), SubResource("Resource_heavy_shafts"), SubResource("Resource_fletchers_edge"), SubResource("Resource_calm_breath"), SubResource("Resource_opening_shot"), SubResource("Resource_finishing_arrow"), SubResource("Resource_quickening_aim"), SubResource("Resource_skewering_shots"), SubResource("Resource_steady_aura")])
