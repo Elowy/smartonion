@@ -73,7 +73,7 @@ static func create(p_data: EnemyData, p_wave: int) -> Boss:
 	b.add_to_group(&"bosses")  # (the camera frames it, CameraRig.boss_points)
 	b.boss_data = p_data as BossData
 	if b.boss_data != null:
-		b.max_hp = b.boss_data.max_hp_for(b.wave, RunState.player_count) * Shrines.enemy_hp_mult()
+		b.max_hp = b.boss_data.max_hp_for(b.wave, RunState.player_count) * Shrines.enemy_hp_mult() * Difficulty.enemy_hp_mult()
 		b.hp = b.max_hp
 		for a in b.boss_data.abilities:
 			if a == null:

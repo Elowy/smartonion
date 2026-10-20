@@ -143,7 +143,7 @@ static func gold_price(item: ItemInstance, wave: int = -1) -> int:
 	if item == null:
 		return 0
 	var shop := ItemGenerator.price_for(item.rarity, RunState.wave if wave < 0 else wave)
-	return maxi(1, roundi(shop * GOLD_SHARE * multiplier(item)))
+	return Difficulty.price(maxi(1, roundi(shop * GOLD_SHARE * multiplier(item))))  # (M9: the tier's shop prices)
 
 
 ## Dust of the next action on [param item]: the rarity's Dust x 2^uses.

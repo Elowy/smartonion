@@ -239,7 +239,7 @@ static func spawn_rate(p_wave: int, coop_mult: float = 1.0) -> float:
 ## Spawn budget per second of the current wave for the current team size (BOSS_ADD_RATE_MULT of
 ## it on a boss wave).
 func spawn_budget_per_second() -> float:
-	var rate := spawn_rate(wave, RunState.coop_count_mult())
+	var rate := spawn_rate(wave, RunState.coop_count_mult()) * Difficulty.spawn_mult()  # (M9: tier density x pressure)
 	return rate * BOSS_ADD_RATE_MULT if boss_data != null else rate
 
 

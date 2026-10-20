@@ -89,7 +89,7 @@ static func expected_count(wave: int, players: int) -> float:
 	var per_wave := BASE_COUNT + COUNT_PER_WAVE * float(wave - FIRST_WAVE)
 	var party := 1.0 + COUNT_PER_PLAYER * float(maxi(1, players) - 1)
 	var wave_mult := ELITE_WAVE_COUNT_MULT if RunState.is_elite_wave(wave) else 1.0
-	return maxf(0.0, per_wave * party * wave_mult * rate_mult)
+	return maxf(0.0, per_wave * party * wave_mult * rate_mult * Pressure.elite_mult())
 
 
 ## Whole elites of the wave: the whole part of [method expected_count] plus one more with the

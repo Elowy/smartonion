@@ -409,7 +409,7 @@ func _refresh_consumables(rng: RandomNumberGenerator) -> void:
 	for data in Consumables.roll_row(_side(rng)):
 		var c := ConsumableOffer.new()
 		c.data = data
-		c.price = Consumables.price(data, wave)
+		c.price = Difficulty.price(Consumables.price(data, wave))  # (M9: the tier's shop prices)
 		consumables.append(c)
 
 
@@ -429,7 +429,7 @@ func _refresh_black_market(rng: RandomNumberGenerator, keep_locked: bool) -> voi
 		return
 	var o := Offer.new()
 	o.item = item
-	o.price = BlackMarket.price(wave)
+	o.price = Difficulty.price(BlackMarket.price(wave))
 	black_market = o
 
 
@@ -488,8 +488,9 @@ static func _queued(list: Array[ClassData], class_data: ClassData) -> int:
 func _make_offer(class_data: ClassData, rng: RandomNumberGenerator) -> Offer:
 	var o := Offer.new()
 	o.item = _generate_for(class_data, rng)
-	o.price = ItemGenerator.price_for(o.item.rarity, wave)
-	o.item.buy_price = o.price
+	var base_price := ItemGenerator.price_for(o.item.rarity, wave)
+	o.price = Difficulty.price(base_price)  # (M9: the tier's shop prices; the item's own value stays the base price)
+	o.item.buy_price = base_price
 	return o
 
 
