@@ -1325,6 +1325,9 @@ func _add_bots() -> void:
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion
+		# --seasonings: every bot carries the ones of its own class.
+		if bot != null and not options.seasonings.is_empty():
+			bot.seasonings = options.seasonings_for(id)
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:

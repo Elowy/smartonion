@@ -55,6 +55,10 @@ extends RefCounted
 ##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
 ##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
 ##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
+##   --seasonings=a,b,c   M9: the Seasonings the bots carry (ids of Db.seasonings, e.g. ssn_smoked_paprika): every bot
+##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
+##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
+##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
 ##   --profile=KIND       M9: the meta profile (Meta.configure): dev (everything unlocked, no raw-power bonus, nothing
 ##                        saved – the default of every automated run), fresh (a new player) or max (every class at
 ##                        the top level, everything unlocked). Without --profile-path nothing is read or written
@@ -131,6 +135,8 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
+## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
+var seasonings: Array[StringName] = []
 ## The meta profile of --profile (Meta.PROFILE_KINDS; &"" = the default of the session) and the file of
 ## --profile-path ("" = none).
 var profile_kind: StringName = &""
@@ -147,6 +153,7 @@ static func _flag_on(value: String) -> bool:
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
 	var o := LaunchOptions.new()
+	var seasonings_arg := ""
 	for raw in args:
 		var arg := String(raw)
 		var key := arg
@@ -249,6 +256,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.leaderboard_path = value
 				else:
 					o.unknown.append(arg)
+			"--seasonings":
+				seasonings_arg = arg
+				for part in value.split(",", false):
+					o.seasonings.append(StringName(part.strip_edges()))
 			"--profile":
 				if StringName(value) in Meta.PROFILE_KINDS:
 					o.profile_kind = StringName(value)
@@ -264,9 +275,62 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				if not key.begins_with("--filter"):
 					o.unknown.append(arg)
 	o.start_wave = o.clamp_wave(o.start_wave)
+	if seasonings_arg != "":
+		var problem := o.seasonings_problem()
+		if problem != "":
+			o.unknown.append("%s (%s)" % [seasonings_arg, problem])
+			o.seasonings.clear()
 	if o.profile_kind == Meta.PROFILE_DEV and o.profile_path != "":
 		o.unknown.append("--profile=dev with --profile-path=%s (the dev profile never touches a file)" % o.profile_path)
 	return o
+
+
+## The class ids of the bots a launch with --players / --classes adds, in join order (Main._add_bots: --classes
+## cycled, else every class the profile has unlocked).
+func bot_classes() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id in classes:
+		if Db.get_class_data(id) != null:
+			ids.append(id)
+	if ids.is_empty():
+		ids = Meta.unlocked_class_ids()
+	var out: Array[StringName] = []
+	if ids.is_empty():
+		return out
+	for i in players:
+		out.append(ids[i % ids.size()])
+	return out
+
+
+## What is wrong with --seasonings ("" = fine): an unknown id, a repeated one, one whose class no bot plays, or more
+## ids of a class than it has slots (Seasonings.MAX_SLOTS).
+func seasonings_problem() -> String:
+	var party := bot_classes()
+	var per_class: Dictionary[StringName, int] = {}
+	var seen: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s == null:
+			return "unknown Seasoning '%s'" % id
+		if id in seen:
+			return "'%s' is listed twice" % id
+		seen.append(id)
+		if s.class_id not in party:
+			return "no bot plays the %s, '%s' would do nothing" % [s.class_id, id]
+		per_class[s.class_id] = int(per_class.get(s.class_id, 0)) + 1
+		if per_class[s.class_id] > Seasonings.MAX_SLOTS:
+			return "more than %d Seasonings for the %s" % [Seasonings.MAX_SLOTS, s.class_id]
+	return ""
+
+
+## The --seasonings of [param class_id], in the order given.
+func seasonings_for(class_id: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s != null and s.class_id == class_id:
+			out.append(id)
+	return out
 
 
 ## A scripted launch (--smoke, --demo, --view, --screenshot): not the player's session, so it never reads or
