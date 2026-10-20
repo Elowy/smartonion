@@ -40,6 +40,8 @@ enum Glyph {
 	# M8, the Shaman: Totem Rite, Thunderbolt, Stormburst, Rumbling Earth, Soothing Downpour, Spirit Pack
 	# (Forking Bolt uses the BOLT glyph, Magma Lash the school's FIRE one).
 	TOTEM, THUNDERBOLT, STORMBURST, QUAKE, DOWNPOUR, PACK,
+	# M8 Hunter, one each.
+	ARROW_FAN, BACKSTEP, LONG_SHOT, ARROW_HAIL, QUICK_DRAW, PLAY_DEAD, BLAST_SNARE, HUNT_SIGNAL,
 }
 
 const SIZE := 50.0
@@ -125,6 +127,10 @@ const EXACT_GLYPHS: Dictionary[StringName, Glyph] = {
 	&"forking_bolt": Glyph.BOLT, &"totem_rite": Glyph.TOTEM, &"thunderbolt": Glyph.THUNDERBOLT,
 	&"rumbling_earth": Glyph.QUAKE, &"magma_lash": Glyph.FIRE, &"soothing_downpour": Glyph.DOWNPOUR,
 	&"stormburst": Glyph.STORMBURST, &"spirit_pack": Glyph.PACK,
+	# Hunter.
+	&"arrow_fan": Glyph.ARROW_FAN, &"backstep": Glyph.BACKSTEP, &"long_shot": Glyph.LONG_SHOT,
+	&"arrow_hail": Glyph.ARROW_HAIL, &"quick_draw": Glyph.QUICK_DRAW, &"play_dead": Glyph.PLAY_DEAD,
+	&"blast_snare": Glyph.BLAST_SNARE, &"hunt_signal": Glyph.HUNT_SIGNAL,
 }
 
 ## Ordered token rules: the first rule with a key that starts one of the id's `_`-separated
@@ -961,6 +967,14 @@ func _draw_glyph(g: Glyph) -> void:
 		Glyph.QUAKE: _g_quake()
 		Glyph.DOWNPOUR: _g_downpour()
 		Glyph.PACK: _g_pack()
+		Glyph.ARROW_FAN: _g_arrow_fan()
+		Glyph.BACKSTEP: _g_backstep()
+		Glyph.LONG_SHOT: _g_long_shot()
+		Glyph.ARROW_HAIL: _g_arrow_hail()
+		Glyph.QUICK_DRAW: _g_quick_draw()
+		Glyph.PLAY_DEAD: _g_play_dead()
+		Glyph.BLAST_SNARE: _g_blast_snare()
+		Glyph.HUNT_SIGNAL: _g_hunt_signal()
 		_: _g_generic()
 
 
@@ -1693,3 +1707,98 @@ func _g_berserking() -> void:
 	for x: float in [-0.2, 0.0, 0.2]:
 		_d_stroke(PackedVector2Array([Vector2(x, 0.36), Vector2(x, 0.6)]), 0.04, OUT)
 	_d_stroke(PackedVector2Array([Vector2(-0.4, 0.48), Vector2(0.4, 0.48)]), 0.04, OUT)
+
+
+# --- M8 Hunter glyphs ----------------------------------------------------------------------------
+
+## An arrow head (a triangle) with its tip at [param tip], pointing along [param dir].
+func _arrow_head(tip: Vector2, dir: Vector2, size: float, col: Color) -> void:
+	var n := Vector2(-dir.y, dir.x)
+	_poly(PackedVector2Array([tip, tip - dir * size * 1.9 + n * size, tip - dir * size * 1.9 - n * size]), col, true)
+
+
+func _g_arrow_fan() -> void:
+	# Three arrows fanning out from one point.
+	var origin := Vector2(0, 0.82)
+	for a: float in [-0.62, 0.62, 0.0]:
+		var dir := Vector2.UP.rotated(a)
+		_stroke(PackedVector2Array([origin, origin + dir * 1.15]), 0.1, _tone)
+		_arrow_head(origin + dir * 1.5, dir, 0.17, _hi)
+	_circ(origin, 0.15, _hi, true)
+
+
+func _g_backstep() -> void:
+	# A curved arrow leaping back, a puff of dust where the hero stood.
+	for p: Vector2 in [Vector2(0.62, -0.5), Vector2(0.86, -0.18), Vector2(0.7, 0.14)]:
+		_circ(p, 0.15, Color(_tone, 0.55), true)
+	var arc := _arc_pts(Vector2(0.1, 0.0), Vector2(0.62, 0.62), -PI * 0.45, PI * 0.95, 14)
+	_stroke(arc, 0.17, _tone)
+	var end := arc[arc.size() - 1]
+	var dir := (arc[arc.size() - 1] - arc[arc.size() - 2]).normalized()
+	_arrow_head(end + dir * 0.28, dir, 0.24, _hi)
+
+
+func _g_long_shot() -> void:
+	# One heavy arrow through a target ring.
+	_circ(Vector2(0.4, 0.0), 0.56, _deep)
+	_d_circ(Vector2(0.4, 0.0), 0.34, _tone)
+	_d_circ(Vector2(0.4, 0.0), 0.12, _deep)
+	_stroke(PackedVector2Array([Vector2(-0.9, 0.0), Vector2(0.62, 0.0)]), 0.13, _hi)
+	_arrow_head(Vector2(0.98, 0.0), Vector2.RIGHT, 0.2, _hi)
+	for s: float in [-1.0, 1.0]:
+		_poly(PackedVector2Array([Vector2(-0.9, 0.0), Vector2(-0.62, 0.34 * s), Vector2(-0.46, 0.34 * s), Vector2(-0.6, 0.0)]), _tone, true)
+
+
+func _g_arrow_hail() -> void:
+	# Arrows raining down on a circle of ground.
+	_poly(_ellipse(Vector2(0, 0.7), 0.88, 0.26, 20), _deep)
+	for x: float in [-0.5, 0.0, 0.5]:
+		var from := Vector2(x - 0.18, -0.95 + 0.14 * absf(x))
+		var tip := Vector2(x + 0.06, 0.52 - 0.12 * absf(x))
+		_stroke(PackedVector2Array([from, tip - (tip - from).normalized() * 0.2]), 0.1, _tone)
+		_arrow_head(tip, (tip - from).normalized(), 0.15, _hi)
+
+
+func _g_quick_draw() -> void:
+	# A quiver full of fletched arrows, speed lines behind it.
+	for y: float in [-0.5, -0.1, 0.3]:
+		_d_stroke(PackedVector2Array([Vector2(-0.95, y), Vector2(-0.58, y)]), 0.07, Color(_tone, 0.7))
+	var a := 0.3
+	_poly(_xf(PackedVector2Array([Vector2(-0.3, -0.35), Vector2(0.3, -0.35), Vector2(0.24, 0.9), Vector2(-0.24, 0.9)]), a, Vector2(0.15, 0.0)), _deep.lightened(0.15))
+	_poly(_xf(_rect_pts(-0.33, -0.42, 0.33, -0.28), a, Vector2(0.15, 0.0)), _hi, true)
+	for i in 3:
+		var x := (float(i) - 1.0) * 0.17
+		var base := Vector2(x, -0.4)
+		var top := Vector2(x + 0.06, -0.95)
+		_stroke(_xf(PackedVector2Array([base, top]), a, Vector2(0.15, 0.0)), 0.07, _tone)
+		var f := _xf(PackedVector2Array([top, top + Vector2(-0.12, -0.12), top + Vector2(0.12, -0.12)]), a, Vector2(0.15, 0.0))
+		_poly(f, _hi, true)
+
+
+func _g_play_dead() -> void:
+	# A fallen, round head with crossed-out eyes and a limp tongue.
+	_circ(Vector2(0, -0.04), 0.7, _hi)
+	for x: float in [-0.28, 0.28]:
+		_d_stroke(PackedVector2Array([Vector2(x - 0.14, -0.28), Vector2(x + 0.14, 0.0)]), 0.08, OUT)
+		_d_stroke(PackedVector2Array([Vector2(x + 0.14, -0.28), Vector2(x - 0.14, 0.0)]), 0.08, OUT)
+	_d_stroke(PackedVector2Array([Vector2(-0.3, 0.3), Vector2(0.3, 0.3)]), 0.07, OUT)
+	_d_poly(PackedVector2Array([Vector2(0.06, 0.3), Vector2(0.3, 0.3), Vector2(0.26, 0.62), Vector2(0.1, 0.62)]), Color(0.9, 0.45, 0.5))
+	_stroke(PackedVector2Array([Vector2(-0.9, 0.88), Vector2(0.9, 0.88)]), 0.1, _tone)
+
+
+func _g_blast_snare() -> void:
+	# A toothed trap ring around a red trigger plate.
+	_poly(_star(Vector2.ZERO, 0.98, 0.62, 8), _tone)
+	_circ(Vector2.ZERO, 0.5, _deep)
+	_d_circ(Vector2.ZERO, 0.3, Color(1.0, 0.45, 0.15))
+	_d_circ(Vector2.ZERO, 0.13, Color(1.0, 0.9, 0.55))
+
+
+func _g_hunt_signal() -> void:
+	# A hunting horn, sound waves leaving its bell.
+	_poly(PackedVector2Array([Vector2(-0.92, 0.3), Vector2(-0.55, 0.08), Vector2(0.0, -0.15), Vector2(0.38, -0.55),
+			Vector2(0.62, -0.22), Vector2(0.5, 0.35), Vector2(-0.1, 0.45), Vector2(-0.6, 0.55)]), _tone)
+	_d_poly(PackedVector2Array([Vector2(0.38, -0.55), Vector2(0.62, -0.22), Vector2(0.5, 0.35), Vector2(0.28, 0.1)]), _hi)
+	_stroke(PackedVector2Array([Vector2(-0.3, 0.1), Vector2(-0.2, 0.62)]), 0.1, _deep)
+	for r: float in [0.45, 0.72]:
+		_d_stroke(_arc_pts(Vector2(0.55, -0.1), Vector2(r * 0.7, r), -0.9, 0.9, 8), 0.07, _hi)

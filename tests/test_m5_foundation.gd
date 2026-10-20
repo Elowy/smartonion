@@ -291,7 +291,7 @@ const GENERAL_ABILITIES: Array[StringName] = [&"bandage", &"berserking", &"sprin
 	&"war_stomp", &"spirit_wolf"]
 ## Every ability tagged "pet" (the tag talents and set bonuses match). A new pet ability is added
 ## here on purpose: the tag has rules (Pack Command, pet leech ...), so a stray one must not slip in.
-const PET_ABILITIES: Array[StringName] = [&"spirit_wolf", &"spirit_pack", &"summon_infernal", &"summon_voidwalker"]
+const PET_ABILITIES: Array[StringName] = [&"spirit_wolf", &"spirit_pack", &"summon_infernal", &"summon_voidwalker", &"hunt_signal"]
 
 
 ## Per class: 2 core abilities (RT / LT) + 6 learnable ones (Active / Auto-cast, in any mix); the

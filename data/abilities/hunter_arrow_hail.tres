@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_arrow_hail.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"arrow_hail"
+display_name = "Arrow Hail"
+description = "Calls a hail of arrows down on the densest group of enemies: a {radius} m circle takes {damage_pct}% weapon damage every {tick} sec for {duration} sec."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"aoe", &"ground", &"weapon"])
+resource = &""
+cost = 0.0
+cooldown = 12.0
+targeting = 2
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_min": 4,
+"damage_pct": 40.0,
+"duration": 4.0,
+"radius": 3.0,
+"slow": 0.0,
+"storms": 1,
+"tick": 0.5
+}
+icon = &"arrow_hail"
+color = Color(0.95, 0.7, 0.3, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{"name": "Crossfire Barrage", "text": "A second hail falls on the next-densest group.", "mods": {"storms": 2}}, {"name": "Pinning Hail", "text": "Enemies in the hail are slowed by 40%.", "mods": {"slow_add": 40.0}}])

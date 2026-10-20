@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="ClassData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/bow.tres" id="2_mh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="3_res_script"]
+[ext_resource type="Resource" path="res://data/resources/focus.tres" id="4_focus"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="5_ability_script"]
+[ext_resource type="Resource" path="res://data/abilities/hunter_arrow_fan.tres" id="6_arrow_fan"]
+[ext_resource type="Resource" path="res://data/abilities/hunter_backstep.tres" id="7_backstep"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_mastery.gd" id="8_mastery"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hunter"
+display_name = "Hunter"
+description = "Marksman who fights beside a loyal animal companion."
+role = "Ranged damage, companion"
+armor_type = 2
+primary_stat = &"agility"
+base_stats = Dictionary[StringName, float]({
+&"agility": 2.0,
+&"stamina": -3.0
+})
+main_hand = ExtResource("2_mh")
+proficiencies = Array[StringName]([&"bow", &"gun", &"crossbow", &"polearm", &"axe", &"sword", &"dagger", &"dual_wield"])
+resource_type = &"focus"
+resource_color = Color(0.95, 0.62, 0.22, 1)
+resources = Array[ExtResource("3_res_script")]([ExtResource("4_focus")])
+abilities = Array[ExtResource("5_ability_script")]([ExtResource("6_arrow_fan"), ExtResource("7_backstep")])
+mastery = ExtResource("8_mastery")
+mastery_text = "Beastbond: your companion deals +2% damage per Mastery point. A permanent Wolf, Boar or Owl fights at your side and cannot be hurt."
+onion_color = Color(0.74, 0.46, 0.27, 1)
+accent_color = Color(0.2, 0.47, 0.34, 1)
+headgear = &"hunter_hat"
+big_shoulders = false
+companion_choices = Array[StringName]([&"wolf", &"boar", &"owl"])

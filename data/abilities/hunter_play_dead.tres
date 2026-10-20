@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_play_dead.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"play_dead"
+display_name = "Play Dead"
+description = "Collapse and play dead for {duration} sec: enemies lose track of you and cannot hit you."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"stealth"])
+resource = &""
+cost = 0.0
+cooldown = 20.0
+targeting = 0
+cast_range = 4.0
+effect = ExtResource("2_effect")
+params = {
+"auto_enemies": 6,
+"auto_hp": 40.0,
+"auto_radius": 3.0,
+"decoy_radius": 0.0,
+"duration": 2.0,
+"forced_crits": 0,
+"heal_max_hp_pct": 0.0
+}
+icon = &"play_dead"
+color = Color(0.55, 0.5, 0.45, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"decoy_radius_add": 4.0}
+rank3_text = "Your companion draws the enemies within 4 m to itself (taunt) meanwhile"
+specs = Array[Dictionary]([{"name": "Patient Predator", "text": "When you rise, your next 3 weapon hits are guaranteed critical strikes.", "mods": {"forced_crits_add": 3}}, {"name": "Rest and Recover", "text": "You recover 30% of your max health while playing dead.", "mods": {"heal_max_hp_pct_add": 30.0}}])

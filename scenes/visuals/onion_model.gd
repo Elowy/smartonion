@@ -33,6 +33,11 @@ const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
 ## chest piece is worn so they stay visible on top of the armour (the low-HP cue must not vanish).
 const PEEL_SPOTS: Array[Vector2] = [Vector2(132.0, 0.46), Vector2(-132.0, 0.6), Vector2(48.0, 0.3)]
 const PEEL_GEAR_LIFT := 0.11
+## Play Dead: how fast the body tips over (1/s), how far (radians) and how much it is lifted so
+## that it rests on the ground.
+const TIP_RATE := 6.0
+const TIP_ANGLE := 1.5
+const TIP_LIFT := 0.36
 ## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
 const CAST_BAR_Y := 2.0
 const CAST_BAR_SIZE := Vector2(1.6, 0.3)
@@ -171,6 +176,9 @@ var _phase := 0.0
 var _time := 0.0
 var _flash := 0.0
 var _squash := 0.0
+## Play Dead (the Hunter): the body tips over on its side while true; _tip is the smoothed 0..1 pose.
+var play_dead := false
+var _tip := 0.0
 var _attack_t: Array[float] = [1.0, 1.0]
 var _blink := 0.0
 var _next_blink := 2.0
@@ -329,6 +337,16 @@ func set_moving(speed_ratio: float) -> void:
 ## Short swing / thrust animation of one hand.
 func play_attack(off_hand: bool) -> void:
 	_attack_t[1 if off_hand else 0] = 0.0
+
+
+## Play Dead (the Hunter): the onion tips over on its side (true) and gets up again (false).
+func set_play_dead(on: bool) -> void:
+	play_dead = on
+
+
+## 0..1 how far the body has tipped over (Play Dead; tests).
+func tip_amount() -> float:
+	return _tip
 
 
 ## White flash + squash when damaged.
@@ -597,6 +615,11 @@ func _animate_alive(delta: float) -> void:
 	_body.position = Vector3(0, bob, 0)
 	_body.rotation = Vector3(-0.14 * s, 0.0, sin(_phase) * 0.13 * s)
 	_body.scale = Vector3(1.0 + 0.14 * sq - breathe * 0.5, 1.0 - 0.18 * sq + breathe, 1.0 + 0.14 * sq - breathe * 0.5)
+	_tip = move_toward(_tip, 1.0 if play_dead else 0.0, delta * TIP_RATE)
+	if _tip > 0.0:
+		var eased := smoothstep(0.0, 1.0, _tip)
+		_body.rotation.z += eased * TIP_ANGLE
+		_body.position += Vector3(-0.05, TIP_LIFT, 0.0) * eased
 	for i in _feet.size():
 		var p := _phase + PI * i
 		var foot := _feet[i]
@@ -1021,7 +1044,7 @@ func _build_body() -> void:
 		return k.build())
 	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio), _is_garlic()))
 	# Sprout: long green stalk for the spring-onion rogue, withered for the warlock, pale garlic scapes for the
-	# shaman, "normal" for any other headgear (hunter_hat until its class package picks a kind in _sprout_mesh).
+	# shaman, "normal" for any other headgear (the hunter's hat covers it).
 	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else ("pale" if headgear == &"tribal_mask" else "normal"))
 	var sprout := MeshKit.cached("onion:sprout:" + sprout_kind, func() -> Mesh: return _sprout_mesh(sprout_kind))
 	_sprout = _mesh("Sprout", _body, sprout, Mats.toon_vc())
@@ -1077,7 +1100,7 @@ func _glove_color() -> Color:
 		&"wizard_hat": return class_data.onion_color.lightened(0.15)
 		&"hood": return Color(0.28, 0.2, 0.15)
 		&"horned_hood": return Color(0.2, 0.12, 0.24)
-		&"hunter_hat": pass  # HUNTER package
+		&"hunter_hat": return Color(0.45, 0.3, 0.18)
 		&"tribal_mask": return Color(0.5, 0.34, 0.2)  # wrapped wooden-brown hands
 		_: pass
 	return class_data.onion_color.lightened(0.1)
@@ -1093,7 +1116,7 @@ func _boot_color() -> Color:
 		&"wizard_hat": return class_data.accent_color.darkened(0.35)
 		&"hood": return Color(0.22, 0.16, 0.12)
 		&"horned_hood": return Color(0.16, 0.09, 0.2)
-		&"hunter_hat": pass  # HUNTER package
+		&"hunter_hat": return Color(0.3, 0.2, 0.12)
 		&"tribal_mask": return Color(0.33, 0.22, 0.14)
 		_: pass
 	return LEATHER
@@ -1159,7 +1182,7 @@ static func _face_mesh_build(brows: bool, headgear: StringName) -> Mesh:
 				&"horned_hood": tilt = 24.0
 				&"hood": tilt = 14.0 if side > 0 else -6.0
 				&"wizard_hat": tilt = -8.0
-				&"hunter_hat": pass  # HUNTER package (e.g. a keen tilt)
+				&"hunter_hat": tilt = 9.0  # a keen, steady look
 				&"tribal_mask": pass  # level brows under the carved mask
 				_: pass  # level brows
 			var bc := center + b * Vector3(0, 0.15, -0.035)

@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_backstep.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"backstep"
+display_name = "Backstep"
+description = "Leaps {distance} m away from the enemy in front of you. Enemies within {slow_radius} m of where you left are slowed by {slow}% for {slow_duration} sec. Charges: {charges}."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"movement", &"cc"])
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 0
+cast_range = 3.0
+effect = ExtResource("2_effect")
+params = {
+"charges": 1,
+"dash_time": 0.18,
+"distance": 5.0,
+"invulnerable": 0.2,
+"slow": 40.0,
+"slow_duration": 2.0,
+"slow_radius": 3.0,
+"trail_duration": 0.0,
+"trail_radius": 1.8,
+"trail_slow": 40.0,
+"volley_arrows": 0,
+"volley_pct": 100.0
+}
+icon = &"backstep"
+color = Color(0.55, 0.85, 0.7, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"charges_add": 1}
+rank3_text = "+1 charge"
+specs = Array[Dictionary]([{"name": "Caltrop Trail", "text": "Caltrops stay along the leap for 3 sec and slow enemies that cross them by 40%.", "mods": {"trail_duration_add": 3.0}}, {"name": "Parting Volley", "text": "Looses 3 arrows at the nearest enemy as you land, each for 100% weapon damage.", "mods": {"volley_arrows_add": 3}}])

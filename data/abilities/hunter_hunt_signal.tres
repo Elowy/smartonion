@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_hunt_signal.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hunt_signal"
+display_name = "Hunt Signal"
+description = "Sends your companion after the strongest enemy within {range} m. It leaps in and strikes for {blow_pct}% weapon damage. Wolf: slows by {wolf_slow}% for {wolf_slow_duration} sec. Boar: stuns for {boar_stun} sec. Owl: {owl_bonus}% more damage."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"pet"])
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"bleed_duration": 4.0,
+"bleed_pct": 0.0,
+"blow_pct": 250.0,
+"boar_stun": 1.0,
+"kill_reset": 0.0,
+"min_enemies": 3,
+"owl_bonus": 25.0,
+"range": 10.0,
+"splash_pct": 60.0,
+"splash_radius": 0.0,
+"strikes": 1,
+"wolf_slow": 50.0,
+"wolf_slow_duration": 2.0
+}
+icon = &"hunt_signal"
+color = Color(0.8, 0.6, 0.35, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"strikes_add": 1}
+rank3_text = "A second strike lands on the next-strongest enemy"
+specs = Array[Dictionary]([{"name": "Mauling Rush", "text": "The blow bursts: enemies within 2.5 m of the target take 60% damage.", "mods": {"splash_radius_add": 2.5}}, {"name": "Relentless Pursuit", "text": "A kill with the blow brings Hunt Signal back after 2 sec.", "mods": {"kill_reset_add": 2.0}}])
