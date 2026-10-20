@@ -785,7 +785,7 @@ func _build_footer() -> void:
 func _fill() -> void:
 	title_label.text = "Wave %d cleared!" % cleared_wave
 	var next := cleared_wave + 1
-	next_label.text = next_wave_text(next)
+	next_label.text = next_wave_text(next) + Pressure.next_wave_suffix(next)  # (M9: the Tear-Jerker pressure of the next wave)
 	var flagged := not _is_past_the_end(next) and (RunState.is_boss_wave(next) or RunState.is_elite_wave(next))
 	next_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.2) if flagged else UiTheme.TEXT_DIM)
 	purse_board.set_shop(RunState.shop)
