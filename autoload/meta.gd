@@ -385,6 +385,11 @@ func sanitize_loadout(loadout: Dictionary, class_id: StringName = &"") -> Dictio
 	l["looks"] = looks
 	if l["alt_weapon"] and not alt_weapon_unlocked(class_id):
 		l["alt_weapon"] = false
+	# --- Wardrobe (M9) --- (a look of another slot, an unknown id or a cosmetic of the wrong kind is dropped as well)
+	l["looks"] = Wardrobe.sanitize_looks(l["looks"], class_id)
+	var cosmetics := Wardrobe.sanitize_cosmetics(l, class_id)
+	for key in Profile.COSMETIC_KEYS:
+		l[key] = cosmetics.get(key, &"")
 	return l
 
 
@@ -564,6 +569,7 @@ func _add_builtin_listeners() -> void:
 	add_run_listener(LISTENER_COUNTERS, _on_counters, PRIORITY_COUNTERS)
 	add_run_listener(LISTENER_ACHIEVEMENTS, _on_achievements, PRIORITY_ACHIEVEMENTS)
 	ClassLevels.register(self)  # (M9 LEVELS: Class XP and Seeds of a finished run)
+	Wardrobe.register(self)  # (M9 WARDROBE: the looks the heroes wear are collected at a wave start and at the run's end)
 
 
 func _on_counters(report: RunReport, p: Profile, _result: Dictionary) -> void:

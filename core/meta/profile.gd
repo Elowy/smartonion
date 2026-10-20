@@ -59,6 +59,9 @@ const SCOPED_KINDS: Array[StringName] = [KIND_DIFFICULTY]
 
 ## The visible armour slots a look can be picked for (the keys of a loadout's "looks").
 const LOOK_SLOTS: Array[StringName] = [&"head", &"shoulders", &"chest"]
+## --- Wardrobe (M9) --- The cosmetic keys of a loadout (flat, next to "looks"): the owned Tabard / Hat variant / Glow / Dye
+## id picked for the class, &"" = none (CosmeticData.KINDS).
+const COSMETIC_KEYS: Array[StringName] = [&"tabard", &"hat", &"glow", &"dye"]
 
 ## "" = a good file or none; else why the file was not used: "corrupt", "newer version" or "unreadable"
 ## (set by [method load_file]).
@@ -270,7 +273,8 @@ func set_heirloom_rank(id: StringName, rank: int) -> void:
 # --- Lobby selections ---------------------------------------------------------------------------
 
 ## The remembered selections of [param class_id]: {"seasonings": Array[StringName], "heirloom": StringName,
-## "looks": {slot name (LOOK_SLOTS): look id}, "alt_weapon": bool (the class's alternative starting weapon, Class Level 12)}
+## "looks": {slot name (LOOK_SLOTS): look id}, "alt_weapon": bool (the class's alternative starting weapon, Class Level 12),
+## and the Wardrobe's cosmetic keys (COSMETIC_KEYS: "tabard", "hat", "glow", "dye": a StringName id, &"" = none)}
 ## – a copy, empty values when nothing was remembered.
 func loadout(class_id: StringName) -> Dictionary:
 	return normalize_loadout(loadouts.get(class_id, {}))
@@ -298,8 +302,12 @@ static func normalize_loadout(value: Dictionary) -> Dictionary:
 			if str(raw_looks[slot]) != "":
 				looks[StringName(str(slot))] = StringName(str(raw_looks[slot]))
 	var alt: Variant = value.get("alt_weapon", false)
-	return {"seasonings": seasonings, "heirloom": StringName(str(value.get("heirloom", ""))), "looks": looks,
+	var out := {"seasonings": seasonings, "heirloom": StringName(str(value.get("heirloom", ""))), "looks": looks,
 			"alt_weapon": typeof(alt) == TYPE_BOOL and alt}
+	# --- Wardrobe (M9) ---
+	for key in COSMETIC_KEYS:
+		out[key] = StringName(str(value.get(key, "")))
+	return out
 
 
 # --- Saving and loading -------------------------------------------------------------------------
@@ -338,6 +346,10 @@ func to_dict() -> Dictionary:
 			looks[String(slot)] = String(l["looks"][slot])
 		loadout_data[String(id)] = {"seasonings": seasonings, "heirloom": String(l["heirloom"]), "looks": looks,
 				"alt_weapon": l["alt_weapon"]}
+		# --- Wardrobe (M9) --- (only the picked ones are written)
+		for key in COSMETIC_KEYS:
+			if l[key] != &"":
+				loadout_data[String(id)][String(key)] = String(l[key])
 	var out := {
 		"version": FORMAT_VERSION,
 		"created_at": created_at,

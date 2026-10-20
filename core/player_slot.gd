@@ -20,6 +20,9 @@ var companion: StringName = &""
 var seasonings: Array[StringName] = []
 var heirloom: StringName = &""
 var looks: Dictionary[StringName, StringName] = {}
+## --- Wardrobe (M9) --- The cosmetics picked for this hero (Profile.COSMETIC_KEYS -> CosmeticData id: "tabard", "hat",
+## "glow", "dye"); a missing key = none. Cosmetic only, like [member looks]; the hero receives it as Player.cosmetic_overrides.
+var cosmetics: Dictionary[StringName, StringName] = {}
 ## M9 LEVELS: the hero starts with its class's alternative weapon (Class Level 12, ClassPathData) instead of the
 ## standard one. The lobby toggles it ([method Lobby.toggle_alt_weapon]); Main drops it for a class that has not
 ## unlocked it (Meta.enforce_alt_weapons).
@@ -59,7 +62,9 @@ func cycle_companion(step: int = 1) -> StringName:
 
 ## The meta selections as one dictionary ({"seasonings", "heirloom", "looks"}, see [method Profile.loadout]).
 func meta_loadout() -> Dictionary:
-	return Profile.normalize_loadout({"seasonings": seasonings, "heirloom": heirloom, "looks": looks, "alt_weapon": alt_weapon})
+	var l := {"seasonings": seasonings, "heirloom": heirloom, "looks": looks, "alt_weapon": alt_weapon}
+	l.merge(cosmetics)  # (Wardrobe: "tabard" / "hat" / "glow" / "dye")
+	return Profile.normalize_loadout(l)
 
 
 ## Sets the meta selections from [param loadout] (the shape of [method meta_loadout]); missing keys clear them.
@@ -69,8 +74,12 @@ func set_meta_loadout(loadout: Dictionary) -> void:
 	heirloom = l["heirloom"]
 	looks = l["looks"]
 	alt_weapon = l["alt_weapon"]
+	cosmetics = {}  # (Wardrobe: only the picked ones are kept)
+	for key in Profile.COSMETIC_KEYS:
+		if l[key] != &"":
+			cosmetics[key] = l[key]
 
 
 ## True when a meta selection is made (never by default, nor in an automated run).
 func has_meta_selection() -> bool:
-	return not (seasonings.is_empty() and heirloom == &"" and looks.is_empty() and not alt_weapon)
+	return not (seasonings.is_empty() and heirloom == &"" and looks.is_empty() and not alt_weapon and cosmetics.is_empty())

@@ -41,6 +41,7 @@ func before_each() -> void:
 	Db.unlock_gates.clear()
 	Meta.remove_run_listener(ClassLevels.LISTENER_XP)
 	Meta.remove_run_listener(ClassLevels.LISTENER_SEEDS)
+	Meta.remove_run_listener(Wardrobe.LISTENER)  # (M9 WARDROBE: tests/test_m9_wardrobe.gd covers the looks)
 	Meta.save_count = 0
 	Meta._pending_unlocks.clear()
 	UiFakes.reset_players()

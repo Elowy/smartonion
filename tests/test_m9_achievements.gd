@@ -31,6 +31,7 @@ func before_each() -> void:
 	_saved_listeners = Meta._listeners.duplicate()
 	Meta.remove_run_listener(ClassLevels.LISTENER_XP)
 	Meta.remove_run_listener(ClassLevels.LISTENER_SEEDS)
+	Meta.remove_run_listener(Wardrobe.LISTENER)  # (M9 WARDROBE: tests/test_m9_wardrobe.gd covers the looks)
 	Meta._pending_unlocks.clear()
 	UiFakes.reset_players()
 	RunState.start_run(2, 77)
