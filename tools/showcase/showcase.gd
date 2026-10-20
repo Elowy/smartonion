@@ -10,6 +10,7 @@ extends SceneTree
 ##             style and a burst of VFX, through the gameplay CameraRig (default).
 ##   live      A real run: bot Players + WaveDirector. --wave=N --players=1..4 --t=seconds
 ##   onions    Close line-up of the classes. --state=hurt|downed|walk|attack --back=1
+##   hunter    The Hunter with its Wolf, Boar and Owl (M8). --back=1 --state=play_dead|frenzy|attack|walk
 ##   enemies   Enemy line-up. --state=walk|windup|stun|hit
 ##   weapons   Every weapon model.
 ##   arena     High overview of the arena and its decoration (--env=<id> --dungeon=1 --frames=N).

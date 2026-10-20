@@ -10,9 +10,10 @@ const HEAD := EquipLook.Slot.HEAD
 const SHOULDERS := EquipLook.Slot.SHOULDERS
 const CHEST := EquipLook.Slot.CHEST
 ## Render draws of a hero (outline counts double) with the class starter look and weapons, measured
-## on the base commit before the equipment was visible: warrior, mage, paladin, rogue, warlock.
+## on the base commit before the equipment was visible: warrior, mage, paladin, rogue, warlock (the
+## Hunter's number is measured with its starter look: the one merged mesh of hat, pauldron and quiver).
 const DRAWS_BEFORE: Dictionary[StringName, int] = {&"warrior": 23, &"mage": 23, &"paladin": 25, &"rogue": 24,
-	&"warlock": 32}
+	&"warlock": 32, &"hunter": 20}
 ## A class without a measured baseline above (a later class, until its package adds the number) is
 ## measured on the spot: its starter look is its own baseline, held to this ceiling (the heaviest
 ## launch class is 32), and the same +[constant DRAW_BUDGET] applies to its gear.

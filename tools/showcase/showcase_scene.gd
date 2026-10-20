@@ -14,6 +14,8 @@ func run() -> void:
 			await _live()
 		"onions":
 			await _onions()
+		"hunter":
+			await _hunter()
 		"equip":
 			await _equip()
 		"sets":
@@ -201,6 +203,37 @@ func _onions() -> void:
 			"attack": m.play_attack(false)
 	_close_camera(stage, Vector3(0, 0.6, 0), 9.0, 22.0)
 	await _frames(4 if state == "attack" else 20)
+
+
+## The Hunter (M8) close up with the three companions: --back=1 shows the quiver, --state=play_dead the
+## tipped-over pose, --state=frenzy the amber ring, --state=attack the lunge, --dist=N zooms.
+func _hunter() -> void:
+	var stage := _studio()
+	var cd := Db.get_class_data(&"hunter")
+	var back := _arg("back", "0") == "1"
+	var state := _arg("state", "")
+	var facing := Vector3(0, 0, -1) if back else Vector3(0, 0, 1)
+	var m := OnionModel.new()
+	stage.add_child(m)
+	m.setup(cd, PlayerManager.PLAYER_COLORS[0])
+	m.set_weapons(cd.main_hand, cd.off_hand)
+	m.position = Vector3(-1.5, 0, 0)
+	m.set_facing(facing)
+	if state == "play_dead":
+		m.set_play_dead(true)
+	var kinds: Array[StringName] = [&"wolf", &"boar", &"owl"]
+	for i in kinds.size():
+		var c := HunterCompanionModel.new()
+		c.kind = kinds[i]
+		stage.add_child(c)
+		c.position = Vector3(0.0 + 1.35 * i, 0, 0)
+		c.set_facing(facing)
+		match state:
+			"attack": c.play_attack()
+			"frenzy": c.set_frenzy(true)
+			"walk": c.set_moving(1.0)
+	_close_camera(stage, Vector3(0.6, 0.7, 0), 7.5, 22.0)
+	await _frames(40 if state == "play_dead" else 20)
 
 
 ## Worn armour (GDD 13): armour types x material tiers (--axis=tier, default) or rarities of one
