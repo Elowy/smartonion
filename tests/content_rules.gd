@@ -29,7 +29,6 @@ const TREES_PER_CLASS := 3
 const PENDING: Array[String] = [
 	# TALENTS packages: the three talent trees.
 	"hunter:trees",
-	"shaman:trees",
 ]
 
 

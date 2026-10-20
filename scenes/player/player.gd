@@ -522,6 +522,21 @@ func fill_hp(amount: float) -> void:
 	_hp_updated()
 
 
+## Lowers HP by [param amount] without it being damage (M8, Bond Totem): no number, no damage meter entry, no
+## hit reaction, no invulnerability, no procs. Never below [param floor_hp] (at least 1: it is never lethal) and
+## nothing while downed. Returns the HP really taken.
+func drain_hp(amount: float, floor_hp: float = 1.0) -> float:
+	if downed or amount <= 0.0:
+		return 0.0
+	var floor_value := maxf(1.0, floor_hp)
+	if hp <= floor_value:
+		return 0.0
+	var before := hp
+	hp = maxf(floor_value, hp - amount)
+	_hp_updated()
+	return before - hp
+
+
 func _on_wave_began_consumables() -> void:
 	Consumables.apply(self)
 
