@@ -6,8 +6,8 @@ extends PanelContainer
 ## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
 ## M9 SEASONINGS: every class also shows a Seasonings pill on the left of the preview (a socket per slot with the picked
-## Seasoning's icon, the button that opens the picker: Lobby, LT); [member picker] is the SeasoningPicker panel that
-## covers the card while it is open.
+## Seasoning's icon, the button that opens the picker: Lobby, LT); [member loadout] is the LoadoutScreen panel (M9 PATCH:
+## tabs Seasonings / Heirloom / Look) that covers the card while it is open, [member picker] the SeasoningPicker inside it.
 ## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
 ## description, and without the Ready prompt (Lobby.ready_block_reason). M9 LEVELS: a profile that records runs also
 ## shows the class's level – a small "Lv 12" badge and the Class XP strip with its numbers on the preview – and, once the
@@ -28,7 +28,8 @@ const XP_BAR_HEIGHT := 11.0
 var index := 0
 var slot: PlayerSlot
 var preview: OnionPreview
-## The Seasoning picker overlay of this card (hidden until the player opens it).
+## The Loadout overlay of this card (hidden until the player opens it) and its Seasonings tab.
+var loadout: LoadoutScreen
 var picker: SeasoningPicker
 
 ## M9 LEVELS: the "Lv 12" badge on the preview's corner, the Class XP strip on its lower edge and the XP numbers (hidden for
@@ -107,9 +108,10 @@ func _build() -> void:
 	picker_layer.name = "PickerLayer"
 	picker_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(picker_layer)
-	picker = SeasoningPicker.create()
-	picker_layer.add_child(picker)
-	picker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	loadout = LoadoutScreen.create()
+	picker_layer.add_child(loadout)
+	loadout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	picker = loadout.picker
 	_apply_empty()
 
 
@@ -388,12 +390,12 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	_state_key = key
 	if p_slot == null:
 		_keyboard_hint.visible = keyboard_free
-		picker.close()
+		loadout.close()
 		_apply_empty()
 		_was_ready = false
 	else:
-		if picker.slot != p_slot:
-			picker.close()
+		if loadout.slot != p_slot:
+			loadout.close()
 		_apply_joined(p_slot)
 		if p_slot.ready and not _was_ready:
 			preview.cheer()
