@@ -40,6 +40,12 @@ const SET_STYLES := {
 		"light": Color(0.42, 0.36, 0.55), "trim": Color(0.6, 0.92, 0.3), "glow": Color(0.55, 0.95, 0.3)},
 	&"felfire_raiment": {"main": Color(0.4, 0.17, 0.5), "dark": Color(0.2, 0.08, 0.28),
 		"light": Color(0.62, 0.34, 0.75), "trim": Color(0.5, 1.0, 0.3), "glow": Color(0.5, 1.0, 0.3)},
+	# Class sets of the M8 classes: leaf green with cream fur and amber glints (Hunter), turquoise with bone
+	# and a cyan glow (Shaman).
+	&"wildtracker_garb": {"main": Color(0.28, 0.56, 0.27), "dark": Color(0.13, 0.3, 0.13),
+		"light": Color(0.58, 0.8, 0.48), "trim": Color(0.9, 0.8, 0.55), "glow": Color(0.95, 0.7, 0.3)},
+	&"totemkeeper_mail": {"main": Color(0.16, 0.55, 0.58), "dark": Color(0.07, 0.3, 0.34),
+		"light": Color(0.45, 0.8, 0.78), "trim": Color(0.93, 0.88, 0.72), "glow": Color(0.35, 0.95, 0.9)},
 	# Class-independent sets: rose silk, oiled grey-blue leather, copper scale, thorn crimson, bark brown.
 	&"mendweave_attire": {"main": Color(0.93, 0.62, 0.72), "dark": Color(0.62, 0.3, 0.42),
 		"light": Color(1.0, 0.85, 0.9), "trim": Color(1.0, 0.95, 0.75), "glow": Color(1.0, 0.7, 0.8)},

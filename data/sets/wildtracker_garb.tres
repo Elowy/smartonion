@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"wildtracker_garb"
+display_name = "Wildtracker's Garb"
+class_id = &"hunter"
+piece_ids = Array[StringName]([&"set_hunter_head", &"set_hunter_shoulders", &"set_hunter_chest", &"set_hunter_hands", &"set_hunter_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "damage",
+"pct": 10.0,
+"source": "pet"
+}],
+"pieces": 2,
+"text": "Your companion deals 10% more damage."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "arrow_fan"
+},
+"mods": {
+"arrows_add": 2.0
+}
+}],
+"pieces": 4,
+"text": "Arrow Fan looses 2 additional arrows."
+}])
