@@ -11,7 +11,9 @@ extends PanelContainer
 ## The Look tab embeds [code]res://scenes/ui/meta/look_picker.gd[/code] (class LookPicker: [code]LookPicker.create(slot)[/code],
 ## signal [code]closed[/code]; it is loaded with [code]ResourceLoader.exists[/code] + [code]load[/code], so this package builds
 ## without it). Input reaches it through its optional [code]handle_input(inp: PlayerInput)[/code]; its [code]closed[/code]
-## closes the whole Loadout.
+## closes the whole Loadout. The optional [code]set_embedded(true)[/code] makes it rows only (the card shows the dressed
+## onion, the card is narrower than the standalone picker) and [code]is_embedded()[/code] tells the screen to leave the
+## prompt row to the picker. Every tab must fit the narrowest 1080p lobby card, width and height.
 
 signal closed
 signal tab_changed(tab: int)
@@ -21,7 +23,10 @@ enum Tab { SEASONINGS, HEIRLOOM, LOOK }
 const TAB_NAMES: Array[String] = ["Seasonings", "Heirloom", "Look"]
 const LOOK_PICKER_PATH := "res://scenes/ui/meta/look_picker.gd"
 const COMING_SOON_TEXT := "Coming soon"
-const TAB_FONT := 20
+## The tab names and their LB / RB glyphs must fit the narrowest 1080p lobby card (about 430 px, with the frame's margins
+## 408 px inside): three names at this size plus the two glyphs come to about 360 px.
+const TAB_FONT := 17
+const TAB_GLYPH := 22.0
 
 ## Where the Look tab looks for the LookPicker script (tests point it at a fake).
 static var look_picker_path := LOOK_PICKER_PATH
@@ -60,7 +65,7 @@ func _build() -> void:
 	add_theme_stylebox_override(&"panel", _frame_style(UiTheme.GOLD_BORDER))
 	var col := UiTheme.vbox(4)
 	add_child(col)
-	_tab_bar = UiTheme.hbox(10)
+	_tab_bar = UiTheme.hbox(8)
 	_tab_bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_tab_bar)
 	_tab_left = UiTheme.hbox(0)
@@ -265,6 +270,9 @@ func _show_look() -> void:
 	# The Loadout routes the owner's input (handle_input below), so the picker must not read it a second time.
 	if &"self_driven" in look_picker:
 		look_picker.set(&"self_driven", false)
+	# The hero's card shows the dressed onion and has no room for the picker's own stage and frame: rows only.
+	if look_picker.has_method(&"set_embedded"):
+		look_picker.call(&"set_embedded", true)
 	look_picker.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	look_holder.add_child(look_picker)
 	coming_soon.visible = false
@@ -299,14 +307,20 @@ func _fill_tab_glyphs() -> void:
 			(box as Control).remove_child(c)
 			c.queue_free()
 	var inp := slot.input if slot != null else null
-	_tab_left.add_child(UiGlyph.for_input(inp, PlayerInput.Pad.LB, 24.0) if inp != null else UiGlyph.pad(PlayerInput.Pad.LB, 24.0))
-	_tab_right.add_child(UiGlyph.for_input(inp, PlayerInput.Pad.RB, 24.0) if inp != null else UiGlyph.pad(PlayerInput.Pad.RB, 24.0))
+	_tab_left.add_child(UiGlyph.for_input(inp, PlayerInput.Pad.LB, TAB_GLYPH) if inp != null else UiGlyph.pad(PlayerInput.Pad.LB, TAB_GLYPH))
+	_tab_right.add_child(UiGlyph.for_input(inp, PlayerInput.Pad.RB, TAB_GLYPH) if inp != null else UiGlyph.pad(PlayerInput.Pad.RB, TAB_GLYPH))
 
 
 func _fill_prompts() -> void:
 	for c in _prompts.get_children():
 		_prompts.remove_child(c)
 		c.queue_free()
+	# An embedded LookPicker shows its own prompts (its rows have more buttons than the three of this row).
+	var own_prompts := tab == Tab.LOOK and look_picker != null and is_instance_valid(look_picker) \
+			and look_picker.has_method(&"is_embedded") and bool(look_picker.call(&"is_embedded"))
+	_prompts.visible = not own_prompts
+	if own_prompts:
+		return
 	var inp := slot.input if slot != null else null
 	var a_label := ""
 	match tab:

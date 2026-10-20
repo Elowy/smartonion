@@ -320,12 +320,15 @@ func go_to_lobby() -> void:
 	_set_state(State.LOBBY)
 
 
-## --loadout-tab (screenshots): opens the Loadout of the second player (the first when alone) in the lobby.
+## --loadout-tab (screenshots): opens the Loadout of the second player (the first when alone, --loadout-player picks
+## another) in the lobby.
 func _open_loadout_view() -> void:
 	var slots := PlayerManager.get_slots()
 	if lobby == null or slots.is_empty():
 		return
-	lobby.open_loadout(slots[1] if slots.size() > 1 else slots[0], LaunchOptions.LOADOUT_TABS.find(options.loadout_tab) as LoadoutScreen.Tab)
+	var slot := slots[mini(1 if options.loadout_player == 0 else options.loadout_player - 1, slots.size() - 1)]
+	slot.ready = false  # (the view readies the first player; a ready hero cannot open the Loadout)
+	lobby.open_loadout(slot, LaunchOptions.LOADOUT_TABS.find(options.loadout_tab) as LoadoutScreen.Tab)
 
 
 ## --seasonings: every bot carries the flagged Seasonings of its own class, in the order given (instead of what the

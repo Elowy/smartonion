@@ -14,6 +14,11 @@ extends PanelContainer
 ## B puts the old one back); X clears the row (Worn gear / None); Y clears every row; B closes.
 ## It edits [member PlayerSlot.looks] / [member PlayerSlot.cosmetics] and remembers them for the class
 ## ([method Meta.remember_loadout]; the file is saved once when the picker closes). Nothing here touches a stat.
+##
+## Embedded ([method set_embedded], the Look tab of the lobby Loadout): the Loadout covers the hero's lobby card, so the live preview
+## stays – as a low banner above the rows instead of the stage on the left – while the title and the frame go and the minimum size
+## with them (the picker takes the host's width and height; the rows, swatches and prompts are compact and fit the narrowest 1080p
+## lobby card). The standalone picker is 760 x 560 with the stage on its left.
 
 ## The picker was closed (B). The selections are on the slot and remembered in the profile.
 signal closed
@@ -34,6 +39,14 @@ const ROW_DEFS: Array[Dictionary] = [
 ]
 const ROW_HEIGHT := 56.0
 const SWATCH := 48.0
+## The standalone picker's minimum size ([method set_embedded] drops it).
+const STANDALONE_SIZE := Vector2(760, 560)
+## Embedded: the preview banner's height, the rows and their swatches a little smaller, the prompts too (the lobby card has no
+## height to spare either).
+const EMBEDDED_STAGE_HEIGHT := 170.0
+const EMBEDDED_ROW_HEIGHT := 44.0
+const EMBEDDED_SWATCH := 38.0
+const EMBEDDED_PROMPT_GLYPH := 22.0
 
 var slot: PlayerSlot
 ## True: the picker reads [member PlayerSlot.input] itself. A host that calls [method handle_input] sets it false.
@@ -49,6 +62,12 @@ var row_panels: Array[PanelContainer] = []
 var _options: Array[Array] = []
 var _before_id: StringName = &""
 var _list_row := -1
+var _embedded := false
+var _column: VBoxContainer
+var _body: HBoxContainer
+var _head: HBoxContainer
+var _head_divider: Control
+var _stage: PanelContainer
 var _title: Label
 var _who: Label
 var _rows_box: VBoxContainer
@@ -83,29 +102,33 @@ func _build() -> void:
 	UiTheme.setup_root(self)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
-	custom_minimum_size = Vector2(760, 560)
+	custom_minimum_size = STANDALONE_SIZE
 	add_theme_stylebox_override(&"panel", _frame_style(UiTheme.GOLD_BORDER))
 	var col := UiTheme.vbox(6)
+	_column = col
 	add_child(col)
 	var head := UiTheme.hbox(8)
+	_head = head
 	_title = UiTheme.label("LOOK", UiTheme.HEADING, 30, UiTheme.GOLD)
 	head.add_child(_title)
 	head.add_child(UiTheme.spacer())
 	_who = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL)
 	head.add_child(_who)
 	col.add_child(head)
-	col.add_child(UiTheme.divider())
+	_head_divider = UiTheme.divider()
+	col.add_child(_head_divider)
 	var body := UiTheme.hbox(14)
+	_body = body
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(body)
 	# Left: the live preview.
-	var stage := UiTheme.panel(UiTheme.INSET_PANEL)
-	stage.custom_minimum_size = Vector2(250, 0)
-	body.add_child(stage)
+	_stage = UiTheme.panel(UiTheme.INSET_PANEL)
+	_stage.custom_minimum_size = Vector2(250, 0)
+	body.add_child(_stage)
 	preview = OnionPreview.create()
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	preview.frame_tall()
-	stage.add_child(preview)
+	_stage.add_child(preview)
 	# Right: the rows, or the list of one row.
 	var right := UiTheme.vbox(4)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -133,14 +156,14 @@ func _build() -> void:
 	var dbox := UiTheme.vbox(1)
 	detail.add_child(dbox)
 	_detail_name = UiTheme.label("", UiTheme.HEADING, 22, UiTheme.GOLD_BRIGHT)
-	_detail_name.clip_text = true
 	dbox.add_child(_detail_name)
 	_detail_line = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL - 2)
-	_detail_line.clip_text = true
 	dbox.add_child(_detail_line)
 	_detail_hint = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL - 2, UiTheme.TEXT_DIM)
-	_detail_hint.clip_text = true
 	dbox.add_child(_detail_hint)
+	for detail_label: Label in [_detail_name, _detail_line, _detail_hint]:
+		detail_label.clip_text = true  # (a long line never widens the picker: it is cut)
+		detail_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_prompts = CenterContainer.new()
 	_prompts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_prompts.custom_minimum_size = Vector2(0, 32)
@@ -154,6 +177,36 @@ static func _frame_style(border: Color) -> UiFrameStyle:
 	s.content_margin_top = 10
 	s.content_margin_bottom = 10
 	return s.rebuild()
+
+
+## Switches the embedded mode (see the class doc) on or off; [method refresh]es when the picker is open.
+func set_embedded(on: bool = true) -> void:
+	_embedded = on
+	custom_minimum_size = Vector2.ZERO if on else STANDALONE_SIZE
+	_head.visible = not on
+	_head_divider.visible = not on
+	_stage.get_parent().remove_child(_stage)
+	if on:  # (the preview becomes a banner above the rows)
+		_column.add_child(_stage)
+		_column.move_child(_stage, _body.get_index())
+		_stage.custom_minimum_size = Vector2(0, EMBEDDED_STAGE_HEIGHT)
+		preview.frame_tall(3.7, 0.6)
+		add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
+	else:
+		_body.add_child(_stage)
+		_body.move_child(_stage, 0)
+		_stage.custom_minimum_size = Vector2(250, 0)
+		preview.frame_tall()
+		add_theme_stylebox_override(&"panel", _frame_style(UiTheme.GOLD_BORDER))
+	for i in row_panels.size():
+		row_panels[i].custom_minimum_size.y = EMBEDDED_ROW_HEIGHT if on else ROW_HEIGHT
+		_swatches[i].custom_minimum_size = Vector2.ONE * (EMBEDDED_SWATCH if on else SWATCH)
+	if slot != null:
+		refresh()
+
+
+func is_embedded() -> bool:
+	return _embedded
 
 
 func _make_row(i: int) -> PanelContainer:
@@ -433,7 +486,8 @@ func refresh() -> void:
 		return
 	_who.text = "%s · %s" % [slot.label(), slot.class_data.display_name]
 	_who.add_theme_color_override(&"font_color", slot.color.lightened(0.35))
-	add_theme_stylebox_override(&"panel", _frame_style(slot.color.lightened(0.15)))
+	if not _embedded:
+		add_theme_stylebox_override(&"panel", _frame_style(slot.color.lightened(0.15)))
 	for i in ROW_DEFS.size():
 		var list := _options[i]
 		var entry := list[_current_index(i)] as WardrobeEntry
@@ -481,7 +535,8 @@ func _fill_detail() -> void:
 	_detail_name.text = entry.title
 	if entry.kind == WardrobeEntry.Kind.NONE:
 		if key in Profile.LOOK_SLOTS:
-			_detail_line.text = "%s: shows the item you wear, or your class's own piece while the slot is empty." % caption
+			_detail_line.text = ("%s: shows what you wear." if _embedded else
+					"%s: shows the item you wear, or your class's own piece while the slot is empty.") % caption
 		else:
 			_detail_line.text = "%s: nothing extra." % caption
 		var have := _options[row].size() - 1
@@ -505,16 +560,17 @@ func _fill_prompts() -> void:
 		_prompts.remove_child(c)
 		c.queue_free()
 	var inp := slot.input if slot != null else null
+	var glyph_size := EMBEDDED_PROMPT_GLYPH if _embedded else 26.0
 	var glyph := func(button: PlayerInput.Pad) -> UiGlyph:
-		return UiGlyph.for_input(inp, button, 26.0) if inp != null else UiGlyph.pad(button, 26.0)
+		return UiGlyph.for_input(inp, button, glyph_size) if inp != null else UiGlyph.pad(button, glyph_size)
 	var items: Array
 	if mode == Mode.LIST:
-		items = [[UiGlyph.nav(26.0, false), "Browse"], [glyph.call(PlayerInput.Pad.A), "Choose"], [glyph.call(PlayerInput.Pad.B), "Back"]]
+		items = [[UiGlyph.nav(glyph_size, false), "Browse"], [glyph.call(PlayerInput.Pad.A), "Choose"], [glyph.call(PlayerInput.Pad.B), "Back"]]
 	else:
-		items = [[UiGlyph.nav(26.0, true), "Row"], [UiGlyph.nav(26.0, false), "Change"], [glyph.call(PlayerInput.Pad.A), "List"],
+		items = [[UiGlyph.nav(glyph_size, true), "Row"], [UiGlyph.nav(glyph_size, false), "Change"], [glyph.call(PlayerInput.Pad.A), "List"],
 				[glyph.call(PlayerInput.Pad.X), "Clear"], [glyph.call(PlayerInput.Pad.B), "Done"]]
 	var line := UiTheme.prompt_row(items, UiTheme.FONT_SMALL - 2)
-	line.add_theme_constant_override(&"separation", 12)
+	line.add_theme_constant_override(&"separation", 8 if _embedded else 12)
 	_prompts.add_child(line)
 
 

@@ -12,6 +12,8 @@ var _saved_path := ""
 var _saved_persist := false
 var _saved_look_path := ""
 var _nodes: Array[Node] = []
+var _async := false
+var _root_size := Vector2i.ZERO
 
 
 func before_each() -> void:
@@ -19,6 +21,8 @@ func before_each() -> void:
 	_saved_path = Meta.path
 	_saved_persist = Meta.persist
 	_saved_look_path = LoadoutScreen.look_picker_path
+	_root_size = tree.root.size
+	tree.root.size = Vector2i(1920, 1080)  # (the lobby cards are laid out for the 1080p canvas)
 	PlayerManager.clear()
 	RunState.start_run(1, 43)
 
@@ -32,8 +36,13 @@ func after_each() -> void:
 	Meta.path = _saved_path
 	Meta.persist = _saved_persist
 	LoadoutScreen.look_picker_path = _saved_look_path
+	tree.root.size = _root_size
 	PlayerManager.clear()
 	UiFakes.reset_players()
+
+
+func is_async() -> bool:
+	return _async
 
 
 # --- Helpers ------------------------------------------------------------------------------------------
@@ -291,37 +300,119 @@ func test_the_real_look_picker_takes_the_stick_and_lt_closes_the_loadout() -> vo
 
 
 func test_the_loadout_fits_inside_the_smallest_card_on_every_tab() -> void:
+	_async = true
+	LoadoutScreen.look_picker_path = LoadoutScreen.LOOK_PICKER_PATH  # (the REAL LookPicker on the Look tab, no stand-in)
 	_lobby()
-	var smallest_card := INF
 	var tallest := 0.0
+	var widest := 0.0
+	var narrowest_card := INF
+	var shortest_card := INF
+	var by_tab: Array[float] = [0.0, 0.0, 0.0]
 	for cid in Db.class_ids:
 		var input := _join("p_%s" % cid, cid)
 		UiFakes.step(lobby)
+		await tree.process_frame
+		await tree.process_frame
 		var card := lobby.cards[0]
 		var closed := card.get_combined_minimum_size().y
-		smallest_card = minf(smallest_card, closed)
+		narrowest_card = minf(narrowest_card, card.size.x)
+		shortest_card = minf(shortest_card, card.size.y)
 		var slot := PlayerManager.get_slot(0)
 		check(lobby.open_loadout(slot), "%s: opens" % cid)
 		check_eq(card.get_combined_minimum_size().y, closed, "%s: an open Loadout does not change the card's height" % cid)
 		for tab_index in 3:
 			_loadout(0).set_tab(tab_index as LoadoutScreen.Tab)
+			var here := _loadout(0).get_combined_minimum_size()
 			if tab_index == LoadoutScreen.Tab.SEASONINGS:
 				for i in _loadout(0).picker.entries.size():
 					_loadout(0).picker.cursor = i
 					_loadout(0).picker.refresh()
-					tallest = maxf(tallest, _loadout(0).get_combined_minimum_size().y)
+					here = here.max(_loadout(0).get_combined_minimum_size())
 			elif tab_index == LoadoutScreen.Tab.HEIRLOOM:
 				for i in _loadout(0).heirloom_tab.entries.size():
 					_loadout(0).heirloom_tab.cursor = i
 					_loadout(0).heirloom_tab.refresh()
-					tallest = maxf(tallest, _loadout(0).get_combined_minimum_size().y)
+					here = here.max(_loadout(0).get_combined_minimum_size())
 			else:
-				tallest = maxf(tallest, _loadout(0).get_combined_minimum_size().y)
+				var look := _loadout(0).look_picker
+				check(look is LookPicker and (look as LookPicker).is_embedded(), "%s: the Look tab holds the real, embedded LookPicker" % cid)
+				var picker := look as LookPicker
+				for row_index in LookPicker.ROW_DEFS.size():  # (every row under the cursor, then the choose grid of each)
+					picker.row = row_index
+					picker.refresh()
+					here = here.max(_loadout(0).get_combined_minimum_size())
+					picker._begin_list()
+					picker.refresh()
+					here = here.max(_loadout(0).get_combined_minimum_size())
+					picker._end_list(false)
+			tallest = maxf(tallest, here.y)
+			by_tab[tab_index] = maxf(by_tab[tab_index], here.y)
+			widest = maxf(widest, here.x)
+			check(here.x <= card.size.x, "%s: tab %s needs %d px, the card is %d px wide" % [cid, LoadoutScreen.TAB_NAMES[tab_index], here.x, card.size.x])
 		_loadout(0).close()
 		PlayerManager.leave(0)
 		check(input != null, "joined")
 		UiFakes.step(lobby)
-	check(tallest <= smallest_card, "the Loadout (%d px at most) fits inside the smallest card (%d px) at 1080p" % [tallest, smallest_card])
+	check(tallest <= shortest_card, "the Loadout (%d px at most; per tab %s) fits inside the smallest card (%d px) at 1080p" % [tallest, by_tab, shortest_card])
+	check(widest <= narrowest_card, "and its widest tab (%d px) inside the narrowest card (%d px)" % [widest, narrowest_card])
+	finished.emit()
+
+
+## The Loadout of each of the four players, laid out for real at 1920 x 1080: it stays on its own card (not under, over or past
+## the neighbour, P4's not off the screen) on every tab, and the Look tab's rows are inside it, not cut off by its clipping.
+func test_the_loadout_of_every_player_stays_on_its_card_and_on_screen() -> void:
+	_async = true
+	LoadoutScreen.look_picker_path = LoadoutScreen.LOOK_PICKER_PATH
+	_lobby()
+	var classes: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue"]
+	for i in classes.size():
+		_join("p%d" % i, classes[i])
+	UiFakes.step(lobby)
+	await tree.process_frame
+	await tree.process_frame
+	var screen := lobby.get_viewport_rect()
+	check_eq(screen.size, Vector2(1920, 1080), "the 1920 x 1080 view")
+	for i in classes.size():
+		var slot := PlayerManager.get_slot(i)
+		var card := lobby.cards[i]
+		check(lobby.open_loadout(slot), "P%d: opens" % (i + 1))
+		var loadout := _loadout(i)
+		for tab_index in 3:
+			loadout.set_tab(tab_index as LoadoutScreen.Tab)
+			await tree.process_frame
+			await tree.process_frame
+			var what := "P%d, %s tab" % [i + 1, LoadoutScreen.TAB_NAMES[tab_index]]
+			var rect := loadout.get_global_rect()
+			check(card.get_global_rect().grow(0.5).encloses(rect), "%s: inside its card %s / %s" % [what, rect, card.get_global_rect()])
+			check(screen.encloses(rect), "%s: on screen %s" % [what, rect])
+			var needs := loadout.get_combined_minimum_size()
+			check(needs.x <= rect.size.x + 0.5 and needs.y <= rect.size.y + 0.5, "%s: needs %s, has %s" % [what, needs, rect.size])
+			var bar := loadout._tab_bar.get_global_rect()
+			check(rect.grow(0.5).encloses(bar), "%s: the tab bar %s is inside %s" % [what, bar, rect])
+			if tab_index == LoadoutScreen.Tab.LOOK:
+				var picker := loadout.look_picker as LookPicker
+				check(picker != null and picker.is_embedded(), "%s: the embedded LookPicker" % what)
+				var picker_rect := picker.get_global_rect()
+				check(rect.grow(0.5).encloses(picker_rect), "%s: the picker %s is inside %s" % [what, picker_rect, rect])
+				for panel in picker.row_panels:
+					check(picker_rect.grow(0.5).encloses(panel.get_global_rect()), "%s: row %s is inside the picker" % [what, panel.name])
+				check(not picker._head.visible and picker.custom_minimum_size == Vector2.ZERO, "%s: no title, no minimum size" % what)
+				var stage := picker._stage.get_global_rect()  # (the Loadout covers the hero's card: the preview is a banner above the rows)
+				check(picker._stage.is_visible_in_tree() and stage.end.y <= picker.row_panels[0].get_global_rect().position.y + 0.5,
+						"%s: the preview banner %s is above the rows" % [what, stage])
+				check(picker_rect.grow(0.5).encloses(stage), "%s: and inside the picker" % what)
+		loadout.close()
+		UiFakes.step(lobby)
+	finished.emit()
+
+
+func test_the_loadout_view_flags_pick_the_tab_and_the_player() -> void:
+	var o := LaunchOptions.parse(["--view=lobby", "--loadout-tab=look", "--loadout-player=4"])
+	check_eq(o.loadout_tab, "look", "the tab")
+	check_eq(o.loadout_player, 4, "the player")
+	check_eq(LaunchOptions.parse(["--loadout-tab=look"]).loadout_player, 0, "the second player's by default")
+	check_eq(LaunchOptions.parse(["--loadout-player=9"]).loadout_player, PlayerManager.MAX_PLAYERS, "at most the fourth")
+	check_eq(LaunchOptions.parse(["--loadout-player=0"]).loadout_player, 1, "at least the first")
 
 
 func test_a_class_change_keeps_what_the_class_can_carry_and_prunes_the_rest() -> void:

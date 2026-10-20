@@ -636,6 +636,35 @@ func test_the_look_picker_builds_under_the_dev_profile() -> void:
 	check_eq(picker.preview.model.class_data.id, &"mage", "of the hero's class")
 
 
+func test_the_look_picker_embedded_mode_is_rows_and_a_banner_and_goes_back() -> void:
+	Meta.configure(&"", "", true)
+	var picker := _picker_for()
+	check(not picker.is_embedded(), "standalone to begin with")
+	check_eq(picker.custom_minimum_size, LookPicker.STANDALONE_SIZE, "760 x 560")
+	check(picker._head.visible and picker._stage.get_parent() == picker._body, "the title, and the stage on the left")
+	picker.set_embedded(true)
+	check(picker.is_embedded(), "embedded")
+	check_eq(picker.custom_minimum_size, Vector2.ZERO, "no minimum size of its own")
+	check(not picker._head.visible and not picker._head_divider.visible, "no title")
+	check(picker._stage.get_parent() == picker._column and picker._stage.get_index() < picker._body.get_index(), "the preview is a banner above the rows")
+	check_eq(picker._stage.custom_minimum_size, Vector2(0, LookPicker.EMBEDDED_STAGE_HEIGHT), "of its own height")
+	check(picker.get_combined_minimum_size().x <= 400.0, "and it needs no more than a lobby card has inside (%d px; the prompts are the widest)" % picker.get_combined_minimum_size().x)
+	check(picker.preview.model != null and picker.preview.model.class_data.id == &"mage", "it still shows the hero")
+	var swap := _tap_feed(picker)
+	check(swap, "the rows still answer the owner's input")
+	picker.set_embedded(false)
+	check(not picker.is_embedded() and picker._head.visible, "standalone again")
+	check_eq(picker.custom_minimum_size, LookPicker.STANDALONE_SIZE, "with its size back")
+	check(picker._stage.get_parent() == picker._body and picker._stage.get_index() == 0, "and the stage on the left")
+
+
+## One step to the right on the first row of an embedded picker (a pick of the Head row); true when the slot changed.
+func _tap_feed(picker: LookPicker) -> bool:
+	var before: StringName = picker.slot.looks.get(&"head", &"")
+	picker.step_row(0, 1)
+	return picker.slot.looks.get(&"head", &"") != before
+
+
 func test_the_look_picker_reacts_to_its_owners_input() -> void:
 	Meta.configure(&"", "", true)
 	var inp := _human("owner")

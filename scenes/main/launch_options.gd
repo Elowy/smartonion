@@ -26,6 +26,7 @@ extends RefCounted
 ##   --patch-tab=NAME     dev: the tab --view=patch opens on – classes, seasonings, heirlooms, achievements, wardrobe
 ##   --loadout-tab=NAME   dev: --view=lobby opens the Loadout of the second player (the first without one) on that tab –
 ##                        seasonings, heirloom, look (screenshots)
+##   --loadout-player=N   dev: with --loadout-tab, the player (1..4) whose Loadout opens instead of the second's
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
 ##   --time-scale=X       overrides the time scale (smoke default 4)
@@ -138,6 +139,8 @@ var artifact_chance := -1.0
 ## --patch-tab / --loadout-tab (M9 PATCH, screenshots): "" = the default tab.
 var patch_tab := ""
 var loadout_tab := ""
+## --loadout-player (1..4): whose Loadout --loadout-tab opens; 0 = the second player's (the first when alone).
+var loadout_player := 0
 ## "" = the end screen opens on the Summary page (--end-page; GameOverScreen.PAGE_IDS).
 var end_page := ""
 ## --save-card: the forced end screen saves the run card right away.
@@ -261,6 +264,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.loadout_tab = value
 				else:
 					o.unknown.append(arg)
+			"--loadout-player":
+				o.loadout_player = clampi(value.to_int(), 1, PlayerManager.MAX_PLAYERS)
 			"--save-card":
 				o.save_card = true
 			"--mode":
