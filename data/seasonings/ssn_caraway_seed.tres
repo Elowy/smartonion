@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_caraway_seed"
+class_id = &"rogue"
+ability = &"fan_of_knives"
+display_name = "Caraway Seed"
+text = "Each Combo Point adds 15% more damage, but Knife Bloom costs 5 more Energy."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fan_of_knives"
+},
+"mods": {
+"combo_bonus_pct_add": 15,
+"cost_add": 5
+}
+}])

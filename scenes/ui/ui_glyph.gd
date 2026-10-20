@@ -89,6 +89,10 @@ static func keyboard_name(button: PlayerInput.Pad) -> String:
 			return "Q"
 		PlayerInput.Pad.RB:
 			return "E"
+		PlayerInput.Pad.RT:
+			return "LMB"
+		PlayerInput.Pad.LT:
+			return "RMB"
 		PlayerInput.Pad.START:
 			return "P"
 		PlayerInput.Pad.SELECT, PlayerInput.Pad.R3:

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_saffron_thread"
+class_id = &"mage"
+ability = &"blink"
+display_name = "Saffron Thread"
+text = "Blink gains a charge, but jumps 2 m less and protects 0.2 sec less."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blink"
+},
+"mods": {
+"charges_add": 1,
+"distance_add": -2.0,
+"invulnerable_add": -0.2
+}
+}])

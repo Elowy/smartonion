@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_sage_leaf"
+class_id = &"paladin"
+ability = &"word_of_glory"
+display_name = "Sage Leaf"
+text = "Call of Valor also shields for 12% max HP but heals 10% max HP less."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "word_of_glory"
+},
+"mods": {
+"shield_max_hp_pct_add": 12,
+"heal_max_hp_pct_add": -10
+}
+}])

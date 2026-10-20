@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_cracked_pepper"
+class_id = &"warrior"
+ability = &"whirlwind"
+display_name = "Cracked Pepper"
+text = "Whirlwind hits 40 points harder but reaches 0.6 m less."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "whirlwind"
+},
+"mods": {
+"damage_pct_add": 40,
+"radius_add": -0.6
+}
+}])

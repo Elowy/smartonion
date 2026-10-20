@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_wolfberry"
+class_id = &"shaman"
+ability = &"spirit_pack"
+display_name = "Wolfberry"
+text = "Spirit Pack calls 1 more wolf; bites 15 points weaker, 2 sec shorter."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "spirit_pack"
+},
+"mods": {
+"wolves_add": 1,
+"bite_pct_add": -15,
+"duration_add": -2.0
+},
+"requires": {
+"knows": "spirit_pack"
+}
+}])

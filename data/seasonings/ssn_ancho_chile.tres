@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_ancho_chile"
+class_id = &"hunter"
+ability = &"play_dead"
+display_name = "Ancho Chile"
+text = "You heal 15% max HP while playing dead (0.5 sec shorter); recharges 25% slower."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "play_dead"
+},
+"mods": {
+"heal_max_hp_pct_add": 15,
+"duration_add": -0.5,
+"cooldown_pct": 25
+},
+"requires": {
+"knows": "play_dead"
+}
+}])

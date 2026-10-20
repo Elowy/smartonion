@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_rock_salt"
+class_id = &"shaman"
+ability = &"totem_rite"
+display_name = "Rock Salt"
+text = "Totems last 4 sec longer but Totem Rite recharges 40% slower."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "totem_rite"
+},
+"mods": {
+"duration_add": 4.0,
+"cooldown_pct": 40
+}
+}])

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_tarragon"
+class_id = &"rogue"
+ability = &"shuriken_toss"
+display_name = "Tarragon"
+text = "Throwing Stars throws 2 more but recharges 25% slower."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shuriken_toss"
+},
+"mods": {
+"shuriken_add": 2,
+"cooldown_pct": 25
+},
+"requires": {
+"knows": "shuriken_toss"
+}
+}])

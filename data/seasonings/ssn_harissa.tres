@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_harissa"
+class_id = &"warlock"
+ability = &"summon_infernal"
+display_name = "Harissa"
+text = "Cinder Brute stays 4 sec longer but recharges 30% slower."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "summon_infernal"
+},
+"mods": {
+"duration_add": 4.0,
+"cooldown_pct": 30
+},
+"requires": {
+"knows": "summon_infernal"
+}
+}])

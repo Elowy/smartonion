@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_vanilla_bean"
+class_id = &"mage"
+ability = &"ice_barrier"
+display_name = "Vanilla Bean"
+text = "Frozen Layer absorbs 60% more but recharges 30% slower."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "ice_barrier"
+},
+"mods": {
+"power_pct": 60,
+"cooldown_pct": 30
+},
+"requires": {
+"knows": "ice_barrier"
+}
+}])

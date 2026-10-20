@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_juniper_berry"
+class_id = &"mage"
+ability = &"meteor"
+display_name = "Juniper Berry"
+text = "Meteor lands 0.3 sec sooner, 0.8 m wider, and recharges 20% slower."
+tier = &"t5"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "meteor"
+},
+"mods": {
+"fall_add": -0.3,
+"radius_add": 0.8,
+"cooldown_pct": 20
+},
+"requires": {
+"knows": "meteor"
+}
+}])

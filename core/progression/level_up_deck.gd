@@ -82,6 +82,7 @@ static func ability_candidates(player: Player) -> Array:
 		if runner.knows(a.id):
 			continue
 		var w := a.card_weight * (FULL_SLOTS_NEW_WEIGHT if full_kinds.get(a.kind, false) else 1.0)
+		w *= Seasonings.card_weight_mult(player, a.id)  # M9: an equipped Seasoning's ability is likelier (weights only)
 		if w > 0.0:
 			out.append([LevelCard.new_ability(a), w])
 	return out

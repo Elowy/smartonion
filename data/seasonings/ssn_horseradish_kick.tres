@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_horseradish_kick"
+class_id = &"warrior"
+ability = &"execute"
+display_name = "Horseradish Kick"
+text = "Execute finishes enemies below 30% HP, but the strike is 100 points weaker."
+tier = &"t4"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "execute"
+},
+"mods": {
+"threshold_add": 10,
+"damage_pct_add": -100
+},
+"requires": {
+"knows": "execute"
+}
+}])

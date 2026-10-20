@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_wild_garlic"
+class_id = &"hunter"
+ability = &"hunter_companion"
+display_name = "Wild Garlic"
+text = "Your companion bites 25% harder but 25% less often."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunter_companion"
+},
+"mods": {
+"damage_bonus_add": 25,
+"interval_pct": 25
+}
+}])

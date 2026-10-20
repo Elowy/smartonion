@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_ginger_snap"
+class_id = &"warrior"
+ability = &"heroic_leap"
+display_name = "Ginger Snap"
+text = "Soaring Slam leaves a crater (slow 50%, 40% weapon damage per sec for 3 sec) but the impact is 60 points weaker."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "heroic_leap"
+},
+"mods": {
+"crater": true,
+"damage_pct_add": -60
+},
+"requires": {
+"knows": "heroic_leap"
+}
+}])

@@ -5,6 +5,9 @@ extends PanelContainer
 ## class stat bonuses, starting weapons, resource and the device's own button prompts. A class with
 ## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
+## M9 SEASONINGS: every class also shows a Seasonings pill on the left of the preview (a socket per slot with the picked
+## Seasoning's icon, the button that opens the picker: Lobby, LT); [member picker] is the SeasoningPicker panel that
+## covers the card while it is open.
 ## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
 ## description, and without the Ready prompt (Lobby.ready_block_reason). M9 LEVELS: a profile that records runs also
 ## shows the class's level – a small "Lv 12" badge and the Class XP strip with its numbers on the preview – and, once the
@@ -12,6 +15,8 @@ extends PanelContainer
 ## that switches it (Lobby: LB / Q).
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
+## The Seasoning sockets on the card.
+const SEASONING_CHIP_SIZE := 28.0
 const PREVIEW_HEIGHT := 150.0
 const ABILITY_ICON_SIZE := 40.0
 ## The Mastery text is cut after this many lines: every class's mastery_text must fit in it
@@ -23,6 +28,8 @@ const XP_BAR_HEIGHT := 11.0
 var index := 0
 var slot: PlayerSlot
 var preview: OnionPreview
+## The Seasoning picker overlay of this card (hidden until the player opens it).
+var picker: SeasoningPicker
 
 ## M9 LEVELS: the "Lv 12" badge on the preview's corner, the Class XP strip on its lower edge and the XP numbers (hidden for
 ## the dev profile).
@@ -64,6 +71,12 @@ var _companion_row: HBoxContainer
 var _companion_label: Label
 var _companion_glyph_holder: HBoxContainer
 var _prompt_holder: CenterContainer
+## The Seasonings pill on the preview: the picker button's glyph and one socket per slot (M9).
+var _season_row: PanelContainer
+var _season_label: Label
+var _season_chips: HBoxContainer
+var _season_glyph_holder: HBoxContainer
+var _season_key := ""
 # Abilities / Mastery block (hidden for a class without M3 data).
 var _abilities_panel: PanelContainer
 var _ability_row: HBoxContainer
@@ -89,6 +102,14 @@ func _build() -> void:
 	custom_minimum_size = Vector2(300, 0)
 	_build_empty()
 	_build_joined()
+	# The picker sits on a plain Control layer, so its (tall) content never changes the card's size: it covers the card.
+	var picker_layer := Control.new()
+	picker_layer.name = "PickerLayer"
+	picker_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(picker_layer)
+	picker = SeasoningPicker.create()
+	picker_layer.add_child(picker)
+	picker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_apply_empty()
 
 
@@ -154,6 +175,8 @@ func _build_joined() -> void:
 	preview = OnionPreview.create()
 	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage.add_child(preview)
+	_season_row = _make_seasoning_pill()  # (under the READY ribbon)
+	stage.add_child(_season_row)
 	_ready_ribbon = _make_ready_ribbon()
 	stage.add_child(_ready_ribbon)
 	level_badge = _make_level_badge()
@@ -250,6 +273,47 @@ func _build_joined() -> void:
 	_joined_box.add_child(_prompt_holder)
 
 
+## The Seasonings pill on the left of the onion preview (M9): "Seasonings", then the picker button's glyph
+## and one socket per Seasoning slot (a picked Seasoning's icon, an empty socket, a dim one for a slot the class has
+## not unlocked). It takes no height of the card, which is already as tall as the 1080p lobby allows, and stays left
+## of the onion.
+func _make_seasoning_pill() -> PanelContainer:
+	var pill := PanelContainer.new()
+	pill.name = "SeasoningPill"
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.025, 0.02, 0.72)
+	style.border_color = Color(UiTheme.GOLD_DARK, 0.8)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 2
+	style.content_margin_bottom = 4
+	pill.add_theme_stylebox_override(&"panel", style)
+	var col := UiTheme.vbox(1)
+	_season_label = UiTheme.label("Seasonings", UiTheme.GOLD_LABEL, UiTheme.FONT_SMALL - 4)
+	col.add_child(_season_label)
+	var row := UiTheme.hbox(4)
+	_season_glyph_holder = UiTheme.hbox(4)
+	row.add_child(_season_glyph_holder)
+	_season_chips = UiTheme.hbox(3)
+	_season_chips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_season_chips)
+	col.add_child(row)
+	pill.add_child(col)
+	# Left side of the preview, in the band between its top row (a level badge) and its bottom edge (the READY ribbon,
+	# a thin bar): clear of both and of the onion.
+	pill.anchor_left = 0.0
+	pill.anchor_right = 0.0
+	pill.anchor_top = 1.0
+	pill.anchor_bottom = 1.0
+	pill.offset_left = 8.0
+	pill.offset_bottom = -44.0
+	pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	return pill
+
+
 func _preview_style() -> UiFrameStyle:
 	var s := UiTheme.inset_style()
 	s.content_margin_left = 2
@@ -311,6 +375,9 @@ func _make_level_badge() -> PanelContainer:
 ## Mirrors [param p_slot] (null = empty slot). Cheap when nothing changed.
 func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	slot = p_slot
+	# The Seasoning pill follows the picks and the slots on its own (they change without the rest of the card changing).
+	if p_slot != null and _joined_box.visible and _seasoning_key(p_slot) != _season_key:
+		_fill_seasonings(p_slot)
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
@@ -321,9 +388,12 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	_state_key = key
 	if p_slot == null:
 		_keyboard_hint.visible = keyboard_free
+		picker.close()
 		_apply_empty()
 		_was_ready = false
 	else:
+		if picker.slot != p_slot:
+			picker.close()
 		_apply_joined(p_slot)
 		if p_slot.ready and not _was_ready:
 			preview.cheer()
@@ -386,6 +456,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 	_fill_stats(data)
 	_fill_weapons(data, s)
 	_fill_companion(s)
+	_fill_seasonings(s)
 	_fill_abilities(data, s)
 	if data != null:
 		_resource_dot.set_color(data.resource_color)
@@ -488,6 +559,57 @@ func _fill_companion(s: PlayerSlot) -> void:
 	_companion_label.text = "Companion: %s" % ClassData.companion_name(s.companion_id())
 	if not s.ready:
 		_companion_glyph_holder.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.RB, 24.0))
+
+
+## The sockets of the Seasoning pill, left to right: one per slot the game has (Seasonings.MAX_SLOTS), each a picked
+## Seasoning, an empty one or a locked one (tests).
+func seasoning_sockets() -> Array[SeasoningIcon.SeasoningSocket]:
+	var out: Array[SeasoningIcon.SeasoningSocket] = []
+	for c in _season_chips.get_children():
+		if c is SeasoningIcon.SeasoningSocket:
+			out.append(c as SeasoningIcon.SeasoningSocket)
+	return out
+
+
+## The glyph of the button that opens the picker (null while the player is ready: the picks are locked; tests).
+func seasoning_glyph() -> UiGlyph:
+	for c in _season_glyph_holder.get_children():
+		if c is UiGlyph:
+			return c as UiGlyph
+	return null
+
+
+## Whether the Seasoning pill shows (not for an empty slot or a locked class; tests).
+func seasoning_pill_visible() -> bool:
+	return _season_row.visible and _joined_box.visible
+
+
+## The Seasonings pill (M9): the button that opens the picker (not while ready: the picks are locked like the class),
+## the count of picked Seasonings of the class's slots and their icons; hidden for a locked class.
+## What the Seasoning pill shows, as one string: the picks and the slot count.
+func _seasoning_key(s: PlayerSlot) -> String:
+	var cid: StringName = s.class_data.id if s.class_data != null else &""
+	return "%s:%s:%d:%s" % [cid, ",".join(PackedStringArray(s.seasonings)), Seasonings.slot_count(cid), s.ready]
+
+
+func _fill_seasonings(s: PlayerSlot) -> void:
+	_season_key = _seasoning_key(s)
+	for c in _season_chips.get_children():
+		_season_chips.remove_child(c)
+		c.queue_free()
+	for c in _season_glyph_holder.get_children():
+		_season_glyph_holder.remove_child(c)
+		c.queue_free()
+	var cid: StringName = s.class_data.id if s.class_data != null else &""
+	var picks := Seasonings.resolve(cid, s.seasonings)
+	var total := Seasonings.slot_count(cid)
+	_season_row.visible = s.class_data != null and _locked_hint(s) == ""
+	if not s.ready:
+		_season_glyph_holder.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.LT, 24.0))
+	for i in Seasonings.MAX_SLOTS:
+		var socket := SeasoningIcon.SeasoningSocket.create(picks[i] if i < picks.size() else null, i >= total, SEASONING_CHIP_SIZE)
+		socket.name = "Socket%d" % (i + 1)
+		_season_chips.add_child(socket)
 
 
 ## The two core abilities (icon with this device's button, name) and the Mastery line.

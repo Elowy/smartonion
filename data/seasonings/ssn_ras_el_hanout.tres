@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_ras_el_hanout"
+class_id = &"warlock"
+ability = &"fear"
+display_name = "Ras el Hanout"
+text = "Fleeing enemies take Shadow damage each second; Fear recharges 25% slower."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "fear"
+},
+"mods": {
+"dread_damage_add": 2.0,
+"cooldown_pct": 25
+},
+"requires": {
+"knows": "fear"
+}
+}])

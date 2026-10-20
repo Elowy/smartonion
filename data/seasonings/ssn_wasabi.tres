@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_wasabi"
+class_id = &"warlock"
+ability = &"summon_voidwalker"
+display_name = "Wasabi"
+text = "The Gloomguard's Menace reaches 2 m further; its fists hit 30% softer."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "summon_voidwalker"
+},
+"mods": {
+"torment_radius_add": 2.0,
+"power_pct": -30
+},
+"requires": {
+"knows": "summon_voidwalker"
+}
+}])

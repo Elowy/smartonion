@@ -15,6 +15,8 @@ extends Control
 ##   not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
+## - M9 SEASONINGS: LT / right mouse button opens the player's Seasoning picker over their card ([method
+##   open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and nothing else in the lobby.
 ## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
 ##   and X toggles Hardcore ([method toggle_hardcore]); the header shows the choice ("Mode: Endless ·
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
@@ -358,6 +360,7 @@ func _set_joining(on: bool) -> void:
 
 func _on_player_joined(slot: PlayerSlot) -> void:
 	Meta.apply_loadout(slot)  # (the selections remembered for the class the player starts on)
+	Seasonings.prune(slot)
 
 
 func _on_device_disconnected(slot: PlayerSlot) -> void:
@@ -393,6 +396,14 @@ func _process(delta: float) -> void:
 func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
 	if inp == null:
+		return
+	# An open Seasoning picker takes everything this player presses.
+	var picker := picker_of(slot)
+	if picker != null and picker.is_open():
+		picker.handle_input(inp)
+		return
+	if inp.just_pressed(PlayerInput.Pad.LT) and open_seasoning_picker(slot):
+		Audio.play_ui(&"ui_confirm")
 		return
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
@@ -466,8 +477,25 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 	if next != null:
 		slot.class_data = next
 		Meta.apply_loadout(slot)
+		Seasonings.prune(slot)  # (what the new class cannot carry: another class's Seasonings, too many for its slots)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
+
+
+## The Seasoning picker on [param slot]'s card (null for a slot without a card).
+func picker_of(slot: PlayerSlot) -> SeasoningPicker:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].picker
+
+
+## Opens [param slot]'s Seasoning picker (LT / right mouse button). Not while the player is ready (the picks are locked like the class),
+## for a class the profile has not unlocked, or without a card. True when it opened.
+func open_seasoning_picker(slot: PlayerSlot) -> bool:
+	var picker := picker_of(slot)
+	if picker == null or slot.ready or ready_block_reason(slot) != "":
+		return false
+	return picker.open(slot)
 
 
 func _update_countdown(delta: float) -> void:

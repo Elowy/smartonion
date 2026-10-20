@@ -311,6 +311,16 @@ func go_to_lobby() -> void:
 	_set_state(State.LOBBY)
 
 
+## --seasonings: every bot carries the flagged Seasonings of its own class, in the order given (instead of what the
+## profile remembers for the class).
+func _apply_seasoning_flag(slots: Array[PlayerSlot]) -> void:
+	if options.seasonings.is_empty():
+		return
+	for slot in slots:
+		if slot.is_bot() and slot.class_data != null:
+			slot.seasonings.assign(options.seasonings_for(slot.class_data.id))
+
+
 ## Starts a run with every joined slot: arena, director, players, HUD, run screens, wave 1
 ## (or --start-wave).
 func start_run() -> void:
@@ -322,6 +332,7 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
+	_apply_seasoning_flag(slots)  # (--seasonings: after the lobby / the profile put their selections on the slots)
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
 	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
 	for slot in slots:

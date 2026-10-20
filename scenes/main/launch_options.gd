@@ -67,6 +67,10 @@ extends RefCounted
 ##   --profile-path=FILE  M9 dev / test hook: reads and saves the meta profile in FILE instead of the player's
 ##                        user://profile.json (the only way an automated run touches a profile). With --profile=fresh
 ##                        or max that profile is the starting point; --profile=dev has no file
+##   --seasonings=a,b,c   M9: the Seasonings the bots carry (ids of Db.seasonings, e.g. ssn_smoked_paprika): every bot
+##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
+##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
+##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -145,6 +149,8 @@ var difficulty: StringName = &"normal"
 ## --profile-path ("" = none).
 var profile_kind: StringName = &""
 var profile_path := ""
+## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
+var seasonings: Array[StringName] = []
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -157,6 +163,7 @@ static func _flag_on(value: String) -> bool:
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
 	var o := LaunchOptions.new()
+	var seasonings_arg := ""
 	for raw in args:
 		var arg := String(raw)
 		var key := arg
@@ -276,14 +283,71 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.profile_path = value
 				else:
 					o.unknown.append(arg)
+			"--seasonings":
+				seasonings_arg = arg
+				for part in value.split(",", false):
+					o.seasonings.append(StringName(part.strip_edges()))
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
 					o.unknown.append(arg)
 	o.start_wave = o.clamp_wave(o.start_wave)
+	if seasonings_arg != "":
+		var problem := o.seasonings_problem()
+		if problem != "":
+			o.unknown.append("%s (%s)" % [seasonings_arg, problem])
+			o.seasonings.clear()
 	if o.profile_kind == Meta.PROFILE_DEV and o.profile_path != "":
 		o.unknown.append("--profile=dev with --profile-path=%s (the dev profile never touches a file)" % o.profile_path)
 	return o
+
+
+## The class ids of the bots a launch with --players / --classes adds, in join order (Main._add_bots: --classes
+## cycled, else every class the profile has unlocked).
+func bot_classes() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id in classes:
+		if Db.get_class_data(id) != null:
+			ids.append(id)
+	if ids.is_empty():
+		ids = Meta.unlocked_class_ids()
+	var out: Array[StringName] = []
+	if ids.is_empty():
+		return out
+	for i in players:
+		out.append(ids[i % ids.size()])
+	return out
+
+
+## What is wrong with --seasonings ("" = fine): an unknown id, a repeated one, one whose class no bot plays, or more
+## ids of a class than it has slots (Seasonings.MAX_SLOTS).
+func seasonings_problem() -> String:
+	var party := bot_classes()
+	var per_class: Dictionary[StringName, int] = {}
+	var seen: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s == null:
+			return "unknown Seasoning '%s'" % id
+		if id in seen:
+			return "'%s' is listed twice" % id
+		seen.append(id)
+		if s.class_id not in party:
+			return "no bot plays the %s, '%s' would do nothing" % [s.class_id, id]
+		per_class[s.class_id] = int(per_class.get(s.class_id, 0)) + 1
+		if per_class[s.class_id] > Seasonings.MAX_SLOTS:
+			return "more than %d Seasonings for the %s" % [Seasonings.MAX_SLOTS, s.class_id]
+	return ""
+
+
+## The --seasonings of [param class_id], in the order given.
+func seasonings_for(class_id: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s != null and s.class_id == class_id:
+			out.append(id)
+	return out
 
 
 ## A scripted launch (--smoke, --demo, --view, --screenshot): not the player's session, so it never reads or

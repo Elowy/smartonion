@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_pink_peppercorn"
+class_id = &"mage"
+ability = &"arcane_missiles"
+display_name = "Pink Peppercorn"
+text = "Arcane Darts fires 4 more darts, each dealing 40% less."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "arcane_missiles"
+},
+"mods": {
+"missiles_add": 4,
+"power_pct": -40
+},
+"requires": {
+"knows": "arcane_missiles"
+}
+}])
