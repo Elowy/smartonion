@@ -853,10 +853,13 @@ static func set_candidates(classes: Array[ClassData]) -> Array[SetData]:
 		var own := Db.set_for_class(cls.id)
 		if own != null and own not in out:
 			out.append(own)
+	var free: Array[SetData] = []
 	for cls in classes:
 		for s in Db.sets_for_class(cls.id, cls):
-			if s not in out:
-				out.append(s)
+			if s.class_id == &"" and s not in free:
+				free.append(s)
+	free.sort_custom(func(a: SetData, b: SetData) -> bool: return String(a.id) < String(b.id))
+	out.append_array(free)
 	return out
 
 
