@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_magma_lash.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"magma_lash"
+display_name = "Magma Lash"
+description = "Lashes the nearest enemy in melee for {damage_pct}% weapon damage as Fire and a burn that spreads to {spread_targets} more enemies."
+class_id = &"shaman"
+school = &"fire"
+tags = Array[StringName]([&"weapon", &"dot", &"spell"])
+resource = &""
+cost = 0.0
+cooldown = 6.0
+targeting = 1
+cast_range = 2.8
+effect = ExtResource("2_effect")
+params = {
+"burn_duration": 4.0,
+"burn_pct": 40.0,
+"damage_pct": 150.0,
+"ground_duration": 0.0,
+"ground_pct": 0.0,
+"ground_radius": 2.0,
+"lash_delay": 0.4,
+"lashes": 1,
+"spell_power_scale": 0.5,
+"spread_pct": 50.0,
+"spread_radius": 3.0,
+"spread_targets": 2
+}
+icon = &"magma_lash"
+color = Color(1, 0.5, 0.15, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"spread_targets_add": 1}
+rank3_text = "+1 enemy the burn spreads to"
+specs = Array[Dictionary]([{"name": "Contagious Flame", "text": "The burn spreads to 3 more enemies at full strength.", "mods": {"spread_pct": 100.0, "spread_targets_add": 3}}, {"name": "Twin Lashes", "text": "Strikes twice, 0.4 sec apart.", "mods": {"lashes": 2}}])

@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="ClassData" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://data/class_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/mace.tres" id="2_mh"]
+[ext_resource type="Resource" path="res://data/weapons/shield.tres" id="3_oh"]
+[ext_resource type="Script" path="res://data/resources/resource_data.gd" id="4_res_script"]
+[ext_resource type="Resource" path="res://data/resources/surge.tres" id="5_surge"]
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="6_ability_script"]
+[ext_resource type="Resource" path="res://data/abilities/shaman_forking_bolt.tres" id="7_forking_bolt"]
+[ext_resource type="Resource" path="res://data/abilities/shaman_totem_rite.tres" id="8_totem_rite"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_mastery.gd" id="9_mastery"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shaman"
+display_name = "Shaman"
+description = "Hybrid caster who fights with weapon and lightning, plants totems and tends the party."
+role = "Totems, lightning, melee"
+armor_type = 2
+primary_stat = &"intellect"
+base_stats = Dictionary[StringName, float]({
+&"armor": 2.0,
+&"spirit": 3.0,
+&"speed": -5.0
+})
+main_hand = ExtResource("2_mh")
+off_hand = ExtResource("3_oh")
+proficiencies = Array[StringName]([&"mace", &"axe", &"dagger", &"staff", &"fist_weapon", &"shield", &"two_hand_mace"])
+resource_type = &"surge"
+resource_color = Color(0.35, 0.85, 1, 1)
+resources = Array[ExtResource("4_res_script")]([ExtResource("5_surge")])
+abilities = Array[ExtResource("6_ability_script")]([ExtResource("7_forking_bolt"), ExtResource("8_totem_rite")])
+mastery = ExtResource("9_mastery")
+mastery_text = "Storm Echo: Lightning and fire hits echo for 50% damage, 1.5% chance per Mastery point. Weapon hits and casts build Surge."
+onion_color = Color(0.92, 0.88, 0.96, 1)
+accent_color = Color(0.2, 0.72, 0.68, 1)
+headgear = &"tribal_mask"
+big_shoulders = true

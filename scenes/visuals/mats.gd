@@ -69,6 +69,13 @@ void fragment() {
 	base *= 0.94 + 0.10 * ridge;
 	// Darker towards the root, papery and lighter towards the neck.
 	base = mix(base * 0.78, base * 1.12, smoothstep(0.02, 0.8, UV.y));
+#ifdef GARLIC
+	// Garlic (the Shaman): ten thin purple streaks run up the bulb from the root and fade out towards the neck.
+	float gs = fract(UV.x * 10.0 + 0.1 * sin(UV.y * 9.0));
+	float streak = smoothstep(0.30, 0.38, gs) * (1.0 - smoothstep(0.52, 0.60, gs));
+	streak *= 1.0 - smoothstep(0.65, 1.0, UV.y);
+	base = mix(base, vec3(0.5, 0.24, 0.72), streak * 0.95);
+#endif
 	// Low HP: outer layers peel off and reveal the pale, juicy inner layer.
 	if (damage > 0.0) {
 		vec2 p = vec2(UV.x * 9.0, UV.y * 5.0);
@@ -264,15 +271,17 @@ static func toon_cloth_vc() -> Material:
 
 
 ## Onion skin: toon + vertical layer stripes; [param damage] (0..1, quantised to 0.05)
-## peels the outer layers off. Cached per colour and damage step.
-static func onion_skin(color: Color, damage: float = 0.0) -> Material:
+## peels the outer layers off. Cached per colour and damage step. [param garlic] (the Shaman) adds the
+## purple streaks of a garlic bulb.
+static func onion_skin(color: Color, damage: float = 0.0, garlic: bool = false) -> Material:
+	var variant := "garlic" if garlic else "onion"
 	var step := roundi(clampf(damage, 0.0, 1.0) * 20.0)
 	if step == 0:
-		return _toon_variant("onion", color, true)
-	var key := "onion_dmg:%s:%d" % [color.to_html(), step]
+		return _toon_variant(variant, color, true)
+	var key := "%s_dmg:%s:%d" % [variant, color.to_html(), step]
 	if _cache.has(key):
 		return _cache[key]
-	var m := (_toon_variant("onion", color, true) as ShaderMaterial).duplicate() as ShaderMaterial
+	var m := (_toon_variant(variant, color, true) as ShaderMaterial).duplicate() as ShaderMaterial
 	m.set_shader_parameter("damage", step / 20.0)
 	_cache[key] = m
 	return m
@@ -500,7 +509,7 @@ static func _toon_variant(variant: String, color: Color, with_outline: bool,
 	var m := ShaderMaterial.new()
 	m.shader = _toon_shader(variant)
 	m.set_shader_parameter("albedo", color)
-	if variant == "onion":
+	if variant == "onion" or variant == "garlic":
 		m.set_shader_parameter("rim_strength", 0.38)
 	if with_outline:
 		m.next_pass = outline(outline_width)
@@ -521,6 +530,8 @@ static func _toon_shader(variant: String) -> Shader:
 			defines = "#define VERTEX_COLOR\n"
 		"onion":
 			defines = "#define ONION\n"
+		"garlic":
+			defines = "#define ONION\n#define GARLIC\n"
 	var code := _TOON_CODE % modes
 	code = code.replace("shader_type spatial;\n", "shader_type spatial;\n" + defines)
 	return _shader("toon_" + variant, code)

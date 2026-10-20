@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_rumbling_earth.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"rumbling_earth"
+display_name = "Rumbling Earth"
+description = "Splits the ground under the densest group: a {radius} m quake hurts and may stun enemies for {duration} sec."
+class_id = &"shaman"
+school = &"nature"
+tags = Array[StringName]([&"aoe", &"ground", &"cc", &"spell"])
+resource = &""
+cost = 0.0
+cooldown = 16.0
+targeting = 2
+cast_range = 11.0
+effect = ExtResource("2_effect")
+params = {
+"auto_cast_min": 4,
+"damage": 2.5,
+"duration": 5.0,
+"intellect_scale": 0.4,
+"quakes": 1,
+"radius": 4.0,
+"slow": 0.0,
+"spell_power_scale": 0.6,
+"stun": 1.2,
+"stun_chance": 25.0,
+"tick": 0.5
+}
+icon = &"rumbling_earth"
+color = Color(0.7, 0.55, 0.35, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{"name": "Faultline", "text": "Enemies in the quake are slowed by 50%.", "mods": {"slow": 50.0}}, {"name": "Twin Fissures", "text": "A second quake opens under the next-densest group.", "mods": {"quakes": 2}}])

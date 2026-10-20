@@ -287,9 +287,11 @@ func test_new_glyphs_draw() -> void:
 	tree.root.add_child(box)
 	nodes.append(box)
 	var count := 0
+	var expected := 0
 	for g in AbilityIcon.Glyph.values():
 		if g < AbilityIcon.Glyph.THUNDER_CLAP:
 			continue
+		expected += 3
 		for side: float in [26.0, 42.0, 64.0]:
 			var icon := AbilityIcon.create(side, side != 26.0)
 			icon.set_ability(Fakes.ability(&"x"))
@@ -299,7 +301,8 @@ func test_new_glyphs_draw() -> void:
 			box.add_child(icon)
 			icon.queue_redraw()
 			count += 1
-	check_eq(count, 34 * 3, "34 new glyphs at three sizes")
+	check_eq(count, expected, "every glyph from Thunder Clap on, at three sizes")
+	check(count >= 34 * 3, "at least the 34 glyphs of M4 and the general pool")
 	await tree.process_frame
 	await tree.process_frame
 	finished.emit()

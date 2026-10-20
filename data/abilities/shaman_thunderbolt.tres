@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_thunderbolt.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"thunderbolt"
+display_name = "Thunderbolt"
+description = "Calls a bolt of lightning down on the nearest enemy ({bolts} per cast). Scales with Intellect and Spell Power."
+class_id = &"shaman"
+school = &"nature"
+tags = Array[StringName]([&"lightning", &"spell"])
+resource = &""
+cost = 0.0
+cooldown = 5.0
+targeting = 1
+cast_range = 10.0
+effect = ExtResource("2_effect")
+params = {
+"bolts": 1,
+"damage": 14.0,
+"intellect_scale": 2.0,
+"spell_power_scale": 2.5,
+"splash_pct": 50.0,
+"splash_radius": 0.0,
+"stun": 0.0
+}
+icon = &"thunderbolt"
+color = Color(0.7, 0.85, 1, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"bolts_add": 1}
+rank3_text = "+1 bolt, at the next-nearest enemy"
+specs = Array[Dictionary]([{"name": "Sundering Bolt", "text": "The strike blasts every enemy within 2.5 m for 50% of its damage.", "mods": {"splash_radius": 2.5}}, {"name": "Staggering Bolt", "text": "The target is stunned for 1.2 sec.", "mods": {"stun": 1.2}}])

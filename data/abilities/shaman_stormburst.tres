@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_stormburst.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"stormburst"
+display_name = "Stormburst"
+description = "When {min_enemies} enemies crowd you, lightning hits every enemy within {radius} m and throws them back."
+class_id = &"shaman"
+school = &"nature"
+tags = Array[StringName]([&"lightning", &"spell", &"aoe", &"cc"])
+resource = &""
+cost = 0.0
+cooldown = 10.0
+targeting = 0
+cast_range = 3.5
+effect = ExtResource("2_effect")
+params = {
+"auto_hp": 40.0,
+"damage": 5.0,
+"intellect_scale": 0.6,
+"min_enemies": 3,
+"pulse_delay": 0.8,
+"pulses": 1,
+"push": 12.0,
+"radius": 3.5,
+"spell_power_scale": 1.0,
+"stun": 0.0
+}
+icon = &"stormburst"
+color = Color(0.6, 0.8, 1, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m radius"
+specs = Array[Dictionary]([{"name": "Echoing Discharge", "text": "A second discharge follows 0.8 sec later.", "mods": {"pulses": 2}}, {"name": "Crackling Field", "text": "Enemies struck are stunned for 1 sec.", "mods": {"stun": 1.0}}])

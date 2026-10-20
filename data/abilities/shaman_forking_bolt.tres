@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_forking_bolt.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"forking_bolt"
+display_name = "Forking Bolt"
+description = "Lightning forks between {targets} enemies, each jump {falloff_pct}% weaker. Costs {cost} Surge. Scales with Intellect and Spell Power."
+class_id = &"shaman"
+school = &"nature"
+tags = Array[StringName]([&"lightning", &"spell"])
+resource = &"surge"
+cost = 30.0
+cooldown = 0.6
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"damage": 7.0,
+"falloff_pct": 15.0,
+"intellect_scale": 1.0,
+"jump_range": 5.0,
+"return_pct": 0.0,
+"slow": 0.0,
+"slow_duration": 2.0,
+"spell_power_scale": 1.5,
+"stun": 0.0,
+"targets": 4
+}
+icon = &"forking_bolt"
+color = Color(0.55, 0.8, 1, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"targets_add": 1}
+rank3_text = "+1 enemy in the chain"
+specs = Array[Dictionary]([{"name": "Thunder Web", "text": "Forking Bolt loses no damage on its jumps and forks to 1 more enemy.", "mods": {"falloff_pct": 0.0, "targets_add": 1}}, {"name": "Static Cling", "text": "Every enemy struck is stunned for 0.6 sec.", "mods": {"stun": 0.6}}])

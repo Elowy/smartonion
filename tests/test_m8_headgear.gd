@@ -31,7 +31,8 @@ func _onion(cd: ClassData) -> OnionModel:
 # --- Headgear defaults ------------------------------------------------------------------------
 
 func test_an_unknown_headgear_id_draws_a_plain_head_never_a_bare_one() -> void:
-	for gear: StringName in [&"zz_unknown_headgear", &"", &"hunter_hat", &"tribal_mask"]:
+	# (tribal_mask is drawn since the Shaman: test_class_shaman_look; hunter_hat leaves this list with the Hunter.)
+	for gear: StringName in [&"zz_unknown_headgear", &"", &"hunter_hat"]:
 		var cd := classes.add_class(gear)
 		var head := OnionArmor.part(HEAD, null, cd)
 		check(head != null and head.solid != null, "headgear '%s': a head piece is drawn" % gear)

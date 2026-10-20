@@ -82,6 +82,9 @@ const RES_SICKNESS_TIME := 15.0
 const RES_SICKNESS_TEXT_COLOR := Color(0.72, 0.68, 0.95)
 ## HP fraction after a teammate revive / after a wave starts while downed.
 const REVIVE_HP_RATIO := 0.3
+## Caps of the revivers' revive bonuses (percent): speed, and extra Max HP returned.
+const REVIVE_SPEED_PCT_CAP := 150.0
+const REVIVE_HP_PCT_CAP := 60.0
 const WAVE_START_REVIVE_HP_RATIO := 0.5
 ## Revive progress (seconds) lost per second while nobody stands next to the ghost.
 const REVIVE_DECAY_PER_SECOND := 0.5
@@ -153,6 +156,13 @@ var forced_crits := 0
 var revive_progress := 0.0
 ## Living teammates currently inside REVIVE_RADIUS while downed (0 when alive).
 var reviver_count := 0
+## M8 (Shaman talents Elder Spirits / Gift of the Elders): bonuses of this hero as a REVIVER, summed over every
+## living teammate in the circle when it revives a downed ally: % faster revive (at most REVIVE_SPEED_PCT_CAP)
+## and % more Max HP returned (at most REVIVE_HP_PCT_CAP). Neutral (0) unless a talent script sets them.
+var revive_speed_pct := 0.0
+var revive_hp_pct := 0.0
+## The revive speed boost (1.0 = none) the current revivers give this ghost; set every tick it is revived.
+var reviver_boost := 1.0
 ## Enemies this ghost's revive circle slowed on its last tick (0 when alive; GDD 16.1).
 var ghost_slowed := 0
 ## Set every tick by the [SpiritHealer] while this ghost waits in its circle: progress
@@ -771,7 +781,7 @@ static func revive_speed(revivers: int) -> float:
 
 ## Seconds until the revive completes at the current speed (-1 when nobody revives).
 func revive_seconds_left() -> float:
-	var speed := revive_speed(reviver_count)
+	var speed := revive_speed(reviver_count) * reviver_boost
 	if not downed or speed <= 0.0:
 		return -1.0
 	return maxf(0.0, REVIVE_TIME - revive_progress) / speed
@@ -1059,9 +1069,10 @@ func _update_regen(delta: float) -> void:
 func _update_revive(delta: float) -> void:
 	var revivers := _revivers()
 	reviver_count = revivers.size()
+	reviver_boost = reviver_speed_boost(revivers)
 	if not revivers.is_empty():
 		# Taking damage does not interrupt the revive (GDD 1): only standing in the circle counts.
-		revive_progress = minf(REVIVE_TIME, revive_progress + delta * revive_speed(reviver_count))
+		revive_progress = minf(REVIVE_TIME, revive_progress + delta * revive_speed(reviver_count) * reviver_boost)
 	else:
 		# The cast bar drains slowly instead of resetting (GDD 1).
 		revive_progress = maxf(0.0, revive_progress - REVIVE_DECAY_PER_SECOND * delta)
@@ -1084,9 +1095,27 @@ func _update_revive(delta: float) -> void:
 		var reviver_slots: Array[int] = []
 		for r in revivers:
 			reviver_slots.append(r.slot_index())
-		revive(REVIVE_HP_RATIO, reviver_slots)
+		revive(minf(1.0, REVIVE_HP_RATIO + reviver_hp_bonus(revivers) / 100.0), reviver_slots)
 		Vfx.resurrect_column(feet)
 		Vfx.floating_text(get_chest_position() + Vector3.UP * 0.6, "Resurrected!", HEAL_TEXT_COLOR, 1.2)
+
+
+## The revive speed multiplier of [param revivers] (M8): 1 + the sum of their revive_speed_pct (at most
+## REVIVE_SPEED_PCT_CAP) / 100; 1.0 without bonuses.
+static func reviver_speed_boost(revivers: Array[Player]) -> float:
+	var pct := 0.0
+	for r in revivers:
+		pct += r.revive_speed_pct
+	return 1.0 + clampf(pct, 0.0, REVIVE_SPEED_PCT_CAP) / 100.0
+
+
+## The extra Max HP (percent points) the revived hero returns with: the sum of the revivers' revive_hp_pct (at
+## most REVIVE_HP_PCT_CAP); 0 without bonuses.
+static func reviver_hp_bonus(revivers: Array[Player]) -> float:
+	var pct := 0.0
+	for r in revivers:
+		pct += r.revive_hp_pct
+	return clampf(pct, 0.0, REVIVE_HP_PCT_CAP)
 
 
 ## Ghost slow (GDD 16.1): while downed, refreshes the GHOST_SLOW_PCT slow on every living enemy

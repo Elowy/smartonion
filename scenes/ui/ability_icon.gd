@@ -37,6 +37,9 @@ enum Glyph {
 	SHURIKEN, BLADE_FLURRY, POISON_BOMB, CHEAT_DEATH, SHADOWSTEP, KILLING_SPREE,
 	CORRUPTION, SHADOW_BOLT, SEED, VOIDWALKER, FEAR, INFERNAL,
 	BANDAGE, SPRINT, WAR_STOMP, SPIRIT_WOLF, BERSERKING,
+	# M8, the Shaman: Totem Rite, Thunderbolt, Stormburst, Rumbling Earth, Soothing Downpour, Spirit Pack
+	# (Forking Bolt uses the BOLT glyph, Magma Lash the school's FIRE one).
+	TOTEM, THUNDERBOLT, STORMBURST, QUAKE, DOWNPOUR, PACK,
 }
 
 const SIZE := 50.0
@@ -118,6 +121,10 @@ const EXACT_GLYPHS: Dictionary[StringName, Glyph] = {
 	# General pool.
 	&"bandage": Glyph.BANDAGE, &"sprint": Glyph.SPRINT, &"engineers_bomb": Glyph.BOMB,
 	&"war_stomp": Glyph.WAR_STOMP, &"spirit_wolf": Glyph.SPIRIT_WOLF, &"berserking": Glyph.BERSERKING,
+	# Shaman (M8).
+	&"forking_bolt": Glyph.BOLT, &"totem_rite": Glyph.TOTEM, &"thunderbolt": Glyph.THUNDERBOLT,
+	&"rumbling_earth": Glyph.QUAKE, &"magma_lash": Glyph.FIRE, &"soothing_downpour": Glyph.DOWNPOUR,
+	&"stormburst": Glyph.STORMBURST, &"spirit_pack": Glyph.PACK,
 }
 
 ## Ordered token rules: the first rule with a key that starts one of the id's `_`-separated
@@ -948,6 +955,12 @@ func _draw_glyph(g: Glyph) -> void:
 		Glyph.WAR_STOMP: _g_war_stomp()
 		Glyph.SPIRIT_WOLF: _g_spirit_wolf()
 		Glyph.BERSERKING: _g_berserking()
+		Glyph.TOTEM: _g_totem()
+		Glyph.THUNDERBOLT: _g_thunderbolt()
+		Glyph.STORMBURST: _g_stormburst()
+		Glyph.QUAKE: _g_quake()
+		Glyph.DOWNPOUR: _g_downpour()
+		Glyph.PACK: _g_pack()
 		_: _g_generic()
 
 
@@ -1144,6 +1157,71 @@ func _g_bolt() -> void:
 	_circ(Vector2(0.0, 0.0), 0.62, _deep)
 	_poly(PackedVector2Array([Vector2(0.22, -0.98), Vector2(-0.52, 0.1), Vector2(-0.06, 0.1), Vector2(-0.3, 0.98), Vector2(0.56, -0.2),
 		Vector2(0.1, -0.2), Vector2(0.5, -0.98)]), _hi)
+
+
+## M8: a carved totem pole – two stacked faces under a crown, short arms.
+func _g_totem() -> void:
+	_poly(_rect_pts(-0.3, -0.92, 0.3, 0.92), _tone)
+	_d_poly(_rect_pts(-0.22, -0.78, 0.22, -0.2), _deep)
+	_d_poly(_rect_pts(-0.22, 0.0, 0.22, 0.58), _deep)
+	for y: float in [-0.5, 0.26]:
+		_d_poly(_rect_pts(-0.15, y - 0.1, -0.05, y), _hi)
+		_d_poly(_rect_pts(0.05, y - 0.1, 0.15, y), _hi)
+		_d_poly(_rect_pts(-0.1, y + 0.12, 0.1, y + 0.2), _hi)
+	_poly(PackedVector2Array([Vector2(-0.3, -0.1), Vector2(-0.86, -0.28), Vector2(-0.78, -0.02), Vector2(-0.3, 0.1)]), _tone)
+	_poly(PackedVector2Array([Vector2(0.3, -0.1), Vector2(0.86, -0.28), Vector2(0.78, -0.02), Vector2(0.3, 0.1)]), _tone)
+	_poly(PackedVector2Array([Vector2(-0.4, 0.92), Vector2(0.4, 0.92), Vector2(0.3, 0.72), Vector2(-0.3, 0.72)]), _deep)
+
+
+## M8: a dark cloud over a bolt that strikes the ground.
+func _g_thunderbolt() -> void:
+	_poly(_ellipse(Vector2(0, -0.5), 0.8, 0.3, 22), _deep.darkened(0.15))
+	_circ(Vector2(-0.36, -0.66), 0.28, _deep.darkened(0.15), true)
+	_circ(Vector2(0.18, -0.78), 0.34, _deep.darkened(0.15), true)
+	_poly(PackedVector2Array([Vector2(0.14, -0.4), Vector2(-0.34, 0.2), Vector2(-0.02, 0.2), Vector2(-0.22, 0.96),
+		Vector2(0.46, 0.0), Vector2(0.1, 0.0), Vector2(0.42, -0.4)]), _hi, true)
+
+
+## M8: a core with jagged bolts bursting out all round.
+func _g_stormburst() -> void:
+	_circ(Vector2.ZERO, 0.36, _deep)
+	for i in 6:
+		var a := TAU * float(i) / 6.0 - PI * 0.5
+		var dir := Vector2(cos(a), sin(a))
+		var side := dir.rotated(PI * 0.5)
+		_stroke(PackedVector2Array([dir * 0.34, dir * 0.55 + side * 0.1, dir * 0.7 - side * 0.1, dir * 0.96]), 0.1, _hi)
+	_d_circ(Vector2.ZERO, 0.16, Color.WHITE)
+
+
+## M8: a slab of ground split by a crack, rocks flying up out of it.
+func _g_quake() -> void:
+	_poly(PackedVector2Array([Vector2(-0.96, 0.18), Vector2(-0.1, 0.1), Vector2(0.06, 0.3), Vector2(0.96, 0.16),
+		Vector2(0.96, 0.86), Vector2(-0.96, 0.86)]), _deep.darkened(0.25))
+	_d_stroke(PackedVector2Array([Vector2(-0.02, 0.12), Vector2(0.12, 0.32), Vector2(-0.1, 0.52), Vector2(0.06, 0.86)]), 0.09, OUT)
+	_poly(PackedVector2Array([Vector2(-0.5, -0.12), Vector2(-0.24, -0.34), Vector2(-0.08, -0.14), Vector2(-0.3, 0.04)]), _tone, true)
+	_poly(PackedVector2Array([Vector2(0.18, -0.4), Vector2(0.5, -0.56), Vector2(0.62, -0.28), Vector2(0.34, -0.14)]), _hi, true)
+	_poly(PackedVector2Array([Vector2(-0.12, -0.72), Vector2(0.06, -0.9), Vector2(0.2, -0.7), Vector2(0.0, -0.58)]), _tone, true)
+
+
+## M8: a rain cloud with slanted drops and a healing plus.
+func _g_downpour() -> void:
+	_poly(_ellipse(Vector2(0, -0.48), 0.8, 0.3, 22), _deep.darkened(0.1))
+	_circ(Vector2(-0.34, -0.64), 0.28, _deep.darkened(0.1), true)
+	_circ(Vector2(0.2, -0.76), 0.33, _deep.darkened(0.1), true)
+	for x: float in [-0.5, -0.1, 0.3]:
+		_stroke(PackedVector2Array([Vector2(x + 0.12, -0.08), Vector2(x - 0.1, 0.34)]), 0.09, _hi)
+	_stroke(PackedVector2Array([Vector2(0.52, 0.18), Vector2(0.52, 0.78)]), 0.12, Color(0.55, 1.0, 0.6))
+	_stroke(PackedVector2Array([Vector2(0.22, 0.48), Vector2(0.82, 0.48)]), 0.12, Color(0.55, 1.0, 0.6))
+
+
+## M8: two wolf heads side by side (the pack).
+func _g_pack() -> void:
+	var head := PackedVector2Array([Vector2(-0.78, 0.74), Vector2(-0.82, 0.04), Vector2(-0.58, -0.42), Vector2(-0.52, -0.96),
+		Vector2(-0.22, -0.52), Vector2(0.02, -0.52), Vector2(0.2, -0.92), Vector2(0.3, -0.36), Vector2(0.56, -0.16),
+		Vector2(0.96, 0.04), Vector2(0.92, 0.26), Vector2(0.46, 0.38), Vector2(0.12, 0.56), Vector2(-0.2, 0.9)])
+	_poly(_xf(_mirror(head), 0.0, Vector2(0.34, -0.12), 0.56), _deep.lightened(0.1))
+	_poly(_xf(head, 0.0, Vector2(-0.3, 0.1), 0.66), _tone, true)
+	_d_circ(Vector2(0.28, 0.16), 0.045, OUT)
 
 
 func _g_bomb() -> void:
