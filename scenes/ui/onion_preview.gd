@@ -18,6 +18,9 @@ var _t := 0.0
 var _class_id: StringName = &""
 var _color := Color(0, 0, 0, 0)
 var _alt := false
+## --- Wardrobe (M9) --- The cosmetic dress of the previewed onion (null = none); kept across show_class.
+var _dress: OnionDress
+var _turn := 0.0
 
 
 static func create() -> OnionPreview:
@@ -77,6 +80,7 @@ func show_class(data: ClassData, player_color: Color, alt: bool = false) -> void
 	if model == null:
 		model = OnionModel.new()
 		_pivot.add_child(model)
+		model.set_dress(_dress)
 	if data.id != _class_id or player_color != _color or alt != _alt:
 		_class_id = data.id
 		_color = player_color
@@ -85,6 +89,26 @@ func show_class(data: ClassData, player_color: Color, alt: bool = false) -> void
 		model.set_weapons(ClassLevels.start_main_hand(data, alt), ClassLevels.start_off_hand(data, alt))
 		model.set_facing(Vector3(0.0, 0.0, 1.0))
 		model.set_moving(0.0)
+
+
+## --- Wardrobe (M9) --- Dresses the previewed onion with [param dress] (look overrides, Tabard, Hat, Glow, Dye; null = the class
+## starter pieces and nothing else). Safe before the first [method show_class].
+func set_dress(dress: OnionDress) -> void:
+	_dress = dress
+	if model != null:
+		model.set_dress(dress)
+
+
+## --- Wardrobe (M9) --- Pulls the camera back so a tall hat or a halo fits: [param distance] from the onion, looking at height [param look_y].
+func frame_tall(distance: float = 4.4, look_y: float = 0.66) -> void:
+	var from := Vector3(0.0, look_y + 1.15, distance)
+	var to := Vector3(0.0, look_y, 0.0)
+	camera.transform = Transform3D(Basis.looking_at(to - from, Vector3.UP), from)
+
+
+## --- Wardrobe (M9) --- Turns the shown onion by [param degrees] on top of its sway (the Wardrobe's rotate button).
+func turn(degrees: float) -> void:
+	_turn += deg_to_rad(degrees)
 
 
 ## Plays the weapon swing of the main hand (feedback when a player readies up).
@@ -97,4 +121,7 @@ func _process(delta: float) -> void:
 	if model == null or not is_visible_in_tree():
 		return
 	_t += delta
-	model.set_facing(Vector3(sin(_t * SWAY_SPEED) * SWAY_AMOUNT, 0.0, 1.0))
+	var facing := Vector3(sin(_t * SWAY_SPEED) * SWAY_AMOUNT, 0.0, 1.0)
+	if _turn != 0.0:
+		facing = facing.rotated(Vector3.UP, _turn)  # (Wardrobe: turned by the player)
+	model.set_facing(facing)

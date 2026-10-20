@@ -378,6 +378,10 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	# The Seasoning pill follows the picks and the slots on its own (they change without the rest of the card changing).
 	if p_slot != null and _joined_box.visible and _seasoning_key(p_slot) != _season_key:
 		_fill_seasonings(p_slot)
+	# --- Wardrobe (M9) --- the card's onion wears the hero's looks and cosmetics (they change without the rest of the card changing;
+	# the model rebuilds only when what it wears changes, and an empty dress is the plain onion of the base game).
+	if p_slot != null and _joined_box.visible:
+		preview.set_dress(OnionDress.for_slot(p_slot) if not (p_slot.looks.is_empty() and p_slot.cosmetics.is_empty()) else null)
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""

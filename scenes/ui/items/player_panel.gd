@@ -1439,6 +1439,7 @@ func _refresh_side(eq: Equipment, cls: ClassData) -> void:
 			_preview.model.set_weapons(eq.main_weapon(), eq.off_weapon())
 			_preview.model.set_equipment(eq.get_item(Items.EquipSlot.HEAD), eq.get_item(Items.EquipSlot.SHOULDERS),
 				eq.get_item(Items.EquipSlot.CHEST))
+			_preview.set_dress(OnionDress.for_slot(slot))  # (Wardrobe M9: the hero's looks / cosmetics, none in an automated run)
 	else:
 		_spec_label.text = ""
 

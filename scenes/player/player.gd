@@ -141,6 +141,9 @@ var companion_id: StringName = &""
 var seasonings: Array[StringName] = []
 var heirloom_id: StringName = &""
 var look_overrides: Dictionary[StringName, StringName] = {}
+## --- Wardrobe (M9) --- The hero's cosmetic picks (PlayerSlot.cosmetics: "tabard" / "hat" / "glow" / "dye" -> CosmeticData id).
+## [member look_overrides] and these only dress the model ([OnionDress]); they never touch a stat.
+var cosmetic_overrides: Dictionary[StringName, StringName] = {}
 var main_hand: WeaponData
 var off_hand: WeaponData
 ## One runner per equipped weapon that attacks (main hand first).
@@ -250,11 +253,14 @@ static func create(p_slot: PlayerSlot) -> Player:
 		p.seasonings = p_slot.seasonings.duplicate()
 		p.heirloom_id = p_slot.heirloom
 		p.look_overrides = p_slot.looks.duplicate()
+		p.cosmetic_overrides = p_slot.cosmetics.duplicate()
 	p.model = OnionModel.new()
 	p.model.name = "Model"
 	p.add_child(p.model)
 	if p.class_data != null:
 		p.model.setup(p.class_data, p_slot.color if p_slot != null else Color.WHITE)
+		if not p.look_overrides.is_empty() or not p.cosmetic_overrides.is_empty():
+			p.model.set_dress(OnionDress.from_ids(p.look_overrides, p.cosmetic_overrides))  # (Wardrobe)
 		p.stats.set_source(&"class", p.class_data.base_stats)
 	p.stats.set_source(&"base", {Stats.MASTERY: Stats.BASE_MASTERY})
 	p.procs = ProcSystem.create(p)
