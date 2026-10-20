@@ -307,6 +307,7 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
+	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
 	for slot in slots:
 		Meta.remember_loadout(slot)
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id())
@@ -327,6 +328,7 @@ func start_run() -> void:
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
+	Meta.apply_run_start(slots)  # (M9 LEVELS: starting gold and free rerolls of the Class Levels; nothing for the dev profile)
 	first_wave = options.clamp_wave(options.start_wave)  # (the lobby may have changed the mode since the parse)
 	wave = 0
 	waves_completed = 0
@@ -1325,6 +1327,8 @@ func _add_bots() -> void:
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion
+		if bot != null and options.alt_weapon:
+			bot.alt_weapon = true  # (--alt-weapon; Meta.enforce_alt_weapons drops it where the profile has not unlocked it)
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:

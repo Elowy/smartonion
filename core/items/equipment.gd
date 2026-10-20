@@ -33,6 +33,9 @@ var backpack: Array[ItemInstance] = []
 ## set bonus ("proficiency" entries, PlayerBonuses.granted_proficiencies; Player forwards them on
 ## every rebuild). Today only &"dual_wield" is grantable (BonusVocabulary.GRANTABLE_PROFICIENCIES).
 var granted_proficiencies: Array[StringName] = []
+## The hero's backpack capacity: Items.BACKPACK_SIZE, plus the Class Level 14 slot (M9 LEVELS, Player.create sets it
+## for a profile with raw power).
+var backpack_size := Items.BACKPACK_SIZE
 
 
 func _init(p_class: ClassData = null) -> void:
@@ -52,7 +55,7 @@ func equipped_items() -> Array[ItemInstance]:
 
 
 func has_space(count: int = 1) -> bool:
-	return backpack.size() + count <= Items.BACKPACK_SIZE
+	return backpack.size() + count <= backpack_size
 
 
 func add_to_backpack(item: ItemInstance) -> bool:
@@ -276,7 +279,7 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 		if not old.pair_off:
 			to_backpack.append(old)
 	var in_backpack := backpack.has(item)
-	var free := Items.BACKPACK_SIZE - backpack.size() + (1 if in_backpack else 0)
+	var free := backpack_size - backpack.size() + (1 if in_backpack else 0)
 	if to_backpack.size() > free:
 		return false
 	if in_backpack:
@@ -427,12 +430,15 @@ func stat_sources() -> Dictionary[StringName, Dictionary]:
 	return out
 
 
-## Starting loadout: the class's starting weapons as Common items (GDD 5.1).
-func equip_starting_weapons() -> void:
+## Starting loadout: the class's starting weapons as Common items (GDD 5.1). [param alt]: the class's alternative
+## starting weapons instead (M9 Class Level 12, ClassPathData; a class without one starts as usual).
+func equip_starting_weapons(alt: bool = false) -> void:
 	if class_data == null:
 		return
-	if class_data.main_hand != null:
-		slots[Items.EquipSlot.MAIN_HAND] = ItemInstance.from_weapon(class_data.main_hand)
-	if class_data.off_hand != null:
-		slots[Items.EquipSlot.OFF_HAND] = ItemInstance.from_weapon(class_data.off_hand)
+	var main := ClassLevels.start_main_hand(class_data, alt)
+	var off := ClassLevels.start_off_hand(class_data, alt)
+	if main != null:
+		slots[Items.EquipSlot.MAIN_HAND] = ItemInstance.from_weapon(main)
+	if off != null:
+		slots[Items.EquipSlot.OFF_HAND] = ItemInstance.from_weapon(off)
 	changed.emit()
