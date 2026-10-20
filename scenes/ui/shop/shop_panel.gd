@@ -498,6 +498,7 @@ func try_buy(slot: PlayerSlot, index: int) -> bool:
 	else:
 		_say("%s bought %s%s – %s g" % [player_tag(slot), item_link(item), where, UiTheme.format_int(price)],
 			"%s bought [%s]%s – %d g" % [slot.label(), item.display_name, where, price])
+	Audio.play_ui(&"ui_buy")
 	item_bought.emit(slot.index, item)
 	_update_cards()
 	return true
@@ -524,6 +525,7 @@ func try_buy_consumable(slot: PlayerSlot, index: int) -> bool:
 		bb += " (replaces %s)" % consumable_link(replaced)
 		plain += " (replaces [%s])" % replaced.display_name
 	_say(bb, plain)
+	Audio.play_ui(&"ui_buy")
 	consumable_bought.emit(slot.index, data)
 	_update_cards()
 	return true
@@ -999,6 +1001,7 @@ func _move_cursor(slot_index: int, dir: Vector2i) -> void:
 				cur = n + _nearest_extra(_grid_card_x(col))
 	if cur != cursor_of(slot_index):
 		_holds.erase(slot_index)
+		Audio.play_ui(&"ui_move")
 	set_cursor(slot_index, cur)
 
 
@@ -1089,6 +1092,7 @@ func _toggle_lock(slot: PlayerSlot) -> void:
 	if o == null or o.item == null or o.sold:
 		return
 	shop.toggle_lock(shop_index(index), slot.index)
+	Audio.play_ui(&"ui_toggle")
 	if o.locked_by >= 0:
 		_say("%s locked %s for the next round" % [player_tag(slot), item_link(o.item)],
 			"%s locked [%s]" % [slot.label(), o.item.display_name])
@@ -1100,6 +1104,7 @@ func _toggle_ping(slot: PlayerSlot) -> void:
 	if o == null or o.item == null or o.sold:
 		return
 	shop.toggle_ping(shop_index(index), slot.index)
+	Audio.play_ui(&"ui_toggle")
 	if slot.index in o.pinged_by:
 		_say("%s wants: %s – %s g" % [player_tag(slot), item_link(o.item), UiTheme.format_int(o.price)],
 			"%s wants: [%s] – %d g" % [slot.label(), o.item.display_name, o.price])
@@ -1110,10 +1115,12 @@ func _vote(slot: PlayerSlot) -> void:
 	var cost := shop.reroll_cost()
 	var had := shop.reroll_votes.has(slot.index)
 	if shop.vote_reroll(slot.index, voters, RunState.rng):
+		Audio.play_ui(&"ui_reroll")
 		_say("The goblin restocks the stall (–%d g)" % cost, "Rerolled for %d g" % cost)
 		return
 	if had:
 		return
+	Audio.play_ui(&"ui_toggle")
 	var all := true
 	for i in voters:
 		if not shop.reroll_votes.get(i, false):
@@ -1132,6 +1139,7 @@ func _say(bb: String, plain: String) -> void:
 
 ## A message for one player ("P2: Backpack full").
 func _say_to(slot: PlayerSlot, text: String) -> void:
+	Audio.play_ui(&"ui_error")
 	_say("%s: [color=#%s]%s[/color]" % [player_tag(slot), UiTheme.RED.lightened(0.25).to_html(false), bb_escape(text)],
 		"%s: %s" % [slot.label() if slot != null else "?", text])
 

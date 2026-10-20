@@ -12,7 +12,7 @@ extends Node
 ##   remain. At most one goblin per wave.
 ## - At that time (the director's clock): a [LootGoblin] at [method WaveDirector.find_spawn_point]
 ##   under the arena's entities, a gold sparkle, "A Loot Goblin appeared!" (gold),
-##   RunState.goblins_spawned += 1. # M7: jingle (no audio system yet).
+##   RunState.goblins_spawned += 1; the appearance jingle plays (Audio "goblin_appear").
 ## - Its escape ([signal LootGoblin.escaped]) is announced: "The Loot Goblin escaped!" (grey).
 ## - [signal WaveDirector.wave_cleared] / a new wave cancel a pending spawn; a living goblin
 ##   is despawned by [method WaveDirector.stop] like any enemy (no loot).
@@ -39,8 +39,8 @@ const SPAWN_MIN_TIME := 3.0
 const SPAWN_MAX_SHARE := 0.35
 ## ... and only if ESCAPE_TIME + this many seconds of the wave remain after it.
 const ESCAPE_MARGIN := 3.0
-const APPEARED_TEXT := "A Loot Goblin appeared!"
-const ESCAPED_TEXT := "The Loot Goblin escaped!"
+const APPEARED_TEXT := "A Coin Gremlin appeared!"
+const ESCAPED_TEXT := "The Coin Gremlin escaped!"
 const APPEARED_COLOR := UiTheme.GOLD
 const ESCAPED_COLOR := Color(0.7, 0.7, 0.72)
 
@@ -175,7 +175,7 @@ func spawn_goblin() -> LootGoblin:
 	RunState.goblins_spawned += 1
 	Vfx.explosion(pos + Vector3.UP * 0.3, 1.0, LootGoblin.COIN_COLOR)
 	Vfx.pickup_sparkle(pos + Vector3.UP * 0.9)
-	# M7: jingle
+	Audio.play(&"goblin_appear")
 	announced.emit(APPEARED_TEXT, APPEARED_COLOR)
 	return g
 
@@ -192,6 +192,7 @@ func _on_wave_cleared(_wave_number: int) -> void:
 func _on_goblin_escaped(g: LootGoblin) -> void:
 	if g == goblin:
 		goblin = null
+	Audio.play(&"goblin_escape")
 	announced.emit(ESCAPED_TEXT, ESCAPED_COLOR)
 
 

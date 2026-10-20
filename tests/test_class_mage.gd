@@ -52,7 +52,7 @@ func test_class_data() -> void:
 	check_eq(c.resources.size(), 1, "one resource")
 	check_eq(c.resources[0].id, &"mana", "mana")
 	check_eq(c.abilities.size(), 2, "two core abilities")
-	check_eq(c.abilities[0].id, &"blizzard", "RT = Blizzard")
+	check_eq(c.abilities[0].id, &"blizzard", "RT = Hailstorm")
 	check_eq(c.abilities[1].id, &"blink", "LT = Blink")
 	check(c.mastery == MageMastery, "Ignite mastery script")
 	check(c.mastery_text.begins_with("Ignite"), "mastery text")
@@ -60,11 +60,11 @@ func test_class_data() -> void:
 	check_eq(mana.regen_per_second, 10.0, "10 mana / s")
 	check(mana.regen_uses_haste, "regen scales with Haste")
 	var blizzard := c.abilities[0]
-	check_eq(blizzard.resource, &"mana", "Blizzard costs mana")
+	check_eq(blizzard.resource, &"mana", "Hailstorm costs mana")
 	check_eq(blizzard.cost, 50.0, "50 Mana")
 	check_eq(blizzard.targeting, AbilityData.Targeting.DENSEST_CLUSTER, "densest cluster")
 	check_eq(blizzard.school, &"frost", "frost")
-	check(blizzard.effect == BlizzardEffect, "Blizzard effect")
+	check(blizzard.effect == BlizzardEffect, "Hailstorm effect")
 	var blink := c.abilities[1]
 	check_eq(blink.resource, &"", "Blink is free")
 	check_eq(blink.cooldown, 6.0, "6 s cooldown")
@@ -87,7 +87,7 @@ func test_class_items_are_ability_mods() -> void:
 	for id: StringName in [&"frostweave_cowl", &"band_of_the_blinking_star"]:
 		var item := ItemGenerator.from_unique(Db.uniques[id], 1, false, RunState.rng, p.class_data)
 		check(p.equipment.equip(item), "mage can wear %s" % id)
-	check_eq(p.ability_mods(&"blizzard"), {"radius_pct": 30.0}, "blizzard mods")
+	check_eq(p.ability_mods(&"blizzard"), {"radius_pct": 30.0}, "hailstorm mods")
 	check_eq(p.ability_mods(&"blink"), {"charges_add": 1.0}, "blink mods")
 
 

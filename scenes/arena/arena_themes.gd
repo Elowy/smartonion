@@ -7,7 +7,8 @@ extends RefCounted
 ## about the forest's draw calls (at most [constant MAX_DRAW_CALLS] mesh instances, a test pins it).
 ## Decoration stays OUTSIDE the walls, except for flat or knee-high ground details inside; the
 ## playable rectangle and the camera's view never change. Uses its own seeded RNG (the arena's decor
-## seed), never RunState.rng. The placeholder art is primitives only: the final look is M7's.
+## seed), never RunState.rng. The art is primitives only; M7b VIS-ENV gave every set its animated glow
+## materials ([ArenaFx]) and a wall / backdrop ring outside the playfield ([ArenaBackdrop], one more mesh).
 ##
 ## [method build] is the one entry point ([method Arena._build_decor] calls it): it picks the set by
 ## [member EnvironmentData.decor_id] and builds the forest ([method ArenaDecor.build]) for any id it
@@ -41,6 +42,11 @@ const V_ROCK_LIGHT := Color(0.29, 0.23, 0.21)
 const V_ASH := Color(0.32, 0.28, 0.27)
 const V_IRON := Color(0.13, 0.11, 0.12)
 const V_LAVA := Color(1.0, 0.42, 0.1)
+## The heat baked into the lava glow mesh's vertex colours (the shader pulses them; alpha 0 = a white-hot core
+## without the drifting crust, 1 = cracks and rivers).
+const V_LAVA_CORE := Color(1.0, 0.56, 0.14, 0.0)
+const V_LAVA_CRACK := Color(1.0, 0.4, 0.08)
+const V_LAVA_RIVER := Color(1.0, 0.46, 0.1)
 # Ice cave
 const I_ICE := Color(0.6, 0.82, 0.96)
 const I_ICE_LIGHT := Color(0.8, 0.93, 1.0)
@@ -52,16 +58,25 @@ const I_GLOW := Color(0.5, 0.85, 1.0)
 
 ## The decor of [param arena] for its environment's decor set.
 static func build(arena: Arena, rng: RandomNumberGenerator) -> Node3D:
+	if arena.in_dungeon_layout:
+		return ArenaCrypt.build(arena, rng)
+	var root: Node3D
 	match arena.environment.decor_id:
 		&"cemetery":
-			return _cemetery(arena, rng)
+			root = _cemetery(arena, rng)
 		&"swamp":
-			return _swamp(arena, rng)
+			root = _swamp(arena, rng)
 		&"volcano":
-			return _volcano(arena, rng)
+			root = _volcano(arena, rng)
 		&"ice_cave":
-			return _ice_cave(arena, rng)
-	return ArenaDecor.build(arena, rng)
+			root = _ice_cave(arena, rng)
+		_:
+			return ArenaDecor.build(arena, rng)
+	# M7b: the wall / backdrop ring outside the playfield (one more mesh, its own RNG).
+	var backdrop := ArenaBackdrop.build(arena)
+	if backdrop != null:
+		root.add_child(backdrop)
+	return root
 
 
 ## The decor set ids this class builds (everything else is the forest).
@@ -147,13 +162,14 @@ static func _post(k: MeshKit, base: Vector3, tilt_deg: Vector3, yaw: float, r_to
 	k.add_cylinder(r_top, r_bot, h, Transform3D(b, base + b * Vector3(0.0, y0 + h * 0.5, 0.0)), color, radial)
 
 
-static func _glow_mesh(root: Node3D, node_name: String, kit: MeshKit, color: Color, energy: float) -> void:
+static func _glow_mesh(root: Node3D, node_name: String, kit: MeshKit, color: Color, energy: float,
+		material: Material = null) -> void:
 	if kit.is_empty():
 		return
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
 	mi.mesh = kit.build()
-	mi.material_override = Mats.glow(color, energy)
+	mi.material_override = material if material != null else Mats.glow(color, energy)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
 
@@ -401,10 +417,12 @@ static func _cemetery_lights(root: Node3D, bounds: Rect2, decor: Rect2, rng: Ran
 	var k := MeshKit.new()
 	var z0 := bounds.position.y - ArenaDecor.WALL_OFFSET
 	for side: float in [-1.0, 1.0]:  # the gate lanterns
-		k.add_sphere(0.14, MeshKit.xf(Vector3((GATE + 1.8) * side, 2.95, z0 - 1.0)), Color.WHITE, 8, 4)
+		var lp := Vector3((GATE + 1.8) * side, 2.95, z0 - 1.0)
+		k.add_sphere(0.14, MeshKit.xf(lp), ArenaFx.lit(lp), 8, 4)
 	# Crypt door lamps.
-	k.add_sphere(0.16, MeshKit.xf(Vector3(bounds.position.x - 7.5 - 1.6, 2.4, bounds.position.y - 9.0 + 2.6)), Color.WHITE, 8, 4)
-	k.add_sphere(0.16, MeshKit.xf(Vector3(bounds.position.x - 7.5 + 1.6, 2.4, bounds.position.y - 9.0 + 2.6)), Color.WHITE, 8, 4)
+	for lx: float in [-1.6, 1.6]:
+		var lp := Vector3(bounds.position.x - 7.5 + lx, 2.4, bounds.position.y - 9.0 + 2.6)
+		k.add_sphere(0.16, MeshKit.xf(lp), ArenaFx.lit(lp), 8, 4)
 	# Wisps and candle flames.
 	for i in 40:
 		var q := _band_point(bounds, decor, rng, 1.8)
@@ -412,8 +430,10 @@ static func _cemetery_lights(root: Node3D, bounds: Rect2, decor: Rect2, rng: Ran
 			continue
 		var wisp := rng.randf() < 0.55
 		var y := rng.randf_range(0.5, 1.9) if wisp else 0.2
-		k.add_sphere(0.1 if wisp else 0.06, MeshKit.xf(Vector3(q.x, y, q.y), Vector3.ZERO, Vector3(1.0, 1.3, 1.0)), Color.WHITE, 6, 3)
-	_glow_mesh(root, "Wisps", k, C_WISP, 1.9)
+		var wp := Vector3(q.x, y, q.y)
+		k.add_sphere(0.1 if wisp else 0.06, MeshKit.xf(wp, Vector3.ZERO, Vector3(1.0, 1.3, 1.0)), ArenaFx.lit(wp), 6, 3)
+	# (Wisps and flames pulse out of step with each other: the phase is in the vertex colour.)
+	_glow_mesh(root, "Wisps", k, C_WISP, 1.9, ArenaFx.twinkle(C_WISP, 1.7, 0.55, 0.15))
 
 
 # =================================================================================================
@@ -584,13 +604,16 @@ static func _swamp_lights(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 	var k := MeshKit.new()
 	var z0 := bounds.position.y - ArenaDecor.WALL_OFFSET
 	for side: float in [-1.0, 1.0]:
-		k.add_sphere(0.12, MeshKit.xf(Vector3((GATE + 1.8) * side - 0.5 * side, 2.8, z0 - 1.0)), Color.WHITE, 8, 4)
+		var lp := Vector3((GATE + 1.8) * side - 0.5 * side, 2.8, z0 - 1.0)
+		k.add_sphere(0.12, MeshKit.xf(lp), ArenaFx.lit(lp), 8, 4)
 	for i in 70:
 		var q := _band_point(bounds, decor, rng, 1.5)
 		if not q.is_finite():
 			continue
-		k.add_sphere(0.05 + 0.04 * rng.randf(), MeshKit.xf(Vector3(q.x, rng.randf_range(0.4, 2.4), q.y)), Color.WHITE, 5, 3)
-	_glow_mesh(root, "Fireflies", k, S_FIREFLY, 2.1)
+		var fp := Vector3(q.x, rng.randf_range(0.4, 2.4), q.y)
+		k.add_sphere(0.05 + 0.04 * rng.randf(), MeshKit.xf(fp), ArenaFx.lit(fp), 5, 3)
+	# (Fireflies blink: mostly dark, a sharp flash now and then, each out of step.)
+	_glow_mesh(root, "Fireflies", k, S_FIREFLY, 2.1, ArenaFx.twinkle(S_FIREFLY, 1.5, 0.92, 0.7))
 
 
 # =================================================================================================
@@ -731,7 +754,7 @@ static func _volcano_glow(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 	var k := MeshKit.new()
 	var z0 := bounds.position.y - ArenaDecor.WALL_OFFSET
 	for v in vents_in(bounds):
-		k.add_cylinder(0.78, 0.78, 0.04, MeshKit.xf(v + Vector3(0.0, 0.07, 0.0)), Color.WHITE, 12)
+		k.add_cylinder(0.78, 0.78, 0.04, MeshKit.xf(v + Vector3(0.0, 0.07, 0.0)), V_LAVA_CORE, 12)
 		# Cracks radiating from the vent.
 		for i in 5:
 			var a := TAU * float(i) / 5.0 + rng.randf_range(-0.3, 0.3)
@@ -741,7 +764,7 @@ static func _volcano_glow(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 				var q := prev + Vector3(sin(a2), 0.0, cos(a2)) * rng.randf_range(0.6, 1.1)
 				if not bounds.grow(-0.4).has_point(Vector2(q.x, q.z)):
 					break
-				k.add_segment(prev + Vector3(0.0, 0.04, 0.0), q + Vector3(0.0, 0.04, 0.0), 0.05 - s * 0.01, 0.04 - s * 0.01, Color.WHITE, 4, false)
+				k.add_segment(prev + Vector3(0.0, 0.04, 0.0), q + Vector3(0.0, 0.04, 0.0), 0.05 - s * 0.01, 0.04 - s * 0.01, V_LAVA_CRACK, 4, false)
 				prev = q
 	# Two lava rivers winding beyond the north and south-west walls.
 	for river in 2:
@@ -754,24 +777,29 @@ static func _volcano_glow(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 		for s in 26:
 			dir = dir.rotated(Vector3.UP, sin(float(s) * 0.55 + float(river) * 2.0) * 0.28).normalized()
 			var q := prev + dir * 1.6
-			k.add_segment(prev + Vector3(0.0, 0.03, 0.0), q + Vector3(0.0, 0.03, 0.0), 0.5 + 0.2 * sin(float(s) * 0.9), 0.5 + 0.2 * sin(float(s + 1) * 0.9), Color.WHITE, 6)
+			k.add_segment(prev + Vector3(0.0, 0.03, 0.0), q + Vector3(0.0, 0.03, 0.0), 0.5 + 0.2 * sin(float(s) * 0.9), 0.5 + 0.2 * sin(float(s + 1) * 0.9), V_LAVA_RIVER, 6)
 			prev = q
 			if absf(prev.x) > decor.end.x - 3.0 or prev.z < decor.position.y + 3.0 or prev.z > decor.end.y - 3.0:
 				break
+	# Dashes of magma along the foot of the wall (the backdrop's crater rim stands behind them).
+	for seam in ArenaBackdrop.magma_seams(bounds):
+		k.add_segment(seam[0], seam[1], 0.08, 0.08, V_LAVA_CRACK, 4, false)
 	# The gate braziers' fire.
 	for side: float in [-1.0, 1.0]:
 		var base := Vector3((GATE + 1.8) * side, 1.65, z0 - 1.0)
-		k.add_sphere(0.28, MeshKit.xf(base, Vector3.ZERO, Vector3(1.0, 1.2, 1.0)), Color.WHITE, 8, 4)
-		k.add_cylinder(0.0, 0.22, 0.6, MeshKit.xf(base + Vector3(0.0, 0.45, 0.0)), Color.WHITE, 6)
-	_glow_mesh(root, "Lava", k, V_LAVA, 2.1)
+		k.add_sphere(0.28, MeshKit.xf(base, Vector3.ZERO, Vector3(1.0, 1.2, 1.0)), V_LAVA_CORE, 8, 4)
+		k.add_cylinder(0.0, 0.22, 0.6, MeshKit.xf(base + Vector3(0.0, 0.45, 0.0)), V_LAVA_CORE, 6)
+	# (Molten, churning and pulsing; the heat of every part is its vertex colour.)
+	_glow_mesh(root, "Lava", k, V_LAVA, 2.1, ArenaFx.lava())
 	# Floating embers.
 	var e := MeshKit.new()
 	for i in 90:
 		var q := _band_point(bounds, decor, rng, 0.5)
 		if not q.is_finite():
 			continue
-		e.add_sphere(0.04 + 0.04 * rng.randf(), MeshKit.xf(Vector3(q.x, rng.randf_range(0.6, 5.0), q.y)), Color.WHITE, 4, 2)
-	_glow_mesh(root, "FloatingEmbers", e, Color(1.0, 0.75, 0.3), 2.2)
+		var ep := Vector3(q.x, rng.randf_range(0.6, 5.0), q.y)
+		e.add_sphere(0.04 + 0.04 * rng.randf(), MeshKit.xf(ep), ArenaFx.lit(ep), 4, 2)
+	_glow_mesh(root, "FloatingEmbers", e, Color(1.0, 0.75, 0.3), 2.2, ArenaFx.twinkle(Color(1.0, 0.75, 0.3), 2.0, 0.7, 0.3))
 
 
 # =================================================================================================
@@ -899,10 +927,13 @@ static func _ice_sparkles(root: Node3D, bounds: Rect2, decor: Rect2, rng: Random
 	var k := MeshKit.new()
 	var z0 := bounds.position.y - ArenaDecor.WALL_OFFSET
 	for side: float in [-1.0, 1.0]:
-		k.add_sphere(0.16, MeshKit.xf(Vector3((GATE + 1.9) * side, 3.5, z0 - 1.0)), Color.WHITE, 8, 4)
+		var lp := Vector3((GATE + 1.9) * side, 3.5, z0 - 1.0)
+		k.add_sphere(0.16, MeshKit.xf(lp), ArenaFx.lit(lp), 8, 4)
 	for i in 60:
 		var q := _band_point(bounds, decor, rng, 1.2)
 		if not q.is_finite():
 			continue
-		k.add_sphere(0.04 + 0.03 * rng.randf(), MeshKit.xf(Vector3(q.x, rng.randf_range(0.3, 3.5), q.y)), Color.WHITE, 4, 2)
-	_glow_mesh(root, "Sparkles", k, I_GLOW, 2.0)
+		var sp := Vector3(q.x, rng.randf_range(0.3, 3.5), q.y)
+		k.add_sphere(0.04 + 0.03 * rng.randf(), MeshKit.xf(sp), ArenaFx.lit(sp), 4, 2)
+	# (The crystals' glints twinkle.)
+	_glow_mesh(root, "Sparkles", k, I_GLOW, 2.0, ArenaFx.twinkle(I_GLOW, 2.2, 0.85, 0.5))

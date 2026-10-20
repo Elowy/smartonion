@@ -199,7 +199,8 @@ func riposte(target: Enemy) -> void:
 	var dmg := CombatMath.weapon_hit_damage(weapon, player.stats) \
 			* (CombatMath.crit_multiplier(weapon, player.stats) if crit else 1.0)
 	Vfx.slash_arc(player.global_position + Vector3.UP * 0.3, dir, 1.4, 70.0, _slash_color())
-	Vfx.hit_spark(target.global_position + Vector3.UP * 0.6, _slash_color())
+	Audio.play(AudioIds.swing(weapon))
+	Vfx.hit_spark(target.global_position + Vector3.UP * 0.6, _slash_color(), weapon.school, crit)
 	player.face_attack(dir)
 	apply_hit(player, target, dmg, crit, dir * weapon.knockback, weapon.stun_chance,
 			weapon.stun_duration, weapon, true)
@@ -260,6 +261,7 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 		hits.remove_at(at)
 		hits.push_front(target)
 	Vfx.slash_arc(origin + Vector3.UP * 0.3, dir, weapon.attack_range, weapon.arc_degrees, _slash_color())
+	Audio.play(AudioIds.swing(weapon))
 	var gate := ProcGate.new()
 	for e in hits:
 		if not is_instance_valid(e) or e.is_dead():
@@ -267,7 +269,7 @@ func _melee(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 		var crit := player.consume_forced_crit() or _bonus_crit(e) \
 				or CombatMath.roll_crit(player.stats, RunState.rng)
 		var dmg := base * (crit_mult if crit else 1.0)
-		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color())
+		Vfx.hit_spark(e.global_position + Vector3.UP * 0.6, _slash_color(), weapon.school, crit)
 		apply_hit(player, e, dmg, crit, dir * weapon.knockback, weapon.stun_chance, weapon.stun_duration,
 				weapon, is_extra, gate.take())
 
@@ -286,6 +288,7 @@ func _shoot(origin: Vector3, dir: Vector3, is_extra: bool = false, target: Enemy
 	var crit_mult := CombatMath.crit_multiplier(weapon, stats)
 	var style := projectile_style(weapon)
 	var color := _projectile_color(style)
+	Audio.play(AudioIds.shot(weapon))
 	var gate := ProcGate.new()
 	for i in count:
 		var shot := dir
@@ -428,6 +431,7 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 		damage *= CombatMath.target_damage_mult(valid_attacker.stats, ratio, enemy.is_elite())
 		damage *= valid_attacker.outgoing_damage_mult(enemy, weapon.school if weapon != null else &"physical", &"weapon")
 	var text_pos := enemy.global_position + Vector3.UP * DAMAGE_TEXT_HEIGHT
+	Audio.play(&"hit_crit" if is_crit else &"hit")
 	if valid_attacker != null and valid_attacker.slot != null:
 		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)), enemy.is_boss())
 	enemy.take_damage(damage, is_crit, valid_attacker, knockback)

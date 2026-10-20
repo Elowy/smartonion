@@ -12,9 +12,9 @@ const SET_IDS: Dictionary[StringName, StringName] = {
 	&"paladin": &"dawnforged_plate", &"rogue": &"shadowstitch_garb", &"warlock": &"felfire_raiment",
 }
 const SET_NAMES: Dictionary[StringName, String] = {
-	&"battlegear_of_fury": "Battlegear of Fury", &"regalia_of_the_arcane": "Regalia of the Arcane",
+	&"battlegear_of_fury": "Ragebound Plate", &"regalia_of_the_arcane": "Regalia of the Arcane",
 	&"dawnforged_plate": "Dawnforged Plate", &"shadowstitch_garb": "Shadowstitch Garb",
-	&"felfire_raiment": "Felfire Raiment",
+	&"felfire_raiment": "Hexfire Raiment",
 }
 ## Piece slot suffix (set_<class>_<slot>) -> slot type, in SetData.piece_ids order.
 const PIECE_SLOTS: Dictionary[String, int] = {
@@ -184,13 +184,13 @@ func test_bonus_numbers_follow_the_design_table() -> void:
 	check_eq(bonus_effects(&"dawnforged_plate", 2), [{"kind": "stats", "stats": {"armor": 3.0}}], "Dawnforged 2: +3 Armor")
 	check_eq(bonus_effects(&"dawnforged_plate", 4),
 		[{"kind": "ability", "match": {"id": "word_of_glory"}, "mods": {"heal_all": true, "heal_max_hp_pct_add": 10.0}}],
-		"Dawnforged 4: Word of Glory heals all, +10% of Max HP")
+		"Dawnforged 4: Call of Valor heals all, +10% of Max HP")
 	check_eq(bonus_effects(&"shadowstitch_garb", 2), [{"kind": "stats", "stats": {"crit": 5.0}}], "Shadowstitch 2: +5% crit")
 	check_eq(bonus_effects(&"shadowstitch_garb", 4), [{"kind": "proc", "proc": {"trigger": "on_cast", "ability": "vanish",
-		"effect": "buff", "stats": {"crit_damage": 50.0}, "duration": 4.0}}], "Shadowstitch 4: Vanish +50% crit damage 4 s")
-	check_eq(bonus_effects(&"felfire_raiment", 2), [{"kind": "damage", "pct": 10.0, "source": "pet"}], "Felfire 2: +10% pet damage")
+		"effect": "buff", "stats": {"crit_damage": 50.0}, "duration": 4.0}}], "Shadowstitch 4: Melt Away +50% crit damage 4 s")
+	check_eq(bonus_effects(&"felfire_raiment", 2), [{"kind": "damage", "pct": 10.0, "source": "pet"}], "Hexfire 2: +10% pet damage")
 	check_eq(bonus_effects(&"felfire_raiment", 4),
-		[{"kind": "ability", "match": {"id": "rain_of_fire"}, "mods": {"free_chance_add": 20.0}}], "Felfire 4: free Rain of Fire 20%")
+		[{"kind": "ability", "match": {"id": "rain_of_fire"}, "mods": {"free_chance_add": 20.0}}], "Hexfire 4: free Ember Rain 20%")
 
 
 func test_regalia_4_piece_proc_has_a_6_second_icd() -> void:
@@ -226,14 +226,14 @@ func test_effects_for_at_0_2_4_and_5_pieces() -> void:
 	check_eq(SetBonuses.active_count(wearing(&"warrior", ["head"])), 0, "1 piece: no bonus")
 	var two := SetBonuses.effects_for(wearing(&"warrior", ["head", "hands"]))
 	check_eq(two, [{"kind": "stats", "stats": {"resource_regen": 10.0}, "rank": 1, "id": "battlegear_of_fury:2",
-		"label": "Battlegear of Fury"}], "2 pieces: the 2-piece bonus, rank 1, id <set>:2, set name label")
+		"label": "Ragebound Plate"}], "2 pieces: the 2-piece bonus, rank 1, id <set>:2, set name label")
 	check_eq(SetBonuses.active_count(wearing(&"warrior", ["head", "hands"])), 1, "2 pieces: 1 bonus")
 	check_eq(SetBonuses.effects_for(wearing(&"warrior", ["head", "hands", "legs"])), two, "3 pieces: still the 2-piece")
 	var four := SetBonuses.effects_for(wearing(&"warrior", ["head", "shoulders", "hands", "legs"]))
 	check_eq(four.size(), 2, "4 pieces: 2-piece + 4-piece")
 	check_eq(four[0], two[0], "the 2-piece bonus stays")
 	check_eq(four[1], {"kind": "ability", "match": {"id": "whirlwind"}, "mods": {"free_chance_add": 30.0}, "rank": 1,
-		"id": "battlegear_of_fury:4", "label": "Battlegear of Fury"}, "the 4-piece bonus")
+		"id": "battlegear_of_fury:4", "label": "Ragebound Plate"}, "the 4-piece bonus")
 	var all := wearing(&"warrior", ["head", "shoulders", "chest", "hands", "legs"])
 	check_eq(SetBonuses.effects_for(all), four, "5 pieces: no 5-piece bonus")
 	check_eq(SetBonuses.active_count(all), 2, "5 pieces: 2 bonuses")
@@ -297,7 +297,7 @@ func test_describe_rows_with_and_without_equipment() -> void:
 	check_eq(slot_names, ["Head", "Shoulders", "Chest", "Hands", "Legs"] as Array[String],
 		"and their slot names (the tooltip's compact block)")
 	check_eq(loose[6], {"kind": SetBonuses.ROW_BONUS, "text": "(2) Set: Increases your critical strike chance by 5%.", "active": false}, "2-piece row")
-	check_eq(str(loose[7]["text"]), "(4) Set: Vanish increases your critical strike damage by 50% for 4 sec.", "4-piece row")
+	check_eq(str(loose[7]["text"]), "(4) Set: Melt Away boosts your critical strike damage by 50% for 4 sec.", "4-piece row")
 	var eq := wearing(&"rogue", ["head", "chest"])
 	var worn := SetBonuses.describe(head, eq)
 	check_eq(worn[0]["text"], "Shadowstitch Garb (2/5)", "worn count")
@@ -448,13 +448,13 @@ func test_each_class_set_reaches_the_engine() -> void:
 		_wear(rogue, piece(&"rogue", s))
 	check_eq(rogue.stats.get_source(&"set_bonus").get(Stats.CRIT, 0.0), 5.0, "Shadowstitch 2: crit")
 	var rdefs := rogue.procs.extra_defs(PlayerBonuses.SOURCE_SETS)
-	check(rdefs.size() == 1 and str(rdefs[0]["ability"]) == "vanish", "Shadowstitch 4: the Vanish proc")
+	check(rdefs.size() == 1 and str(rdefs[0]["ability"]) == "vanish", "Shadowstitch 4: the Melt Away proc")
 	var warlock := Fakes.spawn_player(world, 3, &"warlock", Vector3(18, 0, 0))
 	for s in ["chest", "shoulders", "hands", "legs"]:
 		_wear(warlock, piece(&"warlock", s))
-	check_near(warlock.bonuses.damage_mult(null, &"fire", &"pet"), 1.1, 0.0001, "Felfire 2: +10% pet damage")
+	check_near(warlock.bonuses.damage_mult(null, &"fire", &"pet"), 1.1, 0.0001, "Hexfire 2: +10% pet damage")
 	check_near(warlock.bonuses.damage_mult(null, &"fire", &"ability"), 1.0, 0.0001, "only pets")
-	check_eq(float(warlock.abilities.params_for(Db.get_ability(&"rain_of_fire")).get("free_chance", 0.0)), 20.0, "Felfire 4: free Rain of Fire")
+	check_eq(float(warlock.abilities.params_for(Db.get_ability(&"rain_of_fire")).get("free_chance", 0.0)), 20.0, "Hexfire 4: free Ember Rain")
 
 
 ## Word of Glory Rank V "Light of Dawn" already heals every hero within 8 m; the Dawnforged
@@ -463,10 +463,10 @@ func test_dawnforged_4_piece_still_helps_with_light_of_dawn() -> void:
 	var paladin := _player(&"paladin")
 	var wog := Db.get_ability(&"word_of_glory")
 	var slot := paladin.abilities.slot_of(wog.id)
-	check(slot >= 0, "Word of Glory is known")
+	check(slot >= 0, "Call of Valor is known")
 	while paladin.abilities.rank_of(wog.id) < 5:
 		check(paladin.abilities.rank_up(wog.id), "rank up")
-	check(paladin.abilities.set_spec(wog.id, 0), "Light of Dawn chosen")
+	check(paladin.abilities.set_spec(wog.id, 0), "Chorus of Dawn chosen")
 	var spec_only := paladin.abilities.params_for(wog)
 	check(spec_only.get("heal_all") == true and float(spec_only.get("heal_max_hp_pct")) == 25.0, "the spec heals every hero, 25%")
 	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3, 0, 0))
@@ -486,7 +486,7 @@ func test_dawnforged_4_piece_still_helps_with_light_of_dawn() -> void:
 	holy.set_value(3.0)
 	check(paladin.abilities.try_cast(slot), "cast with the 4-piece")
 	check_near(ally.hp - 2.0, (3.0 + ally.max_hp() * 0.35) * power, 0.001, "the heal grew by 10% of Max HP x power")
-	check(ally.hp - 2.0 > heal_spec, "the set is worth something next to Light of Dawn")
+	check(ally.hp - 2.0 > heal_spec, "the set is worth something next to Chorus of Dawn")
 
 
 # --- Generator: the set roll -------------------------------------------------------------------

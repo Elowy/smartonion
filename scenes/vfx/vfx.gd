@@ -8,6 +8,12 @@ extends RefCounted
 ## (each animated part owns a duplicate of a cached material – no instance uniforms, which
 ## the Compatibility renderer only fits for ~256 instances), small CPU particle bursts.
 ## Visual randomness uses a private RNG so gameplay determinism (RunState.rng) is untouched.
+##
+## M7b combat juice: [method hit_spark] looks different per damage school and has a crit variant
+## (a bigger flash plus a star burst); [method boss_entrance] / [method boss_remains] dress the
+## boss's arrival and death; [method hop_height] is the pop-and-bounce arc of dropped loot; sparks
+## are throttled (per-frame budget and a cap on live ones). Corpses and the spawn rise live in
+## [EnemyCorpse] / [EnemyModel].
 
 ## Floating texts alive at once; extra non-crit texts (size <= 1) are dropped when the
 ## screen is busy. Crits may go CRIT_EXTRA_TEXTS above it.
@@ -31,6 +37,61 @@ const GROUND_Y := 0.04
 const ARC_LIFT := 0.3
 ## Height (m) of the [method resurrect_column] light shaft.
 const RESURRECT_HEIGHT := 14.0
+## Hit sparks: at most this many per rendered frame and MAX_SPARKS_ALIVE on screen (crits may add
+## CRIT_SPARKS_EXTRA to both) – a 150-enemy brawl would otherwise spawn hundreds of particle systems a second.
+const SPARKS_PER_FRAME := 24
+const CRIT_SPARKS_EXTRA := 10
+const MAX_SPARKS_ALIVE := 90
+## How far the colour a caller passes may differ from a known school colour (RGB distance) for
+## [method school_for_color] to call it that school.
+const SCHOOL_MATCH_DISTANCE := 0.07
+## Loot pop (see [method hop_height]): peak of the first arc and of the bounce (m), and the share of the
+## time the first arc takes.
+const HOP_PEAK := 0.75
+const HOP_BOUNCE := 0.18
+const HOP_SPLIT := 0.62
+## The tint a school colour keeps of the caller's own colour (the player's weapon colour).
+const SCHOOL_TINT_KEEP := 0.18
+
+## Impact look per damage school (the spark mesh id, particle count, speed range, gravity, damping,
+## size range, lifetime, additive blending, the flash's alpha and whether the sparks fly up). The
+## colours come from [constant ProcVfx.SCHOOL_COLORS]. Physical hits are quick steel streaks, fire
+## rising embers, frost tumbling shards, arcane spinning stars, holy rays that float up, shadow
+## dark wisps and nature spinning leaves.
+const SCHOOL_FX := {
+	&"physical": {"mesh": &"streak", "count": 9, "speed": Vector2(3.5, 7.0), "gravity": -6.0,
+			"damp": Vector2(6.0, 9.0), "scale": Vector2(0.7, 1.2), "life": 0.28, "additive": true,
+			"flash": 0.9, "spin": 0.0, "up": false},
+	&"fire": {"mesh": &"ember", "count": 9, "speed": Vector2(1.6, 4.0), "gravity": 3.5,
+			"damp": Vector2(2.0, 4.0), "scale": Vector2(0.28, 0.5), "life": 0.38, "additive": false,
+			"flash": 1.0, "spin": 0.0, "up": true},
+	&"frost": {"mesh": &"shard", "count": 8, "speed": Vector2(2.5, 5.5), "gravity": -7.0,
+			"damp": Vector2(3.0, 6.0), "scale": Vector2(0.8, 1.4), "life": 0.34, "additive": false,
+			"flash": 0.8, "spin": 300.0, "up": false},
+	&"arcane": {"mesh": &"star", "count": 9, "speed": Vector2(2.0, 5.0), "gravity": 0.0,
+			"damp": Vector2(3.0, 5.0), "scale": Vector2(1.0, 1.7), "life": 0.4, "additive": false,
+			"flash": 0.95, "spin": 520.0, "up": false},
+	&"holy": {"mesh": &"streak", "count": 7, "speed": Vector2(1.5, 3.2), "gravity": 5.0,
+			"damp": Vector2(2.0, 3.0), "scale": Vector2(0.8, 1.3), "life": 0.42, "additive": false,
+			"flash": 1.0, "spin": 0.0, "up": true},
+	&"shadow": {"mesh": &"ball", "count": 8, "speed": Vector2(1.0, 2.8), "gravity": 1.5,
+			"damp": Vector2(2.5, 4.0), "scale": Vector2(0.5, 0.9), "life": 0.45, "additive": false,
+			"flash": 0.75, "spin": 0.0, "up": true},
+	&"nature": {"mesh": &"leaf", "count": 8, "speed": Vector2(2.0, 4.5), "gravity": -3.0,
+			"damp": Vector2(3.0, 5.0), "scale": Vector2(0.9, 1.5), "life": 0.4, "additive": false,
+			"flash": 0.8, "spin": 420.0, "up": false},
+}
+
+## Ability colours (the kits' own school constants) that are recognised as a school, so their sparks get
+## that school's look too without every call site naming it.
+const _KNOWN_SCHOOL_COLORS: Array = [
+	[Color(1.0, 0.86, 0.4), &"holy"], [Color(1.0, 0.88, 0.45), &"holy"],
+	[Color(1.0, 0.48, 0.12), &"fire"], [Color(1.0, 0.52, 0.16), &"fire"],
+	[Color(0.6, 0.86, 1.0), &"frost"], [Color(0.62, 0.84, 1.0), &"frost"],
+	[Color(0.88, 0.5, 1.0), &"arcane"], [Color(0.78, 0.52, 1.0), &"arcane"],
+	[Color(0.55, 0.38, 0.9), &"shadow"], [Color(0.66, 0.36, 0.95), &"shadow"],
+	[Color(0.45, 0.95, 0.3), &"nature"], [Color(0.45, 1.0, 0.25), &"nature"],
+]
 
 const _ARC_CODE := """
 shader_type spatial;
@@ -148,9 +209,29 @@ void fragment() {
 }
 """
 
+## Pickup magnet streak (a flat quad on the ground plane, head at -Z = UV.y 0): bright at the head, fading to
+## the tail, soft at the sides (alpha-blended: additive would wash out on the bright meadow).
+const _TRAIL_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_mix, shadows_disabled;
+uniform vec4 trail_color = vec4(1.0);
+void fragment() {
+	float along = clamp(UV.y, 0.0, 1.0);
+	float across = clamp(1.0 - abs(UV.x - 0.5) * 2.0, 0.0, 1.0);
+	ALBEDO = mix(trail_color.rgb, vec3(1.0), pow(1.0 - along, 3.0) * 0.45);
+	ALPHA = clamp(pow(1.0 - along, 1.3) * pow(across, 0.6) * trail_color.a, 0.0, 1.0);
+}
+"""
+
 static var _text_count := 0
 static var _rng := RandomNumberGenerator.new()
 static var _materials: Dictionary[String, Material] = {}
+## Tests: a fixed frame id for the per-frame budgets (-1 = the engine's frame counter).
+static var frame_override := -1
+static var _spark_alive := 0
+static var _spark_frame := -1
+static var _spark_used := 0
+static var _trail_materials: Dictionary[String, Material] = {}
 ## Live damage numbers by target instance id (see [method damage_number]).
 static var _merge: Dictionary[int, VfxEffect] = {}
 
@@ -164,9 +245,12 @@ static func floating_text(pos: Vector3, text: String, color: Color, size: float 
 
 
 ## A damage number on [param target] (merge key: hits on the same target within
-## MERGE_WINDOW add up on one number that pops again; null never merges). A crit merged into
+## MERGE_WINDOW add up on one number that pops again; null never merges). Nothing is drawn when the
+## Damage Numbers setting is off. A crit merged into
 ## a normal number upgrades it to [param color] / [param size].
 static func damage_number(target: Object, pos: Vector3, amount: float, color: Color, size: float) -> void:
+	if not Settings.damage_numbers_enabled():
+		return
 	var key := target.get_instance_id() if target != null and is_instance_valid(target) else 0
 	if key != 0 and _merge.has(key):
 		var live: VfxEffect = _merge[key]
@@ -258,27 +342,134 @@ static func slash_arc(pos: Vector3, direction: Vector3, radius: float, arc_degre
 	_start(fx)
 
 
-static func hit_spark(pos: Vector3, color: Color) -> void:
-	var fx := _effect(VfxEffect.Kind.SPARK, pos, 0.3)
+## A burst of sparks at [param pos]. [param color] is the caller's colour. With a damage
+## [param school] (weapon and proc hits) the sparks take that school's colour (a faint tint of
+## [param color] stays) and its shape ([constant SCHOOL_FX]); the abilities' own school-coloured
+## sparks are recognised by [method school_for_color]. [param crit] adds a bigger flash and a star
+## burst. Throttled: [constant SPARKS_PER_FRAME] per rendered frame, [constant MAX_SPARKS_ALIVE] at once.
+static func hit_spark(pos: Vector3, color: Color, school: StringName = &"", crit: bool = false) -> void:
+	if not _spark_allowed(crit):
+		return
+	var look := school
+	var tint := color
+	if look == &"":
+		look = school_for_color(color)
+	elif SCHOOL_FX.has(look):
+		tint = spark_color(look, color)
+	var style: Dictionary = SCHOOL_FX.get(look, SCHOOL_FX[&"physical"])
+	var life := float(style["life"])
+	var fx := _effect(VfxEffect.Kind.SPARK, pos, maxf(0.3, life + 0.03) + (0.1 if crit else 0.0))
 	if fx == null:
 		return
-	fx.size = 0.26
-	fx.color = color
-	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.4), 0.9)
+	_spark_alive += 1
+	fx.size = 0.46 if crit else 0.26
+	fx.color = tint
+	fx.flash = _glow_ball(fx, tint.lerp(Color.WHITE, 0.4), 1.0 if crit else float(style["flash"]))
 	fx.flash.position.y = 0.0
-	var p := _particles(fx, 9, 0.28, _spark_mesh(), Mats.particle(true))
-	p.particle_flag_align_y = true
+	var additive: bool = style["additive"]
+	var p := _particles(fx, int(style["count"]), life, _spark_shape(style["mesh"]), Mats.particle(additive))
+	var speed: Vector2 = style["speed"]
+	var damp: Vector2 = style["damp"]
+	var sz: Vector2 = style["scale"]
+	var spin := float(style["spin"])
+	p.particle_flag_align_y = style["mesh"] == &"streak"
 	p.direction = Vector3.UP
-	p.spread = 180.0
-	p.initial_velocity_min = 3.5
-	p.initial_velocity_max = 7.0
-	p.gravity = Vector3(0, -6, 0)
-	p.damping_min = 6.0
-	p.damping_max = 9.0
-	p.scale_amount_min = 0.7
-	p.scale_amount_max = 1.2
-	p.color_ramp = _fade_gradient(color.lerp(Color.WHITE, 0.5), color)
+	p.spread = 70.0 if style["up"] else 180.0
+	p.initial_velocity_min = speed.x
+	p.initial_velocity_max = speed.y
+	p.gravity = Vector3(0, float(style["gravity"]), 0)
+	p.damping_min = damp.x
+	p.damping_max = damp.y
+	p.scale_amount_min = sz.x
+	p.scale_amount_max = sz.y
+	if spin > 0.0:
+		p.angular_velocity_min = -spin
+		p.angular_velocity_max = spin
+	var head := tint.lerp(Color.WHITE, 0.5) if additive else tint.lerp(Color.WHITE, 0.2)
+	p.color_ramp = _fade_gradient(Color(head.r, head.g, head.b, 1.0), Color(tint.r, tint.g, tint.b, 0.0))
+	if crit:
+		# The star burst of a critical hit: a few big white-gold stars flying out.
+		var stars := _particles(fx, 7, 0.34, _crit_star_mesh(), Mats.particle(false))
+		stars.direction = Vector3.UP
+		stars.spread = 180.0
+		stars.initial_velocity_min = 4.5
+		stars.initial_velocity_max = 8.5
+		stars.gravity = Vector3(0, -2.0, 0)
+		stars.damping_min = 5.0
+		stars.damping_max = 8.0
+		stars.scale_amount_min = 0.9
+		stars.scale_amount_max = 1.5
+		stars.angular_velocity_min = -600.0
+		stars.angular_velocity_max = 600.0
+		stars.color_ramp = _fade_gradient(Color(1.0, 0.93, 0.5), Color(tint.r, tint.g, tint.b, 0.0))
 	_start(fx)
+
+
+## The colour of a [param school]'s impact: the school's colour with a faint tint of [param tint] (the
+## caller's own colour, e.g. the weapon's). Unknown schools come back as [param tint].
+static func spark_color(school: StringName, tint: Color = Color.WHITE) -> Color:
+	if not ProcVfx.SCHOOL_COLORS.has(school):
+		return tint
+	var c := ProcVfx.school_color(school)
+	return Color(c.r, c.g, c.b, 1.0).lerp(Color(tint.r, tint.g, tint.b, 1.0), SCHOOL_TINT_KEEP)
+
+
+## The school whose colour [param color] is (the exact colours of [constant ProcVfx.SCHOOL_COLORS] and the
+## class kits' own school constants), else &"".
+static func school_for_color(color: Color) -> StringName:
+	var v := Vector3(color.r, color.g, color.b)
+	for school: StringName in ProcVfx.SCHOOL_COLORS:
+		var c: Color = ProcVfx.SCHOOL_COLORS[school]
+		if v.distance_to(Vector3(c.r, c.g, c.b)) <= SCHOOL_MATCH_DISTANCE:
+			return school
+	for entry in _KNOWN_SCHOOL_COLORS:
+		var c: Color = entry[0]
+		if v.distance_to(Vector3(c.r, c.g, c.b)) <= SCHOOL_MATCH_DISTANCE:
+			return entry[1]
+	return &""
+
+
+## Sparks alive right now (tests / debugging).
+static func spark_count() -> int:
+	return _spark_alive
+
+
+## Forgets the per-frame spark budget and the frame override (tests).
+static func reset_budgets() -> void:
+	_spark_frame = -1
+	_spark_used = 0
+	frame_override = -1
+
+
+## The frame id the per-frame budgets use (the engine's rendered-frame counter).
+static func frame_id() -> int:
+	return frame_override if frame_override >= 0 else Engine.get_process_frames()
+
+
+static func _spark_allowed(crit: bool) -> bool:
+	var f := frame_id()
+	if f != _spark_frame:
+		_spark_frame = f
+		_spark_used = 0
+	if _spark_used >= SPARKS_PER_FRAME + (CRIT_SPARKS_EXTRA if crit else 0):
+		return false
+	if _spark_alive >= MAX_SPARKS_ALIVE + (CRIT_SPARKS_EXTRA if crit else 0):
+		return false
+	_spark_used += 1
+	return true
+
+
+static func _spark_shape(id: StringName) -> Mesh:
+	match id:
+		&"ember", &"ball":
+			return _ball_mesh()
+		&"shard":
+			return _shard_mesh()
+		&"star":
+			return _star_mesh()
+		&"leaf":
+			return _leaf_mesh()
+	return _spark_mesh()
 
 
 ## [param pos] is the body centre (the shock ring snaps to the ground).
@@ -319,6 +510,7 @@ static func death_puff(pos: Vector3, color: Color, size: float = 1.0) -> void:
 
 
 static func explosion(pos: Vector3, radius: float, color: Color) -> void:
+	Audio.play(&"explosion", clampf(radius - 2.0, -5.0, 2.0))
 	var fx := _effect(VfxEffect.Kind.EXPLOSION, pos, 0.55)
 	if fx == null:
 		return
@@ -365,6 +557,7 @@ static func spawn_telegraph(pos: Vector3, radius: float, duration: float) -> voi
 
 
 static func level_up_burst(pos: Vector3) -> void:
+	Audio.play(&"level_up")
 	var gold := Color(1.0, 0.82, 0.3)
 	var fx := _effect(VfxEffect.Kind.LEVEL_UP, pos, 1.0)
 	if fx == null:
@@ -414,6 +607,7 @@ static func level_up_burst(pos: Vector3) -> void:
 ## Resurrection (GDD 1): a shaft of golden light from the sky onto [param pos] (the
 ## revived player's feet), a shock ring and rising sparkles.
 static func resurrect_column(pos: Vector3) -> void:
+	Audio.play(&"revive")
 	var fx := _effect(VfxEffect.Kind.RESURRECT, pos, 1.3)
 	if fx == null:
 		return
@@ -479,6 +673,147 @@ static func pickup_sparkle(pos: Vector3) -> void:
 	p.angular_velocity_max = 300.0
 	p.color_ramp = _fade_gradient(Color(1.0, 0.97, 0.7), Color(1.0, 0.75, 0.2, 0.0))
 	_start(fx)
+
+
+## The moment a boss arrives (M7b): its rune flares open on the ground (rotating, fading), a shaft of
+## light rises from it, a shock ring runs out and dust rises. [param radius] is the boss's footprint
+## (m). Presentation only: the boss's timing is the director's.
+static func boss_entrance(pos: Vector3, radius: float, color: Color) -> void:
+	var r := maxf(radius, 0.5)
+	var fx := _effect(VfxEffect.Kind.ENTRANCE, Vector3(pos.x, GROUND_Y, pos.z), 1.5)
+	if fx == null:
+		return
+	fx.size = r
+	fx.color = Color(color.r, color.g, color.b, 0.8)
+	var rune := MeshInstance3D.new()
+	rune.name = "Rune"
+	rune.mesh = _quad()
+	rune.material_override = _unique_material("rune", _RUNE_CODE)
+	rune.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rune.position.y = 0.01
+	rune.set_meta(&"diameter", r * 3.2)
+	VfxEffect.param(rune, &"rune_color", Color(color.r, color.g, color.b, 1.0))
+	fx.add_child(rune)
+	fx.main = rune
+	var column := MeshInstance3D.new()
+	column.name = "Column"
+	column.mesh = MeshKit.cached("vfx:column", func() -> Mesh:
+		var c := CylinderMesh.new()
+		c.top_radius = 0.75
+		c.bottom_radius = 0.6
+		c.height = 1.0
+		c.radial_segments = 20
+		c.rings = 1
+		c.cap_top = false
+		c.cap_bottom = false
+		var k := MeshKit.new()
+		k.add_mesh(c, MeshKit.xf(Vector3(0, 0.5, 0)), Color.WHITE)
+		return k.build())
+	column.material_override = _unique_material("column", _COLUMN_CODE)
+	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	VfxEffect.param(column, &"fx_color", Color(color.r, color.g, color.b, 0.9).lerp(Color(1.0, 0.7, 0.4, 0.9), 0.3))
+	fx.add_child(column)
+	fx.flash = column
+	fx.ring = _ground_ring(fx)
+	var dust := _particles(fx, 24, 1.1, _ball_mesh(), Mats.particle(false))
+	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	dust.emission_ring_axis = Vector3.UP
+	dust.emission_ring_radius = r * 0.9
+	dust.emission_ring_inner_radius = r * 0.3
+	dust.emission_ring_height = 0.1
+	dust.direction = Vector3.UP
+	dust.spread = 22.0
+	dust.initial_velocity_min = 1.2
+	dust.initial_velocity_max = 3.4
+	dust.gravity = Vector3(0, -0.4, 0)
+	dust.damping_min = 0.8
+	dust.damping_max = 1.6
+	dust.scale_amount_min = 1.6
+	dust.scale_amount_max = 2.8
+	dust.scale_amount_curve = _grow_curve()
+	dust.explosiveness = 0.6
+	var tone := color.lerp(Color(0.82, 0.76, 0.66), 0.8)
+	dust.color_ramp = _fade_gradient(Color(tone.r, tone.g, tone.b, 0.92), Color(tone.r, tone.g, tone.b, 0.0))
+	_start(fx)
+
+
+## What a boss leaves when it dies (M7b): a glow that lingers over its corpse for a moment, a slow shock
+## ring and drifting motes. [param pos] is on the ground at the boss's feet.
+static func boss_remains(pos: Vector3, color: Color, radius: float) -> void:
+	var r := maxf(radius, 0.5)
+	var fx := _effect(VfxEffect.Kind.REMAINS, pos + Vector3.UP * 0.6, 1.8)
+	if fx == null:
+		return
+	fx.size = r
+	fx.color = Color(color.r, color.g, color.b, 0.7)
+	fx.flash = _glow_ball(fx, color.lerp(Color.WHITE, 0.35), 0.55)
+	fx.ring = _ground_ring(fx)
+	var motes := _particles(fx, 14, 1.4, _star_mesh(), Mats.particle(true))
+	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	motes.emission_sphere_radius = r * 0.7
+	motes.direction = Vector3.UP
+	motes.spread = 30.0
+	motes.initial_velocity_min = 0.6
+	motes.initial_velocity_max = 1.8
+	motes.gravity = Vector3(0, 0.3, 0)
+	motes.damping_min = 0.5
+	motes.damping_max = 1.0
+	motes.scale_amount_min = 1.0
+	motes.scale_amount_max = 2.0
+	motes.angular_velocity_min = -150.0
+	motes.angular_velocity_max = 150.0
+	motes.explosiveness = 0.4
+	motes.color_ramp = _fade_gradient(Color(1.0, 0.95, 0.8), Color(color.r, color.g, color.b, 0.0))
+	_start(fx)
+
+
+## Height (m) above the resting height of a dropped item [param k] (0..1 of its pop time) after it was
+## tossed: an arc to [param peak], landing at [constant HOP_SPLIT], then one small bounce of
+## [param bounce], 0 again at the end. Visual offset only – the item's gameplay position never moves.
+static func hop_height(k: float, peak: float = HOP_PEAK, bounce: float = HOP_BOUNCE) -> float:
+	var t := clampf(k, 0.0, 1.0)
+	if t < HOP_SPLIT:
+		var u := t / HOP_SPLIT
+		return 4.0 * u * (1.0 - u) * peak
+	var v := (t - HOP_SPLIT) / (1.0 - HOP_SPLIT)
+	return 4.0 * v * (1.0 - v) * bounce
+
+
+## Share (1 .. 0) of the sideways toss offset still left at [param k] of the pop time: it is gone when
+## the item first lands.
+static func hop_travel_left(k: float) -> float:
+	return 1.0 - clampf(k / HOP_SPLIT, 0.0, 1.0)
+
+
+## A flat streak (head at the node's -Z end, [param length] m long, [param width] m wide) in
+## [param color] for the pickup magnet trail: one cached quad mesh and one material per colour.
+static func make_streak(color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "Trail"
+	mi.mesh = _quad()
+	mi.material_override = _trail_material(color)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+## Lays [param streak] behind a thing at the node's origin that flies along the flat direction
+## [param heading] (unit length): its head on the thing, its tail [param length] m behind it.
+static func aim_streak(streak: Node3D, heading: Vector3, length: float, width: float) -> void:
+	var len := maxf(length, 0.01)
+	streak.rotation = Vector3(0.0, atan2(-heading.x, -heading.z), 0.0)
+	streak.scale = Vector3(width, 1.0, len)
+	streak.position = Vector3(-heading.x, 0.0, -heading.z) * (len * 0.5) + Vector3(0.0, streak.position.y, 0.0)
+
+
+static func _trail_material(color: Color) -> Material:
+	var key := color.to_html()
+	if _trail_materials.has(key):
+		return _trail_materials[key]
+	var m := _unique_material("trail", _TRAIL_CODE) as ShaderMaterial
+	m.render_priority = 1
+	m.set_shader_parameter(&"trail_color", color)
+	_trail_materials[key] = m
+	return m
 
 
 ## Number of floating texts currently alive (for tests / debugging).
@@ -628,6 +963,32 @@ static func _star_mesh() -> Mesh:
 	return MeshKit.cached("vfx:star", func() -> Mesh:
 		var k := MeshKit.new()
 		k.add_sphere(0.07, MeshKit.xf(Vector3.ZERO, Vector3(0, 0, 45), Vector3(1.0, 1.0, 0.35)), Color.WHITE, 4, 2)
+		return k.build())
+
+
+## Crit star: three thin crossed bars (a "jack") – reads as a sparkle from any angle, so it needs no billboard.
+static func _crit_star_mesh() -> Mesh:
+	return MeshKit.cached("vfx:crit_star", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_box(Vector3(0.34, 0.05, 0.05), MeshKit.xf(Vector3.ZERO, Vector3(0, 0, 45)), Color.WHITE)
+		k.add_box(Vector3(0.34, 0.05, 0.05), MeshKit.xf(Vector3.ZERO, Vector3(0, 0, -45)), Color.WHITE)
+		k.add_box(Vector3(0.05, 0.05, 0.34), Transform3D(), Color.WHITE)
+		return k.build())
+
+
+## Frost shard: a thin, pointed diamond.
+static func _shard_mesh() -> Mesh:
+	return MeshKit.cached("vfx:shard", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_sphere(0.07, MeshKit.xf(Vector3.ZERO, Vector3.ZERO, Vector3(0.55, 2.2, 0.55)), Color.WHITE, 4, 2)
+		return k.build())
+
+
+## Nature leaf: a small flat oval.
+static func _leaf_mesh() -> Mesh:
+	return MeshKit.cached("vfx:leaf", func() -> Mesh:
+		var k := MeshKit.new()
+		k.add_sphere(0.09, MeshKit.xf(Vector3.ZERO, Vector3.ZERO, Vector3(1.7, 0.25, 0.9)), Color.WHITE, 6, 3)
 		return k.build())
 
 

@@ -274,13 +274,13 @@ func test_a_hardcore_arena_has_no_spirit_healer() -> void:
 	opts.hardcore = true
 	_run_with_bots(2, opts)
 	check(RunState.hardcore, "hardcore run")
-	check(main.arena.spirit_healer == null, "no Spirit Healer in the arena")
+	check(main.arena.spirit_healer == null, "no Grave Tender in the arena")
 
 
 func test_a_normal_arena_keeps_its_spirit_healer() -> void:
 	_run_with_bots(2)
 	check(not RunState.hardcore, "not hardcore")
-	check(main.arena.spirit_healer != null, "the Spirit Healer stands in the arena")
+	check(main.arena.spirit_healer != null, "the Grave Tender stands in the arena")
 
 
 func test_hardcore_works_in_the_endless_mode_too() -> void:
@@ -315,7 +315,7 @@ func test_the_ghost_hint_names_the_teammate_in_hardcore() -> void:
 
 func test_the_ghost_hint_names_the_spirit_healer_in_a_normal_run() -> void:
 	_run_with_bots(2)
-	check(main.arena.spirit_healer != null and not RunState.hardcore, "a normal run has its Spirit Healer")
+	check(main.arena.spirit_healer != null and not RunState.hardcore, "a normal run has its Grave Tender")
 	var hero := main.players[0]
 	hero.take_damage(1.0e6, CombatMath.KIND_MELEE, null)
 	check(hero.downed, "downed")
@@ -323,7 +323,7 @@ func test_the_ghost_hint_names_the_spirit_healer_in_a_normal_run() -> void:
 	_add(frame)
 	frame.bind(hero)
 	frame._process(0.016)
-	check("Spirit Healer" in frame.hint_label.text, "normal run: %s" % frame.hint_label.text)
+	check("Grave Tender" in frame.hint_label.text, "normal run: %s" % frame.hint_label.text)
 	check(frame.hint_label.text != UnitFrame.TEAMMATE_HINT, "not the teammate hint")
 
 
@@ -458,7 +458,7 @@ func test_the_lobby_stores_the_choice_in_main_and_the_run_uses_it() -> void:
 	main.start_run()
 	check_eq(RunState.mode, RunState.MODE_ENDLESS, "the run is endless")
 	check(RunState.hardcore, "and hardcore")
-	check(main.arena.spirit_healer == null, "without a Spirit Healer")
+	check(main.arena.spirit_healer == null, "without a Grave Tender")
 	main.go_to_lobby()
 	check_eq(main.lobby.mode_label.text, "Mode: Endless · Hardcore", "the next lobby keeps the choice")
 

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warlock_head"
-display_name = "Felfire Hood"
+display_name = "Hexfire Hood"
 flavor = "Smells faintly of sulphur and caramelised onion."
 slot_type = 0
 armor_type = 0

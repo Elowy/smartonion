@@ -426,6 +426,7 @@ func _start_shrine() -> void:
 	if not shrine_screen.open(Db.get_shrine(RunState.pending_shrine), PlayerManager.get_slots()):
 		_on_shrine_finished()
 		return
+	Audio.play(&"banner")
 	RunState.shrines_offered += 1
 
 
@@ -479,6 +480,7 @@ func _start_portal() -> void:
 	loot_screen.hide()
 	_market_root.visible = false
 	_swallow_humans()
+	Audio.play(&"portal")
 	portal_screen.open(PlayerManager.get_slots(), cleared_wave, RunState.portal_forced, RunState.last_wave_downs)
 
 
@@ -987,7 +989,9 @@ func _route_input(s: PlayerSlot) -> void:
 	var has_panel := panels.has(s.index)
 	if has_panel and (inp.just_pressed(PlayerInput.Pad.LB) or inp.just_pressed(PlayerInput.Pad.RB)):
 		set_panel_focus(s.index, not has_panel_focus(s.index))
+		Audio.play_ui(&"ui_tab")
 		return
+	var was_ready := s.ready
 	var b := inp.just_pressed(PlayerInput.Pad.B)
 	if has_panel and has_panel_focus(s.index):
 		var panel := panels[s.index]
@@ -1000,6 +1004,8 @@ func _route_input(s: PlayerSlot) -> void:
 			s.ready = false
 	if inp.just_pressed(PlayerInput.Pad.START) and not b:
 		s.ready = not s.ready
+	if s.ready != was_ready:
+		Audio.play_ui(&"ui_confirm" if s.ready else &"ui_back")
 
 
 func _bots_settled() -> bool:

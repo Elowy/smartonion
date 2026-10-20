@@ -13,7 +13,7 @@
 script = ExtResource("1_script")
 id = &"mage"
 display_name = "Mage"
-description = "Fragile master of the arcane. Blizzards and blinks."
+description = "Fragile master of the arcane. Hailstorms and blinks."
 role = "Ranged caster, area damage"
 armor_type = 0
 primary_stat = &"intellect"

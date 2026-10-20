@@ -6,8 +6,8 @@
 [resource]
 script = ExtResource("1_script")
 id = &"summon_infernal"
-display_name = "Summon Infernal"
-description = "An Infernal crashes onto the densest group, burning and stunning everything within {impact_radius} m, then smashes enemies for {duration} sec."
+display_name = "Summon Cinder Brute"
+description = "A Cinder Brute crashes onto the densest group, burning and stunning everything within {impact_radius} m, then smashes enemies for {duration} sec."
 class_id = &"warlock"
 school = &"fire"
 tags = Array[StringName]([&"pet", &"aoe", &"cc"])
@@ -40,5 +40,5 @@ color = Color(0.45, 0.95, 0.25, 1)
 kind = 1
 card_weight = 1.0
 rank3 = {"duration_add": 3.0}
-rank3_text = "+3 sec Infernal"
-specs = Array[Dictionary]([{"name": "Immolation", "text": "The Infernal burns every enemy within 2.5 m for 30% of a slam every 0.5 sec.", "mods": {"immolation_share": 30.0}}, {"name": "Abyssal Guardian", "text": "The Infernal draws every enemy within 6 m onto itself and stays 2 sec longer.", "mods": {"taunt_radius": 6.0, "duration_add": 2.0}}])
+rank3_text = "+3 sec Cinder Brute"
+specs = Array[Dictionary]([{"name": "Immolation", "text": "The Cinder Brute burns every enemy within 2.5 m for 30% of a slam every 0.5 sec.", "mods": {"immolation_share": 30.0}}, {"name": "Burning Guardian", "text": "The Cinder Brute draws every enemy within 6 m onto itself and stays 2 sec longer.", "mods": {"taunt_radius": 6.0, "duration_add": 2.0}}])

@@ -33,4 +33,4 @@ kind = 2
 card_weight = 1.0
 rank3 = {"targets_add": 1}
 rank3_text = "+1 enemy corrupted per cast"
-specs = Array[Dictionary]([{"name": "Contagion", "text": "When a corrupted enemy dies, Corruption spreads to up to 3 nearby enemies.", "mods": {"spread_targets_add": 2}}, {"name": "Siphon Life", "text": "Corruption heals you for 30% of the damage it deals.", "mods": {"heal_pct_add": 30.0}}])
+specs = Array[Dictionary]([{"name": "Contagion", "text": "When a corrupted enemy dies, Corruption spreads to up to 3 nearby enemies.", "mods": {"spread_targets_add": 2}}, {"name": "Leeching Curse", "text": "Corruption heals you for 30% of the damage it deals.", "mods": {"heal_pct_add": 30.0}}])

@@ -4,7 +4,9 @@ extends Control
 ## the talent's glyph ([method make_glyph]: an ability id in TalentData.icon – or a modifier's
 ## TalentData.ability – gets that ability's AbilityIcon glyph, a school damage stat the school's
 ## AbilityIcon glyph, any other stat id a TalentGlyph stat glyph, everything else the
-## TalentGlyph of its kind) and, drawn over it by a child layer ([class Overlay]):
+## TalentGlyph of its kind; each talent's own game-icons.net picture ([GameIcons.for_talent]) is
+## drawn instead of that glyph, in the glyph's tint) and, drawn over it by a child layer ([class
+## Overlay]):
 ##  - the state rim ([enum State], pushed in by the tab – nothing is read from gameplay):
 ##    LOCKED (a tier gate, a prerequisite or the level-10 rule: darkened glyph, grey rim),
 ##    UNAVAILABLE (open, but no free point: a little dark), AVAILABLE (a point can go in: green
@@ -111,7 +113,7 @@ static func source_for(t: TalentData) -> String:
 
 
 ## The glyph control of [param t] at [param side] px: an AbilityIcon (ability / school glyph)
-## or a TalentGlyph (stat / kind glyph).
+## or a TalentGlyph (stat / kind glyph), showing the talent's picture when it has one.
 static func make_glyph(t: TalentData, side: float) -> Control:
 	var source := source_for(t)
 	var key := StringName(source.get_slice(":", 1))
@@ -126,6 +128,9 @@ static func make_glyph(t: TalentData, side: float) -> Control:
 		var icon := AbilityIcon.create(side, false)
 		icon.show_prompt = false
 		icon.set_ability(ability, 0.0)
+		var picture := GameIcons.for_talent(t)
+		if picture != null:
+			icon.icon_texture = picture
 		icon.name = "Glyph"
 		icon.size = Vector2(side, side)
 		return icon
@@ -134,6 +139,7 @@ static func make_glyph(t: TalentData, side: float) -> Control:
 		g = TalentGlyph.create(TalentGlyph.for_stat(key), side)
 	else:
 		g = TalentGlyph.create(TalentGlyph.for_kind(t.kind if t != null else TalentData.Kind.TALENT), side)
+	g.texture = GameIcons.for_talent(t)
 	g.name = "Glyph"
 	return g
 

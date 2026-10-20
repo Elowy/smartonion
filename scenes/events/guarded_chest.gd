@@ -177,6 +177,7 @@ func open(by: Player = null) -> void:
 	Vfx.explosion(here + Vector3.UP * 0.6, 1.8, GOLD)
 	Vfx.pickup_sparkle(here + Vector3.UP * 0.9)
 	Vfx.floating_text(here + Vector3.UP * 2.2, "Chest opened!", UiTheme.GOLD, 1.3)
+	Audio.play(&"chest_open")
 	opened.emit(self, by)
 
 

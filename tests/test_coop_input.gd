@@ -313,7 +313,7 @@ func test_pause_ignores_the_stick_held_from_gameplay() -> void:
 	check_eq(menu.selected, PauseMenu.Item.RESUME, "Resume stays highlighted")
 	UiFakes.nudge(menu, a, Vector2.ZERO)
 	UiFakes.nudge(menu, a, Vector2.DOWN)
-	check_eq(menu.selected, PauseMenu.Item.QUIT, "after one neutral frame the stick navigates again")
+	check_eq(menu.selected, PauseMenu.Item.SETTINGS, "after one neutral frame the stick navigates again")
 	UiFakes.free_node(menu)
 
 
@@ -340,14 +340,15 @@ func test_quit_needs_a_second_press() -> void:
 	menu.open(PlayerManager.get_slot(0))
 	UiFakes.step(menu)
 	UiFakes.nudge(menu, a, Vector2.DOWN)
+	UiFakes.nudge(menu, a, Vector2.DOWN)  # (Resume, Settings, Quit)
 	check_eq(menu.selected, PauseMenu.Item.QUIT, "Quit highlighted")
 	UiFakes.tap(menu, a, PlayerInput.Pad.A)
 	check_eq(quits[0], 0, "one A press does not quit")
 	check(menu.quit_armed and menu.visible, "it asks first")
-	check_eq(menu.buttons[PauseMenu.Item.QUIT].text, PauseMenu.QUIT_CONFIRM_TEXT, "the button asks 'Are you sure?'")
+	check_eq(menu.button_for(PauseMenu.Item.QUIT).text, PauseMenu.QUIT_CONFIRM_TEXT, "the button asks 'Are you sure?'")
 	UiFakes.nudge(menu, a, Vector2.UP)
 	check(not menu.quit_armed, "moving the highlight cancels the question")
-	check_eq(menu.buttons[PauseMenu.Item.QUIT].text, PauseMenu.QUIT_TEXT, "button text restored")
+	check_eq(menu.button_for(PauseMenu.Item.QUIT).text, PauseMenu.QUIT_TEXT, "button text restored")
 	UiFakes.nudge(menu, a, Vector2.DOWN)
 	UiFakes.tap(menu, a, PlayerInput.Pad.A)
 	check_eq(quits[0], 0, "armed again, still not quit")
@@ -362,9 +363,9 @@ func test_clicking_quit_also_asks() -> void:
 	var quits: Array[int] = [0]
 	menu.quit_to_menu_requested.connect(func() -> void: quits[0] += 1)
 	menu.open(null)
-	menu.buttons[PauseMenu.Item.QUIT].pressed.emit()
+	menu.button_for(PauseMenu.Item.QUIT).pressed.emit()
 	check_eq(quits[0], 0, "first click asks")
-	menu.buttons[PauseMenu.Item.QUIT].pressed.emit()
+	menu.button_for(PauseMenu.Item.QUIT).pressed.emit()
 	check_eq(quits[0], 1, "second click quits")
 	UiFakes.free_node(menu)
 
@@ -415,8 +416,8 @@ func test_start_cannot_resume_while_a_pad_is_unplugged() -> void:
 		a.release(PlayerInput.Pad.START)
 		_menu_frame()
 	check(menu.visible and tree.paused, "START does not resume")
-	check_eq(menu.entries, [PauseMenu.Item.RESUME, PauseMenu.DROP_BASE + 1, PauseMenu.Item.QUIT] as Array[int],
-		"Resume / Continue without P2 / Quit")
+	check_eq(menu.entries, [PauseMenu.Item.RESUME, PauseMenu.DROP_BASE + 1, PauseMenu.Item.SETTINGS, PauseMenu.Item.QUIT] as Array[int],
+		"Resume / Continue without P2 / Settings / Quit")
 	check_eq(menu.buttons[1].text, "Continue without P2", "the offer names the player")
 	menu.activate_selected()
 	check(menu.visible, "the Resume entry does not resume either")
@@ -426,7 +427,7 @@ func test_start_cannot_resume_while_a_pad_is_unplugged() -> void:
 	b.connected = true
 	PlayerManager.device_reconnected.emit(PlayerManager.get_slot(1))
 	_menu_frame()
-	check_eq(menu.entries.size(), 2, "the offer disappears")
+	check_eq(menu.entries.size(), 3, "the offer disappears")
 	a.press(PlayerInput.Pad.START)
 	_menu_frame()
 	check(not menu.visible, "START resumes with every pad back")
@@ -518,7 +519,7 @@ func test_continue_without_keeps_pausing_while_another_pad_is_missing() -> void:
 	check(main.is_paused() and tree.paused, "P3 is still missing: stay paused")
 	check("P3" in main.hud.notice_label.text, "notice names P3: %s" % main.hud.notice_label.text)
 	_menu_frame()
-	check_eq(main.pause_menu.entries, [PauseMenu.Item.RESUME, PauseMenu.DROP_BASE + 2, PauseMenu.Item.QUIT] as Array[int],
+	check_eq(main.pause_menu.entries, [PauseMenu.Item.RESUME, PauseMenu.DROP_BASE + 2, PauseMenu.Item.SETTINGS, PauseMenu.Item.QUIT] as Array[int],
 		"the menu now offers P3")
 	main.drop_player(PlayerManager.get_slot(2))
 	check(not main.is_paused() and not tree.paused, "last missing pad dropped: running")

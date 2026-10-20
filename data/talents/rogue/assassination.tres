@@ -27,7 +27,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"rogue_assassination_improved_poisons"
 display_name = "Improved Poisons"
-description = "Increases your Mastery by {mastery}: each Deadly Poison stack deals more of the critical hit's damage."
+description = "Increases your Mastery by {mastery}: each Lethal Venom stack deals more of the critical hit's damage."
 values = {
 "mastery": 3.0
 }
@@ -46,7 +46,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_seal_fate"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_seal_fate"
-display_name = "Seal Fate"
+display_name = "Fateful Cuts"
 description = "Your critical weapon hits have a {chance}% chance to grant an extra Combo Point."
 values = {
 "chance": 15.0
@@ -73,8 +73,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_coup_de_grace"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_coup_de_grace"
-display_name = "Coup de Grace"
-description = "Fan of Knives deals an extra {pct}% damage for each Combo Point it spends."
+display_name = "Finishing Flourish"
+description = "Knife Bloom deals an extra {pct}% damage for each Combo Point it spends."
 values = {
 "pct": 2.0
 }
@@ -116,8 +116,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_envenom"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_envenom"
-display_name = "Envenom"
-description = "Fan of Knives consumes the Deadly Poison of every enemy it hits: the enemy takes {pct}% of the poison's remaining damage at once as Nature damage."
+display_name = "Overdose"
+description = "Knife Bloom consumes the Lethal Venom of every enemy it hits: the enemy takes {pct}% of the poison's remaining damage at once as Nature damage."
 values = {
 "pct": 150.0
 }
@@ -140,8 +140,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_venomous_wounds"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_venomous_wounds"
-display_name = "Venomous Wounds"
-description = "When an enemy carrying your Deadly Poison dies, you regain {energy} Energy."
+display_name = "Toxic Harvest"
+description = "When an enemy carrying your Lethal Venom dies, you regain {energy} Energy."
 values = {
 "energy": 1.0
 }
@@ -163,8 +163,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_master_poisoner"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_master_poisoner"
-display_name = "Master Poisoner"
-description = "Your Deadly Poison can stack {stacks} more time(s), and your Nature damage is increased by {pct}%."
+display_name = "Venom Savant"
+description = "Your Lethal Venom can stack {stacks} more time(s), and your Nature damage is increased by {pct}%."
 values = {
 "pct": 4.0,
 "stacks": 1.0
@@ -192,8 +192,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_cold_blood"]
 script = ExtResource("2_talent")
 id = &"rogue_assassination_cold_blood"
-display_name = "Cold Blood"
-description = "Every third Fan of Knives you throw in a wave is a guaranteed critical strike with {crit}% more critical damage, and its knives cripple: enemies hit are {slow}% slower for {slow_duration} sec."
+display_name = "Steel Nerve"
+description = "Every third Knife Bloom you throw in a wave is a guaranteed critical strike with {crit}% more critical damage, and its knives cripple: enemies hit are {slow}% slower for {slow_duration} sec."
 values = {
 "crit": 50.0,
 "slow": 30.0,
@@ -221,9 +221,9 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"rogue_assassination"
 class_id = &"rogue"
-display_name = "Assassination"
+display_name = "Toxins"
 index = 0
-description = "Deadly poisons, Combo Points and lethal Fans of Knives."
+description = "Deadly poisons, Combo Points and lethal Knife Blooms."
 icon = &"poison_bomb"
 color = Color(0.45, 0.8, 0.3, 1)
 talents = Array[ExtResource("2_talent")]([SubResource("Resource_malice"), SubResource("Resource_improved_poisons"), SubResource("Resource_seal_fate"), SubResource("Resource_coup_de_grace"), SubResource("Resource_lethality"), SubResource("Resource_envenom"), SubResource("Resource_venomous_wounds"), SubResource("Resource_master_poisoner"), SubResource("Resource_cold_blood")])

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warrior_chest"
-display_name = "Breastplate of Fury"
+display_name = "Ragebound Breastplate"
 flavor = "Dented from the inside by a very angry heart."
 slot_type = 3
 armor_type = 3

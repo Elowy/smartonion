@@ -53,8 +53,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_consecrated_ground"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_consecrated_ground"
-display_name = "Consecrated Ground"
-description = "Your Consecration lasts {duration} sec longer."
+display_name = "Lasting Circle"
+description = "Your Sacred Circle lasts {duration} sec longer."
 values = {
 "duration": 0.5
 }
@@ -76,8 +76,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_guarded_by_the_light"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_guarded_by_the_light"
-display_name = "Guarded by the Light"
-description = "When you block an attack, you have a {chance}% chance to gain 1 Holy Power (at most once every {icd_fixed} sec)."
+display_name = "Shielded by Faith"
+description = "When you block an attack, you have a {chance}% chance to gain 1 Resolve (at most once every {icd_fixed} sec)."
 values = {
 "chance": 10.0,
 "icd_fixed": 2.0
@@ -104,7 +104,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_ardent_defender"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_ardent_defender"
-display_name = "Ardent Defender"
+display_name = "Dauntless Rally"
 description = "When your health drops below {threshold_fixed}%, you heal {heal}% of your maximum health and gain {armor} Armor for {duration_fixed} sec (at most once every {icd_fixed} sec)."
 values = {
 "armor": 4.0,
@@ -123,7 +123,7 @@ effects = Array[Dictionary]([{
 "proc": {
 "effect": "heal",
 "icd": 20.0,
-"label": "Ardent Defender",
+"label": "Dauntless Rally",
 "max_hp_pct": 8.0,
 "target": "self",
 "threshold": 35.0,
@@ -149,8 +149,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_righteous_fury"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_righteous_fury"
-display_name = "Righteous Fury"
-description = "Enemies standing in your Consecration are taunted to you, and you take {ward}% less damage while you stand in it."
+display_name = "Provoking Light"
+description = "Enemies standing in your Sacred Circle are taunted to you, and you take {ward}% less damage while you stand in it."
 values = {
 "ward": 10.0
 }
@@ -174,7 +174,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shield_of_the_templar"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_shield_of_the_templar"
-display_name = "Shield of the Templar"
+display_name = "Vigilant Shield"
 description = "While you hold a shield, you take {pct}% less damage and your blocks absorb {value}% more damage."
 values = {
 "pct": 3.0,
@@ -205,7 +205,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_reckoning"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_reckoning"
-display_name = "Reckoning"
+display_name = "Swift Rebuke"
 description = "When an enemy hits you, you have a {chance}% chance to strike back at once with your weapon."
 values = {
 "chance": 5.0
@@ -231,7 +231,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_holy_shield"]
 script = ExtResource("2_talent")
 id = &"paladin_protection_holy_shield"
-display_name = "Holy Shield"
+display_name = "Gleaming Shield"
 description = "With a shield: +{block}% block chance. Each block strikes back for {pct}% weapon damage as Holy and shields the most wounded ally within {range} m for {ally}% of max health for {duration} sec (up to {cap}%)."
 values = {
 "ally": 2.0,
@@ -272,7 +272,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"paladin_protection"
 class_id = &"paladin"
-display_name = "Protection"
+display_name = "Vigil"
 index = 1
 description = "Shield, holy ground and taunts: the line no enemy crosses."
 icon = &"avengers_shield"

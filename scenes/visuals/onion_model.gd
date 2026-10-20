@@ -11,7 +11,8 @@ extends Node3D
 ##       ├── FootL / FootR
 ##       └── Body                        bob / waddle / squash / ghost float
 ##           ├── Bulb (lathe mesh, layer stripes, peel shader), Sprout, Roots, Face, Mouth
-##           ├── Gear (headgear, pauldrons, belt ...), Cloth (cape / hood / tabard)
+##           ├── Gear                    Head / Shoulders / Chest armour (OnionArmor): Solid (+ Glow<n> for
+##           │                           Epic and better), Cloth, Accent<n>; class extras (HatStar, ...)
 ##           ├── Peel0..2, TearL / TearR
 ##           └── HandMain / HandOff  → Grip → weapon model
 
@@ -28,6 +29,10 @@ const FLASH_TIME := 0.14
 const SQUASH_TIME := 0.22
 const ATTACK_TIME := 0.24
 const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
+## Peel flaps (angle in degrees from the front, height): on the bulb, and lifted by PEEL_GEAR_LIFT when a
+## chest piece is worn so they stay visible on top of the armour (the low-HP cue must not vanish).
+const PEEL_SPOTS: Array[Vector2] = [Vector2(132.0, 0.46), Vector2(-132.0, 0.6), Vector2(48.0, 0.3)]
+const PEEL_GEAR_LIFT := 0.11
 ## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
 const CAST_BAR_Y := 2.0
 const CAST_BAR_SIZE := Vector2(1.6, 0.3)
@@ -141,6 +146,20 @@ var _hp_fill: Sprite3D
 var _hp_shield: Sprite3D
 var _weapon_nodes: Array[Node3D] = [null, null]
 var _weapon_data: Array[WeaponData] = [null, null]
+## Worn Head / Shoulders / Chest looks (EquipLook.Slot order; null = empty slot = the class starter
+## piece) and their change-detection key. The gear is rebuilt only when the key changes.
+var _looks: Array[EquipLook] = [null, null, null]
+var _looks_key := "-|-|-"
+var _gear: Node3D
+var _gear_meshes: Array[MeshInstance3D] = []
+## Nodes of the class starter pieces (hat star, horn flames, fel trim): freed with the gear.
+var _gear_extras: Array[Node] = []
+## Unshaded glow accents of the gear (hidden on the ghost).
+var _accents: Array[MeshInstance3D] = []
+var _sprout: MeshInstance3D
+var _mouth: MeshInstance3D
+## How often the gear was (re)built – for tests: equipment changes rebuild it, repeats do not.
+var gear_builds := 0
 ## Toon-shaded meshes that take the hit flash and the ghost material.
 var _skin_meshes: Array[GeometryInstance3D] = []
 var _saved_materials: Dictionary[GeometryInstance3D, Material] = {}
@@ -188,6 +207,12 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_weapon_nodes = [null, null]
 	_fel_flame = null
 	_flames.clear()
+	_gear = null
+	_gear_meshes.clear()
+	_gear_extras.clear()
+	_accents.clear()
+	_sprout = null
+	_mouth = null
 	_cast_bar = null
 	_cast_label = null
 	_hp_bar = null
@@ -199,8 +224,8 @@ func setup(p_class_data: ClassData, p_player_color: Color) -> void:
 	_yaw = _node("Yaw", self)
 	_body = _node("Body", _yaw)
 	_build_body()
-	if class_data != null:
-		_build_gear()
+	_build_class_extras()
+	_build_gear()
 	_build_peels()
 	_build_tears()
 	_build_pointer()
@@ -251,6 +276,42 @@ func set_weapons(main_hand: WeaponData, off_hand: WeaponData) -> void:
 		w.visible = not downed
 	if _fel_flame != null:
 		_fel_flame.visible = _weapon_data[1] == null and not downed
+
+
+## Shows the worn Head / Shoulders / Chest armour (GDD 13): per slot the look of the item (armour
+## type, material tier, rarity, set), or the class starter piece when the slot is empty (null) –
+## an equipped item replaces the starter piece of its slot entirely. Only a change of what is worn
+## rebuilds the gear; calling it again with the same items is free.
+func set_equipment(head: ItemInstance, shoulders: ItemInstance, chest: ItemInstance) -> void:
+	set_looks(EquipLook.from_item(head), EquipLook.from_item(shoulders), EquipLook.from_item(chest))
+
+
+## [method set_equipment] with ready-made looks (showcase, tests). A look of the wrong slot is
+## ignored.
+func set_looks(head: EquipLook, shoulders: EquipLook, chest: EquipLook) -> void:
+	var next: Array[EquipLook] = [head, shoulders, chest]
+	var keys := PackedStringArray()
+	for i in EquipLook.SLOT_COUNT:
+		if next[i] != null and next[i].slot != i:
+			next[i] = null
+		keys.append(next[i].key() if next[i] != null else "-")
+	var key := "|".join(keys)
+	if key == _looks_key:
+		return
+	_looks = next
+	_looks_key = key
+	if _body != null:
+		_build_gear()
+
+
+## The worn look of an EquipLook.Slot (null = the class starter piece shows).
+func worn_look(slot: int) -> EquipLook:
+	return _looks[slot] if slot >= 0 and slot < _looks.size() else null
+
+
+## Change-detection key of the worn looks ("-|-|-" = nothing worn).
+func equipment_key() -> String:
+	return _looks_key
 
 
 ## Smoothly turns the body towards [param direction] (XZ plane).
@@ -647,6 +708,8 @@ func _apply_downed_look() -> void:
 		_fel_flame.visible = not downed and _weapon_data[1] == null
 	for fl in _flames:
 		fl.visible = not downed
+	for a in _accents:
+		a.visible = not downed
 	_revive_area.visible = downed
 	_revive_arc.visible = downed and revive_progress > 0.0
 	# The player-colour ring stays under the ghost (pulsing, see _pulse_ghost_ring) so it is
@@ -942,25 +1005,24 @@ func _build_body() -> void:
 	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio)))
 	# Sprout (long green stalk for the spring-onion rogue, withered for the warlock).
 	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else "normal")
-	if headgear != &"wizard_hat":
-		var sprout := MeshKit.cached("onion:sprout:" + sprout_kind, func() -> Mesh: return _sprout_mesh(sprout_kind))
-		_mesh("Sprout", _body, sprout, Mats.toon_vc())
+	var sprout := MeshKit.cached("onion:sprout:" + sprout_kind, func() -> Mesh: return _sprout_mesh(sprout_kind))
+	_sprout = _mesh("Sprout", _body, sprout, Mats.toon_vc())
 	var roots := MeshKit.cached("onion:roots", func() -> Mesh: return _roots_mesh())
 	_mesh("Roots", _body, roots, Mats.toon_vc(false))
-	# Face: big eyes (+ brows for classes without a helm).
-	var brows := headgear not in [&"helm_horned", &"paladin_helm"]
-	var face_key := "onion:face:%s:%s" % [brows, headgear]
+	# Face: big eyes (+ brows unless the head piece is a helm; _apply_head_effects keeps them in sync).
+	var head := OnionArmor.part(EquipLook.Slot.HEAD, _looks[EquipLook.Slot.HEAD], class_data)
 	_face = _node("Face", _body)
 	_face.position.y = EYE_Y
-	var eyes := MeshKit.cached(face_key, func() -> Mesh: return _face_mesh_build(brows, headgear))
-	_mesh("Eyes", _face, eyes, Mats.toon_vc())
+	_mesh("Eyes", _face, _eyes_mesh(head.brows if head != null else true), Mats.toon_vc())
 	if headgear == &"horned_hood":
 		var fel := MeshKit.cached("onion:fel_eyes", func() -> Mesh: return _fel_eyes_mesh())
 		var fm := _mesh("FelEyes", _face, fel, Mats.glow(Color(0.45, 1.0, 0.3), 2.5), false)
 		fm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	if headgear != &"hood":
-		var mouth := MeshKit.cached("onion:mouth", func() -> Mesh: return _mouth_mesh())
-		_mesh("Mouth", _body, mouth, Mats.toon_vc(false))
+	var mouth := MeshKit.cached("onion:mouth", func() -> Mesh: return _mouth_mesh())
+	_mouth = _mesh("Mouth", _body, mouth, Mats.toon_vc(false))
+	if head != null:
+		_sprout.visible = not head.hides_sprout
+		_mouth.visible = not head.hides_mouth
 	# Hands and feet.
 	var glove := _glove_color()
 	var boot := _boot_color()
@@ -1106,10 +1168,9 @@ func _build_peels() -> void:
 			Vector2(0.045, 0.19), Vector2(0.0, 0.22), Vector2(-0.05, 0.17), Vector2(-0.07, 0.08)])
 		k.add_extrusion(leaf, 0.014, Transform3D(), paper, 0.9)
 		return k.build())
-	var spots := [[150.0, 0.42], [-115.0, 0.58], [48.0, 0.3]]
-	for i in spots.size():
-		var a: float = spots[i][0]
-		var y: float = spots[i][1]
+	for i in PEEL_SPOTS.size():
+		var a := PEEL_SPOTS[i].x
+		var y := PEEL_SPOTS[i].y
 		var pivot := _node("Peel%d" % i, _body)
 		var p := bulb_point(y, a, 0.005)
 		var outward := Vector3(p.x, 0, p.z).normalized()
@@ -1121,6 +1182,14 @@ func _build_peels() -> void:
 		_mesh("Flap", pivot, flap, Mats.toon_vc())
 		pivot.visible = false
 		_peels.append(pivot)
+	_place_peels()
+
+
+## Puts the peel flaps on the bulb, or on top of the armour when a chest piece is worn.
+func _place_peels() -> void:
+	var lift := PEEL_GEAR_LIFT if _looks[EquipLook.Slot.CHEST] != null else 0.0
+	for i in _peels.size():
+		_peels[i].position = bulb_point(PEEL_SPOTS[i].y, PEEL_SPOTS[i].x, 0.005 + lift)
 
 
 func _build_cast_bar() -> void:
@@ -1200,50 +1269,172 @@ func _build_tears() -> void:
 		t.visible = false
 		_tears.append(t)
 
+# --- Gear (class starter pieces and worn armour, see OnionArmor) ----------------
 
-# --- Class gear --------------------------------------------------------------
-
+## Rebuilds the Gear node and the class extras (hat star, horn flames, fel trim) from the three slot
+## looks: an empty slot shows the class starter piece, a worn item its own (OnionArmor.part). The
+## parts are merged by material so the common case stays at one solid + one cloth mesh.
 func _build_gear() -> void:
-	var acc := class_data.accent_color
-	var key := "onion:gear:%s:%s:%s:%s" % [class_data.headgear, acc.to_html(), class_data.big_shoulders,
-		class_data.onion_color.to_html()]
-	var gear := MeshKit.cached(key, func() -> Mesh: return _gear_mesh(class_data))
-	if gear.get_surface_count() > 0:
-		_mesh("Gear", _body, gear, Mats.toon_vc())
-	var cloth := MeshKit.cached("onion:cloth:%s:%s" % [class_data.headgear, acc.to_html()],
-		func() -> Mesh: return _cloth_mesh(class_data))
-	if cloth.get_surface_count() > 0:
-		_mesh("Cloth", _body, cloth, Mats.toon_cloth_vc())
-	match class_data.headgear:
-		&"horned_hood":
-			var glow := MeshKit.cached("onion:fel_trim", func() -> Mesh:
-				var k := MeshKit.new()
-				k.add_torus(0.395, 0.425, MeshKit.xf(Vector3(0, 0.3, 0), Vector3.ZERO, Vector3(1, 0.6, 1)), Color.WHITE, 24, 4)
-				return k.build())
-			var gm := _mesh("FelTrim", _body, glow, Mats.glow(acc, 1.6), false)
-			gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			_fel_flame = _build_flame(_hands[1], acc)
-			# Purple flames licking up from the horn tips: the warlock's silhouette glows
-			# from above instead of reading as a dark blob.
-			for side: float in [-1.0, 1.0]:
-				var horn := _warlock_horn(side)
-				var flame := _build_flame(_body, WARLOCK_FLAME, "HornFlameL" if side < 0.0 else "HornFlameR")
-				flame.position = horn[horn.size() - 1] + Vector3(0, 0.02, 0)
-				flame.scale = Vector3.ONE
-				_flames.append(flame)
-		&"wizard_hat":
-			var star := MeshKit.cached("onion:hat_star", func() -> Mesh:
-				var k := MeshKit.new()
-				var pts := PackedVector2Array()
-				for i in 10:
-					var a := TAU * i / 10.0
-					var r := 0.065 if i % 2 == 0 else 0.028
-					pts.append(Vector2(sin(a), cos(a)) * r)
-				k.add_extrusion(pts, 0.015, MeshKit.xf(Vector3(0, 0.86, -0.29), Vector3(12, 0, 0)), Color.WHITE)
-				return k.build())
-			var sm := _mesh("HatStar", _body, star, Mats.glow(Color(1.0, 0.85, 0.35), 1.4), false)
-			sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_clear_gear()
+	gear_builds += 1
+	if class_data == null:
+		return
+	_gear = _node("Gear", _body)
+	var parts: Array[OnionArmor.Part] = []
+	for slot in EquipLook.SLOT_COUNT:
+		parts.append(OnionArmor.part(slot, _looks[slot], class_data))
+	# Solid toon meshes grouped by material (plain / one glow material per rarity colour).
+	var groups: Dictionary[String, Array] = {}
+	for p in parts:
+		if p != null and p.solid != null:
+			var group: Array = groups.get(p.material_key(), [])
+			group.append(p)
+			groups[p.material_key()] = group
+	var gkeys: Array = groups.keys()
+	gkeys.sort()
+	for i in gkeys.size():
+		var group: Array = groups[gkeys[i]]
+		var first: OnionArmor.Part = group[0]
+		var meshes: Array[Mesh] = []
+		var key := "onion:gear:solid"
+		for p: OnionArmor.Part in group:
+			meshes.append(p.solid)
+			key += "|" + p.key
+		var mesh: Mesh = first.solid if meshes.size() == 1 else OnionArmor.merged(key, meshes)
+		var material := Mats.toon_vc() if first.glow.a <= 0.0 else Mats.toon_vc_glow(first.glow, first.glow_energy)
+		_gear_mesh_node("Solid" if first.glow.a <= 0.0 else "Glow%d" % i, mesh, material, true)
+	# Cloth (double-sided, no outline) of every slot in one mesh.
+	var cloths: Array[Mesh] = []
+	var cloth_key := "onion:gear:cloth"
+	for p in parts:
+		if p != null and p.cloth != null:
+			cloths.append(p.cloth)
+			cloth_key += "|" + p.key
+	if not cloths.is_empty():
+		_gear_mesh_node("Cloth", cloths[0] if cloths.size() == 1 else OnionArmor.merged(cloth_key, cloths),
+			Mats.toon_cloth_vc(), true)
+	# Glowing accents (Legendary / set gems and rings): one unshaded mesh per glow colour.
+	var accent_groups: Dictionary[String, Array] = {}
+	for p in parts:
+		if p != null and p.accent != null:
+			var group: Array = accent_groups.get(p.accent_color.to_html(false), [])
+			group.append(p)
+			accent_groups[p.accent_color.to_html(false)] = group
+	var akeys: Array = accent_groups.keys()
+	akeys.sort()
+	for i in akeys.size():
+		var group: Array = accent_groups[akeys[i]]
+		var meshes: Array[Mesh] = []
+		var key := "onion:gear:accent"
+		for p: OnionArmor.Part in group:
+			meshes.append(p.accent)
+			key += "|" + p.key
+		var first: OnionArmor.Part = group[0]
+		var node := _gear_mesh_node("Accent%d" % i, first.accent if meshes.size() == 1 else OnionArmor.merged(key, meshes),
+			Mats.glow(first.accent_color, OnionArmor.ACCENT_ENERGY), false)
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.visible = not downed
+		_accents.append(node)
+	_build_starter_extras(parts)
+	_apply_head_effects(parts[EquipLook.Slot.HEAD])
+	_place_peels()
+	if downed:
+		_apply_downed_look()
+	elif _flash > 0.0:
+		_apply_flash()
 
+
+func _gear_mesh_node(n: String, mesh: Mesh, material: Material, skin: bool) -> MeshInstance3D:
+	var mi := _mesh(n, _gear, mesh, material, skin)
+	_gear_meshes.append(mi)
+	return mi
+
+
+## Frees the previous Gear node and every extra, and forgets them in the skin lists.
+func _clear_gear() -> void:
+	for mi in _gear_meshes:
+		_skin_meshes.erase(mi)
+		_saved_materials.erase(mi)
+	_gear_meshes.clear()
+	_accents.clear()
+	_flames.clear()
+	for n in _gear_extras:
+		if is_instance_valid(n):
+			n.get_parent().remove_child(n)
+			n.queue_free()
+	_gear_extras.clear()
+	if _gear != null:
+		_gear.get_parent().remove_child(_gear)
+		_gear.queue_free()
+		_gear = null
+
+
+## The glowing / animated bits that belong to a class starter piece: the mage's hat star, the warlock's
+## horn flames and fel trim. They go with the starter piece of their slot, not with the class.
+func _build_starter_extras(parts: Array[OnionArmor.Part]) -> void:
+	var acc := class_data.accent_color
+	for p in parts:
+		if p == null:
+			continue
+		for extra in p.extras:
+			match extra:
+				&"hat_star":
+					var star := MeshKit.cached("onion:hat_star", func() -> Mesh:
+						var k := MeshKit.new()
+						var pts := PackedVector2Array()
+						for i in 10:
+							var a := TAU * i / 10.0
+							var r := 0.065 if i % 2 == 0 else 0.028
+							pts.append(Vector2(sin(a), cos(a)) * r)
+						k.add_extrusion(pts, 0.015, MeshKit.xf(Vector3(0, 0.86, -0.29), Vector3(12, 0, 0)), Color.WHITE)
+						return k.build())
+					var sm := _mesh("HatStar", _body, star, Mats.glow(Color(1.0, 0.85, 0.35), 1.4), false)
+					sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+					_gear_extras.append(sm)
+				&"fel_trim":
+					var glow := MeshKit.cached("onion:fel_trim", func() -> Mesh:
+						var k := MeshKit.new()
+						k.add_torus(0.395, 0.425, MeshKit.xf(Vector3(0, 0.3, 0), Vector3.ZERO, Vector3(1, 0.6, 1)), Color.WHITE, 24, 4)
+						return k.build())
+					var gm := _mesh("FelTrim", _body, glow, Mats.glow(acc, 1.6), false)
+					gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+					_gear_extras.append(gm)
+				&"horn_flames":
+					# Purple flames licking up from the horn tips: the warlock's silhouette glows
+					# from above instead of reading as a dark blob.
+					for side: float in [-1.0, 1.0]:
+						var horn := OnionArmor.warlock_horn(side)
+						var flame := _build_flame(_body, WARLOCK_FLAME, "HornFlameL" if side < 0.0 else "HornFlameR")
+						flame.position = horn[horn.size() - 1] + Vector3(0, 0.02, 0)
+						flame.scale = Vector3.ONE
+						_flames.append(flame)
+						_gear_extras.append(flame)
+
+
+## Class-specific nodes that do not depend on the worn armour: the warlock's fel flame in the empty
+## off hand.
+func _build_class_extras() -> void:
+	if class_data != null and class_data.headgear == &"horned_hood" and _hands.size() == 2:
+		_fel_flame = _build_flame(_hands[1], class_data.accent_color)
+
+
+## What the head piece does to the onion body: a closed hat hides the sprout, a mask the mouth,
+## helms and hoods the eyebrows (the face meshes are cached per variant).
+func _apply_head_effects(head: OnionArmor.Part) -> void:
+	if head == null:
+		return
+	if _sprout != null:
+		_sprout.visible = not head.hides_sprout
+	if _mouth != null:
+		_mouth.visible = not head.hides_mouth
+	var eyes := _face_mesh() as MeshInstance3D
+	if eyes != null:
+		eyes.mesh = _eyes_mesh(head.brows)
+
+
+func _eyes_mesh(brows: bool) -> Mesh:
+	var headgear: StringName = class_data.headgear if class_data != null else &""
+	return MeshKit.cached("onion:face:%s:%s" % [brows, headgear], func() -> Mesh: return _face_mesh_build(brows, headgear))
 
 func _build_flame(parent: Node3D, color: Color, node_name: String = "FelFlame") -> Node3D:
 	var pivot := _node(node_name, parent)
@@ -1260,190 +1451,3 @@ func _build_flame(parent: Node3D, color: Color, node_name: String = "FelFlame") 
 	inner.position.y = 0.01
 	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return pivot
-
-
-static func _gear_mesh(cd: ClassData) -> Mesh:
-	var k := MeshKit.new()
-	var acc := cd.accent_color
-	match cd.headgear:
-		&"helm_horned":
-			_helm_dome(k, acc, acc.darkened(0.35))
-			for side: float in [-1.0, 1.0]:
-				var horn := PackedVector3Array([Vector3(0.28 * side, 0.8, 0.02), Vector3(0.42 * side, 0.85, 0.0),
-					Vector3(0.53 * side, 0.96, -0.03), Vector3(0.57 * side, 1.1, -0.06), Vector3(0.53 * side, 1.2, -0.08)])
-				k.add_tube(horn, 0.08, 0.012, IVORY, 8)
-				k.add_torus(0.06, 0.1, Transform3D(MeshKit.basis_from_y(Vector3(side, 0.35, 0)), Vector3(0.3 * side, 0.81, 0.02)), acc.darkened(0.35), 10, 4)
-			_belt(k, LEATHER, acc)
-		&"paladin_helm":
-			var silver := acc.lerp(Color(0.8, 0.82, 0.88), 0.35)
-			_helm_dome(k, GOLD, silver)
-			for side: float in [-1.0, 1.0]:
-				_helm_wing(k, side, Vector3(0.3 * side, 0.74, 0.06))
-				k.add_sphere(0.065, MeshKit.xf(Vector3(0.33 * side, 0.76, 0.03)), silver, 8, 4)
-			_belt(k, GOLD, Color(0.9, 0.2, 0.15))
-		&"wizard_hat":
-			var hat := acc
-			k.add_cylinder(0.5, 0.5, 0.035, MeshKit.xf(Vector3(0, 0.77, 0), Vector3(-6, 0, 0)), hat.darkened(0.15), 24)
-			var cone := PackedVector3Array([Vector3(0, 0.77, 0.0), Vector3(0, 0.98, 0.04), Vector3(0, 1.16, 0.12),
-				Vector3(0, 1.3, 0.25), Vector3(0, 1.36, 0.38)])
-			k.add_tube(cone, 0.29, 0.02, hat, 16)
-			k.add_torus(0.26, 0.32, MeshKit.xf(Vector3(0, 0.83, 0.006), Vector3(-6, 0, 0), Vector3(1, 1.4, 1)), GOLD, 24, 5)
-			_belt(k, GOLD, hat)
-		&"hood":
-			# Open-topped leather cowl: the pale spring-onion neck and its long green stalk
-			# stay visible from the top-down camera (GDD 13), pale trim on both edges.
-			_hood_cap(k, acc, ROGUE_COWL_TOP)
-			_cowl_trim(k, ROGUE_TRIM)
-			_belt(k, LEATHER, Color(0.7, 0.7, 0.72))
-			k.add_box(Vector3(0.12, 0.12, 0.08), MeshKit.xf(OnionModel.bulb_point(0.25, 125.0, 0.04), Vector3(0, 125, 0)), LEATHER.darkened(0.2))
-			var strap := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(32))) * Basis.from_scale(Vector3(1, 0.55, 1)), Vector3(0, 0.45, 0))
-			k.add_torus(0.385, 0.425, strap, LEATHER.darkened(0.1), 28, 4)
-			# Crimson scarf: a band along the hood's lower edge and two tails flapping behind,
-			# so the rogue reads from behind / above too.
-			var band := PackedVector2Array()
-			for p in bulb_profile():
-				if p.y >= 0.4 and p.y <= 0.5:
-					band.append(Vector2(p.x * 1.1 + 0.035, p.y + 0.03))
-			k.add_lathe(band, Transform3D(), SCARF_RED, 22, 54.0, 306.0)
-			var knot := bulb_point(0.47, 180.0, 0.06)
-			k.add_sphere(0.055, MeshKit.xf(knot, Vector3.ZERO, Vector3(1.3, 0.9, 0.8)), SCARF_RED.darkened(0.1), 8, 4)
-			for i in 2:
-				var side := -1.0 if i == 0 else 1.0
-				var length := 0.34 if i == 0 else 0.27
-				var ribbon := PackedVector2Array([Vector2(-0.045, 0.0), Vector2(0.045, 0.0), Vector2(0.04, length),
-					Vector2(0.0, length - 0.06), Vector2(-0.04, length)])
-				k.add_extrusion(ribbon, 0.022, MeshKit.xf(knot + Vector3(0.03 * side, -0.01, 0.0),
-					Vector3(112.0 + 10.0 * i, 18.0 * side, 0.0)), SCARF_RED.darkened(0.06 * i), 0.9)
-		&"horned_hood":
-			var dark := WARLOCK_HOOD
-			_hood_cap(k, dark)
-			for side: float in [-1.0, 1.0]:
-				var horn := _warlock_horn(side)
-				k.add_tube(horn, 0.07, 0.012, WARLOCK_HORN, 8)
-				# Pale bone rim where the horn leaves the hood (reads against the dark hood).
-				k.add_torus(0.055, 0.095, Transform3D(MeshKit.basis_from_y((horn[1] - horn[0]).normalized()), horn[0]),
-					WARLOCK_HORN.lightened(0.25), 10, 4)
-			_belt(k, dark.lightened(0.1), acc)
-		_:
-			_belt(k, LEATHER, GOLD)
-	if cd.big_shoulders:
-		var main := acc if cd.headgear != &"paladin_helm" else Color(0.96, 0.96, 0.93)
-		var trim := acc.darkened(0.4) if cd.headgear != &"paladin_helm" else GOLD
-		for side: float in [-1.0, 1.0]:
-			var b := Basis.from_euler(Vector3(0, 0, deg_to_rad(-48.0 * side)))
-			var c := Vector3(0.33 * side, 0.6, 0.03)
-			k.add_sphere(0.22, Transform3D(b * Basis.from_scale(Vector3(1.05, 1.0, 1.0)), c), main, 16, 8, true)
-			k.add_torus(0.19, 0.25, Transform3D(b * Basis.from_scale(Vector3(1.05, 0.6, 1.0)), c), trim, 18, 5)
-			k.add_sphere(0.16, Transform3D(b * Basis.from_scale(Vector3(1.0, 0.75, 0.95)), c + b * Vector3(0, 0.08, 0)), main.lightened(0.08), 14, 7, true)
-			if cd.headgear == &"helm_horned":
-				for s in 3:
-					var dir := b * Vector3((s - 1) * 0.45, 1.0, 0).normalized()
-					var base := c + b * Vector3((s - 1) * 0.09, 0.17, 0)
-					k.add_segment(base, base + dir * 0.17, 0.045, 0.0, IVORY, 8)
-			else:
-				k.add_sphere(0.05, Transform3D(b, c + b * Vector3(0, 0.2, 0)), Color(0.3, 0.6, 1.0), 8, 4)
-	return k.build()
-
-
-static func _helm_dome(k: MeshKit, metal: Color, trim: Color) -> void:
-	k.add_sphere(0.36, MeshKit.xf(Vector3(0, 0.665, 0), Vector3.ZERO, Vector3(1.0, 0.98, 1.0)), metal, 24, 10, true)
-	k.add_torus(0.33, 0.4, MeshKit.xf(Vector3(0, 0.68, 0), Vector3.ZERO, Vector3(1, 0.75, 1)), trim, 28, 6)
-	var crest := PackedVector2Array()
-	for i in 13:
-		var a := PI * i / 12.0
-		crest.append(Vector2(cos(a), sin(a)) * 0.375)
-	k.add_extrusion(crest, 0.05, MeshKit.xf(Vector3(0, 0.67, 0), Vector3(0, 90, 0)), trim)
-	for i in 10:
-		var a := TAU * i / 10.0
-		k.add_sphere(0.022, MeshKit.xf(Vector3(sin(a) * 0.392, 0.69, cos(a) * 0.392)), trim.lightened(0.3), 6, 3)
-
-
-## One swept-back feathered wing on the paladin helm (white feathers, golden root).
-static func _helm_wing(k: MeshKit, side: float, root: Vector3) -> void:
-	# Outline in (outwards, up) with a scalloped trailing edge.
-	var pts: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.03, 0.13), Vector2(0.11, 0.28), Vector2(0.23, 0.39),
-		Vector2(0.38, 0.46), Vector2(0.36, 0.34), Vector2(0.3, 0.35), Vector2(0.29, 0.23), Vector2(0.22, 0.25),
-		Vector2(0.2, 0.13), Vector2(0.13, 0.15), Vector2(0.1, 0.04), Vector2(0.04, 0.02)]
-	var wing := PackedVector2Array()
-	for p in pts:
-		wing.append(Vector2(p.x * side, p.y))
-	var xform := MeshKit.xf(root, Vector3(0, -34.0 * side, 0))
-	k.add_extrusion(wing, 0.035, xform, Color(0.98, 0.97, 0.94), 0.92)
-	var base := PackedVector2Array()
-	for p: Vector2 in [Vector2(-0.03, -0.03), Vector2(0.03, 0.13), Vector2(0.11, 0.2), Vector2(0.13, 0.1), Vector2(0.07, 0.0)]:
-		base.append(Vector2(p.x * side, p.y))
-	k.add_extrusion(base, 0.06, xform, GOLD, 0.9)
-
-
-static func _belt(k: MeshKit, belt: Color, buckle: Color) -> void:
-	k.add_torus(0.365, 0.41, MeshKit.xf(Vector3(0, 0.3, 0), Vector3.ZERO, Vector3(1, 0.65, 1)), belt, 28, 5)
-	k.add_box(Vector3(0.1, 0.08, 0.04), MeshKit.xf(OnionModel.bulb_point(0.3, 0.0, 0.035)), buckle)
-
-
-## Hood over the top of the bulb. [param top] < the neck height leaves the top open (cowl,
-## no pointed tip).
-static func _hood_cap(k: MeshKit, color: Color, top: float = 2.0) -> void:
-	var prof := PackedVector2Array()
-	for p in bulb_profile():
-		if p.y >= 0.66 and p.y <= top:
-			prof.append(Vector2(p.x * 1.1 + 0.02, p.y + 0.03))
-	k.add_lathe(prof, Transform3D(), color, 28)
-	if top < 1.0:
-		return
-	var tip := PackedVector3Array([Vector3(0, 0.98, 0.04), Vector3(0, 1.05, 0.14), Vector3(0, 1.02, 0.27),
-		Vector3(0, 0.95, 0.33)])
-	k.add_tube(tip, 0.075, 0.015, color, 8)
-
-
-## Pale trim rings on the rogue cowl: its open top and its lower (brow) edge.
-static func _cowl_trim(k: MeshKit, color: Color) -> void:
-	var top_r := bulb_radius(ROGUE_COWL_TOP) * 1.1 + 0.02
-	k.add_torus(top_r - 0.022, top_r + 0.018, MeshKit.xf(Vector3(0, ROGUE_COWL_TOP + 0.03, 0)), color, 22, 4)
-	var low_r := bulb_radius(0.68) * 1.1 + 0.02
-	k.add_torus(low_r - 0.02, low_r + 0.02, MeshKit.xf(Vector3(0, 0.71, 0)), color, 26, 4)
-
-
-## Centre line of a warlock horn (root on the hood, curling backwards).
-static func _warlock_horn(side: float) -> PackedVector3Array:
-	return PackedVector3Array([Vector3(0.26 * side, 0.86, 0.04), Vector3(0.4 * side, 0.95, 0.1),
-		Vector3(0.47 * side, 1.07, 0.2), Vector3(0.43 * side, 1.14, 0.33), Vector3(0.35 * side, 1.1, 0.4)])
-
-
-static func _cloth_mesh(cd: ClassData) -> Mesh:
-	var k := MeshKit.new()
-	var acc := cd.accent_color
-	match cd.headgear:
-		&"wizard_hat":
-			_cape(k, acc.darkened(0.1))
-		&"paladin_helm":
-			var tabard := PackedVector2Array([Vector2(0.43, 0.07), Vector2(0.415, 0.18), Vector2(0.395, 0.28)])
-			k.add_lathe(tabard, Transform3D(), TABARD_BLUE, 6, -30.0, 30.0)
-			var trim := PackedVector2Array([Vector2(0.435, 0.055), Vector2(0.433, 0.075)])
-			k.add_lathe(trim, Transform3D(), GOLD, 6, -30.0, 30.0)
-		&"hood":
-			_hood_sides(k, acc)
-			# Dark domino mask across the eyes (GDD 13: "hood and mask"): the white eyes pop
-			# out of it, so the rogue reads as a masked rogue, not as a dark blob.
-			var mask := PackedVector2Array()
-			for p in bulb_profile():
-				if p.y >= EYE_Y - 0.085 and p.y <= EYE_Y + 0.075:
-					mask.append(Vector2(p.x + 0.014, p.y))
-			k.add_lathe(mask, Transform3D(), ROGUE_MASK, 18, -66.0, 66.0)
-		&"horned_hood":
-			_hood_sides(k, WARLOCK_HOOD)
-			_cape(k, WARLOCK_HOOD.lightened(0.06))
-	return k.build()
-
-
-static func _cape(k: MeshKit, color: Color) -> void:
-	var cape := PackedVector2Array([Vector2(0.5, 0.06), Vector2(0.46, 0.25), Vector2(0.44, 0.45),
-		Vector2(0.38, 0.6), Vector2(0.27, 0.72)])
-	k.add_lathe(MeshKit.smooth_profile(cape, 3), Transform3D(), color, 18, 70.0, 290.0)
-
-
-static func _hood_sides(k: MeshKit, color: Color) -> void:
-	var prof := PackedVector2Array()
-	for p in bulb_profile():
-		if p.y >= 0.4 and p.y <= 0.72:
-			prof.append(Vector2(p.x * 1.1 + 0.02, p.y + 0.03))
-	k.add_lathe(prof, Transform3D(), color, 18, 58.0, 302.0)

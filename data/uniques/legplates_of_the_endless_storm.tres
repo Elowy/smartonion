@@ -22,7 +22,7 @@ unique_params = {
 "pulses_add": 1.0
 }
 }
-unique_text = "Equip: Your Divine Storm pulses 1 more time."
+unique_text = "Equip: Your Radiant Whirl pulses 1 more time."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

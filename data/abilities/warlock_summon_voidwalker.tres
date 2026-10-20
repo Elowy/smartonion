@@ -6,8 +6,8 @@
 [resource]
 script = ExtResource("1_script")
 id = &"summon_voidwalker"
-display_name = "Summon Voidwalker"
-description = "A Voidwalker guards you, drawing nearby enemies to itself and pummeling them. Its Torment taunts all enemies within {torment_radius} m. It cannot die."
+display_name = "Summon Gloomguard"
+description = "A Gloomguard guards you, drawing nearby enemies to itself and pummeling them. Its Menace taunts all enemies within {torment_radius} m. It cannot die."
 class_id = &"warlock"
 school = &"shadow"
 tags = Array[StringName]([&"pet", &"cc"])
@@ -38,5 +38,5 @@ color = Color(0.35, 0.42, 0.95, 1)
 kind = 2
 card_weight = 1.0
 rank3 = {"torment_radius_add": 1.5, "taunt_radius_add": 1.0}
-rank3_text = "+1.5 m Torment and +1 m threat radius"
-specs = Array[Dictionary]([{"name": "Shared Pain", "text": "While the Voidwalker is out you take 20% less damage.", "mods": {"damage_reduction": 20.0}}, {"name": "Consuming Shadows", "text": "Torment also deals 4x fist damage and slows enemies by 40%.", "mods": {"torment_damage_mult": 4.0, "torment_slow": 40.0}}])
+rank3_text = "+1.5 m Menace and +1 m threat radius"
+specs = Array[Dictionary]([{"name": "Shared Pain", "text": "While the Gloomguard is out you take 20% less damage.", "mods": {"damage_reduction": 20.0}}, {"name": "Smothering Dark", "text": "Menace also deals 4x fist damage and slows enemies by 40%.", "mods": {"torment_damage_mult": 4.0, "torment_slow": 40.0}}])

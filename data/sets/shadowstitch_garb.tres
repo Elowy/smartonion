@@ -31,5 +31,5 @@ bonuses = Array[Dictionary]([{
 }
 }],
 "pieces": 4,
-"text": "Vanish increases your critical strike damage by 50% for 4 sec."
+"text": "Melt Away boosts your critical strike damage by 50% for 4 sec."
 }])

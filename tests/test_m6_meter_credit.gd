@@ -233,7 +233,7 @@ func test_consecration_light_s_hammer_heal_credits_the_paladin() -> void:
 			&"paladin_holy_aura_mastery", &"paladin_holy_lights_hammer"] as Array[StringName])
 	_hurt(ally, 0.5)
 	var before := ally.hp
-	check(paladin.abilities.try_cast(0), "Consecration")
+	check(paladin.abilities.try_cast(0), "Sacred Circle")
 	_step_abilities(paladin, 40)
 	check(ally.hp > before, "the ground healed the ally")
 	check_near(_healing(CASTER), ally.hp - before, 0.001, "the paladin is credited with all of it: %s" % RunState.healing_by_player)
@@ -246,13 +246,13 @@ func test_consecration_hallowed_ground_heal_credits_the_paladin() -> void:
 	_rank(paladin, &"consecration", 5, 0)  # Hallowed Ground: AbilityArea heals the heroes inside
 	_hurt(ally, 0.5)
 	var before := ally.hp
-	check(paladin.abilities.try_cast(0), "Consecration")
+	check(paladin.abilities.try_cast(0), "Sacred Circle")
 	var areas := tree.get_nodes_in_group(&"ability_areas")
 	check(not areas.is_empty(), "a ground")
 	for a in areas:
 		Fakes.step(a, 1.1)
 	check(ally.hp > before, "the ground healed the ally")
-	_check_healing_credited_to_caster(ally.hp - before, "Hallowed Ground")
+	_check_healing_credited_to_caster(ally.hp - before, "Healing Circle")
 
 
 func test_divine_storm_heal_credits_the_paladin() -> void:
@@ -261,9 +261,9 @@ func test_divine_storm_heal_credits_the_paladin() -> void:
 	var slot := _learn(paladin, &"divine_storm")
 	_hurt(ally, 0.4)
 	var before := ally.hp
-	check(paladin.abilities.try_cast(slot), "Divine Storm")
+	check(paladin.abilities.try_cast(slot), "Radiant Whirl")
 	check(ally.hp > before, "the ally was healed")
-	_check_healing_credited_to_caster(ally.hp - before, "Divine Storm")
+	_check_healing_credited_to_caster(ally.hp - before, "Radiant Whirl")
 
 
 func test_lay_on_hands_heal_credits_the_paladin() -> void:
@@ -272,9 +272,9 @@ func test_lay_on_hands_heal_credits_the_paladin() -> void:
 	var slot := _learn(paladin, &"lay_on_hands")
 	_hurt(ally, 0.3)
 	var before := ally.hp
-	check(paladin.abilities.try_cast(slot), "Lay on Hands")
+	check(paladin.abilities.try_cast(slot), "Mending Touch")
 	check_eq(ally.hp, ally.max_hp(), "fully healed")
-	_check_healing_credited_to_caster(ally.hp - before, "Lay on Hands")
+	_check_healing_credited_to_caster(ally.hp - before, "Mending Touch")
 
 
 func test_lay_on_hands_shield_credits_the_paladin() -> void:
@@ -282,9 +282,9 @@ func test_lay_on_hands_shield_credits_the_paladin() -> void:
 	var ally := _hero(&"warrior", TARGET, Vector3(3, 0, 0))
 	var slot := _learn(paladin, &"lay_on_hands", 3)  # Rank III: + an absorb shield
 	_hurt(ally, 0.3)
-	check(paladin.abilities.try_cast(slot), "Lay on Hands")
+	check(paladin.abilities.try_cast(slot), "Mending Touch")
 	check_eq(paladin.procs.shield_hp, 0.0, "no shield on the paladin")
-	_check_shield_credited_to_caster(ally, "Lay on Hands shield")
+	_check_shield_credited_to_caster(ally, "Mending Touch shield")
 
 
 func test_word_of_glory_heal_credits_the_paladin() -> void:
@@ -293,9 +293,9 @@ func test_word_of_glory_heal_credits_the_paladin() -> void:
 	_hurt(ally, 0.3)
 	var before := ally.hp
 	paladin.abilities.get_resource(&"holy_power").set_value(3.0)
-	check(paladin.abilities.try_cast(1), "Word of Glory")
+	check(paladin.abilities.try_cast(1), "Call of Valor")
 	check(ally.hp > before, "the ally was healed")
-	_check_healing_credited_to_caster(ally.hp - before, "Word of Glory")
+	_check_healing_credited_to_caster(ally.hp - before, "Call of Valor")
 
 
 func test_word_of_glory_shield_share_credits_the_paladin() -> void:
@@ -305,10 +305,10 @@ func test_word_of_glory_shield_share_credits_the_paladin() -> void:
 	_hurt(ally, 0.3)
 	var before := ally.hp
 	paladin.abilities.get_resource(&"holy_power").set_value(3.0)
-	check(paladin.abilities.try_cast(1), "Word of Glory")
+	check(paladin.abilities.try_cast(1), "Call of Valor")
 	check(ally.hp > before, "the ally was healed")
-	_check_healing_credited_to_caster(ally.hp - before, "Word of Glory heal")
-	_check_shield_credited_to_caster(ally, "Word of Glory shield share")
+	_check_healing_credited_to_caster(ally.hp - before, "Call of Valor heal")
+	_check_shield_credited_to_caster(ally, "Call of Valor shield share")
 
 
 func test_word_of_glory_revive_credits_the_paladin() -> void:
@@ -318,7 +318,7 @@ func test_word_of_glory_revive_credits_the_paladin() -> void:
 	ally.take_damage(ally.max_hp() * 3.0)
 	check(ally.downed, "the ally is down")
 	paladin.abilities.get_resource(&"holy_power").set_value(3.0)
-	check(paladin.abilities.try_cast(1), "Word of Glory raises the ally")
+	check(paladin.abilities.try_cast(1), "Call of Valor raises the ally")
 	check(not ally.downed, "revived")
 	check_eq(RunState.revives_by_player, {CASTER: 1} as Dictionary[int, int], "only the caster is credited")
 
@@ -339,8 +339,8 @@ func test_holy_shock_heal_credits_the_paladin() -> void:
 	_hurt(ally, 0.7)
 	var before := ally.hp
 	_tick_bonuses(paladin, 2.1)
-	check(ally.hp > before, "Holy Shock healed the ally")
-	_check_healing_credited_to_caster(ally.hp - before, "Holy Shock")
+	check(ally.hp > before, "Radiant Pulse healed the ally")
+	_check_healing_credited_to_caster(ally.hp - before, "Radiant Pulse")
 
 
 func test_seal_of_command_heal_credits_the_paladin() -> void:
@@ -366,7 +366,7 @@ func test_seal_of_command_heal_credits_the_paladin() -> void:
 	var before := ally.hp
 	paladin.bonuses.on_hit(e, 10.0, true, true)
 	check(ally.hp > before, "the Seal healed the most wounded hero")
-	_check_healing_credited_to_caster(ally.hp - before, "Seal of Command")
+	_check_healing_credited_to_caster(ally.hp - before, "Sunbrand")
 
 
 func test_holy_shield_ally_shield_credits_the_paladin() -> void:
@@ -386,8 +386,8 @@ func test_holy_shield_ally_shield_credits_the_paladin() -> void:
 	var e := _enemy(Vector3(1.2, 0, 0))
 	paladin._avoided(&"block", e)
 	var key := PaladinProtectionHolyShield.shield_key(paladin)
-	check(ally.procs.shield_of(key) > 0.0, "the ally got the Holy Shield")
-	_check_shield_credited_to_caster(ally, "Holy Shield")
+	check(ally.procs.shield_of(key) > 0.0, "the ally got the Gleaming Shield")
+	_check_shield_credited_to_caster(ally, "Gleaming Shield")
 
 
 # --- Unbreakable --------------------------------------------------------------------------------

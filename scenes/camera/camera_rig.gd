@@ -90,9 +90,10 @@ func snap() -> void:
 	_apply()
 
 
-## Screen shake, [param strength] ~0.1 (hit) .. 1.0 (boss slam).
+## Screen shake, [param strength] ~0.1 (hit) .. 1.0 (boss slam); scaled by the Screen Shake setting
+## (Off / Low / Full = 0 / 0.5 / 1, a visual option only).
 func shake(strength: float) -> void:
-	_trauma = clampf(_trauma + maxf(strength, 0.0), 0.0, 1.0)
+	_trauma = clampf(_trauma + maxf(strength, 0.0) * Settings.screen_shake_mult(), 0.0, 1.0)
 
 
 func get_trauma() -> float:

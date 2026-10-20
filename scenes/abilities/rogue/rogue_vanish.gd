@@ -54,6 +54,8 @@ const TIME_EPSILON := 0.0001
 
 var _player: Player
 var _left := 0.0
+## OnionModel.gear_builds when the silhouette was made / last extended (armour rebuilt since = new meshes).
+var _gear_builds := 0
 ## Unseen Blades: this Vanish throws a free fan when it runs out (cleared by every end).
 var _end_fan := false
 ## Free fans thrown by Unseen Blades (tests).
@@ -102,7 +104,7 @@ func cast(ctx: AbilityContext) -> bool:
 	if player.is_inside_tree():
 		Vfx.death_puff(player.global_position + Vector3.UP * 0.6, SMOKE_COLOR, 1.3)
 		_smoke_bomb(player, ctx.num("smoke_radius", 0.0), ctx.num("smoke_stun", 0.0))
-		Vfx.floating_text(player.self_text_position(1.0), "Vanish", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
+		Vfx.floating_text(player.self_text_position(1.0), "Melt Away", TEXT_COLOR, Player.SELF_TEXT_SIZE, 1.0)
 	return true
 
 
@@ -237,6 +239,7 @@ func _fade(opacity: float) -> void:
 		tint = _player.class_data.onion_color
 	tint = tint.lerp(SHADOW_TONE, SHADOW_BLEND)
 	_ghost = Mats.ghost(Color(tint.r, tint.g, tint.b, opacity))
+	_gear_builds = _player.model.gear_builds
 	for node in yaw.find_children("*", "MeshInstance3D", true, false):
 		var mi := node as MeshInstance3D
 		if mi == null:
@@ -253,6 +256,7 @@ func _fade(opacity: float) -> void:
 func _refade() -> void:
 	if _ghost == null or _player == null or not is_instance_valid(_player) or not _player.is_alive():
 		return
+	_fade_new_meshes()
 	for i in _faded.size():
 		var mi := _faded[i]
 		if not is_instance_valid(mi):
@@ -261,6 +265,26 @@ func _refade() -> void:
 		if base == _ghost:
 			continue  # still ours (a hit flash only tints it)
 		_originals[i] = base
+		mi.material_override = _ghost
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Fades the meshes the model grew since the silhouette was made: the armour pieces OnionModel
+## rebuilds when the hero changes its Head / Shoulders / Chest item during the effect.
+func _fade_new_meshes() -> void:
+	if _player.model == null or _player.model.gear_builds == _gear_builds:
+		return
+	_gear_builds = _player.model.gear_builds
+	var yaw := _player.model.get_node_or_null("Yaw")
+	if yaw == null:
+		return
+	for node in yaw.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi == null or mi in _faded:
+			continue
+		_faded.append(mi)
+		_originals.append(Mats.base_material(mi))
+		_shadows.append(mi.cast_shadow)
 		mi.material_override = _ghost
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 

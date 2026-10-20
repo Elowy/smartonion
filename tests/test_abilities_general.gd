@@ -256,7 +256,7 @@ func test_two_classes_learn_into_their_slots() -> void:
 	for class_id: StringName in [&"warrior", &"mage"]:
 		var p := _hero(class_id)
 		check_eq(p.abilities.learn(_ability(&"bandage")), 2, "%s: Bandage -> RB" % class_id)
-		check_eq(p.abilities.learn(_ability(&"berserking")), 3, "%s: Berserking -> LB" % class_id)
+		check_eq(p.abilities.learn(_ability(&"berserking")), 3, "%s: Savage Haste -> LB" % class_id)
 		check_eq(p.abilities.learn(_ability(&"engineers_bomb")), 4, "%s: bomb -> auto" % class_id)
 		check_eq(p.abilities.learn(_ability(&"war_stomp")), 5, "%s: stomp -> auto" % class_id)
 		check_eq(p.abilities.learn(_ability(&"spirit_wolf")), 6, "%s: wolf -> auto" % class_id)
@@ -519,7 +519,7 @@ func test_berserking_specs() -> void:
 	_run([p], DT)
 	var effect := _effect(p, a) as GeneralBerserking
 	var buff := effect.active_buff()
-	check(buff != null, "berserking")
+	check(buff != null, "Savage Haste")
 	check_near(float(p.stats.get_source(GeneralBerserking.KEY)[Stats.HASTE]), 30.0, 0.001, "20% x 1.5")
 	var left := buff.left
 	var dummy := _enemy(Vector3(30, 0, 0))
@@ -551,7 +551,7 @@ func test_berserking_bot_rule() -> void:
 	check(effect.wants_auto_cast(_ctx(p, a)), "three within 6 m")
 	_cast(p, a)
 	_run([p], DT)
-	check(not effect.wants_auto_cast(_ctx(p, a)), "not while berserking")
+	check(not effect.wants_auto_cast(_ctx(p, a)), "not while Savage Haste lasts")
 	p.end_wave()
 	check(not p.stats.has_source(GeneralBerserking.KEY), "end_wave")
 
@@ -841,14 +841,14 @@ func test_spirit_wolf_rank3_and_specs() -> void:
 	var before := r.hp
 	_run([r], DT)
 	var wolves := (_effect(r, c) as GeneralSpiritWolf).wolves
-	check_eq(wolves.size(), 2, "Spirit Link keeps the Rank III wolves")
+	check_eq(wolves.size(), 2, "Pack Bond keeps the Rank III wolves")
 	_run([r], 1.0)
 	var bites := 0
 	for w in wolves:
 		bites += w.bites
 	check(bites >= 1, "bit")
 	var dmg := _expected_weapon(r, &"nature") * 0.35 * 1.5
-	check_near(r.hp - before, dmg * 0.3 * float(bites), 0.01, "Spirit Link heals 30% of the bites")
+	check_near(r.hp - before, dmg * 0.3 * float(bites), 0.01, "Pack Bond heals 30% of the bites")
 
 
 # --- Every class ------------------------------------------------------------------------------
@@ -869,9 +869,9 @@ func test_every_class_can_use_every_general_ability() -> void:
 		var hit := 0.0
 		for e in enemies:
 			hit += e.total()
-			check(not e.stuns.is_empty(), "%s: War Stomp stuns" % class_id)
+			check(not e.stuns.is_empty(), "%s: Crowd Stomp stuns" % class_id)
 		check(hit > 0.0, "%s: damage dealt" % class_id)
-		check(p.stats.has_source(GeneralBerserking.KEY), "%s: berserking" % class_id)
+		check(p.stats.has_source(GeneralBerserking.KEY), "%s: Savage Haste" % class_id)
 		check(p.hp > p.max_hp() * 0.4, "%s: bandaged" % class_id)
 		p.end_wave()
 		check(not p.stats.has_source(GeneralBerserking.KEY), "%s: cleaned up" % class_id)

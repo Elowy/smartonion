@@ -1,14 +1,17 @@
 class_name ShrineIcon
 extends Control
 ## Square icon of a shrine (the vote card, the HUD's running-shrine row): a dark slot with a border in the
-## shrine's colour and a procedural picture chosen by ShrineData.icon_id – coins (Greed), a lightning bolt
-## (Haste), an open book (Learning), a drop (Blood), a clover (Fortune), a die (the Gambler). Unknown ids get a
-## plain altar diamond. With [member badge] > 0 a round number badge sits in the bottom-right corner (the waves
-## a running shrine has left). No textures, no RNG.
+## shrine's colour and the picture of ShrineData.icon_id – the game-icons.net silhouette of
+## data/icons/icon_map.tres ([GameIcons]) in the shrine's colour, or, when the map has none, a procedural
+## picture: coins (Greed), a lightning bolt (Haste), an open book (Learning), a drop (Blood), a clover
+## (Fortune), a die (the Gambler). Unknown ids get a plain altar diamond. With [member badge] > 0 a round
+## number badge sits in the bottom-right corner (the waves a running shrine has left). No RNG.
 
 const BACKGROUND := Color(0.07, 0.06, 0.055)
 const OUTLINE := Color(0.05, 0.03, 0.02, 0.95)
 const BADGE_FILL := Color(0.1, 0.07, 0.04, 0.96)
+## Side of a game-icons picture as a share of the slot.
+const PICTURE_SCALE := 0.78
 
 var data: ShrineData
 ## Waves left of a running shrine; 0 = no badge.
@@ -20,6 +23,7 @@ static func create(p_data: ShrineData = null, p_size: float = 40.0, p_badge: int
 	icon.name = "ShrineIcon"
 	icon.custom_minimum_size = Vector2(p_size, p_size)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.texture_filter = GameIcons.FILTER
 	icon.data = p_data
 	icon.badge = p_badge
 	return icon
@@ -48,7 +52,14 @@ func _draw() -> void:
 	var c := main_color()
 	if data != null:
 		draw_rect(r.grow(-2.0), Color(c, 0.12))
-		_draw_picture(data.icon_id, c)
+		var picture := GameIcons.for_shrine(data)
+		if picture != null:
+			var m := minf(size.x, size.y)
+			var side := m * PICTURE_SCALE
+			GameIcons.draw_silhouette(self, picture, Rect2((size - Vector2(side, side)) * 0.5, Vector2(side, side)),
+					GameIcons.gradient_top(c), GameIcons.gradient_bottom(c), maxf(1.0, m / 38.0))
+		else:
+			_draw_picture(data.icon_id, c)
 	draw_rect(r, c.darkened(0.15), false, 2.0)
 	if badge > 0:
 		_draw_badge()

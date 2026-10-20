@@ -6,8 +6,8 @@
 [sub_resource type="Resource" id="Resource_curse_of_agony"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_curse_of_agony"
-display_name = "Curse of Agony"
-description = "Your weapon hits curse their target with Agony: {pct}% of the hit's damage as Shadow damage over {duration_fixed} sec. Further hits add to the curse."
+display_name = "Hex of Anguish"
+description = "Your weapon hits curse their target with Anguish: {pct}% of the hit's damage as Shadow damage over {duration_fixed} sec. Further hits add to the curse."
 values = {
 "duration_fixed": 6.0,
 "pct": 5.0
@@ -30,8 +30,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_improved_drain_life"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_improved_drain_life"
-display_name = "Improved Drain Life"
-description = "Drain Life deals and heals {power}% more and recharges {cd}% faster."
+display_name = "Improved Vital Siphon"
+description = "Vital Siphon deals and heals {power}% more and recharges {cd}% faster."
 values = {
 "cd": 4.0,
 "power": 6.0
@@ -55,8 +55,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shadow_mastery"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_shadow_mastery"
-display_name = "Shadow Mastery"
-description = "Your Shadow damage is increased by {pct}% (Drain Life, Agony, Corruption, Shadow Bolt, your Voidwalker)."
+display_name = "Umbral Affinity"
+description = "Your Shadow damage is increased by {pct}% (Vital Siphon, Anguish, Corruption, Umbral Bolt, your Gloomguard)."
 values = {
 "pct": 3.0
 }
@@ -74,8 +74,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_curse_of_exhaustion"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_curse_of_exhaustion"
-display_name = "Curse of Exhaustion"
-description = "Enemies suffering from your afflictions (Agony, Corruption, Seed of Corruption, Dread) are slowed by {slow}%."
+display_name = "Hex of Fatigue"
+description = "Enemies suffering from your afflictions (Anguish, Corruption, Blight Seed, Dread) are slowed by {slow}%."
 values = {
 "slow": 10.0
 }
@@ -117,7 +117,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_affliction_dark_harvest"
 display_name = "Dark Harvest"
-description = "Drain Life also drains every enemy within its range that suffers from your afflictions (up to {targets}): each takes {pct}% of a tick's damage, and that damage heals you too."
+description = "Vital Siphon also drains every enemy within its range that suffers from your afflictions (up to {targets}): each takes {pct}% of a tick's damage, and that damage heals you too."
 values = {
 "pct": 25.0,
 "targets": 6.0
@@ -141,8 +141,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_writhe_in_agony"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_writhe_in_agony"
-display_name = "Writhe in Agony"
-description = "When an enemy suffering from your Agony dies, the rest of the curse is split between up to {targets} enemy(s) within {radius_fixed} m, with the time it had left."
+display_name = "Spreading Anguish"
+description = "When an enemy suffering from your Anguish dies, the rest of the curse is split between up to {targets} enemy(s) within {radius_fixed} m, with the time it had left."
 values = {
 "radius_fixed": 4.0,
 "targets": 1.0
@@ -166,7 +166,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_deaths_embrace"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_deaths_embrace"
-display_name = "Death's Embrace"
+display_name = "Doomed Prey"
 description = "You deal {pct}% more damage to enemies below {hp_fixed}% health."
 values = {
 "hp_fixed": 35.0,
@@ -187,7 +187,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_unstable_affliction"]
 script = ExtResource("2_talent")
 id = &"warlock_affliction_unstable_affliction"
-display_name = "Unstable Affliction"
+display_name = "Volatile Blight"
 description = "When an enemy suffering from any of your afflictions dies – no matter who killed it – it bursts with unstable shadow: Shadow damage to every enemy within {radius} m, stunning them for {stun} sec (each enemy at most once every {icd} sec)."
 values = {
 "icd": 4.0,
@@ -218,7 +218,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"warlock_affliction"
 class_id = &"warlock"
-display_name = "Affliction"
+display_name = "Hexcraft"
 index = 0
 description = "Lingering curses, life drain and dread."
 icon = &"corruption"

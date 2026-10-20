@@ -5,7 +5,7 @@ extends Node
 ##   MENU -> LOBBY -> RUN [ WAVE -> WAVE_END -> INTERMISSION -> WAVE ... ] -> GAME_OVER -> LOBBY
 ##
 ## - MENU: MainMenu. Nobody has joined there, so entering it clears every PlayerSlot.
-##   Play -> LOBBY, Quit -> quits.
+##   Play -> LOBBY, Quit -> quits; Settings and Credits open their pages inside the menu (M7a).
 ## - LOBBY: Lobby (join, class pick, ready). start_requested -> a run; back -> MENU.
 ## - RUN: Arena + WaveDirector + one Player per slot (Arena.entities) + Hud, Intermission,
 ##   GameOverScreen and PauseMenu. Every wave: players back on the spawn points,
@@ -243,6 +243,11 @@ func _ready() -> void:
 				begin_roll()
 		_:
 			go_to_menu()
+			match options.view:
+				"settings":
+					main_menu.open_settings()
+				"credits":
+					main_menu.open_credits()
 
 
 func _exit_tree() -> void:
@@ -417,6 +422,7 @@ func start_wave(n: int) -> void:
 	_wave_start_msec = Time.get_ticks_msec()
 	# Frame the team first: the opening spawn group picks on-screen points from the camera.
 	arena.camera.snap()
+	Audio.play(&"wave_start")
 	wave_director.start_wave(wave)
 	if hud != null:
 		hud.show()
@@ -488,7 +494,7 @@ func _free_roll_screen() -> void:
 func writes_leaderboard() -> bool:
 	if options.leaderboard_path != "":
 		return true
-	return not (options.smoke or options.demo or options.view != "" or options.screenshot_path != "")
+	return not options.is_automated()
 
 
 ## Between-wave screen (tree paused): loot roll (if any team loot), then the shared shop and
@@ -560,11 +566,15 @@ func _on_dungeon_status() -> void:
 
 
 func _on_dungeon_boss_spawned(boss: Boss) -> void:
+	Audio.play(&"boss_spawn")
+	Audio.play_music(&"boss")
+	_boss_entrance_fx(boss)
 	if hud != null:
 		hud.bind_boss(boss)
 
 
 func _on_dungeon_boss_cleared() -> void:
+	Audio.play_music(&"combat")
 	if hud != null:
 		hud.clear_boss()
 
@@ -629,6 +639,7 @@ func end_run(p_victory: bool) -> void:
 	_record_hero_results()
 	var board := _record_leaderboard(p_victory)
 	_set_state(State.GAME_OVER)
+	Audio.play(&"victory" if p_victory else &"defeat")
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
 		"victory" if p_victory else "defeat", wave, RunState.kills, RunState.gold, RunState.level])
 	var boss: Boss = wave_director.boss if wave_director != null and not p_victory else null
@@ -973,7 +984,25 @@ static func _free_node(node: Variant) -> void:
 func _set_state(s: State) -> void:
 	state = s
 	_state_time = 0.0
+	_update_music()
 	state_changed.emit(s)
+
+
+## The music of the new state: the menu theme in the menus, combat music on a wave (the boss theme on a
+## boss wave), the tavern theme in the break; the end screen fades it out (its stinger plays instead).
+## The clear banner (WAVE_END) and the boot keep what plays.
+func _update_music() -> void:
+	match state:
+		State.MENU, State.LOBBY:
+			Audio.play_music(&"menu")
+		State.WAVE:
+			Audio.play_music(&"boss" if RunState.is_boss_wave(wave) else &"combat")
+		State.DUNGEON:
+			Audio.play_music(&"combat")
+		State.INTERMISSION:
+			Audio.play_music(&"intermission")
+		State.GAME_OVER:
+			Audio.stop_music(0.6)
 
 
 # --- Signals ------------------------------------------------------------------------
@@ -1019,6 +1048,7 @@ func _on_wave_cleared(n: int) -> void:
 		return
 	if hud != null:
 		hud.show_banner(_wave_cleared_text(n))
+	Audio.play(&"wave_cleared")
 	_set_state(State.WAVE_END)
 
 
@@ -1037,10 +1067,21 @@ func _wave_cleared_text(n: int) -> String:
 
 ## WaveDirector.boss_spawned: the arrival banner.
 func _on_boss_spawned(boss: Boss) -> void:
+	Audio.play(&"boss_spawn")
+	_boss_entrance_fx(boss)
 	if hud != null and boss.boss_data != null:
-		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED)
+		hud.show_banner(boss.boss_data.intro_text(), UiTheme.RED, [], true)
 	_log(boss_arrival_text(boss, wave, players.size()))
 	_log(heroes_defence_text(players))
+
+
+## M7b: the visual side of a boss's arrival (rune flare, light shaft, shock ring, dust); the boss itself
+## already rises out of the ground (EnemyModel.play_spawn). Presentation only.
+func _boss_entrance_fx(boss: Boss) -> void:
+	if boss == null or not is_instance_valid(boss) or not boss.is_inside_tree():
+		return
+	Vfx.boss_entrance(boss.global_position, maxf(boss.radius * 1.6, 1.2),
+			boss.data.color if boss.data != null else UiTheme.RED)
 
 
 ## The smoke-log line of a boss's arrival.

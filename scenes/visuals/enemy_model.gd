@@ -16,6 +16,9 @@ extends Node3D
 ## stitched brute with an iron belly plate; its arm carries the chain and meat hook).
 ## The wind-up tell can be tinted ([method play_windup]): the Acolyte's channel is violet
 ## ([method play_channel]), everything else red.
+## M7b: [method play_spawn] makes the model rise out of the ground in a short swirl (only the Pivot's
+## offset / yaw / scale – the gameplay body is untouched) and [method corpse_info] hands the shared
+## meshes to [EnemyCorpse] when the enemy dies.
 
 const STYLES: Array[StringName] = [&"skeleton", &"candlekin", &"gurgler", &"troll", &"goblin",
 		&"ghoul", &"cultist", &"golem"]
@@ -28,6 +31,12 @@ const WINDUP_COLOR := Color(1.0, 0.18, 0.1)
 const CHANNEL_COLOR := Color(0.7, 0.3, 1.0)
 ## Angular speed of the pulsing wind-up tint (shader side).
 const WINDUP_PULSE := 30.0
+## M7b: seconds of the rise out of the ground (bosses take the longer one), how deep (x model scale)
+## the model starts below the floor and the turns it swirls while it rises.
+const SPAWN_TIME := 0.45
+const SPAWN_TIME_BOSS := 0.9
+const SPAWN_DEPTH := 1.05
+const SPAWN_TURNS := 0.8
 
 const BONE := Color(0.9, 0.88, 0.78)
 const RUST := Color(0.62, 0.36, 0.2)
@@ -70,6 +79,9 @@ var _windup_color := WINDUP_COLOR
 var _attack := 1.0
 var _stunned := false
 var _overlay_dirty := false
+## M7b: seconds of the spawn rise left (0 = not rising) and its total length.
+var _spawn_left := 0.0
+var _spawn_total := SPAWN_TIME
 ## (kind, quantised amount) of the applied overlay: 0 none, 1 hit flash, 2 wind-up.
 var _overlay_state := Vector2i.ZERO
 
@@ -118,6 +130,42 @@ func setup(p_data: EnemyData) -> void:
 	_pivot.rotation.y = _target_yaw
 	_yaw = _target_yaw
 	_apply_overlay()
+
+
+## M7b: the model rises out of the ground, swirling, over [param duration] seconds (Pivot offset, yaw and
+## squash only – it never touches the enemy's body, collision or AI). The ground hides the part below it.
+func play_spawn(duration: float = SPAWN_TIME) -> void:
+	_spawn_total = maxf(duration, 0.05)
+	_spawn_left = _spawn_total
+
+
+## True while the spawn rise runs.
+func is_spawning() -> bool:
+	return _spawn_left > 0.0
+
+
+## 0 (just appeared) .. 1 (risen) progress of the spawn rise; 1 when it is not running.
+func spawn_progress() -> float:
+	if _spawn_left <= 0.0:
+		return 1.0
+	return clampf(1.0 - _spawn_left / _spawn_total, 0.0, 1.0)
+
+
+## M7b: what an [EnemyCorpse] needs to stand in for this model when its enemy dies – the shared
+## meshes (never copies), the arm pivot / swing, the Pivot scale (data.model_scale) and the node's own
+## scale (elites), current yaw, head height and the glow part (flames, eyes). Empty before [method setup].
+func corpse_info() -> Dictionary:
+	# Still rising out of the ground: no corpse (it would pop up to full height for one frame).
+	if _pivot == null or _body == null or _arm == null or is_spawning():
+		return {}
+	var info := {"body": _body.mesh, "arm": _arm.mesh, "material": Mats.base_material(_body),
+			"arm_pivot": _arm_rest, "arm_x": _arm.rotation.x,
+			"scale": _scale, "node_scale": scale.x, "yaw": _yaw, "head": head_height}
+	if _glow != null:
+		info["glow"] = _glow.mesh
+		info["glow_pos"] = _glow.position
+		info["glow_material"] = _glow.material_override
+	return info
 
 
 func set_facing(direction: Vector3) -> void:
@@ -222,8 +270,20 @@ func _process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta / FLASH_TIME)
 		_overlay_dirty = true
-	_pivot.position = Vector3(0, bob, 0)
-	_pivot.rotation = Vector3(-lean, _yaw, roll)
+	var rise := 0.0
+	var swirl := 0.0
+	if _spawn_left > 0.0:
+		# M7b spawn rise: up out of the ground (eased out), swirling, squashed then a little overshoot.
+		_spawn_left = maxf(0.0, _spawn_left - delta)
+		var k := 1.0 - _spawn_left / _spawn_total
+		var eased := 1.0 - pow(1.0 - k, 3.0)
+		var pop := sin(k * PI)
+		rise = -(1.0 - eased) * SPAWN_DEPTH * _scale
+		swirl = (1.0 - eased) * TAU * SPAWN_TURNS
+		sx *= lerpf(0.72, 1.0, eased) - 0.05 * pop
+		sy *= lerpf(0.55, 1.0, eased) + 0.1 * pop
+	_pivot.position = Vector3(0, bob + rise, 0)
+	_pivot.rotation = Vector3(-lean, _yaw + swirl, roll)
 	_pivot.scale = Vector3(sx, sy, sx) * _scale
 	_arm.rotation = Vector3(arm_x, 0, 0)
 	if _glow != null:

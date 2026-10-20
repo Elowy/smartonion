@@ -71,6 +71,7 @@ func spawn_guards(datas: Array[EnemyData], wave: int, offsets: Array[Vector3], h
 		else:
 			e.position = pos
 		parent.add_child(e)
+		e.play_spawn_in()
 		out.append(e)
 		if director != null and is_instance_valid(director):
 			director.spawned_this_wave += 1

@@ -33,7 +33,7 @@ func test_malice_improved_poisons_and_lethality_add_stats_and_reset_restores() -
 		check_near(p.stats.get_raw(Stats.MASTERY), mastery + 3.0 * n, 0.0001, "Improved Poisons +3 Mastery per rank (%d)" % n)
 	var share_before := _mastery(p).stack_damage(100.0)
 	check_near(share_before, 100.0 * (20.0 + p.stats.get_raw(Stats.MASTERY)) / 100.0, 0.0001,
-			"a Deadly Poison stack takes the Mastery's share")
+			"a Lethal Venom stack takes the Mastery's share")
 	for n in range(1, 3):
 		_add(p, T, "lethality")
 		check_near(p.stats.get_raw(Stats.CRIT_DAMAGE), crit_damage + 10.0 * n, 0.0001, "Lethality +10%% crit damage per rank (%d)" % n)
@@ -48,7 +48,7 @@ func test_malice_improved_poisons_and_lethality_add_stats_and_reset_restores() -
 
 func test_seal_fate_needs_malice_and_gives_a_combo_point_on_crits() -> void:
 	var p := _rogue()
-	check_eq(p.talents.add_block_reason(&"rogue_assassination_seal_fate"), "Needs 3 points in Assassination", "tier gate")
+	check_eq(p.talents.add_block_reason(&"rogue_assassination_seal_fate"), "Needs 3 points in Toxins", "tier gate")
 	_add(p, T, "improved_poisons", 3)
 	check_eq(p.talents.add_block_reason(&"rogue_assassination_seal_fate"), "Requires Malice", "prerequisite")
 	_add(p, T, "malice", 3)
@@ -63,7 +63,7 @@ func test_seal_fate_needs_malice_and_gives_a_combo_point_on_crits() -> void:
 	WeaponRunner.apply_hit(p, e, 5.0, false, Vector3.ZERO)
 	check_eq(_combo(p).value, 0.0, "a normal hit gives nothing")
 	WeaponRunner.apply_hit(p, e, 12.0, true, Vector3.ZERO)
-	check_eq(_combo(p).value, 2.0, "a crit: its own Combo Point + Seal Fate's (exact: pips)")
+	check_eq(_combo(p).value, 2.0, "a crit: its own Combo Point + Fateful Cuts's (exact: pips)")
 	_remove(p, T, "seal_fate", 3)
 	check(_procs_of(p, &"rogue_assassination_seal_fate").is_empty(), "taken back: no proc")
 
@@ -81,7 +81,7 @@ func test_coup_de_grace_raises_the_combo_bonus_of_fan_of_knives() -> void:
 	for k in _throw_fan(p):
 		check_near(k.damage, expected, 0.0001, "5 points x 26%")
 	check_eq(_talent(&"rogue_assassination_coup_de_grace").text_for_rank(3),
-			"Fan of Knives deals an extra 6% damage for each Combo Point it spends.", "rank text")
+			"Knife Bloom deals an extra 6% damage for each Combo Point it spends.", "rank text")
 	_reset(p)
 	check_near(float(p.abilities.params_for(fan)["combo_bonus_pct"]), 20.0, 0.0001, "reset")
 
@@ -105,10 +105,10 @@ func test_venomous_wounds_gives_energy_for_poisoned_kills_only() -> void:
 	check_eq(_energy(p).value, 13.0, "a poisoned kill: +3 Energy")
 	var consumed := Fakes.spawn_enemy(world, Vector3(0, 0, 2))
 	mastery.poison(consumed, 8.0)
-	check(mastery.consume(consumed) > 0.0, "Envenom took the poison")
+	check(mastery.consume(consumed) > 0.0, "Overdose took the poison")
 	check_eq(mastery.stacks_on(consumed), 0, "no stacks left")
 	p.notify_kill(consumed)
-	check_eq(_energy(p).value, 16.0, "a kill right after Envenom still counts")
+	check_eq(_energy(p).value, 16.0, "a kill right after Overdose still counts")
 	mastery.tick(DT)
 	p.notify_kill(consumed)
 	check_eq(_energy(p).value, 16.0, "but only within the tick")
@@ -160,7 +160,7 @@ func test_envenom_data_is_valid_and_neutral_without_the_talent() -> void:
 	var entry := {"kind": "ability", "match": {"id": "fan_of_knives"}, "mods": {"envenom_pct_add": 150.0}}
 	check_eq(BonusVocabulary.validate(entry, &"rogue"), "", "envenom_pct_add is a valid mod (the FoK data declares envenom_pct)")
 	var envenom := _talent(&"rogue_assassination_envenom")
-	check(envenom.is_modifier() and envenom.ability == &"fan_of_knives", "modifier on Fan of Knives")
+	check(envenom.is_modifier() and envenom.ability == &"fan_of_knives", "modifier on Knife Bloom")
 	var p := _rogue()
 	var params := p.abilities.params_for(_fan(p))
 	for key in ["envenom_pct", "cdr_per_combo", "cold_blood_crit_damage", "cold_blood_slow", "cold_blood_slow_duration"]:
@@ -250,7 +250,7 @@ func test_envenom_burst_kill_counts_for_venomous_wounds() -> void:
 	_fly(p)
 	check(grunt.is_dead(), "the burst killed it")
 	check_eq(killers, [0] as Array[int], "credited to the Rogue")
-	check_near(_energy(p).value, 68.0, 0.0001, "Venomous Wounds: +3 Energy for the envenomed kill")
+	check_near(_energy(p).value, 68.0, 0.0001, "Toxic Harvest: +3 Energy for the envenomed kill")
 
 
 ## A fan over a poisoned 1 HP grunt (hit first, 1.5 m ahead) and a second enemy (3 m behind
@@ -280,14 +280,14 @@ func _fan_over_a_dying_grunt(envenom: bool) -> Player:
 	for k in _all_knives(p):
 		detonations += k.detonations
 		hits += k.hit_count
-	check_eq(detonations, 1 if envenom else 0, "Envenom's burst killed the grunt" if envenom else "no burst")
+	check_eq(detonations, 1 if envenom else 0, "Overdose's burst killed the grunt" if envenom else "no burst")
 	check_eq(hits, 2, "two knives landed (the grunt's one counts even on a corpse)")
 	return p
 
 
 func test_without_envenom_the_fan_rolls_its_on_hit_proc_once() -> void:
 	var p := _fan_over_a_dying_grunt(false)
-	check_near(_energy(p).value, 67.0, 0.0001, "Combat Potency fired once for the fan: +2 Energy")
+	check_near(_energy(p).value, 67.0, 0.0001, "Battle Verve fired once for the fan: +2 Energy")
 
 
 ## The burst's kill leaves its knife on a corpse: no weapon hit, so that knife must not close
@@ -295,7 +295,7 @@ func test_without_envenom_the_fan_rolls_its_on_hit_proc_once() -> void:
 ## modifiers") – the knife on the second enemy still rolls.
 func test_envenom_burst_kill_keeps_the_fans_on_hit_proc() -> void:
 	var p := _fan_over_a_dying_grunt(true)
-	check_near(_energy(p).value, 67.0, 0.0001, "Combat Potency still fired once for the fan: +2 Energy")
+	check_near(_energy(p).value, 67.0, 0.0001, "Battle Verve still fired once for the fan: +2 Energy")
 
 
 # --- Cold Blood (capstone) ---------------------------------------------------------------------
@@ -410,8 +410,8 @@ func test_assassination_bot_path_reaches_the_capstone_at_13() -> void:
 	check_eq(path[12], &"rogue_assassination_cold_blood", "the capstone is point 13")
 	check_eq(path.slice(7, 12), [&"rogue_assassination_seal_fate", &"rogue_assassination_seal_fate",
 			&"rogue_assassination_seal_fate", &"rogue_assassination_coup_de_grace",
-			&"rogue_assassination_coup_de_grace"] as Array[StringName], "Seal Fate 3, Coup de Grace 2")
-	check_eq(path[21], &"rogue_assassination_master_poisoner", "Master Poisoner last")
+			&"rogue_assassination_coup_de_grace"] as Array[StringName], "Fateful Cuts 3, Finishing Flourish 2")
+	check_eq(path[21], &"rogue_assassination_master_poisoner", "Venom Savant last")
 	var q := _rogue(1, Vector3(4, 0, 0))
 	check_eq(TalentBot.spend_all(q, 0), 22, "spend_all: the same 22 points")
 	check_eq(q.talents.ranks, p.talents.ranks, "same ranks")

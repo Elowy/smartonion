@@ -35,12 +35,12 @@ const PANEL_ALPHA := 0.8
 ## Smallest text on the frame (resource name, revive hint): readable at 720p.
 const SMALL_FONT := 18
 ## Shown while downed: what a ghost should do (GDD 1 – 1 s in the healer's circle = full HP).
-const GHOST_HINT := "Go to the Spirit Healer"
+const GHOST_HINT := "Go to the Grave Tender"
 ## Shown while downed where no Spirit Healer waits (M6b: a hardcore run's clearing, the dungeon): a teammate
 ## has to revive the hero.
 const TEAMMATE_HINT := "Only a teammate can revive you"
-const WAITING_HINT := "Spirit Healer: %d s"
-const SICKNESS_HINT := "Resurrection Sickness: %d s"
+const WAITING_HINT := "Grave Tender: %d s"
+const SICKNESS_HINT := "Wilted: %d s"
 ## Hint text and revive bar fill (pale spirit blue while the Spirit Healer channels).
 const GHOST_HINT_COLOR := Color(0.74, 0.9, 1.0)
 const REVIVE_BAR_COLOR := Color(0.55, 1.0, 0.45)

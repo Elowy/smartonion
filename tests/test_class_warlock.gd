@@ -137,7 +137,7 @@ func test_class_data() -> void:
 	var c := Db.get_class_data(&"warlock")
 	check_eq(c.resources.size(), 1, "one resource")
 	var shards := c.resources[0]
-	check_eq(shards.id, &"soul_shard", "soul shards")
+	check_eq(shards.id, &"soul_shard", "pact shards")
 	check_eq(shards.display, ResourceData.Display.PIPS, "pips")
 	check_eq(shards.max_value, 5.0, "0-5")
 	check_eq(shards.gain_per_kills, 12, "+1 every 12 kills")
@@ -150,7 +150,7 @@ func test_class_data() -> void:
 	check_eq(c.abilities[1].cooldown, 8.0, "8 s cooldown")
 	check_eq(c.abilities[1].targeting, AbilityData.Targeting.NEAREST_ENEMY, "nearest")
 	check(c.mastery != null and c.mastery.new() is WarlockMastery, "mastery script")
-	check(c.mastery_text.begins_with("Demonic Pact"), "mastery text")
+	check(c.mastery_text.begins_with("Ember Pact"), "mastery text")
 
 
 func test_class_items_are_ability_mods() -> void:
@@ -380,7 +380,7 @@ func test_imp_shoots_pet_firebolts() -> void:
 	check_eq(bolt.pierce, 0, "one target")
 	_fly(bolt)
 	check_eq(e.hits.size(), 1, "hit")
-	check_near(e.hits[0], dmg * 1.2, 0.001, "pet damage x Demonic Pact (10 x 2%)")
+	check_near(e.hits[0], dmg * 1.2, 0.001, "pet damage x Ember Pact (10 x 2%)")
 	check(e.attackers[0] == p, "kill credit to the warlock")
 	var no_int := WarlockImp.bolt_damage(StatBlock.new(), params)
 	check(dmg > no_int + 1.5, "scales with intellect")

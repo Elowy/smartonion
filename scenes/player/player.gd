@@ -389,12 +389,14 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	var valid_source: Node3D = source if source != null and is_instance_valid(source) else null
 	if stats.get_stat(Stats.DODGE) > 0.0 and CombatMath.roll_dodge(stats, rng):
 		Vfx.floating_text(text_pos, "Dodge", DODGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+		Audio.play(&"dodge")
 		_avoided(&"dodge", valid_source)
 		return
 	var attacker: Enemy = valid_source as Enemy
 	if kind == CombatMath.KIND_MELEE and stats.get_raw(Stats.PARRY) > 0.0 \
 			and CombatMath.roll_parry(stats, rng):
 		Vfx.floating_text(text_pos, "Parry", PARRY_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+		Audio.play(&"parry")
 		_riposte(attacker)
 		_avoided(&"parry", valid_source)
 		return
@@ -405,6 +407,7 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 		amount *= 1.0 - CombatMath.block_absorb(stats.get_raw(Stats.BLOCK_VALUE))
 		blocked = true
 		Vfx.floating_text(self_text_position(-_text_side), "Block", BLOCK_TEXT_COLOR, SELF_TEXT_SIZE, -_text_side)
+		Audio.play(&"block")
 		# Both a full and a partial block count as blocked.
 		_avoided(&"block", valid_source)
 		if amount <= 0.0001:
@@ -434,6 +437,7 @@ func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: N
 	invulnerable_left = maxf(invulnerable_left, INVULNERABLE_AFTER_HIT)
 	if dmg > 0.0:
 		Vfx.floating_text(text_pos, _format_amount(dmg), DAMAGE_TEXT_COLOR, SELF_TEXT_SIZE, _text_side)
+		Audio.play(&"hero_hurt")
 	if model != null:
 		model.flash_hit()
 	_shake_camera(HIT_SHAKE)
@@ -572,6 +576,10 @@ func apply_equipment() -> void:
 	var off := equipment.off_weapon()
 	if main != main_hand or off != off_hand:
 		equip_weapons(main, off)
+	if model != null:
+		# Worn Head / Shoulders / Chest show on the onion (the model rebuilds only on a change).
+		model.set_equipment(equipment.get_item(Items.EquipSlot.HEAD), equipment.get_item(Items.EquipSlot.SHOULDERS),
+			equipment.get_item(Items.EquipSlot.CHEST))
 	var procs_refreshed := false
 	if bonuses != null:
 		procs_refreshed = bonuses.set_effects(PlayerBonuses.SOURCE_SETS, SetBonuses.effects_for(equipment))
@@ -1142,6 +1150,7 @@ func _update_channelers(revivers: Array[Player]) -> void:
 func _go_down() -> void:
 	downed = true
 	RunState.record_down(slot_index())
+	Audio.play(&"hero_down")
 	revive_progress = 0.0
 	reviver_count = 0
 	_regen_accum = 0.0

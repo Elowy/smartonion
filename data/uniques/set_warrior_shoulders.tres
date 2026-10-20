@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warrior_shoulders"
-display_name = "Pauldrons of Fury"
+display_name = "Ragebound Pauldrons"
 flavor = "Spiked on the inside too. Nobody knows why."
 slot_type = 2
 armor_type = 3

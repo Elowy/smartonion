@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warrior_head"
-display_name = "Helm of Fury"
+display_name = "Ragebound Helm"
 flavor = "The visor only opens to shout."
 slot_type = 0
 armor_type = 3

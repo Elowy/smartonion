@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"thunder_clap"
-display_name = "Thunder Clap"
+display_name = "Ground Slam"
 description = "Slam the ground: enemies within {radius} m take {damage_pct}% weapon damage and are slowed by {slow}% for {slow_duration} sec."
 class_id = &"warrior"
 school = &"physical"
@@ -41,12 +41,12 @@ specs = Array[Dictionary]([{
 "mods": {
 "echoes_add": 2.0
 },
-"name": "Aftershock",
+"name": "Echoing Slam",
 "text": "The ground keeps shaking: the clap strikes 2 more times, 0.6 sec apart, for half damage."
 }, {
 "mods": {
 "rage_per_hit_add": 6.0
 },
-"name": "Booming Voice",
+"name": "Raging Echo",
 "text": "Each enemy hit gives you 6 Rage (up to 30 per clap)."
 }])

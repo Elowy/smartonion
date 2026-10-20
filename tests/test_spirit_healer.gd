@@ -119,7 +119,7 @@ func test_pulse_revives_ghosts_in_the_circle_at_full_hp() -> void:
 	check_eq(ghost.hp, ghost.max_hp(), "at 100% HP")
 	check_eq(events, [false] as Array[bool], "downed_changed(false)")
 	check_eq(revived.size(), 1, "resurrected signal")
-	check_near(ghost.res_sickness_left, Player.RES_SICKNESS_TIME, DT + 0.001, "15 s Resurrection Sickness")
+	check_near(ghost.res_sickness_left, Player.RES_SICKNESS_TIME, DT + 0.001, "15 s Wilted")
 	check_eq(ghost.healer_channel, 0.0, "no channel left")
 	check(not ghost.model.is_cast_bar_visible(), "cast bar gone")
 	var fx := _effects()
@@ -317,7 +317,7 @@ func test_unit_frame_tells_the_ghost_where_to_go() -> void:
 	check(frame.is_downed_shown(), "DOWNED overlay")
 	check(frame.hint_label.is_visible_in_tree(), "hint shown")
 	frame._process(0.016)
-	check("Spirit Healer" in frame.hint_label.text, "names the Spirit Healer: %s" % frame.hint_label.text)
+	check("Grave Tender" in frame.hint_label.text, "names the Grave Tender: %s" % frame.hint_label.text)
 	ghost.global_position = Vector3(0.5, 0, 0)
 	healer.begin_wave()
 	_step(4.0, [ghost])
@@ -325,10 +325,10 @@ func test_unit_frame_tells_the_ghost_where_to_go() -> void:
 	check_near(frame.revive_bar.ratio(), 0.4, 0.01, "the bar shows the healer's countdown")
 	check(frame.revive_bar.fill_color.is_equal_approx(SpiritHealer.CAST_COLOR), "in the spirit colour")
 	if arena != null and arena.spirit_healer == healer:
-		check(frame.hint_label.text == UnitFrame.WAITING_HINT % 6, "\"Spirit Healer: 6 s\": %s" % frame.hint_label.text)
+		check(frame.hint_label.text == UnitFrame.WAITING_HINT % 6, "\"Grave Tender: 6 s\": %s" % frame.hint_label.text)
 	ghost.res_sickness_left = 9.5
 	frame._process(0.016)
-	check_eq(frame.hint_label.text, UnitFrame.SICKNESS_HINT % 10, "Resurrection Sickness countdown")
+	check_eq(frame.hint_label.text, UnitFrame.SICKNESS_HINT % 10, "Wilted countdown")
 	ghost.res_sickness_left = 0.0
 	_to_pulse([ghost])
 	_step(DT, [ghost])

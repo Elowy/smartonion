@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"holy_power"
-display_name = "Holy Power"
+display_name = "Resolve"
 color = Color(1, 0.85, 0.3, 1)
 display = 1
 max_value = 3.0

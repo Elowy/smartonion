@@ -326,7 +326,7 @@ func test_the_volcano_dresses_its_vents_and_the_hazard_uses_the_same_places() ->
 	var found := 0
 	for p in EnvironmentHazards.LAVA_VENT_POINTS:
 		check(arena.is_inside(p, 2.0), "a vent lies inside the arena")
-		check(Vector2(p.x, p.z).length() > 4.0, "and not at the Spirit Healer / spawn circle")
+		check(Vector2(p.x, p.z).length() > 4.0, "and not at the Grave Tender / spawn circle")
 		var hit := false
 		for v: Vector3 in lava.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 			if absf(v.x - p.x) < 0.9 and absf(v.z - p.z) < 0.9 and v.y > 0.0 and v.y < 0.2:

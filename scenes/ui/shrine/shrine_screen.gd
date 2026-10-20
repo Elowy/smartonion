@@ -32,6 +32,10 @@ const RESULT_TIME := 2.4
 const TIMER_WARN := 5.0
 const CARD_WIDTH := 680.0
 const ICON_SIZE := 104.0
+## The shrine's name sits right of the icon (card width - margins - icon - gap): the heading font shrinks
+## from NAME_FONT until the name fits ("Shrine of the Gambler" in the wide title font).
+const NAME_FONT := 40
+const NAME_WIDTH := CARD_WIDTH - 60.0 - ICON_SIZE - 20.0
 const CHIP_SIZE := Vector2(290, 96)
 const TIMER_SIZE := Vector2(520, 30)
 const TITLE_TOP := 26.0
@@ -238,8 +242,10 @@ func _handle_input(s: PlayerSlot) -> void:
 	var inp := s.input
 	if inp.just_pressed(PlayerInput.Pad.A):
 		vote.cast(s.index, true)
+		Audio.play_ui(&"ui_confirm")
 	elif inp.just_pressed(PlayerInput.Pad.B):
 		vote.cast(s.index, false)
+		Audio.play_ui(&"ui_back")
 
 
 func _decide() -> void:
@@ -365,7 +371,7 @@ func _build_card() -> PanelContainer:
 	names.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(names)
-	name_label = UiTheme.label("", UiTheme.HEADING, 40)
+	name_label = UiTheme.label("", UiTheme.HEADING, NAME_FONT)
 	names.add_child(name_label)
 	duration_label = UiTheme.label("", UiTheme.DIM, 22)
 	names.add_child(duration_label)
@@ -409,6 +415,8 @@ func _fill_card() -> void:
 	icon.set_data(data)
 	icon.set_badge(0)
 	name_label.text = data.display_name
+	name_label.add_theme_font_size_override(&"font_size", UiTheme.fitted_font_size(
+			UiTheme.title_font(), data.display_name, NAME_WIDTH, NAME_FONT))
 	name_label.add_theme_color_override(&"font_color", data.color.lightened(0.3))
 	duration_label.text = Shrines.duration_text(data)
 	flavour_label.text = data.description

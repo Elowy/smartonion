@@ -32,8 +32,8 @@ properties = Array[Dictionary]([{
 "script": "res://scenes/artifacts/warlock_second_voidwalker.gd"
 }],
 "name": "Bound Soul",
-"short": "A second, permanent pet: a Voidwalker that taunts.",
-"text": "A second, permanent pet fights at your side: a Voidwalker that draws the enemies to itself."
+"short": "A second, permanent pet: a Gloomguard that taunts.",
+"text": "A second, permanent pet fights at your side: a Gloomguard that draws the enemies to itself."
 }, {
 "effects": [{
 "kind": "damage",

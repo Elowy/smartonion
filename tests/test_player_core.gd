@@ -259,7 +259,7 @@ func test_downed_ghost_does_not_attack_and_moves_at_full_speed() -> void:
 	Fakes.spawn_enemy(world, Vector3(1.5, 0, 0))
 	p.take_damage(999.0)
 	check(not p.weapons[0].tick(1.0), "ghost does not attack")
-	check_eq(Player.GHOST_SPEED_MULT, 1.0, "GDD 1: ghosts walk to the Spirit Healer at full speed")
+	check_eq(Player.GHOST_SPEED_MULT, 1.0, "GDD 1: ghosts walk to the Grave Tender at full speed")
 	(p.slot.input as ScriptedInput).move = Vector2(0, -1)
 	p.global_position = Vector3(0, 0, 5)
 	Fakes.step(p, 1.0)

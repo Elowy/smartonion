@@ -157,7 +157,7 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Demonic Pact: +%s%% damage over time and pet damage" % _fmt(mastery() * PCT_PER_POINT)
+	return "Ember Pact: +%s%% damage over time and pet damage" % _fmt(mastery() * PCT_PER_POINT)
 
 
 func has_imp() -> bool:

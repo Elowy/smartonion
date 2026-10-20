@@ -22,7 +22,7 @@ unique_params = {
 "gain_per_kills": 8
 }
 }
-unique_text = "Equip: You gain a Soul Shard every 8 kills instead of every 12."
+unique_text = "Equip: You gain a Pact Shard every 8 kills instead of every 12."
 sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
 min_wave = 1
 weight = 1.0

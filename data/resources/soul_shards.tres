@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"soul_shard"
-display_name = "Soul Shards"
+display_name = "Pact Shards"
 color = Color(0.72, 0.32, 0.95, 1)
 display = 1
 max_value = 5.0

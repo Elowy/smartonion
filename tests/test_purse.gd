@@ -180,11 +180,11 @@ func test_the_ticker_packs_two_lines_and_sums_up_the_rest() -> void:
 	var board := _board()
 	for i in 12:
 		RunState.spend_log.append(_entry(i % 2, &"trainer", "Fireball Rank III", 45))
-	RunState.spend_log.append(_entry(0, &"trainer", "Frost Nova Rank V", 300))
+	RunState.spend_log.append(_entry(0, &"trainer", "Rime Burst Rank V", 300))
 	board.refresh()
 	var lines := board.ticker_lines()
 	check_eq(lines.size(), PurseBoard.TICKER_LINES, "two lines")
-	check(lines[0].begins_with("P1 Frost Nova Rank V 300"), "the newest entry first: %s" % lines[0])
+	check(lines[0].begins_with("P1 Rime Burst Rank V 300"), "the newest entry first: %s" % lines[0])
 	var shown := 0
 	for l in lines:
 		check(board.text_width(l) <= PurseBoard.line_width() + 0.5, "the line fits the board: %s" % l)
@@ -317,7 +317,7 @@ func test_many_wants_fit_their_lines() -> void:
 	_open_market()
 	var board := _board()
 	for i in 9:
-		RunState.toggle_want(i % 2, "trainer:x%d" % i, "Arcane Missiles Rank IV", 120)
+		RunState.toggle_want(i % 2, "trainer:x%d" % i, "Arcane Darts Rank IV", 120)
 	_step()
 	# Nothing spent: the ticker needs one line, so the wants take the second one too.
 	check_eq(board.ticker_lines(), [PurseBoard.EMPTY_TICKER] as Array[String], "an empty round")
@@ -329,7 +329,7 @@ func test_many_wants_fit_their_lines() -> void:
 	check_eq(counts[0] + counts[1], 9, "every want shown or in +N more: %s" % [lines])
 	check(counts[0] >= 3, "more than one line's worth shown: %d" % counts[0])
 	check_eq(board.wants_text(), PurseBoard.SEPARATOR.join(lines), "wants_text joins the lines")
-	check(board.row_labels[1].text.contains("Arcane Missiles Rank IV"), "the second row holds wants")
+	check(board.row_labels[1].text.contains("Arcane Darts Rank IV"), "the second row holds wants")
 	check(board.wants_label.text.contains(PurseBoard.more_text(counts[1])), "the bottom row ends in +N more")
 	check_eq([board.caption_labels[0].text, board.caption_labels[1].text, board.caption_labels[2].text],
 		["Spent", "Wants", ""], "the Wants caption moved up a row")
@@ -527,7 +527,7 @@ func test_header_and_chips_clear_the_stall_and_the_panels() -> void:
 	for i in 6:
 		RunState.spend_log.append(_entry(i % 4, &"shop", "Legendary Greatsword of the Endless Night", 9999))
 	for i in 4:
-		RunState.toggle_want(i, "trainer:x%d" % i, "Shadow Bolt Rank IV", 999)
+		RunState.toggle_want(i, "trainer:x%d" % i, "Umbral Bolt Rank IV", 999)
 	PlayerManager.get_slot(3).ready = true
 	_step()
 	_step()

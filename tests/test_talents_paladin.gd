@@ -183,10 +183,10 @@ func test_the_three_paladin_trees_in_tab_order() -> void:
 	for t in trees:
 		ids.append(t.id)
 	check_eq(ids, [&"paladin_holy", &"paladin_protection", &"paladin_retribution"] as Array[StringName], "GDD 7.2 order")
-	check_eq([trees[0].display_name, trees[1].display_name, trees[2].display_name], ["Holy", "Protection", "Retribution"], "names")
-	check_eq(Db.get_talent(&"paladin_holy_lights_hammer").ability, &"consecration", "Light's Hammer changes Consecration")
-	check_eq(Db.get_talent(&"paladin_protection_righteous_fury").ability, &"consecration", "Righteous Fury changes Consecration")
-	check_eq(Db.get_talent(&"paladin_retribution_divine_verdict").ability, &"word_of_glory", "Divine Verdict changes Word of Glory")
+	check_eq([trees[0].display_name, trees[1].display_name, trees[2].display_name], ["Radiance", "Vigil", "Verdict"], "names")
+	check_eq(Db.get_talent(&"paladin_holy_lights_hammer").ability, &"consecration", "Gifted Circle changes Sacred Circle")
+	check_eq(Db.get_talent(&"paladin_protection_righteous_fury").ability, &"consecration", "Provoking Light changes Sacred Circle")
+	check_eq(Db.get_talent(&"paladin_retribution_divine_verdict").ability, &"word_of_glory", "Divine Verdict changes Call of Valor")
 	check_eq(Db.get_talent(&"paladin_holy_divine_guardian").prerequisite, &"paladin_holy_aura_mastery", "prerequisite")
 	check_eq(Db.get_talent(&"paladin_protection_shield_of_the_templar").prerequisite, &"paladin_protection_redoubt", "prerequisite")
 	check_eq(Db.get_talent(&"paladin_retribution_vengeance").prerequisite, &"paladin_retribution_conviction", "prerequisite")
@@ -213,26 +213,26 @@ func test_healing_light_scales_paladin_heals_but_not_the_full_heal() -> void:
 		check_eq(p.stats.get_raw(Stats.HEALING_DONE), 4.0 * n, "+4% Healing Done per rank")
 		check_near(PaladinKit.healing_mult(p), 1.0 + 0.04 * n, 0.0001, "the kit multiplier")
 		check_near(PaladinWordOfGlory.heal_amount(p.abilities.build_context(wog), p, ally), base * (1.0 + 0.04 * n), 0.0001,
-			"Word of Glory heal at rank %d" % n)
-	check_near(PaladinConsecration.tick_heal(p.stats, hallowed, p), 0.5 * 1.12, 0.0001, "Hallowed Ground heal")
+			"Call of Valor heal at rank %d" % n)
+	check_near(PaladinConsecration.tick_heal(p.stats, hallowed, p), 0.5 * 1.12, 0.0001, "Healing Circle heal")
 	check_eq(PaladinConsecration.tick_heal(p.stats, hallowed), 0.5, "no caster: no Healing Done")
 	ally.hp = 2.0
 	_holy_power(p).set_value(3.0)
 	var expected := minf(ally.max_hp(), 2.0 + base * 1.12)
-	check(p.abilities.try_cast(LT), "Word of Glory")
+	check(p.abilities.try_cast(LT), "Call of Valor")
 	check_near(ally.hp, expected, 0.0001, "the real cast heals 12% more")
 	var loh := Db.get_ability(&"lay_on_hands")
 	var slot := p.abilities.learn(loh)
-	check(slot >= 0, "learned Lay on Hands")
+	check(slot >= 0, "learned Mending Touch")
 	ally.hp = 1.0
-	check(p.abilities.try_cast(slot), "Lay on Hands")
+	check(p.abilities.try_cast(slot), "Mending Touch")
 	check_eq(ally.hp, ally.max_hp(), "a full heal stays a full heal")
 	while p.abilities.rank_of(&"lay_on_hands") < 3:
 		check(p.abilities.rank_up(&"lay_on_hands"), "rank up")
 	var params := p.abilities.params_for(loh)
 	ally.hp = 1.0
 	p.abilities.set_cooldown(loh, 0.0)
-	check(p.abilities.try_cast(slot), "Lay on Hands rank III")
+	check(p.abilities.try_cast(slot), "Mending Touch rank III")
 	check_near(ally.procs.shield_hp, ally.max_hp() * float(params["shield_max_hp"]) / 100.0 * float(params["power"]) * 1.12,
 		0.0001, "the Rank III shield grows with Healing Done")
 	_remove(p, "holy", "healing_light", 3)
@@ -258,7 +258,7 @@ func test_aura_mastery_raises_mastery_and_widens_the_aura() -> void:
 	_add(p, "holy", "aura_mastery", 2)
 	check_eq(p.stats.get_raw(Stats.MASTERY), 7.0, "+3 Mastery at 3/3")
 	check_eq(aura.radius(), 9.0, "9 m at 3/3")
-	check(aura.describe().begins_with("Aura of Devotion: allies within 9 m"), "describe: %s" % aura.describe())
+	check(aura.describe().begins_with("Aura of Fealty: allies within 9 m"), "describe: %s" % aura.describe())
 	_remove(p, "holy", "aura_mastery", 3)
 	check_eq(aura.radius(), 6.0, "back to 6 m")
 	aura.refresh()
@@ -280,7 +280,7 @@ func test_eternal_glory_and_lights_grace_change_word_of_glory() -> void:
 		check_near(float(params["power"]), 1.0 + 0.08 * n, 0.0001, "+8% power per rank")
 		check_eq(float(params["allies"]), 1.0 + n, "+1 ally per rank")
 	check_eq(Db.get_talent(&"paladin_holy_lights_grace").text_for_rank(2),
-		"Word of Glory heals 16% more, and the number of wounded allies it heals is increased by 2.", "text at rank 2")
+		"Call of Valor heals 16% more, and the number of wounded allies it heals is increased by 2.", "text at rank 2")
 	p.hp = p.max_hp() * 0.5
 	var allies: Array[Player] = [_ally(1, Vector3(3, 0, 0)), _ally(2, Vector3(-3, 0, 0), &"mage"), _ally(3, Vector3(0, 0, 3), &"rogue")]
 	for a in allies:
@@ -289,14 +289,14 @@ func test_eternal_glory_and_lights_grace_change_word_of_glory() -> void:
 	_seed_roll(24.0, true)
 	check(p.abilities.try_cast(LT), "cast")
 	for a in allies:
-		check(a.hp > a.max_hp() * 0.5, "%s healed (Light's Grace 2: three allies)" % a.name)
+		check(a.hp > a.max_hp() * 0.5, "%s healed (Generous Valor 2: three allies)" % a.name)
 	check(p.hp > p.max_hp() * 0.5, "the Paladin too")
-	check_eq(_holy_power(p).value, 3.0, "Eternal Glory: the roll passed, the cast was free")
+	check_eq(_holy_power(p).value, 3.0, "Boundless Valor: the roll passed, the cast was free")
 	_remove(p, "holy", "lights_grace", 2)
 	var undone := p.abilities.params_for(wog)
-	check(is_equal_approx(float(undone["power"]), 1.0) and is_equal_approx(float(undone["allies"]), 1.0), "Light's Grace undone")
+	check(is_equal_approx(float(undone["power"]), 1.0) and is_equal_approx(float(undone["allies"]), 1.0), "Generous Valor undone")
 	_remove(p, "holy", "eternal_glory", 3)
-	check_eq(float(p.abilities.params_for(wog).get("free_chance", 0.0)), 0.0, "Eternal Glory undone: no free casts")
+	check_eq(float(p.abilities.params_for(wog).get("free_chance", 0.0)), 0.0, "Boundless Valor undone: no free casts")
 	allies[0].hp = allies[0].max_hp() * 0.5
 	_holy_power(p).set_value(3.0)
 	p.abilities.set_cooldown(wog, 0.0)
@@ -315,7 +315,7 @@ func test_unyielding_faith_grants_holy_power_on_a_timer() -> void:
 	if defs.is_empty():
 		return
 	var def: Dictionary = defs[0]
-	check(def.get("trigger") == "periodic" and def.get("effect") == "resource" and def.get("resource") == "holy_power", "periodic Holy Power")
+	check(def.get("trigger") == "periodic" and def.get("effect") == "resource" and def.get("resource") == "holy_power", "periodic Resolve")
 	check(def.get("interval") == 4.0 and def.get("chance") == 24.0 and def.get("value") == 1, "every 4 sec, 8% per rank, 1 point")
 	check_eq(def.get("label"), "", "silent")
 	var gained := 0.0
@@ -324,7 +324,7 @@ func test_unyielding_faith_grants_holy_power_on_a_timer() -> void:
 		p.procs._physics_process(1.0)
 		gained += hp.value
 	var fired := p.procs.fire_count(&"paladin_holy_unyielding_faith")
-	check_eq(gained, float(fired), "one Holy Power per proc")
+	check_eq(gained, float(fired), "one Resolve per proc")
 	check(fired >= 12 and fired <= 36, "about 100 x 24%% = 24 in 400 s, got %d" % fired)
 	_down(p)
 	hp.set_value(0.0)
@@ -339,7 +339,7 @@ func test_unyielding_faith_grants_holy_power_on_a_timer() -> void:
 		hp.set_value(0.0)
 		p.procs._physics_process(1.0)
 		gained += hp.value
-	check_eq(gained, 0.0, "no Holy Power in 100 s after the take-back")
+	check_eq(gained, 0.0, "no Resolve in 100 s after the take-back")
 
 
 # --- Light's Hammer ----------------------------------------------------------------------------
@@ -476,7 +476,7 @@ func test_divine_guardian_shields_everybody_in_the_aura() -> void:
 	_add(p, "holy", "aura_mastery", 2)
 	_add(p, "holy", "eternal_glory", 3)
 	_add(p, "holy", "unyielding_faith", 1)
-	check_eq(p.talents.add_block_reason(&"paladin_holy_divine_guardian"), "Requires Aura Mastery", "prerequisite")
+	check_eq(p.talents.add_block_reason(&"paladin_holy_divine_guardian"), "Requires Aura Reach", "prerequisite")
 	_add(p, "holy", "aura_mastery")
 	for n in range(1, 4):
 		_add(p, "holy", "divine_guardian")
@@ -492,7 +492,7 @@ func test_divine_guardian_shields_everybody_in_the_aura() -> void:
 	_remove(p, "holy", "divine_guardian", 3)
 	aura.refresh()
 	check(not ally.damage_taken_mults.has(key) and not p.damage_taken_mults.has(key), "undone: the key goes on the next refresh")
-	check(ally.stats.has_source(key), "the Armor of the aura stays (Aura Mastery's Mastery)")
+	check(ally.stats.has_source(key), "the Armor of the aura stays (Aura Reach's Mastery)")
 	check_eq(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 1.0, "nothing left in the engine")
 	_add(p, "holy", "divine_guardian", 3)
 	aura.refresh()
@@ -543,7 +543,7 @@ func test_purifying_power_raises_holy_damage() -> void:
 		check_near(p.bonuses.damage_mult(null, &"holy", &"ability"), 1.0 + 0.05 * n, 0.0001, "+5% Holy per rank")
 	check_eq(p.bonuses.damage_mult(null, &"physical", &"weapon"), 1.0, "not physical")
 	var e := _enemy(Vector3(1.0, 0, 0))
-	check(p.abilities.try_cast(RT), "Consecration")
+	check(p.abilities.try_cast(RT), "Sacred Circle")
 	var area := _areas()[0]
 	Fakes.step(area, DT)
 	check_eq(e.fake_hits(), 1, "one tick")
@@ -606,7 +606,7 @@ func test_holy_shock_interval_haste_and_downed() -> void:
 	check_near(shock.interval_now(), 4.0 / 1.25, 0.0001, "Haste at half effect")
 	p.stats.set_source(&"test", {Stats.HASTE: 50.0, Stats.COOLDOWN_REDUCTION: 20.0})
 	check_near(shock.interval_now(), 4.0 / 1.25 * 0.8, 0.0001, "and Cooldown Reduction")
-	check(shock.describe().begins_with("Holy Shock: every 2.6 sec"), shock.describe())
+	check(shock.describe().begins_with("Radiant Pulse: every 2.6 sec"), shock.describe())
 	p.stats.remove_source(&"test")
 	var e := _enemy(Vector3(3.0, 0, 0))
 	_down(p)
@@ -626,16 +626,16 @@ func test_bots_reach_each_capstone_at_point_13() -> void:
 	var path := _bot_path(holy, 0)
 	check_eq(path, HOLY_PATH, "Holy bot path (talents_paladin.md 5.4)")
 	check_eq(path.find(&"paladin_holy_lights_hammer"), 6, "modifier at point 7")
-	check_eq(path.find(SHOCK_ID), 12, "Holy Shock at point 13")
+	check_eq(path.find(SHOCK_ID), 12, "Radiant Pulse at point 13")
 	var prot := _paladin(Vector3(6.0, 0, 0), 1)
 	check(prot.off_hand != null and prot.off_hand.weapon_type == &"shield", "bots start with a shield")
 	path = _bot_path(prot, 1)
 	check_eq(path, PROTECTION_PATH, "Protection bot path")
-	check_eq(path.find(&"paladin_protection_holy_shield"), 12, "Holy Shield at point 13")
+	check_eq(path.find(&"paladin_protection_holy_shield"), 12, "Gleaming Shield at point 13")
 	var ret := _paladin(Vector3(-6.0, 0, 0), 2)
 	path = _bot_path(ret, 2)
 	check_eq(path, RETRIBUTION_PATH, "Retribution bot path")
-	check_eq(path.find(&"paladin_retribution_seal_of_command"), 12, "Seal of Command at point 13")
+	check_eq(path.find(&"paladin_retribution_seal_of_command"), 12, "Sunbrand at point 13")
 	check(holy.bonuses.script_for(SHOCK_ID) != null and prot.bonuses.script_for(&"paladin_protection_holy_shield") != null \
 			and ret.bonuses.script_for(&"paladin_retribution_seal_of_command") != null, "every capstone script runs")
 
@@ -654,6 +654,6 @@ func test_a_tome_protection_bot_defers_the_shield_talents() -> void:
 		&"paladin_protection_ardent_defender", &"paladin_protection_ardent_defender",
 		&"paladin_protection_holy_shield",
 	] as Array[StringName], "Tome path to the capstone (talents_paladin.md 5.4)")
-	check_eq(path.count(&"paladin_protection_reckoning"), 3, "then Reckoning")
+	check_eq(path.count(&"paladin_protection_reckoning"), 3, "then Swift Rebuke")
 	check_eq(path.count(&"paladin_protection_redoubt"), 0, "Redoubt waits while other trees offer points")
 	check_eq(path.size(), 22, "every point spent")

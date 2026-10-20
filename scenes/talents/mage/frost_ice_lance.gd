@@ -73,4 +73,4 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Ice Lance: frozen enemies take x%s from your spells and burns" % TalentData.format_number(crit_mult())
+	return "Frost Spike: frozen enemies take x%s from your spells and burns" % TalentData.format_number(crit_mult())

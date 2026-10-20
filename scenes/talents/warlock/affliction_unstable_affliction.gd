@@ -102,7 +102,7 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Unstable Affliction: %d bursts" % bursts
+	return "Volatile Blight: %d bursts" % bursts
 
 
 ## Connects to the Warlock's afflictions node (created when missing).

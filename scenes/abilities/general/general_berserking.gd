@@ -54,7 +54,7 @@ func cast(ctx: AbilityContext) -> bool:
 	if not player.enemy_killed.is_connected(_on_enemy_killed):
 		player.enemy_killed.connect(_on_enemy_killed)
 	if player.is_inside_tree():
-		Vfx.floating_text(player.self_text_position(-1.0) + Vector3.UP * 0.8, "Berserking", TEXT_COLOR,
+		Vfx.floating_text(player.self_text_position(-1.0) + Vector3.UP * 0.8, "Savage Haste", TEXT_COLOR,
 				Player.SELF_TEXT_SIZE, -1.0)
 	return true
 

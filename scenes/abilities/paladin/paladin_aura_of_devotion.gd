@@ -174,7 +174,7 @@ func teardown() -> void:
 func describe() -> String:
 	var mods := aura_mods()
 	var params := aura_params()
-	var text := "Aura of Devotion: allies within %s m (you included) gain +%s Armor and +%s HP per 5 sec" % [
+	var text := "Aura of Fealty: allies within %s m (you included) gain +%s Armor and +%s HP per 5 sec" % [
 		_fmt(maxf(0.0, float(params.get("radius", RADIUS)))), _fmt(float(mods.get(Stats.ARMOR, 0.0))),
 		_fmt(float(mods.get(Stats.SPIRIT, 0.0)) / 15.0 * 5.0)]
 	var guard := clampf(float(params.get("guard", 0.0)), 0.0, MAX_GUARD)

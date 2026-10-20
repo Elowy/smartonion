@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warrior_legs"
-display_name = "Legplates of Fury"
+display_name = "Ragebound Legplates"
 flavor = "Built for charging. Stopping was never in the plans."
 slot_type = 7
 armor_type = 3

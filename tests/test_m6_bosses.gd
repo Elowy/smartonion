@@ -163,7 +163,7 @@ func test_boss_data_files_are_loaded_by_db() -> void:
 			and frost.slow_time == 2.0, "Frost Circles: every 7 s, r 2.2, 1.2 s, 2x, 40% slow 2 s")
 	var raise := m.abilities[1]
 	check(raise.kind == BossAbility.Kind.SUMMON and raise.interval == 12.0 and raise.count == 4
-			and raise.count_p2 == 6 and raise.summon_id == &"skeleton_grunt", "Raise Dead: 12 s, 4 (6 in phase 2) grunts")
+			and raise.count_p2 == 6 and raise.summon_id == &"skeleton_grunt", "Call the Fallen: 12 s, 4 (6 in phase 2) grunts")
 	var breath := m.abilities[2]
 	check(breath.kind == BossAbility.Kind.FROST_BREATH and breath.interval == 9.0 and breath.angle == 60.0
 			and breath.range == 7.0 and breath.telegraph == 1.0 and breath.damage_mult == 3.0,

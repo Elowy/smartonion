@@ -114,7 +114,7 @@ func test_a_two_hander_takes_its_specialization_after_the_capstone() -> void:
 	check(p.equipment.equip(axe), "two-hander")
 	var path := _path(p, 0)
 	check_eq(path.find(&"warrior_arms_mortal_strike"), 12, "capstone still at 13")
-	check_eq(path.find(&"warrior_arms_two_handed_specialization"), 14, "Two-Handed Specialization at 15-16")
+	check_eq(path.find(&"warrior_arms_two_handed_specialization"), 14, "Two-Hander Prowess at 15-16")
 	check_eq(path.size(), 22, "the whole tree")
 
 

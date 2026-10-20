@@ -16,7 +16,7 @@ extends TalentEffect
 ## Params (not rank-scaled; capstone, rank 1): pct_per_stack, max_stacks, duration,
 ## ally_share_pct, ally_radius, ally_interval.
 
-const TEXT := "Rampage!"
+const TEXT := "Carnage!"
 const TEXT_COLOR := Color(1.0, 0.25, 0.15)
 const RING_COLOR := Color(1.0, 0.28, 0.08, 0.6)
 ## Stacks from which the ember ring shows.
@@ -137,7 +137,7 @@ func teardown() -> void:
 
 
 func describe() -> String:
-	return "Rampage: %d stacks (+%d%% damage)" % [stacks, roundi((_mult - 1.0) * 100.0)]
+	return "Carnage: %d stacks (+%d%% damage)" % [stacks, roundi((_mult - 1.0) * 100.0)]
 
 
 ## Gives the share to every living ally in range and takes it from the others.

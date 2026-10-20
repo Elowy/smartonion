@@ -41,8 +41,8 @@ properties = Array[Dictionary]([{
 }],
 "name": "Frostwyrm's Breath",
 "needs": "blizzard",
-"short": "Every 4th Blizzard has double the radius.",
-"text": "Every 4th Blizzard has double the radius."
+"short": "Every 4th Hailstorm has double the radius.",
+"text": "Every 4th Hailstorm has double the radius."
 }, {
 "effects": [{
 "kind": "script",

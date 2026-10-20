@@ -492,6 +492,7 @@ func open_menu(sell_first: bool = false) -> void:
 				index = i
 	_menu_stack = [{"title": it.display_name, "color": _rarity_color(it), "entries": entries, "index": index, "item": it}]
 	mode = Mode.MENU
+	Audio.play_ui(&"ui_open")
 	_render_menu()
 	_update_tooltip()
 	_update_prompts()
@@ -532,6 +533,7 @@ func set_tab(index: int) -> void:
 		return
 	if mode == Mode.MENU:
 		close_menu()
+	Audio.play_ui(&"ui_tab")
 	active_tab = index
 	_body.visible = index == CHARACTER_TAB
 	trainer.visible = index == TRAINER_TAB
@@ -768,6 +770,7 @@ func _open_trade_choice(it: ItemInstance) -> void:
 func _do_equip(it: ItemInstance, equip_slot: int) -> void:
 	var eq := equipment()
 	if eq.equip(it, equip_slot):
+		Audio.play_ui(&"ui_equip")
 		close_menu()
 		_message("Equipped %s" % _bb_item(it), "Equipped %s" % it.display_name)
 	elif eq.equip_disarms(it, equip_slot):
@@ -779,6 +782,7 @@ func _do_equip(it: ItemInstance, equip_slot: int) -> void:
 func _do_unequip(equip_slot: int) -> void:
 	var it := equipment().get_item(equip_slot as Items.EquipSlot)
 	if equipment().unequip(equip_slot as Items.EquipSlot):
+		Audio.play_ui(&"ui_equip")
 		close_menu()
 		_message("Unequipped %s" % _bb_item(it), "Unequipped %s" % it.display_name)
 	elif equipment().is_last_weapon(it):
@@ -797,6 +801,7 @@ func _do_forge(it: ItemInstance) -> void:
 		_message(reason if reason != "" else "Can't forge that", "", UiTheme.RED)
 		return
 	close_menu()
+	Audio.play_ui(&"ui_confirm")
 	_message("Forged %s!" % _bb_item(result), "Forged %s!" % result.display_name, _rarity_color(result))
 	var at := eq.backpack.find(result)
 	if at >= 0:
@@ -822,6 +827,7 @@ func _do_sell(it: ItemInstance) -> void:
 		return
 	RunState.add_gold(value)
 	close_menu()
+	Audio.play_ui(&"ui_sell")
 	_message("+%d gold" % value, "", UiTheme.GOLD, true)
 	item_sold.emit(it, value)
 
@@ -840,6 +846,7 @@ func _do_disenchant(it: ItemInstance) -> void:
 			_message("Cannot be disenchanted", "", UiTheme.RED)
 		return
 	close_menu()
+	Audio.play_ui(&"ui_confirm")
 	_message("+%s" % DustIcon.bbcode(dust), "+%d Dust" % dust, DustIcon.COLOR_BRIGHT)
 	item_disenchanted.emit(it, dust)
 
@@ -858,6 +865,7 @@ func _do_trade(it: ItemInstance, mate: PlayerSlot) -> void:
 		eq.add_to_backpack(it)
 		return
 	close_menu()
+	Audio.play_ui(&"ui_equip")
 	_message("Gave %s to %s" % [_bb_item(it), mate.label()], "Gave %s to %s" % [it.display_name, mate.label()])
 	trade_done.emit(it, mate.index)
 	for panel in _open_panels:
@@ -871,8 +879,10 @@ func _menu_input(input: PlayerInput) -> void:
 	var nav := input.nav_just_pressed()
 	if nav.y != 0 and not entries.is_empty():
 		level["index"] = posmod(int(level["index"]) + nav.y, entries.size())
+		Audio.play_ui(&"ui_move")
 		_render_menu()
 	if input.just_pressed(PlayerInput.Pad.B) or (nav.x < 0 and _menu_stack.size() > 1):
+		Audio.play_ui(&"ui_back")
 		_menu_stack.pop_back()
 		if _menu_stack.is_empty():
 			close_menu()
@@ -1401,6 +1411,8 @@ func _refresh_side(eq: Equipment, cls: ClassData) -> void:
 		_preview.show_class(cls, slot.color)
 		if _preview.model != null:
 			_preview.model.set_weapons(eq.main_weapon(), eq.off_weapon())
+			_preview.model.set_equipment(eq.get_item(Items.EquipSlot.HEAD), eq.get_item(Items.EquipSlot.SHOULDERS),
+				eq.get_item(Items.EquipSlot.CHEST))
 	else:
 		_spec_label.text = ""
 
@@ -1434,6 +1446,7 @@ func _select(i: int) -> void:
 	if i == selected:
 		return
 	selected = i
+	Audio.play_ui(&"ui_move")
 	_update_selection()
 
 
@@ -1782,6 +1795,8 @@ func _inside_tooltip_span(panel_rect: Rect2, view: Rect2) -> Vector2:
 ## Shows [param bbcode] in the toast for MESSAGE_TIME seconds; [param plain] is stored in
 ## [member last_message] (defaults to the bbcode text).
 func _message(bbcode: String, plain: String = "", color: Color = UiTheme.TEXT, coin: bool = false) -> void:
+	if color == UiTheme.RED:
+		Audio.play_ui(&"ui_error")
 	last_message = plain if plain != "" else bbcode
 	_toast_label.text = "[color=#%s]%s[/color]" % [color.to_html(false), bbcode]
 	_toast_coin.visible = coin

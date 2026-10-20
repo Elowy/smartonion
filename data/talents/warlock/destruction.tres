@@ -26,8 +26,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_emberstorm"]
 script = ExtResource("2_talent")
 id = &"warlock_destruction_emberstorm"
-display_name = "Emberstorm"
-description = "Your Fire damage is increased by {pct}% (your staff, Rain of Fire, your Imp, the Infernal)."
+display_name = "Stoked Flames"
+description = "Your Fire damage is increased by {pct}% (your staff, Ember Rain, your Imp, the Cinder Brute)."
 values = {
 "pct": 3.0
 }
@@ -46,7 +46,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_destruction_fire_and_brimstone"
 display_name = "Fire and Brimstone"
-description = "Rain of Fire deals {power}% more damage and its circle is {radius}% wider."
+description = "Ember Rain deals {power}% more damage and its circle is {radius}% wider."
 values = {
 "power": 4.0,
 "radius": 2.0
@@ -71,7 +71,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"warlock_destruction_aftermath"
 display_name = "Aftermath"
-description = "Rain of Fire slows enemies inside it by {slow}%."
+description = "Ember Rain slows enemies inside it by {slow}%."
 values = {
 "slow": 10.0
 }
@@ -93,7 +93,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_soul_leech"]
 script = ExtResource("2_talent")
 id = &"warlock_destruction_soul_leech"
-display_name = "Soul Leech"
+display_name = "Bloody Tithe"
 description = "Your critical strikes drain {pct}% of their damage from the target as Shadow damage, healing you for the amount."
 values = {
 "pct": 20.0
@@ -118,8 +118,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_shadowburn"]
 script = ExtResource("2_talent")
 id = &"warlock_destruction_shadowburn"
-display_name = "Shadowburn"
-description = "When Drain Life's channel completes, Shadowburn scorches the drained enemy for {pct}% of the channel's damage. If it dies within {window} sec, you gain a Soul Shard (once every {icd} sec)."
+display_name = "Parting Scorch"
+description = "When Vital Siphon's channel completes, Parting Scorch scorches the drained enemy for {pct}% of the channel's damage. If it dies within {window} sec, you gain a Pact Shard (once every {icd} sec)."
 values = {
 "icd": 10.0,
 "pct": 75.0,
@@ -165,8 +165,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_burning_embers"]
 script = ExtResource("2_talent")
 id = &"warlock_destruction_burning_embers"
-display_name = "Burning Embers"
-description = "You start every wave with {shards} extra Soul Shard(s)."
+display_name = "Pocketed Shards"
+description = "You start every wave with {shards} extra Pact Shard(s)."
 values = {
 "shards": 1.0
 }
@@ -184,8 +184,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_conflagrate"]
 script = ExtResource("2_talent")
 id = &"warlock_destruction_conflagrate"
-display_name = "Conflagrate"
-description = "Rain of Fire leaves the ground burning: the circle burns on for {embers} sec at {share}% damage and slows enemies inside by {slow}%. Your critical strikes have a {chance}% chance to grant a Soul Shard."
+display_name = "Lingering Blaze"
+description = "Ember Rain leaves the ground burning: the circle burns on for {embers} sec at {share}% damage and slows enemies inside by {slow}%. Your critical strikes have a {chance}% chance to grant a Pact Shard."
 values = {
 "chance": 10.0,
 "embers": 3.0,
@@ -209,7 +209,7 @@ effects = Array[Dictionary]([{
 "proc": {
 "chance": 10.0,
 "effect": "resource",
-"label": "Soul Shard",
+"label": "Pact Shard",
 "resource": "soul_shard",
 "trigger": "on_crit",
 "value": 1.0
@@ -220,9 +220,9 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"warlock_destruction"
 class_id = &"warlock"
-display_name = "Destruction"
+display_name = "Cinderfall"
 index = 2
-description = "Fire from the sky, critical blasts and Soul Shards."
+description = "Fire from the sky, critical blasts and Pact Shards."
 icon = &"rain_of_fire"
 color = Color(1, 0.45, 0.12, 1)
 talents = Array[ExtResource("2_talent")]([SubResource("Resource_devastation"), SubResource("Resource_emberstorm"), SubResource("Resource_fire_and_brimstone"), SubResource("Resource_aftermath"), SubResource("Resource_soul_leech"), SubResource("Resource_shadowburn"), SubResource("Resource_ruin"), SubResource("Resource_burning_embers"), SubResource("Resource_conflagrate")])

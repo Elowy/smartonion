@@ -121,7 +121,10 @@ func set_page(p_page: Page) -> void:
 
 ## The next ([param step] +1) / previous (-1) page; the ends do not wrap.
 func switch_page(step: int) -> void:
+	var before := page
 	set_page(clampi(int(page) + signi(step), 0, PAGE_NAMES.size() - 1) as Page)
+	if page != before:
+		Audio.play_ui(&"ui_tab")
 
 
 ## Page index for an --end-page name ("summary" / "meter" / "leaderboard"; anything else: the Summary).
@@ -443,4 +446,5 @@ func _process(delta: float) -> void:
 			or pads.any_just_pressed(JOY_BUTTON_START)
 	if go:
 		_done = true
+		Audio.play_ui(&"ui_confirm")
 		back_to_menu_requested.emit()

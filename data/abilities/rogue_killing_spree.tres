@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"killing_spree"
-display_name = "Killing Spree"
+display_name = "Cutthroat Rush"
 description = "For {duration} sec, blink from enemy to enemy, striking one every {interval} sec for {damage_pct}% weapon damage. You take {damage_taken_pct}% less damage meanwhile."
 class_id = &"rogue"
 school = &"physical"
@@ -33,4 +33,4 @@ kind = 1
 card_weight = 1.0
 rank3 = {"duration_add": 1.0}
 rank3_text = "+1 sec (4 more strikes)"
-specs = Array[Dictionary]([{"name": "Blade Whirl", "text": "Each strike also hits every enemy within 2 m of its target.", "mods": {"cleave_radius": 2.0}}, {"name": "Untouchable", "text": "You cannot be hurt during Killing Spree, and it ends with 2 sec of stealth.", "mods": {"invulnerable": 1, "stealth": 2.0}}])
+specs = Array[Dictionary]([{"name": "Blade Whirl", "text": "Each strike also hits every enemy within 2 m of its target.", "mods": {"cleave_radius": 2.0}}, {"name": "Untouchable", "text": "You cannot be hurt during Cutthroat Rush, and it ends with 2 sec of stealth.", "mods": {"invulnerable": 1, "stealth": 2.0}}])

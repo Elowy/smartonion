@@ -5,31 +5,33 @@ controllers / keyboard, pick a class, and fight 25 waves of enemies with auto-at
 weapons, collecting gold (shared wallet) and XP (shared level). Between waves a simple
 "ready up" screen. Later milestones have their own sections below: M2 items, loot and the
 shop; M3 class resources, abilities and Mastery; M4 level-up cards, ranks and the Trainer; M5
-talents, tier sets, forging, elites, the Loot Goblin and the shared-purse tools; M6a the two
+talents, tier sets, forging, elites, the Coin Gremlin and the shared-purse tools; M6a the two
 bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
 Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
 mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
-enchants, hand-made items).
+enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects).
 
 ## Layout
 
 ```
-autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state)
+autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state), Audio and Settings (M7a)
 core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
             items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
             run_summary.gd, run_card.gd (M6a); leaderboard.gd, shrines.gd, shrine_vote.gd,
-            dungeon/ (M6b)
+            dungeon/ (M6b); audio_ids.gd, game_settings.gd, setting_option.gd (M7a)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
             talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
-            environments/ shrines/ (M6b)
+            environments/ shrines/ (M6b), audio/ (M7a), icons/ (M7b)
 scenes/
   main/     Main – game flow state machine                         [integration]
-  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b)  [visuals]
+  arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b); ArenaGround,
+            ArenaAmbient, ArenaFx, ArenaBackdrop, ArenaCrypt (M7b)  [visuals]
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
-  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b)  [visuals]
-  vfx/      Vfx – fire-and-forget effects                           [visuals]
+  visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b),
+            EquipLook, OnionArmor (M7b)  [visuals]
+  vfx/      Vfx – fire-and-forget effects; EnemyCorpse (M7b)        [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
   talents/  per-class TalentEffect scripts (M5)
@@ -43,7 +45,7 @@ scenes/
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
             GameOverScreen (+ MeterPage, LeaderboardPage), PauseMenu; items/ shop/ loot/ (M2),
             level_up/ trainer/ (M4), talents/ purse/ (M5), enchanter/ (M6a), shrine/ dungeon/,
-            EnvironmentRollScreen, HardcoreBadge (M6b)
+            EnvironmentRollScreen, HardcoreBadge (M6b); MenuPage, SettingsPage, CreditsPage, FpsOverlay (M7a), GameIcons (M7b)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
             test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
 ```
@@ -102,7 +104,7 @@ the new screen never sees the button press that closed the old one.
      spawns the `Boss`; the wave ends with its death (see "Bosses, boss waves, elite wave 20, hazards, HUD").
    - A player at 0 HP is **downed**: a ghost that moves at full speed
      (`Player.GHOST_SPEED_MULT` = 1) and that enemies ignore.
-   - **Spirit Healer** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
+   - **Grave Tender** (`SpiritHealer`, `scenes/world/`): part of the level – the Arena builds
      one at `Arena.SPIRIT_HEALER_POINT` (the centre; no decor there) as its own child (not an
      entity), `Arena.current.spirit_healer`; no collision.
      - It is only drawn while a ghost exists (`is_active()`, `is_shown()`). `_shown` fades
@@ -112,7 +114,7 @@ the new screen never sees the button press that closed the old one.
      - The pulse runs regardless. Every physics tick (before the
      entities, paused with the arena) its countdown `pulse_left` runs down from
      `PULSE_INTERVAL` (10 s; restarted by `begin_wave` on `RunState.wave_changed`); at 0
-     every ghost within `HEAL_RADIUS` (1.6 m, flat XZ) without Resurrection Sickness
+     every ghost within `HEAL_RADIUS` (1.6 m, flat XZ) without Wilted
      (`will_revive`) gets `revive(REVIVE_HP_RATIO = 1.0)` + `Vfx.resurrect_column` +
      "Resurrected!", `Player.res_sickness_left = Player.RES_SICKNESS_TIME` (15 s; ticks in
      `Player._physics_process`, cleared at wave start; blocks only the healer) and the
@@ -259,10 +261,10 @@ the new screen never sees the button press that closed the old one.
   `event_rng`) and the `EnvironmentHazards` (the run's hazard, only while the wave runs; its own `environment_rng`).
 - Waves 10 and 25 are **boss waves** (`RunState.is_boss_wave` and a `BossData` for the wave in `Db.bosses`): the
   timer is replaced by the boss, the wave ends when it dies, the normal spawn runs at half rate (adds), and there
-  are no elites and no Loot Goblin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
+  are no elites and no Coin Gremlin. Wave 20 (`RunState.is_elite_wave`) is the **elite wave**: every enemy gets a
   lite affix (HP ×1.5, normal rewards) and the real elites come twice as often. Details: "Bosses, boss waves,
-  elite wave 20, hazards, HUD" in the M6a chapter. M5 adds elites from wave 5 and the Loot Goblin (never on waves
-  10 / 20 / 25) – see "Elites" and "Loot Goblin" in the M5 section.
+  elite wave 20, hazards, HUD" in the M6a chapter. M5 adds elites from wave 5 and the Coin Gremlin (never on waves
+  10 / 20 / 25) – see "Elites" and "Coin Gremlin" in the M5 section.
 
 ## Command line (Main)
 
@@ -277,9 +279,9 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
-| `--view=NAME` `--view-time=S` | Dev: reach a screen for a screenshot – `menu`, `lobby` (bots join, P1 ready), `game`, `intermission` (the wave timer is run out), `game_over`, `victory`, `pause`; forced at S seconds of game time (default: shot time − 3 s) and held open. |
+| `--view=NAME` `--view-time=S` | Dev: reach a screen for a screenshot – `menu`, `settings` and `credits` (M7a: the main menu with that page open), `lobby` (bots join, P1 ready), `game`, `intermission` (the wave timer is run out), `game_over`, `victory`, `pause`; forced at S seconds of game time (default: shot time − 3 s) and held open. |
 | `--time-scale=X` | Overrides the time scale. |
-| `--goblin-chance=X` | M5 test hook: Loot Goblin chance per eligible wave, 0..1 (`GoblinSpawner.chance_override`; default: the normal chance). |
+| `--goblin-chance=X` | M5 test hook: Coin Gremlin chance per eligible wave, 0..1 (`GoblinSpawner.chance_override`; default: the normal chance). |
 | `--elite-mult=X` | M5 test hook: multiplies the expected elites per wave (`EliteAffixes.rate_mult`, ≥ 0). |
 | `--start-level=N` | M5 test hook: team level at run start (1..99; `RunState.set_start_level` after `RunState.start_run`, before the heroes spawn – talent points from level 10, no pending level-ups). |
 | `--panel-tab=NAME` | Dev: when the market first opens, P1's PlayerPanel switches to `talents`, `trainer`, `character` or `enchanter` (`PlayerPanel.debug_start_tab`, screenshots of the Talents tab). |
@@ -288,7 +290,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--end-page=NAME` | M6a dev: the page `--view=game_over` / `victory` opens on, `summary` or `meter`. |
 | `--save-card` | M6a dev: saves the run card (needs a display) as soon as the end view is forced; prints `CARD <path>`. |
 | `--mode=normal\|endless` | M6b: the run mode (`RunState.mode`; the lobby's mode select overrides it for human runs). Endless: no last wave, 26+ with bosses every 5th wave from 30. |
-| `--hardcore[=0\|1]` | M6b: a hardcore run (`RunState.hardcore`: no Spirit Healer, `HardcoreBadge`). |
+| `--hardcore[=0\|1]` | M6b: a hardcore run (`RunState.hardcore`: no Grave Tender, `HardcoreBadge`). |
 | `--env=ID` | M6b: forces the arena environment (`forest_ruin`, `cemetery`, `swamp`, `volcano`, `ice_cave`) instead of the seed-derived roll. Smoke runs roll too (seed 5 -> Ice Cave). |
 | `--event=ID` | M6b debug hook: every eligible wave gets that mid-wave event (`guarded_chest`, `defend_totem`, `goblin_caravan` or `chest`, `totem`, `caravan`; `RunState.event_override`). |
 | `--shrine-chance=X` | M6b debug hook: the chance of a shrine at every break (0..1; `RunState.shrine_chance_override`; default 5%). |
@@ -320,10 +322,10 @@ and each closed market prints `SMOKE market closed after wave n: G gold carried 
 (R bot rerolls so far)`.
 Bots (`BotInput`) kite by weapon reach (melee heroes close in, back off when hurt or
 crowded), avoid walls, stay near the team and run to downed teammates within
-`BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Spirit Healer
-and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Resurrection Sickness it drifts to
-a living teammate instead. A Loot Goblin is never a threat to them; they chase it when nothing
-else is close (M5, "Loot Goblin"). M6a: they sidestep the Flesh Golem's hook, leave boss hazards and poison
+`BotInput.RESCUE_RANGE` (5 m) when it is safe; a ghost bot walks straight to the Grave Tender
+and waits inside its circle (`HEALER_STOP_DISTANCE`) – with Wilted it drifts to
+a living teammate instead. A Coin Gremlin is never a threat to them; they chase it when nothing
+else is close (M5, "Coin Gremlin"). M6a: they sidestep the Flesh Golem's hook, leave boss hazards and poison
 puddles (`BotInput._hazard_steer`; M6b: the environment hazards too) and prioritise the Cultist Acolyte. M6b: they open
 the Guarded Chest, guard the Defend-the-Totem totem, chase the Goblin Caravan's cart (`BotInput._event_steer`) and vote
 on shrines (`ShrineData.bot_accepts`) and the Dungeon portal (`PortalScreen.bot_accepts`). Between waves bots equip, forge, buy,
@@ -344,7 +346,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
 
 ## Visuals (procedural art)
 
-- No imported assets yet: `MeshKit` merges primitives / lathes / extrusions into one
+- No imported 3D models (M7b keeps the 3D look procedural; the only imported art is the 2D icon set and the title font, see M7b): `MeshKit` merges primitives / lathes / extrusions into one
   vertex-coloured `ArrayMesh` per prop, enemy or weapon (cached by key, shared by every
   instance) drawn with `Mats.toon_vc()`. All toon materials share a few cached shaders
   (two-band toon light, warm rim, inverted-hull outline as `next_pass`; the outline is drawn
@@ -388,7 +390,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     halo and a short trail, fast spin – a different hue family from the heroes' class-
     coloured bolts.
   - Camera framing (`CameraRig.framing_points(living, ghosts, anchors)` →
-    `compute_framing`): the living players plus, while anybody is a ghost, the Spirit Healer
+    `compute_framing`): the living players plus, while anybody is a ghost, the Grave Tender
     (so it is always on screen and reachable); everybody down → the ghosts (old fallback).
   - `CameraRig.compute_framing(points, aspect, rect, extras)` – `extras` are soft points (the
     living, not escaped Loot Goblins, `CameraRig.goblin_points(get_nodes_in_group(&"loot_goblins"))`,
@@ -407,24 +409,24 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     along the edge (`Player.clamp_motion_to_rect`: a body already outside is never pushed,
     only kept from going further out). For living players it binds only when the team
     spreads wider than the fully zoomed-out view (never in the MVP arena: the whole arena
-    fits at `MAX_DISTANCE`; the Spirit Healer counts as a framed point while a ghost exists);
+    fits at `MAX_DISTANCE`; the Grave Tender counts as a framed point while a ghost exists);
     a ghost, which the camera does not follow, is kept inside the current view, out from
-    under the HUD (`safe_ground_rect`), grown to reach the Spirit Healer
+    under the HUD (`safe_ground_rect`), grown to reach the Grave Tender
     (`CameraRig.ghost_walk_rect`).
   - `Arena.get_view_rect()` – what the camera may show (smaller margin towards the camera).
 - Art showcase (dev tool, renders a PNG under Xvfb):
   `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -s res://tools/showcase/showcase.gd -- --view=gameplay --out=/tmp/shot.png`
-  (views: gameplay, live, onions, enemies, weapons, arena, revive). Latest gameplay view:
+  (views: gameplay, live, onions, enemies, weapons, arena, revive; M7b adds fx, equip, sets and equip_game, see the M7b chapter). Latest gameplay view:
   `docs/screenshots/visuals_showcase.png`.
 
 ## UI (scenes/ui/)
 
 - Every screen is a full-rect `Control` built in code (`create()`), themed by the cached
   `UiTheme.get_theme()` (WoW look: `UiFrameStyle` stone frames with gold borders, inner
-  shadow and corner studs; parchment tooltips; outlined default font, emboldened via
-  `FontVariation` for titles). Layout is anchors + containers on the 1920x1080
-  `canvas_items` canvas, so it holds at 720p, 4:3 and 21:9. Icons, button glyphs, bars and
-  portraits are drawn procedurally (`UiIcon`, `UiGlyph`, `UiBar`, `UiPortrait`).
+  shadow and corner studs; parchment tooltips; outlined default font; since M7b the titles, headings, buttons and big numbers use Cinzel
+  (`UiTheme.title_font()`). Layout is anchors + containers on the 1920x1080
+  `canvas_items` canvas, so it holds at 720p, 4:3 and 21:9. Button glyphs, bars and
+  portraits are drawn procedurally (`UiIcon`, `UiGlyph`, `UiBar`, `UiPortrait`); the ability, talent, tree, consumable and shrine icons are game-icons.net pictures since M7b (`GameIcons`), with the procedural glyph as the fallback.
 - Input: joined players drive menus only through their own `PlayerSlot.input`. Before anyone
   joined (main menu, empty lobby) Godot's `ui_*` actions are used for keyboard / d-pad focus
   navigation, and `UiPads` reads A / B / START on every controller (the default `ui_accept`
@@ -450,9 +452,9 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   bottom edge (WoW style; level at its left end, "xp / needed XP" at its right end) and a slim
   translucent banner (`BANNER_HEIGHT` 100 px, ribbon alpha 0.38) anchored just below the
   plaque. Unit frames hide when their player is freed; while downed they show the revive
-  progress (teammates' or the Spirit Healer's, whichever is further along; spirit blue for the
-  healer) and a hint: "Go to the Spirit Healer (7 s)" (`GHOST_HINT` + the next pulse),
-  "Spirit Healer: 7 s" in its circle (`WAITING_HINT`), "Resurrection Sickness: 12 s"
+  progress (teammates' or the Grave Tender's, whichever is further along; spirit blue for the
+  healer) and a hint: "Go to the Grave Tender (7 s)" (`GHOST_HINT` + the next pulse),
+  "Grave Tender: 7 s" in its circle (`WAITING_HINT`), "Wilted: 12 s"
   (`SICKNESS_HINT`).
   Frame layout: `[portrait | name row over (HP + resource bars | ability icons)]`, mirrored
   for P2 / P4 (portrait outside, icons on the inner side). The bars cell is as tall as the
@@ -460,7 +462,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   - `ResourceDisplay` (VBox under the HP bar, bound to `player.abilities`): one row per
     `ClassResource` in `resource_order`, following `ClassResource.changed` (no polling).
     `BAR` resources: a `UiBar` in `ResourceData.color` with "value / max" (floored), a spend
-    of ≥ 10% flashes it. `PIPS` (≤ `MAX_PIPS` 10): diamonds (crystals for Soul Shards);
+    of ≥ 10% flashes it. `PIPS` (≤ `MAX_PIPS` 10): diamonds (crystals for Pact Shards);
     primary in a trough like a bar, a secondary row inline in `inline_holder` (the frame's
     `name_pips`, inner end of the name row: the Rogue's combo points add no height).
     No resources → the M1 placeholder bar (`ClassData.resource_type` / `resource_color`).
@@ -474,7 +476,7 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
     (`PlayerInput.ability_button(slot)`): controllers RT / LT / RB / LB, keyboard
     LMB / RMB / **Q** (slot 2) / **E** (slot 3); the icon spacing widens when a pill ("LMB")
     is wider than an icon.
-  - `AbilityIcon` (Control, drawn in code, no assets): gold-rimmed square with a procedural
+  - `AbilityIcon` (Control, drawn in code; since M7b a game-icons.net picture where the map has one, see M7b): gold-rimmed square with a procedural
     glyph (`glyph_for`: `AbilityData.icon`, then the id's words, then the school), tinted by
     `AbilityData.color` / school; clockwise cooldown pie (`sweep_polygon`) + seconds
     (`format_cooldown`: one decimal under 3 s), dimmed when off cooldown but unusable (red
@@ -750,8 +752,8 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   (1 - Cooldown Reduction%)`; resources tick in `_physics_process` (Resource Regen % scales
   gains, Haste scales `regen_uses_haste` resources); targeting is automatic (SELF,
   NEAREST_ENEMY, DENSEST_CLUSTER, MOVE_DIRECTION, ALLY with `prefer_downed`, which picks the
-  nearest ghost in range but skips one the Spirit Healer revives within
-  `PaladinWordOfGlory.HEALER_SOON`, so Word of Glory revives another ghost instead of
+  nearest ghost in range but skips one the Grave Tender revives within
+  `PaladinWordOfGlory.HEALER_SOON`, so Call of Valor revives another ghost instead of
   healing); bots
   (`BotInput`) auto-cast when `AbilityEffect.wants_auto_cast`.
   - Timing: every `AUTO_CAST_INTERVAL` 0.25 s, which is exactly 15 ticks at 60 Hz.
@@ -774,7 +776,7 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   (`charges_max` / `charges_available`; `remaining()` is 0 while a charge is left).
   `set_cooldown(ability, s)` lets effects shorten / reset a running recharge (≤ 0 = ready).
   `spend_charge(ability)` uses one charge as a cast would, for self-triggering passives such
-  as Cheat Death. `cooldown_from_params(ability, params)` gives the cooldown for a preview
+  as Narrow Escape. `cooldown_from_params(ability, params)` gives the cooldown for a preview
   params dict.
 - Wave hooks: `begin_wave` (resources / cooldowns reset, `AbilityEffect.begin_wave`,
   `MasteryEffect.begin_wave`; `Player.begin_wave` also clears `forced_crits` and
@@ -783,16 +785,16 @@ scenes/abilities/<class>/   per-class AbilityEffect / MasteryEffect scripts, VFX
   market). Ability ground areas (group `ability_areas`) are freed by `WaveDirector.stop()`,
   and again by `Main.open_intermission()` for areas that landed during the "Wave cleared!"
   pause.
-- `MasteryEffect.tick` runs every physics tick, **also while downed** (Ignite / Deadly Poison
+- `MasteryEffect.tick` runs every physics tick, **also while downed** (Ignite / Lethal Venom
   DoTs keep burning like item DoTs); pets and auras check `player.is_alive()` themselves.
   Ability effects only tick while alive.
 - Item proc `resource {amount}` (Soulreaping) → `AbilityRunner.gain_from_proc(amount)`: whole
-  points of the first pip resource (Holy Power, Soul Shards, Combo Points), else 10% of the
+  points of the first pip resource (Resolve, Pact Shards, Combo Points), else 10% of the
   primary bar per point.
-- Player state used by abilities / bots: `stealth_left` / `is_stealthed()` (Vanish: enemies
+- Player state used by abilities / bots: `stealth_left` / `is_stealthed()` (Melt Away: enemies
   neither target, touch nor shoot the player; cleared at wave start), `is_reviving()` (alive
   and next to a downed teammate – bots must not dash away), `forced_crits`, `damage_mults`.
-- Crit DoT Masteries (Ignite, Deadly Poison) pick their enemy with `CritDot.target_for(hit)`
+- Crit DoT Masteries (Ignite, Lethal Venom) pick their enemy with `CritDot.target_for(hit)`
   (`scenes/abilities/crit_dot.gd`): the hit enemy while it lives, else the nearest living
   enemy within `CritDot.SPREAD_RADIUS` (2.5 m) of the corpse (`EnemyGrid.nearest`, ties in
   group order), else nothing.
@@ -908,7 +910,7 @@ scenes/abilities/general/        the six general abilities (class_id empty)
   −10 each; Rank III merges `AbilityData.rank3`. Rank V's chosen
   `AbilityData.specs[i]["mods"]` (`AbilityRanks.spec_mods`, a deep copy) apply as a second `apply_mods`
   pass after the rank mods, then the item mods come last. So a spec's `_pct` scales the
-  Rank IV value (Hot Streak: 10 s × 0.8 × 0.7 = 5.6 s). Every effect multiplies its damage / heal / shield / buff
+  Rank IV value (Quickfire: 10 s × 0.8 × 0.7 = 5.6 s). Every effect multiplies its damage / heal / shield / buff
   amounts by `ctx.num("power", 1.0)`. Trainer price `25 × rank × (1 + 0.08 × (wave − 1))`.
   Core abilities train too. `apply_mods`: `<param>_add` adds, `<param>_pct` scales an existing
   `<param>` (else it sets the key itself), anything else replaces – a data test per kit
@@ -965,16 +967,16 @@ scenes/abilities/general/        the six general abilities (class_id empty)
       effects compare it between ticks.
   - `Player.damage_taken_mults`: named incoming multipliers, cleared at wave start.
   - `Player.death_guards`: Callables tried *before* the limited item cheat-death procs, so a
-    free or recharging guard such as Last Stand or Cheat Death never uses one up.
+    free or recharging guard such as Last Stand or Narrow Escape never uses one up.
   - Also `Enemy.apply_fear(duration, from)`, `Enemy.apply_taunt(target, duration)` and
     `Enemy.is_boss()` (true for `Boss`, M6a).
 - **Kit helpers** (per class folder; all damage through `ProcSystem.deal_raw` with sources
   `&"ability"`, `&"dot"`, `&"pet"`):
-  - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Bladestorm / Ravager), `WarriorFx`
-    (VFX base); Bladestorm's "cannot be slowed" is the stat source `&"bladestorm"` cancelling
-    negative Speed. `WarriorKit.is_displaced(player)` makes Charge and Heroic Leap exclusive:
+  - Warrior: `WarriorSpin` (storm ticks for Whirlwind / Steel Cyclone / Whirling Axe), `WarriorFx`
+    (VFX base); Steel Cyclone's "cannot be slowed" is the stat source `&"bladestorm"` cancelling
+    negative Speed. `WarriorKit.is_displaced(player)` makes Charge and Soaring Slam exclusive:
     neither starts while the other moves the hero. Execute instantly kills elites (M5) and
-    the Loot Goblin too – `WarriorExecute.strike` zeroes a Shielding elite's `shield_hp`
+    the Coin Gremlin too – `WarriorExecute.strike` zeroes a Shielding elite's `shield_hp`
     first, so the absorb shield cannot save it; only bosses (`Enemy.is_boss()`) take
     `boss_mult` × damage instead. Its victim choice prefers an executable enemy, then
     `is_elite()` (elites, the goblin) / bosses. M5 talent hooks: see the M5 class kit hooks.
@@ -982,37 +984,37 @@ scenes/abilities/general/        the six general abilities (class_id empty)
     (Projectile subclass dealing ability damage: burn / splash / bounce / pierce / homing),
     `MageBurn` / `MageFrozen` (nodes on the enemy), `MageMeteorStrike` (group
     `ability_areas`).
-    - Ice Barrier = `add_shield(amount, 3600, &"ice_barrier")`, its own entry
+    - Frozen Layer = `add_shield(amount, 3600, &"ice_barrier")`, its own entry
       (`MageIceBarrier.SHIELD_SOURCE`), lasting until used up or wave end. Other shields
       neither block its recast nor inherit its timer.
     - Its Rank III chill fires when `ProcSystem.absorbed_total` grew while the barrier is up,
       so a hit soaked by a shorter-lived shield on top still chills. A shield expiring on its
       timer does not.
-    - Frost Nova's Shatter: the ice of one nova shares a `MageFrozen.ShatterGroup`, so each
+    - Rime Burst's Shatter: the ice of one nova shares a `MageFrozen.ShatterGroup`, so each
       enemy takes one nova's shatter at most once.
   - Paladin: `PaladinKit` (holy strike damage, heals, per-Paladin buff keys),
     `PaladinHolyMissile` (homing / ricochet hammer and shield), `PaladinVfx`. Blessing of
-    Kings = stat source `kings:paladin<slot>` per hero; Lay on Hands never revives (only Word
-    of Glory and the Spirit Healer / teammates do). Word of Glory does not revive a ghost the
-    Spirit Healer revives within `PaladinWordOfGlory.HEALER_SOON` (1 s,
+    Kings = stat source `kings:paladin<slot>` per hero; Mending Touch never revives (only Word
+    of Glory and the Grave Tender / teammates do). Call of Valor does not revive a ghost the
+    Grave Tender revives within `PaladinWordOfGlory.HEALER_SOON` (1 s,
     `Player.healer_seconds_left`); it heals instead. Radiant Bubble ticks are not scaled by
     power: power only lengthens the bubble.
   - Rogue: `RogueBlade` (Projectile subclass for knives / shuriken: weapon hits, optional
     poison and returning), `RogueVanish.shroud()` (stealth + silhouette for other effects);
-    Cheat Death is a `Player.death_guards` entry with the runner's cooldown; each save spends
-    one charge (`AbilityRunner.spend_charge`). Blade Flurry echoes carry each echo target's
+    Narrow Escape is a `Player.death_guards` entry with the runner's cooldown; each save spends
+    one charge (`AbilityRunner.spend_charge`). Cleaving Blades echoes carry each echo target's
     own Executioner / Slayer bonus, not the struck enemy's.
   - Warlock: `WarlockSpell`, `WarlockAfflictions` (one DoT manager node per Warlock, ticks
-    while downed; Demonic Pact on `"dot"` / `"pet"`). Afflictions listen to `Enemy.died`. A
+    while downed; Ember Pact on `"dot"` / `"pet"`). Afflictions listen to `Enemy.died`. A
     host that vanishes without dying (the wave-end despawn) only ends its afflictions: no
     seed burst, no Corruption spread, no Blighted Ground. Fear's Dread deals its damage per
     second without the rank power (`WarlockFear.dread_rate`): power lengthens the fear, so
     the Dread total scales with power once (the same rule as Radiant Bubble).
-    Pets (Voidwalker taunts, Infernal for 8 s) free themselves when their owner is gone;
+    Pets (Gloomguard taunts, Cinder Brute for 8 s) free themselves when their owner is gone;
     `damage_taken_mults["voidwalker"]`.
   - General: `GeneralKit` (weapon damage normalised to a 1 s swing, spell damage with the
     best of Attack / Spell Power), `GeneralBuff` (timed hero buff: named stat source +
-    damage-taken multiplier, refreshed not stacked), Spirit Wolf pet; Bandage is not
+    damage-taken multiplier, refreshed not stacked), Phantom Wolf pet; Bandage is not
     interrupted by damage.
     - A Sprint cast (own or Rallying) never weakens or shortens a running Sprint. Per stat
       the higher value and the longer time are kept (`GeneralSprint.merged_stats`), so a
@@ -1020,7 +1022,7 @@ scenes/abilities/general/        the six general abilities (class_id empty)
       caster's own merged Sprint.
     - Bandage Rank III's extra bandage goes to the most wounded unbandaged ally.
 
-## M5: depth – talents, tier sets, forging, elites, Loot Goblin
+## M5: depth – talents, tier sets, forging, elites, Coin Gremlin
 
 ```
 core/bonus/          BonusVocabulary (the effect vocabulary), PlayerBonuses (the bonus engine)
@@ -1098,7 +1100,7 @@ scenes/ui/purse/     PurseBoard
     next rebuild, read-only. `Player.ability_mods` merges it after the item mods.
   - `damage`: `damage_mult(target, school, source)` = 1 + Σ pct / 100 of the matching entries
     × every script's `damage_mult`. Filters: `source`, `school` (a name or a list), `target`
-    – elite (`is_elite()`: elites, the Loot Goblin, bosses) / boss / stunned (frozen too) /
+    – elite (`is_elite()`: elites, the Coin Gremlin, bosses) / boss / stunned (frozen too) /
     slowed / feared / below_pct / above_pct with `target_pct` –, `self_below_pct` /
     `self_above_pct` on the hero's HP %; comparisons strict. Unconditional entries are
     pre-summed, conditional ones pre-parsed (`DamageRule`): nothing allocated per hit.
@@ -1125,8 +1127,8 @@ scenes/ui/purse/     PurseBoard
   included, before Executioner / Slayer and the outgoing multipliers – dealt with
   `procs.deal_raw(..., target_bonus = false, ...)`, so the outgoing multipliers apply once and
   Executioner / Slayer not again. It arrives as `on_hit_dealt(..., base_damage)` and sits in
-  `Player.last_hit_base` during the call (`hit_pct` procs, Seal of Command, Combustion, Agony);
-  the Mastery keeps the dealt amount. Damage built from the hero's own stats (Mortal Strike,
+  `Player.last_hit_base` during the call (`hit_pct` procs, Sunbrand, Chain Ignition, Anguish);
+  the Mastery keeps the dealt amount. Damage built from the hero's own stats (Ruinous Strike,
   ability-like strikes) uses `target_bonus = true`.
 
 ### Player and WeaponRunner hooks
@@ -1150,7 +1152,7 @@ scenes/ui/purse/     PurseBoard
 - Weapon hits: `bonuses.on_hit` runs for **every** hit with `first` = the attack's `ProcGate`
   hit (roll chances and count attacks only then); `notify_kill` (alive) → `bonuses.on_kill`.
 - Crits (riposte, melee arc per enemy, projectiles for the aimed enemy): `consume_forced_crit()`
-  first (a banked crit is spent even inside Shadow Dance – intended), then
+  first (a banked crit is spent even inside Dusk Waltz – intended), then
   `bonuses.crit_forced(target)`, then the roll (no draw when forced).
 - `begin_wave`: `talents.commit()` first … `procs.begin_wave()` → `abilities.begin_wave()`
   (resources reset) → `procs.after_wave_start()` (`wave_start` procs) → `bonuses.begin_wave()`.
@@ -1225,7 +1227,7 @@ scenes/ui/purse/     PurseBoard
     (`FREE_TEXT`); a failed `cast()` spends nothing.
   - `last_paid(ability)`: what the current / last cast really pays (0 when free or costless,
     0 before the first cast of the wave), settled before `cast()` and restored when it fails.
-    Kits that refund part of a cast cap with it (Meat Cleaver), also inside `cast()`. The cost is
+    Kits that refund part of a cast cap with it (Reaping Spin), also inside `cast()`. The cost is
     still taken after `cast()`, so a refund granted inside it is clamped by the maximum then.
 
 ### Talents (core/talents/, data/talents/)
@@ -1288,7 +1290,7 @@ scenes/ui/purse/     PurseBoard
   tier rows of `TalentNode`s at fixed positions (`node_rect`, the capstone centred and bigger),
   prerequisite arrows (`links()`, gold once met, routed between the columns so they never
   cross a node), a dark band over locked tiers, the tree's points.
-- `TalentNode`: glyph from `TalentData.icon`, else the modifier's ability (ability / school /
+- `TalentNode`: glyph from `TalentData.icon` (since M7b the talent's own game-icons.net picture where the map has one), else the modifier's ability (ability / school /
   `TalentGlyph` stat glyph), else the kind's `TalentGlyph` (rune, gear, crown); state rim
   (`State` LOCKED / UNAVAILABLE / AVAILABLE / PARTIAL / MAXED), rank pill "2/3" ringed in the
   player's colour while ranks are pending, gear badge on modifiers, gold capstone frame.
@@ -1324,80 +1326,80 @@ scripts below; every number is in the `.tres`.
 
 | Class | Trees (index 0 / 1 / 2) | Scripts (`scenes/talents/<class>/`) |
 |---|---|---|
-| Warrior | Arms (the reference tree), Fury, Protection | `WarriorArmsMortalStrike`, `WarriorFuryRampage`, `WarriorProtectionUnbreakable` |
-| Mage | Arcane, Fire, Frost | `MageFireCombustion`, `MageFrostIceLance` (Arcane Power is data) |
-| Paladin | Holy, Protection, Retribution | `PaladinHolyHolyShock`, `PaladinProtectionHolyShield`, `PaladinRetributionSealOfCommand` |
-| Rogue | Assassination, Combat, Subtlety | `RogueCombatAdrenalineRush`, `RogueSubtletyShadowDance` (Cold Blood is data) |
-| Warlock | Affliction, Demonology, Destruction | `WarlockAfflictionUnstableAffliction` (Soul Link, Conflagrate are data) |
+| Warrior | Warblade (the reference tree), Berserker, Ironwall | `WarriorArmsMortalStrike`, `WarriorFuryRampage`, `WarriorProtectionUnbreakable` |
+| Mage | Starlore, Pyrelore, Rimelore | `MageFireCombustion`, `MageFrostIceLance` (Overchannel is data) |
+| Paladin | Radiance, Vigil, Verdict | `PaladinHolyHolyShock`, `PaladinProtectionHolyShield`, `PaladinRetributionSealOfCommand` |
+| Rogue | Toxins, Bladework, Gloaming | `RogueCombatAdrenalineRush`, `RogueSubtletyShadowDance` (Steel Nerve is data) |
+| Warlock | Hexcraft, Pactcraft, Cinderfall | `WarlockAfflictionUnstableAffliction` (Soul Tether, Lingering Blaze are data) |
 
 Modifiers and data talents reach the kits through new **neutral params** (0 = off) in the
 abilities' `.tres` and through the pseudo ids; each kit reads them at cast / refresh time. The
 scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans up).
 
 - **Warrior**
-  - Mortal Strike: every 5th attack (`first`) also deals 150% weapon damage and an 8 s Mortal
+  - Ruinous Strike: every 5th attack (`first`) also deals 150% weapon damage and an 8 s Mortal
     Wound (`Enemy.apply_healing_reduction(50, 8)`, ×1.1 damage from this Warrior).
-  - Rampage: kill stacks (+2% each, up to 10, 5 s); half of it goes to allies within 8 m as
+  - Carnage: kill stacks (+2% each, up to 10, 5 s); half of it goes to allies within 8 m as
     `damage_mults["warrior_fury_rampage:<slot>"]`.
   - Unbreakable: a once-per-wave `death_guards` entry (1 s invulnerability, then +30% Max HP for
-    10 s, 15% for allies within 8 m); it yields to Shield Wall's "Last Stand"
+    10 s, 15% for allies within 8 m); it yields to Stalwart Guard's "Last Stand"
     (`WarriorShieldWall.guards_lethal()`).
-  - Kit: Whirlwind `rage_per_enemy` / `rage_per_enemy_max` (Meat Cleaver: Rage per distinct
+  - Kit: Whirlwind `rage_per_enemy` / `rage_per_enemy_max` (Reaping Spin: Rage per distinct
     enemy of a spin via `WarriorSpin.on_first_strike`, capped by `last_paid` – a free spin
     refunds nothing; first-pulse refunds are paid on `ability_cast`); Charge `taunt` /
     `shield_per_enemy` / `shield_max` / `shield_duration` (Challenging Charge; taunts released
     with `Enemy.release_taunt` on down / wave / forget); `WarriorAuraVfx` (capstone ring).
 - **Mage**
-  - Combustion: a first-hit weapon crit burns up to 4 enemies within 2.5 m for a share of the
+  - Chain Ignition: a first-hit weapon crit burns up to 4 enemies within 2.5 m for a share of the
     base amount (`MageBurn.apply`, 1 s refresh per enemy).
-  - Ice Lance: `crit_forced` on frozen enemies; ×(2 + Critical Damage) for ability / dot / pet
+  - Frost Spike: `crit_forced` on frozen enemies; ×(2 + Critical Damage) for ability / dot / pet
     damage on them.
   - Kit: `MageFrozen.is_frozen(e)` (static O(1) live-ice count, cleared on a new
-    `run_serial`); Fireball `bomb_pct` / `bomb_radius` → `MageBolt` arms Living Bomb on
+    `run_serial`); Fireball `bomb_pct` / `bomb_radius` → `MageBolt` arms Ticking Ember on
     `MageBurn` (`arm_bomb`: explodes when the burn ends or the enemy dies, not on despawn);
     Blink `image_*` → `MageMirrorImage` (a decoy that taunts non-boss enemies, then bursts);
-    Blizzard `end_freeze` / `tick_freeze_chance` / `tick_freeze` (Deep / Flash Freeze, tracked
-    as `BlizzardEffect.Storm` records; Flash Freeze draws).
+    Hailstorm `end_freeze` / `tick_freeze_chance` / `tick_freeze` (Deep / Snap Freeze, tracked
+    as `BlizzardEffect.Storm` records; Snap Freeze draws).
 - **Paladin**
-  - Holy Shock: every 4 s (Haste / CDR scaled) heals the most wounded hero within 8 m below
+  - Radiant Pulse: every 4 s (Haste / CDR scaled) heals the most wounded hero within 8 m below
     90%, else smites the nearest enemy.
-  - Holy Shield: on a block, Holy retaliation + a small absorb on the weakest ally
+  - Gleaming Shield: on a block, Holy retaliation + a small absorb on the weakest ally
     (`PaladinKit.buff_key`).
-  - Seal of Command: 15% per attack (one draw): 70% of the base amount as Holy on the target
+  - Sunbrand: 15% per attack (one draw): 70% of the base amount as Holy on the target
     and 2 more enemies + a small heal.
   - Kit: `PaladinKit.healing_mult(caster)` (Healing Done, applied once by every heal / absorb
-    that can grow – not Lay on Hands' full heal, revives or Holy Shield); pseudo id
+    that can grow – not Mending Touch' full heal, revives or Gleaming Shield); pseudo id
     `paladin_aura` (`BASE` radius / guard / might, read on each aura refresh →
-    `damage_taken_mults` / `damage_mults` of every hero inside); Consecration `ally_range` /
-    `heal_max_hp_pct` (Light's Hammer) and `taunt` / `ward` (Righteous Fury,
+    `damage_taken_mults` / `damage_mults` of every hero inside); Sacred Circle `ally_range` /
+    `heal_max_hp_pct` (Gifted Circle) and `taunt` / `ward` (Provoking Light,
     `damage_taken_mults[PaladinConsecration.ward_key(p)]`), tinted by `ConsecrationVfx`; Word
     of Glory `verdict_pct` / `verdict_sp_scale` / `verdict_range` (Divine Verdict, after
     revive and heal).
 - **Rogue**
-  - Adrenaline Rush: with ≥ 3 enemies within 5 m, `resource_regen` +50 on the Rogue and
+  - Crowd Surge: with ≥ 3 enemies within 5 m, `resource_regen` +50 on the Rogue and
     `haste` +10 on allies within 8 m (1 s linger).
-  - Shadow Dance: a real Vanish cast opens 5 s of `crit_forced` (12 s icd); allies within 8 m
+  - Dusk Waltz: a real Melt Away cast opens 5 s of `crit_forced` (12 s icd); allies within 8 m
     get `crit` +10.
   - Kit: pseudo id `rogue_deadly_poison` (`RogueMastery.BASE` max_stacks / kill_energy);
-    `RogueUtil.bonus_crit` (Fan of Knives, Shuriken Toss, Killing Spree and Ambush ask
-    `crit_forced`), `RogueUtil.reduce_other_cooldowns` (Restless Blades), `RogueVfx.ring`; Fan
-    of Knives `envenom_pct` / `cdr_per_combo` / `cold_blood_*` (Cold Blood: every Nth fan crits
+    `RogueUtil.bonus_crit` (Knife Bloom, Throwing Stars, Cutthroat Rush and Ambush ask
+    `crit_forced`), `RogueUtil.reduce_other_cooldowns` (Hastening Blades), `RogueVfx.ring`; Fan
+    of Knives `envenom_pct` / `cdr_per_combo` / `cold_blood_*` (Steel Nerve: every Nth fan crits
     and slows), `RogueFanOfKnives.throw_free` (Unseen Blades: no cost, no `ability_cast`);
-    Vanish `end_fan` and `auto_offense` (bots); `RogueBlade` envenom / slow.
+    Melt Away `end_fan` and `auto_offense` (bots); `RogueBlade` envenom / slow.
 - **Warlock**
-  - Unstable Affliction: an afflicted enemy's death (`WarlockAfflictions.afflicted_died`)
+  - Volatile Blight: an afflicted enemy's death (`WarlockAfflictions.afflicted_died`)
     queues a Shadow burst + 1 s stun at the corpse, at most 4 per tick, chaining (4 s stun
     memory).
   - Kit: pseudo ids `warlock_afflictions` (`WarlockMastery.AFFLICTION_BASE`: `agony_pct`,
     `agony_duration`, `agony_spread`, `agony_spread_radius`, `slow`; cached, dropped on
     `bonuses.changed` / `equipment.changed`), `warlock_imp` (`damage_bonus`, Wild Imps too)
     and `warlock_shards` (the shard rule; `kills_per_shard()` returns the effective rule).
-  - Agony: every weapon hit of a living Warlock adds `last_hit_base × agony_pct` as a Shadow
-    DoT (`WarlockAfflictions.agonize`, ticks `target_bonus = false`); Writhe in Agony splits a
-    dying host's Agony.
-  - Drain Life `harvest_*` (Dark Harvest) / `shadowburn_*` (a scorch, + a Soul Shard on a
-    kill, 10 s shard timer); Rain of Fire `slow`, `wild_imps` / `wild_imp_*`
-    (`WarlockImp.spawn_wild`, timed and capped) and `ember_*` (Conflagrate: `WarlockEmbers`
+  - Anguish: every weapon hit of a living Warlock adds `last_hit_base × agony_pct` as a Shadow
+    DoT (`WarlockAfflictions.agonize`, ticks `target_bonus = false`); Spreading Anguish splits a
+    dying host's Anguish.
+  - Vital Siphon `harvest_*` (Dark Harvest) / `shadowburn_*` (a scorch, + a Pact Shard on a
+    kill, 10 s shard timer); Ember Rain `slow`, `wild_imps` / `wild_imp_*`
+    (`WarlockImp.spawn_wild`, timed and capped) and `ember_*` (Lingering Blaze: `WarlockEmbers`
     keeps the area burning).
 
 ### Shared purse (GDD 10)
@@ -1415,7 +1417,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
 - **PurseBoard** (`Intermission.purse_board`, 722 px since M6a, in the MARKET header under the title and
   "Next up: Wave N of 25 · S seconds · Level L +k this wave" – no seconds before a boss wave,
   `Intermission.next_wave_text`):
-  - wallet (`gold_value`, also `Intermission.gold_value`; M6a: the Arcane Dust `dust_value` to its right),
+  - wallet (`gold_value`, also `Intermission.gold_value`; M6a: the Glimmer Dust `dust_value` to its right),
     `ReadyPips` (a diamond per joined
     player, filled while ready) and "2/4 ready";
   - **Spent**: the round's log newest first, at most `TICKER_LINES` 2 lines + "+N more"
@@ -1510,11 +1512,11 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
 
   | Class | Set (id) | 2 pieces | 4 pieces |
   |---|---|---|---|
-  | Warrior | Battlegear of Fury (`battlegear_of_fury`) | `stats {resource_regen: 10}` | `ability {id: whirlwind} {free_chance_add: 30}` |
+  | Warrior | Ragebound Plate (`battlegear_of_fury`) | `stats {resource_regen: 10}` | `ability {id: whirlwind} {free_chance_add: 30}` |
   | Mage | Regalia of the Arcane (`regalia_of_the_arcane`) | `stats {haste: 10}` | `proc {on_cast, ability: blink, buff {damage_pct: 30}, duration 3, icd 6}` |
   | Paladin | Dawnforged Plate (`dawnforged_plate`) | `stats {armor: 3}` | `ability {id: word_of_glory} {heal_all: true}` |
   | Rogue | Shadowstitch Garb (`shadowstitch_garb`) | `stats {crit: 5}` | `proc {on_cast, ability: vanish, buff {crit_damage: 50}, duration 4}` |
-  | Warlock | Felfire Raiment (`felfire_raiment`) | `damage {source: pet, pct: 10}` | `ability {id: rain_of_fire} {free_chance_add: 20}` |
+  | Warlock | Hexfire Raiment (`felfire_raiment`) | `damage {source: pet, pct: 10}` | `ability {id: rain_of_fire} {free_chance_add: 20}` |
 
 - **Roll** (`ItemGenerator.generate`, after the rarity roll): an Epic becomes a set piece with
   `set_chance(source)` = `SET_CHANCE_SHOP` 5% in the shop, × `SET_LOOT_MULT` 3 = 15% from
@@ -1576,7 +1578,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
     `_death_loot(pos, attacker)`, `heal(amount) -> float`, `apply_healing_reduction(pct,
     duration)` (strongest wins, equal extends), `healing_taken_mult()`, `release_taunt(target)`.
   - `elite_affix` (`&""` = normal), `make_elite(affix)` (once, no draw), `is_elite()`
-    (overridden by the Loot Goblin), `is_enraged()`, `shield_hp` (drained first, "Absorb"
+    (overridden by the Coin Gremlin), `is_enraged()`, `shield_hp` (drained first, "Absorb"
     text), per-enemy `speed_mult` (`walk_speed()`; lunges keep `lunge_speed`),
     `attack_cooldown_mult` (`attack_cooldown()`), `damage_mult`, `kill(attacker)` (instant
     death through the shield, normal loot / credit).
@@ -1592,7 +1594,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   (`EliteAffixes.COLORS`) and silver dragon wings on the bar ends – fixed-size billboards
   without depth test, shared textures. Shielding shows a blue bubble, Enraged a red tint.
 
-### Loot Goblin (GDD 8)
+### Coin Gremlin (GDD 8)
 
 - **Data** `data/enemies/loot_goblin.tres` (`LootGoblin.DATA_ID`): 30 HP (usual growth), no
   contact damage, 4.4 m/s (heroes 5), `first_wave` 3, **`spawn_weight` 0** (never in
@@ -1604,7 +1606,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
     (`--goblin-chance`) replaces it on eligible waves.
   - `wave_started` → `roll_wave(w)`: the chance draw (none at 0), then a spawn time uniform in
     [3 s, max(3, 0.35 × duration)] only when it comes (`pending_time()`). Then `spawn_goblin()`
-    at `director.find_spawn_point()`: gold burst, `goblins_spawned`, "A Loot Goblin appeared!".
+    at `director.find_spawn_point()`: gold burst, `goblins_spawned`, "A Coin Gremlin appeared!".
   - At most one per wave; a wave end drops a pending spawn, and `WaveDirector.stop()` despawns
     a living goblin (no loot, neither killed nor escaped).
 - **LootGoblin** (`extends Enemy`, group `&"loot_goblins"`):
@@ -1617,17 +1619,17 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
     has no affix, so no elite rewards; `is_boss()` is false.
   - Each damaging hit spills a 1-gold coin (at most one per 0.15 s, 30 per goblin).
   - Escape: at 15 s of age (`GoblinSpawner.ESCAPE_TIME`) it stops and a `GoblinPortal` opens for
-    1.2 s (still killable), then `goblins_escaped`, `escaped` → "The Loot Goblin escaped!",
+    1.2 s (still killable), then `goblins_escaped`, `escaped` → "The Coin Gremlin escaped!",
     `despawn()`.
   - Killed: `kill_gold(w)` = 30 × and `kill_xp(w)` = 25 × the wave's average enemy reward in 8
     piles, `drop_special(Source.GOBLIN, …)` (Rare+, 25% Epic+),
     `record_special_kill(&"goblin", slot)`, a coin burst.
   - Look: `EnemyModel` style **goblin** (big ears, gold-tooth grin, a sack of gold with a
-    twinkling glint) and a gold "Loot Goblin" label; `GoblinPortal` is a violet swirl with a
+    twinkling glint) and a gold "Coin Gremlin" label; `GoblinPortal` is a violet swirl with a
     ground ring (meshes via `MeshKit.cached`).
   - `keep_tag_on_screen()` runs in `_process` (process_priority =
     `CameraRig.PROCESS_PRIORITY + 1`, rendered frames only, no RNG, no gameplay state): the
-    "Loot Goblin" tag stays `TAG_SCREEN_PAD` px inside the viewport (`clamp_tag`,
+    "Coin Gremlin" tag stays `TAG_SCREEN_PAD` px inside the viewport (`clamp_tag`,
     `tag_screen_size`); off its home spot it is placed with `Camera3D.project_position` at the
     same depth.
 - **Bots** never count the goblin as a threat. A living bot with no other enemy within
@@ -1648,7 +1650,7 @@ scripts follow the `TalentEffect` rules (no RNG unless noted, `teardown` cleans 
   two (`Player.GHOST_SLOW_PCT` 33 vs `slow_pct`); `_apply_movement` inlines the same rule for
   walking and lunges. `is_slowed()` is true for either (the `slowed` talent condition counts
   it). An enraged elite ignores it like every slow (`apply_ghost_slow` refuses, `_enrage`
-  clears it); the Loot Goblin is slowed like by every other crowd control.
+  clears it); the Coin Gremlin is slowed like by every other crowd control.
 - Cost: one grid query per ghost per tick, no allocation per enemy, no RNG (group order).
 - Look: `OnionModel.set_ghost_slowing(active)` (the Player forwards `ghost_slowed > 0`; only
   changes act): the revive ring leans towards `GHOST_SLOW_TINT` (pale spectral blue,
@@ -1670,7 +1672,7 @@ Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identic
   and it costs something – before the effect's own draws.
 - Talent / set procs: like item procs, a draw only when the chance (or PPM) is below 100%;
   `every` procs never draw; `on_crit` procs roll after the `on_hit` procs of the same hit.
-- Scripts and kit hooks draw nothing, except Seal of Command (one draw per attack) and Flash
+- Scripts and kit hooks draw nothing, except Sunbrand (one draw per attack) and Flash
   Freeze (one per unfrozen enemy inside a storm per storm tick). The engine and TalentBot
   never draw.
 - Between waves: set rolls inside the generator (only on Epic rolls: the chance, then the
@@ -1715,7 +1717,7 @@ Everything goes through `RunState.rng`; `--fixed-fps 60` smokes stay bit-identic
   Intermission's loot roll, the spend log (a source scan: no `try_spend(` outside RunState and
   exactly the four known spender scripts; then all six kinds in one round with payers, amounts
   and totals), `params_for` merging talents + set + item mods (+ the rank) on Whirlwind and an
-  item + talent `radius_pct` summed on Blizzard, a talent reset (refund, every effect kind
+  item + talent `radius_pct` summed on Hailstorm, a talent reset (refund, every effect kind
   removed, the logged payment, the doubled price, a refused reset logs nothing), the set-aware
   upgrade badges (shop pip, loot chip) and the goblin's `walk_speed()`.
 - `test_ghost_slow.gd` – the ghost slow (inside / outside / edge, a living hero slows nothing,
@@ -1756,7 +1758,7 @@ own section below.
 
 #### RunState (autoload/run_state.gd)
 
-- **Arcane Dust** (the second team currency, GDD 5.7): `arcane_dust` (the pile), `dust_earned`,
+- **Glimmer Dust** (the second team currency, GDD 5.7): `arcane_dust` (the pile), `dust_earned`,
   `dust_spent` (run totals), `add_dust(amount, slot_index := -1, label := "")` (non-positive does nothing),
   `can_afford_dust(amount)`, `try_spend_dust_for(amount, slot_index, kind, label) -> bool` (false and no
   change if too poor / negative). Signal `dust_changed(dust, delta)` fires on every change (and once with
@@ -1785,8 +1787,8 @@ own section below.
 
 #### Enemies, Db, data
 
-- `EnemyData.is_boss := false`; `Enemy.is_boss()` = `data != null and data.is_boss` (the Loot Goblin overrides
-  it with `false`). Execute / Mirror Image / Word of Glory / `PlayerBonuses` "boss" conditions read it.
+- `EnemyData.is_boss := false`; `Enemy.is_boss()` = `data != null and data.is_boss` (the Coin Gremlin overrides
+  it with `false`). Execute / Phantom Double / Call of Valor / `PlayerBonuses` "boss" conditions read it.
 - `EnemyData.Behavior` = `CHASE, SWARM, LUNGE, RANGED, SUPPORT, BRUTE` (the two new values are appended: the
   stored ints of the existing `.tres` files are unchanged). `Enemy._think` dispatches them to
   `_think_support` / `_think_brute` (both implemented by the enemies below; the foundation default was `_update_chase`).
@@ -1945,7 +1947,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   `slow_time`, `summon_id`. A new boss is a new .tres with other numbers; a new ability kind is a
   `Kind` value, a `_cast_*` in `Boss` and (if it lays something down) an `EnemyHazard` subclass.
 - `data/bosses/lich_commander_morvain.tres` (wave 10: base HP 450, contact 3, speed 1.9, radius 0.8,
-  scale 2.1, model `lich`, Frost Circles 7 s / Raise Dead 12 s (4, 6) / Frost Breath 9 s, cooldowns
+  scale 2.1, model `lich`, Frost Circles 7 s / Call the Fallen 12 s (4, 6) / Frost Breath 9 s, cooldowns
   ×0.7 in phase 2, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25 by party size) and
   `data/bosses/vorthalax.tres` (wave 25: base HP 450 (the GDD's earlier 1200 left 38-67% of the HP after the 210 s
   smoke safety, see "Boss-fight data points"), contact 4, `coop_hp_per_player` 0.75 = x1 / x1.75 / x2.5 / x3.25,
@@ -2130,11 +2132,11 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   whirlwind `quake_duration / quake_pct / quake_tick`; charge `shockwave_radius / shockwave_stun`;
   blizzard `nth_cast / nth_radius_bonus`; word_of_glory `shield_max_hp_pct`. The effect scripts read
   them (`WarriorWhirlwind._spawn_quake`, `WarriorCharge._shockwave`, `BlizzardEffect.cast`,
-  `PaladinWordOfGlory.grant_shield`). The Consecration heal (`heal_max_hp_pct`) and Vanish
+  `PaladinWordOfGlory.grant_shield`). The Sacred Circle heal (`heal_max_hp_pct`) and Melt Away
   (`forced_crits`) are pure data (existing params).
 - TalentEffect scripts (`scenes/artifacts/`): `ArtifactMageFrostShards` (on_kill),
   `ArtifactRogueFangsFan` (on_hit, `RogueFanOfKnives.throw_free`), `ArtifactWarlockSecondVoidwalker`
-  (tick; `WarlockVoidwalker.spawn` with the Summon Voidwalker params of the hero, ward off),
+  (tick; `WarlockVoidwalker.spawn` with the Summon Gloomguard params of the hero, ward off),
   `ArtifactWarlockPetLeech` (sets `pet_leech_pct`). The +25% pet damage is a plain `damage`
   entry (`source: pet`).
 
@@ -2215,7 +2217,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   compact block tests in `test_m6_artifacts_ui`, short text tests in `test_m6_artifacts_core`,
   Shatterfrost data / reach tests in `test_m6_artifacts_props`.
 
-### Enchanter and Arcane Dust
+### Enchanter and Glimmer Dust
 
 #### Rules: `core/items/enchanter.gd` (`Enchanter`, pure statics + the spending)
 
@@ -2370,7 +2372,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   the one place that lays out the "P2 wants" tags (stacked card: column from (4, 14); wide card: one row
   at x >= `WIDE_PING_X` (66), y = 6 + `ICON_SIZE`, short "P2" text when the full row does not fit) and
   the overlay draws exactly those rects.
-- `ConsumableCard` (96 high, flexible width), `ConsumableIcon` (procedural: round flask, vial, conical
+- `ConsumableCard` (96 high, flexible width), `ConsumableIcon` (since M7b a tinted silhouette of its picture; procedural otherwise: round flask, vial, conical
   flask, bowl, rings, ribs; border blue for potions / orange for food), `ConsumableTooltip extends
   ItemTooltip` (so `layout_tooltips` places it like an item tooltip; a second tooltip per player,
   `_cons_tooltips`, `_shown_tooltip`), `ShopOfferCard.create_wide` (200x96, `gold_frame`, price at the
@@ -2412,15 +2414,15 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   id the meter credits.
 - `Player.heal(amount, source_slot := -1)`: the **effective** gain (after the max-HP clamp, nothing while downed) goes to
   `RunState.record_heal(source_slot, ...)`; `-1` = the hero itself (regen, Leech, Life on Kill, self heals). **Every call
-  site that heals someone else passes the caster's `slot_index()`**: Word of Glory, Lay on Hands, Divine Storm,
-  Light's Hammer (Consecration), Holy Shock, Seal of Command, Unbreakable's ally heal, item `heal` / `smite_heal` procs,
+  site that heals someone else passes the caster's `slot_index()`**: Call of Valor, Mending Touch, Radiant Whirl,
+  Gifted Circle (Sacred Circle), Radiant Pulse, Sunbrand, Unbreakable's ally heal, item `heal` / `smite_heal` procs,
   `AbilityArea` heals (`owner_player`), the bandage's heal ticks (`GeneralBuff.set_heal(total, ticks, interval,
-  source_slot := -1)` stores `heal_source`). New healing effects (e.g. Dawnbreaker's Consecration heal) must
+  source_slot := -1)` stores `heal_source`). New healing effects (e.g. Dawnbreaker's Sacred Circle heal) must
   pass the caster the same way, otherwise the target is credited.
 - `Player.revive(hp_ratio, reviver_slots: Array[int] = [])`: records one revive for every distinct slot of
   `reviver_slots` after the revive happened (a hero that is not down records nothing). Callers: the teammate channel
-  (`_update_revive` passes the living teammates inside the circle at the moment it completes), Word of Glory (the
-  caster); the wave start, the Spirit Healer and the smoke runner pass none.
+  (`_update_revive` passes the living teammates inside the circle at the moment it completes), Call of Valor (the
+  caster); the wave start, the Grave Tender and the smoke runner pass none.
 - `Player._go_down` -> `record_down`. `Player.take_damage`: `record_damage_taken(slot, hp_before - hp)` (HP really
   lost, no overkill, after armour / mults / shields / cheat-death); a blocked hit records
   `record_absorb(slot, mitigated(raw) - mitigated(blocked))`. The mitigation chain moved into `Player._mitigated(amount,
@@ -2429,7 +2431,7 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   receiving hero's own slot). An entry is identified by `(source, owner_slot)`: shields of one source from different
   casters keep separate entries (and timers); `shield_of(source)` sums the casters. `absorb()` calls
   `record_absorb(s.owner_slot, taken)` for every shield that soaked something. Casters of other heroes' shields
-  pass `slot_index()` (Word of Glory, Lay on Hands, Holy Shield, the `shield` proc).
+  pass `slot_index()` (Call of Valor, Mending Touch, Gleaming Shield, the `shield` proc).
 - `WarriorExecute.strike`: the finishing blow `e.take_damage(e.hp, ...)` records `RunState.record_damage` first.
 
 #### RunSummary (core/run_summary.gd) – the pure model
@@ -2513,7 +2515,7 @@ describe each side).
 4. **Credit of new healing / shielding.** Any new effect that heals or shields someone else passes the caster:
    `Player.heal(amount, caster.slot_index())`, `ProcSystem.add_shield(amount, duration, source, caster_slot)`.
    Dawn's Embrace (`PaladinWordOfGlory.grant_shield`, source `&"dawn_embrace"`) is credited to the casting
-   Paladin; the Dawnbreaker heal of the Consecration mod goes through the existing, already credited code.
+   Paladin; the Dawnbreaker heal of the Sacred Circle mod goes through the existing, already credited code.
    `shield_of(source)` sums the casters, so the 15% top-up rule holds across casters.
 5. **Artifacts and the economy.** An Artifact is never sold (`ItemInstance.can_sell()`: the Sell entry is greyed
    "Artifact", bots never sell one), forged (`Forge.REASON_ARTIFACT`), disenchanted
@@ -2629,7 +2631,7 @@ emptied by consumables, enchants and the Black Market (gold at the last shop 41-
 
 **What kills the bots** (on the merged head; a debug copy printed every hit by source, the numbers equal the
 runs above): the **Flesh Golem** is the biggest damage dealer from wave 12 on: 42% (4 players) / 50% (1) / 37% (2) of all damage taken in waves 10-19
-(hook + melee), then the Troll Axethrower (25-32%); 7 of the 10 downs of waves 10-19 and 11 of the 14 downs of wave 20 in
+(hook + melee), then the Troll Hatchet-Hurler (25-32%); 7 of the 10 downs of waves 10-19 and 11 of the 14 downs of wave 20 in
 the 4-player run came from golem hits (wave 19 alone: 6 downs). **Wave 20** (every enemy carries an elite affix, HP x1.5)
 is a wall for the smoke bots at every party size: golems with Shielding / Vampiric affixes and enraged / frenzied
 axethrowers. The 2-player party loses at wave 14 because nobody is left to revive. Sourceless ground damage (the poison puddles)
@@ -2744,7 +2746,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   The two rules that do change play are the Epic weapons' +10% attack speed (GDD 4.1) and the environment roll: a
   default run now plays a random arena (`--env=forest_ruin` pins the old one). **A seeded number recorded before the
   M6b merges is not comparable with this head** (see "Determinism and the seed-5 smoke").
-- Out of scope: the final balance, the M7 look of the environments, the class-independent tier sets (M8), Crossbow /
+- Out of scope: the final balance, the final look of the environments (done in M7b), the class-independent tier sets (M8), Crossbow /
   Polearm / Fist Weapon (M8).
 
 ### Foundation hooks (autoload/run_state.gd, autoload/db.gd, scenes/main, scenes/ui/intermission.gd)
@@ -2808,7 +2810,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   wave plaque, no room in a normal run) and the end screen (`GameOverScreen.hardcore_badge`). **One ghost hint**:
   `UnitFrame.TEAMMATE_HINT` ("Only a teammate can revive you") is shown for a downed hero whenever there is no Spirit
   Healer to go to (`RunState.hardcore`, also with no arena at all, or an arena without a healer: the dungeon);
-  Resurrection Sickness still wins, a normal clearing keeps "Go to the Spirit Healer".
+  Wilted still wins, a normal clearing keeps "Go to the Grave Tender".
 - **Lobby mode select** (`scenes/ui/lobby.gd`): `Lobby.run_mode`, `Lobby.hardcore`, `cycle_mode(by_slot)`,
   `toggle_hardcore(by_slot)`, `mode_text()` ("Mode: Endless · Hardcore"), `set_run_mode`, signal `mode_changed(mode,
   hardcore)` -> `Main.configure_run`; `Main.go_to_lobby` shows `options.mode / hardcore` every time. Any joined slot's
@@ -2861,8 +2863,8 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   -> Ice Cave): CI covers every environment over seeds; `--env=<id>` pins one.
 - **Decor** (`ArenaThemes.build(arena, rng)` from `Arena._build_decor`, by `decor_id`; the forest for any other id): merged
   vertex-colour meshes (`MeshKit`, `Mats.toon_vc`), tall objects in 4 + 4 chunks the camera can cull, one undergrowth /
-  props / glow mesh, two ground MultiMeshes. Budget (pinned): 13 / 13 / 14 / 13 decor draw calls (cemetery / swamp /
-  volcano / ice) vs the forest's 15, vertices <= 1.5x the forest's. **Invariant (pinned): nothing above 0.55 m stands
+  props / glow mesh, two ground MultiMeshes. Budget (pinned): 14 / 14 / 15 / 14 decor draw calls (cemetery / swamp /
+  volcano / ice; M6b had 13 / 13 / 14 / 13, the M7b Backdrop adds one) vs the forest's 15, limit 16, vertices <= 1.5x the forest's. **Invariant (pinned): nothing above 0.55 m stands
   inside the playable rectangle.** The volcano dresses its six vents (`EnvironmentHazards.LAVA_VENT_POINTS`) inside the
   arena, but only those that fit the layout in use (`ArenaThemes.vents_in(bounds)`, `VENT_CLEARANCE` 1.6 m from the walls:
   all six in the clearing, **none in the dungeon room**, where the vents at +-12 m would be cut in half by the walls and
@@ -2917,7 +2919,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   `WaveDirector.stop()` frees every node in the group `EventSpawner.GROUP` (`&"event_objects"`) and despawns the guards /
   the cart, so **nothing of an event follows the party into a break or a dungeon**.
 - Placement: `_event_point(min_distance)` follows `WaveDirector.find_spawn_point` (on screen outside the HUD, >=
-  `min_distance` from every hero and the Spirit Healer if there is one) drawn from `event_rng`: chest
+  `min_distance` from every hero and the Grave Tender if there is one) drawn from `event_rng`: chest
   `CHEST_HERO_DISTANCE` 10 m (clamped `POST_RADIUS + 0.4` from the walls), totem `TOTEM_HERO_DISTANCE` 4 m; the cart's side
   and lane (`LANE_MARGIN` 3.5 m) from `event_rng` too. Everything else (`Enemy.setup`, the item) uses `RunState.rng`.
   `grunt_hp(wave)` = a Skeleton Grunt's `hp_at_wave x coop_hp_mult()` (the yardstick of the totem x30 and the cart x40).
@@ -2952,7 +2954,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   Measured with a scratch probe in real frames (`--smoke --event=totem --players=4 --env=forest_ruin --fixed-fps 60`),
   hero-seconds beyond 6 m while alive, before -> after: seed 3 wave 14 89.0% -> 15.2%, seed 2 wave 9 41.5% -> 13.7%, seed 5
   wave 9 26.1% -> 1.5%, seed 4 wave 8 58.0% -> 4.4%, 3 bots seed 8 wave 9 78.2% -> 16.5%; what is left is the walk in from
-  the start, the walk back from the Spirit Healer after a revive (it stands 9-15 m from the totem) and rescue runs.
+  the start, the walk back from the Grave Tender after a revive (it stands 9-15 m from the totem) and rescue runs.
 - **Name tags** (`EventFx.label` makes an `EventTag extends Label3D`, fixed-size billboard: the chest's, totem's and cart's):
   every rendered frame the tag slides inside `CameraRig.get_safe_screen_rect()` (the HUD-safe ground rectangle projected
   onto the screen: the largest axis-aligned rectangle inside the projection, clipped to the viewport) with
@@ -3038,8 +3040,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   as a teammate's only while `Dungeon.counts_revives()`.
 - **Arena layout swap** (`scenes/arena/arena.gd`): `DUNGEON_SIZE` 24 x 14, `play_size` (`get_bounds()` follows it),
   `in_dungeon_layout`, `decor`, `wall_boxes_for(size)`, `enter_dungeon_layout(env := null, size := DUNGEON_SIZE)` parks the
-  clearing's WorldEnvironment, sun, ground, walls and decor and builds the room in the run's palette (its own decor generator
-  `DECOR_SEED + 17`), switches the **Spirit Healer off** (`process_mode` DISABLED, `spirit_healer = null` meanwhile; a hardcore
+  clearing's WorldEnvironment, sun, ground, walls and decor and builds the room with the crypt ground and dressing (M7b: `ArenaGround`'s crypt look and `ArenaCrypt`; the sky stays the run's environment's), switches the **Grave Tender off** (`process_mode` DISABLED, `spirit_healer = null` meanwhile; a hardcore
   arena has none to restore); entities, camera, `Arena.current` and the heroes stay (heroes cannot be re-parented:
   `Player._exit_tree` tears their abilities down). `leave_dungeon_layout()` restores the same node instances. The environment
   hazards are not part of it (see "Arena environments").
@@ -3049,7 +3050,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   `Enemy.drops_loot = false` (kills count, no gold / XP / item / Artifact). Rooms: 1 CLEAR 25 kills (cap 12 alive, 1.5x rate),
   2 SURVIVE 25 s (cap 30, 2.5x), 3 DEFEND 20 s (cap 24, 2x) with the `DungeonBrazier` (30 x grunt HP; enemies within 9 m are
   taunted onto it and bite it; 0 HP = failed), 4 WARDEN. Fail: every hero down or the brazier destroyed (the dungeon, not the
-  run). Warden: `data/bosses/dungeon_warden.tres` (`boss_wave` 0, base HP 120, Frost Circles + Raise Dead, phase 2 at 50%,
+  run). Warden: `data/bosses/dungeon_warden.tres` (`boss_wave` 0, base HP 120, Frost Circles + Call the Fallen, phase 2 at 50%,
   enrage at 60 s, no loot / gold, `Boss.director` is a plain Node with `summon(...)`); smoke safety kills a Warden
   `Dungeon.SMOKE_BOSS_GRACE` 60 s past its enrage. HUD: `Hud.set_dungeon_status(title, task, seconds_left)` / `clear_dungeon()` /
   `is_dungeon_shown()`.
@@ -3067,7 +3068,7 @@ above describe each side).
 
 | rule | where it is enforced |
 |---|---|
-| No Spirit Healer in a hardcore run **or** a dungeon; one hint text | `Arena.create(env, not hardcore)`, `Arena.enter_dungeon_layout`, `UnitFrame.TEAMMATE_HINT` |
+| No Grave Tender in a hardcore run **or** a dungeon; one hint text | `Arena.create(env, not hardcore)`, `Arena.enter_dungeon_layout`, `UnitFrame.TEAMMATE_HINT` |
 | Portal only after 6 / 9 / 12 / 15 (endless too, never after 26+); `--dungeon` forces one | `Dungeon.is_portal_wave`, `Main._roll_portal` |
 | Events never on boss / elite-rule waves (endless too), no event object outside a wave | `EventSpawner.is_eligible_wave`, `WaveDirector.stop()` |
 | No environment hazard (and no vent decor) in a dungeon | `EnvironmentHazards` gated on a running wave; `ArenaThemes.vents_in` |
@@ -3187,10 +3188,10 @@ Bracers, Leggings); display names are unique across all content (`test_display_n
 - **Class items** (`unique_effect = &"ability_mod"`) carry `unique_params = {"ability": <real id of the class>, "mods": {...}}`.
   Mod keys used: `<param>_add` for cooldown, duration, buff_duration, shield_duration, radius, range, echoes, targets, pulses,
   pierce, chain, missiles, stun, freeze, threshold, heal_pct, heal_max_hp_pct, burn_pct, slow_pct, shuriken, and `<param>_pct`
-  for `power_pct` (Ice Barrier: the whole absorb, via `power`) only. Every key names a parameter the ability reads through
-  `params_at_rank` (checked for all 30 by `test_items_content_m6b.gd`). Effect-level checks: Ice Barrier x1.25, Fireball burn
-  share 0.50 -> 0.65 of the hit, Lay on Hands cooldown 60 -> 50 at Rank I, four Shuriken Toss stars. Review fix-ups: Robe of
-  the Tidewoven Veil scales the whole Ice Barrier (`power_pct` 25, was `shield_pct`), Long Coal Staff adds burn damage
+  for `power_pct` (Frozen Layer: the whole absorb, via `power`) only. Every key names a parameter the ability reads through
+  `params_at_rank` (checked for all 30 by `test_items_content_m6b.gd`). Effect-level checks: Frozen Layer x1.25, Fireball burn
+  share 0.50 -> 0.65 of the hit, Mending Touch cooldown 60 -> 50 at Rank I, four Throwing Stars stars. Review fix-ups: Robe of
+  the Tidewoven Veil scales the whole Frozen Layer (`power_pct` 25, was `shield_pct`), Long Coal Staff adds burn damage
   (`burn_pct_add` 15, was a duration that lowered the burn rate), Girdle of Lasting Grace shortens the cooldown unconditionally
   (`cooldown_add` -10), five Equip lines say "longer" / "more" instead of absolute values, Leathers of the Unseen Throw adds a
   shuriken (`shuriken_add` 1, `range_add` 3 kept).
@@ -3287,7 +3288,7 @@ bit-identical per run (three runs of the merged head gave identical results in e
 
   Wave 1 of the merged head is bit-identical to the features head (52 kills, 52 gold, 1 looted, 0 bought, the same market carry);
   the first difference is wave 2 (120 vs 119 kills): the shop offers made at the end of wave 1 already draw from the larger
-  pools. The Loot Goblin spawn of wave 3 (1 -> 0) is a `RunState.rng` draw that moved with it, not a rule change. The same
+  pools. The Coin Gremlin spawn of wave 3 (1 -> 0) is a `RunState.rng` draw that moved with it, not a rule change. The same
   command with `--env=forest_ruin` gives 595 kills (1 goblin, gold 178). **Every smoke or balance number recorded before the
   content merge is not comparable with this head**; the 587 of the M6a chapter belongs to the Forest Ruin default of that time,
   the 603 of the features head to the Ice Cave roll.
@@ -3359,7 +3360,7 @@ the *Enemy's* own field), the only `WARNING`s the expected ones of the Warden-da
 - Tooltip-height sensitivity (re-run after every merge of item content): `test_m6_artifacts_fit.gd::test_no_ordinary_wave_25_item_is_scaled_or_loses_its_title`
   opens every hand-made unique as a wave-25 Legendary (two *random* enchants under the unique text) in the loot roll window and wants the title
   block never hidden. Tearjerker's first 152-character text made it one line taller than every old Legendary (612 px vs 583 px) in some
-  random-enchant draws, so all new texts are short. With the two longest enchants (Shadowflame + Wailing) under every Legendary the tallest
+  random-enchant draws, so all new texts are short. With the two longest enchants (Duskflame + Wailing) under every Legendary the tallest
   tooltip is 583 px = the old Bulwark / Stormcaller; it stays green with all 160 uniques.
 
 ### Open items for the final balance (M6b)
@@ -3398,9 +3399,9 @@ matrix); the GDD 9 list ("Nyitott kérdések M6b-re") carries them all.
 
 ### Known gaps
 
-- The bog pool's rim is drawn under its mud ring (1.3:1 contrast) and the boss circles on the ice floor are unreviewed art calls (M7).
+- The bog pool's rim is drawn under its mud ring (1.3:1 contrast) and the boss circles on the ice floor are unreviewed art calls (still open after M7b).
 - Breastplate of Unbroken Anger (40% x ICD 0.5 s) still shows its name on every proc (up to 2 floating labels per second); the `"label"` key can silence it.
-- The enchant prefixes Rallying and Spiked share a word with the abilities "Rallying Sprint" (`general_sprint`) and "Spiked Wall" (`warrior_shield_wall`):
+- The enchant prefixes Rallying and Spiked share a word with the abilities "Rallying Sprint" (`general_sprint`) and "Spiked Guard" (`warrior_shield_wall`):
   different namespaces, no functional clash.
 - The Black Market sells generated max-roll Epics and tier-set pieces only, so the 15 named + 14 class Epics of CONTENT-ITEMS and the 4 Epic trinkets of
   CONTENT-FX reach the player through shop / loot / elite / goblin / boss, the Shrine of Fortune and the dungeon rewards, not through the Black Market.
@@ -3428,8 +3429,8 @@ roll screen sets `EnvironmentRollScreen.enabled` and restores it.
 | `tests/test_content_fx_enchants.gd` | 32 | 50 enchants / per-kind counts; field validity of the 26 (prefix, slots, kind rules, ICD range, school, tooltip placeholders at all five ranks, line length, trademarks); equip numbers x rank and their effect in the combat math (school damage, Area Size, Cooldown Reduction on a real ability, Gold Find, Thorns on a real melee hit, Parry, XP); each of the 18 proc enchants forced through its real trigger and the effect checked against its tooltip; the documented PPM / chance rates by statistics; every new enchant fits an item and is rolled by the generator (3000 items); the prefixes are Rallying and Spiked without a suffix echo |
 | `tests/test_content_fx_uniques.gd` | 47 | ids / counts / unique display names (also against every Artifact and Forge Legendary name); field validity of the 20 trinkets and 17 Legendaries (slot, armour type, rarity, sources, `min_wave`, vocabulary, `PROC_KEYS`, tooltip phrase, text length, every number of the params in the tooltip, trademarks); Legendaries cover all 12 slot types and the 5 that had none; class coverage; generator scaling and 2 random enchants; all 25 Legendaries and all 30 trinkets drop (1500 / 2400 rolls); one test per effect (37) through its trigger with exact damage; statistical rates; the Staff of the Deep Winter flavour |
 | `tests/test_content_fx_fight.gd` | 1 | three heroes wear all 37 new hand-made effects and the 26 enchants through a 24 s simulated fight (the `test_procs_smoke.gd` engine): 0 errors, at least 25 different new procs fire |
-| `tests/test_items_content_m6b.gd` | 17 | loading and fields, Rare / Epic rules, class usability, ability targets, mod keys vs params, the text's numbers equal the mods' (exact set), relative wording, the reworded lines, the mods reaching `params_at_rank` through `Equipment.equip`, the Equip line (green; DIM "(needs X)" until learned), Lay on Hands and Shuriken Toss counts, every named proc firing (forced roll) |
-| `tests/test_items_content_m6b_effects.gd` | 2 | Mage spells: Ice Barrier x1.25 and the Fireball burn share |
+| `tests/test_items_content_m6b.gd` | 17 | loading and fields, Rare / Epic rules, class usability, ability targets, mod keys vs params, the text's numbers equal the mods' (exact set), relative wording, the reworded lines, the mods reaching `params_at_rank` through `Equipment.equip`, the Equip line (green; DIM "(needs X)" until learned), Mending Touch and Throwing Stars counts, every named proc firing (forced roll) |
+| `tests/test_items_content_m6b_effects.gd` | 2 | Mage spells: Frozen Layer x1.25 and the Fireball burn share |
 | `tests/test_m6b_content_integration.gd` | 12 | the content cross-checks (below) |
 | `tests/test_procs.gd` | +4 | the `"label"` key |
 | `tests/test_ui_items.gd` | +1 | `test_epic_weapon_tooltip_shows_the_attack_speed_bonus` |
@@ -3453,3 +3454,262 @@ enchants" assertion became "one enchant each, at most 3 misses in 300 rolls": `M
 onto a miss); `test_ui_market_tooltips.gd` `_check_column_apart` (a test fix: it compared the bottom tooltip's free plan with the top tooltip without
 `PlayerPanel.TOOLTIP_NEIGHBOUR_GAP`, 8 px, although `_tooltip_plan` moves a tooltip that would come closer than the gap; which Legendary pairs get compared depends on the
 `Db.uniques` order); `test_forge.gd` loops over `Db.weapons`, so it already covers the 13 Legendaries; `test_procs.gd` keeps its list of the 24 original enchants.
+
+## M7a: audio, Settings and Credits, menus, IP cleanup
+
+M7 is split. **M7a** (this chapter, done) adds the sound layer, the Settings and Credits pages with their menu entries, two dev flags, and the removal of Blizzard-derived player-visible names, guarded by a test. **M7b** (graphics: fonts and icons, visible equipment, the environment look, combat effects) is done, see the M7b chapter below. Everything in M7a is presentation or hardware only: with the default settings the simulation, the `RunState.rng` draws and the smoke result are unchanged.
+
+### Audio (`autoload/audio.gd`, `data/audio/`, `core/audio_ids.gd`)
+
+- Autoload `Audio` (registered after `RunState` in `project.godot [autoload]`), `process_mode = ALWAYS`: UI clicks and fades work while the tree is paused. Fades run in real time (`delta / Engine.time_scale`).
+- Bus layout `default_bus_layout.tres` (Godot loads it by default, no `project.godot` entry): `Master` <- `Music`, `SFX`, `UI`, all 0 dB. Settings sets the bus volumes by name (`AudioServer.get_bus_index`).
+- Content: `data/audio/sound_bank.gd` (`SoundBank`), `data/audio/sound_def.gd` (`SoundDef`), `data/audio/sound_bank.tres`: id -> streams (variants), volume, pitch, max voices, min interval, priority, bus. 68 sounds and 4 music tracks.
+- `core/audio_ids.gd` (`AudioIds`): pure mapping helpers: weapon -> swing / shot id; ability -> ability sound id (`AudioIds.ability`: tags pet / heal / shield / buff / movement first, then school, then aoe / ground).
+- API:
+  - `play(id, volume_db_offset := 0.0) -> bool`: SFX bus (`victory` and `defeat` use Music).
+  - `play_ui(id, offset := 0.0) -> bool`: UI bus.
+  - `play_music(track, fade := 1.0)`: crossfade; the same track again is a no-op, an unknown track is a no-op, `&""` stops. `stop_music(fade := 1.0)`, `current_music()`, signal `music_changed(track)`. Tracks loop (`loop=true` in the `.import` file).
+  - Unknown id or missing stream: silent no-op (`unknown_count()`). Works headless.
+- Voices: 24 pooled non-positional `AudioStreamPlayer`s (SFX and UI share them; the bus is set per play) plus 3 music voices. Per sound: `max_voices` (concurrent) and `min_interval` (seconds, real time); a throttled or over-limit sound is dropped. With no free voice a sound steals the oldest voice of a strictly lower `priority`, otherwise it is dropped.
+- Variants: random, never the same twice in a row; pitch = `pitch * (1 +- pitch_variation)`.
+- Randomness: its own `RandomNumberGenerator`, never `RunState.rng`. The smoke result is the same as before M7a apart from the perf and real-time fields.
+- Debug / test: `play_count(id)`, `rejected_count(id)`, `active_voices(id)`, `total_active_voices()`, `total_play_count()`, `music_gain(track)`, `music_voices_in_use()`, `advance(delta)`, `reset()`, `clock_override` (>= 0 replaces the real clock).
+
+Sound ids (`sound_bank.tres`; bus in brackets):
+- UI [UI]: `ui_move ui_confirm ui_back ui_error ui_open ui_close ui_tab ui_toggle ui_join ui_card_flip ui_card_pick ui_dice ui_reroll ui_buy ui_sell ui_equip`.
+- Weapons [SFX]: `swing_light` (dagger), `swing_blade`, `swing_heavy` (two-handers, mace, axe), `shot_bow`, `shot_gun`, `cast_arcane cast_fire cast_frost cast_holy cast_shadow cast_nature` (wand, staff, orb by school).
+- Combat [SFX]: `hit hit_crit enemy_death enemy_death_elite enemy_death_boss hero_hurt hero_down revive level_up dodge parry block explosion`.
+- Abilities [SFX]: `ability_physical ability_aoe ability_fire ability_frost ability_arcane ability_holy ability_shadow ability_nature ability_heal ability_shield ability_buff ability_move ability_summon`.
+- Loot / world [SFX]: `gold_pickup xp_pickup item_drop loot_win chest_open`.
+- Flow [SFX]: `wave_start wave_cleared boss_spawn boss_telegraph goblin_appear goblin_escape banner portal`; `victory` and `defeat` [Music].
+- Music: `menu combat intermission boss`.
+
+Hooks (one-liners; no gameplay change):
+- `WeaponRunner`: `_melee` / `riposte` swing, `_shoot` shot, `apply_hit` hit / hit_crit (player weapon, projectile and explosion hits). `AbilityRunner._cast_with`: `AudioIds.ability(a)`.
+- `Enemy._die`: death (normal, elite affix, boss). `Boss`: `boss_telegraph` per cast, `banner` on enrage.
+- `Player.take_damage`: `hero_hurt`, `dodge`, `parry`, `block`; `Player._go_down`: `hero_down`.
+- `Vfx`: `explosion` (volume by radius), `level_up_burst` -> `level_up`, `resurrect_column` -> `revive`.
+- `Pickup.collect`: `gold_pickup` (+ soft `xp_pickup`); `LootDrops._place_bag`: `item_drop`.
+- `GoblinSpawner`: `goblin_appear` / `goblin_escape`. `EventSpawner`: `banner` on an event, `loot_win` on success. `GuardedChest.open`: `chest_open`. `Dungeon`: `portal` (enter), `banner` (room), `wave_cleared` (room cleared), `loot_win` (cleared), `defeat` (failed).
+- `Main`: `_set_state` -> `_update_music` (menu and lobby: `menu`; WAVE: `boss` on boss waves (`RunState.is_boss_wave`), else `combat`; DUNGEON: `combat`, `boss` while the Warden lives; INTERMISSION: `intermission`; GAME_OVER fades out). `start_wave` -> `wave_start`; `_on_wave_cleared` -> `wave_cleared`; `_on_boss_spawned` / `_on_dungeon_boss_spawned` -> `boss_spawn`; `end_run` -> `victory` / `defeat`.
+- UI: every menu and panel plays move / confirm / back / error through `play_ui` (`MainMenu`, `Lobby`, `PauseMenu`, `LevelUpScreen` / `LevelUpPanel`, `LootRollScreen`, `ShopPanel`, `PlayerPanel`, `TalentTab` / `TrainerTab` / `EnchanterTab`, `Intermission`, `ShrineScreen` / `PortalScreen`, `EnvironmentRollScreen` (`banner` on landing), `GameOverScreen`); `PlayerManager.join` plays `ui_join`; `SettingsPage` and `MenuPage` play `ui_move`, `ui_confirm`, `ui_toggle`, `ui_open`, `ui_close`, `ui_back`.
+
+### Settings (`autoload/settings.gd`, `core/game_settings.gd`, `core/setting_option.gd`, `scenes/ui/fps_overlay.gd`)
+
+- Autoload `Settings` (after `Audio`) owns `data: GameSettings`. API: `get_value`, `set_value`, `step_value`, `reset_to_defaults`, `screen_shake_mult() -> float`, `damage_numbers_enabled() -> bool`, `show_fps_enabled()`, `apply_all()` / `apply_audio()` / `apply_video()`, `save()`, signal `changed(key)`. Every change is applied and saved at once.
+- `SettingOption` (`core/setting_option.gd`): one row: key, section, label, kind (`PERCENT` / `CHOICE` / `TOGGLE`), default, `sanitize`, `stepped`, `text`, `to_file` / `from_file`. Percent values clamp and snap to the step and stop at the ends; choices and toggles wrap or flip.
+- `GameSettings` (`core/game_settings.gd`, RefCounted): the `options()` table, values, `set_value` / `step_value` / `reset_to_defaults`, typed reads, `volume_to_db`, `load_file` / `save_file` on an injectable `path`. No engine side effects, so tests build their own instance.
+
+| Section | Option | Values | Default | Applied by |
+|---|---|---|---|---|
+| Audio | Master / Music / Effects / Interface volume | 0–100 %, step 10 (0 % = muted) | 100 / 70 / 80 / 80 | buses `Master`, `Music`, `SFX`, `UI` (linear -> dB; a missing bus is ignored) |
+| Video | Window Mode | Windowed / Borderless Fullscreen / Fullscreen | Windowed | `DisplayServer.window_set_mode` (`WINDOW_MODE_FULLSCREEN` = borderless, `EXCLUSIVE_FULLSCREEN` = Fullscreen) |
+| Video | VSync | On / Off | On | `DisplayServer.window_set_vsync_mode` |
+| Video | Max FPS | 30 / 60 / 120 / 144 / Unlimited | Unlimited | `Engine.max_fps` (0 = unlimited) |
+| Gameplay | Screen Shake | Off / Low / Full | Full | `CameraRig.shake` multiplies its trauma by 0 / 0.5 / 1 |
+| Gameplay | Damage Numbers | On / Off | On | `Vfx.damage_number` returns early when Off (other floating text such as "Dodge" stays) |
+| Gameplay | Show FPS | On / Off | Off | `FpsOverlay` (CanvasLayer 120, top-right "<n> FPS") |
+
+File `user://settings.cfg` (ConfigFile, written through `settings.cfg.tmp` and a rename):
+
+```
+[audio]    master_volume=100  music_volume=70  sfx_volume=80  ui_volume=80
+[video]    window_mode="windowed"|"borderless"|"fullscreen"  vsync=true  max_fps="30"|"60"|"120"|"144"|"unlimited"
+[gameplay] screen_shake="off"|"low"|"full"  damage_numbers=true  show_fps=false
+```
+
+- A missing file, key or unknown value gives the default; out-of-range numbers are clamped or snapped. An unreadable file gives the defaults plus a warning, and the next change overwrites it.
+- Automated runs: `Settings.is_automated_run()` is true in headless runs, under a custom main loop (the test runner), and for `--smoke`, `--demo`, `--view=...` and `--screenshot=...` (`LaunchOptions.is_automated()`; `Main.writes_leaderboard()` uses the same predicate). There the settings are the defaults, `user://settings.cfg` is never read or written, the window / VSync / FPS cap are never touched (so `--fixed-fps` is unaffected) and nothing is applied at startup (`Settings.persist` and `Settings.video_enabled` are false). Tests inject `GameSettings.path`.
+- Visual or hardware only: no gameplay number changes and no `RunState.rng` draw (`Vfx` has its own visual RNG). Bus volumes are set at startup and on change, overriding any `volume_db` in `default_bus_layout.tres` (outside automated runs only).
+- `FpsOverlay`: CanvasLayer 120, top-right label "<n> FPS".
+
+### Menus (`scenes/ui/menu_page.gd`, `settings_page.gd`, `credits_page.gd`)
+
+- `MenuPage`: base of the pages: dimmed screen, stone panel, prompt row, input rules.
+- Main menu: Play / Settings / Credits / Quit (`MainMenu.buttons`, focus wraps). Settings and Credits open a `MenuPage` over the title (the title column is hidden meanwhile; closing gives the focus back to the button). Nobody has joined there, so the page is driven by "anyone": keyboard `ui_*` actions plus every controller (`UiPads`), like the slot-less pause menu.
+- Pause menu: Resume, "Continue without Pn" offers, Settings, Quit to Menu (`PauseMenu.Item.SETTINGS`, `button_for(code)`). The Settings page is driven by the player who paused (their `PlayerInput`); with no working pausing player anyone drives it. While it is open the pause menu waits (START does not resume), the game stays paused, and B / Back returns to the pause menu (the closing B does not also resume).
+- `SettingsPage`: up / down move, left / right change a value, A flips a toggle, cycles a choice, or presses Reset to Defaults / Back; B goes back. Mouse: hover highlights; the arrows (or the left / right half of the value) change it.
+- `CreditsPage`: renders `res://CREDITS.md` as plain text: `#` / `##` / `###` headings, `-` / `*` bullets, paragraphs, `>` small print, `---`, tables; inline marks are stripped. A missing file falls back to the built-in text ("SmartOnion – a fan-made parody game / Made with Godot Engine"). The Godot notice (name, site, `Engine.get_license_text()`, MIT) and the engine's third-party notices (`Engine.get_copyright_info()` components with their copyright lines and licences, then every `Engine.get_license_info()` licence text) are always appended. Scroll with stick / d-pad / arrows / mouse wheel; B goes back.
+- Export: `CREDITS.md` must be in the export preset's include filter (`*.md`); non-resource files are not exported by default.
+
+### The forbidden-name test (`tests/test_m7_ip_names.gd`)
+
+- Renamed (player-visible only): ability, Rank V spec, talent tree and talent names, class masteries, resources, pets and summons, enemies, bosses and boss abilities, systems (Grave Tender, Wilted, Coin Gremlin), items, sets, enchant prefixes, uniques, 31 hard-coded strings (floating texts, banners, tooltips, HUD labels) and the `project.godot` description. Ids, file and class names, parameter keys, node names and cache keys are unchanged. The full old -> new table is in GDD "Kiadás és IP (M7 / M9)" ("Átnevezések (M7a)").
+- The test walks every `.tres` under `res://data/` and every `.gd` under `res://scenes/`, `res://core/` and `res://autoload/`, and checks:
+  1. no display name (ability, spec, talent, tree, enchant prefix, boss ability, enemy, resource, set, unique, mastery) equals an old name;
+  2. no banned phrase or brand appears in data text (String properties and text-bearing dictionary keys) or in the non-comment string literals of the code (comments, `&"ids"`, `^"paths"`, `res://` paths and triple-quoted shader code are skipped; the node names `Voidwalker` and `Infernal` are allow-listed). Single capitalised English words that are also old names match case-sensitively; invented old names (coinages) match in any case in data text and capitalised in code;
+  3. every new name in the table exists in the data;
+  4. ability, spec, talent and tree names are unique game-wide (artifact property names are outside the pool).
+- Self-tests of the matchers cover a false-positive table (a lower-case English word, a flask name that contains a generic word, `Imp Brood`, ids and cache keys). Sanity bounds stop a scan that finds nothing (name, text and literal counts; the pool equals Db's abilities + specs + talents + trees).
+- Verified to fail when a name, a text, a tree name, a code literal or a brand is reverted.
+- Kept on purpose (lead decisions): Need / Greed / Pass, Disenchant, Trainer, Enchanter, Skeleton Grunt, the word Imp (and the Wild Imp creatures), the goblin theme, animal suffixes, Whirlwind, Corruption, Ignite, Artifact, Stormcaller, Frostfang, Dawnbreaker, Shockwave, and Aftershock (the Crowd Stomp's own). Deviations from the approved table: the Fire tree is `Pyrelore` (not Emberlore; the text did not fit); the currency is `Glimmer Dust` (the short label "Dust" stays); the Holy resource is `Resolve`; the shard resource is `Pact Shard`.
+- The planned M8 Hunter and Shaman names are not renamed yet (no code); GDD 3.7 lists their replacements for when M8 is built.
+
+### Dev flags
+
+- `--view=menu`, `--view=settings`, `--view=credits` (`LaunchOptions.VIEWS`): the main menu, with its Settings or Credits page open, for a screenshot.
+
+### Assets, licences, tests
+
+- Audio: `assets/audio/sfx/*.ogg` (132 files, 2.2 MB) and `assets/audio/music/music_{menu,combat,intermission,boss}.ogg` (6.0 MB; `loop=true` in their `.import` files), 8.2 MB in total. All CC0 1.0 (Kenney packs; OpenGameArt music). Every pack is listed in `CREDITS.md`.
+- Tests: `tests/test_m7_audio.gd` (23 tests: bank, buses, streams, loop flags, voice limits, intervals, priority, music crossfade, determinism guard, every id used in the code exists in the bank), `tests/test_m7_settings.gd`, `tests/test_m7_ip_names.gd`. The pause-menu tests were adjusted to the new entry (`test_ui_pause_menu.gd`, `test_coop_input.gd`).
+- Verification: full suite 2888 passed, 0 failed; `--fixed-fps 60 -- --smoke --waves=3 --seed=5` exit 0, 0 errors.
+
+### Known gaps
+
+- Sounds were chosen by name, duration and pitch, not by ear: a listening pass is advisable (volumes per entry in `sound_bank.tres`; music at -8 / -11 / 0 / -6 dB relative to the files).
+- The boss track starts from silence; the combat track is a decoded MP3, so a tiny loop gap is possible.
+- The export preset must include `CREDITS.md` (see Menus).
+- Graphics (M7b) are done, see the M7b chapter below.
+
+## M7b: graphics polish (fonts and icons, visible equipment, environment look, combat effects)
+
+M7b is the second half of M7 and is presentation only. It adds a title font (Cinzel) and game-icons.net pictures on the existing frames; it puts the equipped Head, Shoulders and Chest on the onion model; it gives the five arena environments and the dungeon room their final look (ground shader, ambient particles, animated water and lava, light grades, backdrops, crypt dressing); and it adds combat effects (spawn rise, pooled corpses, school-coloured impacts, stronger crits, loot pop, pickup streaks, boss entrance). The 3D look stays procedural (lead decision): no imported 3D model, no skinned mesh, no new light in the arena.
+
+Rules for the whole chapter: visual only. No gameplay number, timing, collision, camera or spawn position changes. Visual randomness uses private `RandomNumberGenerator`s, never `RunState.rng`. The smoke result is identical to the M7a head apart from `real_time` and `perf`. The numbers below were measured under xvfb with llvmpipe (software GL) against the base `c817e6c`; draw calls are the stable measure, frame times are not.
+
+### Fonts (`scenes/ui/ui_theme.gd`, `assets/fonts/`)
+
+- `assets/fonts/Cinzel-VariableFont_wght.ttf` (variable font, weight 400–900, 125 KB) and `assets/fonts/OFL.txt` (Cinzel, Copyright 2020 The Cinzel Project Authors, SIL OFL 1.1). The file is Google Fonts' `Cinzel[wght].ttf`, renamed.
+- `UiTheme.title_font()` is a `FontVariation` over Cinzel with `variation_opentype = {UiTheme.WEIGHT_TAG: 700.0}`. `WEIGHT_TAG` is the integer tag `0x77676874` ("wght"): a string key is silently ignored and the text stays at regular weight. Glyph spacing 1; `fallbacks = [ThemeDB.fallback_font]` covers the glyphs Cinzel lacks (arrows and similar). If the font file is missing, the function falls back to the old emboldened default font.
+- Users: the `TitleLabel`, `HeadingLabel` and `BigNumber` type variations, the Button font, portrait initials, the shop price and SOLD stamp, the level label and the ilvl value. `bold_font()` and the default font (body text, names, card numbers, tooltips) are unchanged. Cinzel draws lower case as small caps; its digits are lining.
+- `UiTheme.fitted_font_size(font, text, width, max, min) -> int` (generic): the largest size from `max` down to `min` at which `text` fits `width`. `ShrineScreen._fill_card` uses it for the shrine name (`NAME_FONT` 40 down to 30, in the `NAME_WIDTH` column). "Shrine of the Gambler" (514 px against a 496 px column) was the only title that overflowed.
+- Widths against the old title font: +0 to 25 %, most for short words. Checked on the main menu, lobby, settings, credits, wave banner and intermission, game over, loot, portal, shrine, environment roll, HUD and level-up.
+
+### Icons (`scenes/ui/game_icons.gd`, `data/icons/`, `assets/icons/`)
+
+- Source: the game-icons.net full SVG archive (white on transparent, CC BY 3.0). Only the 215 SVGs in use are committed: `assets/icons/lorc/*.svg` (167) and `assets/icons/delapouite/*.svg` (48), plus `assets/icons/LICENSE.txt` (the archive's licence and contributor list). Every `.svg.import` has `svg/scale=0.25` (512 px viewBox to 128 px), `mipmaps/generate=true`, `compress/mode=0` (lossless) and `fix_alpha_border`. Controls set `texture_filter = GameIcons.FILTER` (`LINEAR_WITH_MIPMAPS`), so a 128 px picture drawn at 26–96 px stays smooth.
+- `IconMap` (`data/icons/icon_map.gd`, a Resource; data in `data/icons/icon_map.tres`): typed dictionaries from id to texture path. `abilities` (key `AbilityData.icon`, 46 entries), `talents` (`TalentData.id`, 135; distinct inside each class), `trees` (`TalentTreeData.id`, 15), `consumables` (`icon_id`, 7), `shrines` (`icon_id`, 6), `stats` (stat id, 40; for talents and new content without their own entry) and `schools` (7; the fallback for an ability with neither a picture nor a glyph rule). The 256 entries point at 215 distinct pictures; no shipped id falls back.
+- `GameIcons` (`scenes/ui/game_icons.gd`, static): loads the map once and caches one texture per path. `for_ability(a)` (icon id, then id, then the id without its class prefix), `for_school`, `for_stat`, `for_talent(t)` (own entry, then the icon id as ability or stat, then the modifier's ability), `for_tree`, `for_consumable`, `for_shrine`. Lookups never use display names, so the IP rename does not matter. `null` means no picture, and the control keeps its procedural glyph.
+- `GameIcons.draw_silhouette(ci, tex, rect, top, bottom, outline_px)`: eight shifted dark copies as the outline, then the tinted quad with a vertical gradient (`gradient_top(base)` = base lightened 0.62, `gradient_bottom(base)` = base lightened 0.12).
+- Where they show (frames unchanged):
+  - `AbilityIcon` (HUD ability bar, lobby cards, Trainer rows and detail, spec chooser, level-up cards and panel). `AbilityIcon.texture_for` takes the map entry, else the school picture only when no glyph rule matches (`glyph_is_specific`). The picture is drawn in the cached glyph layer at `PICTURE_SCALE` 0.8 of the side, in the school or ability tint; cooldown, rank, cost, charges and prompt are drawn above as before.
+  - `TalentGlyph.texture` and `TalentNode.make_glyph`: the talent's own picture, tinted as its glyph would have been.
+  - `TalentTreeView`: an 18 px tree emblem left of the name; the name gives up `EMBLEM_ROOM` 22 px (the existing `fitted_name_size` keeps names at 12 px or more).
+  - `ConsumableIcon` (shop row, unit frame, tooltip) and `ShrineIcon` (vote card, HUD running-shrine row): a tinted silhouette at 0.78 of the slot, in the item or shrine colour; border, background and badge unchanged.
+- Not changed: the stat level-up card gem, item / weapon / slot icons (`ItemArt`), enchants and artifacts stay procedural. Icon file names are not player-visible; a file named after a brand was left out on purpose.
+- To add an icon: copy the SVG to `assets/icons/<author>/<name>.svg`; `godot --headless --path . --import`; set its `.import` to scale 0.25 with mipmaps and import again; add the id-to-path entry to `data/icons/icon_map.tres`. Only CC BY archive authors qualify. A new author goes into `CREDITS.md`: a test fails for an uncredited author folder or an unused SVG.
+- Cost: 4-player `--demo --seed=5 --start-wave=4` under xvfb, `RENDER_TOTAL_DRAW_CALLS_IN_FRAME` averaged over 40 frames after about 14 s: base 1149 average / 1251 max, now 942 / 1187 (about −18 %: a procedural ability glyph is about 59 canvas draws, a picture is 9). No 3D cost. Memory: 215 textures at 128 × 128 RGBA with mips, about 85 KB each when loaded (only the shown controls load them; the whole set would be about 18 MB). Font 125 KB.
+
+### Visible equipment (`scenes/visuals/equip_look.gd`, `onion_armor.gd`, `onion_model.gd`)
+
+- `EquipLook` (value object): what one worn Head, Shoulders or Chest item looks like. `EquipLook.from_item(item)`, `EquipLook.make(slot, armor, tier, rarity, set_id, unique_id)`; `key()` (cache key and change check), `family()` (`plate_helm`, `cloth_mantle`, … = `ItemBase.look`), `detail()`, `glows()`, `has_accent()`, `is_set()`. Slots: `EquipLook.Slot.HEAD / SHOULDERS / CHEST`. Items with no model part (wrists, hands, belt, legs, feet, neck, rings, trinkets, weapons) give a null look.
+- `OnionArmor` (`onion_armor.gd`): the procedural pieces. `OnionArmor.part(slot, look, class_data)` returns a cached `OnionArmor.Part` (`solid`, `cloth` and `accent` meshes; `glow` / `glow_energy`; `extras`, `brows`, `hides_sprout`, `hides_mouth`). `look == null` is the class starter piece of that slot. The starter code (horned helm, pauldrons, wizard hat, hoods, capes, belts) moved here from `OnionModel`, split per slot, geometry unchanged. `OnionArmor.merged(key, meshes)` merges vertex-coloured meshes (cached). Style tables: `PALETTES` (per armour type and tier), `SET_STYLES` (one kit per tier set), `GENERIC_SET` (sets without a kit; a test checks that every `Db.sets` entry has a style).
+- `OnionModel`: `set_equipment(head, shoulders, chest: ItemInstance)` and `set_looks(head, shoulders, chest: EquipLook)`; `worn_look(slot)`, `equipment_key()`, and `gear_builds` (a rebuild counter for tests and Vanish). `Body/Gear` is a Node3D with `Solid` (plain toon), `Glow<n>` (one per rarity colour, Epic and better), `Cloth` and `Accent<n>` meshes. `setup()` keeps the worn looks, as it does for weapons.
+- **Slot rule:** an equipped item replaces that slot's starter piece entirely (never layered); unequipping brings the starter back. Heroes start with empty armour slots, so a run starts with the class starter look, unchanged from before M7b.
+- **Families** (slot × armour type): cloth cowl / mantle / robe; leather cap / shoulderpads / tunic; mail coif / spaulders / hauberk; plate helm / pauldrons / breastplate. Plate pauldrons are the largest (0.26 m dome against 0.22 m on the starter).
+- **Tier** = `Items.material_tier(item.wave)` (the material word of the name). Tier I: base shape and rarity trim. Tier II: crest fin, cheek plates, studs, lames, tabard. Tier III: swept wings, big spikes, gems, circlet and crescent, feathers, spine spikes. Palettes per armour type and tier. A tier set piece always uses the richest detail.
+- **Rarity:** trim, bands and gems take `WeaponModel.rarity_color(rarity)`. Epic and better draw the pieces with `Mats.toon_vc_glow(colour, 0.14)` (Legendary 0.24; weapons use 0.55). Legendary and set pieces add an unshaded glow accent (`Mats.glow`: gems and a glow ring).
+- **Class colour:** every chest piece has a strip of cloth in the class colour down the back; crests, pauldron tops and mantle drapes use it too.
+- **Head:** a worn head piece hides the eyebrows; a leather mask hides the mouth; the sprout stays visible (only the starter wizard hat hides it). **Chest:** open-front shells over the sides and back, so the face and the class-coloured skin stay visible.
+- **HP peel and ghost:** the peel flaps (`PEEL_SPOTS`) lift by `PEEL_GEAR_LIFT` (0.11 m) when a chest piece is worn. The downed ghost covers every gear mesh (accents hide). Hit flash goes through `Mats.set_overlay`. Vanish fades everything below `Yaw`; `RogueVanish._refade` scans for new meshes only when `gear_builds` changes.
+- **Wiring:** `Player.apply_equipment` runs on every `Equipment.changed` (equip, unequip, loot, shop, trade, forge, run start). `PlayerPanel._refresh_side` (character panel preview) follows the gear. `OnionPreview` (lobby) shows the starter look only. Gear is rebuilt only when `EquipLook.key()` of one of the three slots changes.
+- **Budget:** every part and merged mesh is cached (`MeshKit.cached`, `OnionArmor._parts`); materials come only from `Mats` (`toon_vc`, `toon_vc_glow`, `toon_cloth_vc`, `glow`), with no instance uniforms. A part takes 2–7 ms to build, once per look. Draw calls per hero (visible meshes, outline counted twice): starter look warrior 23 / mage 23 / paladin 25 / rogue 24 / warlock 32 (unchanged). Fully geared at tier III (common / Epic / Legendary / class set): warrior 24 / 24 / 25 / 25, mage 24 / 24 / 25 / 25, paladin 25 / 25 / 26 / 26, rogue 24 / 24 / 25 / 25, warlock 27 / 27 / 28 / 28. Worst case over every armour type, tier and rarity: +2 (warlock: 0). `DRAW_BUDGET = 10` per hero is enforced in `tests/test_m7_vis_hero.gd`.
+- **4-player live run** at wave 5 (`--view=live --players=4 --wave=5 --seed=7`, xvfb, `--fixed-fps 60`): render draw calls base 377, new starter look 375, common suits 381, Epic suits 381, Legendary suits 385; primitives 942k to 988k.
+- **Showcase:** `--view=equip` (armour types × tiers; `--axis=rarity --armor=N`, `--armor=N`, `--tier=N`, `--rarity=N`, `--back=1`, `--state=hurt|downed`); `--view=sets` (the five class sets worn complete, `--rarity=N`, `--back=1`); `--view=equip_game` (the gameplay camera with geared heroes; `--sets=1`, `--starter=1`, `--facing=north|south`, `--tier=N`, `--rarity=N`); `--view=live --geared=0..4` (bots wear a tier III suit of that rarity).
+- **Not done:** hands, feet and waist items on the model; per-unique custom models (uniques use their family and rarity; Legendaries and sets get accents).
+- Tests: `tests/test_m7_vis_hero.gd` (38).
+
+### Environment look (`scenes/arena/arena_ground.gd`, `arena_ambient.gd`, `arena_fx.gd`, `arena_backdrop.gd`, `arena_crypt.gd`)
+
+- `ArenaGround` (`arena_ground.gd`): the ground shader, one look per environment plus the dungeon's crypt look. `look_for(env, in_dungeon)`, `make_material(look)` (one compiled Shader per look, process-wide), `apply_look(...)` (sun direction, accent colour, the volcano's vents, the crypt's torches). The palette uniforms keep their names (`grass_*`, `dirt_*`, `patches`, `patch_count`, `arena_half`, `road`). The old `Arena._GROUND_CODE` is gone.
+- `ArenaAmbient` (`arena_ambient.gd`): ambient particles as `Arena.ambient` (child "Ambient", not part of "Decor").
+- `ArenaFx` (`arena_fx.gd`): twinkling glow meshes and the animated lava (see Effects below).
+- `ArenaBackdrop` (`arena_backdrop.gd`): the wall and backdrop ring outside the playfield, one "Backdrop" mesh in the decor.
+- `ArenaCrypt` (`arena_crypt.gd`): the dungeon room's dressing.
+
+Ground by look:
+- Forest: the old look plus a slow dappled light.
+- Cemetery: dark churned soil, moss, gravel, a flagstone path through the gate.
+- Swamp: wet mud, algae, peat banks, shallow puddles with a moving sheen.
+- Volcano: voronoi basalt plates; some cracks open and glow, pulsing on `TIME`, brighter around the six vents.
+- Ice cave: packed snow with wind ripples, ice sheets with hairline cracks, a sliding sun glint, twinkles.
+- Crypt (dungeon): 1.6 m chequered tiles, bevels, cracks, moss, warm torch pools (`torch_points()`).
+- Water and ice use sums of sines (`wavy_normal`), because a noise gradient or a thresholded value noise shows its grid as blocky highlights. The moss uses fbm. The dirt-patch loop skips the edge noise for patches further than 1.5 radii away, so a pixel pays for the one or two patches near it.
+
+Ambient particles (`ArenaAmbient`: CPUParticles3D, world space, fixed seed):
+- `specs_for(look)`: forest Leaves 44 + Fireflies 16; cemetery Mist 16 + Motes 28; swamp Mist 12 + Glimmers 30 (one atlas texture for glow dots and bubbles); volcano Embers 46 + Ash 40; ice cave Snow 60 + Glints 18; crypt Dust 26.
+- At most 2 draws per environment (1 in the crypt) and at most 100 particles (`MAX_PARTICLES`); the volcano has the most, 86.
+- Unshaded, `render_priority` −3 (mist) or −2, so every ground ring and telegraph (priority −1) draws over them. Mist is faint (alpha at most 0.25) and flat on the ground; leaves, ash and snow start above 3.5 m and are small.
+- `follow(focus, distance)` centres the node on the ground the camera shows and sizes the emission boxes to it; a focus jump of more than 12 m restarts them.
+- `flicker(t)` breathes the volcano's sun (±7.5 %) and ambient (±4.5 %) light around the data values.
+
+Effects (`ArenaFx`):
+- `twinkle(color, speed, dip, blink)`: the decor's glow meshes (Wisps, Fireflies, Sparkles, FloatingEmbers, crypt torches) pulse, blink or twinkle per light. The phase is a hash of the light's place, read from the vertex colour's alpha (`ArenaFx.lit(at)`). No RNG, no instance uniforms.
+- `lava()`: the volcano's "Lava" mesh churns and pulses on `TIME` with a drifting crust. Heat is baked into the vertex colour (alpha 0 is the hot core without crust). Both materials are unshaded ShaderMaterials, cached.
+- GL Compatibility shows only the albedo of an `unshaded` material (EMISSION is ignored), so the `ArenaFx` materials write ALBEDO only. The lit ground shader does use EMISSION (lava cracks, sheen). `BILLBOARD_PARTICLES` drops the particle's scale unless `billboard_keep_scale = true`.
+- Bog pool (`scenes/enemies/hazards/bog_pool.gd`): the water is its own animated shader (`water_material()`: deep centre, shallow edge, ripples, glints, wet edge). It keeps the ring shader's uniforms (`ring_color`, `ring_shape`, `ring_stroke`), so the fade-in code and the tests are unchanged. The lime rim (`marker_color`) is still the marker.
+- Dungeon brazier (`scenes/dungeon/dungeon_brazier.gd`): warm orange light (`LIGHT_COLOR` (1, 0.52, 0.16)), range 9.5 (was 7), energy up to 2.4 (was 2.1), and a flicker on top of the HP share. Still one non-shadow OmniLight3D.
+
+Backdrops (`ArenaBackdrop`):
+- Cemetery: spear fence on stone posts, and cypresses. Swamp: log palisade with hanging moss, and tall snags. Volcano: crater rim of basalt fangs, and `magma_seams()` (lava dashes along the foot of the wall, drawn by the lava mesh). Ice cave: double cliff wall of ice prisms.
+- Full height on the north, west and east sides, blending down to 25 % at the south wall (the camera's side). Nothing stands in front of the north gate. No shadows; its own seeded RNG. `walk_ring` and `height_factor` are shared with the crypt.
+
+Crypt (`ArenaCrypt`): a colonnade of pillars (rows 3 m and 3.5 m apart, beams, a gap at the gate), a 7.5 m back wall with cornice and alcoves, sarcophagi, bones and banners; the "Torches" flames flicker. `torch_points()` (8 places) also feeds the floor shader's warm light pools. Two draws. Everything stands outside the room, so the playable area still has nothing above 0.55 m. `ArenaThemes.build()` returns it while `arena.in_dungeon_layout`.
+
+Light grades (`data/environments/*.tres`; the sky is unchanged in all five):
+
+| Env | Ambient (colour / energy) | Fog (colour / density) | Sun (colour / energy / pitch) | Glow | Sat | Contrast |
+|---|---|---|---|---|---|---|
+| forest_ruin | unchanged | unchanged | unchanged | 0.55 | 1.12 | 1.05 |
+| cemetery | 0.5, 0.54, 0.78 / 0.76 | 0.2, 0.2, 0.34 / 0.008 | 0.7, 0.78, 1 / 0.95 / -47 | 0.7 | 0.92 | 1.08 |
+| swamp | 0.55, 0.62, 0.45 / 0.6 | 0.25, 0.31, 0.15 / 0.012 | 0.96, 0.9, 0.62 / 0.74 / -46 | 0.65 | 0.97 | 1.06 |
+| volcano | 0.62, 0.5, 0.52 / 0.7 | 0.28, 0.1, 0.06 / 0.0075 | 1, 0.62, 0.38 / 0.95 / -46 | 0.8 | 1.0 | 1.12 |
+| ice_cave | 0.68, 0.78, 0.95 / 0.58 | 0.42, 0.56, 0.76 / 0.0065 | 0.78, 0.9, 1 / 0.72 / -60 | 0.65 | 0.93 | 1.06 |
+
+- Ground palettes: cemetery dark soil and moss, swamp olive mud, volcano black basalt, ice cave pale blue-grey snow with deeper blue ice. Every tone passes the marker-contrast test (at least 2:1 against each hazard marker).
+- `Arena._grade()`: the environment's light data in the clearing; in the dungeon a torch-lit crypt grade (ambient ×0.72 towards violet-grey, sun ×0.62 and cooler, fog at least 0.011 warm-dark, glow at least 0.8, contrast at least 1.1). The sky colour stays the environment's.
+- Wiring: `Arena._build_ambient()` and the `ambient` member; the dungeon layout swap (enter, leave, predelete) includes the ambient; the ground is built through `ArenaGround`; `ArenaThemes.build()` adds the backdrop and uses the crypt in the dungeon; glow meshes use `ArenaFx` materials.
+- No new lights (the existing sun, Spirit Healer and brazier lights only); sun shadows unchanged; one WorldEnvironment.
+
+Budgets:
+- Decor draws (instances in "Decor"): forest 15 (unchanged), cemetery 14, swamp 14, volcano 15, ice cave 14. The four sets with a backdrop gained one each (M6b: 13 / 13 / 14 / 13). The limit stays 16; vertices stay far under 1.5 times the forest's.
+- Ambient: 2 draws per environment (1 in the crypt); particles 60 / 44 / 42 / 86 / 78 / 26 (forest, cemetery, swamp, volcano, ice cave, crypt).
+- Render draw calls (`RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME`, 4-player demo, `--fixed-fps 60 --seed=5 --env=<id>`, mean of frames 360–389 = 6 s of game time, xvfb 800 × 450 opengl3; base c817e6c to M7b): forest 1106.7 → 1109.0, cemetery 1104.7 → 1108.7, swamp 1091.7 → 1095.8, volcano 1101.8 → 1106.1, ice cave 1092.3 → 1096.4: +2 to +4 draws per environment (the two particle draws plus the Backdrop), +0.4 % overall. Primitives: forest 924.6k → 924.8k, cemetery 460k → 476k, swamp 639k → 660k, volcano 406k → 423k, ice cave 411k → 425k.
+- Tests: `tests/test_m7_vis_env.gd` (17): bounded ambient particles that never hide telegraphs; follow and box sizing; every ground look compiles (uniform list) and has no instance uniforms; looks by decor set and vents; glow, lava and twinkle materials; bog water; backdrops (outside the arena, low on the south side, deterministic); decor budgets; the crypt (dressing, floor look, grade, one sun, restored on leave); brazier light; data ranges; light grades; the volcano flicker; no gameplay RNG use.
+
+### Combat effects (`scenes/vfx/vfx.gd`, `enemy_corpse.gd`, `scenes/visuals/enemy_model.gd`, `scenes/enemies/enemy.gd`, `scenes/pickups/`)
+
+All of it goes through `Vfx`, `Mats` and `ProcVfx`, capped and pooled where it is hot. Randomness is private to each class. The effects never touch `Enemy.global_position`, the collision layer, mask or shape, the hp or the AI timers (pinned by test).
+
+- **Spawn rise:** `EnemyModel.play_spawn(duration)`, `is_spawning()`, `spawn_progress()`; `SPAWN_TIME` 0.45 s, `SPAWN_TIME_BOSS` 0.9 s, `SPAWN_DEPTH` 1.05 (times the model scale, below the floor), `SPAWN_TURNS` 0.8. Only the pivot's position, yaw and squash move; the ground plane hides the buried part. The start has y-scale 0.55, xz-scale 0.72 and 0.8 turns of extra yaw, eased out with a cubic. `Enemy.play_spawn_in()` is called by the directors right after `add_child` (WaveDirector group, summon and boss; Dungeon group, summon and Warden; EventGuards). A bare `EnemyModel.setup` never rises (tests and showcase).
+- **Corpses:** `EnemyCorpse` (`scenes/vfx/enemy_corpse.gd`) is a visual-only pooled node, `EnemyCorpse.spawn(model, world_pos, tier, away, accent)`, created by `Enemy._spawn_corpse` from `_die` (not from `despawn`). `EnemyModel.corpse_info()` hands over the shared meshes, base material, arm pose and yaw. `Tier { NORMAL, ELITE, BOSS }`: life 0.6 / 0.9 / 1.7 s, white flash 0.14 / 0.2 / 0.4 s (elites and bosses flash in the affix colour). The corpse tips to 1.45 rad away from the killer in the first 32 % of its life (direction = victim − attacker, ±0.35 rad scatter; random when the killer is unknown). From 40 % of its life it sinks 0.95 × scale into the ground, shrinks 25 % and darkens (a Mats overlay in 10 quantised steps, with cached variants: no per-corpse material). Elites and bosses keep the glow part (flame, eyes, crown); only bosses cast shadows. Structure: `Corpse → Pivot → Body, Arm [, Glow]` under one `Corpses` holder of the effect root. No collision, no groups, not an `Enemy`.
+- **Corpse caps:** `MAX_CORPSES` 40 alive at once (a new one recycles the oldest running one); finished corpses are hidden and reused, so there are never more than 40 nodes. `MAX_SPAWNS_PER_FRAME` 8 ordinary corpses per rendered frame; elites and bosses always get one. The budget key is `Vfx.frame_id()`; tests set `Vfx.frame_override`.
+- **Death puffs:** elite and boss death puffs are ×1.3 and ×1.25 (`Enemy._death_puff_mult`). A boss also gets `Vfx.boss_remains` (`VfxEffect.Kind.REMAINS`, 1.8 s): a glow over the spot where it fell, a slow ring and motes.
+- **Impacts:** `Vfx.hit_spark(pos, color, school := &"", crit := false)`; the `SCHOOL_FX` table; `spark_color` and `school_for_color`. The colour is `ProcVfx.SCHOOL_COLORS` (`core/items/proc_vfx.gd`) lerped `SCHOOL_TINT_KEEP` (0.18) towards the caller's colour. Shapes (shared cached meshes `vfx:spark`, `smoke`, `shard`, `star`, `leaf`): physical = quick streaks; fire = rising embers; frost = tumbling shards; arcane = spinning stars; holy = rays floating up; shadow = dark wisps (non-additive); nature = spinning leaves. A legacy call without a school behaves like the physical look. Call sites that pass the school: `WeaponRunner._melee` and `riposte` (weapon school and crit), `Projectile._impact` (player shots) and `ProcSystem` sparks. Ability sparks in a kit's school colour are recognised by colour.
+- **Crit:** flash 0.46 m (was 0.26 m) at full alpha, life +0.1 s, and a star particle node (7 large white-gold stars). Still at most 4 children per effect (flash, sparks, stars = 3). The camera shake is untouched.
+- **Spark throttle:** `SPARKS_PER_FRAME` 24 (crits may add `CRIT_SPARKS_EXTRA` 10); `MAX_SPARKS_ALIVE` 90 for ordinary sparks.
+- **Boss entrance:** `Vfx.boss_entrance(pos, radius, colour)` (`VfxEffect.Kind.ENTRANCE`, 1.5 s), started by `Main._boss_entrance_fx` for the wave boss and the dungeon Warden. Rune flares open (3.2 × radius wide) and spin while they fade; a light shaft rises to 4.5 m and thins; a shock ring runs out; 20 dust particles rise (4 children). The boss itself rises for 0.9 s. One entrance effect per boss.
+- **Banner slam:** `Hud.show_banner(text, color, sub_lines, slam := false)`. With `slam` the banner scales from 2.6 to 0.9 in 0.12 s (quart-in), settles to 1.0 in 0.12 s (back-out) and holds for 1.9 s. The boss intro banner (`Main`, boss spawn) is the one that slams.
+- **Loot pop:** `Vfx.hop_height(k)` arcs to `HOP_PEAK` 0.75 m (pickups 0.7, bags 0.95) up to `HOP_SPLIT` (62 % of the time), then bounces once (0.18 m; pickups 0.16, bags 0.22) and ends at 0. The sideways toss offset (0.35–0.7 m for pickups, 0.5–0.95 m for bags) is gone at the first landing. Pop time: pickups 0.55 s, bags 0.7 s. Only `Visual`'s local position moves (`Pickup`, `LootBag`).
+- **Pickup streak:** `Vfx.make_streak` and `aim_streak`: one flat additive quad per pulled pickup (shared `vfx:quad` mesh, one material per colour). Length = speed × 0.05 s (0.25–1.2 m); at most `Pickup.TRAIL_MAX` (24) at a time.
+- **Numbers** (xvfb, llvmpipe, 1280 × 720, `--fixed-fps 60`, base c817e6c to M7b; probe = a scratch SceneTree that boots Main and samples every rendered frame):
+  - `--demo --start-wave=15 --seed=5` (43 enemies on average): draw calls 1376.7 → 1378.3 (+0.1 %).
+  - `--demo --start-wave=25 --seed=5` (boss wave, entrance and rising boss inside): 1141.7 → 1143.9 (+0.2 %).
+  - Stress (`tools/showcase/stress.gd`: 150 enemies, 12 kills per 6 frames, 20 sparks per frame, every fourth a crit): 2219 → 2094 average draw calls (−5.6 %, from the spark caps).
+  - Micro-benchmarks (headless): `EnemyCorpse.spawn` 33 µs; `Vfx.hit_spark` 89 µs (base 90 µs).
+  - The bounds: at most 40 corpses (about 5 draws each), at most 90 live ordinary sparks, at most 24 pulled-pickup streaks, one entrance effect per boss.
+- Tests: `tests/test_m7_vis_fx.gd` (31). No existing test was edited in M7b.
+
+### Dev tools
+
+- Showcase (`tools/showcase/showcase.gd`, scene in `showcase_scene.gd`): `--view=fx --phase=spawn|death|impacts|loot|boss|banner` (add the engine flag `--fixed-fps 60` before `--path`, so an effect's age after N frames is exact). `--view=arena --env=<id> --dungeon=1 --frames=N` and `--view=gameplay` with `--env=<id>`, `--dungeon=1`, `--dist=19.5..36` and `--hazards=1` show the environments; the equipment views are listed under Visible equipment.
+- Stress (`tools/showcase/stress.gd`, scene `stress_scene.gd`): a perf stress that runs on any commit, so a base and a new tree can be compared. About 150 enemies on screen, a dozen kills every 6 frames (loot, puffs, corpses) and 20 hit sparks per frame; it prints `STRESS ...` lines (render draw calls, objects, process time) over `--frames=N` rendered frames after a 90-frame warm-up:
+
+  ```
+  xvfb-run -a -s "-screen 0 1280x720x24" godot --fixed-fps 60 --path . --resolution 1280x720 \
+      --rendering-driver opengl3 -s res://tools/showcase/stress.gd -- --frames=360
+  ```
+
+### Tests and verification
+
+- Test files: `tests/test_m7_vis_ui.gd` (22: the font file, OFL, Cinzel as the base, the weight tag and bold weight; theme fonts; fallback glyphs; title widths per screen; the icon map (every path exists, 128 px, import parameters, author folders credited, every SVG used); every ability, talent, tree, consumable and shrine resolves; no stale ids; lookup fallback order; controls draw their picture with the glyph as fallback; no instance uniform or shader in `scenes/ui` and `game_icons`), `tests/test_m7_vis_hero.gd` (38), `tests/test_m7_vis_env.gd` (17) and `tests/test_m7_vis_fx.gd` (31).
+- Whole suite on the integrated M7b head: 3051 passed, 0 failed (`godot --headless --path . -s res://tests/run_tests.gd`).
+- Smoke (`--fixed-fps 60 --smoke --waves=3 --seed=5`): completed, 0 errors; the SMOKE_RESULT matches the M7a head apart from `real_time` and `perf`.
+
+### Known gaps
+
+- Hands, feet and waist items are not on the model, and uniques have no custom models.
+- Item, weapon and slot icons, enchant and artifact icons, and the stat-card gem stay procedural.
+- The two M6b art calls (the bog pool rim contrast and the boss circles on the ice floor) are still open after M7b.
+- All frame times were measured under llvmpipe (software GL); the draw-call numbers are the ones to compare.

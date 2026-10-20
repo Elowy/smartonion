@@ -117,7 +117,7 @@ func is_on_refresh_cooldown(enemy: Node3D) -> bool:
 
 
 func describe() -> String:
-	return "Combustion: %d fires started" % combustions
+	return "Chain Ignition: %d fires started" % combustions
 
 
 ## Index of the enemy in [param pool] nearest to [param centre] (XZ; ties: the earlier one –

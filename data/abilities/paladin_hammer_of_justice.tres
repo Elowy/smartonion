@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"hammer_of_justice"
-display_name = "Hammer of Justice"
+display_name = "Smiting Hammer"
 description = "Hurls a holy hammer at the nearest enemy that is not stunned yet ({hammers} at once): {damage_pct}% weapon damage as Holy damage (+Spell Power) and a {stun} sec stun."
 class_id = &"paladin"
 school = &"holy"

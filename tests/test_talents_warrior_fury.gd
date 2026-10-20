@@ -137,16 +137,16 @@ func test_fury_tree_data() -> void:
 	check(fury != null, "warrior_fury in Db")
 	if fury == null:
 		return
-	check(fury.class_id == &"warrior" and fury.index == 1 and fury.display_name == "Fury", "Warrior tree 2")
+	check(fury.class_id == &"warrior" and fury.index == 1 and fury.display_name == "Berserker", "Warrior tree 2")
 	var ids: Array[StringName] = []
 	for t in fury.talents:
 		ids.append(t.id)
 	check_eq(ids, [&"warrior_fury_cruelty", &"warrior_fury_unbridled_wrath", &"warrior_fury_improved_whirlwind",
 		&"warrior_fury_blood_craze", &"warrior_fury_dual_wield_specialization", &"warrior_fury_meat_cleaver",
 		&"warrior_fury_flurry", &"warrior_fury_death_wish", &"warrior_fury_rampage"] as Array[StringName], "ids")
-	check_eq(fury.get_talent(&"warrior_fury_flurry").prerequisite, &"warrior_fury_cruelty", "Flurry needs Cruelty")
+	check_eq(fury.get_talent(&"warrior_fury_flurry").prerequisite, &"warrior_fury_cruelty", "Rising Tempo needs Cruelty")
 	check_eq(fury.get_talent(&"warrior_fury_meat_cleaver").ability, &"whirlwind", "the modifier changes Whirlwind")
-	check(fury.get_talent(RAMPAGE_ID).is_capstone(), "Rampage is the capstone")
+	check(fury.get_talent(RAMPAGE_ID).is_capstone(), "Carnage is the capstone")
 	check_eq(fury.get_talent(&"warrior_fury_improved_whirlwind").text_for_rank(3),
 		"Whirlwind costs 6 less Rage and deals 15% more damage.", "rank text")
 	check_eq(fury.get_talent(&"warrior_fury_flurry").text_for_rank(2),
@@ -222,7 +222,7 @@ func test_blood_craze_heals_on_kills_once_per_one_and_a_half_seconds() -> void:
 	Fakes.step(p.procs, 1.55)
 	p.notify_kill(e)
 	check_near(p.hp, hp + p.max_hp() * 0.02, 0.0001, "after 1.5 sec it heals again")
-	check_eq(_texts("Blood Craze"), 0, "no talent-name text (the heal number shows)")
+	check_eq(_texts("Savoured Kills"), 0, "no talent-name text (the heal number shows)")
 	_remove(p, "blood_craze", 2)
 	check(p.procs.extra_defs(PlayerBonuses.SOURCE_TALENTS).is_empty(), "undone")
 
@@ -260,7 +260,7 @@ func test_flurry_needs_cruelty_and_hastens_after_crits() -> void:
 	check_near(p.stats.get_stat(Stats.HASTE), haste + 18.0, 0.0001, "+6% Haste per rank after a crit")
 	p.procs.on_hit(e, 5.0, p.main_hand, true)
 	check_near(p.stats.get_stat(Stats.HASTE), haste + 18.0, 0.0001, "a re-proc refreshes, does not stack")
-	check_eq(_texts("Flurry"), 0, "silent")
+	check_eq(_texts("Rising Tempo"), 0, "silent")
 	Fakes.step(p.procs, 3.1, 0.1)
 	check_near(p.stats.get_stat(Stats.HASTE), haste, 0.0001, "for 3 sec")
 
@@ -268,13 +268,13 @@ func test_flurry_needs_cruelty_and_hastens_after_crits() -> void:
 func test_death_wish_raises_mastery_and_battle_fury() -> void:
 	var p := _warrior()
 	var fury := p.abilities.mastery as WarriorBattleFury
-	check(fury != null, "Battle Fury")
+	check(fury != null, "Cornered Fury")
 	_add(p, "cruelty", 3)
 	_add(p, "unbridled_wrath", 3)
 	_add(p, "improved_whirlwind", 3)
 	_add(p, "death_wish", 3)
 	check_near(p.stats.get_stat(Stats.MASTERY), 12.0, 0.0001, "+4 Mastery per rank")
-	check_eq(fury.damage_mult(null, &"physical", &"weapon"), 1.0, "full health: no Battle Fury")
+	check_eq(fury.damage_mult(null, &"physical", &"weapon"), 1.0, "full health: no Cornered Fury")
 	p.hp = p.max_hp() * 0.5
 	check_near(fury.damage_mult(null, &"physical", &"weapon"), 1.0 + 12.0 * 0.5 * 5.0 / 100.0, 0.001,
 		"+0.5% per Mastery point per 10% missing: +30% at half health")
@@ -292,14 +292,14 @@ func test_meat_cleaver_param_is_neutral_without_the_talent() -> void:
 	_ring_of(5)
 	_rage(p).set_value(100.0)
 	check(p.abilities.try_cast(0), "cast")
-	check_near(_rage(p).value, 60.0, 0.0001, "no refund without Meat Cleaver")
+	check_near(_rage(p).value, 60.0, 0.0001, "no refund without Reaping Spin")
 	check_eq(_whirlwind(p).refund_gained(), 0.0, "nothing refunded")
 	_add(p, "cruelty", 3)
 	_add(p, "unbridled_wrath", 3)
 	_add(p, "meat_cleaver")
 	check_eq(float(p.abilities.params_for(ww)["rage_per_enemy"]), 3.0, "3 Rage per enemy")
 	check_eq(float(p.abilities.params_for(Db.get_ability(&"bladestorm")).get("rage_per_enemy", 0.0)), 0.0,
-		"Bladestorm shares the spin but not the param")
+		"Steel Cyclone shares the spin but not the param")
 
 
 func test_meat_cleaver_refunds_three_rage_per_enemy_up_to_twelve() -> void:
@@ -425,15 +425,15 @@ func test_rampage_stacks_on_kills_up_to_twenty_percent() -> void:
 		p.notify_kill(e)
 	check_eq(r.stacks, 9, "nine kills, nine stacks")
 	check_near(p.bonuses.damage_mult(e, &"physical", &"weapon"), 1.18, 0.0001, "+2% per stack")
-	check_eq(_texts("Rampage!"), 0, "no shout below the maximum")
+	check_eq(_texts("Carnage!"), 0, "no shout below the maximum")
 	p.notify_kill(e)
 	check_near(p.outgoing_damage_mult(e, &"fire", &"dot"), 1.2, 0.0001, "10 kills: +20% on every source")
-	check_eq(_texts("Rampage!"), 1, "the shout at 10")
+	check_eq(_texts("Carnage!"), 1, "the shout at 10")
 	p.notify_kill(e)
 	check_eq(r.stacks, 10, "at most 10 stacks")
 	check_near(p.bonuses.damage_mult(null, &"physical", &"ability"), 1.2, 0.0001, "the 11th kill stays at +20%")
-	check_eq(_texts("Rampage!"), 1, "no second shout")
-	check_eq(r.describe(), "Rampage: 10 stacks (+20% damage)", "describe")
+	check_eq(_texts("Carnage!"), 1, "no second shout")
+	check_eq(r.describe(), "Carnage: 10 stacks (+20% damage)", "describe")
 	check_eq(RunState.rng.state, state, "no RNG")
 
 
@@ -561,11 +561,11 @@ func test_fury_bot_path_reaches_rampage_at_13_and_defers_dual_wield() -> void:
 	check_eq(path, FURY_PATH, "Fury bot path (talents_warrior.md 5.4)")
 	check_eq(path.find(&"warrior_fury_meat_cleaver"), 6, "the modifier is point 7")
 	check_eq(path.find(RAMPAGE_ID), 12, "the capstone is point 13")
-	check(_rampage(p) != null, "Rampage runs")
+	check(_rampage(p) != null, "Carnage runs")
 	RunState.set_start_level(31)
 	var more := _path(p, 1)
 	check_eq(more, [&"warrior_protection_toughness", &"warrior_protection_toughness"] as Array[StringName],
-		"then the next tree, not the deferred Dual Wield Specialization")
+		"then the next tree, not the deferred Twin-Blade Prowess")
 	var q := _warrior(2)
 	RunState.set_start_level(29)
 	check_eq(TalentBot.spend_all(q, 1), 20, "spend_all spends the same 20")
@@ -579,6 +579,6 @@ func test_a_dual_wielding_fury_bot_takes_its_specialization_after_blood_craze() 
 	check(p.equipment.equip(spare, Items.EquipSlot.OFF_HAND), "dual wield")
 	var path := _path(p, 1)
 	check_eq(path.find(RAMPAGE_ID), 12, "capstone still at 13")
-	check_eq(path.find(&"warrior_fury_dual_wield_specialization"), 14, "right after Blood Craze 3 (points 15-16)")
+	check_eq(path.find(&"warrior_fury_dual_wield_specialization"), 14, "right after Savoured Kills 3 (points 15-16)")
 	check_eq(path.size(), 22, "the whole tree")
 	check_eq(p.talents.tree_points(&"warrior_fury"), 22, "22 points in Fury")

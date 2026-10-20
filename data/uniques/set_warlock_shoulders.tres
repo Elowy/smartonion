@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 id = &"set_warlock_shoulders"
-display_name = "Felfire Mantle"
+display_name = "Hexfire Mantle"
 flavor = "The green flames are purely decorative. Probably."
 slot_type = 2
 armor_type = 0

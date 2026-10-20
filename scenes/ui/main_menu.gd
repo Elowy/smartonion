@@ -1,9 +1,11 @@
 class_name MainMenu
 extends Control
-## Title screen: gold "SmartOnion" title over an onion hero in a horned helm, Play / Quit.
-## Nobody has joined yet, so any device may drive it: keyboard and d-pad / left stick through
+## Title screen: gold "SmartOnion" title over an onion hero in a horned helm, Play / Settings / Credits /
+## Quit. Nobody has joined yet, so any device may drive it: keyboard and d-pad / left stick through
 ## Godot's ui_* focus navigation, controller A / B through UiPads (ui_accept has no pad
-## buttons). See docs/ARCHITECTURE.md.
+## buttons). Settings and Credits open a [MenuPage] over the title (the menu's own content is hidden
+## meanwhile and the page is driven by "anyone"); closing it gives the focus back to the button that
+## opened it. See docs/ARCHITECTURE.md.
 
 signal play_pressed
 signal quit_pressed
@@ -11,14 +13,26 @@ signal quit_pressed
 const VERSION_TEXT := "First playable build"
 
 var play_button: Button
+var settings_button: Button
+var credits_button: Button
 var quit_button: Button
+## The four buttons top to bottom (focus wraps around).
+var buttons: Array[Button] = []
 var emblem: UiIcon
 var title_label: Label
+## The pages, created the first time they are opened.
+var settings_page: SettingsPage
+var credits_page: CreditsPage
 
 var _pads := UiPads.new()
 var _t := 0.0
 var _backdrop: TextureRect
 var _embers: _Embers
+## The title column and the prompts: hidden while a page is open.
+var _content: Control
+var _hints: Control
+## The press that closed a page must not also act on the menu (first frame is skipped).
+var _skip_frames := 0
 
 
 static func create() -> MainMenu:
@@ -47,6 +61,7 @@ func _build() -> void:
 	center.offset_bottom = -60
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
+	_content = center
 	var col := UiTheme.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_child(col)
@@ -76,14 +91,20 @@ func _build() -> void:
 	gap2.custom_minimum_size = Vector2(0, 26)
 	col.add_child(gap2)
 
-	var buttons := UiTheme.vbox(18)
-	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	col.add_child(buttons)
-	play_button = _make_button("Play", buttons)
-	quit_button = _make_button("Quit", buttons)
-	play_button.focus_neighbor_top = play_button.get_path_to(quit_button)
-	quit_button.focus_neighbor_bottom = quit_button.get_path_to(play_button)
+	var button_column := UiTheme.vbox(16)
+	button_column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(button_column)
+	play_button = _make_button("Play", button_column)
+	settings_button = _make_button("Settings", button_column)
+	credits_button = _make_button("Credits", button_column)
+	quit_button = _make_button("Quit", button_column)
+	for i in buttons.size():
+		var b := buttons[i]
+		b.focus_neighbor_top = b.get_path_to(buttons[wrapi(i - 1, 0, buttons.size())])
+		b.focus_neighbor_bottom = b.get_path_to(buttons[wrapi(i + 1, 0, buttons.size())])
 	play_button.pressed.connect(_on_play)
+	settings_button.pressed.connect(open_settings)
+	credits_button.pressed.connect(open_credits)
 	quit_button.pressed.connect(_on_quit)
 
 	var hints := UiTheme.prompt_row([
@@ -97,6 +118,7 @@ func _build() -> void:
 	hints.offset_left = -400
 	hints.offset_right = 400
 	add_child(hints)
+	_hints = hints
 
 	var version := UiTheme.label(VERSION_TEXT, UiTheme.SMALL)
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -114,9 +136,11 @@ func _build() -> void:
 func _make_button(text: String, parent: Control) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(420, 74)
+	b.custom_minimum_size = Vector2(420, 68)
 	b.focus_mode = Control.FOCUS_ALL
+	b.focus_entered.connect(_on_button_focused)
 	parent.add_child(b)
+	buttons.append(b)
 	return b
 
 
@@ -128,6 +152,12 @@ func _ready() -> void:
 func _on_visibility_changed() -> void:
 	if is_visible_in_tree() and play_button != null and play_button.is_inside_tree():
 		_focus_play.call_deferred()
+
+
+## A button got the focus: the move click (not the first focus, which the menu grabs by itself).
+func _on_button_focused() -> void:
+	if _t > 0.3:
+		Audio.play_ui(&"ui_move")
 
 
 ## Deferred: the menu may already have left the tree (Main switched screens this frame).
@@ -144,6 +174,11 @@ func _process(delta: float) -> void:
 	emblem.position.y = sin(_t * 1.6) * 6.0
 	emblem.rotation = sin(_t * 0.9) * 0.025
 	emblem.pivot_offset = emblem.size * Vector2(0.5, 1.0)
+	if is_page_open():
+		return  # (the page reads the controllers itself)
+	if _skip_frames > 0:
+		_skip_frames -= 1
+		return
 	if _pads.any_just_pressed(JOY_BUTTON_A) or _pads.any_just_pressed(JOY_BUTTON_START):
 		activate_focused()
 	elif _pads.any_just_pressed(JOY_BUTTON_B):
@@ -155,15 +190,69 @@ func activate_focused() -> void:
 	var focus := get_viewport().gui_get_focus_owner() if is_inside_tree() else null
 	if focus == quit_button:
 		_on_quit()
+	elif focus == settings_button:
+		open_settings()
+	elif focus == credits_button:
+		open_credits()
 	else:
 		_on_play()
 
 
+## True while the Settings or Credits page covers the menu.
+func is_page_open() -> bool:
+	return (settings_page != null and settings_page.visible) or (credits_page != null and credits_page.visible)
+
+
+## Opens the Settings page (anyone may drive it: nobody has joined yet).
+func open_settings() -> void:
+	if is_page_open():
+		return
+	if settings_page == null:
+		settings_page = SettingsPage.create(0.4)
+		settings_page.closed.connect(_on_page_closed.bind(settings_button))
+		add_child(settings_page)
+	_show_content(false)
+	settings_page.open(null)
+
+
+## Opens the Credits page.
+func open_credits() -> void:
+	if is_page_open():
+		return
+	if credits_page == null:
+		credits_page = CreditsPage.create(0.35)
+		credits_page.closed.connect(_on_page_closed.bind(credits_button))
+		add_child(credits_page)
+	_show_content(false)
+	credits_page.open(null)
+
+
+func _show_content(value: bool) -> void:
+	_content.visible = value
+	_hints.visible = value
+
+
+## A page was closed: the menu is back, [param opener] (the button that opened it) is focused again.
+func _on_page_closed(opener: Button) -> void:
+	_show_content(true)
+	_skip_frames = 1
+	if is_inside_tree():
+		_focus_button.call_deferred(opener)
+
+
+## Deferred: the menu may already have left the tree (Main switched screens this frame).
+func _focus_button(button: Button) -> void:
+	if button != null and button.is_inside_tree() and button.is_visible_in_tree():
+		button.grab_focus()
+
+
 func _on_play() -> void:
+	Audio.play_ui(&"ui_confirm")
 	play_pressed.emit()
 
 
 func _on_quit() -> void:
+	Audio.play_ui(&"ui_back")
 	quit_pressed.emit()
 
 

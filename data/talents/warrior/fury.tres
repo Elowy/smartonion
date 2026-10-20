@@ -26,7 +26,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_unbridled_wrath"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_unbridled_wrath"
-display_name = "Unbridled Wrath"
+display_name = "Furious Spark"
 description = "Your critical hits generate {rage} extra Rage."
 values = {
 "rage": 3.0
@@ -70,7 +70,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_blood_craze"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_blood_craze"
-display_name = "Blood Craze"
+display_name = "Savoured Kills"
 description = "Your killing blows heal you for {heal}% of your maximum health (at most once every {icd_fixed} sec)."
 values = {
 "heal": 1.0,
@@ -97,7 +97,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_dual_wield_specialization"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_dual_wield_specialization"
-display_name = "Dual Wield Specialization"
+display_name = "Twin-Blade Prowess"
 description = "While dual wielding you deal {pct}% more damage."
 values = {
 "pct": 5.0
@@ -118,7 +118,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_meat_cleaver"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_meat_cleaver"
-display_name = "Meat Cleaver"
+display_name = "Reaping Spin"
 description = "Whirlwind refunds {rage} Rage for each enemy it strikes, up to {max} Rage per spin (never more than the spin cost)."
 values = {
 "max": 12.0,
@@ -143,7 +143,7 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_flurry"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_flurry"
-display_name = "Flurry"
+display_name = "Rising Tempo"
 description = "After a critical hit, your attack speed is increased by {haste}% for {duration_fixed} sec."
 values = {
 "duration_fixed": 3.0,
@@ -172,8 +172,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_death_wish"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_death_wish"
-display_name = "Death Wish"
-description = "Increases your Mastery by {mastery}. Battle Fury: the lower your health, the harder you hit."
+display_name = "Desperate Might"
+description = "Increases your Mastery by {mastery}. Cornered Fury: the lower your health, the harder you hit."
 values = {
 "mastery": 4.0
 }
@@ -192,8 +192,8 @@ effects = Array[Dictionary]([{
 [sub_resource type="Resource" id="Resource_rampage"]
 script = ExtResource("2_talent")
 id = &"warrior_fury_rampage"
-display_name = "Rampage"
-description = "Each enemy you kill grants a stack of Rampage for {duration} sec (kills refresh it): +{pct}% damage per stack, up to {stacks} stacks. Allies within {radius} m gain half of your Rampage bonus."
+display_name = "Carnage"
+description = "Each enemy you kill grants a stack of Carnage for {duration} sec (kills refresh it): +{pct}% damage per stack, up to {stacks} stacks. Allies within {radius} m gain half of your Carnage bonus."
 values = {
 "duration": 5.0,
 "pct": 2.0,
@@ -222,7 +222,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("1_tree")
 id = &"warrior_fury"
 class_id = &"warrior"
-display_name = "Fury"
+display_name = "Berserker"
 index = 1
 description = "Dual-wielding frenzy: critical hits, Rage and killing sprees."
 icon = &"whirlwind"
