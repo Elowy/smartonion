@@ -55,6 +55,12 @@ extends RefCounted
 ##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
 ##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
 ##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
+##   --profile=KIND       M9: the meta profile (Meta.configure): dev (everything unlocked, no raw-power bonus, nothing
+##                        saved – the default of every automated run), fresh (a new player) or max (every class at
+##                        the top level, everything unlocked). Without --profile-path nothing is read or written
+##   --profile-path=FILE  M9 dev / test hook: reads and saves the meta profile in FILE instead of the player's
+##                        user://profile.json (the only way an automated run touches a profile). With --profile=fresh
+##                        or max that profile is the starting point; --profile=dev has no file
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -125,6 +131,10 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
+## The meta profile of --profile (Meta.PROFILE_KINDS; &"" = the default of the session) and the file of
+## --profile-path ("" = none).
+var profile_kind: StringName = &""
+var profile_path := ""
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -239,11 +249,23 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.leaderboard_path = value
 				else:
 					o.unknown.append(arg)
+			"--profile":
+				if StringName(value) in Meta.PROFILE_KINDS:
+					o.profile_kind = StringName(value)
+				else:
+					o.unknown.append(arg)
+			"--profile-path":
+				if value != "":
+					o.profile_path = value
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
 					o.unknown.append(arg)
 	o.start_wave = o.clamp_wave(o.start_wave)
+	if o.profile_kind == Meta.PROFILE_DEV and o.profile_path != "":
+		o.unknown.append("--profile=dev with --profile-path=%s (the dev profile never touches a file)" % o.profile_path)
 	return o
 
 

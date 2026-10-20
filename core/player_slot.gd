@@ -13,6 +13,13 @@ var player: Node3D
 ## The companion picked in the lobby (an id of ClassData.companion_choices; &"" = none picked).
 ## Read the effective choice through [method companion_id]: it stays valid when the class changes.
 var companion: StringName = &""
+## M9 meta selections of the lobby (the main profile's Seasonings, Heirloom and Wardrobe looks), empty until a
+## later package fills them: the Seasonings picked for this hero (ids), the Heirloom it starts with (&"" = none) and
+## the look override per visible armour slot (Profile.LOOK_SLOTS -> look id). The hero receives them when the run
+## starts (Player.seasonings / heirloom_id / look_overrides); the lobby keeps them per class (Meta.apply_loadout).
+var seasonings: Array[StringName] = []
+var heirloom: StringName = &""
+var looks: Dictionary[StringName, StringName] = {}
 
 
 func _init(p_index: int, p_input: PlayerInput, p_color: Color) -> void:
@@ -44,3 +51,21 @@ func cycle_companion(step: int = 1) -> StringName:
 	var at := choices.find(companion_id())
 	companion = choices[wrapi(at + step, 0, choices.size())]
 	return companion
+
+
+## The meta selections as one dictionary ({"seasonings", "heirloom", "looks"}, see [method Profile.loadout]).
+func meta_loadout() -> Dictionary:
+	return Profile.normalize_loadout({"seasonings": seasonings, "heirloom": heirloom, "looks": looks})
+
+
+## Sets the meta selections from [param loadout] (the shape of [method meta_loadout]); missing keys clear them.
+func set_meta_loadout(loadout: Dictionary) -> void:
+	var l := Profile.normalize_loadout(loadout)
+	seasonings = l["seasonings"]
+	heirloom = l["heirloom"]
+	looks = l["looks"]
+
+
+## True when a meta selection is made (never by default, nor in an automated run).
+func has_meta_selection() -> bool:
+	return not (seasonings.is_empty() and heirloom == &"" and looks.is_empty())

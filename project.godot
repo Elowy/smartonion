@@ -18,6 +18,7 @@ PlayerManager="*res://autoload/player_manager.gd"
 RunState="*res://autoload/run_state.gd"
 Audio="*res://autoload/audio.gd"
 Settings="*res://autoload/settings.gd"
+Meta="*res://autoload/meta.gd"
 
 [display]
 

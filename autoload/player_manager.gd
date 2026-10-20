@@ -135,7 +135,7 @@ func join(input: PlayerInput, class_data: ClassData = null) -> PlayerSlot:
 		return null
 	var index := _slots.find(null)
 	var slot := PlayerSlot.new(index, input, PLAYER_COLORS[index])
-	slot.class_data = class_data if class_data != null else Db.get_default_class()
+	slot.class_data = class_data if class_data != null else Meta.default_class()
 	_slots[index] = slot
 	if not slot.is_bot():
 		Audio.play_ui(&"ui_join")

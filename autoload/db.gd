@@ -28,6 +28,10 @@ const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swa
 const SHRINE_DIR := "res://data/shrines/"
 ## Pool order of the shrines; any extra one is appended alphabetically.
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
+## data/unlocks/<id>.tres (UnlockGateData, M9: content the main profile has to unlock before it is offered).
+const UNLOCK_DIR := "res://data/unlocks/"
+## data/achievements/<id>.tres (AchievementData, M9).
+const ACHIEVEMENT_DIR := "res://data/achievements/"
 ## Lobby order of the classes; any extra class is appended alphabetically. An id without a
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
@@ -64,6 +68,11 @@ var environment_ids: Array[StringName] = []
 var shrines: Dictionary[StringName, ShrineData] = {}
 var shrine_ids: Array[StringName] = []
 var class_ids: Array[StringName] = []
+## Every unlock gate (M9), by UnlockGateData.key (kind/id): the content the profile has to unlock. Content without a
+## gate is available from the start. Filled by [method reload]; [method add_unlock_gate] adds one in code.
+var unlock_gates: Dictionary[StringName, UnlockGateData] = {}
+## Every achievement (M9), by id, in file order.
+var achievements: Dictionary[StringName, AchievementData] = {}
 
 
 func _ready() -> void:
@@ -152,6 +161,17 @@ func reload() -> void:
 			extra_shrines.append(id)
 	extra_shrines.sort()
 	shrine_ids.append_array(extra_shrines)
+	unlock_gates.clear()
+	for res in _load_dir(UNLOCK_DIR):
+		if res is UnlockGateData:
+			add_unlock_gate(res)
+	achievements.clear()
+	for res in _load_dir(ACHIEVEMENT_DIR):
+		if res is AchievementData:
+			if achievements.has(res.id):
+				push_error("Db: duplicate achievement id %s" % res.id)
+			else:
+				achievements[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -173,12 +193,13 @@ func get_ability(id: StringName) -> AbilityData:
 
 
 ## Learnable abilities (Active / Auto-cast) offered to [param class_id] on level-up cards:
-## the class's own plus the general ones (AbilityData.class_id empty), unlocked only.
+## the class's own plus the general ones (AbilityData.class_id empty), unlocked only (M9: the main profile's
+## ability unlocks, Meta.is_unlocked).
 func ability_pool(class_id: StringName) -> Array[AbilityData]:
 	var out: Array[AbilityData] = []
 	for id in abilities:
 		var a := abilities[id]
-		if not a.is_learned_kind() or a.card_weight <= 0.0 or not is_unlocked(id):
+		if not a.is_learned_kind() or a.card_weight <= 0.0 or not is_unlocked(id, Profile.KIND_ABILITY, class_id):
 			continue
 		if a.class_id == &"" or a.class_id == class_id:
 			out.append(a)
@@ -351,11 +372,39 @@ func get_unique(id: StringName) -> UniqueItemData:
 	return uniques.get(id)
 
 
-## Content-pool gate for meta-progression (ARCHITECTURE "Forward compatibility"): every
-## player-facing pool (shop, loot, level-up cards, lobby) filters through this. All content is
-## unlocked until milestone M9.
-func is_unlocked(_id: StringName) -> bool:
-	return true
+## Content-pool gate for meta-progression (ARCHITECTURE "Forward compatibility"): every player-facing pool (shop,
+## loot, level-up cards, lobby) filters through this. M9 gates the content kinds of Profile.KINDS: a call with a
+## [param kind] asks the main profile ([method Meta.is_unlocked]); a call without one (the item, enchant, set,
+## consumable and shrine pools) is not gated and answers true.
+func is_unlocked(id: StringName, kind: StringName = &"", class_id: StringName = &"") -> bool:
+	return kind == &"" or Meta.is_unlocked(kind, id, class_id)
+
+
+## The gate of the content [param id] of [param kind] (null = not gated).
+func get_unlock_gate(kind: StringName, id: StringName) -> UnlockGateData:
+	return unlock_gates.get(UnlockGateData.key_for(kind, id))
+
+
+## Registers [param gate] (a gate of the same kind and id is replaced). A content package without a .tres in
+## data/unlocks/ and the tests use it; [method reload] forgets it.
+func add_unlock_gate(gate: UnlockGateData) -> void:
+	if gate != null and gate.kind != &"" and gate.id != &"":
+		unlock_gates[gate.key()] = gate
+
+
+func remove_unlock_gate(kind: StringName, id: StringName) -> void:
+	unlock_gates.erase(UnlockGateData.key_for(kind, id))
+
+
+func get_achievement(id: StringName) -> AchievementData:
+	return achievements.get(id)
+
+
+## Every achievement in file order.
+func achievement_list() -> Array[AchievementData]:
+	var out: Array[AchievementData] = []
+	out.assign(achievements.values())
+	return out
 
 
 ## Next / previous class id in lobby order (wraps around).

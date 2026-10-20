@@ -133,6 +133,11 @@ var class_data: ClassData
 ## pick of the slot (PlayerSlot.companion_id), &"" for a class without companions. Set at creation;
 ## the class kit reads it when it summons.
 var companion_id: StringName = &""
+## M9: the meta selections the hero received from its slot at creation (PlayerSlot.seasonings / heirloom / looks).
+## Nothing reads them yet; the Seasonings, Heirloom and Wardrobe packages apply them.
+var seasonings: Array[StringName] = []
+var heirloom_id: StringName = &""
+var look_overrides: Dictionary[StringName, StringName] = {}
 var main_hand: WeaponData
 var off_hand: WeaponData
 ## One runner per equipped weapon that attacks (main hand first).
@@ -238,6 +243,10 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.class_data = p_slot.class_data if p_slot != null and p_slot.class_data != null else Db.get_default_class()
 	if p_slot != null and p.class_data != null:
 		p.companion_id = p.class_data.pick_companion(p_slot.companion)
+	if p_slot != null:
+		p.seasonings = p_slot.seasonings.duplicate()
+		p.heirloom_id = p_slot.heirloom
+		p.look_overrides = p_slot.looks.duplicate()
 	p.model = OnionModel.new()
 	p.model.name = "Model"
 	p.add_child(p.model)
