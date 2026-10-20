@@ -7,6 +7,7 @@ extends TestCase
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const UiFakes := preload("res://tests/ui_fakes.gd")
+const Support := preload("res://tests/test_loot_support.gd")
 
 ## The ten Heirlooms (design §4) with the slot each one fills.
 const SLOTS := {
@@ -362,6 +363,28 @@ func test_a_bound_weapon_is_never_forged_and_nothing_is_enchanted() -> void:
 		var item := Heirlooms.create_item(Db.heirlooms[id], cls, 5, 5)
 		check_eq(Enchanter.blocked_reason(item, Enchanter.Action.IMBUE), Enchanter.REASON_BOUND, "%s: no Imbue" % id)
 		check(not Enchanter.is_enchantable(item), "%s: nothing to do at the Enchanter" % id)
+
+
+func test_a_bot_with_the_bound_peeler_enchants_something_else() -> void:
+	var cls := Db.get_class_data(&"rogue")
+	var peeler := _item(&"heir_ancestral_peeler", &"rogue", 12, 5)
+	check(peeler.is_bound() and peeler.rarity > Items.Rarity.COMMON, "the Peeler is bound and rarer than a Common")
+	var eq := Equipment.new(cls)
+	eq.slots[Items.EquipSlot.MAIN_HAND] = peeler
+	check_eq(Enchanter.best_weapon(eq), null, "only the Peeler in hand: no weapon to enchant")
+	check_eq(Enchanter.bot_target(eq), null, "and nothing else to work on")
+	check(Enchanter.bot_plan(peeler, cls).is_empty(), "no plan for a bound item")
+	# A Common weapon in the other hand is still better than the bound Peeler: it is the bot's weapon.
+	var dagger := Support.make_weapon(&"dagger", Items.Rarity.COMMON)
+	eq.slots[Items.EquipSlot.OFF_HAND] = dagger
+	check_eq(Enchanter.best_weapon(eq), dagger, "the other hand's weapon, never the Peeler")
+	check_eq(Enchanter.bot_target(eq), dagger, "bot_target follows")
+	# No other weapon: the bot falls back to its Epic armour.
+	eq.slots.erase(Items.EquipSlot.OFF_HAND)
+	var chest := Support.make_armor(90, ClassData.ArmorType.LEATHER, 20, Items.Rarity.EPIC, Items.SlotType.CHEST)
+	eq.slots[Items.EquipSlot.CHEST] = chest
+	check_eq(Enchanter.bot_target(eq), chest, "the Epic chest piece")
+	check(not Enchanter.bot_plan(chest, cls).is_empty(), "with something to do")
 
 
 func test_the_panel_greys_out_sell_and_trade_for_a_bound_item() -> void:

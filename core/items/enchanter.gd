@@ -378,15 +378,15 @@ static func refresh_name(item: ItemInstance, old_prefix: String) -> void:
 # --- Bots --------------------------------------------------------------------------------------
 
 ## The weapon a bot enchants: its best attacking weapon (higher rarity, then Item Level, then the
-## main hand), equipped. An Artifact is skipped (it can never be enchanted, see
-## [method bot_target] for what the bot works on instead). Null without one.
+## main hand), equipped. An Artifact and a bound Heirloom (the Ancestral Peeler) are skipped (neither
+## can be enchanted, see [method bot_target] for what the bot works on instead). Null without one.
 static func best_weapon(eq: Equipment) -> ItemInstance:
 	if eq == null:
 		return null
 	var best: ItemInstance = null
 	for hand in [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]:
 		var item := eq.get_item(hand)
-		if not Equipment.is_attacking_weapon(item) or item.rarity >= Items.Rarity.ARTIFACT:
+		if not Equipment.is_attacking_weapon(item) or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 			continue
 		if best == null or item.rarity > best.rarity or (item.rarity == best.rarity and item.item_level > best.item_level):
 			best = item
@@ -418,7 +418,7 @@ static func bot_target(eq: Equipment) -> ItemInstance:
 ## cannot use (Attack Power on a Spell Power class and the other way round), else Imbue (a free
 ## slot), else Empower of its lowest-ranked enchant. {} when nothing is possible. No randomness.
 static func bot_plan(item: ItemInstance, class_data: ClassData) -> Dictionary:
-	if item == null or item.rarity >= Items.Rarity.ARTIFACT:
+	if item == null or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 		return {}
 	for i in item.enchants.size():
 		var e := item.enchants[i].enchant
