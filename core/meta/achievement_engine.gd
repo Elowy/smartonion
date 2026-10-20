@@ -85,7 +85,7 @@ static func unregister_condition(kind: StringName) -> void:
 
 ## Updates the counters of [param profile] with a finished run: "runs" (+1), "wins" (+1 on a victory), "runs:<class>"
 ## and "wins:<class>" (+1 per class in the party, once even when two heroes share it), "total:<stat>" (+ the run's
-## value, rounded) and "best:<stat>" (the highest run value) for every stat of the report.
+## value, rounded) and "best:<stat>" (the highest run value) for every stat of the report that is not 0.
 static func update_counters(profile: Profile, report: RunReport) -> void:
 	if profile == null or report == null:
 		return
@@ -98,8 +98,9 @@ static func update_counters(profile: Profile, report: RunReport) -> void:
 			profile.add_counter(StringName("%s:%s" % [COUNTER_WINS, id]), 1)
 	for id in report.stats:
 		var value := roundi(report.stats[id])
-		profile.add_counter(StringName(COUNTER_TOTAL + String(id)), value)
-		profile.raise_counter(StringName(COUNTER_BEST + String(id)), value)
+		if value != 0:  # (a zero changes nothing and would only fill the file)
+			profile.add_counter(StringName(COUNTER_TOTAL + String(id)), value)
+			profile.raise_counter(StringName(COUNTER_BEST + String(id)), value)
 
 
 # --- Evaluation ---------------------------------------------------------------------------------

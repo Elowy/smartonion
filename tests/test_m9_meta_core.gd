@@ -344,6 +344,17 @@ func test_a_profile_round_trips_through_its_file() -> void:
 	check_eq(back.selected_title, &"the_unbreakable", "title")
 
 
+func test_a_saved_max_profile_stays_max_and_a_players_file_never_is() -> void:
+	var m := Profile.max_profile(Db.class_ids)
+	m.save_file(_tmp_path)
+	var back := Profile.load_file(_tmp_path)
+	check(back.all_unlocked and not back.is_dev, "max: everything unlocked after a reload")
+	check_eq(back.class_level(Db.class_ids[0]), 30, "and the levels")
+	check(not Profile.from_dict(_rich_profile().to_dict()).all_unlocked, "a normal profile is not")
+	check(not _rich_profile().to_dict().has("all_unlocked"), "its file has no such key")
+	check(not Profile.from_dict({"all_unlocked": "yes"}).all_unlocked, "only a real true counts")
+
+
 func test_saving_replaces_the_old_file() -> void:
 	var p := Profile.fresh()
 	p.earn_seeds(1)
@@ -934,6 +945,58 @@ func test_an_abandoned_run_is_recorded_once_a_wave_was_cleared() -> void:
 	check_eq(int(reports[0].stat(&"waves_cleared")), 3, "with the waves cleared")
 
 
+func _smoke_options(waves: int, start_wave: int = 1) -> LaunchOptions:
+	var opts := LaunchOptions.new()
+	opts.smoke = true
+	opts.waves = waves
+	opts.start_wave = start_wave
+	return opts
+
+
+func test_a_smoke_run_with_a_real_profile_records_its_planned_waves() -> void:
+	_use_file()
+	_track(&"watch")
+	_make_main(_smoke_options(1))
+	main.quit_app = false
+	main._smoke_running = true
+	PlayerManager.add_bot(&"warrior", 1)
+	PlayerManager.add_bot(&"mage", 2)
+	main.start_run()
+	main.wave_director.time_left = 0.0
+	main.wave_director._physics_process(DT)
+	check_eq(main.quit_code, 0, "the smoke run finished")
+	check_eq(reports.size(), 1, "its planned waves were recorded as a run")
+	check(reports[0].abandoned and not reports[0].victory, "one the harness stopped")
+	check_eq(int(reports[0].stat(&"waves_cleared")), 1, "after one wave")
+	check_eq(Profile.load_file(_tmp_path).counter(&"runs"), 1, "saved")
+	# On the last wave the same ending is a victory.
+	_free_main()
+	UiFakes.reset_players()
+	reports.clear()
+	_make_main(_smoke_options(1, RunState.TOTAL_WAVES))
+	main.quit_app = false
+	main._smoke_running = true
+	PlayerManager.add_bot(&"warrior", 1)
+	main.start_run()
+	main.wave_director.time_left = 0.0
+	main.wave_director._physics_process(DT)
+	check(reports.size() == 1 and reports[0].victory and not reports[0].abandoned, "a victory on the final wave")
+	# The dev profile (every automated run): nothing is recorded.
+	_free_main()
+	UiFakes.reset_players()
+	reports.clear()
+	Meta.configure(&"dev", "", true)
+	_make_main(_smoke_options(1))
+	main.quit_app = false
+	main._smoke_running = true
+	PlayerManager.add_bot(&"warrior", 1)
+	main.start_run()
+	main.wave_director.time_left = 0.0
+	main.wave_director._physics_process(DT)
+	check_eq(main.quit_code, 0, "the dev smoke run finished")
+	check(reports.is_empty() and main.meta_result.is_empty(), "the dev profile recorded nothing")
+
+
 func test_the_run_report_collects_what_the_run_kept() -> void:
 	RunState.start_run(2, 5)
 	PlayerManager.add_bot(&"warrior", 1)
@@ -1070,6 +1133,7 @@ func test_run_counters() -> void:
 	check_eq(p.counter(&"runs:mage"), 2, "mage runs")
 	check_eq(p.counter(&"total:kills"), 50, "totals add up")
 	check_eq(p.counter(&"best:kills"), 40, "the best stays")
+	check(not p.counters.has(&"total:bosses_killed"), "a stat that is 0 stores no counter")
 
 
 func test_meta_checks_achievements_saves_and_emits() -> void:

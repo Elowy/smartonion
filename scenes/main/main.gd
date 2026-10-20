@@ -1072,8 +1072,12 @@ func _on_wave_cleared(n: int) -> void:
 		RunState.elites_killed, RunState.elites_spawned, RunState.goblins_spawned,
 		RunState.goblins_killed, RunState.goblins_escaped, _wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
-		if RunState.is_final_wave(n):
+		var won := RunState.is_final_wave(n)
+		if won:
 			RunState.end_run(true)
+		# (A smoke run stops here without Main.end_run: with a real profile -- --profile-path -- the planned waves
+		# count as the run, a victory on the last wave, else a run the harness stopped.)
+		meta_result = _record_meta(won, not won)
 		_finish_smoke("completed")
 		return
 	if hud != null:

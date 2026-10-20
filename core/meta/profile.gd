@@ -16,13 +16,14 @@ extends RefCounted
 ## Origins: a profile read from a file (or [method fresh]) is a normal player profile. [method dev] is the profile
 ## of every automated run (smoke, demo, views, tests): everything unlocked, no raw-power bonus, nothing selected,
 ## never saved. [method max_profile] is a finished player: every class at the top level and everything unlocked.
-## "Everything unlocked" is the [member all_unlocked] flag (not stored in the file): [method has_unlock] answers true.
+## "Everything unlocked" is the [member all_unlocked] flag: [method has_unlock] answers true (the file keeps it only for a
+## max profile written with --profile-path, so that file stays "max").
 ##
 ## File (FORMAT_VERSION 1, JSON, [method save_file] / [method load_file]):
 ##   {"version": 1, "created_at": unix, "classes": {id: {"xp": int, "level": int}}, "unlocks": {kind: [ids]},
 ##    "achievements": {id: unix}, "counters": {name: int}, "seeds": int, "seeds_earned": int,
 ##    "heirloom_ranks": {id: int}, "loadouts": {class id: {"seasonings": [ids], "heirloom": id, "looks": {slot: id}}},
-##    "selected_title": id}
+##    "selected_title": id, "all_unlocked": true (only a saved max profile)}
 ## A missing file is a fresh profile; a file that cannot be parsed is moved to "<path>.corrupt" and a fresh profile
 ## is used; a file of a NEWER version is never overwritten (the profile is fresh and read-only); a path that cannot
 ## be read as a file is never overwritten either. The write goes through "<path>.tmp" and a rename. Unknown keys and
@@ -333,7 +334,7 @@ func to_dict() -> Dictionary:
 		for slot: StringName in l["looks"]:
 			looks[String(slot)] = String(l["looks"][slot])
 		loadout_data[String(id)] = {"seasonings": seasonings, "heirloom": String(l["heirloom"]), "looks": looks}
-	return {
+	var out := {
 		"version": FORMAT_VERSION,
 		"created_at": created_at,
 		"classes": class_data,
@@ -346,6 +347,9 @@ func to_dict() -> Dictionary:
 		"loadouts": loadout_data,
 		"selected_title": String(selected_title),
 	}
+	if all_unlocked:
+		out["all_unlocked"] = true  # (only the max profile saved with --profile-path; a player's file never has it)
+	return out
 
 
 ## The profile of [param data] (a parsed file; run it through [method migrate] first). Tolerant: a field of the
@@ -391,6 +395,8 @@ static func from_dict(data: Dictionary) -> Profile:
 			if str(id) != "" and loadout_data[id] is Dictionary:
 				p.loadouts[StringName(str(id))] = normalize_loadout(loadout_data[id])
 	p.selected_title = StringName(str(data.get("selected_title", "")))
+	var unlocked_all: Variant = data.get("all_unlocked", false)
+	p.all_unlocked = typeof(unlocked_all) == TYPE_BOOL and unlocked_all
 	return p
 
 
