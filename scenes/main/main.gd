@@ -788,8 +788,8 @@ func _report_extras() -> Dictionary:
 	}
 
 
-## M9: checks the achievements against the run so far (a wave cleared, a boss down, an Artifact dropped, a Loot Goblin or
-## an elite killed, a dungeon over, a loot roll resolved): a new one unlocks in the middle of the run and pops a toast.
+## M9: checks the achievements against the run so far (a wave cleared, a boss down, an Artifact dropped, a Loot Goblin
+## killed, a dungeon over, a loot roll resolved): a new one unlocks in the middle of the run and pops a toast.
 ## Real profiles only – the dev profile of the automated runs records nothing, so this costs them nothing.
 func _check_achievements_live() -> void:
 	if not Meta.records_runs() or arena == null or not RunState.active:

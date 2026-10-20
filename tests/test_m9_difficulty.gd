@@ -605,6 +605,8 @@ func test_the_lobby_selector_cycles_within_the_cap() -> void:
 	check_eq(lobby.difficulty_label.text, "Difficulty: Pungent", "the header follows")
 	UiFakes.tap(lobby, a, PlayerInput.Pad.SELECT)
 	check_eq(lobby.difficulty, &"normal", "Tear-Jerker is locked: the choice wraps to Normal")
+	check(lobby.cycle_difficulty() and lobby.difficulty == &"pungent", "a cycle that changes the tier says so")
+	check(lobby.cycle_difficulty() and lobby.difficulty == &"normal", "(and back)")
 	check(lobby._lock_notice.contains("Tear-Jerker is locked") and lobby._lock_notice.contains("Win a run on Pungent with the Warrior"), "and says why: %s" % lobby._lock_notice)
 	check_eq(Difficulty.lock_reason(&"tear_jerker", [&"mage"] as Array[StringName]), "Win a run on Normal with the Mage", "the first missing step, not the last")
 	check_eq(Difficulty.lock_reason(&"normal", [&"mage"] as Array[StringName]), "", "Normal is never locked")
@@ -627,6 +629,7 @@ func test_the_party_cap_is_the_lowest_class() -> void:
 	UiFakes.tap(lobby, a, PlayerInput.Pad.SELECT)
 	check_eq(lobby.difficulty, &"normal", "the mage has not won: Normal only")
 	check(lobby._lock_notice.contains("Mage"), "the mage is named: %s" % lobby._lock_notice)
+	check(not lobby.cycle_difficulty(), "a cycle that changes nothing says so (the lobby plays the error sound)")
 	check_eq(Difficulty.selectable(lobby.party_classes()), [&"normal"] as Array[StringName], "selectable")
 
 

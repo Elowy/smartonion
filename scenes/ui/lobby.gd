@@ -116,26 +116,26 @@ func set_difficulty(id: StringName) -> void:
 
 ## The next tier the joined heroes may play (Normal -> Pungent -> Tear-Jerker -> Normal ...), by [param by_slot] (a
 ## joined slot; null = nobody: a test or a script). When the next tier is locked for the party the footer says why and
-## the choice wraps to Normal. Emits [signal difficulty_changed] when the tier changed.
-func cycle_difficulty(by_slot: PlayerSlot = null) -> void:
+## the choice wraps to Normal. Emits [signal difficulty_changed] and returns true when the tier changed.
+func cycle_difficulty(by_slot: PlayerSlot = null) -> bool:
 	var classes := party_classes()
 	var all := Difficulty.ids()
 	if all.is_empty():
-		return
+		return false
 	var allowed := Difficulty.selectable(classes)
 	var next := all[(maxi(all.find(difficulty), 0) + 1) % all.size()]
 	if next not in allowed:
 		_show_lock_notice("%s is locked: %s" % [Difficulty.name_of(next), Difficulty.lock_reason(next, classes)])
 		next = all[0]
 	if next == difficulty:
-		Audio.play_ui(&"ui_error")
-		return
+		return false
 	difficulty = next
 	if by_slot != null and is_counting_down():
 		by_slot.ready = false  # the countdown stops until everybody has seen the new tier and readied again
 		countdown_left = -1.0
 	_refresh_difficulty()
 	difficulty_changed.emit(difficulty)
+	return true
 
 
 ## The class ids of the joined heroes (the difficulty cap is the lowest tier they have all unlocked).
@@ -420,8 +420,7 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 		toggle_hardcore(slot)
 		Audio.play_ui(&"ui_toggle")
 	elif inp.just_pressed(PlayerInput.Pad.SELECT):
-		cycle_difficulty(slot)
-		Audio.play_ui(&"ui_toggle")
+		Audio.play_ui(&"ui_toggle" if cycle_difficulty(slot) else &"ui_error")
 	if not slot.ready:
 		var nav := inp.nav_just_pressed()
 		if nav.x != 0:
