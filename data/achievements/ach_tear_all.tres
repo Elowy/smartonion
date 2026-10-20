@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_tear_all"
+display_name = "Inconsolable"
+description = "Win a run on Tear-Jerker with each of the seven classes."
+points = 50
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "counter_at_least",
+"counter": "wins:warrior:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:mage:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:paladin:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:rogue:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:warlock:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:hunter:tear_jerker",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:shaman:tear_jerker",
+"value": 1
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "title",
+"id": "title_inconsolable",
+"name": "the Inconsolable"
+}, {
+"kind": "cosmetic",
+"id": "cos_salt_crystal_glow",
+"name": "Salt Crystal Glow"
+}])

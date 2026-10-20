@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_full_table"
+display_name = "Full Table"
+description = "Win a run with a full party of four."
+points = 15
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "run_flag",
+"flag": "final_boss_down"
+}, {
+"kind": "run_flag",
+"flag": "full_party"
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "legendary",
+"id": "sash_of_twin_souls"
+}])

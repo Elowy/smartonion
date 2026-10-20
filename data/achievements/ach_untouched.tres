@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_untouched"
+display_name = "Untouched"
+description = "Win a run without a single hero going down."
+points = 25
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "run_flag",
+"flag": "final_boss_down"
+}, {
+"kind": "run_flag",
+"flag": "no_downs"
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "legendary",
+"id": "vial_of_distilled_adrenaline"
+}, {
+"kind": "title",
+"id": "title_untouched",
+"name": "the Untouched"
+}])

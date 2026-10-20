@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_regular"
+display_name = "Regular at the Patch"
+description = "Finish 3 runs that each reached wave 3, win or lose. Opens the Hunter and the Shaman if you have not earned them yet."
+points = 5
+condition_kind = &"counter_at_least"
+condition_params = {
+"counter": "runs_long",
+"value": 3
+}
+rewards = Array[Dictionary]([{
+"kind": "class",
+"id": "hunter"
+}, {
+"kind": "class",
+"id": "shaman"
+}])

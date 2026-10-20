@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_level_thirty"
+display_name = "Fully Grown"
+description = "Bring any class to Class Level 30."
+points = 25
+condition_kind = &"any_of"
+condition_params = {
+"conditions": [{
+"kind": "class_level_at_least",
+"class_id": "warrior",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "mage",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "paladin",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "rogue",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "warlock",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "hunter",
+"value": 30
+}, {
+"kind": "class_level_at_least",
+"class_id": "shaman",
+"value": 30
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "cosmetic",
+"id": "dye_moss",
+"name": "Moss Green"
+}])

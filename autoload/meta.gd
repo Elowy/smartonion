@@ -19,7 +19,7 @@ extends Node
 ## (data/unlocks/, or [method Db.add_unlock_gate]) and the profile has not unlocked it; collectibles (seasoning,
 ## heirloom, cosmetic, title, look) and the difficulty tiers above Normal are locked until the profile owns them.
 ## The pools call it: Db.ability_pool, TalentState (capstones), ItemGenerator / Forge (Legendaries), the lobby and
-## the bots (classes), the difficulty stub below.
+## the bots (classes), the difficulty selector ([Difficulty], data/difficulties/).
 ##
 ## The run-end hook: Main builds a [RunReport] and calls [method record_run] once. It dispatches the report to the
 ## registered listeners in priority order (the counters first, the achievement check last, in between whoever
@@ -48,9 +48,8 @@ const PRIORITY_ACHIEVEMENTS := 1000
 const LISTENER_COUNTERS := &"counters"
 const LISTENER_ACHIEVEMENTS := &"achievements"
 
-## The difficulty tiers in order (GDD 9.1; a stub until the Difficulty package's DifficultyData replaces it). The
-## first tier is always available, every other one is unlocked per class.
-const DIFFICULTY_TIERS: Array[StringName] = [&"normal", &"pungent", &"tear_jerker"]
+## Seeds an achievement pays once for every point it is worth (design: 615 points = 3075 Seeds).
+const SEEDS_PER_POINT := 5
 const LOCKED_HINT := "Locked"
 
 ## The current profile (never null after startup).
@@ -211,14 +210,15 @@ func raw_power_enabled() -> bool:
 	return profile != null and profile.raw_power
 
 
-# --- Difficulty (stub) --------------------------------------------------------------------------
+# --- Difficulty ---------------------------------------------------------------------------------
 
-## Whether the difficulty tier [param tier] ([constant DIFFICULTY_TIERS]) is open for [param class_id]: the first tier
-## always, the others once the profile unlocked them for the class. Replaced by the Difficulty package's data.
+## Whether the difficulty tier [param tier] (a [Difficulty] id, data/difficulties/) is open for [param class_id]: the
+## first tier always, the others once the profile unlocked them for the class (the class-pair achievements do:
+## winning with a class opens the next tier for it).
 func is_difficulty_unlocked(tier: StringName, class_id: StringName) -> bool:
 	if profile == null or profile.all_unlocked:
 		return true
-	var at := DIFFICULTY_TIERS.find(tier)
+	var at := Difficulty.tier_index(tier)
 	if at <= 0:
 		return at == 0
 	return profile.has_unlock(Profile.KIND_DIFFICULTY, tier, class_id)
@@ -226,8 +226,11 @@ func is_difficulty_unlocked(tier: StringName, class_id: StringName) -> bool:
 
 ## The highest tier every class of [param class_ids] has unlocked: the cap of the party's difficulty select.
 func party_difficulty_cap(class_ids: Array[StringName]) -> StringName:
-	var best := DIFFICULTY_TIERS[0]
-	for tier in DIFFICULTY_TIERS:
+	var tiers := Difficulty.ids()
+	if tiers.is_empty():
+		return Difficulty.NORMAL
+	var best := tiers[0]
+	for tier in tiers:
 		var open := true
 		for id in class_ids:
 			if not is_difficulty_unlocked(tier, id):
@@ -236,6 +239,16 @@ func party_difficulty_cap(class_ids: Array[StringName]) -> StringName:
 			break
 		best = tier
 	return best
+
+
+## [param tier] when a party of [param class_ids] may play it, else the highest tier it may (Main.start_run: a tier
+## the heroes have not unlocked never reaches a run, whatever put it there).
+func clamp_difficulty(tier: StringName, class_ids: Array[StringName]) -> StringName:
+	var wanted := Difficulty.tier_index(tier)
+	var cap := Difficulty.tier_index(party_difficulty_cap(class_ids))
+	if wanted < 0:
+		return Difficulty.NORMAL
+	return tier if wanted <= cap else Difficulty.ids()[cap]
 
 
 # --- Seeds --------------------------------------------------------------------------------------
@@ -321,10 +334,30 @@ func check_achievements(report: RunReport = null) -> Array[StringName]:
 		return []
 	var ids := AchievementEngine.evaluate(profile, report, Db.achievement_list(), now())
 	_pending_unlocks.append_array(ids)
+	_pay_achievements(ids)
 	if not ids.is_empty():
 		_changed()
 	_flush_unlocks()
 	return ids
+
+
+## What new achievements bring besides their rewards: their Seeds ([constant SEEDS_PER_POINT] per point, paid once) and
+## the title the achievement score earns now ([PlayerTitles.POINT_TITLES]). Returns {"seeds": int, "titles":
+## Array[StringName]}.
+func _pay_achievements(ids: Array[StringName]) -> Dictionary:
+	var paid := {"seeds": 0, "titles": [] as Array[StringName]}
+	if ids.is_empty() or profile == null:
+		return paid
+	var seeds_total := 0
+	for id in ids:
+		var data := Db.get_achievement(id)
+		if data != null:
+			seeds_total += data.points * SEEDS_PER_POINT
+	if seeds_total > 0:
+		earn_seeds(seeds_total)
+	paid["seeds"] = seeds_total
+	paid["titles"] = PlayerTitles.grant_for_points(profile, achievement_points())
+	return paid
 
 
 ## The profile's achievement score (the points of the unlocked achievements).
@@ -449,8 +482,12 @@ func _on_counters(report: RunReport, p: Profile, _result: Dictionary) -> void:
 	AchievementEngine.update_counters(p, report)
 
 
-func _on_achievements(report: RunReport, p: Profile, _result: Dictionary) -> void:
-	_pending_unlocks.append_array(AchievementEngine.evaluate(p, report, Db.achievement_list(), now()))
+func _on_achievements(report: RunReport, p: Profile, result: Dictionary) -> void:
+	var ids := AchievementEngine.evaluate(p, report, Db.achievement_list(), now())
+	_pending_unlocks.append_array(ids)
+	var paid := _pay_achievements(ids)
+	result["achievement_seeds"] = paid["seeds"]
+	result["point_titles"] = paid["titles"]
 
 
 func _sorted_listeners() -> Array[Dictionary]:

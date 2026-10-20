@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_master_chef"
+display_name = "Master Chef"
+description = "Bring an ability to Rank V."
+points = 10
+condition_kind = &"stat_at_least"
+condition_params = {
+"stat": "rank5",
+"value": 1,
+"scope": "hero"
+}

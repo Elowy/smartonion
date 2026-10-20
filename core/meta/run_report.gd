@@ -8,16 +8,18 @@ extends RefCounted
 ## Fields:
 ##   victory / abandoned     - the run was won / given up (quit to the menu, the last hero dropped out)
 ##   mode, hardcore, endless - the run settings (RunState); environment: the arena's id
-##   difficulty              - the difficulty tier id (&"normal" until the Difficulty package sets it)
+##   difficulty              - the difficulty tier id (RunState.difficulty; &"normal" for a report made without one)
 ##   party                   - the class ids as the run started, in slot order (duplicates when two heroes share one)
 ##   wave / waves_cleared    - the wave the run ended on / waves cleared this run
 ##   stats                   - run-wide numbers, see [method collect] for the list (stat id -> float)
 ##   heroes                  - per hero still in the run: {"slot", "class_id", "alive", "damage", "healing", "absorbed",
-##                             "taken", "kills", "bosses", "revives", "downs", "need_wins", "companion",
+##                             "taken", "kills", "bosses", "revives", "downs", "need_wins", "capstones" (capstone talents
+##                             taken), "rank5" (abilities at Rank V), "sets_active" (set bonuses active), "companion",
 ##                             "equipped": [item summaries: {"source_id", "slot_type", "equip_slot", "armor_type",
 ##                             "rarity", "wave", "item_level", "unique", "set_id", "look": {EquipLook fields} or {}}]}
 ##   flags                   - named run facts the achievement conditions test ([method flag]): victory, abandoned,
-##                             hardcore, endless, solo, full_party, no_downs (+ mode, environment, difficulty as text)
+##                             hardcore, endless, solo, full_party, no_downs, final_boss_down ("a win": the run was
+##                             won, or in the endless mode the wave-25 boss died) (+ mode, environment, difficulty as text)
 
 ## The stat ids [method collect] fills (all numbers; run-wide).
 const STAT_IDS: Array[StringName] = [
@@ -28,7 +30,7 @@ const STAT_IDS: Array[StringName] = [
 	&"events_spawned", &"events_completed", &"shrines_offered", &"shrines_accepted", &"dungeons_entered",
 	&"dungeons_completed", &"dungeons_failed", &"dungeon_rooms_cleared", &"downs", &"revives", &"damage",
 	&"healing", &"absorbed", &"damage_taken", &"items_bought", &"items_looted", &"loot_rolls", &"level_cards",
-	&"ranks_trained", &"shop_rerolls", &"legendaries_held",
+	&"ranks_trained", &"shop_rerolls", &"legendaries_held", &"boss_wave_down", &"need_legendary_wins",
 ]
 
 var victory := false
@@ -46,6 +48,9 @@ var heroes: Array[Dictionary] = []
 var flags: Dictionary[StringName, Variant] = {}
 ## [method Meta.record_run] handled this report (it records a report once).
 var recorded := false
+## [method AchievementEngine.update_counters] added this report to the profile's counters (so a "lifetime total"
+## condition does not count the run twice).
+var counted := false
 
 
 ## A report from plain values (tests, scripts): [param p_party] the class ids in slot order, [param p_stats] the run
@@ -156,6 +161,8 @@ static func collect(p_victory: bool, p_abandoned: bool, p_extras: Dictionary = {
 		&"ranks_trained": float(int(p_extras.get("ranks_trained", 0))),
 		&"shop_rerolls": float(int(p_extras.get("shop_rerolls", 0))),
 		&"legendaries_held": float(legendaries),
+		&"boss_wave_down": float(RunState.boss_wave_down),
+		&"need_legendary_wins": float(RunState.need_legendary_wins),
 	}
 	r._build_flags()
 	return r
@@ -172,6 +179,11 @@ func stat(id: StringName) -> float:
 ## and difficulty.
 func flag(id: StringName) -> Variant:
 	return flags.get(id)
+
+
+## The run counts as a win: it was won, or (endless mode) the final boss died ([constant RunState.TOTAL_WAVES]).
+func won() -> bool:
+	return bool(flags.get(&"final_boss_down", victory))
 
 
 ## The classes in the party, each once, in slot order.
@@ -233,6 +245,7 @@ func _build_flags() -> void:
 		&"solo": heroes_in_party == 1,
 		&"full_party": heroes_in_party >= PlayerManager.MAX_PLAYERS,
 		&"no_downs": downs == 0,
+		&"final_boss_down": victory or int(stat(&"boss_wave_down")) >= RunState.TOTAL_WAVES,
 		&"mode": String(mode),
 		&"environment": String(environment),
 		&"difficulty": String(difficulty),
@@ -262,9 +275,45 @@ static func _hero_entry(slot: PlayerSlot) -> Dictionary:
 		"revives": int(RunState.revives_by_player.get(i, 0)),
 		"downs": int(RunState.downs_by_player.get(i, 0)),
 		"need_wins": int(RunState.need_wins_by_player.get(i, 0)),
+		"capstones": _capstones_taken(slot),
+		"rank5": _rank5_abilities(slot),
+		"sets_active": _sets_active(slot),
 		"companion": String(slot.companion_id()),
 		"equipped": _equipped_summaries(slot),
 	}
+
+
+## Capstone talents [param slot]'s hero has taken (0 once the hero is gone).
+static func _capstones_taken(slot: PlayerSlot) -> int:
+	var hero := slot.player as Player
+	if hero == null or not is_instance_valid(hero) or hero.talents == null:
+		return 0
+	var n := 0
+	for id: StringName in hero.talents.ranks:
+		var t := Db.get_talent(id)
+		if t != null and t.is_capstone() and hero.talents.ranks[id] > 0:
+			n += 1
+	return n
+
+
+## Abilities at Rank V on [param slot]'s hero.
+static func _rank5_abilities(slot: PlayerSlot) -> int:
+	var hero := slot.player as Player
+	if hero == null or not is_instance_valid(hero) or hero.abilities == null:
+		return 0
+	var n := 0
+	for id: StringName in hero.abilities.ranks:
+		if hero.abilities.knows(id) and hero.abilities.rank_of(id) >= AbilityRanks.MAX_RANK:
+			n += 1
+	return n
+
+
+## Set bonuses active on [param slot]'s hero (a 4-piece set counts 2: SetBonuses.active_count).
+static func _sets_active(slot: PlayerSlot) -> int:
+	var hero := slot.player as Player
+	if hero == null or not is_instance_valid(hero) or hero.equipment == null:
+		return 0
+	return SetBonuses.active_count(hero.equipment)
 
 
 ## What [param slot]'s hero wears now, one summary per equipped item (weapons included).

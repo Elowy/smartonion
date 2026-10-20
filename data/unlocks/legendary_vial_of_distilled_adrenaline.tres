@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnlockGateData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/unlock_gate_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+kind = &"legendary"
+id = &"vial_of_distilled_adrenaline"
+hint = "Earn the achievement Untouched"

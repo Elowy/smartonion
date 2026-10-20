@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_wardrobe_150"
+display_name = "Wardrobe Wonder"
+description = "Collect 150 looks in your Wardrobe."
+points = 10
+condition_kind = &"unlock_count_at_least"
+condition_params = {
+"unlock_kind": "look",
+"count": 150
+}
+rewards = Array[Dictionary]([{
+"kind": "cosmetic",
+"id": "dye_charcoal",
+"name": "Charcoal Grey"
+}])

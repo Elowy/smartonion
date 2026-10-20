@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_salt_of_earth"
+display_name = "Salt of the Earth"
+description = "Slay 500 enemies in total, over all your runs."
+points = 5
+condition_kind = &"total_at_least"
+condition_params = {
+"stat": "kills",
+"value": 500
+}
+rewards = Array[Dictionary]([{
+"kind": "class",
+"id": "shaman"
+}])
