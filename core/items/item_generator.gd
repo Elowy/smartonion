@@ -929,9 +929,12 @@ static func _usable_by_any(data: UniqueItemData, users: Array[ClassData]) -> boo
 
 
 ## Whether [param data] may come from [param source] at [param wave]: unlocked, listed source,
-## min_wave reached; never above Epic in the shop (Legendaries only from loot sources).
+## min_wave reached; never above Epic in the shop (Legendaries only from loot sources). M9: a hand-made Legendary
+## is in the pool only when the main profile has it unlocked (kind legendary; ungated ones always are).
 static func unique_available(data: UniqueItemData, source: Source, wave: int) -> bool:
 	if data == null or data.weight <= 0.0 or not Db.is_unlocked(data.id):
+		return false
+	if data.rarity == Items.Rarity.LEGENDARY and not Db.is_unlocked(data.id, Profile.KIND_LEGENDARY):
 		return false
 	if source_id(source) not in data.sources or wave < data.min_wave:
 		return false

@@ -5,6 +5,8 @@ extends PanelContainer
 ## class stat bonuses, starting weapons, resource and the device's own button prompts. A class with
 ## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
+## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
+## description, and without the Ready prompt (Lobby.ready_block_reason).
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
 const PREVIEW_HEIGHT := 150.0
@@ -255,8 +257,8 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
-		key = "%d:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
-				p_slot.companion_id()]
+		key = "%d:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
+				p_slot.companion_id(), _locked_hint(p_slot)]
 	if key == _state_key:
 		return
 	_state_key = key
@@ -315,9 +317,14 @@ func _apply_joined(s: PlayerSlot) -> void:
 	_ready_ribbon.visible = s.ready
 	_left_arrow.visible = not s.ready
 	_right_arrow.visible = not s.ready
+	var lock_hint := _locked_hint(s)
 	_class_label.text = data.display_name if data != null else "?"
 	_role_label.text = data.role if data != null else ""
 	_desc_label.text = data.description if data != null else ""
+	if lock_hint != "":
+		_desc_label.text = "Locked: %s" % lock_hint
+	_desc_label.add_theme_color_override(&"font_color", UiTheme.RED if lock_hint != "" else Color(0.9, 0.87, 0.8))
+	preview.modulate = Color(0.45, 0.45, 0.5) if lock_hint != "" else Color.WHITE
 	_fill_stats(data)
 	_fill_weapons(data)
 	_fill_companion(s)
@@ -447,6 +454,11 @@ func _fill_prompts(s: PlayerSlot) -> void:
 	var items: Array = []
 	if s.ready:
 		items = [[UiGlyph.for_input(inp, PlayerInput.Pad.B, 28.0), "Not ready"]]
+	elif _locked_hint(s) != "":
+		items = [
+			[UiGlyph.nav(28.0), "Class"],
+			[UiGlyph.for_input(inp, PlayerInput.Pad.B, 28.0), "Leave"],
+		]
 	else:
 		items = [
 			[UiGlyph.nav(28.0), "Class"],
@@ -456,6 +468,13 @@ func _fill_prompts(s: PlayerSlot) -> void:
 	var row := UiTheme.prompt_row(items, UiTheme.FONT_SMALL + 1)
 	row.add_theme_constant_override(&"separation", 16)
 	_prompt_holder.add_child(row)
+
+
+## The unlock hint of [param s]'s class when the main profile has not unlocked it ("" = playable).
+static func _locked_hint(s: PlayerSlot) -> String:
+	if s == null or s.class_data == null or Meta.is_class_unlocked(s.class_data.id):
+		return ""
+	return Meta.unlock_hint(Profile.KIND_CLASS, s.class_data.id)
 
 
 func _card_style(border: Color, fill: Color, glow: Color = Color(0, 0, 0, 0)) -> UiFrameStyle:

@@ -8,7 +8,8 @@ extends Control
 ## drawn instead of that glyph, in the glyph's tint) and, drawn over it by a child layer ([class
 ## Overlay]):
 ##  - the state rim ([enum State], pushed in by the tab – nothing is read from gameplay):
-##    LOCKED (a tier gate, a prerequisite or the level-10 rule: darkened glyph, grey rim),
+##    LOCKED (a tier gate, a prerequisite, the level-10 rule or a capstone the profile has not unlocked: darkened
+##    glyph, grey rim),
 ##    UNAVAILABLE (open, but no free point: a little dark), AVAILABLE (a point can go in: green
 ##    rim), PARTIAL (some ranks: green), MAXED (gold),
 ##  - the rank pill "2/3" hanging over the bottom-right corner (ringed in the player's colour
@@ -163,6 +164,8 @@ static func state_for(s: TalentState, t: TalentData) -> State:
 		return State.MAXED
 	if r > 0:
 		return State.PARTIAL
+	if s.capstone_locked(t):
+		return State.LOCKED
 	if s.can_add(t.id):
 		return State.AVAILABLE
 	return State.UNAVAILABLE if is_open(s, t) else State.LOCKED
@@ -171,6 +174,8 @@ static func state_for(s: TalentState, t: TalentData) -> State:
 ## Whether [param t] passes the level rule, its tier gate and its prerequisite (a point could go
 ## in if one were free).
 static func is_open(s: TalentState, t: TalentData) -> bool:
+	if s.capstone_locked(t):
+		return false
 	if RunState.level < RunState.TALENT_START_LEVEL:
 		return false
 	if s.points_below_tier(s.tree_of(t.id), t.tier) < TalentState.gate_points(t.tier):

@@ -211,7 +211,7 @@ func forges_on_buy(index: int, slot: PlayerSlot) -> bool:
 	if player == null or player.equipment == null or player.equipment.has_space():
 		return false
 	var partner := Forge.partner_for(player.equipment, o.item)
-	return partner != null and Forge.can_place(player.equipment, o.item, partner)
+	return partner != null and not Forge.result_locked(o.item) and Forge.can_place(player.equipment, o.item, partner)
 
 
 ## The full-backpack purchase: forges with the partner (Forge.forge_with_offer) or refuses.

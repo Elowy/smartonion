@@ -20,6 +20,9 @@ extends Control
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
 ##   A change while the start countdown runs un-readies the player who made it, which cancels the countdown
 ##   (everybody sees the new mode before the run starts).
+## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
+##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
+##   remembered for that class on their slot (Meta.apply_loadout).
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
@@ -222,6 +225,7 @@ func _build_mode_block() -> Control:
 
 func _ready() -> void:
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
+	PlayerManager.player_joined.connect(_on_player_joined)
 	visibility_changed.connect(_on_visibility_changed)
 	_on_visibility_changed()
 	_refresh()
@@ -246,6 +250,10 @@ func _set_joining(on: bool) -> void:
 	elif _owns_joining:
 		PlayerManager.joining_enabled = false
 		_owns_joining = false
+
+
+func _on_player_joined(slot: PlayerSlot) -> void:
+	Meta.apply_loadout(slot)  # (the selections remembered for the class the player starts on)
 
 
 func _on_device_disconnected(slot: PlayerSlot) -> void:
@@ -282,8 +290,11 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 		return
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
-		slot.ready = not slot.ready
-		Audio.play_ui(&"ui_confirm" if slot.ready else &"ui_back")
+		if not slot.ready and ready_block_reason(slot) != "":
+			Audio.play_ui(&"ui_error")
+		else:
+			slot.ready = not slot.ready
+			Audio.play_ui(&"ui_confirm" if slot.ready else &"ui_back")
 	elif inp.just_pressed(PlayerInput.Pad.B):
 		Audio.play_ui(&"ui_back")
 		if slot.ready:
@@ -292,8 +303,11 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			PlayerManager.leave(slot.index)
 			return
 	elif inp.just_pressed(PlayerInput.Pad.START):
-		slot.ready = true
-		Audio.play_ui(&"ui_confirm")
+		if ready_block_reason(slot) != "":
+			Audio.play_ui(&"ui_error")
+		else:
+			slot.ready = true
+			Audio.play_ui(&"ui_confirm")
 	# Any joined player picks the run's mode: Y cycles Normal / Endless, X toggles Hardcore.
 	if inp.just_pressed(PlayerInput.Pad.Y):
 		cycle_mode(slot)
@@ -310,6 +324,14 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 
 
+## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
+## class's unlock hint. Never the case with the dev profile of the automated runs.
+func ready_block_reason(slot: PlayerSlot) -> String:
+	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
+		return ""
+	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
+
+
 ## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class
 ## without companion choices.
 func cycle_companion(slot: PlayerSlot) -> bool:
@@ -324,6 +346,7 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 	var next := Db.get_class_data(Db.cycle_class(current, step))
 	if next != null:
 		slot.class_data = next
+		Meta.apply_loadout(slot)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
 

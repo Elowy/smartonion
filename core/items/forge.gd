@@ -23,6 +23,9 @@ extends RefCounted
 ##   appended to the backpack. Same base = same hand, so the hero is never left unarmed. Taking
 ##   two pieces frees a place, so the result always fits ([method can_place] guards the odd
 ##   case of an unequippable result).
+## - M9: an Epic pair whose weapon type's Legendary effect is locked in the main profile (Profile.KIND_LEGENDARY,
+##   ForgeLegendaryData.unlock_id; [method result_locked]) cannot be forged: [method blocked_reason] says so, the shop's
+##   auto-forge is refused and the bots skip it.
 ## - Every forge counts RunState.weapons_forged.
 ## - Bots ([method bot_forge_all]): backpack + backpack and equipped + backpack pairs (the
 ##   result replaces the equipped one), never two equipped weapons (dual wield – whether one
@@ -47,6 +50,8 @@ const REASON_NO_HERO := "No hero to forge for"
 ## "No other Common Dagger" (rarity name, base weapon name).
 const REASON_NO_PARTNER := "No other %s %s"
 const REASON_NO_ROOM := "No room for the forged weapon"
+## M9: the weapon type's Legendary effect is not unlocked in the main profile yet.
+const REASON_LEGENDARY_LOCKED := "This Legendary is not unlocked yet"
 
 ## Partner search order of the equipped hands (after the backpack).
 const HANDS: Array[Items.EquipSlot] = [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]
@@ -104,12 +109,23 @@ static func blocked_reason(eq: Equipment, item: ItemInstance) -> String:
 		return REASON_UNKNOWN
 	if eq == null:
 		return REASON_NO_HERO
+	if result_locked(item):
+		return REASON_LEGENDARY_LOCKED
 	var partner := partner_for(eq, item)
 	if partner == null:
 		return REASON_NO_PARTNER % [item.rarity_name(), base.display_name]
 	if not can_place(eq, item, partner):
 		return REASON_NO_ROOM
 	return ""
+
+
+## True when forging [param item] would make a Legendary whose effect the main profile has not unlocked (M9). A
+## weapon type without a Legendary effect is not gated.
+static func result_locked(item: ItemInstance) -> bool:
+	if not is_forgeable(item) or item.rarity + 1 < Items.Rarity.LEGENDARY:
+		return false
+	var data := legendary_for(item.source_id)
+	return data != null and not Db.is_unlocked(data.unlock_id(), Profile.KIND_LEGENDARY)
 
 
 ## The rarity a forge of [param item] produces (-1 when it is not forgeable).
@@ -172,7 +188,7 @@ static func forge_with_offer(eq: Equipment, offer_item: ItemInstance, rng: Rando
 ## max(a.wave, b.wave, RunState.wave), Looted if either was; a Legendary gets its weapon
 ## type's Legendary effect ([method legendary_for]).
 static func make_result(a: ItemInstance, b: ItemInstance, rng: RandomNumberGenerator) -> ItemInstance:
-	if not pairs_with(a, b):
+	if not pairs_with(a, b) or result_locked(a):
 		return null
 	var base := Db.get_weapon(a.source_id)
 	var rarity := a.rarity + 1
@@ -203,7 +219,7 @@ static func apply_legendary(item: ItemInstance, data: ForgeLegendaryData) -> voi
 ## partner (the shop's anvil pips) – with a full backpack or not.
 static func offer_forge_slots(offer_item: ItemInstance, slots: Array[PlayerSlot]) -> Array[int]:
 	var out: Array[int] = []
-	if not is_forgeable(offer_item):
+	if not is_forgeable(offer_item) or result_locked(offer_item):
 		return out
 	for s in slots:
 		var eq := _equipment_of(s)
