@@ -260,6 +260,17 @@ func set_usable_by(set_data: SetData, class_data: ClassData) -> bool:
 	return false
 
 
+## Every companion id some class offers (ClassData.companion_choices), in lobby order of the
+## classes, without duplicates – what `--companion=` accepts.
+func companion_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for cid in class_ids:
+		for c in classes[cid].companion_choices:
+			if c not in out:
+				out.append(c)
+	return out
+
+
 func get_default_class() -> ClassData:
 	return classes.get(class_ids[0]) if not class_ids.is_empty() else null
 

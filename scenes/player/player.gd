@@ -126,6 +126,10 @@ var facing := Vector3.FORWARD
 
 ## The class this player was built from (slot.class_data or the default class).
 var class_data: ClassData
+## The permanent companion this hero plays with (M8, the Hunter's wolf / boar / owl): the lobby
+## pick of the slot (PlayerSlot.companion_id), &"" for a class without companions. Set at creation;
+## the class kit reads it when it summons.
+var companion_id: StringName = &""
 var main_hand: WeaponData
 var off_hand: WeaponData
 ## One runner per equipped weapon that attacks (main hand first).
@@ -218,6 +222,8 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.add_child(shape)
 
 	p.class_data = p_slot.class_data if p_slot != null and p_slot.class_data != null else Db.get_default_class()
+	if p_slot != null and p.class_data != null:
+		p.companion_id = p.class_data.pick_companion(p_slot.companion)
 	p.model = OnionModel.new()
 	p.model.name = "Model"
 	p.add_child(p.model)

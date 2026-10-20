@@ -1271,7 +1271,8 @@ func _apply_time_scale(scale: float) -> void:
 	Engine.max_physics_steps_per_frame = maxi(8, ceili(8.0 * scale))
 
 
-## Joins --players bots, classes cycling through --classes (default: Db.class_ids).
+## Joins --players bots, classes cycling through --classes (default: Db.class_ids); a bot takes
+## its class's first companion, or --companion where the class offers it.
 func _add_bots() -> void:
 	PlayerManager.clear()
 	var ids: Array[StringName] = []
@@ -1285,7 +1286,10 @@ func _add_bots() -> void:
 	var base_seed := options.run_seed() if options.run_seed() >= 0 else randi() % 100000
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
-		PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
+		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
+		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
+		if bot != null and options.companion != &"":
+			bot.companion = options.companion
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:

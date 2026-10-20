@@ -21,6 +21,7 @@ Brotato-szerű, WoW-hangulatú arena survivor Godot 4-ben, 1–4 fős helyi co-o
 |---|---|---|
 | Csatlakozás a lobbyban | A | Enter / Space / F |
 | Kaszt váltása | bal kar / d-pad ◀ ▶ | A / D vagy nyilak |
+| Társ (companion) váltása, ha a kasztnak van | RB | E |
 | Ready / megerősítés | A | Enter / Space / F |
 | Mód váltása (Normal / Endless) | Y | C |
 | Hardcore be / ki | X | R |

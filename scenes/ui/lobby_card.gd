@@ -2,7 +2,9 @@ class_name LobbyCard
 extends PanelContainer
 ## One of the four lobby slots (GDD 12). Empty: "Press A to join". Joined: the player's
 ## colour and device, a live onion preview, the class (◀ ▶ to change), role, description,
-## class stat bonuses, starting weapons, resource and the device's own button prompts.
+## class stat bonuses, starting weapons, resource and the device's own button prompts. A class with
+## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
+## row with the button that cycles it (Lobby: RB); every other class has no such row.
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
 const PREVIEW_HEIGHT := 150.0
@@ -43,6 +45,10 @@ var _weapons_box: VBoxContainer
 var _resource_dot: UiIcon
 var _resource_label: Label
 var _armor_label: Label
+## "Companion: Wolf" + the cycle button's glyph (visible only for a class with companion choices).
+var _companion_row: HBoxContainer
+var _companion_label: Label
+var _companion_glyph_holder: HBoxContainer
 var _prompt_holder: CenterContainer
 # Abilities / Mastery block (hidden for a class without M3 data).
 var _abilities_panel: PanelContainer
@@ -175,6 +181,15 @@ func _build_joined() -> void:
 	_armor_label = UiTheme.label("Plate", UiTheme.SMALL)
 	res_row.add_child(_armor_label)
 	info_box.add_child(res_row)
+	_companion_row = UiTheme.hbox(8)
+	_companion_row.name = "CompanionRow"
+	_companion_label = UiTheme.label("Companion:", UiTheme.GOLD_LABEL, UiTheme.FONT_SMALL + 1)
+	_companion_row.add_child(_companion_label)
+	_companion_row.add_child(UiTheme.spacer())
+	_companion_glyph_holder = UiTheme.hbox(4)
+	_companion_row.add_child(_companion_glyph_holder)
+	_companion_row.visible = false
+	info_box.add_child(_companion_row)
 
 	_abilities_panel = UiTheme.panel(UiTheme.INSET_PANEL)
 	_joined_box.add_child(_abilities_panel)
@@ -240,7 +255,8 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
-		key = "%d:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name()]
+		key = "%d:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
+				p_slot.companion_id()]
 	if key == _state_key:
 		return
 	_state_key = key
@@ -304,6 +320,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 	_desc_label.text = data.description if data != null else ""
 	_fill_stats(data)
 	_fill_weapons(data)
+	_fill_companion(s)
 	_fill_abilities(data, s)
 	if data != null:
 		_resource_dot.set_color(data.resource_color)
@@ -348,6 +365,21 @@ func _fill_weapons(data: ClassData) -> void:
 		var rarity := clampi(w.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)
 		line.add_child(UiTheme.label(w.display_name, &"", UiTheme.FONT_SMALL + 1, UiTheme.RARITY_COLORS[rarity]))
 	_weapons_box.add_child(line)
+
+
+## The "Companion: <Name>" row of a class with companion choices (hidden for every other class), with
+## the glyph of the button that cycles it (not while ready: the choice is locked like the class).
+func _fill_companion(s: PlayerSlot) -> void:
+	for c in _companion_glyph_holder.get_children():
+		_companion_glyph_holder.remove_child(c)
+		c.queue_free()
+	var has := s.class_data != null and s.class_data.has_companions()
+	_companion_row.visible = has
+	if not has:
+		return
+	_companion_label.text = "Companion: %s" % ClassData.companion_name(s.companion_id())
+	if not s.ready:
+		_companion_glyph_holder.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.RB, 24.0))
 
 
 ## The two core abilities (icon with this device's button, name) and the Mastery line.
