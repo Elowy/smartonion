@@ -36,7 +36,9 @@ enum ArmorType { CLOTH, LEATHER, MAIL, PLATE }
 @export var onion_color: Color = Color(0.85, 0.55, 0.3)
 ## Accent colour for armour trim / cloth.
 @export var accent_color: Color = Color(0.9, 0.75, 0.3)
-## helm_horned, wizard_hat, paladin_helm, hood, horned_hood
+## helm_horned, wizard_hat, paladin_helm, hood, horned_hood, hunter_hat, tribal_mask. An id the
+## armour and body builders do not know shows a plain circlet (OnionArmor) and the default gloves /
+## boots (OnionModel): never a bare head.
 @export var headgear: StringName
 ## true -> oversized shoulder pads
 @export var big_shoulders: bool = false

@@ -1003,7 +1003,8 @@ func _build_body() -> void:
 		k.add_lathe(bulb_profile(), Transform3D(), Color.WHITE, 36)
 		return k.build())
 	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio)))
-	# Sprout (long green stalk for the spring-onion rogue, withered for the warlock).
+	# Sprout: long green stalk for the spring-onion rogue, withered for the warlock, "normal" for any
+	# other headgear (hunter_hat / tribal_mask until their class package picks a kind in _sprout_mesh).
 	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else "normal")
 	var sprout := MeshKit.cached("onion:sprout:" + sprout_kind, func() -> Mesh: return _sprout_mesh(sprout_kind))
 	_sprout = _mesh("Sprout", _body, sprout, Mats.toon_vc())
@@ -1048,6 +1049,8 @@ func _build_body() -> void:
 		_feet.append(foot)
 
 
+## Glove colour per headgear. [code]hunter_hat[/code] and [code]tribal_mask[/code] (M8) are hooks the
+## class packages fill; any headgear id without an arm gets the plain look (the onion skin, lighter).
 func _glove_color() -> Color:
 	if class_data == null:
 		return Color(0.85, 0.55, 0.3)
@@ -1057,9 +1060,13 @@ func _glove_color() -> Color:
 		&"wizard_hat": return class_data.onion_color.lightened(0.15)
 		&"hood": return Color(0.28, 0.2, 0.15)
 		&"horned_hood": return Color(0.2, 0.12, 0.24)
+		&"hunter_hat": pass  # HUNTER package
+		&"tribal_mask": pass  # SHAMAN package
+		_: pass
 	return class_data.onion_color.lightened(0.1)
 
 
+## Boot colour per headgear (same hooks and default as [method _glove_color]: plain leather).
 func _boot_color() -> Color:
 	if class_data == null:
 		return LEATHER
@@ -1069,6 +1076,9 @@ func _boot_color() -> Color:
 		&"wizard_hat": return class_data.accent_color.darkened(0.35)
 		&"hood": return Color(0.22, 0.16, 0.12)
 		&"horned_hood": return Color(0.16, 0.09, 0.2)
+		&"hunter_hat": pass  # HUNTER package
+		&"tribal_mask": pass  # SHAMAN package
+		_: pass
 	return LEATHER
 
 
@@ -1128,6 +1138,9 @@ static func _face_mesh_build(brows: bool, headgear: StringName) -> Mesh:
 				&"horned_hood": tilt = 24.0
 				&"hood": tilt = 14.0 if side > 0 else -6.0
 				&"wizard_hat": tilt = -8.0
+				&"hunter_hat": pass  # HUNTER package (e.g. a keen tilt)
+				&"tribal_mask": pass  # SHAMAN package
+				_: pass  # level brows
 			var bc := center + b * Vector3(0, 0.15, -0.035)
 			var bb := b * Basis.from_euler(Vector3(0, 0, deg_to_rad(tilt * side)))
 			k.add_capsule(0.022, 0.13, Transform3D(bb * Basis.from_euler(Vector3(0, 0, PI / 2)), bc), Color(0.16, 0.1, 0.1), 6, 2)

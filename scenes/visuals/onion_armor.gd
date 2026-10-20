@@ -705,6 +705,8 @@ static func _build_starter(key: String, slot: int, cd: ClassData) -> Part:
 	match slot:
 		EquipLook.Slot.HEAD:
 			_starter_head(solid, cloth, cd)
+			# Part flags per headgear. hunter_hat / tribal_mask (M8) keep the defaults (brows on,
+			# sprout and mouth shown, no extras) until their class package changes them here.
 			p.brows = cd.headgear not in [&"helm_horned", &"paladin_helm"]
 			p.hides_sprout = cd.headgear == &"wizard_hat"
 			p.hides_mouth = cd.headgear == &"hood"
@@ -767,6 +769,36 @@ static func _starter_head(k: MeshKit, cloth: MeshKit, cd: ClassData) -> void:
 				# Pale bone rim where the horn leaves the hood (reads against the dark hood).
 				k.add_torus(0.055, 0.095, Transform3D(MeshKit.basis_from_y((horn[1] - horn[0]).normalized()), horn[0]),
 					OnionModel.WARLOCK_HORN.lightened(0.25), 10, 4)
+		&"hunter_hat":
+			_head_hunter_hat(k, cloth, cd)
+		&"tribal_mask":
+			_head_tribal_mask(k, cloth, cd)
+		_:
+			# Any other id (a class whose look is not drawn yet): a plain circlet, never a bare head.
+			_head_plain(k, cd)
+
+
+## The default head piece (an unknown headgear id): a plain circlet in the accent colour around the
+## head. It sits in the single "Solid" mesh (no extra draw call), leaves the face, brows and sprout
+## alone and carries no extras.
+static func _head_plain(k: MeshKit, cd: ClassData) -> void:
+	var acc := cd.accent_color
+	var y := 0.74
+	var r := OnionModel.bulb_radius(y) + 0.02
+	k.add_torus(r - 0.028, r + 0.028, MeshKit.xf(Vector3(0, y, 0)), acc.darkened(0.2), 28, 6)
+	k.add_sphere(0.045, MeshKit.xf(OnionModel.bulb_point(y, 0.0, 0.035)), acc.lightened(0.25), 8, 4)
+
+
+## HUNTER package hook: the feathered hunter hat (class headgear id hunter_hat). Until the class
+## package draws it the plain circlet shows. Part flags (brows, sprout, extras) go in _build_starter.
+static func _head_hunter_hat(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
+	_head_plain(k, cd)
+
+
+## SHAMAN package hook: the carved wooden mask (class headgear id tribal_mask). Until the class
+## package draws it the plain circlet shows. Part flags (brows, mouth, extras) go in _build_starter.
+static func _head_tribal_mask(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
+	_head_plain(k, cd)
 
 
 static func _starter_shoulders(k: MeshKit, cd: ClassData) -> void:
@@ -829,8 +861,22 @@ static func _starter_chest(k: MeshKit, cloth: MeshKit, cd: ClassData) -> void:
 			var dark := OnionModel.WARLOCK_HOOD
 			_belt(k, dark.lightened(0.1), acc)
 			_cape(cloth, OnionModel.WARLOCK_HOOD.lightened(0.06))
+		&"hunter_hat":
+			_chest_hunter(k, cloth, cd)
+		&"tribal_mask":
+			_chest_tribal(k, cloth, cd)
 		_:
 			_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
+
+
+## HUNTER package hook: the starter chest (fur trim, quiver strap). The default leather belt until then.
+static func _chest_hunter(k: MeshKit, _cloth: MeshKit, _cd: ClassData) -> void:
+	_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
+
+
+## SHAMAN package hook: the starter chest (bone beads, totem harness). The default leather belt until then.
+static func _chest_tribal(k: MeshKit, _cloth: MeshKit, _cd: ClassData) -> void:
+	_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
 
 
 static func _helm_dome(k: MeshKit, metal: Color, trim: Color) -> void:
