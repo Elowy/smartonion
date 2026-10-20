@@ -11,7 +11,12 @@ extends Node3D
 ##   earth  every 0.25 s enemies within earth_radius are slowed by earth_slow x power % (at most 60)
 ##   air    every 0.25 s heroes within air_radius get the stat source "totem_air:<slot>" {haste: air_haste x
 ##          power (at most 40)}, removed when they leave, at the end and with the wave
-##   bond / storm: look only (the Wellspring capstone and the Artifact drive them)
+##   bond   (Bond Totem, the Wellspring capstone plants it; params radius, equalize_pct, tick, damage_taken_pct) every
+##          FIELD_TICK s the living heroes within radius get the damage-taken multiplier "bond_totem:<slot>"
+##          (1 - damage_taken_pct / 100) and every tick s each moves equalize_pct x tick % of the gap towards the
+##          group's average HP share: below it = a normal heal credited to the owner, above it = a silent HP loss
+##          (Player.drain_hp: never below the average, never lethal, no damage event, no damage meter entry)
+##   storm: look only (the Artifact drives it)
 ## Aura (Artifact property, aura_damage_pct > 0): heroes within aura_radius of ANY totem of the owner get
 ## the stat source "totem_aura:<slot>" {damage_pct}. Radii count the owner's Area Size.
 ## [param params] are the final Totem Rite numbers (rank / spec / item mods and the shaman_totems mods in).
@@ -24,6 +29,8 @@ const BOLT_SPEED := 14.0
 const MAX_SLOW := 60.0
 const MAX_HASTE := 40.0
 const GROUP := &"shaman_totems"
+## Bond Totem: HP a hero must be off the average by before it is moved (no number spam for crumbs).
+const MIN_TRANSFER := 0.05
 
 var owner_player: Player
 var element: StringName = &"fire"
@@ -44,9 +51,12 @@ var _fire_left := FIRST_SHOT_DELAY
 var _water_left := 0.0
 var _field_left := 0.0
 var _aura_left := 0.0
+var _bond_left := 0.0
 ## Instance id -> hero buffed by this totem's Air field / aura.
 var _air_buffed: Dictionary[int, Player] = {}
 var _aura_buffed: Dictionary[int, Player] = {}
+## Instance id -> hero carrying this totem's Bond damage reduction.
+var _bond_buffed: Dictionary[int, Player] = {}
 
 
 ## Plants a totem of [param p_element] for [param p_owner] at [param at] for [param p_duration] s under
@@ -133,6 +143,8 @@ func step(delta: float) -> void:
 			_step_field(delta, false)
 		&"air":
 			_step_field(delta, true)
+		&"bond":
+			_step_bond(delta)
 	if num("aura_damage_pct") > 0.0:
 		_step_aura(delta)
 
@@ -276,6 +288,12 @@ func _release_buffs() -> void:
 		if is_instance_valid(hero) and not (is_inside_tree() and _covered_by_sibling(hero)):
 			hero.stats.remove_source(aura)
 	_aura_buffed.clear()
+	var bond := _bond_key()
+	for id in _bond_buffed:
+		var hero := _bond_buffed[id]
+		if is_instance_valid(hero):
+			hero.damage_taken_mults.erase(bond)
+	_bond_buffed.clear()
 
 
 func _air_key() -> StringName:
@@ -284,6 +302,72 @@ func _air_key() -> StringName:
 
 func _aura_key() -> StringName:
 	return StringName("totem_aura:" + _slot_key)
+
+
+# --- Bond Totem ----------------------------------------------------------------------------------
+
+## The Bond field: membership (and the damage reduction) every FIELD_TICK s, the evening out every [code]tick[/code] s.
+func _step_bond(delta: float) -> void:
+	_field_left -= delta
+	if _field_left <= 0.0:
+		_field_left += FIELD_TICK
+		if _field_left <= 0.0:
+			_field_left = FIELD_TICK
+		_refresh_bond()
+	_bond_left -= delta
+	if _bond_left > 0.0:
+		return
+	var tick := maxf(0.05, num("tick", 0.5))
+	_bond_left += tick
+	if _bond_left <= 0.0:
+		_bond_left = tick
+	_even_out(tick)
+
+
+## Heroes inside the circle carry the damage reduction, the ones that left lose it.
+func _refresh_bond() -> void:
+	var key := _bond_key()
+	var mult := 1.0 - clampf(num("damage_taken_pct"), 0.0, 90.0) / 100.0
+	var inside: Dictionary[int, Player] = {}
+	for hero in ShamanKit.heroes_around(get_tree(), global_position, radius_of("radius", 6.0)):
+		inside[hero.get_instance_id()] = hero
+	for id in _bond_buffed.keys():
+		if not inside.has(id):
+			var gone := _bond_buffed[id]
+			if is_instance_valid(gone):
+				gone.damage_taken_mults.erase(key)
+			_bond_buffed.erase(id)
+	for id in inside:
+		var hero := inside[id]
+		hero.damage_taken_mults[key] = mult
+		_bond_buffed[id] = hero
+
+
+## Every hero in the circle moves [code]equalize_pct x tick[/code] % of the gap between its HP share and the
+## group's average towards it. Needs two living heroes; downed heroes and heroes out of range are not part of it.
+func _even_out(tick: float) -> void:
+	var heroes := ShamanKit.heroes_around(get_tree(), global_position, radius_of("radius", 6.0))
+	if heroes.size() < 2:
+		return
+	var sum := 0.0
+	for hero in heroes:
+		sum += ShamanKit.hp_ratio(hero)
+	var average := sum / float(heroes.size())
+	var share := clampf(num("equalize_pct", 10.0) / 100.0 * tick, 0.0, 1.0)
+	var crown := global_position + Vector3.UP * (ShamanTotemModel.CROWN_Y + 0.1)
+	for hero in heroes:
+		var move := (average - ShamanKit.hp_ratio(hero)) * share * hero.max_hp()
+		if absf(move) < MIN_TRANSFER:
+			continue
+		if move > 0.0:
+			hero.heal(move, Player.slot_index_of(owner_player))
+		else:
+			hero.drain_hp(-move, maxf(1.0, average * hero.max_hp()))
+		ProcVfx.beam(crown, hero.get_chest_position(), ShamanKit.BOND_COLOR)
+
+
+func _bond_key() -> StringName:
+	return StringName("bond_totem:" + _slot_key)
 
 
 # --- Params ------------------------------------------------------------------------------------
