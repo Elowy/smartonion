@@ -9,7 +9,7 @@ talents, tier sets, forging, elites, the Coin Gremlin and the shared-purse tools
 bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
 Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
 mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
-enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects).
+enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects); M8 the Hunter and Shaman classes (companion, totems, talents, Artifacts, sets and items), the Crossbow, Polearm and Fist Weapon types and the class-independent tier sets.
 
 ## Layout
 
@@ -33,9 +33,9 @@ scenes/
             EquipLook, OnionArmor (M7b)  [visuals]
   vfx/      Vfx – fire-and-forget effects; EnemyCorpse (M7b)        [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
-  abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4)
-  talents/  per-class TalentEffect scripts (M5)
-  artifacts/  TalentEffect scripts of the Artifact properties (M6a)
+  abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4; hunter/ and shaman/ in M8)
+  talents/  per-class TalentEffect scripts (M5; hunter/ and shaman/ in M8)
+  artifacts/  TalentEffect scripts of the Artifact properties (M6a; the Hunter and Shaman properties in M8)
   enemies/  Enemy; EliteAffixes, ElitePlate, LootGoblin, GoblinPortal (M5); Boss, PoisonPuddle,
             HookLine, hazards/ (M6a; M6b adds the environment hazards)   [enemies]
   events/   GuardedChest, DefendTotem, CaravanCart, EventGuards, EventFx, EventTag (M6b)
@@ -275,7 +275,8 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--smoke` | Bots, menus skipped, `Engine.time_scale = 4` (with 4× physics ticks, so the simulation step stays 1/60 s of game time), plays `--waves=N` waves (default 3), prints one line `SMOKE_RESULT {json}` and quits. Exit 0 only when every wave completed and no engine / script error was logged (`ErrorCounter` is an `OS.add_logger` logger); exit 1 on errors, on a timeout (real-time watchdog) or – with `--allow-defeat` – on a defeat. Without `--allow-defeat` a full party wipe is counted (`wipes`) and everybody is revived, so later waves still get exercised. A boss that outlives its enrage by 120 s is killed by the smoke safety (`SMOKE boss timeout`, M6a), so `completed` does not prove the boss is beatable; a Dungeon Warden is killed 60 s past its enrage (M6b). A smoke run with an unknown argument or an invalid value reports the result `bad_args` (the arguments in `unknown_args`) and exits 1 (M6b). |
 | `--demo` | Bots at normal speed, endless (the next run starts 6 s after a Game Over). |
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
-| `--classes=a,b,...` | Bot classes in join order (cycled; unknown ids warn and are skipped), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
+| `--classes=a,b,...` | Bot classes in join order (cycled; an unknown id makes the argument invalid: `bad_args`, exit 1 in a smoke run; M8), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
+| `--companion=wolf\|boar\|owl` | M8: every bot of a class that offers that companion choice takes it (`LaunchOptions.companion`); a class without it keeps its first choice. An id outside `Db.companion_ids()` is `bad_args`. Not part of `SMOKE_RESULT`. |
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
@@ -3713,3 +3714,277 @@ All of it goes through `Vfx`, `Mats` and `ProcVfx`, capped and pooled where it i
 - Item, weapon and slot icons, enchant and artifact icons, and the stat-card gem stay procedural.
 - The two M6b art calls (the bog pool rim contrast and the boss circles on the ice floor) are still open after M7b.
 - All frame times were measured under llvmpipe (software GL); the draw-call numbers are the ones to compare.
+
+## M8: Hunter, Shaman, three weapon types, class-independent tier sets
+
+M8 adds the two classes of GDD 3.7 with their content, the three weapon types of GDD 4 and the
+class-independent tier sets of GDD 5.5. The Hunter has Focus and a permanent companion chosen in
+the lobby; the Shaman has Surge, Storm Echo and totems. Each class has 8 abilities (2 core, 6
+learnable), 3 talent trees, a class tier set, an Artifact and 8 class items. The set system moves
+from "one set per class" to set ids with an optional class (`SetData.class_id`). The numbers are the
+starting values of the designs; M8 has no balance pass. Gameplay randomness stays on `RunState.rng`,
+so a seeded run differs from M7 (new weapon, set and item pools change the rolls).
+
+Naming: every new name (abilities, trees, Mastery, resources, capstones, sets, Artifacts,
+Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
+
+### Class plumbing (`autoload/db.gd`, `data/class_data.gd`, `core/player_slot.gd`, `scenes/ui/lobby_card.gd`)
+
+- `Db.CLASS_ORDER = [warrior, mage, paladin, rogue, warlock, hunter, shaman]`. `Db.class_ids` takes the
+  ids that have a `data/classes/<id>.tres`, in that order; the default 4-bot party is still the first
+  four. A class needs only its `.tres` file: no code change in `Db`.
+- Companion choice: `ClassData.companion_choices: Array[StringName]` (Hunter: `wolf`, `boar`, `owl`; empty
+  for the other classes). Helpers: `has_companions()`, `default_companion()` (first choice),
+  `pick_companion(wanted)`, `ClassData.companion_name(id)`. `Db.companion_ids()` lists every offered id.
+- `PlayerSlot.companion` is the lobby pick (`&""` = none); `PlayerSlot.companion_id()` is the effective
+  choice (the pick if the class offers it, else the first choice, else `&""`), so it stays valid when the
+  class changes; `PlayerSlot.cycle_companion(step)` moves through the choices. `Player.companion_id` is set
+  in `Player.create` from the slot; the Hunter kit reads it when it summons.
+- Lobby: `LobbyCard._companion_row` ("Companion: <Name>") is shown only for a class with choices. RB (keyboard
+  E) cycles it, not while the slot is ready (sound `ui_move`). Y and X are unchanged.
+- Bots take the first choice. `--companion=<id>` makes every bot of a class that offers that id take it; a
+  class without it keeps its first choice. The flag is validated against `Db.companion_ids()` and does not
+  change `SMOKE_RESULT`.
+- Proficiency grant: `BonusVocabulary` kind `proficiency`, `{"kind": "proficiency", "grant": "dual_wield"}`
+  (`GRANTABLE_PROFICIENCIES = [dual_wield]`, no rank scaling, may carry `requires`). The path is
+  `PlayerBonuses.has_proficiency(id)` / `granted_proficiencies()` -> `Player._on_bonuses_changed` ->
+  `Equipment.set_granted_proficiencies` -> `Equipment.can_dual_wield()` (class proficiency OR granted; used by
+  `target_slots`). Losing the grant (respec) moves a one-hander out of the off hand into the backpack (into
+  the main hand if empty; it stays when the backpack is full). The weapon requirement `{"weapon": "dual_wield"}`
+  is unchanged.
+- Headgear hooks (`scenes/visuals/onion_armor.gd`, `onion_model.gd`): an unknown headgear id gets the plain
+  circlet (`_head_plain`) and the default belt; `_glove_color` / `_boot_color` and the brow tilt have explicit
+  arms for `hunter_hat` and `tribal_mask`. The class packages fill `_head_hunter_hat`, `_chest_hunter`,
+  `_head_tribal_mask` and `_chest_tribal` and the part flags in `_build_starter`. The starter look is measured in
+  `DRAWS_BEFORE` (Hunter 20 listed; the Shaman's 26 draws are left unlisted, held to the unmeasured ceiling).
+- `BonusVocabulary.PSEUDO_IDS` gained `hunter_companion` (Hunter), `shaman_totems` (Shaman) and `shaman_echo`
+  (Shaman). Validation compares only the owner id, so a pseudo id validates before its class exists.
+
+### Content rules and the PENDING list (`tests/content_rules.gd`, `Rules`)
+
+- Invariants: `LAUNCH_CLASSES`, `LAUNCH_WEAPONS`, `LAUNCH_UNIQUES` (the launch classes' items plus the class-free,
+  set-free items), `CLASS_ITEMS_PER_CLASS = 8`, `PIECES_PER_SET = 5`, `TREES_PER_CLASS = 3`; helpers `class_items`,
+  `class_sets`, `free_sets`, `launch_uniques`, `classes_with(part)`, `count_of(class, part)`, `free_set_fits`
+  (the native armour rule, `==`).
+- Completeness is derived from `Db.class_ids`: one Artifact per class (`Db.artifact_classes()`), one class set of
+  5 pieces and 8 class items, 2 core + 6 learnable abilities, 3 trees x 9 talents x 22 points, a Forge Legendary
+  per weapon base, the Artifact pick odds `0.8 + 0.2 / N`, the glyph / learnable count `6 N + 6`.
+- PENDING protocol: `Rules.PENDING` ("class:part", one per line) lets a class exist before its Artifact, set,
+  items or trees. The completeness checks skip a listed part. Each package deleted its lines when its content
+  landed (ITEMS: `*:artifact`, `*:set`, `*:items`; TALENTS: `*:trees`). `test_m8_foundation` fails on a listed part
+  whose content already exists, so a stale line cannot hide a regression. The list is empty at the end of M8.
+- Explicit lists that needed deliberate edits: `PET_ABILITIES` (`test_m5_foundation`), `PSEUDO_ID_OWNERS`,
+  `DRAWS_BEFORE` (`test_m7_vis_hero`; an unlisted class is measured and held to `DRAWS_UNMEASURED_MAX = 40`),
+  `USERS` (`test_m6_weapons`), `SET_IDS` / `SET_NAMES` (`test_sets`).
+- Fixtures: `tests/class_fixtures.gd` (a "zz_" class built from the Warrior, injected talent trees),
+  `tests/set_fixtures.gd` (`SetFixtures.add_free_set(id, armor, min_wave)`, `remove_free_sets()`, `restore()`),
+  `tests/shaman_base.gd` and `tests/talents_hunter_base.gd` (shared helpers, no tests).
+
+### Hunter (HUNTER package; `data/classes/hunter.tres`)
+
+- Data: `data/resources/focus.tres` (BAR 0..100, start 100, +10 per second, Haste-scaled, no other source),
+  `data/abilities/hunter_{arrow_fan,backstep,long_shot,arrow_hail,quick_draw,play_dead,blast_snare,hunt_signal}.tres`
+  (bare ids). Mail, primary Agility, stamina -3, starts with a Bow, proficiencies bow, gun, crossbow, polearm,
+  axe, sword, dagger, dual_wield. `RunSummary.class_color` derives the meter colour from the onion colour.
+- Ability effects: `scenes/abilities/hunter/hunter_<id>.gd` (class `Hunter<PascalId>`). Helpers:
+  `hunter_kit.gd` (`HunterKit`; `HunterKit.companion(player)`), `hunter_arrow.gd` (`HunterArrow`: a weapon-style
+  arrow with `is_extra = true`, used by Arrow Fan, Long Shot and Parting Volley; `BOSS_REPEAT_MULT` 0.4 as the
+  Rogue's knives), `hunter_bleed.gd` (`HunterBleed`, source `dot`), `hunter_snare.gd` (`HunterSnare`, arms, bursts,
+  Area Size scales the radius), `hunter_feather_bolt.gd` (`HunterFeatherBolt`, the Owl's shot).
+- Mastery and companion: `hunter_mastery.gd` (`HunterMastery`: Beastbond `PCT_PER_POINT = 2.0`, `damage_mult`
+  for source `pet` only; spawns the companion lazily from `tick`; frees it in `teardown`).
+  `hunter_companion.gd` (`HunterCompanion`: a Node3D with no body, HP or group, so it is not targetable; `BASE_PARAMS`
+  and `KIND_PARAMS` for `wolf`, `boar`, `owl`; pseudo id `hunter_companion`; hidden while the owner is downed, snapped
+  back at wave start, teleported home beyond 14 m; Pack Frenzy hooks `frenzy_left`, `frenzy_damage_pct`,
+  `frenzy_haste_pct`). `hunter_companion_model.gd` (procedural Wolf, Boar and Owl).
+- Visuals: `hunter_aim_charge.gd` (Long Shot aim ring), `hunter_arrow_hail_vfx.gd`, `hunter_haste_vfx.gd`;
+  look in `onion_armor.gd` (`_head_hunter_hat`, `_chest_hunter`, `hides_sprout`) and `onion_model.gd` (gloves,
+  boots, brow tilt, `set_play_dead`, `tip_amount`). Eight new game-icons.net pictures (`icon_map.tres`
+  `abilities`) and eight glyphs in `ability_icon.gd`.
+- Damage sources: `weapon` (weapon hits and arrows of the Arrow Fan are weapon-style), `ability` (Arrow Hail
+  ticks, Blast Snare burst), `pet` (companion blows, bites, Hunt Signal blow / splash, the Boar's charge, the
+  Owl's bolts; Beastbond and Keen Companion apply to them), `dot` (Long Shot bleed). Pets cannot crit.
+- Dev tool: `tools/showcase --view=hunter` (`--back=1 --state=play_dead|frenzy|attack|walk`).
+
+### Shaman (SHAMAN package; `data/classes/shaman.tres`)
+
+- Data: `data/resources/surge.tres` (BAR 0..100, start 0, `gain_on_hit 5`, decay 2 per second after 3 s without
+  a gain), `data/abilities/shaman_*.tres` (8 files, bare ids: `forking_bolt`, `totem_rite`, `thunderbolt`,
+  `rumbling_earth`, `magma_lash`, `soothing_downpour`, `stormburst`, `spirit_pack`); eight pictures in `icon_map.tres`
+  (`abilities`) and six glyphs in `ability_icon.gd`. Entries in talents, items
+  and sets match `{"id": "forking_bolt"}`. Mail, primary Intellect, armor +2, spirit +3, speed -5%, starts with
+  a Mace and Shield; proficiencies mace, axe, dagger, staff, fist_weapon, shield, two_hand_mace.
+- Effects: `scenes/abilities/shaman/shaman_<name>.gd` (`ShamanForkingBolt`, `ShamanTotemRite`, `ShamanThunderbolt`,
+  `ShamanRumblingEarth`, `ShamanMagmaLash`, `ShamanSoothingDownpour`, `ShamanStormburst`, `ShamanSpiritPack`).
+  Helpers: `shaman_kit.gd` (`ShamanKit`: `spell_damage`, `power`, `weapon_strike`, `heal_amount`, `totem_params`,
+  `empower`, `last_fork`, `strike`, `lowest_hero`, `nearest_enemies`, `knock_back`, element colours);
+  `shaman_quake.gd` (`ShamanQuake extends AbilityArea`), `shaman_rain.gd` (`ShamanRain extends AbilityArea`),
+  `shaman_burn.gd` (Magma Lash burn, spread on end or on the target's death), `shaman_area_fx.gd`,
+  `shaman_wolf.gd` (`ShamanWolf extends GeneralSpiritWolfPet`).
+- Schools and tags: lightning is Nature school with the `lightning` tag (added to `BonusVocabulary.TAGS`); fire is
+  Fire school; Shaman damage abilities carry `spell`, so Spell Power scales them.
+- Surge and Storm Echo (`shaman_mastery.gd`, `ShamanMastery`): `tick()` connects `ability_cast` once and every cast
+  calls `surge.on_weapon_hit(false)`, so each cast gains 5 Surge. `echo_params()` merges `ECHO_BASE` (1.5% per
+  Mastery point, cap 60%, echo 50%) with `player.ability_mods(&"shaman_echo")`. `roll_echo(target, amount, school)`
+  makes one `RunState.rng` draw, and only while the chance is above 0; the echo is `deal_raw(..., false, &"ability")`
+  and never echoes again. Eligible calls are the `ShamanKit.strike(..., echo = true)` ones (Forking Bolt jumps,
+  Thunderbolt, Stormburst, the first Magma Lash strikes, Gale Strike); totem bolts, burns, quake ticks, rain
+  lightning and wolf bites are not.
+- Elemental Surge hub (neutral until the talent feeds it): `grant_empower(casts, pct)` sets the charges,
+  `take_empower()` consumes one and returns `1 + pct / 100`, `clear_empower()` runs at wave start / end and while
+  downed. Each of the six damaging abilities calls `ShamanKit.empower(player)` once at the top of `cast()`; the
+  multiplier is baked into every hit, jump, quake tick, burn, bite and echo of that cast. `last_fork` records the
+  first hit of the last Forking Bolt for the Thunderpost.
+- Totems (`shaman_totem.gd`, `ShamanTotem`, group `shaman_totems`; no HP, not in `enemies`; `plant(owner, element,
+  params, feet, duration)`; `shaman_totem_model.gd` for the look). `step` dispatches by element: `fire` (first shot
+  0.3 s after planting, then `fire_interval / owner haste`; damage `4 + 0.7 Int + 1.0 SP x fire_interval`, instant,
+  `ProcVfx.bolt`), `water` (every `water_interval` heals every living hero in `water_radius`), `earth` (slow of
+  `min(60, earth_slow x power)` every 0.25 s), `air` (stat source `totem_air:<slot>`, haste every 0.25 s),
+  `bond` (`_step_bond`, the Bond Totem talent), `storm` (`_step_storm`, the Thunderpost Artifact). The aura
+  (`aura_damage_pct > 0`) is the stat source `totem_aura:<slot>`, kept while any totem of the owner covers the hero.
+  Radii use the owner's Area Size. Totems fade in and out over 0.2 s and are removed on replace, expiry, wave end,
+  the owner being freed, or `_exit_tree`; an Air hero who leaves the radius loses the haste at once. Totem Rite (`ShamanTotemRite`) keeps a cycle index (Fire, Water, Earth, Air, persists
+  across waves) and `standing()` returns a copy; a new cast clears the old totems.
+- Player hooks used by the Shaman's talents: `Player.revive_speed_pct` and `revive_hp_pct` (a reviver's bonuses,
+  set and cleared by the talent script), `Player.reviver_boost` and `reviver_speed_boost()` / `reviver_hp_bonus()`
+  (caps 150 and 60), `Player.drain_hp(amount, floor_hp)` (a silent HP loss that never goes below `floor_hp`).
+- Look: `Mats.onion_skin(color, damage, garlic)` with a `garlic` shader variant (`OnionModel._is_garlic()` = the
+  `tribal_mask` headgear), `OnionArmor._head_tribal_mask`, `_chest_tribal` and the teal pauldrons,
+  `OnionModel._back_totem_mesh` (the back totem is a body-level mesh, so it stays under chest armour).
+- Bot rules (`wants_auto_cast`): Totem Rite when an enemy is within 10 m and the longest-standing totem has 4 s or less left; Rumbling
+  Earth when `auto_cast_min` enemies are clustered; Soothing Downpour for a hero below 60% HP not covered by a rain;
+  Stormburst for `min_enemies` or a hero below 40% HP; Spirit Pack when no wolf is alive and enemies are close.
+
+### Weapons (ITEMS-SHARED; `data/weapons/{crossbow,polearm,fist_weapon}.tres`)
+
+- Data: Crossbow (two-hand, projectile, base 12, Agility 1.3, cooldown 1.4, range 12 m, `pierce = 2`, speed 30),
+  Polearm (two-hand melee, base 9, Agility 1.3, cooldown 1.1, range 3.2 m, arc 70), Fist Weapon (one-hand melee,
+  base 3.5, Intellect 0.7 + Agility 0.4, cooldown 0.6, range 1.8 m, arc 80). Proficiencies: crossbow and polearm for
+  the Hunter, fist_weapon for the Shaman. The generator, shop, loot and Forge pick them up through `Db.weapons`.
+- Projectile style `&"quarrel"` (`WeaponRunner.projectile_style`, `Projectile.default_color`,
+  `ProjectileVisual._build_quarrel`). A projectile weapon without the style would fire the arcane bolt.
+- Visuals: `WeaponModel` (`TYPES`, `reach()`, `_crossbow`, `_polearm`, `_fist_weapon`), `OnionModel.grip_pose`,
+  `ItemArt` (`WEAPON_SHAPES`, `_crossbow`, `_polearm`, `_fist`), `ItemTooltip.WEAPON_TYPE_NAMES`.
+- Sounds: `AudioIds.shot` maps the crossbow to `shot_crossbow`, a bank definition that reuses the `shot_bow` streams
+  (pitch 0.8, -8 dB, three voices; no new file, `CREDITS.md` unchanged). `AudioIds.LIGHT_TYPES = [dagger,
+  fist_weapon]` gives the light swing; the polearm uses `swing_heavy`.
+- Forge Legendaries (`data/forge/legendary_{crossbow,polearm,fist_weapon}.tres`, existing ProcSystem blocks):
+  Bindweed (`bolt`, every 3rd hit, 160%, stun 1 s), Barberry (`dot`, every 4th hit, 140% over 5 s, 2 stacks),
+  Mossknuckle (`smite_heal`, every 5th hit, 120% Nature, heals the most wounded ally 4 HP). `Forge.legendaries()`
+  has one per weapon base (test-pinned).
+- Dual wield needs no weapon data: the Shaman's gate is the proficiency grant of the Warspirit talent.
+
+### Set system (P0 mechanism; ITEMS-SHARED and ITEMS-CLASS content)
+
+- `SetData` (`data/sets/set_data.gd`): `class_id: StringName` (`&""` = class-independent; `is_independent()`),
+  `armor_type: int = -1` (0..3 for an independent set: Cloth, Leather, Mail, Plate; -1 for a class set).
+- `Db` (`autoload/db.gd`): `set_for_class(class_id)` (the class's own set; `&""` gives null), `sets_for_class(class_id,
+  class_data = null)` (own set first, then the independent sets of the class's own armour type),
+  `set_usable_by(set, class_data)` (own class set or an independent set of the same armour: a Plate hero can wear and
+  Need a cloth piece but is never rolled that set), `independent_sets()`, `independent_sets_for_armor(armor)`.
+- `ItemGenerator` (`core/items/item_generator.gd`): `SET_INDEPENDENT_SHARE = 0.30` and the test hook
+  `static var independent_share_override` (-1 = default, 0.0 = class sets only, 1.0 = independent only);
+  `roll_classes(for_class, team)`, `set_classes(for_class, team)` (the classes with a class set),
+  `independent_sets_for(for_class, team)`. `_roll_set_piece` draws `r = randf()` for the chance as before; a miss
+  draws nothing more. A hit is an independent set when the team has a class of the set's armour type and
+  `r < chance x share` (the same `r`, no extra draw), or when no class has a class set; otherwise a class set. Then
+  one `randi_range` over the sets when more than one fits, and one over the pieces when more than one fits.
+  Resulting rates (per set hit): default party 17.5% per class set and 10% per independent set (was 25% per class
+  set); a solo Hunter or Shaman 70% class set and 15% per Mail set.
+- `BlackMarket` (`core/shop/black_market.gd`): `set_piece_candidates` stays class-only; `independent_piece_candidates(
+  wave, slots)` lists the pieces of the independent sets of each hero's armour, "missing" when a native hero neither
+  wears nor carries the piece; `set_piece_pool(wave, slots)` is (1) missing class pieces, else (2) missing
+  independent pieces, else (3) all. `BlackMarket._roll_set_piece` and `DungeonRewards.bonus_set_piece` draw one
+  `randi_range` over that pool.
+- Bots and tooltip: `ItemTooltip.INDEPENDENT_SET_CREDIT = 8.0` is added to the item score of an independent-set piece
+  for a viewer of the set's own armour type (and when there is no viewer). Without it those pieces score 56-66% of a
+  class set piece, under the 70% upgrade tolerance; with it 80-94%. The same score drives the upgrade badge.
+- Looks: `OnionArmor.SET_STYLES` has an entry for each set id (the seven class sets and the five independent sets);
+  a set without an entry wears `GENERIC_SET`.
+- Set bonuses are plain data (`stats`, `damage`, `damage_taken`, `proc` and `ability` entries) and must validate for every class (`BonusVocabulary.validate(e, &"")`). Procs are labelled with the set name.
+- Tests: `tests/test_m8_sets.gd` (the rules a class-free set must follow; the native rule; bands; share statistics;
+  the dungeon pool), `tests/test_m8_items_shared.gd` (the shipped weapons, Legendaries, sets, roll share, market,
+  bots and tooltip), `tests/test_m8_items_class.gd` (the class sets and items, Artifacts, see below).
+
+### Artifacts and class items (ITEMS-CLASS)
+
+- Data: `data/artifacts/galestrike_longbow.tres` (Hunter, Bow, agility 14, crit 7, haste 7, class restriction `hunter`)
+  and `data/artifacts/fist_of_the_ancestors.tres` (Shaman, Fist Weapon, intellect 8, stamina 4, mastery 3, haste 2).
+  Both: loot only, `min_wave 10`, `unlock_waves [3, 6]`, two fixed enchants. Growth is the common Artifact rule.
+- Scripts (`TalentEffect`-based property effects): `scenes/artifacts/hunter_gale_volley.gd` (`ArtifactHunterGaleVolley`;
+  params `every 4, arrows 5, spread 40, damage_pct 60, cooldown 1`). It counts the first hit of each weapon attack
+  (`on_hit(..., first)`) and ignores hits flagged by `Player.last_hit_extra`, a new field set by `Player.on_hit_dealt`
+  from its `is_extra` argument (Arrow Fan, Long Shot and Parting Volley arrows, Rogue knives, Extra Attack).
+  `hunter_gale_arrow.gd` (`ArtifactHunterGaleArrow`) is a real projectile, dealing `deal_raw(..., false, &"proc")`
+  at 60% of the shot's amount (`Player.last_hit_base`, crit included): no crit, no leech, no on-hit procs. `shaman_thunderpost.gd`
+  (`ArtifactShamanThunderpost`; params `duration 4, interval 0.8, damage_pct 40, range 8, max_posts 2`) plants a
+  storm `ShamanTotem` where `last_fork` says the Forking Bolt first struck.
+- Rising Gale (`resource` focus, `gain_on_crit_add 4`) and Ancestral Chorus (`ability` on `shaman_totems`, `aura_damage_pct_add 10`,
+  `requires knows totem_rite`) are data only.
+- Drops: `LootDrops` has no literal class count; `Db.artifact_classes()` is 7 once both files load, so the pick odds
+  are `0.8 + 0.2 / 7` (82.9%). `--artifact-chance=1` gives seven drops, one per class.
+- Class items: 16 `ability_mod` uniques in `data/uniques/` (8 per class; Rare or Epic; class-restricted; five sources;
+  `min_wave 1`, `weight 1`); every mod key names a real parameter. `ItemTooltip.unique_needs` no longer greys out a
+  pseudo ability id (`hunter_companion`, `shaman_totems`), which no hero can learn.
+- Class tier sets: `data/sets/{wildtracker_garb,totemkeeper_mail}.tres` (`class_id` hunter / shaman, Epic, Mail,
+  five pieces, `min_wave 6`, `weight 0`); the pieces are `data/uniques/set_hunter_*.tres` and `set_shaman_*.tres`.
+  The Shaman set's id is `totemkeeper_mail`.
+
+### Talents (TALENTS-H, TALENTS-S; `data/talents/{hunter,shaman}/`)
+
+- Data: `hunter/{packlord,sharpshot,wildcraft}.tres` (ids `hunter_<tree>_<snake>`) and `shaman/{stormweaving,warspirit,wellspring}.tres`
+  (ids `shaman_<tree>_<snake>`), 9 talents each, 22 points. 60 pictures (game-icons.net, Lorc and Delapouite, already in
+  `CREDITS.md`) in `assets/icons/`, mapped in `icon_map.tres` (`talents` and `trees`). `TalentData.icon` gives the
+  procedural fallback glyph; the glyph test wants distinct ones inside a tree.
+- Scripts (`TalentEffect`, passive for bots, no RNG of their own):
+  - `scenes/talents/hunter/packlord_pack_frenzy.gd` (`HunterPacklordPackFrenzy`; params `interval 30, duration 10, damage_pct 50,
+    haste_pct 30, first_at 5`): runs only inside a wave; sets the companion's frenzy hooks through `HunterKit.companion(player)`.
+    A due frenzy is missed while the Hunter is down.
+  - `scenes/talents/hunter/sharpshot_steady_aura.gd` (`HunterSharpshotSteadyAura`; `radius 8, damage_pct 5, interval 0.25`): sets
+    `Player.damage_mults["hunter_steady_aura:<Hunter's slot index>"]` on living heroes in range; one key per Hunter.
+  - `scenes/talents/shaman/stormweaving_elemental_surge.gd` (`ShamanStormweavingElementalSurge`; `interval 20, first_at 8,
+    casts 3, pct 100`): `grant_empower` on the Mastery hub while a wave runs.
+  - `scenes/talents/shaman/warspirit_gale_strike.gd` (`ShamanWarspiritGaleStrike`; `every 5, strikes 2, strike_delay 0.2, range 6,
+    surge_per_strike 3`): counted on `on_hit(..., first)`; strikes through `ShamanKit.strike`.
+  - `scenes/talents/shaman/wellspring_elder_spirits.gd` (`ShamanWellspringElderSpirits`; `speed_pct`, `hp_pct`): adds to
+    `Player.revive_speed_pct` / `revive_hp_pct` in `setup`, subtracts in `teardown`. Gift of the Elders uses the same script.
+  - `scenes/talents/shaman/wellspring_bond_totem.gd` (`ShamanWellspringBondTotem`; `interval 25, first_at 8, duration 10, radius 6,
+    equalize_pct 10, tick 0.5, damage_taken_pct 20`): plants `ShamanTotem.plant(player, &"bond", ...)`. The Bond Totem is separate
+    from the Totem Rite slot.
+  - Twinned Spirits, Firebug Bombs, Rebounding Arc, Molten Trail, Ancestral Reach and the other talents are data only.
+- Bond Totem behaviour (`ShamanTotem._step_bond`): every 0.25 s the living heroes in range get
+  `Player.damage_taken_mults["bond_totem:<owner slot>"] = 0.8` (two Shamans multiply). Every `tick` each hero moves
+  `equalize_pct / 100 x tick` of the gap towards the group's mean HP share: a hero below the mean is healed with
+  `Player.heal`, a hero above it loses HP with `Player.drain_hp(amount, floor = max(1, average HP))` (no damage event,
+  no number, never below the average). Needs two living heroes in range; downed or distant heroes are not in the average.
+- Elder Spirits in the revive: `Player._update_revive` takes speed boost `1 + min(150, sum) / 100` over the living
+  revivers in the circle, on top of the 50% per extra reviver rule; the revived HP is `min(1, 0.3 + min(60, sum) / 100)`.
+- Bots: `TalentBot` is unchanged (tree = slot index % 3). Bots never wield two weapons, so the Warspirit dual-wield
+  talents stay idle for them.
+
+### Tests, smoke runs and tools
+
+- New test files: `test_m8_foundation` (class order, PENDING guard, 3 trees x 22 points), `test_m8_headgear`,
+  `test_m8_companion` (slot, lobby card, Main, flags), `test_m8_vocabulary` (pseudo ids, proficiency entry, dual wield),
+  `test_m8_sets`, `test_m8_items_shared` (weapons, Legendaries, five sets), `test_m8_items_class` (48 tests: class sets,
+  Artifacts, class items), `test_class_hunter*.gd` (6 files, about 110 tests), `test_class_shaman*.gd` (5 files, about 130),
+  `test_talents_hunter*.gd` (packlord, sharpshot, wildcraft, ui, data: 64) and `test_talents_shaman*.gd` (scripts, ui, data: 57).
+- Last recorded full run (TALENTS-H head, before the integration review): `godot --headless --path . -s res://tests/run_tests.gd`
+  gave 3444 passed, 0 failed.
+- Smoke runs recorded by the packages (`--fixed-fps 60` before `--path`, exit 0, 0 errors, 0 warnings): default party
+  `--smoke --waves=3 --seed=5`; `--waves=6 --seed=7 --classes=hunter,hunter,warrior,mage`; `--players=1 --classes=shaman --waves=4`;
+  `--waves=8 --seed=11 --classes=shaman,shaman,shaman,shaman`; `--players=1 --classes=hunter --companion=owl --waves=4`;
+  `--start-wave=10 --waves=4 --seed=13 --classes=hunter,shaman,hunter,shaman --artifact-chance=1` (seven Artifact drops);
+  `--waves=14 --seed=5 --classes=hunter,hunter,hunter,warrior` and `--waves=5 --seed=5 --start-level=31` (every talent point
+  spent, capstones in combat). Balance numbers were not judged from these runs.
+- `--companion=wolf|boar|owl` (new, `LaunchOptions.companion`): see the class plumbing above.
+- Dev views: `tools/showcase --view=hunter`, `--view=hands` (weapons in hand, `--weapons= --classes= --dual=1`), `--view=sets`
+  (`--free=1` for the independent sets, `--classes=hunter,shaman` filter, `--dist=N`), `--view=hands --artifact=1`.
+
+### Known gaps (M8)
+
+- No balance pass: the numbers are the designs' starting values; the final balance is the last step of the project (GDD 9).
+- Kindred Instinct's slow reaches the Boar's bites too: the vocabulary has no companion-kind filter.
+- Bond Totem's silent HP drain is the least conventional rule; it is pinned by tests.
+- Gale Volley's arrows are real projectiles: a Quick Draw Hunter can spawn up to five per second.
+- `Stormweaving` is flush with its tree frame at the minimum name size (cosmetic).
