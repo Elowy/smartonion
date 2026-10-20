@@ -25,6 +25,7 @@ func add_free_set(id: StringName, armor: int, min_wave: int = 6) -> SetData:
 	set_data.id = id
 	set_data.display_name = "Test Set %s" % id
 	set_data.class_id = &""
+	set_data.armor_type = armor
 	for i in SLOTS.size():
 		var piece := UniqueItemData.new()
 		piece.id = StringName("%s_%s" % [id, SLOT_NAMES[i]])

@@ -76,12 +76,13 @@ static func launch_uniques() -> int:
 	return n
 
 
-## The class-independent set pool rule: whether a class of armour [param class_armor] collects (rolls,
-## is offered) a class-free set of armour [param set_armor] (ClassData.ArmorType values). Today anyone
-## who can wear it: armour <= class armour (Db.set_usable_by). A narrower rule (native armour, ==) is
-## a change of Db.set_usable_by and of this one line; test_m8_sets derives its expectations from here.
+## The class-independent set pool rule: whether a class of armour [param class_armor] rolls (is offered,
+## collects) a class-independent set of armour [param set_armor] (ClassData.ArmorType values). Native armour
+## only: a set rolls for the classes that wear exactly its armour type (Db.set_usable_by,
+## ItemGenerator.independent_sets_for); wearing a lighter set is allowed but never rolled. test_m8_sets
+## derives its pool expectations from here.
 static func free_set_fits(set_armor: int, class_armor: int) -> bool:
-	return set_armor <= class_armor
+	return set_armor == class_armor
 
 
 ## Whether [param part] ("artifact", "set", "items", "trees") of [param class_id] is still to come

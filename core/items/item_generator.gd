@@ -19,7 +19,9 @@ extends RefCounted
 ## for one class: &"usable_by", else the &"class_data" bias, else a random &"team_classes"
 ## class with a set, else (no team given) any class with a set; the piece is uniform among
 ## that set's pieces available at the wave (set_piece_available; pieces have weight 0, so the
-## plain unique roll never picks them). See [method _roll_set_piece] for the rng draws.
+## plain unique roll never picks them). SET_INDEPENDENT_SHARE of the hits are a class-independent
+## set of the hero's / team's armour type instead of a class set. See [method _roll_set_piece] for
+## the rng draws.
 ## Attack Power / Spell Power enchants (Mighty / Arcane-touched) follow the class when one is
 ## known (&"class_data" bias or &"usable_by"): classes whose own weapon is magic (Mage,
 ## Warlock) mostly roll Spell Power, the others Attack Power (power_enchant_weight); items
@@ -114,6 +116,12 @@ const UNIQUE_CHANCE := 0.05
 ## source (LOOT, ELITE, GOBLIN, BOSS) rolls SET_LOOT_MULT times that ("3x more common in loot").
 const SET_CHANCE_SHOP := 0.05
 const SET_LOOT_MULT := 3.0
+## Of the set hits, the share that is a class-independent set (M8) when the hero / team has one of its
+## armour type; the rest is a class set. Set rates overall stay SET_CHANCE_SHOP / x SET_LOOT_MULT.
+const SET_INDEPENDENT_SHARE := 0.30
+## Test hook: replaces SET_INDEPENDENT_SHARE when >= 0.0 (0.0 = class sets only), like
+## LootDrops.artifact_chance_override.
+static var independent_share_override := -1.0
 ## The slots tier-set pieces exist for (a forced other slot never rolls a set piece).
 const SET_SLOTS: Array[int] = [
 	Items.SlotType.HEAD, Items.SlotType.SHOULDERS, Items.SlotType.CHEST, Items.SlotType.HANDS,
@@ -822,74 +830,83 @@ static func set_piece_available(data: UniqueItemData, source: Source, wave: int)
 	return source != Source.SHOP or data.rarity <= Items.Rarity.EPIC
 
 
-## The classes a set piece may be rolled for: [param for_class] alone when given, else the
-## [param team] classes (in team order), else – no team given – every class (Db.class_ids order);
-## only classes that can collect a set ([method Db.sets_for_class]: their own or a class-independent
-## one). Empty when none fits.
-static func set_classes(for_class: ClassData, team: Array) -> Array[ClassData]:
+## The classes a tier-set roll is for: [param for_class] alone when given, else the [param team]
+## classes (in team order), else – no team given – every class (Db.class_ids order).
+static func roll_classes(for_class: ClassData, team: Array) -> Array[ClassData]:
 	var out: Array[ClassData] = []
 	if for_class != null:
-		if not Db.sets_for_class(for_class.id, for_class).is_empty():
-			out.append(for_class)
-		return out
-	if not team.is_empty():
+		out.append(for_class)
+	elif not team.is_empty():
 		for c: Variant in team:
 			var cd := c as ClassData
-			if cd != null and cd not in out and not Db.sets_for_class(cd.id, cd).is_empty():
+			if cd != null and cd not in out:
 				out.append(cd)
-		return out
-	for id in Db.class_ids:
-		if not Db.sets_for_class(id).is_empty():
+	else:
+		for id in Db.class_ids:
 			out.append(Db.get_class_data(id))
 	return out
 
 
-## The sets a roll for [param classes] draws from, in draw order: first the classes' own sets
-## (in class order), then the class-independent sets (SetData.class_id empty) one of the classes
-## can wear (by id). With no class-independent set it is exactly one set per class, in class order.
-static func set_candidates(classes: Array[ClassData]) -> Array[SetData]:
+## The classes a class-set piece may be rolled for: [method roll_classes] that have a class set of
+## their own ([method Db.set_for_class]). Empty when none fits.
+static func set_classes(for_class: ClassData, team: Array) -> Array[ClassData]:
+	var out: Array[ClassData] = []
+	for cd in roll_classes(for_class, team):
+		if Db.set_for_class(cd.id) != null:
+			out.append(cd)
+	return out
+
+
+## The class-independent sets a roll for [param for_class] / [param team] draws from, by id: the sets of
+## the armour types of [method roll_classes] (native armour only, see SetData.armor_type).
+static func independent_sets_for(for_class: ClassData, team: Array) -> Array[SetData]:
+	var armors: Array[int] = []
+	for cd in roll_classes(for_class, team):
+		if cd.armor_type not in armors:
+			armors.append(cd.armor_type)
 	var out: Array[SetData] = []
-	for cls in classes:
-		var own := Db.set_for_class(cls.id)
-		if own != null and own not in out:
-			out.append(own)
-	var free: Array[SetData] = []
-	for cls in classes:
-		for s in Db.sets_for_class(cls.id, cls):
-			if s.class_id == &"" and s not in free:
-				free.append(s)
-	free.sort_custom(func(a: SetData, b: SetData) -> bool: return String(a.id) < String(b.id))
-	out.append_array(free)
+	for s in Db.independent_sets():
+		if s.armor_type in armors:
+			out.append(s)
 	return out
 
 
 ## The tier-set roll of an Epic item (null = it stays a normal Epic). [param rng] (RunState.rng
-## for loot, the shop rng for offers) draws, in order: 1. the set chance (randf) – only when
-## [param forced_slot] is none or a set slot; on a hit 2. the set (randi_range over
-## [method set_candidates]: the eligible classes' own sets, then the class-independent sets they
-## can wear) – only when more than one fits (with one set per class: the old class draw);
-## 3. the piece (randi_range) – only when more than one piece of that set is available for the
-## slot / wave and usable (by the set's class, or by one of the eligible classes for a
-## class-independent set).
-## A hit without an available piece (wave < min_wave, a team without a set) draws no more.
+## for loot, the shop rng for offers) draws, in order: 1. the set chance (randf, r) – only when
+## [param forced_slot] is none or a set slot; a miss (r >= chance) draws nothing more. A hit is a
+## class-independent set when the hero / team has one of its armour type and r < chance x
+## SET_INDEPENDENT_SHARE (the same r: no extra draw; the first r band is the independent one), or
+## when no class has a class set; else a class set. Then 2. the class (class set) or the set
+## (independent), randi_range – only when more than one fits; 3. the piece (randi_range) – only when
+## more than one piece of that set is available for the slot / wave (and, for a class set, usable by
+## the class). A hit without an available piece (wave < min_wave, a team without a set) draws no more.
+## Without a class-independent set the draws are those of M5..M7 (chance, class, piece).
 static func _roll_set_piece(source: Source, wave: int, forced_slot: int, for_class: ClassData,
 		team: Array, rng: RandomNumberGenerator) -> UniqueItemData:
 	if forced_slot >= 0 and forced_slot not in SET_SLOTS:
 		return null
-	if rng.randf() >= set_chance(source):
+	var chance := set_chance(source)
+	var r := rng.randf()
+	if r >= chance:
 		return null
-	var classes := set_classes(for_class, team)
-	if classes.is_empty():
-		return null
-	var candidates := set_candidates(classes)
-	if candidates.is_empty():
-		return null
-	var set_data := candidates[0] if candidates.size() == 1 else candidates[rng.randi_range(0, candidates.size() - 1)]
-	# Who must be able to wear a piece: the set's class, or – class-independent – any eligible class.
+	var share := SET_INDEPENDENT_SHARE if independent_share_override < 0.0 else independent_share_override
+	var class_sets := set_classes(for_class, team)
+	var independent := independent_sets_for(for_class, team)
+	var go_independent := not independent.is_empty() and (class_sets.is_empty() or r < chance * share)
+	var set_data: SetData
+	# Who must be able to wear a piece: the class of a class set, the native classes of an independent one.
 	var users: Array[ClassData] = []
-	for cls in classes:
-		if set_data.class_id == &"" or set_data.class_id == cls.id:
-			users.append(cls)
+	if go_independent:
+		set_data = independent[0] if independent.size() == 1 else independent[rng.randi_range(0, independent.size() - 1)]
+		for cls in roll_classes(for_class, team):
+			if cls.armor_type == set_data.armor_type:
+				users.append(cls)
+	else:
+		if class_sets.is_empty():
+			return null
+		var cls := class_sets[0] if class_sets.size() == 1 else class_sets[rng.randi_range(0, class_sets.size() - 1)]
+		set_data = Db.set_for_class(cls.id)
+		users.append(cls)
 	var pool: Array[UniqueItemData] = []
 	for piece_id in set_data.piece_ids:
 		var data := Db.get_unique(piece_id)
