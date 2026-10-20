@@ -10,7 +10,6 @@ const FONT_PATH := "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
 const ICON_DIR := "res://assets/icons"
 ## Ids that are allowed to have no picture (they keep their procedural glyph). Empty: every shipped id has one.
 const GLYPH_ONLY: Array[StringName] = []
-const Rules := preload("res://tests/content_rules.gd")
 
 var nodes: Array[Node] = []
 
