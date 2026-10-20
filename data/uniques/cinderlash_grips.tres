@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cinderlash_grips"
+display_name = "Cinderlash Grips"
+flavor = "Always slightly on fire."
+slot_type = 5
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"intellect": 4.0,
+&"stamina": 4.0
+})
+class_restriction = &"shaman"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "magma_lash",
+"mods": {
+"spread_targets_add": 1.0
+}
+}
+unique_text = "Equip: Your Magma Lash's burn spreads to 1 more enemy."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

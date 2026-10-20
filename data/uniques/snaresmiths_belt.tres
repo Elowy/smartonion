@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"snaresmiths_belt"
+display_name = "Snaresmith's Belt"
+flavor = "Click, then boom."
+slot_type = 6
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"agility": 4.0,
+&"stamina": 4.0
+})
+class_restriction = &"hunter"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "blast_snare",
+"mods": {
+"radius_add": 0.7,
+"arm_time_add": -0.2
+}
+}
+unique_text = "Equip: Your Blast Snare bursts in a 0.7 m wider circle and arms 0.2 sec faster."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0
