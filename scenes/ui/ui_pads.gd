@@ -5,7 +5,7 @@ extends RefCounted
 ## keyboard keys, so controllers are read here directly. Joined players always go through
 ## their own PlayerSlot.input instead. Call poll() once per frame from _process().
 
-const BUTTONS: Array[JoyButton] = [JOY_BUTTON_A, JOY_BUTTON_B, JOY_BUTTON_START]
+const BUTTONS: Array[JoyButton] = [JOY_BUTTON_A, JOY_BUTTON_B, JOY_BUTTON_START, JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]
 
 var _prev: Dictionary[String, bool] = {}
 var _cur: Dictionary[String, bool] = {}

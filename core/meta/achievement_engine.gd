@@ -78,6 +78,8 @@ const WIN_COUNTER_CAP := 9999
 const COUNTER_TOTAL := "total:"
 const COUNTER_BEST := "best:"
 const COUNTER_ENV_WINS := "env_wins:"
+## The highest wave a class reached ("best_wave:<class>", M9 PATCH: the Classes tab of The Onion Patch).
+const COUNTER_BEST_WAVE := "best_wave:"
 
 ## Conditions of content packages: kind -> Callable(condition: Dictionary, profile: Profile, report: RunReport,
 ## defs: Array[AchievementData]) -> bool.
@@ -121,6 +123,7 @@ static func update_counters(profile: Profile, report: RunReport) -> void:
 	var top_tier := maxi(Difficulty.tier_index(report.difficulty), 0)
 	for id in report.classes_played():
 		profile.add_counter(StringName("%s:%s" % [COUNTER_RUNS, id]), 1)
+		profile.raise_counter(StringName(COUNTER_BEST_WAVE + String(id)), roundi(report.stat(&"wave")))
 		if won:
 			_add_win(profile, StringName("%s:%s" % [COUNTER_WINS, id]))
 			for i in mini(top_tier + 1, tiers.size()):

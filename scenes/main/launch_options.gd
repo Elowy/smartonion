@@ -20,9 +20,12 @@ extends RefCounted
 ##   --seed=N             RunState / bot seed
 ##   --screenshot=PATH    saves a PNG after --shot-time seconds of game time, then quits
 ##   --shot-time=S        seconds after the run starts (after boot for menu / lobby views)
-##   --view=NAME          dev: reach a screen for a screenshot – menu, settings and credits (the main
-##                        menu's pages), lobby, roll (the "Rolling the arena..." screen, --env picks the
+##   --view=NAME          dev: reach a screen for a screenshot – menu, settings, credits and patch (the main
+##                        menu's pages; patch = The Onion Patch, --patch-tab picks its tab), lobby, roll (the "Rolling the arena..." screen, --env picks the
 ##                        card it lands on), game, intermission, game_over, victory, pause
+##   --patch-tab=NAME     dev: the tab --view=patch opens on – classes, seasonings, heirlooms, achievements, wardrobe
+##   --loadout-tab=NAME   dev: --view=lobby opens the Loadout of the second player (the first without one) on that tab –
+##                        seasonings, heirloom, look (screenshots)
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
 ##   --time-scale=X       overrides the time scale (smoke default 4)
@@ -71,20 +74,23 @@ extends RefCounted
 ##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
 ##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
 ##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
-
-const DEFAULT_BOTS := 4
-const DEFAULT_SMOKE_WAVES := 3
 ##   --heirloom=ID        M9 PATCH: every hero starts with this Heirloom equipped (an id of Db.heirlooms, e.g.
 ##                        heir_sprout_cap), instead of what the profile remembers for the class (a smoke run with
 ##                        the dev profile owns them all at rank 1; --profile=max at rank 5; a real profile must own
 ##                        it). An unknown id is an unknown argument
+
+const DEFAULT_BOTS := 4
+const DEFAULT_SMOKE_WAVES := 3
 const SMOKE_TIME_SCALE := 4.0
 ## Smoke runs are seeded (deterministic content rolls) unless --seed is given.
 const SMOKE_SEED := 1
 const DEFAULT_SHOT_TIME := 8.0
+## --patch-tab / --loadout-tab values (the lower-case tab names of OnionPatchPage / LoadoutScreen).
+const PATCH_TABS: Array[String] = ["classes", "seasonings", "heirlooms", "achievements", "wardrobe"]
+const LOADOUT_TABS: Array[String] = ["seasonings", "heirloom", "look"]
 ## Views that need a running game (bots are added and a run starts right away).
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
-const VIEWS: Array[String] = ["menu", "settings", "credits", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
+const VIEWS: Array[String] = ["menu", "settings", "credits", "patch", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
 ## --panel-tab values (PlayerPanel.TAB_IDS).
 const PANEL_TABS: Array[String] = ["character", "trainer", "talents", "enchanter"]
 ## --start-level ceiling (far beyond a full run).
@@ -129,6 +135,9 @@ var panel_tab := ""
 var boss_hp := 1.0
 ## < 0 = off (the normal Artifact chances); else the chance of every Artifact roll.
 var artifact_chance := -1.0
+## --patch-tab / --loadout-tab (M9 PATCH, screenshots): "" = the default tab.
+var patch_tab := ""
+var loadout_tab := ""
 ## "" = the end screen opens on the Summary page (--end-page; GameOverScreen.PAGE_IDS).
 var end_page := ""
 ## --save-card: the forced end screen saves the run card right away.
@@ -155,6 +164,8 @@ var profile_kind: StringName = &""
 var profile_path := ""
 ## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
 var seasonings: Array[StringName] = []
+## The Heirloom of --heirloom (&"" = none: the heroes take what their slot has).
+var heirloom: StringName = &""
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -164,8 +175,6 @@ var unknown: Array[String] = []
 static func _flag_on(value: String) -> bool:
 	return not (value.to_lower() in FLAG_OFF_VALUES)
 
-## The Heirloom of --heirloom (&"" = none: the heroes take what their slot has).
-var heirloom: StringName = &""
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
 	var o := LaunchOptions.new()
@@ -242,6 +251,16 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.end_page = value
 				else:
 					o.unknown.append(arg)
+			"--patch-tab":
+				if value in PATCH_TABS:
+					o.patch_tab = value
+				else:
+					o.unknown.append(arg)
+			"--loadout-tab":
+				if value in LOADOUT_TABS:
+					o.loadout_tab = value
+				else:
+					o.unknown.append(arg)
 			"--save-card":
 				o.save_card = true
 			"--mode":
@@ -293,6 +312,11 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				seasonings_arg = arg
 				for part in value.split(",", false):
 					o.seasonings.append(StringName(part.strip_edges()))
+			"--heirloom":
+				if Db.heirlooms.has(StringName(value)):
+					o.heirloom = StringName(value)
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
@@ -312,11 +336,6 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 ## cycled, else every class the profile has unlocked).
 func bot_classes() -> Array[StringName]:
 	var ids: Array[StringName] = []
-			"--heirloom":
-				if Db.heirlooms.has(StringName(value)):
-					o.heirloom = StringName(value)
-				else:
-					o.unknown.append(arg)
 	for id in classes:
 		if Db.get_class_data(id) != null:
 			ids.append(id)

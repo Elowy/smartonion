@@ -257,6 +257,8 @@ func _ready() -> void:
 				PlayerManager.get_slot(0).ready = true
 			if options.view == "roll":
 				begin_roll()
+			if options.loadout_tab != "":
+				_open_loadout_view()
 		_:
 			go_to_menu()
 			match options.view:
@@ -264,6 +266,10 @@ func _ready() -> void:
 					main_menu.open_settings()
 				"credits":
 					main_menu.open_credits()
+				"patch":
+					main_menu.open_onion_patch()
+					if options.patch_tab != "":
+						main_menu.onion_patch_page.set_tab(LaunchOptions.PATCH_TABS.find(options.patch_tab) as OnionPatchPage.Tab)
 
 
 func _exit_tree() -> void:
@@ -311,6 +317,14 @@ func go_to_lobby() -> void:
 	_set_state(State.LOBBY)
 
 
+## --loadout-tab (screenshots): opens the Loadout of the second player (the first when alone) in the lobby.
+func _open_loadout_view() -> void:
+	var slots := PlayerManager.get_slots()
+	if lobby == null or slots.is_empty():
+		return
+	lobby.open_loadout(slots[1] if slots.size() > 1 else slots[0], LaunchOptions.LOADOUT_TABS.find(options.loadout_tab) as LoadoutScreen.Tab)
+
+
 ## --seasonings: every bot carries the flagged Seasonings of its own class, in the order given (instead of what the
 ## profile remembers for the class).
 func _apply_seasoning_flag(slots: Array[PlayerSlot]) -> void:
@@ -319,6 +333,14 @@ func _apply_seasoning_flag(slots: Array[PlayerSlot]) -> void:
 	for slot in slots:
 		if slot.is_bot() and slot.class_data != null:
 			slot.seasonings.assign(options.seasonings_for(slot.class_data.id))
+
+
+## --heirloom: every hero starts with that Heirloom (instead of what the profile remembers for the class).
+func _apply_heirloom_flag(slots: Array[PlayerSlot]) -> void:
+	if options.heirloom == &"":
+		return
+	for slot in slots:
+		slot.heirloom = options.heirloom
 
 
 ## Starts a run with every joined slot: arena, director, players, HUD, run screens, wave 1
@@ -333,16 +355,9 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	_apply_seasoning_flag(slots)  # (--seasonings: after the lobby / the profile put their selections on the slots)
+	_apply_heirloom_flag(slots)  # (M9 PATCH: --heirloom likewise)
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
 	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
-## --heirloom: every hero starts with that Heirloom (instead of what the profile remembers for the class).
-func _apply_heirloom_flag(slots: Array[PlayerSlot]) -> void:
-	if options.heirloom == &"":
-		return
-	for slot in slots:
-		slot.heirloom = options.heirloom
-
-
 	for slot in slots:
 		Meta.remember_loadout(slot)
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id(), _difficulty_for(slots))
@@ -355,7 +370,6 @@ func _apply_heirloom_flag(slots: Array[PlayerSlot]) -> void:
 	for slot in slots:
 		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
-	_apply_heirloom_flag(slots)  # (M9 PATCH: --heirloom likewise)
 	RunState.shrine_chance_override = options.shrine_chance
 	RunState.event_override = options.event
 	RunState.dungeon_forced = options.dungeon
@@ -462,7 +476,10 @@ func start_wave(n: int) -> void:
 	_place_players()
 	for p in players:
 		if is_instance_valid(p):
+			Heirlooms.rescale_player(p, wave)  # (M9 PATCH: an Heirloom grows with the wave; nothing without one)
 			p.begin_wave()
+			for held in Heirlooms.held(p.equipment):
+				_log(Heirlooms.log_line(p.slot.label() if p.slot != null else "", p.class_data.id, held, p.equipment.is_equipped(held), wave))
 	_begin_shrines()
 	_begin_pressure()
 	_downs_at_wave_start = players_downed
@@ -476,10 +493,7 @@ func start_wave(n: int) -> void:
 	if hud != null:
 		hud.show()
 		# The running shrines (M6b) are listed under the title, with the waves they have left.
-			Heirlooms.rescale_player(p, wave)  # (M9 PATCH: an Heirloom grows with the wave; nothing without one)
 		var banner_lines := Shrines.banner_lines()
-			for held in Heirlooms.held(p.equipment):
-				_log(Heirlooms.log_line(p.slot.label() if p.slot != null else "", p.class_data.id, held, p.equipment.is_equipped(held), wave))
 		if Pressure.banner_line() != "":
 			banner_lines.append(Pressure.banner_line())
 		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, banner_lines)
