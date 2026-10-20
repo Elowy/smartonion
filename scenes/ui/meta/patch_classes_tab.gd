@@ -115,10 +115,11 @@ func _make_row(id: StringName, selected: bool) -> PanelContainer:
 		var bar := UiBar.create(UiTheme.XP_PURPLE, 20.0, UiTheme.FONT_SMALL - 4)
 		bar.animated = false
 		var max_level := bool(progress["max"])
-		bar.set_values(float(progress["into"]), maxf(float(progress["needed"]), 1.0) if not max_level else 1.0,
-				"MAX LEVEL" if max_level else "%s / %s XP" % [UiTheme.format_int(int(progress["into"])), UiTheme.format_int(int(progress["needed"]))])
 		if max_level:
 			bar.set_values(1.0, 1.0, "MAX LEVEL")
+		else:
+			bar.set_values(float(progress["into"]), maxf(float(progress["needed"]), 1.0),
+					"%s / %s XP" % [UiTheme.format_int(int(progress["into"])), UiTheme.format_int(int(progress["needed"]))])
 		xp.add_child(bar)
 		var to_next := UiTheme.label("" if max_level else "%s XP to level %d" % [UiTheme.format_int(int(progress["needed"]) - int(progress["into"])), level + 1],
 				&"", UiTheme.FONT_SMALL - 3, UiTheme.TEXT_DIM)
