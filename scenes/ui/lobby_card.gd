@@ -5,19 +5,20 @@ extends PanelContainer
 ## class stat bonuses, starting weapons, resource and the device's own button prompts. A class with
 ## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
+## M9 SEASONINGS: every class also shows a Seasonings pill on the left of the preview (a socket per slot with the picked
+## Seasoning's icon, the button that opens the picker: Lobby, LT); [member picker] is the SeasoningPicker panel that
+## covers the card while it is open.
 ## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
-## description, and without the Ready prompt (Lobby.ready_block_reason). Every class also shows a Seasonings pill on
-## the preview (a socket per slot with the picked Seasoning's icon, the button that opens the picker: Lobby, LT);
-## [member picker] is the SeasoningPicker panel that covers the card while it is open.
+## description, and without the Ready prompt (Lobby.ready_block_reason).
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
+## The Seasoning sockets on the card.
+const SEASONING_CHIP_SIZE := 28.0
 const PREVIEW_HEIGHT := 150.0
 const ABILITY_ICON_SIZE := 40.0
 ## The Mastery text is cut after this many lines: every class's mastery_text must fit in it
 ## at the 1080p canvas (test_ui_m3_lobby checks all Db classes).
 const MASTERY_MAX_LINES := 3
-## The Seasoning sockets on the card.
-const SEASONING_CHIP_SIZE := 28.0
 
 var index := 0
 var slot: PlayerSlot
@@ -63,6 +64,7 @@ var _season_row: PanelContainer
 var _season_label: Label
 var _season_chips: HBoxContainer
 var _season_glyph_holder: HBoxContainer
+var _season_key := ""
 # Abilities / Mastery block (hidden for a class without M3 data).
 var _abilities_panel: PanelContainer
 var _ability_row: HBoxContainer
@@ -161,10 +163,10 @@ func _build_joined() -> void:
 	preview = OnionPreview.create()
 	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage.add_child(preview)
+	_season_row = _make_seasoning_pill()  # (under the READY ribbon)
+	stage.add_child(_season_row)
 	_ready_ribbon = _make_ready_ribbon()
 	stage.add_child(_ready_ribbon)
-	_season_row = _make_seasoning_pill()
-	stage.add_child(_season_row)
 
 	var class_row := UiTheme.hbox(6)
 	_left_arrow = UiIcon.create(UiIcon.Kind.ARROW_LEFT, Vector2(34, 40), UiTheme.GOLD)
@@ -316,12 +318,14 @@ func _make_ready_ribbon() -> PanelContainer:
 ## Mirrors [param p_slot] (null = empty slot). Cheap when nothing changed.
 func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	slot = p_slot
+	# The Seasoning pill follows the picks and the slots on its own (they change without the rest of the card changing).
+	if p_slot != null and _joined_box.visible and _seasoning_key(p_slot) != _season_key:
+		_fill_seasonings(p_slot)
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
-		key = "%d:%s:%s:%s:%s:%s:%s:%d" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
-				p_slot.companion_id(), _locked_hint(p_slot), ",".join(PackedStringArray(p_slot.seasonings)),
-				Seasonings.slot_count(cid)]
+		key = "%d:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
+				p_slot.companion_id(), _locked_hint(p_slot)]
 	if key == _state_key:
 		return
 	_state_key = key
@@ -481,7 +485,14 @@ func seasoning_pill_visible() -> bool:
 
 ## The Seasonings pill (M9): the button that opens the picker (not while ready: the picks are locked like the class),
 ## the count of picked Seasonings of the class's slots and their icons; hidden for a locked class.
+## What the Seasoning pill shows, as one string: the picks and the slot count.
+func _seasoning_key(s: PlayerSlot) -> String:
+	var cid: StringName = s.class_data.id if s.class_data != null else &""
+	return "%s:%s:%d:%s" % [cid, ",".join(PackedStringArray(s.seasonings)), Seasonings.slot_count(cid), s.ready]
+
+
 func _fill_seasonings(s: PlayerSlot) -> void:
+	_season_key = _seasoning_key(s)
 	for c in _season_chips.get_children():
 		_season_chips.remove_child(c)
 		c.queue_free()

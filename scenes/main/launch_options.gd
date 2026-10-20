@@ -55,16 +55,16 @@ extends RefCounted
 ##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
 ##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
 ##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
-##   --seasonings=a,b,c   M9: the Seasonings the bots carry (ids of Db.seasonings, e.g. ssn_smoked_paprika): every bot
-##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
-##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
-##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
 ##   --profile=KIND       M9: the meta profile (Meta.configure): dev (everything unlocked, no raw-power bonus, nothing
 ##                        saved – the default of every automated run), fresh (a new player) or max (every class at
 ##                        the top level, everything unlocked). Without --profile-path nothing is read or written
 ##   --profile-path=FILE  M9 dev / test hook: reads and saves the meta profile in FILE instead of the player's
 ##                        user://profile.json (the only way an automated run touches a profile). With --profile=fresh
 ##                        or max that profile is the starting point; --profile=dev has no file
+##   --seasonings=a,b,c   M9: the Seasonings the bots carry (ids of Db.seasonings, e.g. ssn_smoked_paprika): every bot
+##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
+##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
+##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -135,12 +135,12 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
-## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
-var seasonings: Array[StringName] = []
 ## The meta profile of --profile (Meta.PROFILE_KINDS; &"" = the default of the session) and the file of
 ## --profile-path ("" = none).
 var profile_kind: StringName = &""
 var profile_path := ""
+## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
+var seasonings: Array[StringName] = []
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -256,10 +256,6 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.leaderboard_path = value
 				else:
 					o.unknown.append(arg)
-			"--seasonings":
-				seasonings_arg = arg
-				for part in value.split(",", false):
-					o.seasonings.append(StringName(part.strip_edges()))
 			"--profile":
 				if StringName(value) in Meta.PROFILE_KINDS:
 					o.profile_kind = StringName(value)
@@ -270,6 +266,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.profile_path = value
 				else:
 					o.unknown.append(arg)
+			"--seasonings":
+				seasonings_arg = arg
+				for part in value.split(",", false):
+					o.seasonings.append(StringName(part.strip_edges()))
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):

@@ -1322,12 +1322,12 @@ func _add_bots() -> void:
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
-		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
-		if bot != null and options.companion != &"":
-			bot.companion = options.companion
 		# --seasonings: every bot carries the ones of its own class.
 		if bot != null and not options.seasonings.is_empty():
 			bot.seasonings = options.seasonings_for(id)
+		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
+		if bot != null and options.companion != &"":
+			bot.companion = options.companion
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:

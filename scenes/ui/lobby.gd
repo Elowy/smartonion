@@ -20,11 +20,11 @@ extends Control
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
 ##   A change while the start countdown runs un-readies the player who made it, which cancels the countdown
 ##   (everybody sees the new mode before the run starts).
+## - M9 SEASONINGS: LT / right mouse button opens the player's Seasoning picker over their card ([method
+##   open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and nothing else in the lobby.
 ## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
 ##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
-##   remembered for that class on their slot (Meta.apply_loadout). LT / right mouse button opens the player's Seasoning picker over
-##   their card ([method open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and
-##   nothing else in the lobby.
+##   remembered for that class on their slot (Meta.apply_loadout).
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
