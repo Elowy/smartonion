@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mask_of_the_gathering_storm"
+display_name = "Mask of the Gathering Storm"
+flavor = "Smells of rain, even indoors."
+slot_type = 0
+armor_type = 2
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 7.0,
+&"stamina": 6.0
+})
+class_restriction = &"shaman"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "forking_bolt",
+"mods": {
+"cost_add": -8.0
+}
+}
+unique_text = "Equip: Your Forking Bolt costs 8 less Surge."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

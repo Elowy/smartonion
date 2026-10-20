@@ -687,12 +687,14 @@ func _viewer_hero() -> Player:
 
 ## The ability an ability-mod item's Equip line needs ("" = none): the item's ability when
 ## [param hero] (the hero looking at the tooltip) has not learned it. Null [param hero] = nobody
-## to ask, so nothing is missing (as for an Artifact property's "(needs Whirlwind)").
+## to ask, so nothing is missing (as for an Artifact property's "(needs Whirlwind)"). A pseudo ability
+## (BonusVocabulary.PSEUDO_IDS: the Imp, the companion, the totems ...) is nothing to learn: the class's kit
+## always has it, so its items never grey out.
 static func unique_needs(p_item: ItemInstance, hero: Player) -> StringName:
 	if p_item == null or p_item.unique_effect != &"ability_mod" or hero == null:
 		return &""
 	var ability_id := StringName(p_item.unique_params.get("ability", ""))
-	if ability_id == &"" or Artifacts.hero_knows(hero, ability_id):
+	if ability_id == &"" or BonusVocabulary.PSEUDO_IDS.has(ability_id) or Artifacts.hero_knows(hero, ability_id):
 		return &""
 	return ability_id
 

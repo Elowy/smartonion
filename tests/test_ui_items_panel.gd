@@ -690,7 +690,7 @@ func test_artifact_tooltips_fit_the_4_player_panels() -> void:
 		players.erase(slot.player)
 		(slot.player as Player).free()
 		UiFakes.reset_players()
-	check_eq(checked, 5 * 2 * 2 * 4, "five Artifacts x asleep / awake x comparison on / off x four corners")
+	check_eq(checked, Db.artifacts.size() * 2 * 2 * 4, "every Artifact x asleep / awake x comparison on / off x four corners")
 	finished.emit()
 
 

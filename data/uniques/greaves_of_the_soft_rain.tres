@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"greaves_of_the_soft_rain"
+display_name = "Greaves of the Soft Rain"
+flavor = "Squelch, but the gentle kind."
+slot_type = 7
+armor_type = 2
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"intellect": 6.0,
+&"stamina": 6.0,
+&"spirit": 3.0
+})
+class_restriction = &"shaman"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "soothing_downpour",
+"mods": {
+"cooldown_add": -4.0
+}
+}
+unique_text = "Equip: Your Soothing Downpour recharges 4 sec faster."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

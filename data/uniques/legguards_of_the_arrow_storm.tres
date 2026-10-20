@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"legguards_of_the_arrow_storm"
+display_name = "Legguards of the Arrow Storm"
+flavor = "Rains down on the unprepared."
+slot_type = 7
+armor_type = 2
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"agility": 7.0,
+&"haste": 4.0
+})
+class_restriction = &"hunter"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "arrow_hail",
+"mods": {
+"radius_add": 1.0,
+"duration_add": 1.0
+}
+}
+unique_text = "Equip: Your Arrow Hail covers 1 m more and lasts 1 sec longer."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0

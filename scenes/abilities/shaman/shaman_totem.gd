@@ -11,7 +11,11 @@ extends Node3D
 ##   earth  every 0.25 s enemies within earth_radius are slowed by earth_slow x power % (at most 60)
 ##   air    every 0.25 s heroes within air_radius get the stat source "totem_air:<slot>" {haste: air_haste x
 ##          power (at most 40)}, removed when they leave, at the end and with the wave
-##   bond / storm: look only (the Wellspring capstone and the Artifact drive them)
+##   storm  (Thunderpost, the Fist of the Ancestors Artifact) the first zap 0.3 s after planting, then every
+##          storm_interval s a bolt at the nearest enemy within storm_range of the post for storm_damage
+##          (a fixed amount the Artifact works out from its Forking Bolt) Nature damage, ability damage
+##          without Storm Echo
+##   bond   look only (the Wellspring capstone drives it)
 ## Aura (Artifact property, aura_damage_pct > 0): heroes within aura_radius of ANY totem of the owner get
 ## the stat source "totem_aura:<slot>" {damage_pct}. Radii count the owner's Area Size.
 ## [param params] are the final Totem Rite numbers (rank / spec / item mods and the shaman_totems mods in).
@@ -32,7 +36,7 @@ var life_left := 10.0
 var follows := false
 var dismissed := false
 var model: ShamanTotemModel
-## Counters (tests): firebolts shot, heals given, slows applied.
+## Counters (tests): firebolts / Thunderpost zaps shot, heals given, slows applied.
 var shots := 0
 var heals := 0
 
@@ -41,6 +45,7 @@ var _slot_key := ""
 var _age := 0.0
 var _duration := 10.0
 var _fire_left := FIRST_SHOT_DELAY
+var _storm_left := FIRST_SHOT_DELAY
 var _water_left := 0.0
 var _field_left := 0.0
 var _aura_left := 0.0
@@ -125,6 +130,8 @@ func step(delta: float) -> void:
 		var o := owner_player.global_position
 		global_position = Vector3(o.x, 0.0, o.z)
 	match element:
+		&"storm":
+			_step_storm(delta)
 		&"fire":
 			_step_fire(delta)
 		&"water":
@@ -167,6 +174,26 @@ func _step_fire(delta: float) -> void:
 func fire_interval() -> float:
 	var haste := owner_player.stats.attack_speed_mult() if owner_player != null else 1.0
 	return maxf(0.2, num("fire_interval", 1.0) / maxf(0.2, haste))
+
+
+## Thunderpost: a Nature bolt of [code]storm_damage[/code] at the nearest enemy within [code]storm_range[/code] of
+## the post every [code]storm_interval[/code] s (not shortened by Haste); nothing in reach keeps it ready.
+func _step_storm(delta: float) -> void:
+	_storm_left = maxf(0.0, _storm_left - delta)
+	if _storm_left > 0.0:
+		return
+	var targets := ShamanKit.nearest_enemies(get_tree(), global_position, radius_of("storm_range", 8.0), 1)
+	if targets.is_empty():
+		return
+	_storm_left = maxf(0.1, num("storm_interval", 0.8))
+	var e := targets[0]
+	var from := global_position + Vector3.UP * (ShamanTotemModel.CROWN_Y + 0.1)
+	ProcVfx.beam(from, ShamanKit.chest(e), ShamanKit.STORM_COLOR)
+	Audio.play(AudioIds.cast_for_school(ShamanKit.NATURE))
+	owner_player.procs.deal_raw(e, num("storm_damage"), ShamanKit.NATURE, true, &"ability")
+	shots += 1
+	if is_instance_valid(e) and e.is_inside_tree():
+		Vfx.hit_spark(ShamanKit.chest(e), ShamanKit.STORM_COLOR, ShamanKit.NATURE)
 
 
 func _step_water(delta: float) -> void:

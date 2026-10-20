@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"boots_of_the_quiet_retreat"
+display_name = "Boots of the Quiet Retreat"
+flavor = "Leaves no tracks but plenty of dust."
+slot_type = 8
+armor_type = 2
+rarity = 2
+stats = Dictionary[StringName, float]({
+&"agility": 4.0,
+&"dodge": 3.0
+})
+class_restriction = &"hunter"
+unique_effect = &"ability_mod"
+unique_params = {
+"ability": "backstep",
+"mods": {
+"cooldown_add": -2.0,
+"distance_add": 1.5
+}
+}
+unique_text = "Equip: Your Backstep recharges 2 sec faster and leaps 1.5 m farther."
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 1
+weight = 1.0
