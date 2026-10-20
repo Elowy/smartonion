@@ -481,3 +481,621 @@ func test_mossknuckle_strikes_and_heals_the_most_wounded_ally_on_every_fifth_hit
 		p.procs._physics_process(1.0)
 		p.procs.on_hit(target, 20.0, p.main_hand, false)
 	check(p.hp > low, "the wielder heals when he is the most wounded (%s -> %s)" % [low, p.hp])
+
+
+# --- Class-independent sets: data -------------------------------------------------------------------
+
+func _set_data(id: StringName) -> SetData:
+	return Db.get_set(id)
+
+
+func _piece(set_key: String, slot: String, wave: int = 8) -> ItemInstance:
+	return ItemGenerator.from_unique(Db.get_unique(StringName("set_%s_%s" % [set_key, slot])), wave, false, rng)
+
+
+func test_the_five_independent_sets_are_shipped_with_five_pieces_each() -> void:
+	var free: Array[StringName] = []
+	for s in Rules.free_sets():
+		free.append(s.id)
+	free.sort()
+	var wanted: Array[StringName] = []
+	wanted.assign(SETS.keys())
+	wanted.sort()
+	check_eq(free, wanted, "exactly the five class-independent sets")
+	for id in SETS:
+		var data := _set_data(id)
+		check(data != null, "%s loaded" % id)
+		if data == null:
+			continue
+		var info: Array = SETS[id]
+		check_eq(data.display_name, info[0], "%s: its name" % id)
+		check_eq(data.class_id, &"", "%s: class-independent" % id)
+		check(data.is_independent(), "%s: is_independent" % id)
+		check_eq(data.armor_type, info[1], "%s: its armour type" % id)
+		var expected: Array[StringName] = []
+		for s in SLOT_KEYS:
+			expected.append(StringName("set_%s_%s" % [info[2], s]))
+		check_eq(data.piece_ids, expected, "%s: Head, Shoulders, Chest, Hands, Legs" % id)
+		var thresholds: Array[int] = []
+		for b in data.bonuses:
+			thresholds.append(int(b["pieces"]))
+			check(str(b.get("text", "")) != "" and not (b["effects"] as Array).is_empty(), "%s: bonus text and effects" % id)
+		check_eq(thresholds, [2, 4] as Array[int], "%s: 2- and 4-piece bonuses, no 5-piece" % id)
+		check(Db.set_for_class(&"") == null, "an independent set is nobody's own")
+		for bad in Content.BANNED:
+			check(not data.display_name.containsn(bad), "%s: no trademark (%s)" % [id, bad])
+	# Two mail sets (the Hunter and the Shaman are the mail natives), one set of every other armour type.
+	var by_armor := {}
+	for id in SETS:
+		by_armor[SETS[id][1]] = by_armor.get(SETS[id][1], 0) + 1
+	check_eq(by_armor, {ClassData.ArmorType.CLOTH: 1, ClassData.ArmorType.LEATHER: 1, ClassData.ArmorType.MAIL: 2, ClassData.ArmorType.PLATE: 1},
+			"one set per armour type, plus a second mail set")
+
+
+func test_set_pieces_have_stamina_two_secondaries_and_no_primary_stat() -> void:
+	var slot_types: Array[int] = [Items.SlotType.HEAD, Items.SlotType.SHOULDERS, Items.SlotType.CHEST, Items.SlotType.HANDS, Items.SlotType.LEGS]
+	var names: Array[String] = []
+	for id in SETS:
+		var info: Array = SETS[id]
+		for i in SLOT_KEYS.size():
+			var pid := StringName("set_%s_%s" % [info[2], SLOT_KEYS[i]])
+			var u := Db.get_unique(pid)
+			check(u != null, "%s exists" % pid)
+			if u == null:
+				continue
+			check_eq(u.set_id, id, "%s: its set" % pid)
+			check_eq(u.rarity, Items.Rarity.EPIC, "%s: Epic" % pid)
+			check_eq(u.slot_type, slot_types[i], "%s: slot" % pid)
+			check_eq(u.armor_type, info[1], "%s: the set's armour type" % pid)
+			check_eq(u.class_restriction, &"", "%s: usable by any class that wears the armour" % pid)
+			check_eq(u.weight, 0.0, "%s: set roll only" % pid)
+			check_eq(u.min_wave, 6, "%s: from wave 6" % pid)
+			check_eq(u.sources, [&"shop", &"loot", &"elite", &"goblin", &"boss"] as Array[StringName], "%s: every source" % pid)
+			check(u.display_name != "" and u.flavor != "" and u.unique_effect == &"", "%s: named, flavoured, no unique effect of its own" % pid)
+			check(u.display_name.begins_with(String(info[0]).get_slice(" ", 0)), "%s: named after the set (%s)" % [pid, u.display_name])
+			for bad in Content.BANNED:
+				check(not (u.display_name + " " + u.flavor).containsn(bad), "%s: no banned word (%s)" % [pid, bad])
+			check(u.display_name not in names, "%s: a distinct name" % pid)
+			names.append(u.display_name)
+			check_eq(u.stats.size(), 3, "%s: three stats" % pid)
+			check(u.stats.get(Stats.STAMINA, 0.0) > 0.0, "%s: Stamina" % pid)
+			var secondaries := 0
+			for stat in u.stats:
+				check(stat not in [Stats.STRENGTH, Stats.AGILITY, Stats.INTELLECT], "%s: no primary stat (%s)" % [pid, stat])
+				if stat in ItemGenerator.SECONDARY_STATS:
+					secondaries += 1
+			check_eq(secondaries, 2, "%s: two secondary stats" % pid)
+			var budget := ItemGenerator.RARITY_BUDGET[Items.Rarity.EPIC] * ItemGenerator.slot_multiplier(u.slot_type)
+			check_near(ItemGenerator.stat_cost(u.stats), budget, 0.5, "%s: Epic budget" % pid)
+			# As an item: implicit armour of its type, a set piece, hand-made.
+			var item := ItemGenerator.from_unique(u, 8, false, rng)
+			check(item.unique and item.set_id == id and item.class_restriction == &"", "%s: a class-free hand-made set piece" % pid)
+			if info[1] != ClassData.ArmorType.CLOTH:
+				check(item.all_stats().get(Stats.ARMOR, 0.0) > 0.0, "%s: implicit armour" % pid)
+
+
+func test_the_bonuses_follow_the_design_and_validate_for_every_class() -> void:
+	var want := {
+		&"mendweave_attire": [[{"kind": "stats", "stats": {"spirit": 8.0}}],
+			[{"kind": "proc", "proc": {"trigger": "periodic", "interval": 8.0, "effect": "heal", "target": "lowest_ally", "max_hp_pct": 10.0}}]],
+		&"slipskin_leathers": [[{"kind": "stats", "stats": {"dodge": 5.0}}],
+			[{"kind": "proc", "proc": {"trigger": "on_dodge", "effect": "buff", "icd": 3.0, "duration": 4.0, "stats": {"damage_pct": 10.0, "speed": 15.0}}}]],
+		&"hoardscale_mail": [[{"kind": "stats", "stats": {"gold_find": 20.0, "fortune": 15.0}}],
+			[{"kind": "proc", "proc": {"trigger": "on_kill", "effect": "gold", "chance": 6.0, "amount": 3}}]],
+		&"redthorn_mail": [[{"kind": "stats", "stats": {"slayer": 12.0}}],
+			[{"kind": "proc", "proc": {"trigger": "on_kill", "effect": "buff", "duration": 6.0, "max_stacks": 6, "stats": {"damage_pct": 2.0}}}]],
+		&"stonebark_plate": [[{"kind": "damage_taken", "pct": -5.0}],
+			[{"kind": "proc", "proc": {"trigger": "low_hp", "threshold": 40.0, "per_wave": 1, "effect": "shield", "max_hp_pct": 30.0, "duration": 6.0}}]],
+	}
+	for id in want:
+		var data := _set_data(id)
+		check_eq(data.bonuses[0]["effects"], want[id][0], "%s 2 pieces" % id)
+		check_eq(data.bonuses[1]["effects"], want[id][1], "%s 4 pieces" % id)
+		for b in data.bonuses:
+			for e: Dictionary in b["effects"]:
+				check_eq(BonusVocabulary.validate(e, &""), "", "%s %d-piece valid without a class: %s" % [id, b["pieces"], e])
+				for class_id in Db.class_ids:
+					check_eq(BonusVocabulary.validate(e, class_id), "", "%s %d-piece valid for %s" % [id, b["pieces"], class_id])
+				# Class-agnostic: no ability ids, no class resources.
+				check(not e.has("match") and not e.has("ability") and e.get("kind") != "resource", "%s: no class content in %s" % [id, e])
+				if e.get("kind") == "proc":
+					check(not (e["proc"] as Dictionary).has("ability") and not (e["proc"] as Dictionary).has("label"), "%s: a plain proc (the engine labels it with the set name)" % id)
+
+
+func test_every_independent_set_has_its_own_look() -> void:
+	var seen: Array[Color] = []
+	for id in OnionArmor.SET_STYLES:
+		var main: Color = OnionArmor.SET_STYLES[id]["main"]
+		check(main not in seen, "%s: its own main colour" % id)
+		seen.append(main)
+	for id in SETS:
+		check(OnionArmor.SET_STYLES.has(id), "%s has a style" % id)
+		var look := EquipLook.make(EquipLook.Slot.HEAD, SETS[id][1], 1, 3, id)
+		var pal := OnionArmor.palette(look)
+		check(pal.main != OnionArmor.GENERIC_SET["main"], "%s: not the generic gold" % id)
+		for slot in [EquipLook.Slot.HEAD, EquipLook.Slot.SHOULDERS, EquipLook.Slot.CHEST]:
+			var part := OnionArmor.part(slot, EquipLook.make(slot, SETS[id][1], 1, 3, id), Db.get_class_data(&"warrior"))
+			check(part != null and part.solid != null, "%s: draws slot %d" % [id, slot])
+
+
+# --- Class-independent sets: they work for every class that wears them ---------------------------------
+
+## Players of every class that can wear [param armor] (class armour >= set armour).
+func _wearers(armor: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in Db.class_ids:
+		if int(Db.get_class_data(id).armor_type) >= armor:
+			out.append(id)
+	return out
+
+
+func _wear(p: Player, item: ItemInstance) -> void:
+	p.equipment.add_to_backpack(item)
+	check(p.equipment.equip(item), "%s equips on %s" % [item.display_name, p.class_data.id])
+
+
+func test_any_class_that_can_wear_a_set_gets_its_bonuses() -> void:
+	var two_piece := {
+		&"mendweave_attire": {Stats.SPIRIT: 8.0}, &"slipskin_leathers": {Stats.DODGE: 5.0},
+		&"hoardscale_mail": {Stats.GOLD_FIND: 20.0, Stats.FORTUNE: 15.0}, &"redthorn_mail": {Stats.SLAYER: 12.0},
+		&"stonebark_plate": {},
+	}
+	var checked := 0
+	for id in SETS:
+		var key: String = SETS[id][2]
+		for class_id in _wearers(SETS[id][1]):
+			var p := Fakes.spawn_player(world, 0, class_id)
+			Enemy.invalidate_player_cache()
+			_wear(p, _piece(key, "head"))
+			check(p.bonuses.effects_of(PlayerBonuses.SOURCE_SETS).is_empty(), "%s on %s: one piece, nothing" % [id, class_id])
+			_wear(p, _piece(key, "legs"))
+			check_eq(p.equipment.set_counts(), {id: 2} as Dictionary[StringName, int], "%s on %s: two pieces counted" % [id, class_id])
+			check_eq(SetBonuses.active_count(p.equipment), 1, "%s on %s: the 2-piece bonus" % [id, class_id])
+			var source := p.stats.get_source(&"set_bonus")
+			for stat in two_piece[id]:
+				check_eq(source.get(stat, 0.0), two_piece[id][stat], "%s on %s: %s" % [id, class_id, stat])
+			if id == &"stonebark_plate":
+				check_near(p.bonuses.damage_taken_mult(CombatMath.KIND_MELEE, null), 0.95, 0.0001, "%s on %s: 5%% less damage taken" % [id, class_id])
+			check(p.procs.extra_defs(PlayerBonuses.SOURCE_SETS).is_empty(), "%s on %s: no proc yet" % [id, class_id])
+			_wear(p, _piece(key, "chest"))
+			_wear(p, _piece(key, "hands"))
+			check_eq(SetBonuses.active_count(p.equipment), 2, "%s on %s: four pieces, both bonuses" % [id, class_id])
+			var defs := p.procs.extra_defs(PlayerBonuses.SOURCE_SETS)
+			check_eq(defs.size(), 1, "%s on %s: the 4-piece proc is handed to the ProcSystem" % [id, class_id])
+			if defs.size() == 1:
+				check_eq(str(defs[0]["id"]), "%s:4" % id, "%s on %s: proc id" % [id, class_id])
+				check_eq(str(defs[0]["label"]), SETS[id][0], "%s on %s: labelled with the set name" % [id, class_id])
+			check(_has_proc(p, StringName("%s:4" % id)), "%s on %s: the proc is live" % [id, class_id])
+			p.free()
+			Enemy.invalidate_player_cache()
+			checked += 1
+	var pairs := 0
+	for id in SETS:
+		pairs += _wearers(SETS[id][1]).size()
+	check_eq(checked, pairs, "every (set, wearing class) pair was checked")
+	check(checked >= 14, "the five launch classes alone make 14 pairs (%d)" % checked)
+
+
+func test_a_lighter_set_is_wearable_by_a_heavier_class_but_not_the_other_way() -> void:
+	var warrior := Fakes.spawn_player(world, 0, &"warrior")
+	var mage := Fakes.spawn_player(world, 1, &"mage", Vector3(5, 0, 0))
+	Enemy.invalidate_player_cache()
+	for id in SETS:
+		var piece := _piece(SETS[id][2], "chest")
+		check(piece.can_be_used_by(warrior.class_data), "%s: the plate warrior may Need / wear it" % id)
+		check_eq(piece.can_be_used_by(mage.class_data), SETS[id][1] == ClassData.ArmorType.CLOTH, "%s: the cloth mage only wears the cloth set" % id)
+		if SETS[id][1] != ClassData.ArmorType.CLOTH:
+			check(piece.unusable_reason(mage.class_data) != "", "%s: the mage is told why" % id)
+	for p in [warrior, mage]:
+		p.free()
+
+
+func test_mendweave_heals_the_most_wounded_ally_every_eight_seconds() -> void:
+	var p := Fakes.spawn_player(world, 0, &"mage")
+	var ally := Fakes.spawn_player(world, 1, &"warrior", Vector3(3, 0, 0))
+	for h in [p, ally]:
+		h.stats.set_source(&"tough", {Stats.STAMINA: 500.0})
+	Enemy.invalidate_player_cache()
+	for s in ["head", "shoulders", "chest", "hands"]:
+		_wear(p, _piece("mendweave", s))
+	p.hp = p.max_hp()
+	ally.hp = ally.max_hp() * 0.4
+	var before := ally.hp
+	p.procs.begin_wave()
+	for i in 470:  # 7.8 s
+		p.procs._physics_process(DT)
+	check_near(ally.hp, before, 0.001, "nothing before 8 s")
+	for i in 30:
+		p.procs._physics_process(DT)
+	check_near(ally.hp, before + ally.max_hp() * 0.10, 0.6, "10%% of the ally's Max HP (%s -> %s of %s)" % [before, ally.hp, ally.max_hp()])
+	# Alone: the wearer is the most wounded ally.
+	ally.hp = ally.max_hp()
+	p.hp = p.max_hp() * 0.5
+	var mine := p.hp
+	for i in 500:
+		p.procs._physics_process(DT)
+	check(p.hp > mine + p.max_hp() * 0.05, "the wearer heals when he is the most wounded (%s -> %s)" % [mine, p.hp])
+	for h in [p, ally]:
+		h.free()
+
+
+func test_slipskin_rewards_a_dodge_with_damage_and_speed_once_every_three_seconds() -> void:
+	var p := Fakes.spawn_player(world, 0, &"rogue")
+	for s in ["head", "shoulders", "chest", "hands"]:
+		_wear(p, _piece("slipskin", s))
+	var damage := p.stats.get_stat(Stats.DAMAGE_PCT)
+	var speed := p.stats.get_stat(Stats.SPEED)
+	p.procs.on_avoided(&"dodge", null)
+	check_eq(p.procs.fire_count(&"slipskin_leathers:4"), 1, "a dodge fires it")
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT) - damage, 10.0, 0.001, "+10% damage")
+	check_near(p.stats.get_stat(Stats.SPEED) - speed, 15.0, 0.001, "+15% Speed")
+	p.procs.on_avoided(&"dodge", null)
+	check_eq(p.procs.fire_count(&"slipskin_leathers:4"), 1, "the 3 s cooldown holds it back")
+	p.procs._physics_process(3.2)
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT) - damage, 10.0, 0.001, "the buff is still up after 3.2 s")
+	p.procs.on_avoided(&"dodge", null)
+	check_eq(p.procs.fire_count(&"slipskin_leathers:4"), 2, "and it fires again after the cooldown")
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT) - damage, 10.0, 0.001, "refreshed, not stacked")
+	p.procs.on_avoided(&"parry", null)
+	check_eq(p.procs.fire_count(&"slipskin_leathers:4"), 2, "a parry is not a dodge")
+	p.procs._physics_process(4.2)
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT), damage, 0.001, "the 4 s buff ran out")
+	check_near(p.stats.get_stat(Stats.SPEED), speed, 0.001, "and the speed with it")
+	p.free()
+
+
+func test_hoardscale_finds_extra_gold_on_six_percent_of_the_kills() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	for s in ["head", "shoulders", "chest", "hands"]:
+		_wear(p, _piece("hoardscale", s))
+	var e := _fake(Vector3(3, 0, 0))
+	RunState.rng.seed = 4242
+	var gold := RunState.gold
+	for i in 3000:
+		p.procs.on_kill(e)
+	var found := RunState.gold - gold
+	check_eq(found % 3, 0, "gold comes in lots of 3 (%d)" % found)
+	check_near(float(found) / 3.0 / 3000.0, 0.06, 0.012, "about 6%% of the kills (%d lots)" % (found / 3))
+	p.free()
+
+
+func test_redthorn_stacks_damage_with_every_kill_up_to_six_times() -> void:
+	var p := Fakes.spawn_player(world, 0, &"paladin")
+	for s in ["head", "shoulders", "chest", "hands"]:
+		_wear(p, _piece("redthorn", s))
+	var e := _fake(Vector3(3, 0, 0))
+	var base := p.stats.get_stat(Stats.DAMAGE_PCT)
+	for i in 3:
+		p.procs.on_kill(e)
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT) - base, 6.0, 0.001, "three kills: +6% damage")
+	for i in 10:
+		p.procs.on_kill(e)
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT) - base, 12.0, 0.001, "six stacks at most: +12%")
+	p.procs._physics_process(6.1)
+	check_near(p.stats.get_stat(Stats.DAMAGE_PCT), base, 0.001, "gone after 6 s")
+	p.free()
+
+
+func test_stonebark_raises_a_barrier_below_forty_percent_once_per_wave() -> void:
+	var p := Fakes.spawn_player(world, 0, &"warrior")
+	p.stats.set_source(&"tough", {Stats.STAMINA: 500.0})
+	for s in ["head", "shoulders", "chest", "hands"]:
+		_wear(p, _piece("stonebark", s))
+	var max_hp := p.max_hp()
+	p.hp = max_hp
+	p.procs.begin_wave()
+	p.hp = max_hp * 0.5
+	p.procs.on_struck(null, 1.0)
+	check_eq(p.procs.shield_hp, 0.0, "50% health: nothing yet")
+	p.hp = max_hp * 0.39
+	p.procs.on_struck(null, 1.0)
+	check_near(p.procs.shield_hp, max_hp * 0.30, 0.01, "below 40%%: a barrier of 30%% Max HP (%s of %s)" % [p.procs.shield_hp, max_hp])
+	check_eq(p.procs.fire_count(&"stonebark_plate:4"), 1, "fired")
+	p.procs._physics_process(6.2)
+	check_eq(p.procs.shield_hp, 0.0, "it fades after 6 s")
+	p.hp = max_hp
+	p.procs._physics_process(DT)
+	p.hp = max_hp * 0.3
+	p.procs.on_struck(null, 1.0)
+	check_eq(p.procs.fire_count(&"stonebark_plate:4"), 1, "once per wave: not again")
+	p.procs.begin_wave()
+	p.hp = max_hp
+	p.procs._physics_process(DT)
+	p.hp = max_hp * 0.3
+	p.procs.on_struck(null, 1.0)
+	check_eq(p.procs.fire_count(&"stonebark_plate:4"), 2, "the next wave it is back")
+	p.free()
+
+
+# --- Class-independent sets: who rolls them -----------------------------------------------------------
+
+func _ids(sets: Array[SetData]) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for s in sets:
+		out.append(s.id)
+	return out
+
+
+func _team(ids: Array[StringName]) -> Array[ClassData]:
+	var out: Array[ClassData] = []
+	for id in ids:
+		out.append(Db.get_class_data(id))
+	return out
+
+
+## [param n] Epic rolls from [param source] at [param wave]; the set pieces among them.
+func _set_rolls(source: ItemGenerator.Source, wave: int, n: int, options: Dictionary = {}, seed_value: int = 7) -> Array[ItemInstance]:
+	var r := RandomNumberGenerator.new()
+	r.seed = seed_value
+	var opts := options.duplicate()
+	opts[&"rarity"] = Items.Rarity.EPIC
+	var out: Array[ItemInstance] = []
+	for i in n:
+		var it := ItemGenerator.generate(source, wave, r, opts)
+		if it.set_id != &"":
+			out.append(it)
+	return out
+
+
+func test_the_roll_pool_is_the_native_armour_of_the_hero_or_team() -> void:
+	# A mail class (the Hunter / Shaman come with their own packages): the two mail sets.
+	var mail := classes.add_class()
+	mail.armor_type = ClassData.ArmorType.MAIL
+	check_eq(_ids(ItemGenerator.independent_sets_for(mail, [])), [&"hoardscale_mail", &"redthorn_mail"] as Array[StringName], "mail: Hoardscale + Redthorn, by id")
+	check_eq(_ids(Db.sets_for_class(mail.id, mail)), [&"hoardscale_mail", &"redthorn_mail"] as Array[StringName],
+			"Db.sets_for_class: no class set for the fixture, the two mail sets")
+	var per_class := {&"warrior": [&"stonebark_plate"], &"paladin": [&"stonebark_plate"], &"mage": [&"mendweave_attire"],
+		&"warlock": [&"mendweave_attire"], &"rogue": [&"slipskin_leathers"]}
+	for class_id in per_class:
+		var cd := Db.get_class_data(class_id)
+		var want: Array[StringName] = []
+		want.assign(per_class[class_id])
+		check_eq(_ids(ItemGenerator.independent_sets_for(cd, [])), want, "%s: only its own armour's set" % class_id)
+		var listed := _ids(Db.sets_for_class(class_id))
+		check_eq(listed.slice(1), want, "%s: Db.sets_for_class = its class set, then that set" % class_id)
+		check_eq(listed[0], Db.set_for_class(class_id).id, "%s: its own set first" % class_id)
+		for set_id in SETS:
+			var native: bool = SETS[set_id][1] == int(cd.armor_type)
+			check_eq(Db.set_usable_by(Db.get_set(set_id), cd), native, "%s collects %s: %s" % [class_id, set_id, native])
+	# The default party: plate + cloth + leather.
+	var party := _team([&"warrior", &"mage", &"paladin", &"rogue"])
+	check_eq(_ids(ItemGenerator.independent_sets_for(null, party)), [&"mendweave_attire", &"slipskin_leathers", &"stonebark_plate"] as Array[StringName],
+			"the default party rolls the plate, cloth and leather sets, not the mail sets")
+	# Nobody given: every armour of the classes in the game.
+	var any_mail := false
+	for id in Db.class_ids:
+		any_mail = any_mail or int(Db.get_class_data(id).armor_type) == ClassData.ArmorType.MAIL
+	check_eq(&"hoardscale_mail" in _ids(ItemGenerator.independent_sets_for(null, [])), any_mail, "the mail sets roll for 'nobody in particular' only when a mail class exists")
+
+
+func test_rolled_independent_pieces_are_native_and_wearable() -> void:
+	var party := _team([&"warrior", &"mage", &"paladin", &"rogue"])
+	var seen := {}
+	for it in _set_rolls(ItemGenerator.Source.LOOT, 14, 12000, {&"team_classes": party}):
+		var data := Db.get_set(it.set_id)
+		if not data.is_independent():
+			continue
+		seen[it.set_id] = seen.get(it.set_id, 0) + 1
+		check_eq(it.armor_type, data.armor_type, "%s: its armour" % it.display_name)
+		check_eq(it.class_restriction, &"", "%s: no class restriction" % it.display_name)
+		check(it.can_be_used_by(party[0]) or it.can_be_used_by(party[1]) or it.can_be_used_by(party[3]), "%s: a party class wears it" % it.display_name)
+		check(it.set_id != &"hoardscale_mail" and it.set_id != &"redthorn_mail", "%s: no mail set for a party without a mail class" % it.display_name)
+	check_eq(seen.keys().size(), 3, "all three native sets drop: %s" % [seen])
+	# A hero asked for by class (the shop): its own armour's set only.
+	var warrior := Db.get_class_data(&"warrior")
+	for it in _set_rolls(ItemGenerator.Source.SHOP, 14, 6000, {&"usable_by": warrior, &"team_classes": party}):
+		check(it.set_id in [Db.set_for_class(&"warrior").id, &"stonebark_plate"], "usable_by warrior: its class set or the plate set (%s)" % it.set_id)
+	# Before wave 6 there is no piece at all.
+	check(_set_rolls(ItemGenerator.Source.LOOT, 5, 3000, {&"team_classes": party}).is_empty(), "waves 1-5: no set pieces")
+	# A forced slot rolls that slot only.
+	for it in _set_rolls(ItemGenerator.Source.LOOT, 14, 4000, {&"slot_type": Items.SlotType.HANDS, &"team_classes": party}):
+		check_eq(it.slot_type, Items.SlotType.HANDS, "forced Hands: a Hands piece")
+
+
+func test_thirty_percent_of_the_set_hits_are_independent_sets() -> void:
+	var party := _team([&"warrior", &"mage", &"paladin", &"rogue"])
+	var rolls: Array[ItemInstance] = []
+	var n := 40000
+	var r := RandomNumberGenerator.new()
+	r.seed = 5150
+	var hits := 0
+	var independent := 0
+	var by_set := {}
+	for i in n:
+		var piece := ItemGenerator._roll_set_piece(ItemGenerator.Source.LOOT, 14, -1, null, party, r)
+		if piece == null:
+			continue
+		hits += 1
+		var set_id := piece.set_id
+		by_set[set_id] = by_set.get(set_id, 0) + 1
+		if Db.get_set(set_id).is_independent():
+			independent += 1
+	check_near(float(hits) / n, 0.15, 0.01, "set rate unchanged: 15%% of the loot rolls (%d hits)" % hits)
+	check_near(float(independent) / hits, 0.30, 0.03, "30%% of the hits are independent sets (%d / %d)" % [independent, hits])
+	# The default party: 17.5% per class set (4 of them share 70%), 10% per independent set (3 share 30%).
+	for set_id in by_set:
+		var share := float(by_set[set_id]) / hits
+		var expected := 0.10 if Db.get_set(set_id).is_independent() else 0.175
+		check_near(share, expected, 0.03, "%s: %.1f%% of the hits (expected %.1f%%)" % [set_id, share * 100.0, expected * 100.0])
+	# A solo mail hero: 70% class set (none here: a fixture has none) -> the two mail sets share everything.
+	var mail := classes.add_class()
+	mail.armor_type = ClassData.ArmorType.MAIL
+	r.seed = 99
+	by_set.clear()
+	hits = 0
+	for i in 8000:
+		var piece := ItemGenerator._roll_set_piece(ItemGenerator.Source.LOOT, 14, -1, mail, [], r)
+		if piece != null:
+			hits += 1
+			by_set[piece.set_id] = by_set.get(piece.set_id, 0) + 1
+	check_eq(by_set.keys().size(), 2, "a mail hero without a class set: the two mail sets")
+	for set_id in by_set:
+		check_near(float(by_set[set_id]) / hits, 0.5, 0.06, "%s: half each" % set_id)
+	# The hook switches the independent sets off.
+	ItemGenerator.independent_share_override = 0.0
+	r.seed = 5150
+	for i in 6000:
+		var piece := ItemGenerator._roll_set_piece(ItemGenerator.Source.LOOT, 14, -1, null, party, r)
+		check(piece == null or not Db.get_set(piece.set_id).is_independent(), "override 0: class sets only")
+
+
+func test_class_set_rolls_are_the_old_rolls_when_no_independent_set_is_eligible() -> void:
+	# Hide the independent sets: the draws are exactly the M7 ones (chance, class, piece).
+	fixtures.remove_free_sets()
+	var party := _team([&"warrior", &"mage"])
+	var a := RandomNumberGenerator.new()
+	var probe := RandomNumberGenerator.new()
+	var hits := 0
+	for seed_value in range(1, 150):
+		a.seed = seed_value
+		probe.seed = seed_value
+		if probe.randf() >= 0.15:
+			check(ItemGenerator._roll_set_piece(ItemGenerator.Source.LOOT, 12, -1, null, party, a) == null, "seed %d: a miss" % seed_value)
+			check_eq(a.state, probe.state, "seed %d: a miss draws once" % seed_value)
+			continue
+		hits += 1
+		var got := ItemGenerator._roll_set_piece(ItemGenerator.Source.LOOT, 12, -1, null, party, a)
+		var cls := party[probe.randi_range(0, 1)]
+		var want := Db.set_for_class(cls.id).piece_ids[probe.randi_range(0, 4)]
+		check(got != null and got.id == want, "seed %d: class %s, piece %s" % [seed_value, cls.id, want])
+		check_eq(a.state, probe.state, "seed %d: three draws" % seed_value)
+	check(hits > 10, "hits: %d" % hits)
+
+
+# --- Class-independent sets: Black Market, dungeon, Need -----------------------------------------------
+
+func test_the_black_market_offers_independent_pieces_once_the_class_set_is_complete() -> void:
+	var mage := Fakes.spawn_player(world, 0, &"mage")
+	var slots: Array[PlayerSlot] = [mage.slot]
+	var class_set := Db.set_for_class(&"mage")
+	check_eq(BlackMarket.set_piece_candidates(18, slots).size(), 5, "class pieces: the mage's five")
+	var free := BlackMarket.independent_piece_candidates(18, slots)
+	check_eq(free.size(), 5, "independent pieces: the five Mendweave pieces (cloth is the mage's armour)")
+	for c in free:
+		check_eq((c["data"] as UniqueItemData).set_id, &"mendweave_attire", "a Mendweave piece")
+	for c in BlackMarket.set_piece_pool(18, slots):
+		check_eq((c["data"] as UniqueItemData).set_id, class_set.id, "first the class set")
+	for piece_id in class_set.piece_ids:
+		mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(piece_id), 18, false, rng))
+	var pool := BlackMarket.set_piece_pool(18, slots)
+	check_eq(pool.size(), 5, "the class set complete: the independent set is what is missing")
+	for c in pool:
+		check_eq((c["data"] as UniqueItemData).set_id, &"mendweave_attire", "Mendweave")
+	var seen := {}
+	for i in 60:
+		var r2 := RandomNumberGenerator.new()
+		r2.seed = i
+		var item := BlackMarket.roll(18, slots, r2)
+		check(item != null, "an offer")
+		if item != null and item.set_id != &"":
+			seen[item.set_id] = true
+			check(item.can_be_used_by(mage.class_data), "the mage can wear %s" % item.display_name)
+	check_eq(seen.keys(), [&"mendweave_attire"], "only Mendweave pieces are offered as the set piece")
+	# A plate warrior in the party gets the Stonebark set, never the cloth one.
+	var warrior := Fakes.spawn_player(world, 1, &"warrior", Vector3(4, 0, 0))
+	var both: Array[PlayerSlot] = [mage.slot, warrior.slot]
+	var ids: Array[StringName] = []
+	for c in BlackMarket.independent_piece_candidates(18, both):
+		var sid := (c["data"] as UniqueItemData).set_id
+		if sid not in ids:
+			ids.append(sid)
+	check_eq(ids, [&"mendweave_attire", &"stonebark_plate"] as Array[StringName], "one independent set per native armour, in hero order")
+	check(BlackMarket.independent_piece_candidates(3, both).is_empty(), "before wave 6: nothing")
+	for p in [mage, warrior]:
+		p.free()
+	Enemy.invalidate_player_cache()
+
+
+func test_a_plate_hero_may_need_a_cloth_set_piece_but_a_cloth_hero_not_a_plate_one() -> void:
+	var cloth_piece := _piece("mendweave", "head")
+	var plate_piece := _piece("stonebark", "head")
+	var warrior := Db.get_class_data(&"warrior")
+	var mage := Db.get_class_data(&"mage")
+	check(cloth_piece.can_be_used_by(warrior), "the warrior may Need the Mendweave Cowl (wearable)")
+	check(not plate_piece.can_be_used_by(mage), "the mage may not Need the Stonebark Greathelm")
+	check_eq(plate_piece.unusable_reason(mage), "Cannot wear Plate", "and is told why")
+
+
+# --- Class-independent sets: bots, tooltips ---------------------------------------------------------------
+
+func test_bots_value_independent_pieces_with_a_flat_credit() -> void:
+	for set_id in SETS:
+		var key: String = SETS[set_id][2]
+		for class_id in _wearers(SETS[set_id][1]):
+			var cd := Db.get_class_data(class_id)
+			var native: bool = int(cd.armor_type) == SETS[set_id][1]
+			for slot in SLOT_KEYS:
+				var item := _piece(key, slot)
+				var stats := 0.0
+				for stat in ItemTooltip.total_stats(item):
+					stats += ItemTooltip.total_stats(item)[stat] * ItemTooltip.stat_weight(stat, cd)
+				var credit := ItemTooltip.INDEPENDENT_SET_CREDIT if native else 0.0
+				check_near(ItemTooltip.item_score(item, cd), stats + credit, 0.0001,
+						"%s on %s: the stats%s" % [item.display_name, class_id, " plus the flat credit" if native else " (a lighter set than its armour: no credit)"])
+		# No viewer at all: scored without a class, credit included.
+		var anon := _piece(key, "head")
+		var anon_stats := 0.0
+		for stat in ItemTooltip.total_stats(anon):
+			anon_stats += ItemTooltip.total_stats(anon)[stat] * ItemTooltip.stat_weight(stat, null)
+		check_near(ItemTooltip.item_score(anon, null), anon_stats + ItemTooltip.INDEPENDENT_SET_CREDIT, 0.0001, "%s: no viewer" % set_id)
+	# A class piece gets no credit.
+	var warrior := Db.get_class_data(&"warrior")
+	var class_piece := ItemGenerator.from_unique(Db.get_unique(&"set_warrior_head"), 8, false, rng)
+	var stats := 0.0
+	for stat in ItemTooltip.total_stats(class_piece):
+		stats += ItemTooltip.total_stats(class_piece)[stat] * ItemTooltip.stat_weight(stat, warrior)
+	check_near(ItemTooltip.item_score(class_piece, warrior), stats, 0.0001, "a class set piece: the stats only")
+	# With the credit an independent piece is worth at least 70% of the class piece it competes with
+	# (SET_UPGRADE_TOLERANCE 0.3), so a bot completing a bonus with it does wear it.
+	for slot in SLOT_KEYS:
+		var mine := ItemTooltip.item_score(_piece("stonebark", slot), warrior)
+		var theirs := ItemTooltip.item_score(ItemGenerator.from_unique(Db.get_unique(StringName("set_warrior_%s" % slot)), 8, false, rng), warrior)
+		check(mine >= theirs * (1.0 - ItemTooltip.SET_UPGRADE_TOLERANCE), "Stonebark %s (%.1f) is within 30%% of the Battlegear piece (%.1f)" % [slot, mine, theirs])
+
+
+func test_a_bot_wears_the_second_piece_of_an_independent_set_over_a_plain_epic() -> void:
+	var warrior := Db.get_class_data(&"warrior")
+	var eq := Equipment.new(warrior)
+	# A plain Epic chest as a bot would carry it: a Battlegear chest without its set (a primary stat, 37 points).
+	var plain_chest := ItemGenerator.from_unique(Db.get_unique(&"set_warrior_chest"), 8, false, rng)
+	plain_chest.set_id = &""
+	plain_chest.class_restriction = &""
+	eq.slots[Items.EquipSlot.CHEST] = plain_chest
+	eq.slots[Items.EquipSlot.HEAD] = _piece("stonebark", "head")
+	var chest := _piece("stonebark", "chest")
+	check_eq(SetBonuses.bonus_change(chest, [plain_chest] as Array[ItemInstance], eq), 1, "the second piece completes the 2-piece bonus")
+	check_eq(ItemTooltip.upgrade_direction(chest, plain_chest, warrior, eq), 1, "so the bot swaps the plain chest for it")
+	# Without the credit the piece would be below 70% of the plain chest and be refused.
+	var bare := ItemTooltip.item_score(chest, warrior) - ItemTooltip.INDEPENDENT_SET_CREDIT
+	check(bare < ItemTooltip.item_score(plain_chest, warrior) * (1.0 - ItemTooltip.SET_UPGRADE_TOLERANCE),
+			"the credit is what makes the difference (%.1f without it, the plain chest %.1f)" % [bare, ItemTooltip.item_score(plain_chest, warrior)])
+
+
+func test_the_tooltip_shows_the_set_of_an_independent_piece() -> void:
+	var tip := ItemTooltip.create()
+	tree.root.add_child(tip)
+	var mage := Db.get_class_data(&"mage")
+	var head := _piece("mendweave", "head")
+	tip.show_item(head, mage)
+	check(tip.find_line("Mendweave Attire (5 pieces)", true) != null, "the loot-roll block names the set: %s" % [tip.line_texts()])
+	check(tip.find_line("(2) Set: Increases your Spirit by 8.", true) != null, "the 2-piece row")
+	check(tip.find_line("(4) Set: Every 8 sec, the most wounded ally (you, when alone) is healed for 10% of their Max HP.", true) != null, "the 4-piece row")
+	check(tip.find_line("Classes:") == null, "no Classes line: any class that wears cloth")
+	var eq := Equipment.new(mage)
+	eq.slots[Items.EquipSlot.HEAD] = head
+	eq.slots[Items.EquipSlot.CHEST] = _piece("mendweave", "chest")
+	tip.viewer_equipment = eq
+	tip.show_item(head, mage)
+	check(tip.find_line("Mendweave Attire (2/5)", true) != null, "worn count")
+	var two := tip.find_line("(2) Set: Increases your Spirit by 8.", true)
+	check(two != null and two.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.ENCHANT_GREEN), "the reached bonus is green")
+	# A heavier armour than the viewer wears is called out.
+	tip.viewer_equipment = null
+	tip.show_item(_piece("stonebark", "head"), mage)
+	var plate := tip.find_line("Plate")
+	check(plate != null and plate.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.UNUSABLE_RED), "a heavier armour than the viewer wears is red")
+	tip.show_item(_piece("mendweave", "head"), Db.get_class_data(&"warrior"))
+	var cloth := tip.find_line("Cloth")
+	check(cloth != null and not cloth.get_theme_color(&"font_color").is_equal_approx(ItemTooltip.UNUSABLE_RED), "a lighter one is fine for the warrior")
+	tip.get_parent().remove_child(tip)
+	tip.free()
