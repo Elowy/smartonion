@@ -295,6 +295,16 @@ func go_to_lobby() -> void:
 	_set_state(State.LOBBY)
 
 
+## --seasonings: every bot carries the flagged Seasonings of its own class, in the order given (instead of what the
+## profile remembers for the class).
+func _apply_seasoning_flag(slots: Array[PlayerSlot]) -> void:
+	if options.seasonings.is_empty():
+		return
+	for slot in slots:
+		if slot.is_bot() and slot.class_data != null:
+			slot.seasonings.assign(options.seasonings_for(slot.class_data.id))
+
+
 ## Starts a run with every joined slot: arena, director, players, HUD, run screens, wave 1
 ## (or --start-wave).
 func start_run() -> void:
@@ -306,6 +316,7 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
+	_apply_seasoning_flag(slots)  # (--seasonings: after the lobby / the profile put their selections on the slots)
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
 	for slot in slots:
 		Meta.remember_loadout(slot)
@@ -1322,9 +1333,6 @@ func _add_bots() -> void:
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
-		# --seasonings: every bot carries the ones of its own class.
-		if bot != null and not options.seasonings.is_empty():
-			bot.seasonings = options.seasonings_for(id)
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion

@@ -531,15 +531,31 @@ func test_the_bots_carry_their_classes_seasonings() -> void:
 	main._add_bots()
 	var slots := PlayerManager.get_slots()
 	check_eq(slots.size(), 3, "three bots")
-	check_eq(slots[0].seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the first Warrior")
-	check_eq(slots[1].seasonings, [&"ssn_cinnamon_stick"] as Array[StringName], "the Mage")
-	check_eq(slots[2].seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the second Warrior too")
 	main.start_run()
+	check_eq(slots[0].seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the first Warrior's slot")
+	check_eq(slots[1].seasonings, [&"ssn_cinnamon_stick"] as Array[StringName], "the Mage's")
+	check_eq(slots[2].seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the second Warrior's too")
 	check_eq(main.players.size(), 3, "three heroes")
 	check_eq(main.players[0].seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the Warrior carries both")
 	check_near(float(main.players[0].abilities.params_for(Db.get_ability(&"whirlwind"))["damage_pct"]), 190.0, 0.001, "and they work")
 	check_eq(main.players[1].seasonings, [&"ssn_cinnamon_stick"] as Array[StringName], "the Mage carries its own")
 	check(not main.players[1].bonuses.effects_of(Seasonings.SOURCE).is_empty(), "as a source")
+
+
+func test_the_flag_wins_over_what_a_real_profile_remembers() -> void:
+	var profile := Profile.max_profile(Db.class_ids)
+	Meta.profile = profile
+	Meta.persist = false
+	Meta.path = ""
+	profile.set_loadout(&"warrior", {"seasonings": [&"ssn_bay_leaf"], "heirloom": &"", "looks": {}})
+	var main := Main.create(_opts(["--players=1", "--classes=warrior", "--seasonings=ssn_smoked_paprika"]))
+	tree.root.add_child(main)
+	_nodes.append(main)
+	main._add_bots()
+	Meta.apply_loadout(PlayerManager.get_slot(0))  # (what the lobby does; the bots of a launch take it too once LEVELS is in)
+	check_eq(PlayerManager.get_slot(0).seasonings, [&"ssn_bay_leaf"] as Array[StringName], "the profile's choice is on the slot first")
+	main.start_run()
+	check_eq(main.players[0].seasonings, [&"ssn_smoked_paprika"] as Array[StringName], "the flag replaces it when the run starts")
 
 
 func test_bots_without_the_flag_carry_nothing() -> void:
