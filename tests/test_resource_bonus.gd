@@ -46,7 +46,7 @@ func _res(p: Player, id: StringName) -> ClassResource:
 # --- Neutral ----------------------------------------------------------------------------------
 
 func test_no_bonus_reads_the_data() -> void:
-	for cid: StringName in [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]:
+	for cid in Db.class_ids:
 		for data in Db.get_class_data(cid).resources:
 			var r := ClassResource.new(data)
 			check_eq(r.max_value(), data.max_value, "%s max" % data.id)

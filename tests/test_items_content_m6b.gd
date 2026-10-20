@@ -6,6 +6,7 @@ extends TestCase
 ## the equipment; the tooltip shows the Equip line; every named item's proc fires.
 
 const Fakes := preload("res://tests/player_fakes.gd")
+const Rules := preload("res://tests/content_rules.gd")
 
 const NAMED_IDS: Array[StringName] = [
 	&"circlet_of_ninefold_skin", &"tunic_of_the_quiet_bulb", &"bracers_of_the_shallot_fold",
@@ -98,8 +99,35 @@ func test_new_item_lists_have_the_pinned_sizes() -> void:
 	for id in CLASS_IDS:
 		var cls := Db.get_unique(id).class_restriction
 		per_class[cls] = per_class.get(cls, 0) + 1
-	for cls in [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]:
+	for cls in Rules.LAUNCH_CLASSES:
 		check_eq(per_class.get(cls, 0), 6, "6 new %s items" % cls)
+	for cls in per_class:
+		check(cls in Rules.LAUNCH_CLASSES, "the 30 are the launch classes' (%s)" % cls)
+
+
+## Every class (the M8 ones too) has exactly 8 class items: the 2 of M6a and 6 more, each an
+## "Equip:" ability mod of one of its own abilities, and a class set of 5 pieces restricted to it.
+func test_every_class_has_eight_class_items_and_a_full_set() -> void:
+	for class_id in Db.class_ids:
+		var items := Rules.class_items(class_id)
+		if not Rules.pending(class_id, "items"):
+			check_eq(items.size(), Rules.CLASS_ITEMS_PER_CLASS, "%s: its class items" % class_id)
+		var ids: Array[StringName] = []
+		for u in items:
+			check(u.id not in ids, "%s: %s listed once" % [class_id, u.id])
+			ids.append(u.id)
+			check_eq(u.unique_effect, &"ability_mod", "%s: %s is an ability mod" % [class_id, u.id])
+		if Rules.pending(class_id, "set"):
+			continue
+		var sets := Rules.class_sets(class_id)
+		check_eq(sets.size(), 1, "%s: one class tier set" % class_id)
+		if sets.size() != 1:
+			continue
+		check_eq(sets[0].piece_ids.size(), Rules.PIECES_PER_SET, "%s: %d set pieces" % [class_id, Rules.PIECES_PER_SET])
+		for piece_id in sets[0].piece_ids:
+			var piece := Db.get_unique(piece_id)
+			check(piece != null and piece.set_id == sets[0].id and piece.class_restriction == class_id,
+					"%s: %s is a piece of the set, restricted to the class" % [class_id, piece_id])
 
 
 func test_new_items_load_with_valid_fields() -> void:

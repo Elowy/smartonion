@@ -28,8 +28,10 @@ const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swa
 const SHRINE_DIR := "res://data/shrines/"
 ## Pool order of the shrines; any extra one is appended alphabetically.
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
-## Lobby order of the launch classes; any extra class is appended alphabetically.
-const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+## Lobby order of the classes; any extra class is appended alphabetically. An id without a
+## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
+## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
+const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock", &"hunter", &"shaman"]
 
 var classes: Dictionary[StringName, ClassData] = {}
 var weapons: Dictionary[StringName, WeaponData] = {}

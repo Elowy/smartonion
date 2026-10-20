@@ -4,6 +4,7 @@ extends TestCase
 ## (set_id, M5) have no unique effect – their set bonus is the effect (test_sets.gd).
 
 ## Shared unique-effect vocabulary (ProcSystem building blocks and triggers).
+const Rules := preload("res://tests/content_rules.gd")
 const BLOCKS: Array[StringName] = [
 	&"bolt", &"chain", &"dot", &"nova", &"explode", &"extra_attack", &"buff", &"heal", &"drain",
 	&"slow", &"stun", &"gold", &"shield", &"reflect", &"smite_heal", &"cheat_death",
@@ -107,8 +108,8 @@ func test_unique_counts() -> void:
 	check_eq(trinkets, 30, "trinkets (10 + 20 in M6b)")
 	check_eq(legendaries, 25, "Legendaries (8 + 17 in M6b)")
 	check_eq(named, 40, "named Rare / Epic items (M6b: 10 + 30)")
-	for class_id in Db.class_ids:
-		check_eq(per_class.get(class_id, 0), 8, "class items for %s (M6b: 8 per class)" % class_id)
+	for class_id in Rules.classes_with("items"):
+		check_eq(per_class.get(class_id, 0), Rules.CLASS_ITEMS_PER_CLASS, "class items for %s (M6b: 8 per class)" % class_id)
 
 
 func test_unique_data_is_valid() -> void:

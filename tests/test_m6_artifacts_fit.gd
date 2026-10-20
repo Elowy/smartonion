@@ -57,7 +57,7 @@ func _artifact(class_id: StringName, wave: int = 10) -> ItemInstance:
 	return ItemGenerator.generate_artifact(class_id, wave)
 
 
-## The five shipped Artifacts, one item each.
+## The shipped Artifacts (one per class), one item each.
 func _artifacts(wave: int = 10) -> Array[ItemInstance]:
 	var out: Array[ItemInstance] = []
 	for data: ArtifactData in Db.artifacts.values():
@@ -119,7 +119,7 @@ func test_every_artifact_fits_the_roll_window_while_choosing() -> void:
 				% [what, screen.tooltip_fit, screen.tooltip.size.y, screen.tooltip_room()])
 		check(screen.timer_bar.get_global_rect().end.y <= screen.chips_row.get_global_rect().position.y, "%s: the timer bar is clear of the chips" % what)
 		seen += 1
-	check_eq(seen, 5, "all five Artifacts")
+	check_eq(seen, Db.artifacts.size(), "every Artifact (one per class)")
 	finished.emit()
 
 
@@ -180,7 +180,7 @@ func test_a_tall_tooltip_widens_before_it_shrinks() -> void:
 		check(drawn_w <= screen.frame.size.x - 2.0 * 26.0 + 0.5, "%s: not wider than the frame's inside (%.0f drawn)" % [what, drawn_w])
 		if screen.tooltip.size.x > ItemTooltip.WIDTH:
 			widened += 1
-	check_eq(widened, 5, "all five widened")
+	check_eq(widened, Db.artifacts.size(), "every Artifact widened")
 	finished.emit()
 
 
@@ -288,7 +288,7 @@ func test_the_frame_stays_clear_of_the_title_block_for_every_artifact() -> void:
 		check(frame.end.y <= screen.chips_row.get_global_rect().position.y - LootRollScreen.FRAME_CHIPS_GAP + 0.5,
 				"%s: and the chips still have their gap (%.1f)" % [what, frame.end.y])
 		seen += 1
-	check_eq(seen, 5, "all five Artifacts")
+	check_eq(seen, Db.artifacts.size(), "every Artifact (one per class)")
 	finished.emit()
 
 

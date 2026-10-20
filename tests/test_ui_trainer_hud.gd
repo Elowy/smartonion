@@ -244,12 +244,20 @@ func test_full_hud_keeps_the_top_plaque_free() -> void:
 
 # --- Glyphs -------------------------------------------------------------------------------------
 
-func test_every_m4_ability_id_has_its_own_glyph() -> void:
+func test_every_learnable_ability_id_has_its_own_glyph() -> void:
 	var seen: Dictionary[int, StringName] = {}
 	var all: Array[StringName] = []
-	all.append_array(CORE_IDS)
-	all.append_array(M4_IDS)
-	check_eq(M4_IDS.size(), 36, "36 learnable abilities in GDD 6.4")
+	var learnable := 0
+	for id in Db.abilities:
+		all.append(id)
+		if Db.abilities[id].is_learned_kind():
+			learnable += 1
+	# GDD 6.4: six learnable abilities per class and six general ones.
+	check_eq(learnable, 6 * Db.class_ids.size() + 6, "6 learnable abilities per class + 6 general")
+	for id in M4_IDS:
+		check(Db.abilities.has(id), "the launch ability %s is still there" % id)
+	for id in CORE_IDS:
+		check(Db.abilities.has(id), "the launch core ability %s is still there" % id)
 	for id in all:
 		var g := AbilityIcon.glyph_for(id, &"physical", id)
 		check(g != AbilityIcon.Glyph.GENERIC, "%s has a real glyph" % id)

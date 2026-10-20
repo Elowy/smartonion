@@ -13,6 +13,10 @@ const CHEST := EquipLook.Slot.CHEST
 ## on the base commit before the equipment was visible: warrior, mage, paladin, rogue, warlock.
 const DRAWS_BEFORE: Dictionary[StringName, int] = {&"warrior": 23, &"mage": 23, &"paladin": 25, &"rogue": 24,
 	&"warlock": 32}
+## A class without a measured baseline above (a later class, until its package adds the number) is
+## measured on the spot: its starter look is its own baseline, held to this ceiling (the heaviest
+## launch class is 32), and the same +[constant DRAW_BUDGET] applies to its gear.
+const DRAWS_UNMEASURED_MAX := 40
 ## Draw calls a fully geared hero may add on top of the starter look.
 const DRAW_BUDGET := 10
 
@@ -280,6 +284,18 @@ func test_gear_keeps_the_hero_in_a_sane_size() -> void:
 
 # --- Class starter look ------------------------------------------------------------------
 
+## Draw calls of the class starter look (nothing worn) the gear budgets build on: the measured
+## [constant DRAWS_BEFORE] where there is one, else what the look draws now (up to
+## [constant DRAWS_UNMEASURED_MAX]).
+func _baseline(id: StringName) -> int:
+	if DRAWS_BEFORE.has(id):
+		return DRAWS_BEFORE[id]
+	var starter := _draws(_onion(id))
+	check(starter <= DRAWS_UNMEASURED_MAX, "%s: %d starter draws, no measured baseline (ceiling %d; add it to DRAWS_BEFORE)"
+			% [id, starter, DRAWS_UNMEASURED_MAX])
+	return starter
+
+
 func test_empty_slots_show_the_class_starter_look() -> void:
 	for id in Db.class_ids:
 		var cd := Db.get_class_data(id)
@@ -291,7 +307,7 @@ func test_empty_slots_show_the_class_starter_look() -> void:
 			if part != null:
 				check(part.is_starter(), "%s slot %d is the starter piece" % [id, slot])
 		check_eq(_gear_names(m).has("Solid"), true, "%s: plain armour mesh" % id)
-		check_eq(_draws(m), DRAWS_BEFORE[id], "%s: same draw calls as before the equipment was visible" % id)
+		check_eq(_draws(m), _baseline(id), "%s: same draw calls as before the equipment was visible" % id)
 	# The classes' own pieces are still there.
 	check(_onion(&"mage").get_node_or_null("Yaw/Body/HatStar") != null, "the mage's hat star")
 	check(not (_onion(&"mage").get_node("Yaw/Body/Sprout") as Node3D).visible, "the wizard hat covers the sprout")
@@ -672,18 +688,19 @@ func test_rogue_vanish_fades_armour_put_on_during_the_effect() -> void:
 
 func test_draw_call_budget_per_hero() -> void:
 	for id in Db.class_ids:
+		var before := _baseline(id)
 		var starter := _draws(_onion(id))
-		check(starter <= DRAWS_BEFORE[id], "%s starter look: %d draws (before %d)" % [id, starter, DRAWS_BEFORE[id]])
+		check(starter <= before, "%s starter look: %d draws (before %d)" % [id, starter, before])
 		var worst := 0
 		for armor in 4:
 			for rarity in [0, 3, 4]:
 				for tier in 3:
 					var d := _draws(_dressed(id, _suit(armor, tier, rarity)))
 					worst = maxi(worst, d)
-					check(d <= DRAWS_BEFORE[id] + DRAW_BUDGET, "%s armour %d tier %d rarity %d: %d draws (limit %d)" % [id, armor, tier, rarity, d, DRAWS_BEFORE[id] + DRAW_BUDGET])
+					check(d <= before + DRAW_BUDGET, "%s armour %d tier %d rarity %d: %d draws (limit %d)" % [id, armor, tier, rarity, d, before + DRAW_BUDGET])
 		# Class set, mixed rarities: the worst realistic case.
 		var mixed := _onion(id, _look(HEAD, 3, 2, 4), _look(SHOULDERS, 3, 2, 3, &"battlegear_of_fury"), _look(CHEST, 0, 2, 1))
-		check(_draws(mixed) <= DRAWS_BEFORE[id] + DRAW_BUDGET, "%s mixed gear: %d draws" % [id, _draws(mixed)])
+		check(_draws(mixed) <= before + DRAW_BUDGET, "%s mixed gear: %d draws" % [id, _draws(mixed)])
 	# Plain gear costs no more than the starter look: merged by material.
 	var plain := _draws(_dressed(&"paladin", _suit(ClassData.ArmorType.PLATE, 1, 1)))
 	check(plain <= DRAWS_BEFORE[&"paladin"] + 2, "uncommon plate: %d draws" % plain)

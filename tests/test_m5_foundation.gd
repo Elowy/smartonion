@@ -286,8 +286,46 @@ func test_talent_data_text_and_tiers() -> void:
 	check(set_data.piece_ids.is_empty() and set_data.bonuses.is_empty(), "SetData defaults")
 
 
+## The six general abilities (AbilityData.class_id empty): every class can learn them.
+const GENERAL_ABILITIES: Array[StringName] = [&"bandage", &"berserking", &"sprint", &"engineers_bomb",
+	&"war_stomp", &"spirit_wolf"]
+## Every ability tagged "pet" (the tag talents and set bonuses match). A new pet ability is added
+## here on purpose: the tag has rules (Pack Command, pet leech ...), so a stray one must not slip in.
+const PET_ABILITIES: Array[StringName] = [&"spirit_wolf", &"summon_infernal", &"summon_voidwalker"]
+
+
+## Per class: 2 core abilities (RT / LT) + 6 learnable ones (Active / Auto-cast, in any mix); the
+## general ones are exactly [constant GENERAL_ABILITIES]; nothing else exists.
+func test_ability_counts_per_class() -> void:
+	var general: Array[StringName] = []
+	var per_class: Dictionary[StringName, Array] = {}
+	for id in Db.abilities:
+		var a := Db.abilities[id]
+		if a.class_id == &"":
+			general.append(id)
+			continue
+		check(a.class_id in Db.class_ids, "%s belongs to a known class (%s)" % [id, a.class_id])
+		if not per_class.has(a.class_id):
+			per_class[a.class_id] = []
+		per_class[a.class_id].append(a)
+	general.sort()
+	var want_general := GENERAL_ABILITIES.duplicate()
+	want_general.sort()
+	check_eq(general, want_general, "the general abilities")
+	var total := general.size()
+	for cid in Db.class_ids:
+		var list: Array = per_class.get(cid, [])
+		var core := 0
+		for a: AbilityData in list:
+			if a.kind == AbilityData.Kind.CORE:
+				core += 1
+		check_eq(core, 2, "%s: two core abilities" % cid)
+		check_eq(list.size() - core, 6, "%s: six learnable abilities" % cid)
+		total += list.size()
+	check_eq(Db.abilities.size(), total, "every ability is a general one or belongs to a class")
+
+
 func test_ability_tags() -> void:
-	check_eq(Db.abilities.size(), 46, "every ability")
 	for id in Db.abilities:
 		var a := Db.abilities[id]
 		check(not a.tags.is_empty(), "%s has tags" % id)
@@ -295,11 +333,14 @@ func test_ability_tags() -> void:
 			check(tag in BonusVocabulary.TAGS, "%s: known tag %s" % [id, tag])
 	check_eq(Db.get_ability(&"fireball").tags, [&"projectile", &"dot", &"spell"] as Array[StringName], "fireball")
 	check_eq(Db.get_ability(&"thunder_clap").tags, [&"aoe", &"cc", &"weapon"] as Array[StringName], "ground slam")
-	var pets := 0
+	var pets: Array[StringName] = []
 	for id in Db.abilities:
 		if &"pet" in Db.abilities[id].tags:
-			pets += 1
-	check_eq(pets, 3, "phantom wolf, cinder brute, gloomguard")
+			pets.append(id)
+	pets.sort()
+	var want_pets := PET_ABILITIES.duplicate()
+	want_pets.sort()
+	check_eq(pets, want_pets, "the pet-tagged abilities are exactly PET_ABILITIES")
 
 
 ## Two "zz_test" trees (index 1 given first) + one of another class, registered in Db like

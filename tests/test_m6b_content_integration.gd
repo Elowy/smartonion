@@ -6,6 +6,7 @@ extends TestCase
 
 const Support := preload("res://tests/test_loot_support.gd")
 const Procs := preload("res://tests/test_procs.gd")
+const Rules := preload("res://tests/content_rules.gd")
 
 ## The content of the three packages, by id (data/ file names).
 const NEW_WEAPONS: Array[StringName] = [&"two_hand_sword", &"two_hand_mace", &"orb"]
@@ -175,13 +176,21 @@ func test_display_names_are_unique_across_all_content() -> void:
 
 
 func test_the_merged_totals() -> void:
-	check_eq(Db.weapons.size(), 13, "weapon bases")
-	check_eq(Forge.legendaries().size(), 13, "Forge Legendaries: one per weapon base")
+	# Weapon bases, Legendaries, class items and Artifacts follow the classes and weapon types of the
+	# data (the rules of content_rules.gd); the M6b launch content must all still be there.
+	for id in Rules.LAUNCH_WEAPONS:
+		check(Db.weapons.has(id), "launch weapon base %s" % id)
+	check_eq(Forge.legendaries().size(), Db.weapons.size(), "Forge Legendaries: one per weapon base")
 	check_eq(Db.item_bases.size(), 116, "item bases: 96 armour + 20 jewellery")
 	check_eq(Db.affixes.size(), 25, "stat suffixes")
 	check_eq(Db.enchants.size(), 50, "enchants: 24 + 26")
-	check_eq(Db.uniques.size(), 160, "hand-made items: 63 + 20 trinkets + 17 Legendaries + 30 named + 30 class items")
-	check_eq(Db.artifacts.size(), 5, "Artifacts: one per class, untouched")
+	check_eq(Rules.launch_uniques(), Rules.LAUNCH_UNIQUES,
+			"launch hand-made items: 63 + 20 trinkets + 17 Legendaries + 30 named + 30 class items")
+	for class_id in Rules.classes_with("items"):
+		check_eq(Rules.class_items(class_id).size(), Rules.CLASS_ITEMS_PER_CLASS, "%s: its class items" % class_id)
+	for class_id in Rules.classes_with("set"):
+		check_eq(Rules.class_sets(class_id).size(), 1, "%s: one class tier set" % class_id)
+	check_eq(Db.artifacts.size(), Rules.classes_with("artifact").size(), "Artifacts: one per class")
 	check_eq(Db.enchants.size(), Procs.ENCHANT_IDS.size() + NEW_ENCHANTS.size(), "24 old + 26 new enchants")
 	for id in NEW_ENCHANTS:
 		check(Db.enchants.has(id), "new enchant %s exists" % id)
@@ -361,8 +370,10 @@ func test_artifacts_are_unchanged_by_the_content_packages() -> void:
 	for id in Db.artifacts:
 		ids.append(id)
 	ids.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
-	check_eq(ids, ARTIFACT_IDS, "the five Artifacts")
 	for id in ARTIFACT_IDS:
+		check(ids.has(id), "the launch Artifact %s is still there" % id)
+	check_eq(ids.size(), Rules.classes_with("artifact").size(), "and there is one per class")
+	for id in ids:
 		var item := ItemGenerator.from_artifact(Db.artifacts[id], 12)
 		check(item.is_artifact() and item.rarity == Items.Rarity.ARTIFACT, "%s is an Artifact" % id)
 		check(item.can_disenchant() == false, "%s cannot be disenchanted" % id)

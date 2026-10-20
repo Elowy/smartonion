@@ -1,12 +1,14 @@
 extends TestCase
-## M6 ARTIFACTS core (GDD 5.5): the data of the five Artifacts, the item path (ilvl, Greed, never
+## M6 ARTIFACTS core (GDD 5.5): the data of the class Artifacts (one per class), the item path (ilvl, Greed, never
 ## sold / forged), growth (+3 Item Level, +4% weapon damage, the two properties awakening), the
 ## Fangs of the Shadow pair rule of Equipment and the drop roll of LootDrops.roll_artifact
 ## (wave 10, the chances, Fortune, 80 / 20 class pick, one per class, one roll per kill, pity).
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const EFakes := preload("res://tests/enemies_fakes.gd")
-const ALL_CLASSES: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+const Rules := preload("res://tests/content_rules.gd")
+## An id that is no class: "a class without an Artifact" in the checks below.
+const NO_SUCH_CLASS := &"zz_no_such_class"
 
 var world: Node3D
 var arena: EFakes.TestArena
@@ -64,15 +66,22 @@ func _killer(fortune: float = 0.0) -> Player:
 
 # --- Data -------------------------------------------------------------------------------
 
-func test_five_artifacts_one_per_class_all_valid() -> void:
-	check_eq(Db.artifacts.size(), 5, "five Artifacts (Hunter / Shaman come with M8)")
-	for class_id in ALL_CLASSES:
+## Every class has exactly one Artifact and every Artifact belongs to a class (a missing or a
+## second one fails; a class whose Artifact is still pending in Rules.PENDING is left out), all
+## with valid data, listed in lobby order.
+func test_one_artifact_per_class_all_valid() -> void:
+	var expected := Rules.classes_with("artifact")
+	check_eq(Db.artifacts.size(), expected.size(), "one Artifact per class")
+	for class_id in expected:
+		check_eq(Rules.count_of(class_id, "artifact"), 1, "%s: exactly one Artifact" % class_id)
 		var data := Db.artifact_for_class(class_id)
 		check(data != null, "%s has an Artifact" % class_id)
 		if data != null:
 			check_eq(Artifacts.validate(data), "", "%s: valid data" % data.id)
-	check_eq(Db.artifact_classes(), ALL_CLASSES, "in lobby order")
-	check(Db.artifact_for_class(&"hunter") == null, "no Artifact for a class without one")
+	for id in Db.artifacts:
+		check(Db.artifacts[id].class_id in expected, "%s belongs to a class that has Artifacts" % id)
+	check_eq(Db.artifact_classes(), expected, "in lobby order")
+	check(Db.artifact_for_class(NO_SUCH_CLASS) == null, "no Artifact for a class without one")
 
 
 func test_the_named_weapons_of_the_gdd() -> void:
@@ -86,15 +95,18 @@ func test_the_named_weapons_of_the_gdd() -> void:
 		check_eq(data.id, want[class_id][0], "%s: the Artifact" % class_id)
 		check_eq(data.weapon.weapon_type, want[class_id][1], "%s: its weapon type" % class_id)
 		check_eq(data.weapon.is_two_handed(), want[class_id][2], "%s: two-handed" % class_id)
-		check_eq(data.is_pair(), class_id == &"rogue", "only the Rogue's is a pair")
-		check_eq(data.unlock_waves, [3, 6] as Array[int], "properties after 3 and 6 wave ends")
-		check_eq(data.properties.size(), 2, "two properties")
+	# What every class's Artifact shares (the M8 classes' included).
+	for class_id in Db.artifact_classes():
+		var data := Db.artifact_for_class(class_id)
+		check_eq(data.is_pair(), class_id == &"rogue", "%s: only the Rogue's is a pair" % class_id)
+		check_eq(data.unlock_waves, [3, 6] as Array[int], "%s: properties after 3 and 6 wave ends" % class_id)
+		check_eq(data.properties.size(), 2, "%s: two properties" % class_id)
 
 
 func test_artifacts_stay_out_of_the_normal_pools() -> void:
 	for id in Db.uniques:
 		check(Db.uniques[id].rarity != Items.Rarity.ARTIFACT, "%s is no Artifact" % id)
-	check_eq(Db.uniques.size(), 160, "the hand-made items: 63 (M6a) + 20 trinkets + 17 Legendaries (CONTENT-FX) + 30 named + 30 class items (CONTENT-ITEMS)")
+	check_eq(Rules.launch_uniques(), Rules.LAUNCH_UNIQUES, "the launch hand-made items: 63 (M6a) + 20 trinkets + 17 Legendaries (CONTENT-FX) + 30 named + 30 class items (CONTENT-ITEMS)")
 	for id in Db.artifacts:
 		check(not ItemGenerator.unique_available(Db.artifacts[id], ItemGenerator.Source.BOSS, 25),
 				"%s is never a hand-made roll" % id)
@@ -129,7 +141,7 @@ func test_item_level_is_10_plus_3_wave_plus_25() -> void:
 
 
 func test_the_item_is_a_class_weapon_with_fixed_enchants() -> void:
-	for class_id in ALL_CLASSES:
+	for class_id in Db.artifact_classes():
 		var item := _artifact(class_id)
 		var cls := Db.get_class_data(class_id)
 		check(item.is_weapon() and cls.can_use(item.weapon), "%s: a weapon the class can use" % class_id)
@@ -140,14 +152,14 @@ func test_the_item_is_a_class_weapon_with_fixed_enchants() -> void:
 		for roll in item.enchants:
 			check_eq(roll.rank, 2, "rank III")
 		check(item.can_be_used_by(cls), "usable by its class")
-		for other in ALL_CLASSES:
+		for other in Db.class_ids:
 			if other != class_id:
 				check(not item.can_be_used_by(Db.get_class_data(other)), "%s cannot use %s's" % [other, class_id])
 
 
 func test_making_an_artifact_draws_nothing() -> void:
 	var before := RunState.rng.state
-	for class_id in ALL_CLASSES:
+	for class_id in Db.artifact_classes():
 		_artifact(class_id)
 	check_eq(RunState.rng.state, before, "no rng draw: seeds stay stable")
 
@@ -646,8 +658,10 @@ func test_class_pick_80_percent_the_team_20_percent_anyone() -> void:
 			team += 1
 		else:
 			other += 1
-	# 80% the team's class + 20% any of the five (a fifth of them the Warrior) = 84%.
-	check_near(float(team) / 3000.0, 0.84, 0.03, "the Warrior (the only team class) is picked ~84%")
+	# 80% the team's class + 20% any class that still has an Artifact to give (one in N of them the
+	# Warrior): 0.8 + 0.2 / N (84% with five classes).
+	var expected := 0.8 + 0.2 / float(Db.artifact_classes().size())
+	check_near(float(team) / 3000.0, expected, 0.03, "the Warrior (the only team class) is picked ~%d%%" % roundi(expected * 100.0))
 	check(other > 300, "other classes do come up")
 
 
@@ -660,7 +674,7 @@ func test_a_class_that_got_its_artifact_is_skipped_and_all_taken_means_no_drop()
 	check(LootDrops.artifact_candidates(true).is_empty(), "no team class left")
 	for i in 200:
 		check(LootDrops.pick_artifact_class(rng) != &"warrior", "never the taken class (the 80%% branch falls back to anyone)")
-	for c in ALL_CLASSES:
+	for c in Db.class_ids:
 		if c not in RunState.artifact_classes:
 			RunState.artifact_classes.append(c)
 	check_eq(LootDrops.pick_artifact_class(rng), &"", "all taken: no class")
@@ -676,15 +690,16 @@ func test_every_class_can_drop_once_and_only_once() -> void:
 		_join(c)
 	LootDrops.artifact_chance_override = 1.0
 	var seen: Array[StringName] = []
-	for i in 12:
+	var total := Db.artifact_classes().size()
+	for i in total + 7:
 		var bag := LootDrops.roll_artifact(ItemGenerator.Source.BOSS, _enemy(true), null)
 		if bag == null:
 			break
 		check(bag.item.class_restriction not in seen, "%s dropped twice" % bag.item.class_restriction)
 		seen.append(bag.item.class_restriction)
-	check_eq(seen.size(), 5, "five Artifacts in total, then it stops")
-	check_eq(RunState.artifacts_dropped, 5, "counted")
-	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, _enemy(true), null) == null, "the sixth roll finds none")
+	check_eq(seen.size(), total, "one Artifact per class in total, then it stops")
+	check_eq(RunState.artifacts_dropped, total, "counted")
+	check(LootDrops.roll_artifact(ItemGenerator.Source.BOSS, _enemy(true), null) == null, "the next roll finds none")
 
 
 func test_without_an_arena_the_artifact_goes_straight_to_the_team_loot() -> void:
