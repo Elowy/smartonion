@@ -194,6 +194,7 @@ func test_a_hand_edited_file_is_sanitised() -> void:
 
 
 func test_a_corrupt_file_gives_the_defaults_and_an_error() -> void:
+	expect_error("ConfigFile parse error")
 	var f := FileAccess.open(_tmp_path, FileAccess.WRITE)
 	f.store_string("[audio\nthis is = not = a config {{{\n")
 	f.close()
