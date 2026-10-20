@@ -898,3 +898,13 @@ func test_the_picker_never_changes_the_cards_height_and_fits_inside_it() -> void
 		check(input != null, "joined")
 		UiFakes.step(lobby)
 	check(tallest_picker <= smallest_card, "the picker (%d px at most) fits inside the smallest card (%d px) at 1080p" % [tallest_picker, smallest_card])
+
+
+func test_the_achievement_tiers_name_real_achievements() -> void:
+	if Db.achievements.is_empty():
+		return  # (the ACHIEVE-DIFF package's data is not in this branch: checked once it is merged)
+	for s in _all():
+		var id := s.unlock_achievement()
+		if id == &"":
+			continue
+		check(Db.get_achievement(id) != null, "%s opens with %s, which must exist" % [s.id, id])
