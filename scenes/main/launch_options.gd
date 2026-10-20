@@ -74,6 +74,10 @@ extends RefCounted
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
+##   --heirloom=ID        M9 PATCH: every hero starts with this Heirloom equipped (an id of Db.heirlooms, e.g.
+##                        heir_sprout_cap), instead of what the profile remembers for the class (a smoke run with
+##                        the dev profile owns them all at rank 1; --profile=max at rank 5; a real profile must own
+##                        it). An unknown id is an unknown argument
 const SMOKE_TIME_SCALE := 4.0
 ## Smoke runs are seeded (deterministic content rolls) unless --seed is given.
 const SMOKE_SEED := 1
@@ -160,6 +164,8 @@ var unknown: Array[String] = []
 static func _flag_on(value: String) -> bool:
 	return not (value.to_lower() in FLAG_OFF_VALUES)
 
+## The Heirloom of --heirloom (&"" = none: the heroes take what their slot has).
+var heirloom: StringName = &""
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
 	var o := LaunchOptions.new()
@@ -306,6 +312,11 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 ## cycled, else every class the profile has unlocked).
 func bot_classes() -> Array[StringName]:
 	var ids: Array[StringName] = []
+			"--heirloom":
+				if Db.heirlooms.has(StringName(value)):
+					o.heirloom = StringName(value)
+				else:
+					o.unknown.append(arg)
 	for id in classes:
 		if Db.get_class_data(id) != null:
 			ids.append(id)

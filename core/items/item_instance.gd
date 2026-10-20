@@ -50,6 +50,11 @@ var artifact_base_damage := 0.0
 var companion: ItemInstance
 ## True for the off-hand piece of a pair (see [member companion]).
 var pair_off := false
+## --- Heirlooms (M9 PATCH) ---
+## > 0 for a hero's Heirloom (HeirloomData, made by Heirlooms.create_item): its rank 1 .. 5. Such an item is BOUND.
+var heirloom_rank := 0
+## The weapon Heirloom's damage before the wave / rank multiplier (Heirlooms.rescale is linear on it).
+var heirloom_base_damage := 0.0
 
 
 func _init() -> void:
@@ -143,16 +148,16 @@ func is_artifact() -> bool:
 	return rarity >= Items.Rarity.ARTIFACT
 
 
-## Whether the Sell entry / bots may sell it (GDD 5.5: an Artifact never).
+## Whether the Sell entry / bots may sell it (GDD 5.5: an Artifact never; M9: an Heirloom never).
 func can_sell() -> bool:
-	return not is_artifact()
+	return not is_artifact() and not is_bound()
 
 
 ## Whether the Enchanter may disenchant it into Arcane Dust (GDD 5.5: an Artifact never). The one
 ## rule: Enchanter.disenchant_blocked_reason / dust_for (the Disenchant menu entry, the bots and the
 ## auto-disenchant of an all-Passed item) ask this.
 func can_disenchant() -> bool:
-	return not is_artifact()
+	return not is_artifact() and not is_bound()
 
 
 ## Gold for the shared wallet when the item goes to Greed (GDD 10.1). An Artifact pays 5 times
@@ -190,3 +195,26 @@ static func scaled_weapon(base: WeaponData, p_rarity: int) -> WeaponData:
 		w.attack_speed_pct = base.attack_speed_pct + Items.WEAPON_RARITY_ATTACK_SPEED[rarity_index]
 	w.bonus_stats = base.bonus_stats.duplicate()
 	return w
+
+
+# --- Heirlooms (M9 PATCH) -----------------------------------------------------------------------
+
+## An Heirloom (Heirlooms): the persistent item a hero starts the run with.
+func is_heirloom() -> bool:
+	return heirloom_rank > 0
+
+
+## Bound to its hero: never sold, traded, disenchanted, forged, enchanted, put into the team loot or dropped. (Only an
+## Heirloom is bound today; every path asks this one rule.)
+func is_bound() -> bool:
+	return heirloom_rank > 0
+
+
+## Whether it may go to another hero (Trade entry): everything but a bound item.
+func can_trade() -> bool:
+	return not is_bound()
+
+
+## Whether it may enter the shared loot (the team loot pile, a dropped bag, Need / Greed): everything but a bound item.
+func can_be_shared() -> bool:
+	return not is_bound()

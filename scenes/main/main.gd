@@ -335,6 +335,14 @@ func start_run() -> void:
 	_apply_seasoning_flag(slots)  # (--seasonings: after the lobby / the profile put their selections on the slots)
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
 	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
+## --heirloom: every hero starts with that Heirloom (instead of what the profile remembers for the class).
+func _apply_heirloom_flag(slots: Array[PlayerSlot]) -> void:
+	if options.heirloom == &"":
+		return
+	for slot in slots:
+		slot.heirloom = options.heirloom
+
+
 	for slot in slots:
 		Meta.remember_loadout(slot)
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id(), _difficulty_for(slots))
@@ -347,6 +355,7 @@ func start_run() -> void:
 	for slot in slots:
 		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
+	_apply_heirloom_flag(slots)  # (M9 PATCH: --heirloom likewise)
 	RunState.shrine_chance_override = options.shrine_chance
 	RunState.event_override = options.event
 	RunState.dungeon_forced = options.dungeon
@@ -467,7 +476,10 @@ func start_wave(n: int) -> void:
 	if hud != null:
 		hud.show()
 		# The running shrines (M6b) are listed under the title, with the waves they have left.
+			Heirlooms.rescale_player(p, wave)  # (M9 PATCH: an Heirloom grows with the wave; nothing without one)
 		var banner_lines := Shrines.banner_lines()
+			for held in Heirlooms.held(p.equipment):
+				_log(Heirlooms.log_line(p.slot.label() if p.slot != null else "", p.class_data.id, held, p.equipment.is_equipped(held), wave))
 		if Pressure.banner_line() != "":
 			banner_lines.append(Pressure.banner_line())
 		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, banner_lines)

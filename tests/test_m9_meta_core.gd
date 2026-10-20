@@ -1243,12 +1243,12 @@ func test_slot_selections_default_to_empty_and_reach_the_player() -> void:
 	check(plain.seasonings.is_empty() and plain.heirloom_id == &"" and plain.look_overrides.is_empty(), "the player gets nothing")
 	plain.free()
 	slot.seasonings = [&"ssn_smoked_paprika", &"ssn_cracked_pepper"]  # (real Warrior Seasonings: the hero keeps those it can carry)
-	slot.heirloom = &"old_ladle"
+	slot.heirloom = &"heir_apron"  # (a real Heirloom: the hero drops one it cannot carry, M9 PATCH)
 	slot.looks = {&"head": &"iron_helm"}
 	check(slot.has_meta_selection(), "a selection")
 	var p := Player.create(slot)
 	check_eq(p.seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the Seasonings arrive")
-	check_eq(p.heirloom_id, &"old_ladle", "the Heirloom arrives")
+	check_eq(p.heirloom_id, &"heir_apron", "the Heirloom arrives")
 	check_eq(p.look_overrides, {&"head": &"iron_helm"} as Dictionary[StringName, StringName], "the look overrides arrive")
 	slot.seasonings.append(&"ssn_sea_salt")
 	check_eq(p.seasonings.size(), 2, "the player has its own copy")
@@ -1258,17 +1258,18 @@ func test_slot_selections_default_to_empty_and_reach_the_player() -> void:
 func test_the_lobby_remembers_selections_per_class() -> void:
 	var profile := _use_fresh()
 	profile.unlock(Profile.KIND_SEASONING, &"smoked_paprika")
-	profile.unlock(Profile.KIND_HEIRLOOM, &"old_ladle")
+	profile.unlock(Profile.KIND_HEIRLOOM, &"heir_apron")
+	profile.set_class_progress(&"warrior", 0, 5)  # (the Heirloom slot opens at Class Level 5: the lobby drops a pick a class has no slot for)
 	var warrior := Fakes.make_slot(0, &"warrior")
 	warrior.seasonings = [&"smoked_paprika", &"never_bought"]
-	warrior.heirloom = &"old_ladle"
+	warrior.heirloom = &"heir_apron"
 	Meta.remember_loadout(warrior)
 	check_eq(profile.loadout(&"warrior")["seasonings"].size(), 2, "remembered as picked")
 	# A slot that changes to the warrior gets what the profile owns of it.
 	var other := Fakes.make_slot(1, &"warrior")
 	Meta.apply_loadout(other)
 	check_eq(other.seasonings, [&"smoked_paprika"] as Array[StringName], "only owned Seasonings come back")
-	check_eq(other.heirloom, &"old_ladle", "the owned Heirloom")
+	check_eq(other.heirloom, &"heir_apron", "the owned Heirloom")
 	var mage := Fakes.make_slot(2, &"mage")
 	Meta.apply_loadout(mage)
 	check(not mage.has_meta_selection(), "another class: nothing remembered")
@@ -1291,7 +1292,7 @@ func test_the_lobby_remembers_selections_per_class() -> void:
 	check(not joined.has_meta_selection(), "a class with nothing remembered")
 	UiFakes.nudge(lobby, input, Vector2(-1, 0))
 	check_eq(joined.class_data.id, Db.class_ids[0], "the player picked the first class (the warrior)")
-	check_eq(joined.heirloom, &"old_ladle", "and got what is remembered for it")
+	check_eq(joined.heirloom, &"heir_apron", "and got what is remembered for it")
 
 
 func test_main_remembers_the_selections_at_run_start() -> void:

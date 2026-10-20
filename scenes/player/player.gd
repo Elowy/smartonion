@@ -137,7 +137,8 @@ var class_data: ClassData
 var companion_id: StringName = &""
 ## M9: the meta selections the hero received from its slot at creation (PlayerSlot.seasonings / heirloom / looks).
 ## [member seasonings] holds the ones the hero really carries ([method Seasonings.apply] drops what its class cannot
-## carry or the profile does not own); the Heirloom and Wardrobe packages apply the others.
+## carry or the profile does not own); [method Heirlooms.equip_at_start] equips the Heirloom ([member heirloom_id] keeps
+## it, or &"" when the hero cannot carry it), the Wardrobe package applies the looks.
 var seasonings: Array[StringName] = []
 var heirloom_id: StringName = &""
 var look_overrides: Dictionary[StringName, StringName] = {}
@@ -271,6 +272,7 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.abilities.ability_cast.connect(p._on_ability_cast)
 	p.equipment = Equipment.new(p.class_data)
 	p.equipment.equip_starting_weapons(p_slot != null and p_slot.alt_weapon)  # (M9: the alternative start weapon, Class Level 12)
+	Heirlooms.equip_at_start(p)  # (M9 PATCH: the picked Heirloom starts equipped; nothing without a pick)
 	p.apply_equipment()
 	p.equipment.changed.connect(p.apply_equipment)
 	p._apply_meta_power()
@@ -670,6 +672,10 @@ func apply_equipment() -> void:
 		var artifact_effects := Artifacts.effects_for(equipment)
 		if not artifact_effects.is_empty() or not bonuses.effects_of(Artifacts.SOURCE).is_empty():
 			procs_refreshed = bonuses.set_effects(Artifacts.SOURCE, artifact_effects) or procs_refreshed
+		# The rank perks of an equipped Heirloom (M9 PATCH): likewise an own source, skipped without one.
+		var heirloom_effects := Heirlooms.effects_for(equipment)
+		if not heirloom_effects.is_empty() or not bonuses.effects_of(Heirlooms.SOURCE).is_empty():
+			procs_refreshed = bonuses.set_effects(Heirlooms.SOURCE, heirloom_effects) or procs_refreshed
 	if procs != null and not procs_refreshed:
 		procs.refresh()
 	refresh_armor_spec()

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="HeirloomData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/heirloom_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"heir_ancestral_peeler"
+display_name = "Ancestral Peeler"
+slot_type = 11
+armor_rule = &"weapon"
+weights = Dictionary[StringName, float]({})
+perk3 = Array[Dictionary]([{"kind": "stats", "stats": {"crit": 3}}])
+perk3_text = "+3 Crit"
+perk5 = Array[Dictionary]([{"kind": "proc", "proc": {"trigger": "on_hit", "effect": "extra_attack", "chance": 6, "count": 1}}])
+perk5_text = "Hits have a 6% chance to strike again at once."
+source_text = "Achievement: Sharp Palate"
+gift_class = &""
+achievement = &"ach_first_pungent"
+flavor = "Peeled a thousand onions. Never once cried."

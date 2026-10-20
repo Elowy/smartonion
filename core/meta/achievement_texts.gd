@@ -23,7 +23,8 @@ static func reward_line(reward: Dictionary) -> String:
 		Profile.KIND_TITLE:
 			return "Title: %s" % (named if named != "" else PlayerTitles.name_of(id))
 		Profile.KIND_HEIRLOOM:
-			return "Heirloom: %s" % (named if named != "" else String(id).trim_prefix("heir_").capitalize())
+			var h := Db.get_heirloom(id)  # (M9 PATCH: the Heirloom data names it, the reward's "name" is the fallback)
+			return "Heirloom: %s" % (h.display_name if h != null else (named if named != "" else String(id).trim_prefix("heir_").capitalize()))
 		Profile.KIND_COSMETIC:
 			return "Cosmetic: %s" % (named if named != "" else String(id).capitalize())
 		Profile.KIND_SEASONING:

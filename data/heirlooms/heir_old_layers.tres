@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="HeirloomData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/heirloom_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"heir_old_layers"
+display_name = "Mantle of Old Layers"
+slot_type = 2
+armor_rule = &"hero"
+weights = Dictionary[StringName, float]({&"primary": 0.4, &"stamina": 0.3, &"armor": 0.3})
+perk3 = Array[Dictionary]([{"kind": "stats", "stats": {"armor": 4}}])
+perk3_text = "+4 Armor"
+perk5 = Array[Dictionary]([{"kind": "proc", "proc": {"trigger": "when_struck", "effect": "shield", "chance": 20, "max_hp_pct": 5, "duration": 4, "icd": 8}}])
+perk5_text = "When struck: 20% chance to shield you for 5% Max HP for 4 sec (8 sec cooldown)."
+source_text = "Reach Paladin level 5"
+gift_class = &"paladin"
+achievement = &""
+flavor = "Every layer remembers a harder winter."
