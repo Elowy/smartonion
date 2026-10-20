@@ -98,7 +98,13 @@ func _fires(id: String, report: RunReport, profile: Profile) -> bool:
 	if def == null:
 		return false
 	var defs: Array[AchievementData] = [def]
-	return StringName("ach_" + id) in AchievementEngine.evaluate(profile, report, defs, 1000)
+	var fired := StringName("ach_" + id) in AchievementEngine.evaluate(profile, report, defs, 1000)
+	if fired:
+		check(profile.has_achievement(def.id), "ach_%s is recorded" % id)
+		for r in def.rewards:  # (every reward of an achievement that fires is in the profile)
+			check(profile.has_unlock(StringName(str(r["kind"])), StringName(str(r["id"])), StringName(str(r.get("class_id", "")))),
+					"ach_%s: the reward %s %s is unlocked" % [id, r["kind"], r["id"]])
+	return fired
 
 
 ## [method _fires] on a fresh profile with [param counters] ({name: value}) set first.
@@ -733,3 +739,100 @@ func test_the_end_screen_with_the_block_at_its_fullest_fits_the_screen() -> void
 		check(need.y <= 1080.0 - 40.0, "page %d: the panel needs %s px of the 1080" % [page, need.y])
 		var rect := screen.panel.get_global_rect()
 		check(rect.position.y >= 0.0 and rect.end.y <= 1080.0, "page %d: it fits the canvas (%s)" % [page, rect])
+
+
+# --- All forty, one table ----------------------------------------------------------------------------------------
+
+## A crafted case per achievement: {report, counters?, profile_setup?}. Every id of the data must have one and must fire.
+func _case(id: String) -> Dictionary:
+	var gardens: Dictionary = {}
+	var bulbs: Dictionary = {}
+	var tears: Dictionary = {}
+	for e in ENVS:
+		gardens["env_wins:" + e] = 1
+	for c in CLASSES:
+		bulbs["wins:%s:normal" % c] = 1
+		tears["wins:%s:tear_jerker" % c] = 1
+	var hero_set := _heroes([_hero("mage", {"capstones": 1, "rank5": 1, "sets_active": 2})])
+	match id:
+		"green_shoot":
+			return {"report": _report(false, ["mage"], {"waves_cleared": 5})}
+		"salt_of_earth":
+			return {"report": _report(false, ["mage"], {"kills": 50}), "counters": {"total:kills": 450}}
+		"regular":
+			return {"report": _report(false), "counters": {"runs_long": 3}}
+		"tenth_hour":
+			return {"report": _report(false, ["mage"], {"boss_wave_down": 10})}
+		"harvest_home":
+			return {"report": _win()}
+		"lone_bulb":
+			return {"report": _win(["mage"])}
+		"full_table":
+			return {"report": _win(["warrior", "mage", "paladin", "rogue"])}
+		"untouched":
+			return {"report": _win(["mage", "rogue"])}
+		"swift_harvest":
+			return {"report": _win(["mage"], {"run_time": 1800.0})}
+		"hardcore_win":
+			return {"report": _win(["mage"], {}, {"hardcore": true})}
+		"five_gardens":
+			return {"report": _report(false), "counters": gardens}
+		"seven_bulbs":
+			return {"report": _report(false), "counters": bulbs}
+		"endless_40":
+			return {"report": _report(false, ["mage"], {"wave": 41}, {"endless": true})}
+		"first_pungent":
+			return {"report": _win(["mage"], {}, {"difficulty": "pungent"})}
+		"first_tear":
+			return {"report": _win(["mage"], {}, {"difficulty": "tear_jerker"})}
+		"tear_all":
+			return {"report": _report(false), "counters": tears}
+		"gremlin_roundup":
+			return {"report": _report(false, ["mage"], {"goblins_killed": 4})}
+		"need_legendary":
+			return {"report": _report(false, ["mage"], {"need_legendary_wins": 2})}
+		"relic_hunter":
+			return {"report": _report(false, ["mage"], {"artifacts_dropped": 1})}
+		"peak_of_the_tree", "master_chef", "dressed_up":
+			return {"report": _report(false, ["mage"], {}, {}, hero_set)}
+		"cellar_cleaner":
+			return {"report": _report(false, ["mage"], {"dungeons_completed": 3})}
+		"second_chance":
+			return {"report": _report(false, ["mage"], {"revives": 6})}
+		"level_thirty":
+			return {"report": _report(false), "setup": func(p: Profile) -> void: p.set_class_progress(&"rogue", 33205, 30)}
+		"wardrobe_150":
+			return {"report": _report(false), "setup": func(p: Profile) -> void:
+				for i in 150:
+					p.unlock(Profile.KIND_LOOK, StringName("g.chest.0.0.%d" % i))}
+	for c in CLASSES:
+		if id == "clear_" + c:
+			return {"report": _win([c])}
+		if id == "pungent_" + c:
+			return {"report": _win([c], {}, {"difficulty": "pungent"})}
+	return {}
+
+
+func test_every_one_of_the_forty_fires_and_pays_its_rewards() -> void:
+	var covered := 0
+	for a in Db.achievement_list():
+		var id := String(a.id).trim_prefix("ach_")
+		var c := _case(id)
+		check(not c.is_empty(), "%s has a crafted case" % id)
+		if c.is_empty():
+			continue
+		var p := Profile.fresh()
+		for key: Variant in c.get("counters", {}):
+			p.counters[StringName(str(key))] = int(c["counters"][key])
+		if c.has("setup"):
+			(c["setup"] as Callable).call(p)
+		check(_fires(id, c["report"], p), "%s fires" % id)
+		covered += 1
+	check_eq(covered, 40, "all forty were exercised")
+
+
+func test_a_blank_run_fires_none_of_the_forty() -> void:
+	var p := Profile.fresh()
+	var blank := _report(false, ["warrior"], {"wave": 1})
+	check(AchievementEngine.evaluate(p, blank, Db.achievement_list(), 1).is_empty(), "nothing fires on an empty run")
+	check(AchievementEngine.evaluate(p, null, Db.achievement_list(), 1).is_empty(), "nor without a report (a check outside a run)")
