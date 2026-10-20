@@ -150,6 +150,10 @@ var talents: TalentState
 ## Base amount of the weapon hit being reported by on_hit_dealt (after the crit, before
 ## Executioner / Slayer and the outgoing multipliers – valid during that call; kits read it).
 var last_hit_base := 0.0
+## Whether the hit being reported by on_hit_dealt belongs to an extra attack or to an ability's arrows /
+## knives (WeaponRunner.apply_hit is_extra: Extra Attack, HunterArrow, RogueBlade) rather than to the
+## weapon's own shot or swing. Valid during that call; the Gale Volley Artifact counts shots by it.
+var last_hit_extra := false
 ## The next N weapon hits are guaranteed critical strikes (Vanish, talents ...).
 var forced_crits := 0
 ## Seconds of revive progress while downed (0 .. REVIVE_TIME).
@@ -543,6 +547,7 @@ func on_hit_dealt(damage: float, target: Node3D, weapon: WeaponData = null, is_c
 		return
 	var base := base_damage if base_damage >= 0.0 else damage
 	last_hit_base = base
+	last_hit_extra = is_extra
 	hit_dealt.emit(damage, target)
 	if stats.get_stat(Stats.LEECH) > 0.0 and CombatMath.roll_leech(stats, RunState.rng):
 		heal(1.0)

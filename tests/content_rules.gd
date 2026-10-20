@@ -27,9 +27,6 @@ const TREES_PER_CLASS := 3
 ## is forgotten, and a class missing a part that is NOT listed fails its completeness check.
 ## Parts: artifact, set, items, trees. Inert while the class has no data.
 const PENDING: Array[String] = [
-	# ITEMS package: the Artifact.
-	"hunter:artifact",
-	"shaman:artifact",
 	# TALENTS packages: the three talent trees.
 	"hunter:trees",
 	"shaman:trees",

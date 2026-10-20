@@ -314,7 +314,7 @@ func test_every_property_has_a_short_text_for_the_compact_tooltip() -> void:
 			check(short.length() <= Artifacts.SHORT_TEXT_MAX, "%s property %d: short text %d characters" % [data.id, i + 1, short.length()])
 			check(short.length() <= str(p["text"]).length(), "%s property %d: not longer than the full text" % [data.id, i + 1])
 			seen += 1
-	check_eq(seen, 10, "ten properties")
+	check_eq(seen, 2 * Db.artifacts.size(), "two properties per Artifact")
 
 
 func test_validate_wants_a_short_text() -> void:
