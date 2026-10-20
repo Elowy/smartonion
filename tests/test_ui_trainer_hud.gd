@@ -299,7 +299,9 @@ func test_new_glyphs_draw() -> void:
 			box.add_child(icon)
 			icon.queue_redraw()
 			count += 1
-	check_eq(count, 34 * 3, "34 new glyphs at three sizes")
+	# Every glyph from THUNDER_CLAP on is a "new" one (34 of the M4 pool, plus each M8 class's own).
+	check_eq(count, (AbilityIcon.Glyph.size() - AbilityIcon.Glyph.THUNDER_CLAP) * 3, "every new glyph at three sizes")
+	check(count >= 34 * 3, "at least the 34 of the M4 pool")
 	await tree.process_frame
 	await tree.process_frame
 	finished.emit()

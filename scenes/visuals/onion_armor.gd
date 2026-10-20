@@ -705,10 +705,10 @@ static func _build_starter(key: String, slot: int, cd: ClassData) -> Part:
 	match slot:
 		EquipLook.Slot.HEAD:
 			_starter_head(solid, cloth, cd)
-			# Part flags per headgear. hunter_hat / tribal_mask (M8) keep the defaults (brows on,
-			# sprout and mouth shown, no extras) until their class package changes them here.
+			# Part flags per headgear. tribal_mask (M8) keeps the defaults (brows on, sprout and mouth
+			# shown, no extras) until its class package changes them here.
 			p.brows = cd.headgear not in [&"helm_horned", &"paladin_helm"]
-			p.hides_sprout = cd.headgear == &"wizard_hat"
+			p.hides_sprout = cd.headgear in [&"wizard_hat", &"hunter_hat"]
 			p.hides_mouth = cd.headgear == &"hood"
 			if cd.headgear == &"wizard_hat":
 				p.extras = [&"hat_star"]
@@ -789,10 +789,31 @@ static func _head_plain(k: MeshKit, cd: ClassData) -> void:
 	k.add_sphere(0.045, MeshKit.xf(OnionModel.bulb_point(y, 0.0, 0.035)), acc.lightened(0.25), 8, 4)
 
 
-## HUNTER package hook: the feathered hunter hat (class headgear id hunter_hat). Until the class
-## package draws it the plain circlet shows. Part flags (brows, sprout, extras) go in _build_starter.
+## The Hunter's feathered hat (class headgear id hunter_hat): a round green felt crown with a wide
+## drooping brim, a leather band and a long ivory feather with a short copper one tucked into it at
+## the back right, so the hat reads from the top-down camera as a brim ring with a feather. It
+## closes over the sprout (Part.hides_sprout is set in _build_starter).
 static func _head_hunter_hat(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
-	_head_plain(k, cd)
+	var felt := cd.accent_color
+	var brim_y := 0.8
+	k.add_cylinder(0.47, 0.47, 0.035, MeshKit.xf(Vector3(0, brim_y, 0), Vector3(-5, 0, 0)), felt.darkened(0.15), 30)
+	k.add_torus(0.45, 0.49, MeshKit.xf(Vector3(0, brim_y, 0), Vector3(-5, 0, 0), Vector3(1, 0.7, 1)), felt.darkened(0.3), 30, 5)
+	var crown := PackedVector2Array([Vector2(0.3, 0.8), Vector2(0.295, 0.9), Vector2(0.26, 1.0), Vector2(0.19, 1.08),
+		Vector2(0.09, 1.125), Vector2(0.0, 1.135)])
+	k.add_lathe(MeshKit.smooth_profile(crown, 3), Transform3D(), felt, 26)
+	k.add_torus(0.275, 0.325, MeshKit.xf(Vector3(0, 0.865, 0), Vector3.ZERO, Vector3(1, 2.4, 1)), OnionModel.LEATHER, 26, 5)
+	k.add_box(Vector3(0.08, 0.07, 0.03), MeshKit.xf(Vector3(0, 0.865, -0.305)), OnionModel.GOLD)
+	# A long ivory feather and a short copper one, both swept back from the band.
+	var root := Vector3(0.2, 0.9, 0.14)
+	var quill := PackedVector3Array([root, root + Vector3(0.05, 0.12, 0.07), root + Vector3(0.08, 0.26, 0.17),
+		root + Vector3(0.06, 0.36, 0.3)])
+	k.add_tube(quill, 0.014, 0.006, OnionModel.IVORY.darkened(0.12), 5)
+	var vane := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.06, 0.07), Vector2(0.09, 0.2), Vector2(0.07, 0.34),
+		Vector2(0.0, 0.46), Vector2(-0.04, 0.3), Vector2(-0.05, 0.14)])
+	k.add_extrusion(vane, 0.02, MeshKit.xf(root + Vector3(0.0, 0.0, 0.02), Vector3(-34, -12, 8)), OnionModel.IVORY, 0.9)
+	var small := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.045, 0.05), Vector2(0.055, 0.15), Vector2(0.0, 0.27),
+		Vector2(-0.035, 0.13)])
+	k.add_extrusion(small, 0.018, MeshKit.xf(root + Vector3(-0.03, -0.01, 0.0), Vector3(-18, 14, -14)), Color(0.85, 0.36, 0.2), 0.9)
 
 
 ## SHAMAN package hook: the carved wooden mask (class headgear id tribal_mask). Until the class
@@ -869,9 +890,40 @@ static func _starter_chest(k: MeshKit, cloth: MeshKit, cd: ClassData) -> void:
 			_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
 
 
-## HUNTER package hook: the starter chest (fur trim, quiver strap). The default leather belt until then.
-static func _chest_hunter(k: MeshKit, _cloth: MeshKit, _cd: ClassData) -> void:
-	_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
+## The Hunter's starter chest: a leather belt, a fur-trimmed mail pauldron on the left shoulder
+## (the class has no big pauldrons), a quiver strap across the chest and the quiver itself on the
+## back with three fletched arrows – all in the single Solid mesh.
+static func _chest_hunter(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
+	var mail := Color(0.6, 0.64, 0.7)
+	var fur := Color(0.93, 0.86, 0.7)
+	var leather := OnionModel.LEATHER
+	_belt(k, leather, OnionModel.GOLD)
+	# Mail pauldron with a thick fur rim.
+	var b := Basis.from_euler(Vector3(0, 0, deg_to_rad(48.0)))
+	var c := Vector3(-0.33, 0.6, 0.03)
+	k.add_sphere(0.17, Transform3D(b * Basis.from_scale(Vector3(1.05, 0.9, 1.0)), c), mail, 16, 8, true)
+	k.add_sphere(0.12, Transform3D(b * Basis.from_scale(Vector3(1.0, 0.7, 0.95)), c + b * Vector3(0, 0.07, 0)), mail.lightened(0.12), 12, 6, true)
+	k.add_torus(0.15, 0.215, Transform3D(b * Basis.from_scale(Vector3(1.05, 0.7, 1.0)), c + b * Vector3(0, -0.01, 0)), fur, 18, 6)
+	for i in 5:
+		var a := TAU * float(i) / 5.0
+		k.add_sphere(0.024, Transform3D(b, c + b * Vector3(cos(a) * 0.09, 0.1, sin(a) * 0.09)), mail.darkened(0.25), 5, 3)
+	# Quiver strap, tilted across the chest.
+	var strap := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(-34))) * Basis.from_scale(Vector3(1, 0.55, 1)), Vector3(0, 0.46, 0))
+	k.add_torus(0.385, 0.425, strap, leather.darkened(0.1), 28, 4)
+	k.add_box(Vector3(0.07, 0.07, 0.035), MeshKit.xf(OnionModel.bulb_point(0.5, -22.0, 0.035), Vector3(0, -22, 0)), OnionModel.GOLD)
+	# Quiver on the back: a leaning leather tube with a dark rim, a copper band and three arrows.
+	var base := Vector3(-0.1, 0.3, 0.44)
+	var top := Vector3(0.1, 0.8, 0.38)
+	k.add_segment(base, top, 0.07, 0.085, leather.lightened(0.08), 10)
+	k.add_segment(top - (top - base).normalized() * 0.04, top + (top - base).normalized() * 0.01, 0.09, 0.09, leather.darkened(0.35), 10)
+	k.add_segment(base.lerp(top, 0.45), base.lerp(top, 0.55), 0.092, 0.092, Color(0.82, 0.55, 0.28), 10)
+	var up := (top - base).normalized()
+	var fletch: Array[Color] = [Color(0.95, 0.9, 0.75), Color(0.85, 0.36, 0.2), Color(0.95, 0.9, 0.75)]
+	for i in 3:
+		var lean := Vector3((float(i) - 1.0) * 0.05, 0.0, (float(i) - 1.0) * -0.03)
+		var tail := top + lean + up * 0.04
+		k.add_segment(tail, tail + (up + lean * 1.5).normalized() * 0.2, 0.012, 0.012, Color(0.6, 0.42, 0.26), 4)
+		k.add_box(Vector3(0.06, 0.012, 0.09), Transform3D(MeshKit.basis_from_y(up), tail + (up + lean * 1.5).normalized() * 0.2), fletch[i])
 
 
 ## SHAMAN package hook: the starter chest (bone beads, totem harness). The default leather belt until then.

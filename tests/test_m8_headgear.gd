@@ -1,7 +1,8 @@
 extends TestCase
 ## M8 P0 – headgear defaults: a class whose headgear id the armour and body builders do not know
-## (and the M8 ids hunter_hat / tribal_mask until their class packages draw them) shows a plain
-## circlet, the default gloves and boots – never a bare head. The classes are fixtures.
+## (and the M8 id tribal_mask until its class package draws it; hunter_hat is drawn since the Hunter,
+## see test_class_hunter_look) shows a plain circlet, the default gloves and boots – never a bare
+## head. The classes are fixtures.
 
 const Rules := preload("res://tests/content_rules.gd")
 const ClassFixtures := preload("res://tests/class_fixtures.gd")
@@ -31,7 +32,7 @@ func _onion(cd: ClassData) -> OnionModel:
 # --- Headgear defaults ------------------------------------------------------------------------
 
 func test_an_unknown_headgear_id_draws_a_plain_head_never_a_bare_one() -> void:
-	for gear: StringName in [&"zz_unknown_headgear", &"", &"hunter_hat", &"tribal_mask"]:
+	for gear: StringName in [&"zz_unknown_headgear", &"", &"tribal_mask"]:
 		var cd := classes.add_class(gear)
 		var head := OnionArmor.part(HEAD, null, cd)
 		check(head != null and head.solid != null, "headgear '%s': a head piece is drawn" % gear)
