@@ -34,6 +34,10 @@ func run() -> void:
 			await _revive()
 		"fx":
 			await _fx()
+		"wardrobe":
+			await _wardrobe()
+		"wardrobe_page", "look_picker":
+			await _wardrobe_ui(view)
 		_:
 			await _gameplay()
 	var out := _arg("out", "/tmp/smartonion_showcase.png")
@@ -48,6 +52,108 @@ func run() -> void:
 
 
 # --- Views -------------------------------------------------------------------
+
+## M9 WARDROBE: the two controls on a dark screen, with a believable profile in memory (a share of the looks collected, a few
+## cosmetics, Seeds). --view=wardrobe_page (--filter=0..4, --pick=N moves the grid cursor, --focus=grid) and --view=look_picker
+## (--list=1 opens the first row's list, --class=mage, --row=N). Nothing is written to disk.
+func _wardrobe_ui(view: String) -> void:
+	Meta.configure(&"fresh", "", true)
+	var profile := Meta.profile
+	var ids := Wardrobe.all_look_ids()
+	for i in ids.size():
+		if (i * 7919) % 100 < 38 or String(ids[i]).begins_with("s.") and i % 3 == 0:
+			profile.unlock(Profile.KIND_LOOK, ids[i])
+	for id: StringName in [&"cos_warrior_tabard", &"cos_mage_tabard", &"cos_mage_hat", &"cos_mage_glow", &"cos_paladin_glow", &"cos_gala_tabard",
+			&"cos_hunter_hat", &"cos_rogue_glow", &"dye_ember", &"dye_moss"]:
+		profile.unlock(Profile.KIND_COSMETIC, id)
+	profile.earn_seeds(340)
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(root)
+	UiTheme.setup_root(root)
+	var back := ColorRect.new()
+	back.color = Color(0.05, 0.04, 0.045)
+	back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(back)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+	if view == "wardrobe_page":
+		var page := WardrobePage.create()
+		page.custom_minimum_size = Vector2(1360, 700)
+		center.add_child(page)
+		page.set_preview_class(Db.get_class_data(StringName(_arg("class", "mage"))), PlayerManager.PLAYER_COLORS[1])
+		page.set_filter(int(_arg("filter", "0")))
+		if _arg("focus", "") == "grid":
+			page._set_focus(WardrobePage.Focus.GRID)
+		page.grid.select_index(int(_arg("pick", "0")))
+	else:
+		var slot := PlayerSlot.new(1, ScriptedInput.new("shot"), PlayerManager.PLAYER_COLORS[1])
+		slot.class_data = Db.get_class_data(StringName(_arg("class", "mage")))
+		var head := StringName(_arg("head", ""))
+		slot.looks = {&"head": &"g.head.3.2.3", &"chest": &"s.chest.regalia_of_the_arcane"}
+		slot.cosmetics = {&"tabard": &"cos_mage_tabard", &"glow": &"cos_mage_glow", &"dye": &"dye_ember"}
+		for id: StringName in slot.looks.values():
+			profile.unlock(Profile.KIND_LOOK, id)
+		var picker := LookPicker.create(slot)
+		picker.custom_minimum_size = Vector2(900, 640)
+		center.add_child(picker)
+		picker.skip_frames = 0
+		picker.row = int(_arg("row", "0"))
+		if _arg("list", "0") == "1":
+			picker._begin_list()
+		picker.refresh()
+	await _frames(40)
+
+## M9 WARDROBE: the cosmetics on the onions. --set=tabards|hats|glows (every class cosmetic on its own class, then the
+## achievement ones), --set=mix (default: look overrides over worn gear, Tabard, Hat, Glow and a Dye), --dye=dye_ember
+## (tints the Tabard and Glow of the sets), --back=1, --dist=N.
+func _wardrobe() -> void:
+	var stage := _studio()
+	var back := _arg("back", "0") == "1"
+	var set_name := _arg("set", "mix")
+	var dye_id := StringName(_arg("dye", ""))
+	var dyes: Array[StringName] = [&"dye_rose_blush", &"dye_gilded", &"dye_winter_blue", &"dye_ember", &"dye_moss", &"dye_charcoal"]
+	var heroes: Array[Dictionary] = []
+	match set_name:
+		"tabards", "hats", "glows":
+			var kind := StringName(set_name.trim_suffix("s"))
+			for i in Db.class_ids.size():
+				heroes.append({"class": Db.class_ids[i], "cosmetics": {kind: StringName("cos_%s_%s" % [Db.class_ids[i], kind])}})
+			if kind != &"hat":
+				heroes.append({"class": &"warrior", "cosmetics": {kind: &"cos_gala_tabard" if kind == &"tabard" else &"cos_salt_crystal_glow"}})
+		"dyes":
+			for i in dyes.size():
+				heroes.append({"class": Db.class_ids[i % Db.class_ids.size()], "cosmetics": {&"tabard": &"cos_gala_tabard", &"glow": &"cos_salt_crystal_glow",
+						&"dye": dyes[i]}})
+		_:
+			heroes = [
+				{"class": &"warrior", "looks": {&"head": &"g.head.3.2.3", &"shoulders": &"g.shoulders.3.2.3", &"chest": &"g.chest.3.2.3"},
+					"cosmetics": {&"tabard": &"cos_warrior_tabard", &"glow": &"cos_warrior_glow"}},
+				{"class": &"mage", "looks": {&"head": &"s.head.felfire_raiment", &"chest": &"s.chest.felfire_raiment"},
+					"cosmetics": {&"hat": &"cos_mage_hat", &"tabard": &"cos_mage_tabard", &"glow": &"cos_mage_glow", &"dye": &"dye_winter_blue"}},
+				{"class": &"rogue", "looks": {&"shoulders": &"g.shoulders.0.2.4", &"chest": &"u.chest.tunic_of_the_quiet_bulb"},
+					"cosmetics": {&"tabard": &"cos_gala_tabard", &"glow": &"cos_rogue_glow", &"dye": &"dye_ember"}},
+				{"class": &"paladin", "looks": {&"head": &"u.head.crown_of_ashes"},
+					"cosmetics": {&"hat": &"cos_paladin_hat", &"glow": &"cos_paladin_glow", &"tabard": &"cos_paladin_tabard"}},
+			]
+	for i in heroes.size():
+		var cd := Db.get_class_data(heroes[i]["class"])
+		var m := OnionModel.new()
+		stage.add_child(m)
+		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		m.set_weapons(cd.main_hand, cd.off_hand)
+		var cosmetics: Dictionary = heroes[i].get("cosmetics", {})
+		if dye_id != &"" and not cosmetics.has(&"dye"):
+			cosmetics[&"dye"] = dye_id
+		m.set_dress(OnionDress.from_ids(heroes[i].get("looks", {}), cosmetics))
+		m.position = Vector3((i - (heroes.size() - 1) * 0.5) * 1.7, 0, 0)
+		m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
+	_close_camera(stage, Vector3(0, 0.7, 0), 5.0 + heroes.size() * 1.4, 24.0)
+	await _frames(24)
+
 
 func _gameplay() -> void:
 	var arena := _make_arena()
