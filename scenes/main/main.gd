@@ -143,6 +143,8 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
+## What the main profile made of the last finished run (Meta.record_run's result; {} when it recorded nothing).
+var meta_result: Dictionary = {}
 ## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
 ## player who left mid-run (drop_player), the slots no longer have them.
 var run_classes: Array[StringName] = []
@@ -304,8 +306,12 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
+	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
+	for slot in slots:
+		Meta.remember_loadout(slot)
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id())
 	_roll_seed = -1
+	meta_result = {}
 	artifact_lines.clear()
 	run_classes.clear()
 	for slot in slots:
@@ -398,6 +404,8 @@ func start_run() -> void:
 	_log("run started: %d players (%s), first wave %d, seed %d, mode %s, environment %s" % [
 		players.size(), _class_list(), first_wave, options.run_seed(), RunState.mode_text(RunState.mode, RunState.hardcore).to_lower(),
 		RunState.environment])
+	if Meta.records_runs():
+		_log("meta: profile %s" % (Meta.path if Meta.persist else "in memory"))
 	start_wave(first_wave)
 
 
@@ -638,6 +646,7 @@ func end_run(p_victory: bool) -> void:
 	RunState.end_run(p_victory)
 	_record_hero_results()
 	var board := _record_leaderboard(p_victory)
+	meta_result = _record_meta(p_victory, false)
 	_set_state(State.GAME_OVER)
 	Audio.play(&"victory" if p_victory else &"defeat")
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
@@ -707,6 +716,27 @@ func quit_to_menu() -> void:
 func _record_abandoned_run() -> void:
 	if RunState.is_endless() and waves_completed > 0:
 		_record_leaderboard(false)
+	if waves_completed > 0:
+		meta_result = _record_meta(false, true)
+
+
+## The finished run in the main profile (M9, Meta.record_run: Class XP, Seeds, achievements ... through the
+## registered listeners; one save). {} when the profile records nothing – every automated run, which has the dev
+## profile (Meta.records_runs) – otherwise Meta.record_run's result. An abandoned run is reported as such
+## (RunReport.abandoned) and only once a wave was cleared.
+func _record_meta(p_victory: bool, p_abandoned: bool) -> Dictionary:
+	if not Meta.records_runs():
+		return {}
+	var report := RunReport.collect(p_victory, p_abandoned, {
+		"wave": wave, "waves_cleared": waves_completed, "classes": run_classes, "items_bought": items_bought,
+		"items_looted": items_looted, "loot_rolls": loot_rolls, "level_cards": level_cards,
+		"ranks_trained": ranks_trained, "shop_rerolls": shop_rerolls,
+	})
+	var result := Meta.record_run(report)
+	_log("meta: run recorded (%s), saved %s, achievements %s" % ["abandoned" if p_abandoned else
+			("victory" if p_victory else "defeat"), "ok" if int(result.get("save_error", OK)) == OK else "FAILED",
+			result.get("achievements", [])])
+	return result
 
 
 ## Opens the PauseMenu for [param by] (null = no player, e.g. a controller was unplugged).
@@ -1271,7 +1301,8 @@ func _apply_time_scale(scale: float) -> void:
 	Engine.max_physics_steps_per_frame = maxi(8, ceili(8.0 * scale))
 
 
-## Joins --players bots, classes cycling through --classes (default: Db.class_ids); a bot takes
+## Joins --players bots, classes cycling through --classes (default: the classes the profile has unlocked, i.e.
+## all of Db.class_ids with the dev profile); a bot takes
 ## its class's first companion, or --companion where the class offers it.
 func _add_bots() -> void:
 	PlayerManager.clear()
@@ -1282,7 +1313,7 @@ func _add_bots() -> void:
 		else:
 			push_warning("--classes: unknown class '%s'" % id)
 	if ids.is_empty():
-		ids = Db.class_ids
+		ids = Meta.unlocked_class_ids()  # (every class with the dev profile of the automated runs)
 	var base_seed := options.run_seed() if options.run_seed() >= 0 else randi() % 100000
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
