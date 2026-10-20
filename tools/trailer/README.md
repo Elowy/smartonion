@@ -79,3 +79,15 @@ No video file is ever committed.
 
 Movie Maker records the window size, which the project overrides to 1600x900: `make_trailer.sh` writes a temporary
 `override.cfg` (1920x1080, MJPEG quality 0.93) next to `project.godot` and removes it when it ends.
+
+## Rotate-device card (phones held upright)
+
+`tools/trailer/rotate_card.py <out_dir>` renders the 3 s "Rotate your device" card (PIL, Cinzel from
+`assets/fonts/`) as PNG frames. Put it in front of the finished cut with silent audio:
+
+```
+python3 tools/trailer/rotate_card.py /tmp/rotate
+ffmpeg -framerate 30 -i /tmp/rotate/rotate_%03d.png -f lavfi -t 3 -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+  -i smartonion_trailer.mp4 -filter_complex "[0:v]format=yuv420p,setsar=1[cv];[2:v]setsar=1[tv];[cv][1:a][tv][2:a]concat=n=2:v=1:a=1[v][a]" \
+  -map "[v]" -map "[a]" -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart smartonion_trailer_rotate.mp4
+```
