@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"polearm"
+display_name = "Barberry"
+unique_effect = &"dot"
+unique_params = {
+"trigger": "on_hit",
+"every": 4,
+"hit_pct": 140.0,
+"duration": 5.0,
+"stacks": 2,
+"school": "physical"
+}
+unique_text = "Every 4th thrust opens a deep wound: it bleeds for 140% of the hit as Physical damage over 5 sec (stacks 2 times)."
+flavor = "Sweet to look at, sour to be stabbed by."

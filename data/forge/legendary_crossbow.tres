@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"crossbow"
+display_name = "Bindweed"
+unique_effect = &"bolt"
+unique_params = {
+"trigger": "on_hit",
+"every": 3,
+"hit_pct": 160.0,
+"school": "physical",
+"stun": 1.0
+}
+unique_text = "Every 3rd bolt is a barbed harpoon: 160% of the shot to the target, pinning it in place for 1 sec."
+flavor = "It grows around whatever it hits."
