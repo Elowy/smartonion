@@ -2095,7 +2095,7 @@ Két fegyver, ököl-fegyver és Magma Lash. A fa adja a Shaman Dual Wield-jét.
 
 | Tier | Talent | Pont | Hatás / pont |
 |---|---|---|---|
-| 1 | Twinned Spirits | 3 | Megadja a Dual Wield jártasságot (egykezes fegyver az off-kézbe is; a megadás nem skálázódik). Kettős fegyverrel +3% Haste pontonként |
+| 1 | Twinned Spirits | 3 | Megadja a Dual Wield jártasságot (egykezes fegyver az off-kézbe is; a megadás nem skálázódik; ha elvész, az off-kéz fegyver a hátizsákba vagy az üres fő kézbe kerül, teli hátizsáknál addig nem támad, amíg hely nem lesz). Kettős fegyverrel +3% Haste pontonként |
 | 1 | Hardened Knuckles | 3 | A fegyvertalálataid +4% sebzést okoznak |
 | 2 | Mirrored Strikes (előfeltétel: Twinned Spirits 3/3) | 3 | Kettős fegyverrel a fegyvertalálataid pontonként +4% eséllyel azonnal még egyszer lecsapnak |
 | 2 | Spirit Pulse | 3 | A fegyvertalálatok és a képesség-castok +1 Surge-zsal többet adnak pontonként |

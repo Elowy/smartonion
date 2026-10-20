@@ -14,6 +14,11 @@ extends RefCounted
 ## (target_slots = [MAIN_HAND], like a two-hander that also fills the off hand); unequip() of
 ## either piece takes the pair back as the one backpack item, and anything that displaces one
 ## piece displaces both (displaced_by). The off-hand piece never sits in the backpack.
+## A one-hander in the off hand needs the dual_wield proficiency (the class's or a granted one). Losing a
+## grant (a talent respec or undo) puts the weapon away (settle_off_hand); with the backpack full and the
+## main hand taken it STAYS in the slot but is inert (stranded_off_hand: off_weapon() and stat_sources() leave
+## it out, so it neither attacks nor adds stats, and the weapon requirement dual_wield turns off with it)
+## until a backpack slot frees up (remove_from_backpack, take, equip settle it again) or the grant returns.
 
 signal changed
 
@@ -65,6 +70,7 @@ func remove_from_backpack(item: ItemInstance) -> bool:
 	if i < 0 or is_last_weapon(item):
 		return false
 	backpack.remove_at(i)
+	settle_off_hand()
 	changed.emit()
 	return true
 
@@ -76,18 +82,43 @@ func can_dual_wield() -> bool:
 
 
 ## Replaces the granted proficiencies. Losing dual wield (a talent respec) takes a one-hander out
-## of the off hand: into the backpack, or into the main hand when that is empty; with neither
-## possible (a full backpack) it stays where it is. [signal changed] fires once when it moved.
+## of the off hand ([method settle_off_hand]): into the backpack, or into the main hand when that is
+## empty; with neither possible (a full backpack) it stays where it is but is inert
+## ([method stranded_off_hand]) until room appears. [signal changed] fires when the weapon moved or
+## a one-hander sits in the off hand (its attack switches on / off with the grant: Player rebuilds).
 ## (A pair Artifact needs a class with dual_wield of its own, so a grant never matters for one.)
 func set_granted_proficiencies(ids: Array[StringName]) -> void:
 	if ids == granted_proficiencies:
 		return
 	granted_proficiencies = ids.duplicate()
-	if can_dual_wield():
-		return
+	var moved := settle_off_hand()
+	if moved or _off_hand_one_hander() != null:
+		changed.emit()
+
+
+## The one-hander in the off hand (null: none; a shield, a tome and the off-hand piece of a pair do not count).
+func _off_hand_one_hander() -> ItemInstance:
 	var off := get_item(Items.EquipSlot.OFF_HAND)
 	if off == null or not off.is_weapon() or off.is_off_hand_only() or off.pair_off:
-		return
+		return null
+	return off
+
+
+## The off-hand one-hander of a hero who cannot dual-wield (the grant was lost and settle_off_hand found no
+## room): it is inert while it sits there, see off_weapon() / stat_sources(). Null otherwise.
+func stranded_off_hand() -> ItemInstance:
+	if class_data == null or can_dual_wield():
+		return null
+	return _off_hand_one_hander()
+
+
+## Puts a stranded off-hand one-hander away: into the main hand when that is empty, else into the backpack
+## when it has room. True when it moved (the caller emits [signal changed]); false when nothing is stranded or
+## there is still no room. Runs whenever a backpack slot may have freed up.
+func settle_off_hand() -> bool:
+	var off := stranded_off_hand()
+	if off == null:
+		return false
 	if get_item(Items.EquipSlot.MAIN_HAND) == null:
 		slots.erase(Items.EquipSlot.OFF_HAND)
 		slots[Items.EquipSlot.MAIN_HAND] = off
@@ -95,8 +126,8 @@ func set_granted_proficiencies(ids: Array[StringName]) -> void:
 		slots.erase(Items.EquipSlot.OFF_HAND)
 		backpack.append(off)
 	else:
-		return
-	changed.emit()
+		return false
+	return true
 
 
 func can_equip(item: ItemInstance) -> bool:
@@ -258,6 +289,7 @@ func equip(item: ItemInstance, equip_slot: int = -1) -> bool:
 	slots[equip_slot] = item
 	if item.companion != null:
 		slots[Items.EquipSlot.OFF_HAND] = item.companion
+	settle_off_hand()
 	changed.emit()
 	return true
 
@@ -287,12 +319,14 @@ func unequip(equip_slot: Items.EquipSlot) -> bool:
 func take(item: ItemInstance) -> bool:
 	if backpack.has(item):
 		backpack.erase(item)
+		settle_off_hand()
 		changed.emit()
 		return true
 	for s in slots.keys():
 		if slots[s] == item:
 			slots.erase(s)
 			_drop_companion(item)
+			settle_off_hand()  # a stranded off-hand weapon steps into a main hand that was just emptied
 			changed.emit()
 			return true
 	return false
@@ -333,9 +367,12 @@ func main_weapon() -> WeaponData:
 	return item.weapon if item != null and item.is_weapon() else null
 
 
+## The off-hand weapon that is in use: a stranded one-hander (stranded_off_hand) is not.
 func off_weapon() -> WeaponData:
 	var item := get_item(Items.EquipSlot.OFF_HAND)
-	return item.weapon if item != null and item.is_weapon() else null
+	if item == null or not item.is_weapon() or item == stranded_off_hand():
+		return null
+	return item.weapon
 
 
 ## Armor Specialization (GDD 5.3): all 8 armor slots hold the class's own armor type.
@@ -383,8 +420,10 @@ func average_item_level() -> float:
 ## Stat source name -> stats for every equipped position (see Items.source_for).
 func stat_sources() -> Dictionary[StringName, Dictionary]:
 	var out: Dictionary[StringName, Dictionary] = {}
+	var stranded := stranded_off_hand()
 	for s in slots:
-		out[Items.source_for(s)] = slots[s].equip_stats()
+		if slots[s] != stranded:
+			out[Items.source_for(s)] = slots[s].equip_stats()
 	return out
 
 

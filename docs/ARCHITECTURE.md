@@ -3749,9 +3749,13 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
   (`GRANTABLE_PROFICIENCIES = [dual_wield]`, no rank scaling, may carry `requires`). The path is
   `PlayerBonuses.has_proficiency(id)` / `granted_proficiencies()` -> `Player._on_bonuses_changed` ->
   `Equipment.set_granted_proficiencies` -> `Equipment.can_dual_wield()` (class proficiency OR granted; used by
-  `target_slots`). Losing the grant (respec) moves a one-hander out of the off hand into the backpack (into
-  the main hand if empty; it stays when the backpack is full). The weapon requirement `{"weapon": "dual_wield"}`
-  is unchanged.
+  `target_slots`). Losing the grant (respec or undo) moves a one-hander out of the off hand into the backpack
+  (into the main hand if empty: `Equipment.settle_off_hand`). With a full backpack it stays in the slot but is
+  STRANDED (`Equipment.stranded_off_hand`): `off_weapon()` and `stat_sources()` leave it out, so `Player` builds no
+  off-hand runner, the `weapon:off` and item stats are gone and `{"weapon": "dual_wield"}` is false. It is put
+  away by itself when a backpack slot frees (`remove_from_backpack`, `take`, `equip` call `settle_off_hand`), and
+  it works again if the grant returns first (`set_granted_proficiencies` emits `changed` while a one-hander sits
+  in the off hand). The weapon requirement `{"weapon": "dual_wield"}` is unchanged.
 - Headgear hooks (`scenes/visuals/onion_armor.gd`, `onion_model.gd`): an unknown headgear id gets the plain
   circlet (`_head_plain`) and the default belt; `_glove_color` / `_boot_color` and the brow tilt have explicit
   arms for `hunter_hat` and `tribal_mask`. The class packages fill `_head_hunter_hat`, `_chest_hunter`,
