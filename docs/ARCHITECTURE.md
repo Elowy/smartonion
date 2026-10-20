@@ -9,20 +9,24 @@ talents, tier sets, forging, elites, the Coin Gremlin and the shared-purse tools
 bosses, three new enemies, Artifacts, the Enchanter, consumables and the damage meter; M6b the
 Endless and Hardcore modes with the local leaderboard, five arena environments with hazards,
 mid-wave events, shrines, the Dungeon portal and the content packages (weapons, armour tiers,
-enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects); M8 the Hunter and Shaman classes (companion, totems, talents, Artifacts, sets and items), the Crossbow, Polearm and Fist Weapon types and the class-independent tier sets.
+enchants, hand-made items); M7a the sound layer, the Settings and Credits pages, the menus and the IP cleanup; M7b the graphics polish (title font and icons, visible equipment, the final environment look, combat effects); M8 the Hunter and Shaman classes (companion, totems, talents, Artifacts, sets and items), the Crossbow, Polearm and Fist Weapon types and the class-independent tier sets; M9 the meta-progression (the main profile, Class Levels, Seasonings, achievements and difficulty tiers, Heirlooms, the Wardrobe and The Onion Patch).
 
 ## Layout
 
 ```
-autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state), Audio and Settings (M7a)
+autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state), Audio and Settings (M7a),
+            Meta (M9: the main profile, unlocks, the run-end hook)
 core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
             items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
             run_summary.gd, run_card.gd (M6a); leaderboard.gd, shrines.gd, shrine_vote.gd,
-            dungeon/ (M6b); audio_ids.gd, game_settings.gd, setting_option.gd (M7a)
+            dungeon/ (M6b); audio_ids.gd, game_settings.gd, setting_option.gd (M7a);
+            meta/ (M9: profile, class levels, achievements, run report, Wardrobe); difficulty.gd, pressure.gd,
+            seasonings.gd (M9); items/heirlooms.gd (M9)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
             talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
-            environments/ shrines/ (M6b), audio/ (M7a), icons/ (M7b)
+            environments/ shrines/ (M6b), audio/ (M7a), icons/ (M7b); seasonings/ heirlooms/ cosmetics/ achievements/
+            difficulties/ pressure/ unlocks/ meta/ (M9)
 scenes/
   main/     Main – game flow state machine                         [integration]
   arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b); ArenaGround,
@@ -30,7 +34,7 @@ scenes/
   camera/   CameraRig                                                [visuals]
   world/    SpiritHealer – level object of the arena (revives ghosts)  [visuals]
   visuals/  Mats, OnionModel, EnemyModel, WeaponModel, BossModel (M6a), CartModel (M6b),
-            EquipLook, OnionArmor (M7b)  [visuals]
+            EquipLook, OnionArmor (M7b), OnionDress, OnionCosmetics (M9)  [visuals]
   vfx/      Vfx – fire-and-forget effects; EnemyCorpse (M7b)        [visuals]
   player/   Player, WeaponRunner, Projectile                        [player]
   abilities/  per-class AbilityEffect / MasteryEffect scripts (M3, M4; hunter/ and shaman/ in M8)
@@ -45,9 +49,12 @@ scenes/
   ui/       UiTheme, MainMenu, Lobby, Hud, Intermission,            [ui]
             GameOverScreen (+ MeterPage, LeaderboardPage), PauseMenu; items/ shop/ loot/ (M2),
             level_up/ trainer/ (M4), talents/ purse/ (M5), enchanter/ (M6a), shrine/ dungeon/,
-            EnvironmentRollScreen, HardcoreBadge (M6b); MenuPage, SettingsPage, CreditsPage, FpsOverlay (M7a), GameIcons (M7b)
+            EnvironmentRollScreen, HardcoreBadge (M6b); MenuPage, SettingsPage, CreditsPage, FpsOverlay (M7a), GameIcons (M7b);
+            meta/ (M9: The Onion Patch, Loadout, LookPicker, WardrobePage), seasoning_picker, seasoning_icon,
+            achievement_toast, difficulty_badge, meta_rewards_panel (M9)
 tests/      run_tests.gd runner + test_*.gd (extend TestCase); shared helpers without the
-            test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd)
+            test_ prefix (*_fakes.gd, *_base.gd, talent_effect_probe.gd, M9 fake_look_picker.gd / fake_wardrobe_page.gd);
+            error_logger.gd (M9: the error logger of the runner)
 ```
 
 The public API of every module is fixed by the stub scripts committed with the foundation
@@ -277,10 +284,18 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--players=N` | Bot count 1–4 (default 4); classes cycle through `Db.class_ids`. |
 | `--classes=a,b,...` | Bot classes in join order (cycled; an unknown id makes the argument invalid: `bad_args`, exit 1 in a smoke run; M8), e.g. `--classes=warrior,mage,paladin,rogue`. Default: `Db.class_ids`. |
 | `--companion=wolf\|boar\|owl` | M8: every bot of a class that offers that companion choice takes it (`LaunchOptions.companion`); a class without it keeps its first choice. An id outside `Db.companion_ids()` is `bad_args`. Not part of `SMOKE_RESULT`. |
+| `--profile=dev\|fresh\|max` | M9: the profile kind (`Meta.configure`). `dev` is the dev profile (the automated default: everything open, nothing selected, nothing saved); `fresh` is a new player; `max` is every class at Class Level 30, everything owned, Heirlooms at rank 5. Without `--profile-path` they live in memory only. An unknown value is `bad_args`. |
+| `--profile-path=FILE` | M9: the profile file. A normal session reads and writes `user://profile.json`; with this flag an automated run reads and writes FILE, the only way an automated run touches a profile. Together with `--profile=dev` it is `bad_args`. |
+| `--seasonings=a,b,c` | M9: the Seasonings of every bot whose class matches, in the order given. Unknown or repeated ids, a class no bot plays, or more than the class's slots → `bad_args`. A real profile drops the ids it does not own or has no slot for. |
+| `--heirloom=ID` | M9: the Heirloom every hero takes (`Db.heirlooms`); an unknown id is `bad_args`. A real profile's hero drops an Heirloom it does not own. |
+| `--difficulty=normal\|pungent\|tear_jerker` | M9: the run's difficulty tier, validated against `Db.difficulties`; a real profile caps it the way the lobby does. |
+| `--alt-weapon[=0\|1]` | M9 test hook: the bots take the alternative starting weapon (works with the dev profile). |
+| `--view=patch`, `--patch-tab=classes\|seasonings\|heirlooms\|achievements\|wardrobe` | M9 dev: opens The Onion Patch from the main menu, on that tab. |
+| `--loadout-tab=seasonings\|heirloom\|look` | M9 dev: with `--view=lobby`, the second player's Loadout opens on that tab. |
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
-| `--view=NAME` `--view-time=S` | Dev: reach a screen for a screenshot – `menu`, `settings` and `credits` (M7a: the main menu with that page open), `lobby` (bots join, P1 ready), `game`, `intermission` (the wave timer is run out), `game_over`, `victory`, `pause`; forced at S seconds of game time (default: shot time − 3 s) and held open. |
+| `--view=NAME` `--view-time=S` | Dev: reach a screen for a screenshot – `menu`, `settings` and `credits` (M7a: the main menu with that page open), `patch` (M9: The Onion Patch), `lobby` (bots join, P1 ready), `game`, `intermission` (the wave timer is run out), `game_over`, `victory`, `pause`; forced at S seconds of game time (default: shot time − 3 s) and held open. |
 | `--time-scale=X` | Overrides the time scale. |
 | `--goblin-chance=X` | M5 test hook: Coin Gremlin chance per eligible wave, 0..1 (`GoblinSpawner.chance_override`; default: the normal chance). |
 | `--elite-mult=X` | M5 test hook: multiplies the expected elites per wave (`EliteAffixes.rate_mult`, ≥ 0). |
@@ -534,11 +549,14 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
 
 ## Forward compatibility: meta-progression (GDD chapter 17, milestone M9)
 
+*Status: built in M9. The M9 chapter at the end describes what exists; this section records what the earlier
+milestones prepared for it.*
+
 Meta-progression ships last, but every system built before it must already allow it
 without rewrites:
 
 - **Stable content ids.** Every class / weapon / enemy / item base / affix / enchant /
-  ability / talent / glyph has a permanent `id: StringName`. Never rename a shipped id
+  ability / talent / Seasoning has a permanent `id: StringName`. Never rename a shipped id
   (saves, unlocks and achievements reference them).
 - **Unlock gating in content pools.** Code that draws from a content pool (level-up ability
   cards, shop offers, loot tables, lobby class list, difficulty list) filters through one
@@ -546,15 +564,15 @@ without rewrites:
   M9). Do not iterate `Db.*` directly for player-facing pools without that hook.
 - **Run statistics as events.** Notable run events (kill, boss kill, elite kill, goblin kill,
   item won by Need, legendary looted, player downed / revived, wave cleared, run won / lost,
-  difficulty) go through `RunState` signals / counters, so Class XP, Valor and achievements
+  difficulty) go through `RunState` signals / counters, so Class XP, Seeds and achievements
   can be computed from them later. Keep `RunState` per-player stats keyed by slot index.
 - **One main profile.** All persistent progress lives in a single main profile (the game
-  save) and is keyed **by class id** (Class Level, glyphs, heirlooms) or account-wide
-  (achievements, transmog, Valor) – never by slot index or device. Any player who picks a
+  save) and is keyed **by class id** (Class Level, Seasonings, heirlooms) or account-wide
+  (achievements, Wardrobe, Seeds) – never by slot index or device. Any player who picks a
   class gets that class's level and unlocks; Class XP from a run is credited per class played
   (summed when two players used the same class).
 - **Run start loadout.** Starting a run goes through one function (class, starting weapon,
-  heirloom, glyphs, transmog) so M9 can inject choices from the lobby.
+  heirloom, Seasonings, Wardrobe) so M9 can inject choices from the lobby.
 - **Versioned saves.** The end-of-wave autosave and future profile saves use a versioned
   format (`{"version": N, ...}`) with migration, stored under `user://`.
 - **Power budget.** Balance Normal difficulty with zero meta-progression; meta bonuses add
@@ -3996,3 +4014,441 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
 - Bond Totem's silent HP drain is the least conventional rule; it is pinned by tests.
 - Gale Volley's arrows are real projectiles: a Quick Draw Hunter can spawn up to five per second.
 - `Stormweaving` is flush with its tree frame at the minimum name size (cosmetic).
+
+## M9: meta-progression (profile, Class Levels, Seasonings, achievements and difficulty, Heirlooms, Wardrobe, The Onion Patch)
+
+M9 adds the persistent layer of GDD chapter 17 and the difficulty tiers of GDD 9.1. It builds on the
+foundations of the earlier milestones (stable content ids, unlock checks in the content pools, run-stat
+events, the versioned save, the bonus-effect engine). The numbers are the GDD's starting values; M9 has no
+balance pass. Two rules hold throughout:
+
+- **Automated runs never touch the profile.** `--smoke`, `--demo`, `--view`, `--screenshot`, headless runs
+  and the unit tests use the dev profile: everything unlocked, no raw-power bonus, nothing selected, Normal,
+  and no file IO. A Normal run with the dev profile is the base game.
+- **Gameplay randomness is untouched.** No M9 code draws from `RunState.rng`. The Tear-Jerker pressure uses
+  its own generator (`RunState.pressure_rng = sub_rng(RunState.SALT_PRESSURE)`), and the Seasoning deck hook
+  changes weights only.
+
+Names: the player-visible M9 names (Seasoning, Seeds, Wardrobe, Pungent, Tear-Jerker) follow the GDD's
+"Átnevezések (M9)" table. Every player-visible name is checked by `tests/test_m7_ip_names.gd`, whose
+banned lists were extended for the M9 design terms.
+
+### Modules and files
+
+| Area | Files | Role |
+|---|---|---|
+| Autoload | `autoload/meta.gd` (`Meta`) | Owns the current profile; picks it at startup; unlock questions; the run-end hook; Seeds; loadouts; achievements; Heirloom and Patch helpers |
+| Profile | `core/meta/profile.gd` (`Profile`) | Data, file format, versioning, migration. A plain `RefCounted`, not an autoload |
+| Run snapshot | `core/meta/run_report.gd` (`RunReport`) | A snapshot of a finished run, built once per run |
+| Class Levels | `core/meta/class_levels.gd` (`ClassLevels`), `data/class_level_table.gd`, `data/class_path_data.gd`, `data/meta/class_levels.tres`, `data/meta/class_paths/*.tres` | Class XP, levels, the reward path, Seeds per run, raw power |
+| Unlock gates | `data/unlock_gate_data.gd`, `data/unlocks/*.tres` (42) | Opt-in locks for classes, abilities, capstones and Legendaries |
+| Seasonings | `core/seasonings.gd` (`Seasonings`), `data/seasoning_data.gd`, `data/seasonings/*.tres` (56), `scenes/ui/seasoning_picker.gd`, `seasoning_icon.gd` | Side-grade data, slots, bonus source, deck weight, the picker |
+| Achievements | `core/meta/achievement_engine.gd`, `achievement_progress.gd`, `achievement_texts.gd`, `player_titles.gd`, `data/achievement_data.gd`, `data/achievements/*.tres` (40), `scenes/ui/achievement_toast.gd`, `meta_rewards_panel.gd` | Conditions, counters, rewards, titles, toasts, the end-screen block |
+| Difficulty | `core/difficulty.gd` (`Difficulty`), `core/pressure.gd` (`Pressure`), `data/difficulty_data.gd`, `data/pressure_data.gd`, `data/difficulties/*.tres` (3), `data/pressure/*.tres` (6), `scenes/ui/difficulty_badge.gd` | Tiers, multipliers, the pressure rotation, the HUD chip |
+| Heirlooms | `core/items/heirlooms.gd` (`Heirlooms`), `data/heirloom_data.gd`, `data/heirlooms/*.tres` (10); `core/items/item_instance.gd` (the bound rule) | Items, scaling, the bound rule, perks, ranks |
+| Wardrobe | `core/meta/wardrobe.gd` (`Wardrobe`), `data/cosmetic_data.gd`, `data/cosmetics/*.tres` (29), `scenes/visuals/onion_dress.gd`, `onion_cosmetics.gd` | Look ids, the collection, cosmetics, dressing the model |
+| UI | `scenes/ui/meta/` (`onion_patch_page.gd`, `patch_*_tab.gd`, `loadout_screen.gd`, `loadout_heirloom_tab.gd`, `look_picker.gd`, `wardrobe_page.gd`, `wardrobe_grid.gd`, `wardrobe_icon.gd`, `wardrobe_entry.gd`, `rank_dots.gd`) | The Onion Patch, the lobby Loadout, the Look picker, the Wardrobe page |
+| Test tooling | `tests/error_logger.gd` (`TestErrorLogger`) | The stricter test runner (see Tests) |
+
+### The profile (`autoload/meta.gd`, `core/meta/profile.gd`)
+
+**Which profile.** `Meta.configure_from_command_line()` runs once at startup and calls
+`Meta.configure(kind, path, automated)`:
+
+- a normal session loads `user://profile.json` and saves it when something changes;
+- an automated run (`Settings.is_automated_run()`) gets the dev profile and no file, unless `--profile-path`
+  is given;
+- `--profile=dev|fresh|max` selects an in-memory profile: `Profile.dev()`, `Profile.fresh()`, or
+  `Profile.max_profile(class_ids, heirloom_ids)` (every class at Class Level 30, everything owned, Heirlooms
+  at rank 5);
+- `--profile-path=FILE` reads and writes that file. This is the only way an automated run writes a profile.
+
+`Meta.profile_replaced` is emitted after a change. Tests call `Meta.configure` to switch profiles.
+
+**Contents** (`Profile.to_dict()`, `FORMAT_VERSION` 1): `version`, `created_at`, `classes`
+(`{class_id: {xp, level}}`; the stored level never drops), `unlocks` (`{kind: {id: true}}`),
+`achievements` (`{id: unix time}`), `counters` (`{name: int}`), `seeds`, `seeds_earned`, `heirloom_ranks`,
+`loadouts` (`{class_id: {seasonings, heirloom, looks, alt_weapon, tabard, hat, glow, dye}}`) and
+`selected_title`. Unknown keys and ids are kept. Unlocks are stored, not derived (a retuned table is handled
+by `ClassLevels.sync_unlocks`, not by a migration).
+
+**File handling** (`Profile.load_file`, `save_file`):
+
+- a missing file is a fresh profile (`is_new`, no warning: the normal first launch);
+- a file that cannot be parsed, or has no `version`, is moved to `<path>.corrupt` and replaced by a fresh
+  profile (`load_error` = `corrupt`, one warning);
+- a newer `version`, or an unreadable path, gives a read-only fresh profile: saves are refused and the file
+  is never overwritten;
+- writes go through `<path>.tmp` and a rename, so a crash keeps the old file.
+
+**Migration.** `Profile.migrate(data)` runs the steps of `Profile._migration_steps()`
+(`{from_version: Callable(Dictionary) -> Dictionary}`). To change the format, add the step and raise
+`FORMAT_VERSION`. Missing keys are default-filled, so adding a field needs no version bump.
+
+**Saves.** One save per run end (after all listeners, below), one per purchase, and one per mid-run
+achievement (`Meta.save()`). Mutators called inside a run-end listener (`earn_seeds`, `spend_seeds`,
+`unlock`) do not save; the dispatch saves once. `Meta.save_count` counts writes for the tests.
+
+### Unlock questions and the gated pools
+
+`Meta.is_unlocked(kind, id, class_id := &"")` answers every unlock question:
+
+- the dev and max profiles: always true;
+- **collectibles** (`seasoning`, `heirloom`, `cosmetic`, `title`, `look`; `Profile.COLLECTIBLE_KINDS`): true
+  only when owned. Purchases call `Meta.unlock(kind, id)`;
+- **difficulty** (per class, stored as `difficulty:<class>`): the first tier is always open; the others open
+  once unlocked for that class (`Meta.is_difficulty_unlocked`, `party_difficulty_cap`, `clamp_difficulty`);
+- **class, ability, capstone_tree, legendary**: opt-in. Locked only when an `UnlockGateData` exists
+  (`data/unlocks/*.tres`, or `Db.add_unlock_gate(gate)` in code) and the profile has not unlocked it. Content
+  without a gate is open. The 42 gate files are: `class_hunter`, `class_shaman`; 14 `ability_<id>` (the two
+  learnable abilities of each class, at Class Level 2 and 4); 21 `capstone_<tree id>` (Class Levels 8 / 16 / 24);
+  5 `legendary_<id>` (achievement-gated).
+
+`Meta.unlock_hint(kind, id)` returns the gate's hint (shown in the lobby and the Patch), or "Locked".
+
+| Pool | Gate |
+|---|---|
+| Class list (lobby, bots, `PlayerManager.join`) | `Meta.unlocked_class_ids()`, `Meta.default_class()`, `Meta.enforce_class_locks(slots)` in `Main.start_run`, `Lobby.ready_block_reason` |
+| Level-up ability cards | `Db.ability_pool(class)` filters the `ability` gates |
+| Capstone talents | `TalentState.capstone_locked` / `capstone_lock_text` inside `add_block_reason`; `TalentNode.state_for` returns LOCKED; the bots skip it through `can_add` |
+| Legendaries | `ItemGenerator.unique_available` (kind `legendary`, id = the unique id); the Forge (`legendary_<weapon_id>`, `ForgeLegendaryData.unlock_id()`) |
+| Difficulty tiers | `Meta.is_difficulty_unlocked`; `Main._difficulty_for` caps the lobby's choice with `Meta.clamp_difficulty` |
+
+Items, enchants, sets, consumables and shrines are not gated: `Db.is_unlocked(id)` without a kind returns true.
+
+### Run end: `RunReport`, the listeners and the single save
+
+`Main.end_run` (victory or defeat), and an abandoned run (quit to the menu, or the last hero dropped) after at
+least one cleared wave, call `Meta.record_run(RunReport.collect(victory, abandoned, extras))` once.
+`Main.meta_result` keeps the returned dictionary for the end screen. `record_run` does nothing for the dev
+profile, for a null report, or for a report already recorded (`RunReport.recorded`).
+
+`RunReport` (`core/meta/run_report.gd`) is a snapshot: `victory`, `abandoned`, `mode`, `hardcore`, `endless`,
+`environment`, `difficulty`, `party` (class ids in slot order), `wave`, `waves_cleared`, `stats`
+(`RunReport.STAT_IDS`), `heroes` (per hero still in the run: class, alive, the hero stats, the `equipped` item
+summaries with their `EquipLook`, and `hero_facts`: capstones taken, abilities at Rank V, active set bonuses)
+and `flags` (`victory`, `abandoned`, `hardcore`, `endless`, `solo`, `full_party`, `no_downs`,
+`final_boss_down`). `RunReport.make(...)` builds one in tests.
+
+**Dispatch order.** The listeners run in priority order (lower first, ties by registration order), then ONE
+save, then the signals:
+
+1. `counters` (`PRIORITY_COUNTERS` = −1000): `AchievementEngine.update_counters`, so the later listeners see
+   the run already counted;
+2. at the default priority, in registration order: `class_xp` (`ClassLevels.on_run_xp`), `seeds`
+   (`ClassLevels.on_run_seeds`), `wardrobe` (`Wardrobe.register`);
+3. `achievements` (`PRIORITY_ACHIEVEMENTS` = 1000): evaluates every achievement, after the XP, Seeds and looks.
+
+Other code adds a listener with `Meta.add_run_listener(id, callable, priority)`; `remove_run_listener(id)` and
+`listener_ids()` exist too; registering an id again replaces it. The result dictionary has `recorded`,
+`listeners`, `achievements`, `save_error`, `class_xp` (one entry per class), `level_seeds`, `seeds`,
+`new_looks` and `looks_collected`. The signals come after the save: `achievement_unlocked(id)` per new
+achievement, `run_recorded(report, result)`, and `seeds_changed(total, delta)` on any Seeds change.
+
+**Mid-run checks.** `Meta.check_achievements(report)` runs on a live report (`RunReport.collect(false, false,
+Main._report_extras())`) for a real profile (`Meta.records_runs()`): when a wave is cleared, a boss wave's boss
+dies, an Artifact drops, a Loot Goblin dies, a dungeon is finished, and a loot roll resolves. The counter-based
+achievements wait for the run end.
+
+### Class Levels (`core/meta/class_levels.gd`)
+
+- **Pure maths:** `ClassLevels.run_xp(report, profile)`, `run_seeds(report)`, `xp_for_level`, `level_for_xp`,
+  `next_rewards(class, level, n)`, `summary_text(result)` (the one-line log form).
+- **Data:** `data/meta/class_levels.tres` (`ClassLevelTable`, `Db.class_levels`) holds `xp_to_next` (29 values,
+  summing to 33 205), the XP constants (wave base 6, +0.5 per wave to wave 30, kill 0.03, elite 1.5 capped at 60,
+  boss 40, final boss 150), the catch-up constants (gap 10, below level 20, ×1.5), `first_win_bonus` per tier
+  (250 / 400 / 600), the Seeds constants, and the `rewards` list. Reward kinds: `ability`, `capstone`,
+  `seasoning_slot`, `seasoning_tier`, `heirloom_slot`, `heirloom_gift`, `alt_weapon`, `cosmetic`, `title`, `gold`,
+  `primary_pct`, `reroll`, `backpack`.
+- **Per class:** `data/meta/class_paths/<class>.tres` (`ClassPathData`, `Db.class_path(id)`): `deck_abilities`
+  (the two learnables that start locked), `capstone_trees` (in the order of levels 8 / 16 / 24),
+  `alt_main_hand` / `alt_off_hand`, `gift_heirloom`, `cosmetics` (tabard, hat, glow) and `title_id`.
+- **Class XP per run** (`run_xp`): each hero is a share of the team's sum over the cleared waves
+  (`6 + 0.5·min(w, 30)`), the elites (≤ 60), the bosses (40 each) and the final boss (150). A class gets
+  `shares × team_xp + 0.03 × its heroes' kills`, times the difficulty XP multiplier and the catch-up, plus the
+  first-win bonus (a profile counter `first_win:<tier>:<class>`, never multiplied). Two heroes of one class are
+  two shares. "Final boss down" is the `final_boss_down` flag.
+- **Seeds per run** (`run_seeds`): `1.5 × waves + 12 × bosses + 40 (final boss) + floor(team kills / 400)`, times
+  the difficulty Seeds multiplier and `1 + 0.1 × (players − 1)`, capped at 400. The multipliers are read from
+  `DifficultyData` (`xp_mult`, `seeds_mult`); `ClassLevels.xp_mult_hook` / `seeds_mult_hook` are test seams.
+- **Awarding** (`award_xp(profile, class, xp)`): adds the XP, raises the stored level to the level the XP reaches
+  (never lowers it), pays the Seeds gift `5 + L` for every new level (doubled on the seven levels that have no
+  other reward), and grants the new levels' rewards (`grant_level`). `Meta.configure` calls `sync_unlocks` for
+  every real profile, so a retuned table or a max profile gets its unlocks.
+- **Raw power** (real profiles only, `Meta.raw_power_enabled()`): `Meta.raw_power(class)` sums gold,
+  primary-stat percent, rerolls and backpack up to the class level. `Meta.apply_run_start(slots)` pays the gold
+  to the shared wallet (`RunState.grant_starting_gold`) and the free rerolls to `RunState.free_rerolls`
+  (`Shop.reroll_cost()` is 0 while any remain). The backpack bonus goes to `equipment.backpack_size`; the
+  primary share is the PlayerBonuses source `meta` (`Player.META_SOURCE`), re-read at every wave start by
+  `Player.refresh_meta_power`.
+- **Alternative start weapon:** `PlayerSlot.alt_weapon`; `Meta.alt_weapon_unlocked(class)` (level 12);
+  `Meta.enforce_alt_weapons(slots)` in `Main.start_run`; `Equipment.equip_starting_weapons(alt)`. The lobby
+  toggles it with LB (`Lobby.toggle_alt_weapon`); the class default is `Meta.toggle_default_alt_weapon`.
+- **Slots and tiers:** `Meta.seasoning_slots(class)` answers 0, 1, 2 or 3 (levels 3 / 10 / 20);
+  `Meta.seasoning_tier_unlocked(class, tier)` answers for tiers 1–5 (levels 3 / 6 / 9 / 13 / 17);
+  `Meta.heirloom_slots(class)` answers 0 below level 5 and 1 from it. The dev and max profiles answer full.
+- **UI:** the lobby card shows a "Lv N" badge and an XP strip (`Meta.shows_class_levels()`, real profiles only).
+  The end screen has a fourth page, "Progress" (`GameOverScreen.progress_rows(meta)`), whose tab exists only for
+  a recorded run.
+
+### Seasonings (`core/seasonings.gd`, `data/seasoning_data.gd`)
+
+- **Data:** `SeasoningData` (`id` `ssn_<key>`, `class_id`, `ability`, `display_name`, `text`, `tier`, `entries`).
+  Each entry is a `BonusVocabulary` ability entry: `{"kind":"ability","match":{"id":...},"mods":{...},
+  "requires":{"knows":...}}`. `requires` is set only for learnable abilities (34 of the 56); the pseudo targets
+  are `hunter_companion` and `shaman_echo`. `SeasoningData.problems()` checks the id prefix, uniqueness,
+  the class, the target, and `BonusVocabulary.validate` of every entry.
+- **Tiers:** `SeasoningData.TIER_LEVELS` (3, 6, 9, 13, 17) and `TIER_PRICES` (60, 80, 100, 140, 180; A 160;
+  AA 240). The A and AA tiers name their achievement through `unlock_achievement()` (`ach_clear_<class>` and
+  `ach_pungent_<class>`); the Patch enforces it (`Meta.seasoning_lock_reason`, `Meta.buy_seasoning`).
+  `Seasonings.owned(s)` asks only the profile's `seasoning` unlock.
+- **Resolution:** `Seasonings.resolve(class, ids)` keeps the ids that exist, belong to the class, are owned and
+  are unique, at most `slot_count` of them, in the given order. `Seasonings.apply(player)` (called from
+  `Player.create`) turns the chosen rows into the PlayerBonuses source `&"seasoning"` (`Seasonings.SOURCE`), with
+  copies tagged by the Seasoning id. With no selection nothing is set, so the base game's path is untouched.
+- **Slot count:** `Seasonings.slot_count(class)` clamps `Meta.seasoning_slots(class)` to `MAX_SLOTS` (3).
+- **Deck weight:** `LevelUpDeck.ability_candidates` multiplies the weight of a NEW ability by
+  `Seasonings.card_weight_mult(player, id)` (×3 when an equipped Seasoning changes it and the hero has not
+  learned it). Weights only: no extra RNG draw.
+- **Dormancy:** a Seasoning on a learnable ability is inactive until `requires.knows` holds; the check follows
+  `AbilityRunner.slots_changed`.
+- **Lobby:** LT opens the Loadout's Seasonings tab, which embeds `SeasoningPicker` (`set_embedded(true)`).
+  `Seasonings.toggle` calls `Meta.remember_loadout(slot)` and saves (real profiles); `Seasonings.prune` runs after
+  a class change, and `Meta.apply_loadout(slot)` restores the remembered picks when a player joins or changes
+  class. `SeasoningIcon` draws the icons and the card's socket pill.
+- **Flag:** `--seasonings=id,id,id` (see Launch options).
+
+### Achievements and titles (`core/meta/achievement_engine.gd`, `achievement_progress.gd`, `achievement_texts.gd`, `player_titles.gd`)
+
+- **Data:** `AchievementData` (40 files in `data/achievements/`, `Db.achievements`): `id`, `display_name`,
+  `description`, `points`, `hidden`, `condition_kind`, `condition_params`, `rewards` (dictionaries of `kind`,
+  `id`, and `class_id` or `name` where needed). `AchievementEngine.validate(data)` lists problems; a content
+  test runs it.
+- **Conditions** (flat dictionaries; compounds nest): `stat_at_least` / `stat_at_most` (run or hero scope, an
+  optional class), `run_flag`, `counter_at_least`, `class_in_party`, `class_level_at_least`,
+  `achievements_at_least`, `points_at_least`, `unlocked`, `all_of`, `any_of`, `not`. Added in M9:
+  `total_at_least` (lifetime plus the run in progress), `unlock_count_at_least` (e.g. looks collected),
+  `difficulty_at_least`. `AchievementEngine.register_condition(kind, callable)` adds a kind.
+- **Counters** (`update_counters`): `runs`, `wins`, `runs:<class>`, `wins:<class>`, `runs_long`,
+  `wins:<class>:<tier>` (a win also counts on every lower tier), `env_wins:<arena>`, `total:<stat>`,
+  `best:<stat>`, `best_wave:<class>`, `first_win:<tier>:<class>`. Capped at 9999.
+- **Evaluation** repeats until nothing new unlocks, since points and counts can depend on other achievements.
+  `Meta.check_achievements(report := null)` runs it outside a run end; `Meta.achievement_points()` sums the points.
+- **Rewards** (`AchievementEngine.grant_rewards`): the unlock kinds `class` (Hunter, Shaman), `legendary`,
+  `title`, `heirloom`, `cosmetic`, and `difficulty` (with `class_id`). Each new achievement pays
+  `Meta.SEEDS_PER_POINT` (5) Seeds per point. `PlayerTitles.POINT_TITLES` grants the point titles at 100, 250,
+  450 and 600 points; the class titles at Class Level 30 are granted by LEVELS.
+- **Progress** for the Patch's bars: `AchievementProgress.of(data, profile)` returns `{known, value, goal, done}`.
+- **Toasts:** `AchievementToast` (a HUD child; `Hud.show_achievement(data)`) slides in on the right edge, holds for
+  3.4 s and keeps a queue of up to 8. It waits while the HUD is hidden (the market) and plays at the next wave.
+  The end screen's `MetaRewardsPanel` (on the Summary page under "Best:") is hidden when nothing unlocked.
+
+### Difficulty and pressure (`core/difficulty.gd`, `core/pressure.gd`)
+
+- **`DifficultyData`** (`data/difficulties/{normal,pungent,tear_jerker}.tres`; `Db.difficulties`, `Db.difficulty_ids`
+  in tier order): `enemy_hp_mult`, `enemy_damage_mult`, `spawn_density_mult`, `elite_rate_mult`,
+  `shop_price_mult`, `xp_mult`, `seeds_mult`, `pressure`, `extra_elite_affixes` (reserved, unused), `color`.
+- **`Difficulty`** (static) is the one place every system asks. Normal multiplies by exactly 1.0 everywhere, so
+  a Normal automated run is unchanged. Where each number is read:
+  - enemy HP and damage: `Enemy.setup` (next to `Shrines.enemy_hp_mult`), `Boss.create`; the contact and
+    projectile damage;
+  - spawn density: `WaveDirector.spawn_budget_per_second`, normal waves only (boss-wave adds keep their rate;
+    `MAX_ENEMIES` stays 150);
+  - elite rate: `Main.start_run` sets `EliteAffixes.rate_mult`; the pressure's part comes from `Pressure`;
+  - prices: `Difficulty.price(base)` in `Shop._make_offer` (the item keeps its base `buy_price` for sell values),
+    the consumables row, the Black Market, `AbilityRunner.trainer_price` and `Enchanter.gold_price`. Rerolls and
+    Arcane Dust are not affected;
+  - XP and Seeds: `RunState.difficulty_xp_mult()` / `difficulty_seeds_mult()`.
+- **Selection:** `RunState.start_run(..., p_difficulty)` sets `RunState.difficulty`. `Main.configure_difficulty(id)`
+  stores the lobby's choice in `options.difficulty`; `Main._difficulty_for(slots)` caps it with
+  `Meta.clamp_difficulty` and warns when it lowers the tier. The lobby's `Lobby.cycle_difficulty(slot)` and
+  `set_difficulty(id)` drive it, with the signal `difficulty_changed(id)`; the button is SELECT (Tab). A class
+  change that lowers the cap lowers the choice. The choice lasts for the session; the profile has no preferences
+  store. A change during the start countdown un-readies the players.
+- **Pressure** (`Pressure`, static; `PressureData` in `data/pressure/prs_*.tres`, six modifiers, `Db.pressures`,
+  order `Db.PRESSURE_ORDER`): the fields are `enemy_hp_pct`, `enemy_damage_pct`, `enemy_speed_pct`,
+  `spawn_rate_pct`, `elite_rate_pct`, `gold_pct`, `xp_pct` and `hero_effects` (BonusVocabulary entries).
+  Rotation: waves 1–2 are calm; from wave 3, every wave except the boss and elite waves gets one, drawn
+  uniformly, never the previous wave's. `Pressure.end_wave` (the break path, next to the shrines) rolls the next
+  pick from `RunState.pressure_rng`; `Pressure.begin_wave(wave, players)` (before the director starts the wave)
+  makes it live. The multipliers are 1.0 unless `RunState.pressure_live`, so the market and the dungeon never see
+  them. Hero effects are applied to each hero as the PlayerBonuses source `pressure`. HUD: the `DifficultyBadge`
+  pill, the pressure chip (it keeps its width), the wave banner's sub-line and the break screen's "Next up" suffix.
+- **Leaderboard:** the category key gets `/pungent` or `/tear_jerker` (`Leaderboard.category_key(..., difficulty)`),
+  and entries carry `"difficulty"`. The file is now FORMAT_VERSION 2: `Leaderboard.migrate` adds
+  `"difficulty": "normal"` to version-1 entries, and the plain Normal keys do not move. A newer file is read-only.
+- **`SMOKE_RESULT`** gets `difficulty` and `pressures` (`{wave: id}`) only on a Pungent or Tear-Jerker run.
+
+### Heirlooms (`core/items/heirlooms.gd`, `data/heirloom_data.gd`)
+
+- **Data:** `HeirloomData` (`id`, `display_name`, `slot_type`, `armor_rule`, `weights` (stat → share), `perk3`,
+  `perk5` (BonusVocabulary entries), the texts, `gift_class`, `achievement`). Ten files in `data/heirlooms/`,
+  `Db.heirlooms`, `Db.HEIRLOOM_ORDER`. `HeirloomData.problems()` validates them.
+- **Formula** (pure, tested as a table): `Heirlooms.budget_for(wave, rank) = (2.5 + 0.5·w) × slot_mult ×
+  (1 + 0.08·(rank − 1))`. A stat is `budget × share / ItemGenerator.STAT_PRICE_i`, snapped to 0.1, with
+  "primary" meaning the hero's primary stat; an armour piece adds `ItemGenerator.implicit_armor` for the hero's
+  armour type. A weapon Heirloom multiplies its base damage by `1 + (0.03 + 0.003·(rank − 1))·w` and has no
+  stats. The item level is `5 + 2·w + 2·(rank − 1)`; the look's rarity is 1 to 3, by rank (`rarity_for`).
+  `Heirlooms.stats_for(data, class, wave, rank)` and `item_level_for` are the pure helpers.
+- **Lifecycle:**
+  - *Pick:* `PlayerSlot.heirloom`; `Heirlooms.available(class, id)` (the class has the slot and the profile owns
+    the Heirloom); `Heirlooms.toggle(slot, id)` returns `RESULT_ADDED / REMOVED / LOCKED / NO_SLOT / INVALID`;
+    `Heirlooms.prune` runs after a class change.
+  - *Start:* `Player.create` calls `Heirlooms.equip_at_start(player)` after the starting weapons and before
+    `apply_equipment`. The item is built for wave 1 at the profile's rank (1 for the dev profile, 5 for max) and
+    equipped. Armour takes the hero's armour type. The Ancestral Peeler goes into the main hand and copies the
+    start weapon's type and damage (Standard or Alternative). A pick the hero cannot carry is dropped silently.
+  - *Wave start:* `Main.start_wave` calls `Heirlooms.rescale_player(player, wave)` BEFORE `Player.begin_wave`, so
+    the new Max HP is healed to. Every Heirloom the hero holds (worn or in the pack) is recomputed in place (the
+    same `ItemInstance`), then `equipment.changed` fires once. A dungeon entry does not rescale.
+  - *Perks:* `Heirlooms.effects_for(equipment)` gives the PlayerBonuses source `&"heirloom"` (`Heirlooms.SOURCE`),
+    for the EQUIPPED Heirloom only: perk3 from rank 3, perk5 from rank 5.
+  - *Ranks:* `Meta.rank_up_heirloom(id)` pays the Seeds and sets the rank in ONE save (not a spend plus a second
+    write); it emits `seeds_changed` and `heirloom_ranked(id, rank)`. `Meta.heirloom_rank_up_reason(id)` gives the
+    refusal text.
+  - *Gifts:* `ClassPathData.gift_heirloom` is unlocked at Class Level 5 (`ClassLevels.grant_level`). The three
+    achievement Heirlooms come from the `heirloom` rewards of their achievements.
+- **The bound rule** (`ItemInstance.is_bound()`), which every path asks:
+  - `can_sell()`, `can_trade()` and `can_disenchant()` are false; PlayerPanel greys out Sell and Trade, and
+    `_do_trade` refuses;
+  - `Equipment.remove_from_backpack` is the central guard for sell, trade and disenchant;
+  - `Forge` (`REASON_BOUND`, `is_forgeable` false) and `Enchanter` (`blocked_reason`, `is_enchantable`,
+    `dust_for` 0);
+  - `RunState.add_team_loot` refuses it, so it never enters `team_loot`; `LootDrops._place_bag` places no bag;
+    `LootRoll.can_need` is false;
+  - `ItemTooltip._heirloom_block` shows the perks and the rank.
+- **Flag** `--heirloom=<id>`: `Main._apply_heirloom_flag` puts it on every slot in `start_run`.
+
+### Wardrobe (`core/meta/wardrobe.gd`, `scenes/visuals/onion_dress.gd`, `onion_cosmetics.gd`)
+
+- **Look ids** (`Wardrobe`, static): `g.<slot>.<armor 0-3>.<tier 0-2>.<rarity 0-5>` (a generated look, from
+  `EquipLook.key()` without set or unique), `s.<slot>.<set_id>` (a tier-set piece) and `u.<slot>.<unique_id>` (a
+  hand-made unique). The slot is `head`, `shoulders` or `chest` (`Profile.LOOK_SLOTS`).
+  `Wardrobe.look_id(look)`, `look_id_of_item(item)` and `look_from_id(id)` are inverse (`look_from_id` returns null
+  for a malformed or unknown id). An item whose set or unique the data does not know falls back to its generated
+  id, so a recorded id always resolves.
+- **Collection:** `Wardrobe.all_look_ids(false)` has 256 ids: 180 generated, 36 tier-set and 40 unique.
+  `all_look_ids(true)` also returns the 36 Artifact-rarity looks. `Wardrobe.MAX_COLLECTED_RARITY` (Legendary) is
+  the one constant that changes the rule.
+- **Recording** (real profiles only): the run-end listener `wardrobe` (default priority, after the counters and
+  the class XP, before the achievements, so `ach_wardrobe_150` sees the new looks) reads
+  `report.heroes[].equipped[].look`, unlocks each look, and fills `new_looks` and `looks_collected`. A
+  `RunState.wave_changed` hook (`Wardrobe.record_worn_now()`) collects what every hero wears at each wave start and
+  saves once when something is new. Known limit: an item worn and swapped out during a run is caught only by that
+  hook, not by the run-end snapshot.
+- **Cosmetics:** `CosmeticData` (`kind` tabard, hat, glow or dye; `style`, `color`, `trim`, `price`, `order`); 29
+  files in `data/cosmetics/`. Ownership is `profile.has_unlock(&"cosmetic", id)`. `Wardrobe.buy_cosmetic(id)` returns
+  `RESULT_BOUGHT / OWNED / POOR / INVALID`; it unlocks first and then spends (a crash between the writes never loses
+  Seeds without the dye). Dyes cost 100 Seeds.
+- **Dressing:** `PlayerSlot.looks` (`{slot name: look id}`) and `PlayerSlot.cosmetics` (`{"tabard" | "hat" | "glow" |
+  "dye": id}`) become `Player.look_overrides` and `cosmetic_overrides` in `Player.create`, then
+  `OnionModel.set_dress(OnionDress.from_ids(look_ids, cosmetic_ids))` right after the model's setup, and only when
+  something is selected. A look override replaces the worn item's model in that slot for show, whatever the armour
+  type; no override means the worn item; an empty slot without an override shows the class starter piece. A hat
+  replaces the head piece; the tabard and the glow are additions. `OnionDress.key()` is the parallel of
+  `EquipLook.key()`; the model rebuilds the gear only when a key changes. `OnionModel.worn_look(slot)` and
+  `equipment_key()` report the look that is shown.
+- **Cosmetic only:** no stat, equipment or bonus source is touched. A test compares the stat snapshot of a dressed
+  hero with a plain one.
+- **Persistence:** `PlayerSlot.meta_loadout()` and `set_meta_loadout()` carry the looks and cosmetics;
+  `Profile.COSMETIC_KEYS`, `Profile.normalize_loadout` and `Meta.sanitize_loadout` keep only collected looks of the
+  right slot and owned cosmetics of the right kind.
+
+### Loadout, The Onion Patch and the picker contracts (`scenes/ui/meta/`)
+
+- **Lobby Loadout** (`LoadoutScreen`, a PanelContainer over the hero's card; `Lobby.open_loadout(slot, first_tab)`;
+  `Lobby.open_seasoning_picker(slot)` is kept as a shortcut). Its tabs are Seasonings (the embedded
+  `SeasoningPicker`), Heirloom (`LoadoutHeirloomTab`: ten rows; A goes through `Heirlooms.toggle`) and Look (the
+  `LookPicker`). While it is open it gets all of the owner's input: LB / RB or ◀ ▶ switch tabs, B or LT close it,
+  and LB is the alternative weapon only while it is closed. Every tab fits the smallest 1080p lobby card (a test).
+- **The Onion Patch** (`OnionPatchPage extends MenuPage`, opened from `MainMenu` between Play and Settings;
+  `UiPads.BUTTONS` gained the shoulder buttons). Five tabs, each a `PatchTab` (base class with the hooks
+  `on_open`, `refresh`, `on_nav`, `on_accept` and `action_text`, and the signal `message_posted`): `patch_classes_tab.gd`,
+  `patch_seasonings_tab.gd`, `patch_heirlooms_tab.gd`, `patch_achievements_tab.gd`, `patch_wardrobe_tab.gd`. Every
+  purchase goes through `Meta` and saves at once. Any player can drive the page: it takes the driver's slot, or
+  "anyone" (the Q / E keys).
+- **Contracts between the packages.** The embedded pages are duck-typed, so each package builds and tests alone.
+  `LookPicker`: `static create(slot)`, the signal `closed`, `open(slot)`, `handle_input(inp)`. It reads `slot.input`
+  itself when `self_driven` is true; a host that routes the input sets it false. `WardrobePage`: `static create()`,
+  `handle_input(inp) -> bool` (false for B, LB, RB and Up on the filter row, so the host keeps its back and tab
+  keys), `handle_nav(dir)`, `handle_accept()`, `refresh()`, `set_preview_class(cd, color)`, `counts_for(i)` and the
+  signal `purchased(id)`. `LoadoutScreen` and `PatchWardrobeTab` reach them through `Object.call` and `has_method`.
+- **Minimum sizes:** `LookPicker` 760 × 560; `WardrobePage` 1000 × 520 (it fills what its host gives it).
+
+### Launch options (M9)
+
+The flags are in the command-line table above: `--profile`, `--profile-path`, `--seasonings`, `--heirloom`,
+`--difficulty`, `--alt-weapon`, `--view=patch` with `--patch-tab`, and `--loadout-tab` with `--view=lobby`. Each
+unknown value is `bad_args`, and a smoke run exits 1. Examples:
+
+```bash
+godot --headless --path . -- --smoke --waves=3 --seasonings=ssn_smoked_paprika,ssn_cracked_pepper,ssn_cayenne_rush --classes=warrior,mage,paladin,rogue
+godot --headless --path . -- --smoke --waves=11 --seed=9 --profile=max --difficulty=pungent --heirloom=heir_old_layers
+godot --headless --path . -- --smoke --waves=6 --profile=fresh --profile-path=user://m9_check.json
+```
+
+The dev views for screenshots: `tools/showcase` with `--view=wardrobe --set=mix|tabards|hats|glows|dyes`,
+`--view=wardrobe_page --filter=0..4 --focus=grid --pick=N --class=<id>` and `--view=look_picker --list=1 --row=N
+--class=<id>`. They use an in-memory profile and write nothing.
+
+### Trailer tooling (`tools/trailer/`)
+
+A development pipeline that makes the Steam-page trailer from the real game: bots play, Godot's Movie Maker records,
+and ffmpeg edits. `tools/trailer/make_trailer.sh` renders the missing takes (`trailer.gd` is the SceneTree entry,
+`trailer_director.gd` fast-forwards, marks the clips and drives the camera, HUD and break screens, `trailer_takes.gd`
+holds the takes, and the `trailer_shots.gd`, `trailer_gear.gd`, `trailer_stage.gd` and `cards.gd` files hold the
+shot recipes, the dressing and the text cards). `tools/trailer/edit.py` cuts the shot list on the beat grid, lays the
+cards over, mixes and encodes. `tools/trailer/rotate_card.py` renders the three-second "Rotate your device" card for
+phones held upright. Nothing in the gameplay code changes. The output goes to `build/trailer`, which is git-ignored;
+no video is committed. The requirements, the takes and how to change them are in `tools/trailer/README.md`.
+
+### Tests and the stricter runner
+
+- **Error attribution** (`tests/run_tests.gd`, `tests/error_logger.gd`). The runner installs `TestErrorLogger`, a
+  `Logger` (the same `OS.add_logger` mechanism as the smoke runs' `ErrorCounter`) that keeps every non-warning entry
+  with its message, location and script stack. For each test it runs `before_each`, the test (awaiting `finished` for
+  async tests) and `after_each`, then `TestCase.review_errors(logger.drain(), stray)`. An unexpected error fails the
+  test whose window it falls in; an error between tests fails the next one; errors outside any test fail on their
+  own. `expect_error(substring, times := 1)` declares an expected error (matched on the message only, and an
+  expectation that does not happen also fails). `--async-timeout=<sec>` (default 120 s) fails an async test that never
+  emits `finished`, which an error can cause. `--test-dir=<dir>` lets `tests/test_runner.gd` run fixture tests in a child
+  process (12 tests of the runner itself).
+- **Hidden failures.** Under the stricter runner the whole suite had no hidden failures in game code. The only logged
+  errors were two deliberate ones, now declared: the corrupt settings file in `test_m7_settings.gd` and the read-only
+  `ProcSystem.shield_hp` write in `test_procs.gd`.
+- **M9 test files:** `test_m9_meta_core` (profile IO, migration, the newer-version rule, gates, listener order,
+  `RunReport`), `test_m9_levels` (the XP table sums to 33 205, the gates per class, the reward path),
+  `test_m9_seasonings` (a behaviour probe per class, covering its eight rows) and `test_m9_seasoning_casts` (one cast test per Seasoning),
+  `test_m9_achievements`, `test_m9_difficulty`, `test_m9_heirlooms` (the formula table, the bound paths),
+  `test_m9_patch_loadout`, `test_m9_patch_ui` and `test_m9_wardrobe`. The stand-ins `tests/fake_look_picker.gd` and
+  `tests/fake_wardrobe_page.gd` have no `test_` prefix.
+- **Last recorded full run** (integration head, `godot --headless --path . -s res://tests/run_tests.gd`): **3943 passed,
+  2 failed**. Both failures are in `test_m9_patch_loadout.gd`: the stick sideways switches two Loadout tabs at once
+  (`test_the_tabs_are_named_and_lb_rb_switch_them`), and B closes the Loadout from the second tab
+  (`test_b_closes_the_loadout_from_every_tab_without_leaving_the_lobby`). Both are open.
+- **Smoke:** during the package work the seed-5 default smoke was compared with the base commit (`--fixed-fps 60`,
+  dev profile), and each flag run listed above was checked to exit 0 with no errors or warnings.
+
+### Deviations from the design
+
+- The profile stores its unlocks (the design derived them); `ClassLevels.sync_unlocks` re-grants them after a retune.
+  There is no `.bak` copy; a bad file goes to `.corrupt`.
+- The XP table is stored as values (the design's numbers). The rounded formula differs by 5 at levels 5, 15 and 25.
+- The first-win bonus is tracked by profile counters (`first_win:<tier>:<class>`), not by per-tier wins.
+- The Seasoning A and AA tiers are not granted by their achievements; the achievement only opens the purchase.
+- The lobby's difficulty choice is remembered for the session only, not in preferences.
+- The leaderboard file is version 2, with a migration (the design kept version 1).
+- The collection has 256 looks (the design said about 292): the 36 Artifact-rarity armour looks are excluded.
+- The Patch's Wardrobe tab does not set a class's default look (the lobby's Look picker does).
+- The Patch has no per-class default Heirloom (the lobby remembers the pick).
+
+### Known gaps (M9)
+
+- No balance pass: every number is a starting value (GDD 9, 18). Seeds and XP were calibrated on paper; they need
+  re-fitting from real runs. The Pungent and Tear-Jerker numbers are placeholders.
+- The Wardrobe "unseen" marker needs a persisted seen-set. The per-class default Heirloom and default look in the
+  Patch, and the Heirloom indicator on the lobby card, are not built.
+- The Endless-mode Heirloom budget has no cap, and bots can swap the Heirloom out of its slot.
+- No one-time grant for players upgrading from earlier builds (the Hunter and the Shaman start locked).
+- The two failing tests listed under Tests.
+- The GDD's chapter 17.8 lists the M9 leftovers and the quest and backstory plans for the very end.

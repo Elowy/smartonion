@@ -28,14 +28,18 @@ Brotato-szerű, WoW-hangulatú arena survivor Godot 4-ben, 1–4 fős helyi co-o
 | Vissza / unready / kilépés a lobbyból | B | Esc / Backspace |
 | Mozgás | bal kar | WASD / nyilak |
 | Szünet | Start | P / Esc |
+| Nehézség váltása (lobby, az egész csapatra) | SELECT | Tab |
+| Loadout: Seasoning / Heirloom / Look (lobby, a saját kártyádon) | LT | jobb egérgomb |
+| Alternatív kezdőfegyver (lobby, 12. szint után) | LB | Q |
+| The Onion Patch fülei (főmenü) | LB / RB | Q / E |
 
 A fegyverek automatikusan támadnak. Elesett társat úgy lehet feléleszteni, hogy 5 másodpercig mellette állsz. Ha te esel el, a pálya közepén megjelenő Grave Tender-nél térhetsz vissza (Hardcore módban nincs Grave Tender).
 
-A lobbyban bármelyik csatlakozott játékos átválthatja a módot (Y) és bekapcsolhatja a Hardcore-t (X); a fejlécen látszik a választás.
+A lobbyban bármelyik csatlakozott játékos átválthatja a módot (Y) és bekapcsolhatja a Hardcore-t (X); a fejlécen látszik a választás. A nehézség (SELECT) a csapaté; a Loadout (LT) és az alternatív fegyver (LB) a hős saját kártyáján áll. Új profilon a Hunter és a Shaman achievementtel nyílik meg (GDD 17.5).
 
 A főmenüben a **Settings** és a **Credits** oldal érhető el, a szünetmenüből a Settings. Az oldalakon a fel / le lépteti a sorokat, a bal / jobb (vagy a d-pad) állítja az értéket, az A (billentyűzeten Enter / Space) választ, a B (Esc) visszalép. A Credits oldalt a bal kar, a d-pad vagy a nyilak görgetik.
 
-### Ami ebben a verzióban van (M0–M8)
+### Ami ebben a verzióban van (M0–M9)
 
 - **Kör:** főmenü → lobby (1–4 játékos, 7 kaszt, mód és Hardcore) → hullámok (Normal: 25 hullám, Endless: végtelen) → győzelem / vereség → eredmény és ranglista → lobby.
 - **Hősök:** 7 kaszt (Warrior, Mage, Paladin, Rogue, Warlock, Hunter, Shaman). Szintlépéskor ability- és stat-kártyát választasz; 48 ability van, auto-cast slotokkal és rangokkal (Trainer). Kasztonként 3 talentfa.
@@ -54,8 +58,9 @@ A főmenüben a **Settings** és a **Credits** oldal érhető el, a szünetmenü
 - **Helyi ranglista:** a saját gépen, módonként, Hardcore-ral és nélküle, valamint játékosszám szerint külön lista.
 - **Hang és beállítások (M7a):** UI-, fegyver-, harc- és zenei hangok (CC0-s csomagok); a Settings oldalon hangerők (Master / Music / Effects / Interface), ablakmód, VSync, FPS-limit, képernyőrázkódás, sebzésszámok és FPS-kijelző; a Credits oldal a forrásokat mutatja.
 - **Grafika (M7b):** Cinzel-címek; game-icons.net ikonok a képességeken, talentfákon, fogyóeszközökön és szentélyeken; a hősön látszik a viselt sisak, váll és mellvért (páncéltípus, fokozat, ritkaság, setek); az öt aréna végleges látványa (élő talaj, környezeti részecskék, animált víz és láva) és a kripta-jellegű dungeon; új harci effektek (spawn, hullák, iskolaszínű találatok, kritikus találat, loot-pattanás, arany- és XP-nyomvonal, boss-belépő).
+- **Meta-progresszió (M9):** egy fő mentés (`user://profile.json`), kasztonként 1–30-as Class Level, szintenként új képességek és jutalmak. 56 Seasoning (kaszt-képesség oldalirányú módosítója), 10 Heirloom (megmaradó tárgy, rangokkal), 40 achievement és a Seeds-pénznem, amit a főmenü **The Onion Patch** pontjában lehet elkölteni; a **Wardrobe** a gyűjtött páncélkinézeteket és kozmetikumokat adja, három nehézség (Normal, Pungent, Tear-Jerker) a Tear-Jerker nyomással. Az automatikus futamok (smoke, demo, nézetek) nem használják a mentést (GDD 17).
 
-Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; a hátralévő tartalom (M9: meta-progresszió) a GDD 16. fejezetében van. A végleges balansz még hátra van.
+Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; az M9 (meta-progresszió) is kész (GDD 17. fejezet). A végleges balansz még hátra van; a Questek és a háttértörténet a legvégén készül (GDD 17.8).
 
 ## Fejlesztői parancsok
 
@@ -67,6 +72,20 @@ godot --path . -- --demo                                             # botok já
 ```
 
 Friss klónnál (a `.godot/` mappa nincs a repóban) egyszer futtasd az importot: `godot --headless --path . --import`. Ez importálja a projekt assetjeit (köztük az ikonokat és a Cinzel-betűtípust).
+
+### Fejlesztői kapcsolók (M9)
+
+- `--profile=dev|fresh|max` – a profil: `dev` (automatikus futamokon alapértelmezett: minden nyitva, nem ment), `fresh` (új játékos), `max` (minden kaszt 30. szinten, minden nyitva, 5. rangú Heirloomok).
+- `--profile-path=FILE` – a profil fájlja; ilyenkor egy automatikus futam is ebből olvas, és ide ír.
+- `--seasonings=ssn_a,ssn_b,ssn_c` – a botok Seasoning-jei (minden bot a saját kasztjának Seasoning-jeit kapja).
+- `--heirloom=heir_…` – minden hős Heirloomja.
+- `--difficulty=normal|pungent|tear_jerker` – a nehézségi szint.
+- `--alt-weapon[=0|1]` – a botok alternatív kezdőfegyvert kapnak.
+- `--view=patch --patch-tab=classes|seasonings|heirlooms|achievements|wardrobe` – The Onion Patch képernyőképe; `--view=lobby --loadout-tab=seasonings|heirloom|look` – a második játékos Loadout-ja.
+
+Példa: `godot --headless --path . -- --smoke --waves=11 --seed=9 --profile=max --difficulty=pungent --heirloom=heir_old_layers`
+
+A kapcsolók teljes leírása: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), M9 fejezet.
 
 ### Fejlesztői kapcsolók (M6)
 
@@ -107,3 +126,7 @@ A teljes lista: [scenes/main/launch_options.gd](scenes/main/launch_options.gd). 
   ```bash
   xvfb-run -a -s "-screen 0 1280x720x24" godot --fixed-fps 60 --path . --resolution 1280x720 --rendering-driver opengl3 -s res://tools/showcase/stress.gd -- --frames=360
   ```
+
+### Trailer (fejlesztői eszköz)
+
+A Steam-oldal trailerét a `tools/trailer/` csomag készíti az igazi játékból: botok játszanak, a Movie Maker rögzít, az ffmpeg vág. Indítás: `tools/trailer/make_trailer.sh` (követelmények és a jelenetek: [tools/trailer/README.md](tools/trailer/README.md)). A játékkódot nem módosítja, a videó nem kerül a repóba.
