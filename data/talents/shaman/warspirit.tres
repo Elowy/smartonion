@@ -106,7 +106,7 @@ effects = Array[Dictionary]([{
 script = ExtResource("2_talent")
 id = &"shaman_warspirit_molten_trail"
 display_name = "Molten Trail"
-description = "Magma Lash leaves molten ground at the target for {duration} sec: enemies standing in it take {pct}% of the lash's damage every 0.5 sec."
+description = "Magma Lash leaves molten ground for {duration} sec that deals {pct}% of the lash every 0.5 sec."
 values = {
 "duration": 3.0,
 "pct": 15.0
