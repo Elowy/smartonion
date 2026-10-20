@@ -512,6 +512,11 @@ func test_stat_list_fits_its_inset_with_long_rows() -> void:
 ## (PlayerPanel.MIN_INSIDE_TOOLTIP_FIT) and reaches out of the panel towards the middle, on
 ## screen. Neither it nor a wave-25 Legendary unique with the comparison block ever reaches the
 ## other corner panel of its screen column (those shrink below the floor only when it would).
+## Piece [param i] of [param data] as a wave-8 item.
+func _set_piece(data: SetData, i: int) -> ItemInstance:
+	return ItemGenerator.from_unique(Db.get_unique(data.piece_ids[i]), 8, false, RandomNumberGenerator.new())
+
+
 func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 	_async = true
 	_root_size = tree.root.size
@@ -527,7 +532,14 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 	var pieces := 0
 	var legendaries := 0
 	for data: SetData in Db.sets.values():
-		var slot := _join(data.class_id)
+		# A class set is shown to its class; a class-independent one to the first class that can wear it.
+		var viewer_class := data.class_id
+		if viewer_class == &"":
+			for id in Db.class_ids:
+				if Db.set_usable_by(data, Db.get_class_data(id)):
+					viewer_class = id
+					break
+		var slot := _join(viewer_class)
 		var eq := _eq(slot)
 		var panel := _panel(slot)
 		panel.tooltip_inside = true
@@ -540,13 +552,13 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 		var mates: Array[Rect2] = [Rect2(corners[2], shown), Rect2(corners[3], shown), Rect2(corners[0], shown),
 			Rect2(corners[1], shown)]
 		for i in data.piece_ids.size():
-			var piece := Items_.set_piece(data.class_id, String(data.piece_ids[i]).get_slice("_", 2))
+			var piece := _set_piece(data, i)
 			piece.looted = true
 			# Two other pieces worn ("(2/5)", the 2-piece bonus on), a plain item where this
 			# one goes (the comparison block), the piece in the backpack.
 			eq.slots.clear()
 			for j in [(i + 1) % 5, (i + 2) % 5]:
-				var other := Items_.set_piece(data.class_id, String(data.piece_ids[j]).get_slice("_", 2))
+				var other := _set_piece(data, j)
 				eq.slots[eq.target_slots(other)[0]] = other
 			eq.slots[eq.target_slots(piece)[0]] = Items_.armor("Plain Piece", piece.slot_type, piece.armor_type, 1, {"stamina": 2})
 			eq.backpack.clear()

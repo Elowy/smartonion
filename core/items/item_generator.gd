@@ -823,31 +823,51 @@ static func set_piece_available(data: UniqueItemData, source: Source, wave: int)
 
 
 ## The classes a set piece may be rolled for: [param for_class] alone when given, else the
-## [param team] classes that have a set (in team order), else – no team given – every class
-## with a set (Db.class_ids order). Empty when none fits.
+## [param team] classes (in team order), else – no team given – every class (Db.class_ids order);
+## only classes that can collect a set ([method Db.sets_for_class]: their own or a class-independent
+## one). Empty when none fits.
 static func set_classes(for_class: ClassData, team: Array) -> Array[ClassData]:
 	var out: Array[ClassData] = []
 	if for_class != null:
-		if Db.set_for_class(for_class.id) != null:
+		if not Db.sets_for_class(for_class.id, for_class).is_empty():
 			out.append(for_class)
 		return out
 	if not team.is_empty():
 		for c: Variant in team:
 			var cd := c as ClassData
-			if cd != null and cd not in out and Db.set_for_class(cd.id) != null:
+			if cd != null and cd not in out and not Db.sets_for_class(cd.id, cd).is_empty():
 				out.append(cd)
 		return out
 	for id in Db.class_ids:
-		if Db.set_for_class(id) != null:
+		if not Db.sets_for_class(id).is_empty():
 			out.append(Db.get_class_data(id))
+	return out
+
+
+## The sets a roll for [param classes] draws from, in draw order: first the classes' own sets
+## (in class order), then the class-independent sets (SetData.class_id empty) one of the classes
+## can wear (by id). With no class-independent set it is exactly one set per class, in class order.
+static func set_candidates(classes: Array[ClassData]) -> Array[SetData]:
+	var out: Array[SetData] = []
+	for cls in classes:
+		var own := Db.set_for_class(cls.id)
+		if own != null and own not in out:
+			out.append(own)
+	for cls in classes:
+		for s in Db.sets_for_class(cls.id, cls):
+			if s not in out:
+				out.append(s)
 	return out
 
 
 ## The tier-set roll of an Epic item (null = it stays a normal Epic). [param rng] (RunState.rng
 ## for loot, the shop rng for offers) draws, in order: 1. the set chance (randf) – only when
-## [param forced_slot] is none or a set slot; on a hit 2. the class (randi_range) – only when
-## more than one class fits; 3. the piece (randi_range) – only when more than one piece of that
-## set is available for the slot / wave.
+## [param forced_slot] is none or a set slot; on a hit 2. the set (randi_range over
+## [method set_candidates]: the eligible classes' own sets, then the class-independent sets they
+## can wear) – only when more than one fits (with one set per class: the old class draw);
+## 3. the piece (randi_range) – only when more than one piece of that set is available for the
+## slot / wave and usable (by the set's class, or by one of the eligible classes for a
+## class-independent set).
 ## A hit without an available piece (wave < min_wave, a team without a set) draws no more.
 static func _roll_set_piece(source: Source, wave: int, forced_slot: int, for_class: ClassData,
 		team: Array, rng: RandomNumberGenerator) -> UniqueItemData:
@@ -858,12 +878,19 @@ static func _roll_set_piece(source: Source, wave: int, forced_slot: int, for_cla
 	var classes := set_classes(for_class, team)
 	if classes.is_empty():
 		return null
-	var cls := classes[0] if classes.size() == 1 else classes[rng.randi_range(0, classes.size() - 1)]
-	var set_data := Db.set_for_class(cls.id)
+	var candidates := set_candidates(classes)
+	if candidates.is_empty():
+		return null
+	var set_data := candidates[0] if candidates.size() == 1 else candidates[rng.randi_range(0, candidates.size() - 1)]
+	# Who must be able to wear a piece: the set's class, or – class-independent – any eligible class.
+	var users: Array[ClassData] = []
+	for cls in classes:
+		if set_data.class_id == &"" or set_data.class_id == cls.id:
+			users.append(cls)
 	var pool: Array[UniqueItemData] = []
 	for piece_id in set_data.piece_ids:
 		var data := Db.get_unique(piece_id)
-		if not set_piece_available(data, source, wave) or not unique_usable_by(data, cls):
+		if not set_piece_available(data, source, wave) or not _usable_by_any(data, users):
 			continue
 		if forced_slot >= 0 and unique_slot(data) != forced_slot:
 			continue
@@ -871,6 +898,14 @@ static func _roll_set_piece(source: Source, wave: int, forced_slot: int, for_cla
 	if pool.is_empty():
 		return null
 	return pool[0] if pool.size() == 1 else pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Whether some class of [param users] can use [param data] ([method unique_usable_by]).
+static func _usable_by_any(data: UniqueItemData, users: Array[ClassData]) -> bool:
+	for cls in users:
+		if unique_usable_by(data, cls):
+			return true
+	return false
 
 
 ## Whether [param data] may come from [param source] at [param wave]: unlocked, listed source,

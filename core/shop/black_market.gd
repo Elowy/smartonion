@@ -9,8 +9,9 @@ extends RefCounted
 ##   - with [constant MAX_ROLL_CHANCE] a "max-roll" Epic: the best the generator rolls for the
 ##     wave – the loot budget (+25% stats, one enchant rank more, GDD 5.2 "Loot bonus") and two
 ##     enchants – usable by one of the team's classes;
-##   - otherwise a guaranteed tier-set piece (GDD 5.5) of a class in the team, preferably a piece
-##     the hero's set is still missing (not worn and not in the backpack of a hero of that class),
+##   - otherwise a guaranteed tier-set piece (GDD 5.5) of a set a class in the team can collect (its
+##     own set, or a class-independent one it can wear: Db.sets_for_class), preferably a piece
+##     the hero is still missing (not worn and not in the backpack of a hero who can use it),
 ##     else any piece of those sets that exists at the wave; a team without such a piece (no
 ##     class with a set, wave before the sets) gets the max-roll Epic instead. A set piece is
 ##     NOT looted (no loot budget, no "Looted" tag): it is exactly the shop's piece of that wave.
@@ -56,9 +57,10 @@ static func roll(wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerator
 
 
 ## Set pieces the team can use at [param wave]: [{"data": UniqueItemData, "class": ClassData,
-## "missing": bool}] – every piece of the set of every team class that exists at the wave, in
-## slot order then piece order, one entry per piece id. "missing" = some hero of that class
-## neither wears nor carries it.
+## "missing": bool}] – every piece of every set of every team class (its own, then the
+## class-independent ones it can wear) that exists at the wave and the hero can use, in slot order,
+## set order, then piece order, one entry per piece id ("class": the first hero's). "missing" =
+## some hero who can use it neither wears nor carries it.
 static func set_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var seen: Dictionary[StringName, bool] = {}
@@ -67,25 +69,24 @@ static func set_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[D
 	for s: PlayerSlot in ordered:
 		if s == null or s.class_data == null:
 			continue
-		var set_data := Db.set_for_class(s.class_data.id)
-		if set_data == null:
-			continue
 		var owned := _owned_source_ids(s)
-		for piece_id in set_data.piece_ids:
-			var data := Db.get_unique(piece_id)
-			if not ItemGenerator.set_piece_available(data, ItemGenerator.Source.SHOP, wave) \
-					or not ItemGenerator.unique_usable_by(data, s.class_data):
-				continue
-			var missing := not owned.has(piece_id)
-			if seen.has(piece_id):
-				# The same piece for a second hero of the class: missing for either counts.
-				if missing:
-					for entry in out:
-						if entry["data"] == data:
-							entry["missing"] = true
-				continue
-			seen[piece_id] = true
-			out.append({"data": data, "class": s.class_data, "missing": missing})
+		for set_data in Db.sets_for_class(s.class_data.id, s.class_data):
+			for piece_id in set_data.piece_ids:
+				var data := Db.get_unique(piece_id)
+				if not ItemGenerator.set_piece_available(data, ItemGenerator.Source.SHOP, wave) \
+						or not ItemGenerator.unique_usable_by(data, s.class_data):
+					continue
+				var missing := not owned.has(piece_id)
+				if seen.has(piece_id):
+					# The same piece for a second hero (of the class, or of a class-independent
+					# set): missing for either counts.
+					if missing:
+						for entry in out:
+							if entry["data"] == data:
+								entry["missing"] = true
+					continue
+				seen[piece_id] = true
+				out.append({"data": data, "class": s.class_data, "missing": missing})
 	return out
 
 
