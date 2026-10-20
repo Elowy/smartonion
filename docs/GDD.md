@@ -420,7 +420,7 @@ lépnek: **Fire** → **Water** → **Earth** → **Air** → Fire; a ciklus a f
 - **Earth** (lassít): 5 m-en belül −30% ellenséges mozgássebesség.
 - **Air** (gyorsít): 6 m-en belüli szövetségesek +15% Haste.
 - A totemek nem célozhatók (nincs HP-jük, nem számítanak ellenségnek). A sugarakat az Area Size növeli.
-- Twin Totems (V. rang): második totem a következő elemből, 1,6 m-re jobbra; a ciklus kettővel lép.
+- Twin Totems (V. rang): második totem a következő elemből, 1,6 m-re jobbra (a játéktéren belül marad: a fal mellett a falhoz 0,5 m-re kerül, a dungeon-teremben is); a ciklus kettővel lép.
   Walking Totem (V. rang): a totem követ, +2 mp.
 - A Totem Rite CD-je 12 mp, nincs költsége. A Totemkeeper's Mail két darabja +30% totem-élettartamot ad (10 → 13 mp).
 

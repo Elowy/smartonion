@@ -16,8 +16,10 @@ const ELEMENTS: Array[StringName] = [&"fire", &"water", &"earth", &"air"]
 const NAMES: Dictionary[StringName, String] = {
 	&"fire": "Fire Totem", &"water": "Water Totem", &"earth": "Earth Totem", &"air": "Air Totem",
 }
-## Twin Totems: the second totem stands this far to the right of the first.
+## Twin Totems: the second totem stands this far to the right of the first (kept inside the playable area).
 const TWIN_OFFSET := 1.6
+## Distance (m) a totem keeps from the walls (Arena.clamp_point, as the other ground objects of the kits).
+const WALL_MARGIN := 0.5
 ## A Rite totem with at most this many seconds left may be replaced by a bot.
 const REFRESH_WINDOW := 4.0
 
@@ -54,6 +56,8 @@ func cast(ctx: AbilityContext) -> bool:
 	for i in count:
 		var element := ELEMENTS[(cycle + i) % ELEMENTS.size()]
 		var at := p.global_position + Vector3(TWIN_OFFSET * float(i), 0.0, 0.0)
+		if i > 0:
+			at = _inside_arena(at)
 		var t := ShamanTotem.plant(p, element, params, at, duration, follows)
 		if not t.is_inside_tree():
 			t.free()
@@ -67,6 +71,15 @@ func cast(ctx: AbilityContext) -> bool:
 	cycle = (cycle + count) % ELEMENTS.size()
 	Vfx.floating_text(p.self_text_position(1.0), " + ".join(names), first_color, Player.SELF_TEXT_SIZE, 1.0)
 	return true
+
+
+## [param pos] inside the playable area of the clearing or the dungeon room (the Arena keeps the current size);
+## unchanged without an arena.
+static func _inside_arena(pos: Vector3) -> Vector3:
+	var arena := Arena.current
+	if arena != null and is_instance_valid(arena):
+		return arena.clamp_point(pos, WALL_MARGIN)
+	return pos
 
 
 func begin_wave(_ctx: AbilityContext) -> void:

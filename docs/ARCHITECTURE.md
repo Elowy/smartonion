@@ -3848,7 +3848,8 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
   (`aura_damage_pct > 0`) is the stat source `totem_aura:<slot>`, kept while any totem of the owner covers the hero.
   Radii use the owner's Area Size. Totems fade in and out over 0.2 s and are removed on replace, expiry, wave end,
   the owner being freed, or `_exit_tree`; an Air hero who leaves the radius loses the haste at once. Totem Rite (`ShamanTotemRite`) keeps a cycle index (Fire, Water, Earth, Air, persists
-  across waves) and `standing()` returns a copy; a new cast clears the old totems.
+  across waves) and `standing()` returns a copy; a new cast clears the old totems. Twin Totems' second totem (1.6 m to the right) is
+  clamped with `Arena.current.clamp_point(.., 0.5)`, so it stays inside the clearing and the dungeon room.
 - Player hooks used by the Shaman's talents: `Player.revive_speed_pct` and `revive_hp_pct` (a reviver's bonuses,
   set and cleared by the talent script), `Player.reviver_boost` and `reviver_speed_boost()` / `reviver_hp_bonus()`
   (caps 150 and 60), `Player.drain_hp(amount, floor_hp)` (a silent HP loss that never goes below `floor_hp`).

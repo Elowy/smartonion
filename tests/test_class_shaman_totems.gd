@@ -4,6 +4,9 @@ extends "res://tests/shaman_base.gd"
 ## and the cleanup (replace, expiry, wave start / end, teardown).
 
 
+const EFakes := preload("res://tests/enemies_fakes.gd")
+
+
 func _stats(p: Player) -> void:
 	p.stats.set_source(&"test", {Stats.INTELLECT: 10.0, Stats.SPELL_POWER: 4.0})
 
@@ -352,6 +355,48 @@ func test_twin_totems_plant_two_and_move_the_cycle_on_by_two() -> void:
 	check_eq(next[1].element, &"air", "Earth and Air")
 	check(both[0].dismissed and both[1].dismissed, "both old totems were replaced")
 	check_eq(_live_totems(), 2, "never more than two")
+
+
+func test_the_second_twin_totem_stays_inside_the_clearing() -> void:
+	var arena := EFakes.TestArena.new()
+	world.add_child(arena)
+	var edge := arena.get_bounds().end.x
+	# Open ground: still 1.6 m to the right.
+	var mid := _shaman(Vector3(edge - 6.0, 0, 0))
+	_learn(mid, &"totem_rite", 5, 0)
+	check(_cast(mid, &"totem_rite"), "cast in the open")
+	var open := _fx_rite(mid).standing()
+	check_near(open[1].global_position.x - open[0].global_position.x, 1.6, 0.0001, "1.6 m to the right when there is room")
+	_fx_rite(mid).clear()
+	# 0.8 m from the right wall: the right-hand spot (x + 1.6) would stand outside.
+	var p := _shaman(Vector3(edge - 0.8, 0, 0), 1)
+	_learn(p, &"totem_rite", 5, 0)
+	check(_cast(p, &"totem_rite"), "cast at the wall")
+	var both := _fx_rite(p).standing()
+	check_eq(both.size(), 2, "two totems")
+	check_near(both[0].global_position.x, edge - 0.8, 0.0001, "the first at the feet")
+	check(both[1].global_position.x <= edge - 0.5 + 0.0001, "the second keeps 0.5 m from the wall (%.2f, wall %.2f)" % [both[1].global_position.x, edge])
+	check(arena.is_inside(both[1].global_position), "inside the playable area")
+	check_near(both[1].global_position.z, 0.0, 0.0001, "z unchanged")
+	_fx_rite(p).clear()
+	arena.free()
+
+
+func test_the_second_twin_totem_stays_inside_a_dungeon_room() -> void:
+	var arena := Arena.create()
+	world.add_child(arena)
+	arena.enter_dungeon_layout()
+	var edge := arena.get_bounds().end.x
+	check_eq(edge, 12.0, "the dungeon room is 24 m wide")
+	var p := _shaman(Vector3(edge - 0.9, 0, 0))
+	_learn(p, &"totem_rite", 5, 0)
+	check(_cast(p, &"totem_rite"), "cast")
+	var both := _fx_rite(p).standing()
+	check_eq(both.size(), 2, "two totems")
+	check(both[1].global_position.x <= edge - 0.5 + 0.0001, "inside the room (%.2f, wall %.2f)" % [both[1].global_position.x, edge])
+	check(arena.get_bounds().has_point(Vector2(both[1].global_position.x, both[1].global_position.z)), "inside the playable rectangle")
+	_fx_rite(p).clear()
+	arena.free()
 
 
 func test_the_walking_totem_follows_the_shaman_and_lasts_longer() -> void:
