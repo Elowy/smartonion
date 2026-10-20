@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"dye_moss"
+display_name = "Moss Green"
+kind = &"dye"
+color = Color(0.38, 0.6, 0.22, 1)
+price = 100
+order = 4

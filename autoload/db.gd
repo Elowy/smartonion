@@ -49,6 +49,8 @@ const CLASS_PATH_DIR := "res://data/meta/class_paths/"
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock", &"hunter", &"shaman"]
+## data/cosmetics/<id>.tres (CosmeticData, M9 WARDROBE: the Tabards, Hats, Glows and Dyes of the Wardrobe).
+const COSMETIC_DIR := "res://data/cosmetics/"
 
 var classes: Dictionary[StringName, ClassData] = {}
 var weapons: Dictionary[StringName, WeaponData] = {}
@@ -99,6 +101,8 @@ var pressure_ids: Array[StringName] = []
 var class_levels: ClassLevelTable
 ## Every class's level path (M9 LEVELS), by class id.
 var class_paths: Dictionary[StringName, ClassPathData] = {}
+## Every Wardrobe cosmetic (M9 WARDROBE), by id.
+var cosmetics: Dictionary[StringName, CosmeticData] = {}
 
 
 func _ready() -> void:
@@ -236,6 +240,13 @@ func reload() -> void:
 	for res in _load_dir(CLASS_PATH_DIR):
 		if res is ClassPathData:
 			class_paths[res.class_id] = res
+	cosmetics.clear()
+	for res in _load_dir(COSMETIC_DIR):
+		if res is CosmeticData:
+			if cosmetics.has(res.id):
+				push_error("Db: duplicate cosmetic id %s" % res.id)
+			else:
+				cosmetics[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -256,6 +267,22 @@ func get_class_data(id: StringName) -> ClassData:
 ## class without one.
 func class_path(class_id: StringName) -> ClassPathData:
 	return class_paths.get(class_id)
+
+
+## The Wardrobe cosmetic [param id] (M9 WARDROBE); null for an unknown id.
+func get_cosmetic(id: StringName) -> CosmeticData:
+	return cosmetics.get(id)
+
+
+## The cosmetics of [param kind] (CosmeticData.KINDS) in list order.
+func cosmetics_of_kind(kind: StringName) -> Array[CosmeticData]:
+	var out: Array[CosmeticData] = []
+	for id in cosmetics:
+		if cosmetics[id].kind == kind:
+			out.append(cosmetics[id])
+	out.sort_custom(func(a: CosmeticData, b: CosmeticData) -> bool:
+		return a.order < b.order or (a.order == b.order and String(a.id) < String(b.id)))
+	return out
 
 
 func get_ability(id: StringName) -> AbilityData:

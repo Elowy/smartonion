@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_warrior_tabard"
+display_name = "Ironhide Tabard"
+kind = &"tabard"
+class_id = &"warrior"
+style = &"chevron"
+color = Color(0.62, 0.16, 0.14, 1)
+trim = Color(0.85, 0.72, 0.4, 1)
+order = 0

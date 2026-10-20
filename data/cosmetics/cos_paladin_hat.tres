@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_paladin_hat"
+display_name = "Crowned Helm"
+kind = &"hat"
+class_id = &"paladin"
+style = &"crowned"
+color = Color(0.97, 0.94, 0.82, 1)
+trim = Color(1.0, 0.8, 0.3, 1)
+order = 2
