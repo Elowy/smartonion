@@ -622,7 +622,7 @@ func test_set_piece_tooltips_fit_the_4_player_panels() -> void:
 		players.erase(slot.player)
 		(slot.player as Player).free()
 		UiFakes.reset_players()
-	check_eq(pieces, 25, "five pieces of five sets")
+	check_eq(pieces, Db.sets.size() * 5, "five pieces of every set")
 	check(legendaries >= 8, "Legendary uniques checked: %d" % legendaries)
 	finished.emit()
 
