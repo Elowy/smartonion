@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_curry_leaf"
+class_id = &"shaman"
+ability = &"thunderbolt"
+display_name = "Curry Leaf"
+text = "Thunderbolt stuns for 0.5 sec but deals 20% less."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "thunderbolt"
+},
+"mods": {
+"stun": 0.5,
+"power_pct": -20
+},
+"requires": {
+"knows": "thunderbolt"
+}
+}])

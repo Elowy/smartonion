@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_cardamom_pod"
+class_id = &"paladin"
+ability = &"hammer_of_justice"
+display_name = "Cardamom Pod"
+text = "Smiting Hammer stuns 1 sec longer but recharges 25% slower."
+tier = &"t4"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hammer_of_justice"
+},
+"mods": {
+"stun_add": 1.0,
+"cooldown_pct": 25
+},
+"requires": {
+"knows": "hammer_of_justice"
+}
+}])

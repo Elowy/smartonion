@@ -28,6 +28,8 @@ const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swa
 const SHRINE_DIR := "res://data/shrines/"
 ## Pool order of the shrines; any extra one is appended alphabetically.
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
+## data/seasonings/<id>.tres (SeasoningData, M9: the per-class ability side-grades chosen in the lobby).
+const SEASONING_DIR := "res://data/seasonings/"
 ## data/unlocks/<id>.tres (UnlockGateData, M9: content the main profile has to unlock before it is offered).
 const UNLOCK_DIR := "res://data/unlocks/"
 ## data/achievements/<id>.tres (AchievementData, M9).
@@ -67,6 +69,8 @@ var environment_ids: Array[StringName] = []
 ## Every shrine, by id (M6b), and the ids in SHRINE_ORDER (extras alphabetically): the roll's pool order.
 var shrines: Dictionary[StringName, ShrineData] = {}
 var shrine_ids: Array[StringName] = []
+## Every Seasoning (M9), by id, in file order.
+var seasonings: Dictionary[StringName, SeasoningData] = {}
 var class_ids: Array[StringName] = []
 ## Every unlock gate (M9), by UnlockGateData.key (kind/id): the content the profile has to unlock. Content without a
 ## gate is available from the start. Filled by [method reload]; [method add_unlock_gate] adds one in code.
@@ -161,6 +165,13 @@ func reload() -> void:
 			extra_shrines.append(id)
 	extra_shrines.sort()
 	shrine_ids.append_array(extra_shrines)
+	seasonings.clear()
+	for res in _load_dir(SEASONING_DIR):
+		if res is SeasoningData:
+			if seasonings.has(res.id):
+				push_error("Db: duplicate seasoning id %s" % res.id)
+			else:
+				seasonings[res.id] = res
 	unlock_gates.clear()
 	for res in _load_dir(UNLOCK_DIR):
 		if res is UnlockGateData:
@@ -394,6 +405,23 @@ func add_unlock_gate(gate: UnlockGateData) -> void:
 
 func remove_unlock_gate(kind: StringName, id: StringName) -> void:
 	unlock_gates.erase(UnlockGateData.key_for(kind, id))
+
+
+func get_seasoning(id: StringName) -> SeasoningData:
+	return seasonings.get(id)
+
+
+## The Seasonings of [param class_id] in unlock order (tier, then name) – the lobby picker's list.
+func seasonings_for_class(class_id: StringName) -> Array[SeasoningData]:
+	var out: Array[SeasoningData] = []
+	for id in seasonings:
+		if seasonings[id].class_id == class_id:
+			out.append(seasonings[id])
+	out.sort_custom(func(a: SeasoningData, b: SeasoningData) -> bool:
+		if a.tier_index() != b.tier_index():
+			return a.tier_index() < b.tier_index()
+		return a.display_name < b.display_name)
+	return out
 
 
 func get_achievement(id: StringName) -> AchievementData:

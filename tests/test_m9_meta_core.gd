@@ -1236,15 +1236,15 @@ func test_slot_selections_default_to_empty_and_reach_the_player() -> void:
 	var plain := Player.create(slot)
 	check(plain.seasonings.is_empty() and plain.heirloom_id == &"" and plain.look_overrides.is_empty(), "the player gets nothing")
 	plain.free()
-	slot.seasonings = [&"smoked_paprika", &"black_pepper"]
+	slot.seasonings = [&"ssn_smoked_paprika", &"ssn_cracked_pepper"]  # (real Warrior Seasonings: the hero keeps those it can carry)
 	slot.heirloom = &"old_ladle"
 	slot.looks = {&"head": &"iron_helm"}
 	check(slot.has_meta_selection(), "a selection")
 	var p := Player.create(slot)
-	check_eq(p.seasonings, [&"smoked_paprika", &"black_pepper"] as Array[StringName], "the Seasonings arrive")
+	check_eq(p.seasonings, [&"ssn_smoked_paprika", &"ssn_cracked_pepper"] as Array[StringName], "the Seasonings arrive")
 	check_eq(p.heirloom_id, &"old_ladle", "the Heirloom arrives")
 	check_eq(p.look_overrides, {&"head": &"iron_helm"} as Dictionary[StringName, StringName], "the look overrides arrive")
-	slot.seasonings.append(&"salt")
+	slot.seasonings.append(&"ssn_sea_salt")
 	check_eq(p.seasonings.size(), 2, "the player has its own copy")
 	p.free()
 
@@ -1290,10 +1290,11 @@ func test_the_lobby_remembers_selections_per_class() -> void:
 
 func test_main_remembers_the_selections_at_run_start() -> void:
 	var profile := _use_fresh()
-	profile.unlock(Profile.KIND_SEASONING, &"salt")
+	profile.unlock(Profile.KIND_SEASONING, &"ssn_smoked_paprika")
+	profile.set_class_progress(&"warrior", 215, 3)  # (Class Level 3 opens the first Seasoning slot)
 	_make_main()
 	var bot := PlayerManager.add_bot(&"warrior", 1)
-	bot.seasonings = [&"salt"]
+	bot.seasonings = [&"ssn_smoked_paprika"]
 	main.start_run()
-	check_eq(profile.loadout(&"warrior")["seasonings"], [&"salt"] as Array[StringName], "remembered when the run starts")
-	check_eq(main.players[0].seasonings, [&"salt"] as Array[StringName], "and the hero has it")
+	check_eq(profile.loadout(&"warrior")["seasonings"], [&"ssn_smoked_paprika"] as Array[StringName], "remembered when the run starts")
+	check_eq(main.players[0].seasonings, [&"ssn_smoked_paprika"] as Array[StringName], "and the hero has it")

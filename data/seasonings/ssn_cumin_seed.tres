@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_cumin_seed"
+class_id = &"warlock"
+ability = &"corruption"
+display_name = "Cumin Seed"
+text = "Corruption lasts 4 sec longer and jumps 2 m further, ticking 15% weaker."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "corruption"
+},
+"mods": {
+"duration_add": 4.0,
+"spread_radius_add": 2.0,
+"power_pct": -15
+},
+"requires": {
+"knows": "corruption"
+}
+}])

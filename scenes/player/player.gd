@@ -134,7 +134,8 @@ var class_data: ClassData
 ## the class kit reads it when it summons.
 var companion_id: StringName = &""
 ## M9: the meta selections the hero received from its slot at creation (PlayerSlot.seasonings / heirloom / looks).
-## Nothing reads them yet; the Seasonings, Heirloom and Wardrobe packages apply them.
+## [member seasonings] holds the ones the hero really carries ([method Seasonings.apply] drops what its class cannot
+## carry or the profile does not own); the Heirloom and Wardrobe packages apply the others.
 var seasonings: Array[StringName] = []
 var heirloom_id: StringName = &""
 var look_overrides: Dictionary[StringName, StringName] = {}
@@ -262,6 +263,7 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.talents = TalentState.create(p.class_data.id if p.class_data != null else &"")
 	p.talents.changed.connect(p._on_talents_changed)
 	p.bonuses.changed.connect(p._on_bonuses_changed)
+	Seasonings.apply(p)  # M9: the Seasonings the lobby picked become the "seasoning" bonus source (none: untouched)
 	p.wave_began.connect(p._on_wave_began_consumables)
 	p.wave_ended.connect(p._on_wave_ended_consumables)
 	p.abilities.ability_cast.connect(p._on_ability_cast)

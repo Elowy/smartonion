@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_fenugreek"
+class_id = &"rogue"
+ability = &"cheat_death"
+display_name = "Fenugreek"
+text = "Narrow Escape recharges 30% faster but protects 0.4 sec less and heals 7% less."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "cheat_death"
+},
+"mods": {
+"cooldown_pct": -30,
+"invulnerable_add": -0.4,
+"heal_max_hp_pct_add": -7
+},
+"requires": {
+"knows": "cheat_death"
+}
+}])

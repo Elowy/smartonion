@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_black_garlic"
+class_id = &"warrior"
+ability = &"shield_wall"
+display_name = "Black Garlic"
+text = "Attackers take 100% weapon damage, but Stalwart Guard blocks 15% less."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shield_wall"
+},
+"mods": {
+"retaliate_add": 100,
+"reduction_add": -15
+},
+"requires": {
+"knows": "shield_wall"
+}
+}])

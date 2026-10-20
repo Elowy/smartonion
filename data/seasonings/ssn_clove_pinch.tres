@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_clove_pinch"
+class_id = &"paladin"
+ability = &"divine_shield"
+display_name = "Clove Pinch"
+text = "Gilded Halo lasts 1.5 sec longer but recharges 35% slower."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "divine_shield"
+},
+"mods": {
+"duration_add": 1.5,
+"cooldown_pct": 35
+},
+"requires": {
+"knows": "divine_shield"
+}
+}])

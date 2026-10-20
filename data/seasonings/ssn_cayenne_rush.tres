@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_cayenne_rush"
+class_id = &"warrior"
+ability = &"charge"
+display_name = "Cayenne Rush"
+text = "Charge ends in a 3 m shockwave (0.5 sec stun); recharges 25% slower."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "charge"
+},
+"mods": {
+"shockwave_radius": 3.0,
+"shockwave_stun": 0.5,
+"cooldown_pct": 25
+}
+}])

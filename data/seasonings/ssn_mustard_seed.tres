@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_mustard_seed"
+class_id = &"hunter"
+ability = &"arrow_fan"
+display_name = "Mustard Seed"
+text = "Arrow Fan looses 3 more arrows in a wider fan, each 35 points weaker."
+tier = &"t1"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "arrow_fan"
+},
+"mods": {
+"arrows_add": 3,
+"spread_add": 20,
+"damage_pct_add": -35
+}
+}])

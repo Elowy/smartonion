@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_golden_turmeric"
+class_id = &"paladin"
+ability = &"lay_on_hands"
+display_name = "Golden Turmeric"
+text = "Mending Touch also shields 15% and cuts damage 20% for 6 sec; recharges 30% slower."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "lay_on_hands"
+},
+"mods": {
+"shield_max_hp_add": 15,
+"guard_add": 20,
+"cooldown_pct": 30
+},
+"requires": {
+"knows": "lay_on_hands"
+}
+}])

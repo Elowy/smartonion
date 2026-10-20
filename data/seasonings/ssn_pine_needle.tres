@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_pine_needle"
+class_id = &"hunter"
+ability = &"backstep"
+display_name = "Pine Needle"
+text = "Backstep leaves caltrops for 2.5 sec but leaps 1.5 m less."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "backstep"
+},
+"mods": {
+"trail_duration_add": 2.5,
+"distance_add": -1.5
+}
+}])

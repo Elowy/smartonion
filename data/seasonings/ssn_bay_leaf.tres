@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_bay_leaf"
+class_id = &"warrior"
+ability = &"charge"
+display_name = "Bay Leaf"
+text = "A second Charge, but each rushes 2 m less and stuns 0.6 sec less."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "charge"
+},
+"mods": {
+"charges_add": 1,
+"distance_add": -2.0,
+"stun_add": -0.6
+}
+}])
