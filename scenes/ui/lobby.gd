@@ -22,7 +22,9 @@ extends Control
 ##   (everybody sees the new mode before the run starts).
 ## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
 ##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
-##   remembered for that class on their slot (Meta.apply_loadout).
+##   remembered for that class on their slot (Meta.apply_loadout). LB / Q opens the player's Seasoning picker over
+##   their card ([method open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and
+##   nothing else in the lobby.
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
@@ -254,6 +256,7 @@ func _set_joining(on: bool) -> void:
 
 func _on_player_joined(slot: PlayerSlot) -> void:
 	Meta.apply_loadout(slot)  # (the selections remembered for the class the player starts on)
+	Seasonings.prune(slot)
 
 
 func _on_device_disconnected(slot: PlayerSlot) -> void:
@@ -287,6 +290,11 @@ func _process(delta: float) -> void:
 func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
 	if inp == null:
+		return
+	# An open Seasoning picker takes everything this player presses.
+	var picker := picker_of(slot)
+	if picker != null and picker.is_open():
+		picker.handle_input(inp)
 		return
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
@@ -322,6 +330,24 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
 			Audio.play_ui(&"ui_move")
+		if inp.just_pressed(PlayerInput.Pad.LB) and open_seasoning_picker(slot):
+			Audio.play_ui(&"ui_confirm")
+
+
+## The Seasoning picker on [param slot]'s card (null for a slot without a card).
+func picker_of(slot: PlayerSlot) -> SeasoningPicker:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].picker
+
+
+## Opens [param slot]'s Seasoning picker (LB / Q). Not while the player is ready (the picks are locked like the class),
+## for a class the profile has not unlocked, or without a card. True when it opened.
+func open_seasoning_picker(slot: PlayerSlot) -> bool:
+	var picker := picker_of(slot)
+	if picker == null or slot.ready or ready_block_reason(slot) != "":
+		return false
+	return picker.open(slot)
 
 
 ## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
@@ -347,6 +373,7 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 	if next != null:
 		slot.class_data = next
 		Meta.apply_loadout(slot)
+		Seasonings.prune(slot)  # (what the new class cannot carry: another class's Seasonings, too many for its slots)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
 
