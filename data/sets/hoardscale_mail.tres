@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"hoardscale_mail"
+display_name = "Hoardscale Mail"
+class_id = &""
+armor_type = 2
+piece_ids = Array[StringName]([&"set_hoardscale_head", &"set_hoardscale_shoulders", &"set_hoardscale_chest", &"set_hoardscale_hands", &"set_hoardscale_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{"kind": "stats", "stats": {"gold_find": 20.0, "fortune": 15.0}}],
+"pieces": 2,
+"text": "Increases your Gold Find by 20% and your Fortune by 15."
+}, {
+"effects": [{"kind": "proc", "proc": {"trigger": "on_kill", "effect": "gold", "chance": 6.0, "amount": 3}}],
+"pieces": 4,
+"text": "On kill: 6% chance to find 3 extra gold."
+}])

@@ -25,9 +25,10 @@ const LEGENDARY_GLOW_ENERGY := 0.24
 ## Energy of the unshaded accent gems and rings (Mats.glow).
 const ACCENT_ENERGY := 2.0
 
-## Class sets (data/sets): the class-coloured kit a set piece wears. main / dark / light are the
-## armour colours, trim the ornament colour, glow the emission and accent colour. A set without an
-## entry uses [constant GENERIC_SET].
+## Tier sets (data/sets): the kit a set piece wears – the class sets in their class colour, the
+## class-independent sets (M8) in a colour of their own (kept apart from the class kits). main / dark /
+## light are the armour colours, trim the ornament colour, glow the emission and accent colour. A set
+## without an entry uses [constant GENERIC_SET].
 const SET_STYLES := {
 	&"battlegear_of_fury": {"main": Color(0.74, 0.17, 0.19), "dark": Color(0.42, 0.08, 0.1),
 		"light": Color(0.93, 0.36, 0.28), "trim": Color(1.0, 0.8, 0.32), "glow": Color(1.0, 0.45, 0.2)},
@@ -39,6 +40,17 @@ const SET_STYLES := {
 		"light": Color(0.42, 0.36, 0.55), "trim": Color(0.6, 0.92, 0.3), "glow": Color(0.55, 0.95, 0.3)},
 	&"felfire_raiment": {"main": Color(0.4, 0.17, 0.5), "dark": Color(0.2, 0.08, 0.28),
 		"light": Color(0.62, 0.34, 0.75), "trim": Color(0.5, 1.0, 0.3), "glow": Color(0.5, 1.0, 0.3)},
+	# Class-independent sets: rose silk, oiled grey-blue leather, copper scale, thorn crimson, bark brown.
+	&"mendweave_attire": {"main": Color(0.93, 0.62, 0.72), "dark": Color(0.62, 0.3, 0.42),
+		"light": Color(1.0, 0.85, 0.9), "trim": Color(1.0, 0.95, 0.75), "glow": Color(1.0, 0.7, 0.8)},
+	&"slipskin_leathers": {"main": Color(0.74, 0.8, 0.86), "dark": Color(0.42, 0.5, 0.6),
+		"light": Color(0.92, 0.96, 1.0), "trim": Color(0.35, 0.9, 0.85), "glow": Color(0.5, 0.95, 0.95)},
+	&"hoardscale_mail": {"main": Color(0.86, 0.52, 0.2), "dark": Color(0.5, 0.28, 0.1),
+		"light": Color(1.0, 0.78, 0.4), "trim": Color(1.0, 0.9, 0.35), "glow": Color(1.0, 0.8, 0.3)},
+	&"redthorn_mail": {"main": Color(0.5, 0.1, 0.2), "dark": Color(0.26, 0.05, 0.1),
+		"light": Color(0.78, 0.28, 0.38), "trim": Color(0.9, 0.85, 0.8), "glow": Color(1.0, 0.35, 0.35)},
+	&"stonebark_plate": {"main": Color(0.5, 0.4, 0.32), "dark": Color(0.28, 0.21, 0.16),
+		"light": Color(0.72, 0.62, 0.5), "trim": Color(0.7, 0.8, 0.55), "glow": Color(0.75, 0.9, 0.5)},
 }
 const GENERIC_SET := {"main": Color(0.9, 0.76, 0.35), "dark": Color(0.55, 0.4, 0.15),
 	"light": Color(1.0, 0.92, 0.65), "trim": Color(0.8, 0.5, 1.0), "glow": Color(0.8, 0.5, 1.0)}

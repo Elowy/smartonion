@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"set_stonebark_chest"
+display_name = "Stonebark Breastplate"
+flavor = "Slow to bend, slower to break."
+slot_type = 3
+armor_type = 3
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"mastery": 4.0,
+&"stamina": 9.0,
+&"versatility": 2.0
+})
+class_restriction = &""
+set_id = &"stonebark_plate"
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 6
+weight = 0.0
