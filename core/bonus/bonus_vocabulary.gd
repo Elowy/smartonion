@@ -31,7 +31,7 @@ const GRANTABLE_PROFICIENCIES: Array[StringName] = [&"dual_wield"]
 const DAMAGE_SOURCES: Array[StringName] = [&"weapon", &"ability", &"dot", &"pet", &"proc"]
 const SCHOOLS: Array[StringName] = [&"physical", &"fire", &"frost", &"arcane", &"holy", &"shadow", &"nature"]
 ## AbilityData.tags values ({"match": {"tag": ...}}).
-const TAGS: Array[StringName] = [&"aoe", &"projectile", &"dot", &"heal", &"shield", &"buff", &"cc", &"movement", &"pet", &"weapon", &"spell", &"ground", &"stealth"]
+const TAGS: Array[StringName] = [&"aoe", &"projectile", &"dot", &"heal", &"shield", &"buff", &"cc", &"movement", &"pet", &"weapon", &"spell", &"ground", &"stealth", &"lightning"]
 ## "target" filter of damage entries (below_pct / above_pct compare with "target_pct").
 const TARGET_CONDITIONS: Array[StringName] = [&"elite", &"boss", &"stunned", &"slowed", &"feared", &"below_pct", &"above_pct"]
 ## {"requires": {"weapon": ...}} conditions.
@@ -53,7 +53,7 @@ const RESOURCE_FIELDS: Array[String] = ["max_value", "start_value", "regen_per_s
 ## registry: a new one is an integrator request (talent_vocabulary.md §5).
 ## An id may name a class that has no data yet (M8: hunter_companion, shaman_totems): validation
 ## compares the owner's id only, never Db.classes.
-const PSEUDO_IDS: Dictionary[StringName, StringName] = {&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock", &"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue", &"hunter_companion": &"hunter", &"shaman_totems": &"shaman"}
+const PSEUDO_IDS: Dictionary[StringName, StringName] = {&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock", &"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue", &"hunter_companion": &"hunter", &"shaman_totems": &"shaman", &"shaman_echo": &"shaman"}
 
 ## Keys every entry may carry besides its kind's fields.
 const META_KEYS: Array[String] = ["kind", "requires", "rank", "id", "label"]
