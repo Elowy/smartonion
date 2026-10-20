@@ -266,31 +266,43 @@ func _dress_preview(entry: WardrobeEntry) -> void:
 func handle_input(inp: PlayerInput) -> bool:
 	if inp == null or not is_visible_in_tree():
 		return false
-	var used := false
-	var nav := inp.nav_just_pressed()
-	if focus == Focus.FILTERS:
-		if nav.x != 0:
-			set_filter(filter + nav.x)
-			Audio.play_ui(&"ui_move")
-			used = true
-		elif nav.y > 0 and not grid.entries.is_empty():
-			_set_focus(Focus.GRID)
-			Audio.play_ui(&"ui_move")
-			used = true
-	elif nav != Vector2i.ZERO:
-		if grid.move(nav):
-			Audio.play_ui(&"ui_move")
-		elif nav.y < 0:
-			_set_focus(Focus.FILTERS)
-			Audio.play_ui(&"ui_move")
-		used = true
+	var used := handle_nav(inp.nav_just_pressed())
 	if inp.just_pressed(PlayerInput.Pad.A):
-		activate()
+		handle_accept()
 		used = true
 	if inp.just_pressed(PlayerInput.Pad.X):
 		preview.turn(60.0)
 		used = true
 	return used
+
+
+## One navigation step (a host such as The Onion Patch, which drives pages without a [PlayerInput], calls it directly).
+## Returns true when it used the step; Up on the filter row is left to the host.
+func handle_nav(nav: Vector2i) -> bool:
+	if nav == Vector2i.ZERO or not is_visible_in_tree():
+		return false
+	if focus == Focus.FILTERS:
+		if nav.x != 0:
+			set_filter(filter + nav.x)
+			Audio.play_ui(&"ui_move")
+			return true
+		if nav.y > 0 and not grid.entries.is_empty():
+			_set_focus(Focus.GRID)
+			Audio.play_ui(&"ui_move")
+			return true
+		return false
+	if grid.move(nav):
+		Audio.play_ui(&"ui_move")
+	elif nav.y < 0:
+		_set_focus(Focus.FILTERS)
+		Audio.play_ui(&"ui_move")
+	return true
+
+
+## The A press: [method activate] on the selected entry.
+func handle_accept() -> void:
+	if is_visible_in_tree():
+		activate()
 
 
 func _set_focus(f: Focus) -> void:

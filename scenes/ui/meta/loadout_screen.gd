@@ -202,6 +202,13 @@ func handle_input(inp: PlayerInput) -> void:
 			if _open:
 				_fill_prompts()
 		Tab.LOOK:
+			if look_picker != null and is_instance_valid(look_picker) and inp.just_pressed(PlayerInput.Pad.LT):
+				# LT closes the Loadout from every tab; the picker's own close remembers and saves the choices.
+				Audio.play_ui(&"ui_back")
+				look_picker.call(&"close")
+				if _open:
+					close()
+				return
 			if look_picker != null and is_instance_valid(look_picker) and look_picker.has_method(&"handle_input"):
 				look_picker.call(&"handle_input", inp)
 			elif inp.just_pressed(PlayerInput.Pad.B) or inp.just_pressed(PlayerInput.Pad.LT):
@@ -255,6 +262,9 @@ func _show_look() -> void:
 	if not (created is Control):
 		return
 	look_picker = created as Control
+	# The Loadout routes the owner's input (handle_input below), so the picker must not read it a second time.
+	if &"self_driven" in look_picker:
+		look_picker.set(&"self_driven", false)
 	look_picker.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	look_holder.add_child(look_picker)
 	coming_soon.visible = false
@@ -271,6 +281,9 @@ func _on_look_closed() -> void:
 
 func _drop_look_picker() -> void:
 	if look_picker != null and is_instance_valid(look_picker):
+		# A pick is remembered at once (Meta.remember_loadout) but written only when the picker closes itself:
+		# leaving the Look tab another way still saves it.
+		Meta.save()
 		if look_holder != null and look_picker.get_parent() == look_holder:
 			look_holder.remove_child(look_picker)
 		look_picker.queue_free()
