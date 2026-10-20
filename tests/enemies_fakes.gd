@@ -9,6 +9,8 @@ class FakePlayer extends Player:
 	var fake_hits: Array[float] = []
 	var fake_kinds: Array[StringName] = []
 	var fake_sources: Array[Node3D] = []
+	## The max_hp_share each hit carried (0 = none).
+	var fake_caps: Array[float] = []
 
 	func _init() -> void:
 		add_to_group(&"players")
@@ -19,10 +21,12 @@ class FakePlayer extends Player:
 	func _physics_process(_delta: float) -> void:
 		pass
 
-	func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null) -> void:
+	func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null,
+			max_hp_share: float = 0.0) -> void:
 		fake_hits.append(raw)
 		fake_kinds.append(kind)
 		fake_sources.append(source)
+		fake_caps.append(max_hp_share)
 
 	## The Flesh Golem's hook (M6): records {raw, toward, distance, source}; lands unless
 	## [member fake_hook_dodges].

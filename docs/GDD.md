@@ -3055,7 +3055,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 - **M6b:** minden új item- és enchant-nevet (5.8) ennek a listának a szerint ellenőriztünk,
   mielőtt bekerült a játékba. Ellenőrizve, egyik sem Blizzard-név: Thistlebrand, Boulderbloom,
   Tearglass (Forge Legendary); Two-Hand Sword, Two-Hand Mace, Orb (fegyverek); az új alaptípus-nevek
-  (a 62 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
+  (a 64 páncél-alaptípus, pl. Cuirass, Plate Carapace, és a 12 új ékszer), a 7 új utótag, a 26 új
   enchant-előtag, a 20 új trinket, a 17 új Legendary, a 60 új névvel ellátott és kaszt-specifikus
   item. A tesztek ellenőrzik (item-, alaptípus-, utótag-, set-nevek, enchant-előtagok és
   -leírások tiltott-listája; minden megjelenített név egyedi). Névütközések, amiket a névadáskor
@@ -3204,6 +3204,8 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
 | **Meta-progresszió bővítések** | Önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
+| **IP-tisztítás (Blizzard)** | Minden WoW-ból / Blizzard-játékból átvett név lecserélése saját névre, hogy ne legyen IP-ütközés – részletek lent („Kiadás és IP”) | **M7**, a Steam-oldal előtt |
+| **Steam-kiadás** | Early Access az M7 után, teljes kiadás az M8–M9 után – részletek lent („Kiadás és IP”) | M7 (Early Access), M9 (teljes) |
 
 **Játékmódok: Endless és Hardcore (M6b)**
 
@@ -3439,6 +3441,41 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
   azonnal megy tovább a szünet.
 - A Haste hátránya „*Enemies move 15% faster*” (az előjel az irány; lassító szentélynél „slower”).
 - A teszt-futtató az alap 5%-ot 0-ra állítja; a tesztek a `--shrine-chance` megfelelőjét használják.
+
+**Kiadás és IP (M7 / M9)**
+
+- **IP-tisztítás – cél:** a játékban (UI, adat, tooltip, GDD) ne maradjon olyan név, amely
+  a Blizzard játékaiból (WoW, Diablo, Hearthstone, Overwatch) egy az egyben átvett tulajdonnév
+  vagy jellegzetes kifejezés. A WoW-hangulat maradhat (onion-paródia, általános fantasy
+  szavak), de a konkrét nevek nem.
+- **Mit kell átnézni:**
+  - **Ability-nevek**, amelyek egy az egyben WoW-varázslatok – pl. *Blizzard* (ez a cég neve
+    is), *Vanish*, *Consecration*, *Word of Glory*, *Light of Dawn*, *Lay on Hands*,
+    *Divine Shield*, *Hammer of Justice*, *Avenger's Shield*, *Blessing of Kings*,
+    *Fan of Knives*, *Shadowstep*, *Killing Spree*, *Blade Flurry*, *Cheat Death*,
+    *Bladestorm*, *Heroic Leap*, *Shield Wall*, *Battle Shout*, *Thunder Clap*,
+    *Pyroblast*, *Arcane Missiles*, *Ice Barrier*, *Frost Nova*, *Seed of Corruption*,
+    *Rain of Fire*, *Drain Life*, *Summon Infernal*, *Summon Voidwalker*, *Mortal Strike*.
+  - **Talentfa- és spec-nevek** WoW-os kombinációban (Arms / Fury / Protection, Holy /
+    Retribution, Assassination / Combat / Subtlety, Affliction / Demonology / Destruction),
+    és a talentek, modifierek nevei.
+  - **Rendszer- és szörnynevek:** *Loot Goblin* (a Diablo Treasure Goblinjára emlékeztet),
+    *Spirit Healer*, *Voidwalker*, *Infernal*, *Imp*, a pet-nevek; itemek, setek, Artifactok,
+    enchantok neveinek újraellenőrzése (14. fejezet tiltólistája).
+  - Általános fantasy szavak maradhatnak (Warrior, Mage, Paladin, Rogue, Warlock, Hunter,
+    Shaman, Fireball, Charge, Execute stb.), de a végső listát a tisztításkor egyenként döntjük el.
+- **Hogyan:** egy átnevezési kör (adat-id-k maradhatnak belső azonosítónak, a megjelenő név
+  változik), a tiltólista bővítése, és egy teszt, amely a megjelenő szövegekben (adatok,
+  tooltip, UI) tiltott nevet keres. A GDD-t és a README-t is átírjuk.
+- **Steam-kiadás – árazási terv** (a hasonló játékok alapján: Brotato, Vampire Survivors,
+  Halls of Torment 4,99 USD; Soulstone Survivors, Deep Rock Galactic: Survivor ~9,99 USD):
+  - **Early Access** az M7 (grafika, hang, menük, IP-tisztítás) után, **4,99 USD**, az
+    5 meglévő kaszttal;
+  - **teljes kiadás** az M8–M9 (Hunter, Shaman, meta-progresszió) után, **6,99–7,99 USD**;
+  - indulási kedvezmény 10–20% (1–2 hét), a Steam regionális ártáblázatával (HU kb.
+    1500–2000 Ft a 4,99-es árhoz);
+  - számolni kell a Steam 30%-os részesedésével, az áfával és az egyszeri 100 USD-s
+    Steam Direct díjjal.
 
 **Dungeon-portál (M6b)**
 

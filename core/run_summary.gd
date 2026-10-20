@@ -132,6 +132,38 @@ static func meter_dict() -> Dictionary:
 	return out
 
 
+## {source id: {wave as String: damage}} – the SMOKE_RESULT "taken_by_source" entry, the heroes'
+## damage taken (RunState.damage_taken_by_source) by what dealt it, rounded to 0.1. Balance
+## diagnostics: it tells which enemy type is eating the party.
+static func source_damage_dict() -> Dictionary:
+	var out := {}
+	for source in RunState.damage_taken_by_source:
+		var per_wave: Dictionary = RunState.damage_taken_by_source[source]
+		var line := {}
+		for w in per_wave:
+			line[str(w)] = snappedf(float(per_wave[w]), 0.1)
+		out[String(source)] = line
+	return out
+
+
+## {slot index as String: damage} – the SMOKE_RESULT "boss_damage" entry: what each hero dealt to bosses
+## (RunState.boss_damage_by_player), rounded to 0.1. Balance diagnostics.
+static func boss_damage_dict() -> Dictionary:
+	var out := {}
+	for slot_index in RunState.boss_damage_by_player:
+		out[str(slot_index)] = snappedf(float(RunState.boss_damage_by_player[slot_index]), 0.1)
+	return out
+
+
+## {slot index as String: ratio} – the SMOKE_RESULT "shield_peak" entry: the highest total absorb shield each
+## hero carried, as a multiple of its Max HP (RunState.shield_peak_by_player), rounded to 0.01.
+static func shield_peak_dict() -> Dictionary:
+	var out := {}
+	for slot_index in RunState.shield_peak_by_player:
+		out[str(slot_index)] = snappedf(float(RunState.shield_peak_by_player[slot_index]), 0.01)
+	return out
+
+
 # --- Pure model -------------------------------------------------------------------------------
 
 ## Fills in the derived fields of [param run] (the run totals: victory, waves_cleared,

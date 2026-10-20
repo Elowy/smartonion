@@ -351,7 +351,7 @@ func test_hatched_groups_are_loot_free_enemies_of_the_cleared_wave() -> void:
 	for node in enemies:
 		var e := node as Enemy
 		check(not e.drops_loot, "no loot")
-		check_eq(e.wave, 9, "scaled to the cleared wave")
+		check_eq(e.wave, Dungeon.strength_wave(9), "scaled to the cleared wave plus the strength bonus")
 		check(e.data.first_wave <= 9 and e.data.spawn_weight > 0.0, "an eligible enemy")
 		check(arena.get_bounds().has_point(Vector2(e.global_position.x, e.global_position.z)), "inside the room")
 
@@ -409,9 +409,9 @@ func test_room_three_draws_the_enemies_to_the_brazier_and_the_brazier_takes_thei
 	var b := dungeon.brazier
 	check(b != null and b.is_inside_tree(), "the brazier stands")
 	check_eq(b.global_position, Vector3.ZERO, "in the middle")
-	check_near(b.max_hp, Dungeon.brazier_hp(6), 0.001, "30 grunts' worth of HP")
+	check_near(b.max_hp, Dungeon.brazier_hp(Dungeon.strength_wave(6)), 0.001, "30 grunts' worth of HP")
 	var grunt := Db.get_enemy(&"skeleton_grunt")
-	check_near(b.max_hp, 30.0 * grunt.hp_at_wave(6) * RunState.coop_hp_mult(), 0.001, "= 30 x a Grunt's HP x the party factor")
+	check_near(b.max_hp, 30.0 * grunt.hp_at_wave(Dungeon.strength_wave(6)) * RunState.coop_hp_mult(), 0.001, "= 30 x a Grunt's HP x the party factor")
 	dungeon._spawning = false
 	var near := _enemy_at(Vector3(6, 0, 0))
 	var far := _enemy_at(Vector3(11.5, 0, 0))
@@ -491,8 +491,8 @@ func test_the_warden_arrives_after_a_rune_with_the_boss_rules() -> void:
 	check_eq(w.boss_data.id, &"dungeon_warden", "the Dungeon Warden")
 	check_eq(w.boss_data.max_hp, 120.0, "base HP 120")
 	check_eq(w.boss_data.enrage_time, 60.0, "enrage at 60 s")
-	check_near(w.max_hp, w.boss_data.max_hp_for(6, RunState.player_count), 0.001, "the boss HP rules (wave growth, party x(1 + 0.75 (n - 1)))")
-	check_near(w.max_hp, w.boss_data.hp_at_wave(6) * 1.75, 0.01, "x1.75 for two players")
+	check_near(w.max_hp, w.boss_data.max_hp_for(Dungeon.strength_wave(6), RunState.player_count), 0.001, "the boss HP rules (wave growth, party x(1 + 0.75 (n - 1)))")
+	check_near(w.max_hp, w.boss_data.hp_at_wave(Dungeon.strength_wave(6)) * 1.75, 0.01, "x1.75 for two players")
 	check(w.is_in_group(&"bosses") and w.is_boss(), "a boss to the rest of the game")
 	check(not w.drops_loot, "no boss loot")
 	check(w.director == dungeon, "its adds come through the dungeon")

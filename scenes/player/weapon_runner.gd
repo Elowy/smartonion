@@ -429,7 +429,7 @@ static func apply_hit(attacker: Player, enemy: Enemy, damage: float, is_crit: bo
 		damage *= valid_attacker.outgoing_damage_mult(enemy, weapon.school if weapon != null else &"physical", &"weapon")
 	var text_pos := enemy.global_position + Vector3.UP * DAMAGE_TEXT_HEIGHT
 	if valid_attacker != null and valid_attacker.slot != null:
-		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)))
+		RunState.record_damage(valid_attacker.slot.index, minf(damage, maxf(0.0, enemy.hp)), enemy.is_boss())
 	enemy.take_damage(damage, is_crit, valid_attacker, knockback)
 	if stun_chance > 0.0 and is_instance_valid(enemy) and not enemy.is_dead() \
 			and RunState.rng.randf() < stun_chance:

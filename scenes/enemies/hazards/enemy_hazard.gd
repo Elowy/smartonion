@@ -22,6 +22,11 @@ const GROUND_Y := 0.05
 const HERO_REACH := Player.RADIUS * 0.5
 ## Bots keep this far (m) outside a dangerous hazard.
 const BOT_MARGIN := 0.9
+## Final balance 2: one hit of a ground attack (a Fire Fields tick, a Meteor's share, a Frost Circle or Breath) takes
+## at most this share of the hero's Max HP (after armour etc.), so a hero at full health always survives one: the
+## hits were 70-140% of a Rogue's or Mage's HP (a lone Meteor 135%, Morvain's Frost Breath 70-85%) and every such
+## hit was a death, not a lesson.
+const MAX_HIT_SHARE := 0.4
 
 enum Stage { TELEGRAPH, ACTIVE, DONE }
 
@@ -178,12 +183,12 @@ func heroes_in_circle() -> Array[Player]:
 
 
 ## Hurts [param hero] for [param amount] (AOE kind, the boss as the source when it still
-## exists).
+## exists), at most [constant MAX_HIT_SHARE] of its Max HP.
 func hit_hero(hero: Player, amount: float) -> void:
 	if hero == null or not is_instance_valid(hero) or amount <= 0.0:
 		return
 	var from: Node3D = source if source != null and is_instance_valid(source) else null
-	hero.take_damage(amount, CombatMath.KIND_AOE, from)
+	hero.take_damage(amount, CombatMath.KIND_AOE, from, MAX_HIT_SHARE)
 	LivingPlayers.mark_dirty()
 
 

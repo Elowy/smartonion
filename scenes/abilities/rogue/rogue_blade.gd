@@ -20,8 +20,21 @@ extends Projectile
 ##                          the fan's shared proc gate stays open for its other knives.
 ##   [member slow_pct] / [member slow_duration] – Cold Blood: a living enemy is slowed after
 ##                          the hit.
+## A boss is ONE big target ([member boss_hits], [constant BOSS_REPEAT_MULT],
+## [constant BOSS_ENVENOM_MULT]): of the knives of one cast that hit the same boss only the first
+## deals its full damage, every further knife deals [constant BOSS_REPEAT_MULT] of it, and an Envenom
+## burst on a boss is [constant BOSS_ENVENOM_MULT] of the normal one. Nothing changes against the
+## ordinary enemies, where each knife that hits another enemy is a new target.
 
 enum Look { KNIFE, SHURIKEN }
+
+## Final balance 2 (boss damage): a point-blank Fan of Knives put 4-5 of its 12 knives into the boss's wide body on
+## every throw, and every throw also burst the stacked poison: together those two were 72-75% of a lone Rogue's
+## boss damage (~19k DPS, Vor'thalax dead in 11 s while a Paladin did a few hundred DPS; 67% of a full party's boss
+## damage). A boss now takes this share of the damage of every knife of the same cast after the first ...
+const BOSS_REPEAT_MULT := 0.4
+## ... and this share of an Envenom burst.
+const BOSS_ENVENOM_MULT := 2.0 / 3.0
 
 var look := Look.KNIFE
 var poison_hits := false
@@ -38,6 +51,9 @@ var slow_pct := 0.0
 var slow_duration := 0.0
 ## Envenom detonations of this blade (tests).
 var detonations := 0
+## Hits per boss instance id this cast has landed so far – one dictionary shared by the cast's blades (a blade
+## thrown on its own counts alone).
+var boss_hits: Dictionary[int, int] = {}
 
 
 ## A blade of [param player] thrown along [param dir] with [param p_weapon]'s hit rules.
@@ -92,13 +108,28 @@ func _apply_hit(body: Node3D, kb_dir: Vector3, from_explosion: bool) -> void:
 		if dead != null and is_instance_valid(dead) and dead.is_dead():
 			hit_count += 1
 			return
+	var full_damage := damage
+	damage = full_damage * boss_repeat_mult(body)
 	super._apply_hit(body, kb_dir, from_explosion)
 	if poison_hits and not is_crit:
 		_poison(body)
+	damage = full_damage
 	if slow_pct > 0.0 and slow_duration > 0.0:
 		var e := body as Enemy
 		if e != null and is_instance_valid(e) and not e.is_dead():
 			e.apply_slow(slow_pct, slow_duration)
+
+
+## The share of its damage this blade's hit on [param body] deals, and counts the hit: 1 for anything but a boss
+## and for the first hit of the cast on a boss, [constant BOSS_REPEAT_MULT] for the later ones.
+func boss_repeat_mult(body: Node3D) -> float:
+	var boss := body as Enemy
+	if boss == null or not is_instance_valid(boss) or not boss.is_boss():
+		return 1.0
+	var id := boss.get_instance_id()
+	var seen: int = boss_hits.get(id, 0)
+	boss_hits[id] = seen + 1
+	return 1.0 if seen == 0 else BOSS_REPEAT_MULT
 
 
 ## Envenom: detonates the Rogue's Deadly Poison on [param body] (once per cast and enemy).
@@ -122,7 +153,10 @@ func _envenom(body: Node3D) -> void:
 	detonations += 1
 	if enemy.is_inside_tree():
 		Vfx.hit_spark(enemy.global_position + Vector3.UP * 0.6, RogueVfx.POISON_COLOR)
-	rogue.procs.deal_raw(enemy, total * envenom_pct / 100.0, RogueMastery.SCHOOL, false, &"dot")
+	var burst := total * envenom_pct / 100.0
+	if enemy.is_boss():
+		burst *= BOSS_ENVENOM_MULT
+	rogue.procs.deal_raw(enemy, burst, RogueMastery.SCHOOL, false, &"dot")
 
 
 ## A Deadly Poison stack for the hit on [param body] (the Mastery's share of this blade's

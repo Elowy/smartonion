@@ -9,7 +9,7 @@ extends Node
 ## the run's environment palette, no environment hazard, no Spirit Healer): the heroes, the camera,
 ## Arena.current and the fighting systems stay exactly as in a wave, only the scenery is swapped, and
 ## [method _leave] puts it back. Enemies are the run's eligible ones ([method
-## WaveDirector.eligible_enemies]) scaled to the cleared wave ([member wave]); they pay nothing
+## WaveDirector.eligible_enemies]) scaled to [method strength_wave] of the cleared wave ([member wave]); they pay nothing
 ## ([member Enemy.drops_loot] is false) – the dungeon has its own rewards, [DungeonRewards].
 ##
 ##   1 CLEAR   – kill CLEAR_KILLS (25) enemies; they come in telegraphed groups, at most CLEAR_CAP alive.
@@ -49,6 +49,26 @@ enum Room { CLEAR, SURVIVE, DEFEND, WARDEN }
 
 ## The waves after which the portal opens (normal, endless and hardcore runs).
 const PORTAL_WAVES: Array[int] = [6, 9, 12, 15]
+## Final balance 2: the wave whose HP / damage growth the dungeon's enemies, its brazier and the Warden use, per
+## portal wave and party size (the entry is [1, 2, 3, 4] heroes; see [method strength_wave]). The portal waves are
+## the party's most comfortable stretch, so the dungeon is stronger than the cleared wave - by how much depends on
+## the party and on the portal. Measured with the bots (cleared / entered after the waves 6 / 9 / 12 / 15):
+##   four heroes  x1.6 flat (10 / 14 / 19 / 24)  9/12, 12/12, 6/10, 1/7   (too hard late)
+##                9 / 13 / 16 / 19               9/10, 10/10, 8/8, 9/9   (too easy)
+##                10 / 15 / 18 / 21              8/10, 9/10, 8/9, 8/9    (still 87%: revives are free in a full party)
+##                10 / 17 / 20 / 23 (16 waves)   6/8, 3/8, 5/8, 4/6      (60%, only the second portal was too hard)
+##   a lone hero  7 / 10 / 13 / 16               9/10, 9/10, 9/9, 8/8
+##                8 / 12 / 16 / 20               6/10, 5/10, 5/6, 3/6    (and the runs that lost the first two dungeons
+##                                                died on waves 10-12: a lone hero lives off the rewards)
+## so a bigger party needs the bigger bonus (a full party is 3-4 revives deep), the middle portals a bigger one than the
+## first (the party has gear by then), and a lone hero keeps the small numbers. The target is about 50-80% cleared per
+## portal for three and four heroes and a bit fewer for a lone hero.
+const STRENGTH_WAVES: Dictionary[int, Array] = {
+	6: [7, 10, 10, 10],
+	9: [11, 14, 14, 16],
+	12: [15, 17, 18, 20],
+	15: [18, 21, 22, 23],
+}
 const ROOM_COUNT := 4
 const ROOM_NAMES: Array[String] = ["Clear", "Survive", "Defend", "Warden"]
 const WARDEN_ID := &"dungeon_warden"
@@ -180,6 +200,30 @@ func _init() -> void:
 ## The portal opens after [param p_wave] (6, 9, 12, 15).
 static func is_portal_wave(p_wave: int) -> bool:
 	return p_wave in PORTAL_WAVES
+
+
+## The wave whose growth the dungeon's enemies, brazier and Warden use after the cleared wave [param p_wave]
+## for [param players] heroes (-1 = the run's party; more than four count as four): the [constant STRENGTH_WAVES]
+## entry of the portal wave. Between two portal waves (a forced portal, tests) the bonus over the cleared wave is
+## interpolated, before the first and after the last it stays that of the nearest portal. Which enemy types
+## appear still follows the cleared wave itself.
+static func strength_wave(p_wave: int, players: int = -1) -> int:
+	var n := clampi(RunState.player_count if players < 0 else players, 1, 4)
+	var w := maxi(1, p_wave)
+	var portals := PORTAL_WAVES
+	var bonus := float(int(STRENGTH_WAVES[portals[0]][n - 1]) - portals[0])
+	for i in portals.size():
+		var at: int = portals[i]
+		var at_bonus := float(int(STRENGTH_WAVES[at][n - 1]) - at)
+		if w >= at:
+			bonus = at_bonus
+			continue
+		if i > 0:
+			var prev: int = portals[i - 1]
+			var prev_bonus := float(int(STRENGTH_WAVES[prev][n - 1]) - prev)
+			bonus = lerpf(prev_bonus, at_bonus, float(w - prev) / float(at - prev))
+		break
+	return maxi(1, w + roundi(bonus))
 
 
 ## The Skeleton Grunt-based HP of the brazier at [param p_wave] (see BRAZIER_GRUNTS).
@@ -488,7 +532,7 @@ func _hatch(g: PendingGroup) -> void:
 			pos += Vector3(cos(angle), 0.0, sin(angle)) * g.ring * rng.randf_range(0.7, 1.0)
 		pos = arena.clamp_point(pos, g.data.radius + 0.1)
 		pos.y = 0.0
-		var e := Enemy.create(g.data, wave)
+		var e := Enemy.create(g.data, strength_wave(wave))
 		e.drops_loot = false
 		e.position = pos
 		e.died.connect(_on_enemy_died)
@@ -523,7 +567,7 @@ func summon(add_data: EnemyData, count: int, center: Vector3, scatter: float) ->
 		var pos := center + Vector3(cos(angle), 0.0, sin(angle)) * scatter
 		pos = arena.clamp_point(pos, add_data.radius + 0.1)
 		pos.y = 0.0
-		var e := Enemy.create(add_data, wave)
+		var e := Enemy.create(add_data, strength_wave(wave))
 		e.drops_loot = false
 		e.position = pos
 		parent.add_child(e)
@@ -556,7 +600,7 @@ static func _ring_radius(data: EnemyData, count: int) -> float:
 # --- Room 3: the brazier -----------------------------------------------------------------
 
 func _spawn_brazier() -> void:
-	brazier = DungeonBrazier.create(brazier_hp(wave))
+	brazier = DungeonBrazier.create(brazier_hp(strength_wave(wave)))
 	var parent := _spawn_parent()
 	if parent != null:
 		parent.add_child(brazier)
@@ -650,7 +694,7 @@ func _spawn_warden() -> void:
 	var parent := _spawn_parent()
 	if parent == null:
 		return
-	var b := Boss.create(warden_data, wave)
+	var b := Boss.create(warden_data, strength_wave(wave))
 	b.director = self
 	b.drops_loot = false
 	b.position = arena.clamp_point(_warden_point, warden_data.radius * warden_data.model_scale * 0.5 + 0.2)

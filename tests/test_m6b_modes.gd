@@ -174,7 +174,7 @@ func test_an_endless_boss_has_its_waves_normal_scaling() -> void:
 	nodes.append(at30)
 	nodes.append(at35)
 	check_near(at30.max_hp, morvain.max_hp_for(30, 2), 0.01, "Morvain's HP at wave 30")
-	check_near(at30.max_hp, morvain.max_hp * morvain.hp_mult_at_wave(30) * 1.75, 0.01, "= base x the wave 30 growth x the boss co-op factor")
+	check_near(at30.max_hp, morvain.max_hp * morvain.hp_mult_at_wave(30) * (1.0 + morvain.coop_hp_per_player), 0.01, "= base x the wave 30 growth x the boss co-op factor")
 	check_near(at35.max_hp, vorthalax.max_hp_for(35, 2), 0.01, "Vor'thalax's HP at wave 35")
 	check(at30.max_hp > morvain.max_hp_for(10, 2) * 10.0, "far above the wave 10 Morvain")
 	check_near(at30.contact_damage, morvain.contact_damage_at_wave(30) * RunState.coop_damage_mult(), 0.001, "contact damage at the wave")

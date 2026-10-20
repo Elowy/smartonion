@@ -11,5 +11,6 @@ waves = 3
 icon_id = &"greed"
 color = Color(1, 0.8, 0.25, 1)
 bot_accepts = true
+bot_accepts_solo = false
 gold_pct = 30.0
 enemy_damage_pct = 20.0

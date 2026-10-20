@@ -67,7 +67,7 @@ var casts_total := 0
 
 ## A boss of [param p_data] (a [BossData]; any EnemyData works, without abilities) at wave
 ## [param p_wave], not in the tree yet. Max HP follows the boss rule (BossData.max_hp_for:
-## x(1 + 0.75 (players - 1)), --boss-hp), not Enemy.setup's co-op factor.
+## x(1 + k (players - 1) + convex (players - 1)(players - 2) / 2), --boss-hp), not Enemy.setup's co-op factor.
 static func create(p_data: EnemyData, p_wave: int) -> Boss:
 	var b := setup(Boss.new(), p_data, p_wave) as Boss
 	b.add_to_group(&"bosses")  # (the camera frames it, CameraRig.boss_points)

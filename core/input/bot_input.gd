@@ -432,7 +432,7 @@ func _safe_rescue(pos: Vector2, ghost: Vector2, enemies: Array[Vector2], more: A
 	if _hp_ratio() < RESCUE_MIN_HP_RATIO:
 		return false
 	var threats := 0
-	for list in [enemies, more]:
+	for list: Array[Vector2] in [enemies, more]:
 		for d: Vector2 in list:
 			if (pos - d).distance_to(ghost) < RESCUE_THREAT_RADIUS:
 				threats += 1

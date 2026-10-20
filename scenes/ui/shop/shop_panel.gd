@@ -31,12 +31,16 @@ extends Control
 ## lock_input(seconds) makes A / X ignored for a moment after the market opens.
 ## Shows an ItemTooltip for each shop-focused player's hovered offer, compared with the item it
 ## would replace for that player (ItemTooltip.equipped_for_compare). Tooltips never overlap
-## each other or the player panels in the screen corners and never hide their own card: each
-## goes beside its hovered card on the stall if that spot is free, else on the card's other
-## side, above / below it, or into the free band between the corner panels on the player's
-## side – at a smaller scale when nothing else fits ([method layout_tooltips]). They also keep
-## clear of a corner panel's own item tooltip that reaches out of its panel into such a band
-## ([member tooltip_obstacles]).
+## each other, the player panels in the screen corners or their own hovered card: each goes
+## beside its hovered card on the stall if that spot is free, else on the card's other side,
+## above / below it, or into the free band between the corner panels on the player's side; if
+## none of those is free at any scale, anywhere free on the stall or in a band, nearest to the
+## card first – at a smaller scale when nothing else fits ([method layout_tooltips], down to
+## TOOLTIP_SCALES[-1]). They also keep clear of a corner panel's own item tooltip that reaches
+## out of its panel into such a band ([member tooltip_obstacles]).
+## The one exception: when four tall tooltips do not fit the stall together even at the smallest
+## scale (a free band is only ~230 px tall, the stall 688 px: a Legendary with the comparison
+## block is ~400 px tall at 0.54), all of them are at that scale and the least overlap stays.
 ## The panel only calls the Shop contract (buy / toggle_lock / toggle_ping / vote_reroll) and
 ## redraws on Shop.changed and RunState.gold_changed (while hidden – the whole wave, the
 ## Intermission stays in the tree – a wallet change is caught up at the end of the frame the
@@ -64,14 +68,38 @@ const EXTRA_GAP := 10
 const FEEDBACK_TIME := 6.0
 const TOOLTIP_GAP := 12.0
 ## Shop tooltips are drawn a little smaller so they cover fewer neighbouring cards; when no
-## free spot is found the next smaller scale is tried.
+## free spot is found the next smaller scale is tried (and, when a player's tooltip still has
+## none, everybody's, see [method layout_tooltips]).
 const TOOLTIP_SCALE := 0.82
 const TOOLTIP_SCALES: Array[float] = [0.82, 0.72, 0.62, 0.54]
 ## Inset of the tooltips from the stall body's edges.
 const TOOLTIP_MARGIN := 8.0
-## A spot that covers the hovered card or a [member tooltip_obstacles] rect counts this many
-## times its overlapping area (another shop tooltip: once).
+## In the last-resort overlap (no free spot even at the smallest scale), a spot that covers the
+## hovered card or a [member tooltip_obstacles] rect counts this many times its overlapping area
+## (another shop tooltip: once).
 const COVER_WEIGHT := 4.0
+## Distance from the edges of the area and of the other tooltips of the spots [method _free_spots]
+## tries; at the smallest scale, as a last resort, SPOT_TIGHT_GAP (a free spot that all but
+## touches them is still free).
+const SPOT_GAP := 6.0
+const SPOT_TIGHT_GAP := 0.1
+
+## What [method layout_tooltips] needs to place one tooltip: its unscaled size, its hovered
+## card (global rect) and the cursor position / player slot it belongs to.
+class SpotRequest:
+	var raw := Vector2.ZERO
+	var card := Rect2()
+	var index := 0
+	var slot_index := 0
+
+
+## A tooltip's place: the global [member rect], the [member scale] it is drawn at and the
+## [member cost] of the overlap it accepts (0: free).
+class TooltipSpot:
+	var rect := Rect2()
+	var scale := 1.0
+	var cost := 0.0
+
 
 var shop: Shop
 ## Returns the global rects (Array[Rect2]) the shop tooltips keep clear of besides each other:
@@ -103,6 +131,8 @@ var _tooltips: Dictionary[int, ItemTooltip] = {}
 ## The same per player for a hovered consumables card (only one of the two is visible).
 var _cons_tooltips: Dictionary[int, ConsumableTooltip] = {}
 var _tooltip_keys: Dictionary[int, String] = {}
+## What the last [method layout_tooltips] laid out (an equal key: nothing to do).
+var _layout_key: Array = []
 ## Slot indices, the player who acted last at the end (tooltip priority and draw order).
 var _act_order: Array[int] = []
 ## Newest last: {"bb": String, "plain": String, "age": float}.
@@ -1199,12 +1229,11 @@ func _shown_tooltip(slot_index: int) -> ItemTooltip:
 	return _tooltips.get(slot_index)
 
 
-## Places every visible tooltip at the first free candidate spot, largest scale first. The
-## player who acted last is placed first (the one browsing gets the best, full-size spot);
-## the others take what is left. A corner panel's tooltip that reaches into a free band
-## ([member tooltip_obstacles]) is there first: a spot over it counts COVER_WEIGHT times.
+## Places every visible tooltip at a spot that overlaps nothing (no other shop tooltip, no
+## [member tooltip_obstacles] rect, not its own hovered card), largest scale first, see
+## [method _solve]. Nothing is recomputed while the tooltips, cursors, cards and areas are as in
+## the last call.
 func layout_tooltips() -> void:
-	var placed: Array[Rect2] = []
 	var blocked: Array[Rect2] = []
 	if tooltip_obstacles.is_valid():
 		blocked.assign(tooltip_obstacles.call())
@@ -1217,37 +1246,217 @@ func layout_tooltips() -> void:
 	for s in _slots:
 		if s not in order:
 			order.append(s)
+	var tips: Array[ItemTooltip] = []
+	var requests: Array[SpotRequest] = []
+	var key: Array = [global_position, areas, blocked]
 	for s in order:
 		var tip := _shown_tooltip(s.index)
 		var index := cursor_of(s.index)
 		var card_node := card_at(index)
 		if tip == null or not tip.visible or card_node == null:
 			continue
-		var raw := tip.get_combined_minimum_size().max(tip.size)
-		var card := card_node.get_global_rect()
-		var best := Rect2()
-		var best_scale := TOOLTIP_SCALES[-1]
-		var best_overlap := INF
-		for scale_value in TOOLTIP_SCALES:
-			var tsize := raw * scale_value
-			for r in _candidates(tsize, card, index, s.index, areas):
-				var overlap := _overlap(r, placed) + _overlap(r, blocked) * COVER_WEIGHT \
-						+ (r.intersection(card).get_area() * COVER_WEIGHT if r.intersects(card) else 0.0)
-				if overlap < best_overlap - 0.5:
-					best_overlap = overlap
-					best = r
-					best_scale = scale_value
-				if overlap <= 0.0:
-					break
-			if best_overlap <= 0.0:
-				break
-		if not best.has_area():
+		var request := SpotRequest.new()
+		request.raw = tip.get_combined_minimum_size().max(tip.size)
+		request.card = card_node.get_global_rect()
+		request.index = index
+		request.slot_index = s.index
+		tips.append(tip)
+		requests.append(request)
+		key.append([tip.get_instance_id(), request.raw, request.card, index, s.index])
+	if key == _layout_key:
+		return
+	_layout_key = key
+	var spots := _solve(requests, areas, blocked)
+	for k in tips.size():
+		tips[k].scale = Vector2.ONE * spots[k].scale
+		tips[k].position = spots[k].rect.position - global_position
+
+
+## The spots of all [param requests] (in the order of the list: the player who acted last is
+## first and gets the best, full-size spot):
+## 1. Each takes what is left in turn, at the largest scale that has a free spot
+##    ([method _find_spot]).
+## 2. When one of them has to overlap, all are laid out again at one scale step smaller
+##    (TOOLTIP_SCALES), the tallest placed first (the hardest to fit), and so on down to the
+##    second smallest scale.
+## 3. At the smallest scale every order of placing them is tried until all are free. Only if
+##    none is does the layout with the least overlap stay (all at the smallest scale).
+func _solve(requests: Array[SpotRequest], areas: Array[Rect2], blocked: Array[Rect2]) -> Array[TooltipSpot]:
+	var given: Array[int] = []
+	for k in requests.size():
+		given.append(k)
+	var tallest_first := given.duplicate()
+	tallest_first.sort_custom(func(a: int, b: int) -> bool:
+		return requests[a].raw.y > requests[b].raw.y or (requests[a].raw.y == requests[b].raw.y and a < b))
+	var spots := _layout_pass(requests, given, 0, areas, blocked)
+	if _total_cost(spots) <= 0.0:
+		return spots
+	var last := TOOLTIP_SCALES.size() - 1
+	for cap in range(1, last):
+		spots = _layout_pass(requests, tallest_first, cap, areas, blocked)
+		if _total_cost(spots) <= 0.0:
+			return spots
+	var best: Array[TooltipSpot] = []
+	var best_cost := INF
+	var orders: Array[Array] = [tallest_first]
+	orders.append_array(_permutations(given))
+	for order: Array[int] in orders:
+		spots = _layout_pass(requests, order, last, areas, blocked)
+		var cost := _total_cost(spots)
+		if cost < best_cost:
+			best_cost = cost
+			best = spots
+		if cost <= 0.0:
+			break
+	return best
+
+
+## One layout: [param requests] placed one after the other in [param order], none of them
+## larger than TOOLTIP_SCALES[[param cap]]; the spots come in the order of [param requests].
+func _layout_pass(requests: Array[SpotRequest], order: Array[int], cap: int, areas: Array[Rect2],
+		blocked: Array[Rect2]) -> Array[TooltipSpot]:
+	var spots: Array[TooltipSpot] = []
+	spots.resize(requests.size())
+	var placed: Array[Rect2] = []
+	for k in order:
+		var r := requests[k]
+		var spot := _find_spot(r.raw, r.card, r.index, r.slot_index, areas, placed, blocked, cap)
+		if not spot.rect.has_area():
 			# Taller than the stall even at the smallest scale: at the stall's top, not the
 			# screen's corner.
-			best = Rect2(areas[0].position, raw * best_scale)
-		tip.scale = Vector2.ONE * best_scale
-		tip.position = best.position - global_position
-		placed.append(best)
+			spot.rect = Rect2(areas[0].position, r.raw * spot.scale)
+		spots[k] = spot
+		placed.append(spot.rect)
+	return spots
+
+
+static func _total_cost(spots: Array[TooltipSpot]) -> float:
+	var total := 0.0
+	for spot in spots:
+		total += spot.cost
+	return total
+
+
+## Every order of [param items] (at most 4 of them: 24).
+static func _permutations(items: Array[int]) -> Array[Array]:
+	var out: Array[Array] = []
+	if items.size() <= 1:
+		out.append(items.duplicate())
+		return out
+	for i in items.size():
+		var rest := items.duplicate()
+		var first: int = rest.pop_at(i)
+		for tail in _permutations(rest):
+			var order: Array[int] = [first]
+			order.append_array(tail)
+			out.append(order)
+	return out
+
+
+## Where one tooltip of [param raw] size goes, at the scale TOOLTIP_SCALES[[param cap]] or
+## smaller: the first spot that is free (see [method _cost]) at the largest scale that has one.
+## 1. The preferred spots ([method _candidates]: beside the hovered card, above / below it, the
+##    free bands), largest scale first.
+## 2. When none of them is free at any scale, any free spot on the stall or in a band
+##    ([method _free_spots]: the one nearest to the card), again largest scale first.
+## 3. Only when nothing is free even at the smallest scale (TOOLTIP_SCALES[-1]) does it accept
+##    the least overlap, there (its cost is that overlap). The rect has no area when the
+##    tooltip fits no area at all.
+func _find_spot(raw: Vector2, card: Rect2, index: int, slot_index: int, areas: Array[Rect2],
+		placed: Array[Rect2], blocked: Array[Rect2], cap := 0) -> TooltipSpot:
+	var spot := TooltipSpot.new()
+	for i in range(cap, TOOLTIP_SCALES.size()):
+		spot.scale = TOOLTIP_SCALES[i]
+		for r in _candidates(raw * spot.scale, card, index, slot_index, areas):
+			if _is_free(r, card, placed, blocked):
+				spot.rect = r
+				return spot
+	var obstacles: Array[Rect2] = placed.duplicate()
+	obstacles.append_array(blocked)
+	obstacles.append(card)
+	for i in range(cap, TOOLTIP_SCALES.size()):
+		spot.scale = TOOLTIP_SCALES[i]
+		var found := _nearest_free(_free_spots(raw * spot.scale, areas, obstacles, SPOT_GAP), card, placed, blocked)
+		if found.has_area():
+			spot.rect = found
+			return spot
+	# No free spot anywhere: the least overlap at the smallest scale (spots that all but touch
+	# the obstacles included), the nearest to the card among equals.
+	var tsize := raw * spot.scale
+	var options := _candidates(tsize, card, index, slot_index, areas)
+	options.append_array(_free_spots(tsize, areas, obstacles, SPOT_GAP))
+	options.append_array(_free_spots(tsize, areas, obstacles, SPOT_TIGHT_GAP))
+	var best_cost := INF
+	var best_distance := INF
+	for r in options:
+		var cost := _cost(r, card, placed, blocked)
+		var distance := r.get_center().distance_squared_to(card.get_center())
+		if cost < best_cost - 0.5 or (cost <= best_cost + 0.5 and distance < best_distance):
+			best_cost = cost
+			best_distance = distance
+			spot.rect = r
+	spot.cost = best_cost if spot.rect.has_area() else 0.0
+	return spot
+
+
+## The weighted overlap of [param r]: what it covers of the shop tooltips already placed
+## (once), of the corner panels' tooltips ([member tooltip_obstacles]) and of its own hovered
+## card (COVER_WEIGHT times each). 0: the spot is free.
+func _cost(r: Rect2, card: Rect2, placed: Array[Rect2], blocked: Array[Rect2]) -> float:
+	return _overlap(r, placed) + (_overlap(r, blocked) + _overlap(r, [card] as Array[Rect2])) * COVER_WEIGHT
+
+
+## True when [method _cost] of [param r] is 0 (stops at the first thing it touches).
+func _is_free(r: Rect2, card: Rect2, placed: Array[Rect2], blocked: Array[Rect2]) -> bool:
+	if r.intersects(card):
+		return false
+	for o in placed:
+		if o.intersects(r):
+			return false
+	for o in blocked:
+		if o.intersects(r):
+			return false
+	return true
+
+
+## The one of [param spots] that is free and has its centre nearest to [param card]'s (an empty
+## Rect2 when none is free).
+func _nearest_free(spots: Array[Rect2], card: Rect2, placed: Array[Rect2], blocked: Array[Rect2]) -> Rect2:
+	var best := Rect2()
+	var best_distance := INF
+	for r in spots:
+		var distance := r.get_center().distance_squared_to(card.get_center())
+		if distance < best_distance and _is_free(r, card, placed, blocked):
+			best_distance = distance
+			best = r
+	return best
+
+
+## Spots for a tooltip of [param tsize] that line up with an area's edge or with an obstacle's
+## edge ([param gap] away from it), inside one of [param areas]: a spot that keeps [param gap]
+## from all the obstacles can be slid left and up (or right and down) onto such a spot, so when
+## one exists, one of these is free too.
+static func _free_spots(tsize: Vector2, areas: Array[Rect2], obstacles: Array[Rect2], gap: float) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for a in areas:
+		if a.size.x + 0.5 < tsize.x or a.size.y + 0.5 < tsize.y:
+			continue
+		var xs := PackedFloat32Array([a.position.x, a.end.x - tsize.x])
+		var ys := PackedFloat32Array([a.position.y, a.end.y - tsize.y])
+		for o in obstacles:
+			xs.append(o.end.x + gap)
+			xs.append(o.position.x - gap - tsize.x)
+			ys.append(o.end.y + gap)
+			ys.append(o.position.y - gap - tsize.y)
+		var max_x := a.end.x - tsize.x
+		var max_y := a.end.y - tsize.y
+		for x in xs:
+			if x < a.position.x - 0.01 or x > max_x + 0.01:
+				continue
+			for y in ys:
+				if y >= a.position.y - 0.01 and y <= max_y + 0.01:
+					out.append(Rect2(clampf(x, a.position.x, max_x), clampf(y, a.position.y, max_y), tsize.x, tsize.y))
+	return out
 
 
 ## Screen rects tooltips may use: the stall body and the free bands between the top and the

@@ -13,6 +13,8 @@ class FakeEnemy extends Enemy:
 	var fake_knockback_log: Array[Vector3] = []
 	var fake_stun_count := 0
 	var fake_dead := false
+	## Counts as a boss (RogueBlade's one-big-target rule ...).
+	var fake_boss := false
 
 	func _init() -> void:
 		hp = 1000.0
@@ -33,6 +35,9 @@ class FakeEnemy extends Enemy:
 
 	func is_dead() -> bool:
 		return fake_dead
+
+	func is_boss() -> bool:
+		return fake_boss
 
 	func take_damage(amount: float, is_crit: bool = false, attacker: Node3D = null,
 			knockback: Vector3 = Vector3.ZERO) -> void:

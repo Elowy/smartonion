@@ -4,7 +4,7 @@ extends TestCase
 const EFakes := preload("res://tests/enemies_fakes.gd")
 const DT := 1.0 / 60.0
 ## RunState.coop_damage_mult() for 1..4 players (GDD 9).
-const COOP_DAMAGE: Array[float] = [0.45, 0.6, 0.75, 0.95]
+const COOP_DAMAGE: Array[float] = [0.45, 0.6, 0.9, 1.05]
 
 var world: Node3D
 
@@ -109,7 +109,7 @@ func test_coop_damage_mult_by_party_size() -> void:
 		check_near(RunState.coop_damage_mult(), COOP_DAMAGE[n - 1], 0.0001, "%d player(s)" % n)
 	for n in range(1, 4):
 		check(COOP_DAMAGE[n - 1] < COOP_DAMAGE[n], "%d players hit softer than %d" % [n, n + 1])
-	check(COOP_DAMAGE[3] <= 1.0, "never harder than the EnemyData curve")
+	check(COOP_DAMAGE[0] < 1.0, "a lone hero always takes softer hits than the EnemyData curve")
 
 
 func test_enemy_damage_scales_with_party_size() -> void:

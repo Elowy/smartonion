@@ -171,7 +171,7 @@ func test_boss_data_files_are_loaded_by_db() -> void:
 	var v := Db.get_boss(VORTHALAX)
 	check_eq(v.boss_wave, 25, "wave 25")
 	check_eq(v.max_hp, 450.0, "base HP")
-	check_eq(v.contact_damage, 4.0, "contact")
+	check_eq(v.contact_damage, 1.5, "contact")
 	check_eq(v.abilities.size(), 3, "three abilities")
 	var fields := v.abilities[0]
 	check(fields.kind == BossAbility.Kind.FIRE_FIELDS and fields.interval == 8.0 and fields.count == 2
@@ -206,11 +206,12 @@ func test_boss_max_hp_rule() -> void:
 	var m := Db.get_boss(MORVAIN)
 	var base := m.hp_at_wave(10)
 	check_near(m.max_hp_for(10, 1), base, 0.001, "solo: base x the wave's growth")
-	check_near(m.max_hp_for(10, 2), base * 1.75, 0.001, "2 players: x(1 + 0.75)")
-	check_near(m.max_hp_for(10, 3), base * 2.5, 0.001, "3 players: x2.5")
-	check_near(m.max_hp_for(10, 4), base * 3.25, 0.001, "4 players: x3.25 (not the normal +60%)")
+	var k := m.coop_hp_per_player
+	check_near(m.max_hp_for(10, 2), base * (1.0 + k), 0.001, "2 players: x(1 + k)")
+	check_near(m.max_hp_for(10, 3), base * (1.0 + 2.0 * k), 0.001, "3 players: x(1 + 2 k)")
+	check_near(m.max_hp_for(10, 4), base * (1.0 + 3.0 * k), 0.001, "4 players: x(1 + 3 k) (not the normal +60%)")
 	BossData.hp_mult = 0.1
-	check_near(m.max_hp_for(10, 4), base * 3.25 * 0.1, 0.001, "--boss-hp multiplies it")
+	check_near(m.max_hp_for(10, 4), base * (1.0 + 3.0 * k) * 0.1, 0.001, "--boss-hp multiplies it")
 	BossData.hp_mult = 1.0
 	check(m.max_hp_for(10, 1) > 4000.0, "wave 10 growth is the usual enemy growth (%f)" % m.max_hp_for(10, 1))
 
@@ -253,7 +254,7 @@ func test_boss_create_uses_the_boss_hp_rule_and_party_damage() -> void:
 	var b := _boss(MORVAIN, Vector3.ZERO, 10)
 	var m := Db.get_boss(MORVAIN)
 	check(b.is_boss() and b.is_elite(), "a boss is an elite for targeting")
-	check_near(b.max_hp, m.hp_at_wave(10) * 3.25, 0.001, "max HP = growth x (1 + 0.75 x 3)")
+	check_near(b.max_hp, m.hp_at_wave(10) * (1.0 + 3.0 * m.coop_hp_per_player), 0.001, "max HP = growth x (1 + k x 3)")
 	check_eq(b.hp, b.max_hp, "full HP")
 	check_near(b.contact_damage, m.contact_damage_at_wave(10) * RunState.coop_damage_mult(), 0.0001,
 			"contact damage = base x the wave's growth x the party's damage factor")

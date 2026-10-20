@@ -15,8 +15,9 @@ var _special: Array = []
 ## A hero for the Vampiric tests: records hits like EFakes.FakePlayer and, like a real Player,
 ## reports landed damage through damage_taken.
 class EmittingHero extends EFakes.FakePlayer:
-	func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null) -> void:
-		super.take_damage(raw, kind, source)
+	func take_damage(raw: float, kind: StringName = CombatMath.KIND_MELEE, source: Node3D = null,
+			max_hp_share: float = 0.0) -> void:
+		super.take_damage(raw, kind, source, max_hp_share)
 		damage_taken.emit(raw, source)
 
 
