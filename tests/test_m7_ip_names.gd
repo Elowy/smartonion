@@ -73,6 +73,9 @@ const OLD_NAMES: Array[String] = [
 	"Breastplate of Fury", "Gauntlets of Fury", "Helm of Fury", "Legplates of Fury",
 	"Pauldrons of Fury", "Felfire Raiment", "Felfire Robes", "Felfire Gloves", "Felfire Hood",
 	"Felfire Leggings", "Felfire Mantle", "Bloodlust", "Shadowflame",
+	# M9 (meta-progression): the WoW system names the game replaced (Valor -> Seeds). Only as the WHOLE display name: the
+	# kept names "Call of Valor", "Boundless Valor", "Generous Valor" and the specialisation "Raging Echo" contain the words.
+	"Valor", "Raging",
 ]
 
 ## Old names that are plain English words (or damage schools): the exact-name check of the
@@ -111,6 +114,11 @@ const WORDS_COINED: Array[String] = [
 	"Blizzard", "Pyroblast", "Bladestorm", "Shadowstep", "Consecration", "Voidwalker", "Felfire",
 	"Frostweave", "Bloodlust", "Shadowflame", "Conflagrate", "Shadowburn", "Premeditation",
 	"Warbringer",
+	# M9: WoW's difficulty / system names (Pungent and Tear-Jerker replace Heroic and Mythic, the Wardrobe replaces
+	# Transmog) and the Mythic+ affix names (the Tear-Jerker pressures have names of their own). "Glyph" is a plain word
+	# and "Valor" / "Raging" are exact-name bans (OLD_NAMES), none of them is listed here.
+	"Heroic", "Mythic", "Transmog", "Bolstering", "Volcanic", "Sanguine", "Bursting", "Necrotic", "Fortified",
+	"Tyrannical",
 ]
 
 ## Brand and proper names (GDD chapter 14 plus the Blizzard IPs): whole words, any case.
@@ -406,11 +414,16 @@ func test_ability_spec_talent_and_tree_names_are_unique() -> void:
 func test_matchers_catch_the_old_names() -> void:
 	for text in ["Your Vital Siphon and Word of Glory", "Summon Voidwalker", "gain a Soul Shard", "3 Soul Shards",
 			"The BLIZZARD hits", "a blizzard of arrows", "Fan(s) of Knives", "Spirit Healer: 6 s",
-			"Holy Power", "Rampage!", "Berserking", "Arcane dust", "the Horde", "WoW-flavoured", "Diablo"]:
+			"Holy Power", "Rampage!", "Berserking", "Arcane dust", "the Horde", "WoW-flavoured", "Diablo",
+			"Heroic mode", "a heroic run", "Mythic+ keys", "Transmog set", "Bolstering enemies", "Volcanic ash", "Sanguine pools",
+			"Bursting foes", "Necrotic wounds", "Fortified bosses", "Tyrannical bosses", "the Tyrannical week"]:
 		check(not _text_hits(text, false).is_empty(), "data text \"%s\" is caught" % text)
-	for text in ["Word of Glory", "Soul Shards: %d", "Rampage!", "Infernal", "Voidwalker", "Blizzard", "Alliance"]:
+	for text in ["Word of Glory", "Soul Shards: %d", "Rampage!", "Infernal", "Voidwalker", "Blizzard", "Alliance",
+			"Heroic", "Mythic", "Transmog", "Bolstering", "Volcanic", "Sanguine", "Bursting", "Necrotic", "Fortified",
+			"Tyrannical"]:
 		check(not _text_hits(text, true).is_empty(), "code literal \"%s\" is caught" % text)
 	check(_is_old_name("Vanish") and _is_old_name(" Fury ") and _is_old_name("Imp Swarm") == false, "exact names")
+	check(_is_old_name("Valor") and _is_old_name(" Raging ") and _old_exact_code.has("Valor"), "Valor and Raging as whole names (M9)")
 	check(_is_old_name("Wild Imps") and _is_old_name("Improved Imp") and _is_old_name("Retribution"), "exact names, more")
 
 
@@ -421,7 +434,10 @@ func test_matchers_spare_plain_english_and_kept_names() -> void:
 			"Wild Imps fight for you", "Skeleton Grunt", "Soul Siphon", "Aftershock", "Shockwave", "Whirlwind", "Corruption",
 			"Ignite", "Artifact", "Dawnbreaker", "Hailstorm", "Melt Away", "Sacred Circle", "Ember Rain", "Resolve", "Pact Shards",
 			"Glimmer Dust", "Need", "Greed", "Disenchant", "Dust", "Goblin Coin Purse", "Coin Gremlin", "Grave Tender", "Wilted",
-			"Throne room", "Alliances are made", "Hordes"]:
+			"Throne room", "Alliances are made", "Hordes", "Call of Valor", "Boundless Valor", "Generous Valor", "Raging Echo",
+			"Glyph", "Seasoning", "Seeds", "Wardrobe", "Pungent", "Tear-Jerker", "Salt Rain", "Hardened Peel", "Paring Knives",
+			"Wilting Heat", "Weeping Fog", "Bitter Harvest", "heroes", "a hero's journey", "mythical beasts", "burst of flame",
+			"bursts", "volcano", "fortify", "fortress", "necromancer", "tyrant", "sanguine_pool", "heroic_leap"]:
 		var hits := _text_hits(text, false)
 		check(hits.is_empty(), "\"%s\" is not flagged: %s" % [text, hits])
 	for text in ["warlock:infernal:body", "warlock:voidwalker:eyes", "ConsecrationVfx", "BlizzardShards", "torment_radius",
@@ -429,6 +445,8 @@ func test_matchers_spare_plain_english_and_kept_names() -> void:
 		var hits2 := _text_hits(text, true)
 		check(hits2.is_empty(), "code id/key \"%s\" is not flagged: %s" % [text, hits2])
 	check(not _is_old_name("Melt Away") and not _is_old_name("Arcane Focus") and not _is_old_name("Imp"), "new / kept names are not old")
+	check(not _is_old_name("Call of Valor") and not _is_old_name("Boundless Valor") and not _is_old_name("Raging Echo")
+			and not _is_old_name("Valorous") and not _is_old_name("Raging Bull"), "Valor / Raging only as the exact name")
 
 
 func test_code_scanner_skips_comments_ids_and_paths() -> void:
