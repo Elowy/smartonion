@@ -10,7 +10,7 @@ extends Node3D
 ## swung in _process (trot cycle, wagging, flaps); attacks lunge the body forward. A pulsing
 ## amber ring marks Pack Frenzy ([method set_frenzy]). Only nodes move – materials are shared.
 
-const WOLF_SCALE := 1.25
+const WOLF_SCALE := 1.05
 const BOAR_SCALE := 1.2
 const OWL_SCALE := 1.0
 const HOVER_HEIGHT := 1.6
@@ -21,9 +21,9 @@ const ATTACK_TIME := 0.25
 const FLAP_SPEED := 16.0
 const FRENZY_COLOR := Color(1.0, 0.55, 0.15, 0.85)
 
-const WOLF_FUR := Color(0.56, 0.55, 0.6)
-const WOLF_DARK := Color(0.33, 0.32, 0.38)
-const WOLF_LIGHT := Color(0.86, 0.84, 0.8)
+const WOLF_FUR := Color(0.52, 0.48, 0.44)
+const WOLF_DARK := Color(0.29, 0.26, 0.26)
+const WOLF_LIGHT := Color(0.84, 0.79, 0.7)
 const COLLAR := Color(0.5, 0.32, 0.16)
 const TAG := Color(0.96, 0.76, 0.3)
 const NOSE := Color(0.12, 0.1, 0.12)
@@ -151,10 +151,10 @@ func _build() -> void:
 func _build_ground(mat: Material) -> void:
 	var hips := WOLF_HIPS if kind == &"wolf" else BOAR_HIPS
 	var leg_mesh := MeshKit.cached("hunter:%s:leg" % kind, func() -> Mesh: return _leg_mesh(kind))
-	for hip in hips:
+	for i in hips.size():
 		var leg := Node3D.new()
-		leg.name = "Leg"
-		leg.position = hip
+		leg.name = "Leg%d" % i
+		leg.position = hips[i]
 		_pivot.add_child(leg)
 		var mi := MeshInstance3D.new()
 		mi.mesh = leg_mesh
@@ -359,9 +359,9 @@ static func _leg_mesh(p_kind: StringName) -> Mesh:
 		k.add_segment(Vector3(0, 0.02, 0), Vector3(0, -0.26, 0.0), 0.07, 0.05, BOAR_FUR, 8)
 		k.add_sphere(0.055, _xf(Vector3(0, -0.28, -0.015), Vector3.ZERO, Vector3(1.0, 0.6, 1.3)), BOAR_DARK, 8, 4)
 		return k.build()
-	k.add_segment(Vector3(0, 0.02, 0), Vector3(0, -0.22, 0.02), 0.05, 0.035, WOLF_FUR, 8)
-	k.add_segment(Vector3(0, -0.22, 0.02), Vector3(0, -0.4, -0.01), 0.035, 0.03, WOLF_LIGHT, 8)
-	k.add_sphere(0.04, _xf(Vector3(0, -0.41, -0.03), Vector3.ZERO, Vector3(1.0, 0.6, 1.4)), WOLF_LIGHT, 8, 4)
+	k.add_segment(Vector3(0, 0.02, 0), Vector3(0, -0.22, 0.02), 0.07, 0.05, WOLF_FUR, 8)
+	k.add_segment(Vector3(0, -0.22, 0.02), Vector3(0, -0.4, -0.01), 0.05, 0.04, WOLF_LIGHT, 8)
+	k.add_sphere(0.055, _xf(Vector3(0, -0.4, -0.03), Vector3.ZERO, Vector3(1.0, 0.6, 1.4)), WOLF_LIGHT, 8, 4)
 	return k.build()
 
 

@@ -320,7 +320,7 @@ func _bite(e: Enemy) -> void:
 	_heal_owner(dealt)
 	if model != null:
 		model.play_attack()
-	if HunterKit.is_live(e) or (is_instance_valid(e) and e.is_inside_tree()):
+	if is_instance_valid(e) and e.is_inside_tree():
 		Vfx.hit_spark(e.global_position + Vector3.UP * 0.5, SPARK_COLOR)
 
 

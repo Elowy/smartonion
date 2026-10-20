@@ -808,9 +808,9 @@ static func _head_hunter_hat(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void
 	var quill := PackedVector3Array([root, root + Vector3(0.05, 0.12, 0.07), root + Vector3(0.08, 0.26, 0.17),
 		root + Vector3(0.06, 0.36, 0.3)])
 	k.add_tube(quill, 0.014, 0.006, OnionModel.IVORY.darkened(0.12), 5)
-	var vane := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.06, 0.07), Vector2(0.09, 0.2), Vector2(0.07, 0.34),
-		Vector2(0.0, 0.46), Vector2(-0.04, 0.3), Vector2(-0.05, 0.14)])
-	k.add_extrusion(vane, 0.02, MeshKit.xf(root + Vector3(0.0, 0.0, 0.02), Vector3(-34, -12, 8)), OnionModel.IVORY, 0.9)
+	var vane := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.075, 0.08), Vector2(0.11, 0.24), Vector2(0.085, 0.4),
+		Vector2(0.0, 0.54), Vector2(-0.05, 0.36), Vector2(-0.06, 0.16)])
+	k.add_extrusion(vane, 0.02, MeshKit.xf(root + Vector3(0.0, 0.0, 0.02), Vector3(-34, -12, 8)), OnionModel.IVORY.lightened(0.15), 0.9)
 	var small := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.045, 0.05), Vector2(0.055, 0.15), Vector2(0.0, 0.27),
 		Vector2(-0.035, 0.13)])
 	k.add_extrusion(small, 0.018, MeshKit.xf(root + Vector3(-0.03, -0.01, 0.0), Vector3(-18, 14, -14)), Color(0.85, 0.36, 0.2), 0.9)
