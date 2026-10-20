@@ -96,7 +96,8 @@ func _build() -> void:
 		m.height = 0.03
 		m.radial_segments = 28
 		return m)
-	disc.material_override = Mats.glow(Color(tint.r, tint.g, tint.b, 0.38), 1.0)
+	# Alpha-blended (not additive): the element colour stays readable on the bright ice and snow arenas too.
+	disc.material_override = Mats.unshaded(Color(tint.r, tint.g, tint.b, 0.5))
 	disc.position.y = 0.04
 	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(disc)

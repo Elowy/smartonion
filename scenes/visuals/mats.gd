@@ -70,11 +70,11 @@ void fragment() {
 	// Darker towards the root, papery and lighter towards the neck.
 	base = mix(base * 0.78, base * 1.12, smoothstep(0.02, 0.8, UV.y));
 #ifdef GARLIC
-	// Garlic (the Shaman): thin purple streaks run up the bulb from the root and fade out towards the neck.
-	float gs = fract(UV.x * 7.0 + 0.12 * sin(UV.y * 9.0));
-	float streak = smoothstep(0.34, 0.46, gs) * (1.0 - smoothstep(0.5, 0.62, gs));
-	streak *= 1.0 - smoothstep(0.45, 0.92, UV.y);
-	base = mix(base, vec3(0.6, 0.32, 0.76), streak * 0.85);
+	// Garlic (the Shaman): ten thin purple streaks run up the bulb from the root and fade out towards the neck.
+	float gs = fract(UV.x * 10.0 + 0.1 * sin(UV.y * 9.0));
+	float streak = smoothstep(0.30, 0.38, gs) * (1.0 - smoothstep(0.52, 0.60, gs));
+	streak *= 1.0 - smoothstep(0.65, 1.0, UV.y);
+	base = mix(base, vec3(0.5, 0.24, 0.72), streak * 0.95);
 #endif
 	// Low HP: outer layers peel off and reveal the pale, juicy inner layer.
 	if (damage > 0.0) {

@@ -1467,9 +1467,12 @@ static func _back_totem_mesh(accent: Color) -> Mesh:
 	# Wings.
 	for side: float in [-1.0, 1.0]:
 		k.add_box(Vector3(0.14, 0.04, 0.05), at.call(Vector3(0.1 * side, 0.46, 0)) as Transform3D, dark)
-	# Strap across the body and a binding ring.
-	var strap := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(-32))) * Basis.from_scale(Vector3(1, 0.5, 1)), Vector3(0, 0.46, 0))
-	k.add_torus(0.4, 0.43, strap, LEATHER.darkened(0.1), 28, 4)
+	# A strap across the back and around the sides (never over the face) and a binding ring on the post.
+	var strap := PackedVector3Array()
+	for step in 11:
+		var a := lerpf(70.0, 290.0, float(step) / 10.0)
+		strap.append(bulb_point(lerpf(0.66, 0.26, float(step) / 10.0), a, 0.025))
+	k.add_tube(strap, 0.022, 0.022, LEATHER.darkened(0.1), 5)
 	k.add_torus(0.045, 0.075, at.call(Vector3(0, 0.12, 0)) as Transform3D, LEATHER, 10, 4)
 	return k.build()
 
