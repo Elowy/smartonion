@@ -28,6 +28,9 @@ extends RefCounted
 ##                 ProcSystem.set_extra_procs(source, defs) – each def gets the entry's "label"
 ##                 (unless the proc names one; "" silences it) and "id" (the talent / set bonus
 ##                 id) – followed by procs.refresh() when a source's defs changed.
+##   proficiency   the granted proficiency ids ([method has_proficiency] / [method granted_proficiencies]);
+##                 Player hands them to Equipment.set_granted_proficiencies on every rebuild (the
+##                 Shaman's dual wield from a talent).
 ##   script        one TalentEffect instance per entry ([method scripts]); diffed by
 ##                 source + id + index + rank + str(params): an unchanged script keeps its
 ##                 instance (and its wave state), a removed one gets teardown() before new ones
@@ -111,6 +114,8 @@ var _scripts: Array[TalentEffect] = []
 var _script_by_key: Dictionary[String, TalentEffect] = {}
 ## Every "knows" condition of the entries -> whether it held at the last rebuild.
 var _knows_state: Dictionary[StringName, bool] = {}
+## Proficiency ids the active "proficiency" entries grant (BonusVocabulary.GRANTABLE_PROFICIENCIES).
+var _granted: Array[StringName] = []
 
 
 static func create(p_player: Player) -> PlayerBonuses:
@@ -204,6 +209,17 @@ func script_for(source_id: StringName) -> TalentEffect:
 		if s.source_id == source_id:
 			return s
 	return null
+
+
+## Whether an active "proficiency" entry grants [param id] (&"dual_wield") – ClassData.proficiencies
+## besides, which Equipment consults separately.
+func has_proficiency(id: StringName) -> bool:
+	return id in _granted
+
+
+## Every proficiency id the active entries grant (a copy).
+func granted_proficiencies() -> Array[StringName]:
+	return _granted.duplicate()
 
 
 ## True when [param req] (an entry's "requires", or null / {} for none) holds for this hero.
@@ -358,6 +374,7 @@ func _rebuild() -> bool:
 	_taken_all_pct = 0.0
 	_taken_by_kind.clear()
 	_knows_state.clear()
+	var granted: Array[StringName] = []
 	for source in _ordered_sources():
 		var stats := {}
 		var defs: Array[Dictionary] = []
@@ -394,10 +411,15 @@ func _rebuild() -> bool:
 				&"script":
 					var key := "%s|%s|%d|%d|%s" % [source, str(raw.get("id", "")), index, rank, str(raw.get("params", {}))]
 					wanted.append([key, e, source])
+				&"proficiency":
+					var grant := _name(e.get("grant"))
+					if grant in BonusVocabulary.GRANTABLE_PROFICIENCIES and grant not in granted:
+						granted.append(grant)
 				_:
 					push_warning("PlayerBonuses: unknown entry kind '%s' (%s)" % [kind, str(raw.get("id", ""))])
 		stats_by_source[source] = stats
 		defs_by_source[source] = defs
+	_granted = granted
 	_apply_stats(stats_by_source)
 	_apply_resources(resource_sums)
 	var refreshed := _apply_procs(defs_by_source)

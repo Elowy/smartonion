@@ -1252,10 +1252,13 @@ func _on_talents_changed() -> void:
 		bonuses.set_effects(PlayerBonuses.SOURCE_TALENTS, talents.effects())
 
 
-## The bonus engine rebuilt: the ability params (talent / set mods) are stale.
+## The bonus engine rebuilt: the ability params (talent / set mods) are stale, and the proficiencies
+## its "proficiency" entries grant (the Shaman's dual wield) are the equipment's to know.
 func _on_bonuses_changed() -> void:
 	if abilities != null:
 		abilities.invalidate_params()
+	if equipment != null and bonuses != null:
+		equipment.set_granted_proficiencies(bonuses.granted_proficiencies())
 
 
 ## Parry (GDD 2.4.1): an immediate counter-strike with the first attacking weapon.

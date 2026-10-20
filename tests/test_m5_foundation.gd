@@ -745,10 +745,22 @@ func test_validate_rejects_typos() -> void:
 	check_eq(AbilityRunner.apply_mods(ww_params, {"damage_pct_add": 10})["damage_pct"], 160.0, "the _add form adds")
 
 
+## The pseudo ids of the registry by owner class. The M8 classes' ids are registered before their
+## data exists, so the registry may name a class that is not in Db.class_ids yet (Db.CLASS_ORDER does).
+const PSEUDO_ID_OWNERS: Dictionary[StringName, StringName] = {
+	&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock",
+	&"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue",
+	&"hunter_companion": &"hunter", &"shaman_totems": &"shaman",
+}
+
+
 func test_pseudo_ids_only_for_their_class() -> void:
-	check_eq(BonusVocabulary.PSEUDO_IDS.size(), 5, "the closed registry")
+	for id in PSEUDO_ID_OWNERS:
+		check_eq(BonusVocabulary.PSEUDO_IDS.get(id), PSEUDO_ID_OWNERS[id], "%s is registered for %s" % [id, PSEUDO_ID_OWNERS[id]])
 	for id: StringName in BonusVocabulary.PSEUDO_IDS:
 		var owner: StringName = BonusVocabulary.PSEUDO_IDS[id]
+		check(owner in Db.CLASS_ORDER, "%s: its class %s is a class of the game (data or not yet)" % [id, owner])
+		check(not Db.abilities.has(id), "%s is no ability id" % id)
 		var entry := {"kind": "ability", "match": {"id": String(id)}, "mods": {"damage_bonus_add": 10, "anything_pct": 5, "flag": true}}
 		check_eq(BonusVocabulary.validate(entry, owner), "", "%s validates for %s (param keys skipped)" % [id, owner])
 		for other in Db.class_ids:
@@ -833,7 +845,9 @@ func test_vocabulary_constants_match_the_engine() -> void:
 		check(r in ResourceData.new(), "ResourceData has %s" % r)
 	for s in BonusVocabulary.SCHOOLS:
 		check(Stats.SCHOOL_STATS.has(s), "school %s" % s)
-	check_eq(BonusVocabulary.KINDS.size(), 7, "seven kinds")
+	check_eq(BonusVocabulary.KINDS.size(), BonusVocabulary.KIND_KEYS.size(), "every kind has its keys")
+	for kind in BonusVocabulary.KINDS:
+		check(BonusVocabulary.KIND_KEYS.has(kind), "kind %s has a key list" % kind)
 
 
 # --- Stats, caps -------------------------------------------------------------------------------

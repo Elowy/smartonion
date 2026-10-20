@@ -24,6 +24,10 @@ const NEED_WEAPON := "You need a weapon"
 var class_data: ClassData
 var slots: Dictionary[int, ItemInstance] = {}
 var backpack: Array[ItemInstance] = []
+## Proficiencies the hero has besides ClassData.proficiencies, granted at runtime by a talent or
+## set bonus ("proficiency" entries, PlayerBonuses.granted_proficiencies; Player forwards them on
+## every rebuild). Today only &"dual_wield" is grantable (BonusVocabulary.GRANTABLE_PROFICIENCIES).
+var granted_proficiencies: Array[StringName] = []
 
 
 func _init(p_class: ClassData = null) -> void:
@@ -65,6 +69,36 @@ func remove_from_backpack(item: ItemInstance) -> bool:
 	return true
 
 
+## Whether the hero may wield one-handers in both hands: the class's dual_wield proficiency or a
+## granted one (a Warspirit talent for the Shaman).
+func can_dual_wield() -> bool:
+	return class_data != null and (class_data.can_dual_wield() or &"dual_wield" in granted_proficiencies)
+
+
+## Replaces the granted proficiencies. Losing dual wield (a talent respec) takes a one-hander out
+## of the off hand: into the backpack, or into the main hand when that is empty; with neither
+## possible (a full backpack) it stays where it is. [signal changed] fires once when it moved.
+## (A pair Artifact needs a class with dual_wield of its own, so a grant never matters for one.)
+func set_granted_proficiencies(ids: Array[StringName]) -> void:
+	if ids == granted_proficiencies:
+		return
+	granted_proficiencies = ids.duplicate()
+	if can_dual_wield():
+		return
+	var off := get_item(Items.EquipSlot.OFF_HAND)
+	if off == null or not off.is_weapon() or off.is_off_hand_only() or off.pair_off:
+		return
+	if get_item(Items.EquipSlot.MAIN_HAND) == null:
+		slots.erase(Items.EquipSlot.OFF_HAND)
+		slots[Items.EquipSlot.MAIN_HAND] = off
+	elif has_space():
+		slots.erase(Items.EquipSlot.OFF_HAND)
+		backpack.append(off)
+	else:
+		return
+	changed.emit()
+
+
 func can_equip(item: ItemInstance) -> bool:
 	return item != null and item.can_be_used_by(class_data) and not target_slots(item).is_empty()
 
@@ -79,14 +113,14 @@ func target_slots(item: ItemInstance) -> Array[Items.EquipSlot]:
 		return []  # only ever equipped with its main-hand piece
 	if item.companion != null:
 		# A pair needs both hands: a class that can wield the off-hand piece too.
-		if class_data == null or not class_data.can_dual_wield() or not class_data.can_use(item.companion.weapon):
+		if class_data == null or not can_dual_wield() or not class_data.can_use(item.companion.weapon):
 			return []
 		return [Items.EquipSlot.MAIN_HAND]
 	if item.is_off_hand_only():
 		return [Items.EquipSlot.OFF_HAND]
 	if item.is_two_handed():
 		return [Items.EquipSlot.MAIN_HAND]
-	if class_data != null and class_data.can_dual_wield():
+	if can_dual_wield():
 		return [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]
 	return [Items.EquipSlot.MAIN_HAND]
 
