@@ -102,8 +102,10 @@ func test_the_tabs_are_named_and_lb_rb_switch_them() -> void:
 	check_eq(loadout.tab, LoadoutScreen.Tab.SEASONINGS, "RB wraps to the Seasonings")
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
 	check_eq(loadout.tab, LoadoutScreen.Tab.LOOK, "LB wraps back")
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	check_eq(loadout.tab, LoadoutScreen.Tab.HEIRLOOM, "LB: Heirloom")
 	UiFakes.nudge(lobby, p1, Vector2(-1, 0))
-	check_eq(loadout.tab, LoadoutScreen.Tab.HEIRLOOM, "the stick sideways switches too")
+	check_eq(loadout.tab, LoadoutScreen.Tab.SEASONINGS, "the stick sideways switches too (the Look tab uses it to change a row)")
 	check(loadout.is_open(), "it stays open throughout")
 	check(PlayerManager.get_slot(0).class_data.id == &"warrior", "the stick did not change the class")
 
@@ -263,6 +265,29 @@ func test_the_look_tab_embeds_the_look_picker_when_the_script_exists() -> void:
 	check(loadout.look_picker != null, "and a new one is made when it comes back")
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.B)
 	check(not loadout.is_open(), "the picker's closed signal closes the Loadout")
+
+
+func test_the_real_look_picker_takes_the_stick_and_lt_closes_the_loadout() -> void:
+	check(LoadoutScreen.look_picker_available(), "WARDROBE's LookPicker is in the project")
+	_lobby()
+	var p1 := _join("p1", &"warrior")
+	var slot := PlayerManager.get_slot(0)
+	UiFakes.step(lobby)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
+	var loadout := _loadout(0)
+	loadout.set_tab(LoadoutScreen.Tab.LOOK)
+	var look := loadout.look_picker
+	check(look is LookPicker and not (look as LookPicker).self_driven, "the Loadout routes the input to it")
+	check(not slot.looks.has(&"head"), "worn gear to begin with")
+	UiFakes.nudge(lobby, p1, Vector2(1, 0))
+	check_eq(loadout.tab, LoadoutScreen.Tab.LOOK, "the stick sideways changes the row, not the tab")
+	check(slot.looks.has(&"head"), "the Head row took the next collected look (dev profile: all owned)")
+	var picked: StringName = slot.looks.get(&"head", &"")
+	UiFakes.nudge(lobby, p1, Vector2(1, 0))
+	check(slot.looks.get(&"head", &"") != picked, "one step per nudge (the input is read once)")
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
+	check(not loadout.is_open(), "LT closes the Loadout from the Look tab too")
+	check_eq(PlayerManager.count(), 1, "and nobody left")
 
 
 func test_the_loadout_fits_inside_the_smallest_card_on_every_tab() -> void:

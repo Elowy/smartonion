@@ -196,7 +196,8 @@ func open(p_slot: PlayerSlot) -> bool:
 	row = 0
 	_list_row = -1
 	visible = true
-	skip_frames = 1
+	# Self-driven, the press that opened the picker is still down this frame; a host that routes the input has used it.
+	skip_frames = 1 if self_driven else 0
 	var inp := slot.input
 	_wait_neutral = inp != null and inp.nav_held() != Vector2i.ZERO
 	preview.show_class(slot.class_data, slot.color)
