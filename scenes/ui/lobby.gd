@@ -15,13 +15,13 @@ extends Control
 ##   not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
+## - M9 SEASONINGS: LT / right mouse button opens the player's Seasoning picker over their card ([method
+##   open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and nothing else in the lobby.
 ## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
 ##   and X toggles Hardcore ([method toggle_hardcore]); the header shows the choice ("Mode: Endless ·
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
 ##   A change while the start countdown runs un-readies the player who made it, which cancels the countdown
 ##   (everybody sees the new mode before the run starts).
-## - M9 SEASONINGS: LT / right mouse button opens the player's Seasoning picker over their card ([method
-##   open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and nothing else in the lobby.
 ## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
 ##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
 ##   remembered for that class on their slot (Meta.apply_loadout).
@@ -334,6 +334,14 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_confirm")
 
 
+## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
+## class's unlock hint. Never the case with the dev profile of the automated runs.
+func ready_block_reason(slot: PlayerSlot) -> String:
+	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
+		return ""
+	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
+
+
 ## The Seasoning picker on [param slot]'s card (null for a slot without a card).
 func picker_of(slot: PlayerSlot) -> SeasoningPicker:
 	if slot == null or slot.index < 0 or slot.index >= cards.size():
@@ -348,14 +356,6 @@ func open_seasoning_picker(slot: PlayerSlot) -> bool:
 	if picker == null or slot.ready or ready_block_reason(slot) != "":
 		return false
 	return picker.open(slot)
-
-
-## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
-## class's unlock hint. Never the case with the dev profile of the automated runs.
-func ready_block_reason(slot: PlayerSlot) -> String:
-	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
-		return ""
-	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
 
 
 ## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class
