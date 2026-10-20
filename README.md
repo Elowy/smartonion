@@ -81,7 +81,7 @@ Friss klónnál (a `.godot/` mappa nincs a repóban) egyszer futtasd az importot
 - `--heirloom=heir_…` – minden hős Heirloomja.
 - `--difficulty=normal|pungent|tear_jerker` – a nehézségi szint.
 - `--alt-weapon[=0|1]` – a botok alternatív kezdőfegyvert kapnak.
-- `--view=patch --patch-tab=classes|seasonings|heirlooms|achievements|wardrobe` – The Onion Patch képernyőképe; `--view=lobby --loadout-tab=seasonings|heirloom|look` – a második játékos Loadout-ja.
+- `--view=patch --patch-tab=classes|seasonings|heirlooms|achievements|wardrobe` – The Onion Patch képernyőképe; `--view=lobby --loadout-tab=seasonings|heirloom|look` – a második játékos Loadout-ja (`--loadout-player=1..4` másik játékosét nyitja).
 
 Példa: `godot --headless --path . -- --smoke --waves=11 --seed=9 --profile=max --difficulty=pungent --heirloom=heir_old_layers`
 

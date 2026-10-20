@@ -4027,9 +4027,11 @@ a „Kiadás és IP” részben vannak. A kódszintű leírás a `docs/ARCHITECT
   szintjét kapja.
 - **Mentés:** a futam végén egyetlen mentés (XP, Seeds, győzelmek, achievementek, gyűjtemény,
   élettartam-statisztikák); vásárláskor és futam közben feloldott achievementnél azonnal. Az írás
-  ideiglenes fájlon át, átnevezéssel történik, így megszakadt mentésnél a régi fájl marad.
-  Olvashatatlan fájlt a játék `.corrupt` néven félreteszi, és üres profillal indul. Újabb
-  verziójú fájlt a játék csak olvas, és nem írja felül.
+  ideiglenes fájlon át, átnevezéssel történik, és a játék visszaolvasva ellenőrzi: egy sikertelen
+  vagy rövid írás (tele lemez) nem írja felül a régi fájlt. A felülírt jó fájlról minden mentésnél
+  `profile.json.bak` másolat marad. Olvashatatlan fájlt a játék `.corrupt` néven félreteszi; ha
+  van olvasható `.bak`, abból tölt be (figyelmeztetéssel, a haladás megmarad), különben üres
+  profillal indul. Újabb verziójú fájlt a játék csak olvas, és nem írja felül.
 - **Automatizált futamok nem érintik a profilt.** A smoke, a demo, a `--view`, a képernyőkép és
   a tesztek a **dev profilt** használják: minden nyitva, nincs nyers erő, nincs kiválasztás,
   Normal nehézség, és nincs fájl-írás. Ezért a meglévő tesztek és a smoke-futamok az alap játékot játsszák.
@@ -4213,7 +4215,7 @@ achievement-pontok és a választott cím látszik. Minden vásárlás azonnal m
 | Seasonings | Kaszt-léptető, a 8 Seasoning állapota (zárolt / megvehető / megvett) és ára | Vásárlás Seeds-ért; a megvett Seasoning a kaszt megjegyzett összeállításába tehető |
 | Heirlooms | 10 kártya, rangpöttyök, statok 1. / 10. / 25. hullámon, perkek | Rang-fejlesztés R2–R5 (60 / 120 / 240 / 480 Seeds) |
 | Achievements | 40 sor haladással, pontokkal és jutalommal (a rejtett és a Legendary jutalom „???”, amíg nincs meg) | Cím kiválasztása |
-| Wardrobe | Szűrők (fej, váll, mell, kozmetikum, festék), gyűjtemény-rács, 3D-előnézet, „N / 256” számláló | Festék vásárlása 100 Seeds-ért |
+| Wardrobe | Szűrők (fej, váll, mell, kozmetikum, festék), gyűjtemény-rács, 3D-előnézet, „N / 256” számláló | Festék vásárlása 100 Seeds-ért; X (billentyűzeten R) forgatja az előnézetet |
 
 **Wardrobe (kinézet-gyűjtemény):**
 
@@ -4232,7 +4234,9 @@ achievement-pontok és a választott cím látszik. Minden vásárlás azonnal m
 Minden hős kártyáján (a játékos saját padjával):
 
 - **LT** nyitja a **Loadout** képernyőt három fülrel: **Seasonings**, **Heirloom**, **Look**.
-  LB / RB (vagy ◀ ▶) vált fület, B vagy LT bezár. A Look fülön a kinézet-választó nyílik.
+  LB / RB (vagy ◀ ▶) vált fület, B vagy LT bezár. A Look fülön a kinézet-választó nyílik
+  (kompakt módban: az élő előnézet a sorok fölött látszik, mert a Loadout eltakarja a hős kártyáját).
+  Minden fül elfér a legkisebb, 1080p-s lobbykártyán.
 - **LB** (Q) kapcsolja az alternatív kezdőfegyvert (12. szint után); a Loadout zárt állapotában.
 - **SELECT** (Tab) lépteti a csapat nehézségi szintjét (9.1).
 - Egy zárt kaszt (pl. a még nem nyitott Hunter) kártyáján az ok látszik, és a kész (Ready) állapot

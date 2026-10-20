@@ -292,6 +292,7 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--alt-weapon[=0\|1]` | M9 test hook: the bots take the alternative starting weapon (works with the dev profile). |
 | `--view=patch`, `--patch-tab=classes\|seasonings\|heirlooms\|achievements\|wardrobe` | M9 dev: opens The Onion Patch from the main menu, on that tab. |
 | `--loadout-tab=seasonings\|heirloom\|look` | M9 dev: with `--view=lobby`, the second player's Loadout opens on that tab. |
+| `--loadout-player=1..4` | M9 dev: with `--loadout-tab`, the player whose Loadout opens instead of the second's (that player is un-readied first). |
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
@@ -2267,13 +2268,14 @@ pruned in `think()` when the golem is gone or no longer in `HOOK`).
   is swapped after a change. Hand-made (`unique`) items, Forge-made Legendaries (`unique_effect`) and names that do
   not start with the old prefix stay as they are.
 - Bots:
-  - `best_weapon(eq)`: the best attacking weapon; **skips Artifacts** (rarity >= ARTIFACT) and returns null when only
-    Artifacts are in hand (the Fangs pair counts as two).
+  - `best_weapon(eq)`: the best attacking weapon; **skips Artifacts** (rarity >= ARTIFACT) and **bound items** (the
+    Ancestral Peeler: an Heirloom takes no enchants) and returns null when only those are in hand (the Fangs pair counts
+    as two). A bot with the Peeler in one hand enchants the other hand's weapon, else its Epic armour.
   - `bot_target(eq) -> ItemInstance`: `best_weapon(eq)`, else the best equipped non-Artifact item of rarity >=
     `BOT_FALLBACK_MIN_RARITY` (EPIC) that is not an attacking weapon (armour, jewellery, a shield / tome) and for which
     `bot_plan(item, eq.class_data)` is not empty (rarity, then Item Level, then the lower `EquipSlot`); null if none.
   - `bot_plan(item, class)`: Reroll an off-class power enchant, else Imbue, else Empower the lowest rank (`{}` for an
-    Artifact). `bot_enchant(slot, gold_budget, rng)` works on `bot_target` (it used `best_weapon`, so a bot wearing an
+    Artifact or a bound item). `bot_enchant(slot, gold_budget, rng)` works on `bot_target` (it used `best_weapon`, so a bot wearing an
     Artifact weapon spent nothing at all).
   - `bot_disenchant_spare(slot, eq, dust_needed)`, `is_spare` (not an upgrade by the same test bots buy and Need with,
     never the last weapon). The pick is deterministic: no RNG change.
@@ -4079,7 +4081,16 @@ by `ClassLevels.sync_unlocks`, not by a migration).
   profile (`load_error` = `corrupt`, one warning);
 - a newer `version`, or an unreadable path, gives a read-only fresh profile: saves are refused and the file
   is never overwritten;
-- writes go through `<path>.tmp` and a rename, so a crash keeps the old file.
+- writes go through `<path>.tmp` and a rename, so a crash keeps the old file. The temporary file is read back and
+  compared before anything is replaced: a failed or short write (a full disk) is dropped, the old file stays and
+  `save_file` returns an error (`Meta` warns). The good file being replaced is first copied to `<path>.bak` (every
+  save; a file that does not parse is never copied over a good backup; a backup that cannot be made does not stop the
+  save). `Profile.write_limit` is the test hook that simulates the full disk;
+- a corrupt file with a readable `.bak` loads the backup instead of a fresh profile: the corrupt file is moved to
+  `<path>.corrupt` as above, `load_error` = `Profile.LOAD_RECOVERED` ("recovered from backup": a warning, the profile
+  is writable and not new). So is a missing file with a good `.bak` (a crash between the steps). A backup that does
+  not parse, or is of a newer version, is ignored. The dev profile and every automated run never touch the disk, the
+  backup included.
 
 **Migration.** `Profile.migrate(data)` runs the steps of `Profile._migration_steps()`
 (`{from_version: Callable(Dictionary) -> Dictionary}`). To change the format, add the step and raise
@@ -4125,10 +4136,19 @@ profile, for a null report, or for a report already recorded (`RunReport.recorde
 
 `RunReport` (`core/meta/run_report.gd`) is a snapshot: `victory`, `abandoned`, `mode`, `hardcore`, `endless`,
 `environment`, `difficulty`, `party` (class ids in slot order), `wave`, `waves_cleared`, `stats`
-(`RunReport.STAT_IDS`), `heroes` (per hero still in the run: class, alive, the hero stats, the `equipped` item
-summaries with their `EquipLook`, and `hero_facts`: capstones taken, abilities at Rank V, active set bonuses)
+(`RunReport.STAT_IDS`), `heroes` (per hero of the run, one who left mid-run included: class, alive, the hero stats,
+the `equipped` item summaries with their `EquipLook`, and `hero_facts`: capstones taken, abilities at Rank V, active
+set bonuses)
 and `flags` (`victory`, `abandoned`, `hardcore`, `endless`, `solo`, `full_party`, `no_downs`,
 `final_boss_down`). `RunReport.make(...)` builds one in tests.
+
+A hero who leaves mid-run ("Continue without Pn", `Main.drop_player`) stays in the report. The run-wide numbers
+(`downs`, `revives`, `damage`, `healing`, `absorbed`, `damage_taken`, `need_wins`) are the sums of every value in
+`RunState.*_by_player`, which keeps the departed hero's numbers until the next run, so a win after a drop is not a
+"no downs" win. `Main.drop_player` takes the hero's entry (`RunReport.hero_entry(slot)`, before the hero is freed) into
+`Main.departed_heroes`; `_report_extras()` hands them to `RunReport.collect` as `departed_heroes`, which adds them to
+`heroes` in slot order (their counters are read again from RunState). That keeps Class XP's kill term and the
+Wardrobe run-end listener working for that hero, also when the last hero drops and the abandoned run is recorded.
 
 **Dispatch order.** The listeners run in priority order (lower first, ties by registration order), then ONE
 save, then the signals:
@@ -4360,20 +4380,31 @@ achievements wait for the run end.
   `Lobby.open_seasoning_picker(slot)` is kept as a shortcut). Its tabs are Seasonings (the embedded
   `SeasoningPicker`), Heirloom (`LoadoutHeirloomTab`: ten rows; A goes through `Heirlooms.toggle`) and Look (the
   `LookPicker`). While it is open it gets all of the owner's input: LB / RB or ◀ ▶ switch tabs, B or LT close it,
-  and LB is the alternative weapon only while it is closed. Every tab fits the smallest 1080p lobby card (a test).
+  and LB is the alternative weapon only while it is closed. Every tab fits the narrowest and smallest 1080p lobby card,
+  width and height (432 px wide, 770 px high; the tab names and LB / RB glyphs are small for that). The Loadout covers
+  the hero's card, so the Look tab embeds the picker in its compact mode (`LookPicker.set_embedded(true)`: no title, no
+  frame, no minimum size, the preview a low banner above the rows, compact rows and prompts; the Loadout leaves the
+  Look tab's prompt row to the picker). The tests lay the four cards out at 1920 × 1080 with the real picker and check
+  every tab, every Look row and choose grid, and that each Loadout stays inside its own card and on screen.
 - **The Onion Patch** (`OnionPatchPage extends MenuPage`, opened from `MainMenu` between Play and Settings;
-  `UiPads.BUTTONS` gained the shoulder buttons). Five tabs, each a `PatchTab` (base class with the hooks
-  `on_open`, `refresh`, `on_nav`, `on_accept` and `action_text`, and the signal `message_posted`): `patch_classes_tab.gd`,
+  `UiPads.BUTTONS` gained the shoulder buttons and X). Five tabs, each a `PatchTab` (base class with the hooks
+  `on_open`, `refresh`, `on_nav`, `on_accept`, `on_x`, `action_text` and `x_text`, and the signal `message_posted`): `patch_classes_tab.gd`,
   `patch_seasonings_tab.gd`, `patch_heirlooms_tab.gd`, `patch_achievements_tab.gd`, `patch_wardrobe_tab.gd`. Every
   purchase goes through `Meta` and saves at once. Any player can drive the page: it takes the driver's slot, or
-  "anyone" (the Q / E keys).
+  "anyone" (the Q / E keys). X is the tab's second action: the driver's X, or in anyone mode any controller's X or the
+  R key (`KeyboardInput.button_key_held(Pad.X)`, the key `UiGlyph` shows for X), goes to `PatchTab.on_x()`; the
+  Wardrobe tab turns the preview. The prompt row is the page's: it shows `A <action_text>` and `X <x_text>` for the
+  current tab with the driver's glyphs (pad button plus keyboard key in anyone mode); the embedded WardrobePage hides
+  its own row.
 - **Contracts between the packages.** The embedded pages are duck-typed, so each package builds and tests alone.
-  `LookPicker`: `static create(slot)`, the signal `closed`, `open(slot)`, `handle_input(inp)`. It reads `slot.input`
-  itself when `self_driven` is true; a host that routes the input sets it false. `WardrobePage`: `static create()`,
-  `handle_input(inp) -> bool` (false for B, LB, RB and Up on the filter row, so the host keeps its back and tab
-  keys), `handle_nav(dir)`, `handle_accept()`, `refresh()`, `set_preview_class(cd, color)`, `counts_for(i)` and the
-  signal `purchased(id)`. `LoadoutScreen` and `PatchWardrobeTab` reach them through `Object.call` and `has_method`.
-- **Minimum sizes:** `LookPicker` 760 × 560; `WardrobePage` 1000 × 520 (it fills what its host gives it).
+  `LookPicker`: `static create(slot)`, the signal `closed`, `open(slot)`, `handle_input(inp)`, `set_embedded(on)` and
+  `is_embedded()`. It reads `slot.input` itself when `self_driven` is true; a host that routes the input sets it false.
+  `WardrobePage`: `static create()`, `handle_input(inp) -> bool` (false for B, LB, RB and Up on the filter row, so the
+  host keeps its back and tab keys), `handle_nav(dir)`, `handle_accept()`, `handle_turn()` (X: the preview),
+  `refresh()`, `set_preview_class(cd, color)`, `counts_for(i)`, `action_text()` ("Buy" or ""), `x_text()` ("Turn"),
+  `set_prompts_visible(shown)` and the signal `purchased(id)`. `LoadoutScreen` and `PatchWardrobeTab` reach them through `Object.call` and `has_method`.
+- **Minimum sizes:** `LookPicker` 760 × 560 standalone (the stage on its left), none embedded (it takes its host's width
+  and height); `WardrobePage` 1000 × 520 (it fills what its host gives it).
 
 ### Launch options (M9)
 
@@ -4422,17 +4453,18 @@ no video is committed. The requirements, the takes and how to change them are in
   `test_m9_achievements`, `test_m9_difficulty`, `test_m9_heirlooms` (the formula table, the bound paths),
   `test_m9_patch_loadout`, `test_m9_patch_ui` and `test_m9_wardrobe`. The stand-ins `tests/fake_look_picker.gd` and
   `tests/fake_wardrobe_page.gd` have no `test_` prefix.
-- **Last recorded full run** (integration head, `godot --headless --path . -s res://tests/run_tests.gd`): **3943 passed,
-  2 failed**. Both failures are in `test_m9_patch_loadout.gd`: the stick sideways switches two Loadout tabs at once
-  (`test_the_tabs_are_named_and_lb_rb_switch_them`), and B closes the Loadout from the second tab
-  (`test_b_closes_the_loadout_from_every_tab_without_leaving_the_lobby`). Both are open.
+- **Last recorded full run** (head of the M9 integration-review fixes, `godot --headless --path . -s res://tests/run_tests.gd`,
+  about 6 minutes): **3959 passed, 0 failed**. The two Loadout failures of the integration head (the stick sideways
+  switching two tabs, B on the second tab) were fixed in commit `da356b4`.
 - **Smoke:** during the package work the seed-5 default smoke was compared with the base commit (`--fixed-fps 60`,
-  dev profile), and each flag run listed above was checked to exit 0 with no errors or warnings.
+  dev profile), and each flag run listed above was checked to exit 0 with no errors or warnings. The review fixes
+  keep the seed-5 3-wave smoke bit-identical (the `SMOKE_RESULT` line without `real_time` and `perf`).
 
 ### Deviations from the design
 
 - The profile stores its unlocks (the design derived them); `ClassLevels.sync_unlocks` re-grants them after a retune.
-  There is no `.bak` copy; a bad file goes to `.corrupt`.
+  The profile keeps a `.bak` of the file each save replaces (the design said at each run end); a bad file goes to
+  `.corrupt` and a good `.bak` is loaded in its place.
 - The XP table is stored as values (the design's numbers). The rounded formula differs by 5 at levels 5, 15 and 25.
 - The first-win bonus is tracked by profile counters (`first_win:<tier>:<class>`), not by per-tier wins.
 - The Seasoning A and AA tiers are not granted by their achievements; the achievement only opens the purchase.
@@ -4450,5 +4482,4 @@ no video is committed. The requirements, the takes and how to change them are in
   Patch, and the Heirloom indicator on the lobby card, are not built.
 - The Endless-mode Heirloom budget has no cap, and bots can swap the Heirloom out of its slot.
 - No one-time grant for players upgrading from earlier builds (the Hunter and the Shaman start locked).
-- The two failing tests listed under Tests.
 - The GDD's chapter 17.8 lists the M9 leftovers and the quest and backstory plans for the very end.
