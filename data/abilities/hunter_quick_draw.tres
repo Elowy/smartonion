@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_quick_draw.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"quick_draw"
+display_name = "Quick Draw"
+description = "Your hands blur: +{haste}% Haste for {duration} sec."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"buff"])
+resource = &""
+cost = 0.0
+cooldown = 16.0
+targeting = 0
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"auto_enemies": 3,
+"auto_radius": 8.0,
+"duration": 4.0,
+"extra_arrows": 0,
+"focus_gain": 0.0,
+"haste": 40.0,
+"pierce": 0
+}
+icon = &"quick_draw"
+color = Color(1, 0.8, 0.3, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"pierce_add": 1}
+rank3_text = "Your arrows pierce 1 more enemy while it lasts"
+specs = Array[Dictionary]([{"name": "Hail of Shafts", "text": "Your weapon shots loose 2 extra arrows in a fan while it lasts.", "mods": {"extra_arrows_add": 2}}, {"name": "Focus Rush", "text": "Restores 35 Focus when cast.", "mods": {"focus_gain_add": 35.0}}])

@@ -66,6 +66,7 @@ const PLAIN_PANEL := &"PlainPanel"
 const RESOURCE_NAMES := {
 	&"rage": "Rage", &"mana": "Mana", &"energy": "Energy",
 	&"holy_power": "Resolve", &"soul_shard": "Pact Shards",
+	&"focus": "Focus",
 }
 
 ## The display font (assets/fonts/OFL.txt) and its variable-weight axis.

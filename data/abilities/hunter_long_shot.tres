@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_long_shot.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"long_shot"
+display_name = "Long Shot"
+description = "Takes aim for {windup} sec while you keep moving, then looses a heavy arrow for {damage_pct}% weapon damage that pierces every enemy in its line."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"projectile", &"weapon"])
+resource = &""
+cost = 0.0
+cooldown = 9.0
+targeting = 1
+cast_range = 12.0
+effect = ExtResource("2_effect")
+params = {
+"arrows": 1,
+"bleed_duration": 4.0,
+"bleed_pct": 0.0,
+"damage_pct": 320.0,
+"execute_bonus": 0.0,
+"execute_threshold": 35.0,
+"pierce": 99,
+"range": 14.0,
+"speed": 36.0,
+"windup": 0.7
+}
+icon = &"long_shot"
+color = Color(0.9, 0.55, 0.2, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"arrows_add": 1}
+rank3_text = "+1 arrow, along the next-best line"
+specs = Array[Dictionary]([{"name": "Snap Shot", "text": "No aiming time and a 30% shorter cooldown.", "mods": {"windup": 0.0, "cooldown_pct": -30.0}}, {"name": "Rending Shaft", "text": "Struck enemies bleed for 80% weapon damage over 4 sec.", "mods": {"bleed_pct_add": 80.0}}])

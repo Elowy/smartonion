@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_blast_snare.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"blast_snare"
+display_name = "Blast Snare"
+description = "Lays a snare in the path of the nearest enemy. It arms after {arm_time} sec and bursts when an enemy steps on it, dealing {damage_pct}% weapon damage as Fire damage in a {radius} m circle. Lasts {lifetime} sec."
+class_id = &"hunter"
+school = &"fire"
+tags = Array[StringName]([&"aoe", &"ground"])
+resource = &""
+cost = 0.0
+cooldown = 8.0
+targeting = 1
+cast_range = 8.0
+effect = ExtResource("2_effect")
+params = {
+"arm_time": 0.5,
+"damage_pct": 220.0,
+"ember_duration": 0.0,
+"ember_pct": 0.0,
+"ember_tick": 0.5,
+"lay_distance": 3.0,
+"lifetime": 15.0,
+"max_traps": 3,
+"radius": 2.5,
+"scatter": 0,
+"scatter_pct": 50.0,
+"scatter_radius": 1.5,
+"scatter_range": 3.0,
+"slow": 0.0,
+"slow_duration": 3.0,
+"traps": 1,
+"trigger_radius": 1.2
+}
+icon = &"blast_snare"
+color = Color(1, 0.5, 0.15, 1)
+kind = 2
+card_weight = 1.0
+rank3 = {"radius_add": 1.0}
+rank3_text = "+1 m blast radius"
+specs = Array[Dictionary]([{"name": "Clinging Net", "text": "The blast slows enemies by 60% for 3 sec.", "mods": {"slow_add": 60.0}}, {"name": "Heavy Charge", "text": "The blast hits for 100% more weapon damage, but the snare takes 0.5 sec longer to arm.", "mods": {"damage_pct_add": 100.0, "arm_time_add": 0.5}}])
