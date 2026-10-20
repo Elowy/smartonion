@@ -1325,6 +1325,8 @@ func _add_bots() -> void:
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
+		if bot != null:
+			Meta.apply_loadout(bot)  # (M9: what the profile remembers for the class, as in the lobby; nothing for the dev profile)
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion
