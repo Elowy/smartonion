@@ -60,7 +60,7 @@ var _visual: Node3D
 var _spinner: Node3D
 
 
-## [param p_style]: &"bolt" (arcane), &"fireball", &"arrow", &"bullet", &"axe" (troll throw).
+## [param p_style]: &"bolt" (arcane), &"fireball", &"arrow", &"bullet", &"quarrel" (crossbow), &"axe" (troll throw).
 ## [param p_attacker]: the Player that fired it (for kill credit / leech) or the Enemy.
 ## [param p_pierce]: how many extra targets it passes through; [param p_aoe_radius] > 0
 ## makes every impact explode.
@@ -98,6 +98,8 @@ static func default_color(p_style: StringName) -> Color:
 			return Color(0.95, 0.9, 0.75)
 		&"bullet":
 			return Color(1.0, 0.86, 0.45)
+		&"quarrel":
+			return Color(0.82, 0.78, 0.70)
 		&"axe":
 			return Color(0.75, 0.75, 0.78)
 	return Color.WHITE

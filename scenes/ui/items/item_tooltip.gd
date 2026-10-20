@@ -78,6 +78,7 @@ const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
 	&"gun": "Gun", &"wand": "Wand", &"staff": "Staff", &"shield": "Shield", &"tome": "Tome",
 	&"two_hand_sword": "2H Sword", &"two_hand_mace": "2H Mace", &"orb": "Orb",
+	&"crossbow": "Crossbow", &"polearm": "Polearm", &"fist_weapon": "Fist Weapon",
 }
 
 var item: ItemInstance

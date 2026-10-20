@@ -360,6 +360,8 @@ static func projectile_style(w: WeaponData) -> StringName:
 			return &"arrow"
 		&"gun":
 			return &"bullet"
+		&"crossbow":
+			return &"quarrel"
 	return &"bolt"
 
 
