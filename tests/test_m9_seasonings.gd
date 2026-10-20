@@ -575,14 +575,14 @@ func _picker(index: int) -> SeasoningPicker:
 	return lobby.picker_of(PlayerManager.get_slot(index))
 
 
-func test_lb_opens_the_picker_over_that_players_card() -> void:
+func test_lt_opens_the_picker_over_that_players_card() -> void:
 	_lobby()
 	var p1 := _join("p1", &"warrior")
 	var p2 := _join("p2", &"mage")
 	UiFakes.step(lobby)
 	check(not _picker(0).is_open() and not _picker(1).is_open(), "closed to begin with")
-	UiFakes.tap(lobby, p2, PlayerInput.Pad.LB)
-	check(_picker(1).is_open(), "P2's LB opens P2's picker")
+	UiFakes.tap(lobby, p2, PlayerInput.Pad.LT)
+	check(_picker(1).is_open(), "P2's LT opens P2's picker")
 	check(not _picker(0).is_open(), "and only theirs")
 	check_eq(_picker(1).entries.size(), 8, "the eight Mage Seasonings")
 	check_eq(_picker(1).entries[0].class_id, &"mage", "of the Mage")
@@ -599,7 +599,7 @@ func test_the_picker_is_driven_by_its_owners_input() -> void:
 	var p2 := _join("p2", &"warrior")
 	var slot1 := PlayerManager.get_slot(0)
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	var picker := _picker(0)
 	check_eq(picker.cursor, 0, "the cursor starts at the top")
 	UiFakes.nudge(lobby, p2, Vector2(0, 1))
@@ -625,9 +625,9 @@ func test_the_picker_is_driven_by_its_owners_input() -> void:
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.B)
 	check(not picker.is_open(), "B closes the picker")
 	check_eq(PlayerManager.count(), 2, "and the player did not leave")
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
-	check(picker.is_open(), "LB opens it again")
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
+	check(picker.is_open(), "LT opens it again")
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	check(not picker.is_open(), "and closes it")
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.B)
 	check_eq(PlayerManager.count(), 1, "B with the picker closed leaves the lobby as before")
@@ -639,7 +639,7 @@ func test_an_open_picker_takes_every_button_of_its_owner() -> void:
 	var slot := PlayerManager.get_slot(0)
 	UiFakes.step(lobby)
 	var mode := lobby.run_mode
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.Y)
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.X)
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.START)
@@ -657,7 +657,7 @@ func test_a_ready_player_cannot_open_the_picker() -> void:
 	UiFakes.step(lobby)
 	UiFakes.tap(lobby, p1, PlayerInput.Pad.A)
 	check(PlayerManager.get_slot(0).ready, "ready")
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	check(not _picker(0).is_open(), "the picks are locked like the class")
 	check(not lobby.open_seasoning_picker(PlayerManager.get_slot(0)), "also through the API")
 	check(not lobby.open_seasoning_picker(null), "no slot, no picker")
@@ -671,7 +671,7 @@ func test_the_picker_lists_owned_and_locked_seasonings() -> void:
 	var p1 := _join("p1", &"warrior")
 	var slot := PlayerManager.get_slot(0)
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	var picker := _picker(0)
 	check_eq(picker.rows.size(), 8, "eight rows")
 	check_eq(picker.slot_total(), 1, "one slot at Class Level 3")
@@ -703,7 +703,7 @@ func test_a_locked_row_shows_how_to_get_it() -> void:
 	_lobby()
 	var p1 := _join("p1", &"mage")
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	var picker := _picker(0)
 	check_eq(picker.slot_total(), 0, "a new Mage has no slot")
 	picker.cursor = picker.entries.find(Db.get_seasoning(&"ssn_chili_flake"))
@@ -715,7 +715,7 @@ func test_a_locked_row_shows_how_to_get_it() -> void:
 	check_eq(picker._detail_name.text, "Pink Peppercorn", "named")
 	check(picker._detail_text.text.contains("4 more darts"), "with its text: " + picker._detail_text.text)
 	check(picker._detail_target.text.contains("Arcane Darts"), "and the ability it changes")
-	check(picker._note.text.contains("no slot yet"), "the header says why nothing can be equipped: " + picker._note.text)
+	check(picker._note.text.contains("first slot at Class Level 3"), "the header says why nothing can be equipped: " + picker._note.text)
 
 
 func test_the_choice_follows_the_class_and_is_saved() -> void:
@@ -730,7 +730,7 @@ func test_the_choice_follows_the_class_and_is_saved() -> void:
 	var p1 := _join("p1", &"warrior")
 	var slot := PlayerManager.get_slot(0)
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	var picker := _picker(0)
 	picker.cursor = picker.entries.find(Db.get_seasoning(&"ssn_cracked_pepper"))
 	picker.activate()
@@ -764,7 +764,7 @@ func test_the_dev_profile_keeps_a_choice_per_slot_only() -> void:
 	var p1 := _join("p1", &"warrior")
 	var slot := PlayerManager.get_slot(0)
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	_picker(0).activate()
 	check_eq(slot.seasonings.size(), 1, "the dev profile owns everything: it equips")
 	check(Meta.profile.loadout(&"warrior")["seasonings"].is_empty(), "but remembers nothing (no profile is touched)")
@@ -788,7 +788,7 @@ func test_the_card_shows_sockets_the_glyph_and_the_count() -> void:
 	check(not sockets[0].locked and not sockets[1].locked and sockets[2].locked, "two slots open, the third not yet (Level 10)")
 	check(sockets[0].content == null, "all empty")
 	var glyph := card.seasoning_glyph()
-	check(glyph != null and glyph.text == "LB", "the controller's LB opens it")
+	check(glyph != null and glyph.text == "LT", "the controller's LT opens it")
 	slot.seasonings.assign([&"ssn_smoked_paprika"])
 	UiFakes.step(lobby)
 	sockets = card.seasoning_sockets()
@@ -798,13 +798,13 @@ func test_the_card_shows_sockets_the_glyph_and_the_count() -> void:
 	check(card.seasoning_glyph() == null, "ready: no button to show, the picks are locked")
 
 
-func test_the_keyboards_glyph_is_q() -> void:
+func test_the_keyboards_glyph_is_the_right_mouse_button() -> void:
 	_lobby()
 	var slot := PlayerManager.join(KeyboardInput.new(), Db.get_class_data(&"warrior"))
 	check(slot != null, "the keyboard joins")
 	UiFakes.step(lobby)
 	var glyph := lobby.cards[0].seasoning_glyph()
-	check(glyph != null and glyph.text == "Q", "Q opens it on the keyboard")
+	check(glyph != null and glyph.text == "RMB", "the right mouse button opens it on the keyboard")
 
 
 func test_an_empty_slot_and_a_left_player_have_no_picker() -> void:
@@ -813,7 +813,7 @@ func test_an_empty_slot_and_a_left_player_have_no_picker() -> void:
 	check(not lobby.cards[0].seasoning_pill_visible(), "no pill on an open slot")
 	var p1 := _join("p1", &"warrior")
 	UiFakes.step(lobby)
-	UiFakes.tap(lobby, p1, PlayerInput.Pad.LB)
+	UiFakes.tap(lobby, p1, PlayerInput.Pad.LT)
 	check(_picker(0).is_open(), "open")
 	PlayerManager.leave(0)
 	UiFakes.step(lobby)
@@ -857,3 +857,28 @@ func test_every_seasoning_goes_through_player_create() -> void:
 		check_eq(entries.size(), 1, "%s: one entry" % s.id)
 		p.free()
 		index += 1
+
+
+func test_the_picker_never_changes_the_cards_height_and_fits_inside_it() -> void:
+	_lobby()
+	var smallest_card := INF
+	var tallest_picker := 0.0
+	for cid in Db.class_ids:
+		var input := _join("p_%s" % cid, cid)
+		UiFakes.step(lobby)
+		var card := lobby.cards[0]
+		var closed := card.get_combined_minimum_size().y
+		smallest_card = minf(smallest_card, closed)
+		var slot := PlayerManager.get_slot(0)
+		check(lobby.open_seasoning_picker(slot), "%s: the picker opens" % cid)
+		check_eq(card.get_combined_minimum_size().y, closed, "%s: an open picker does not change the card's height" % cid)
+		var picker := card.picker
+		for i in picker.entries.size():
+			picker.cursor = i
+			picker.refresh()
+			tallest_picker = maxf(tallest_picker, picker.get_combined_minimum_size().y)
+		picker.close()
+		PlayerManager.leave(0)
+		check(input != null, "joined")
+		UiFakes.step(lobby)
+	check(tallest_picker <= smallest_card, "the picker (%d px at most) fits inside the smallest card (%d px) at 1080p" % [tallest_picker, smallest_card])

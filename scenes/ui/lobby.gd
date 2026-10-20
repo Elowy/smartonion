@@ -22,7 +22,7 @@ extends Control
 ##   (everybody sees the new mode before the run starts).
 ## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
 ##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
-##   remembered for that class on their slot (Meta.apply_loadout). LB / Q opens the player's Seasoning picker over
+##   remembered for that class on their slot (Meta.apply_loadout). LT / right mouse button opens the player's Seasoning picker over
 ##   their card ([method open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and
 ##   nothing else in the lobby.
 ## See docs/ARCHITECTURE.md.
@@ -330,7 +330,7 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
 			Audio.play_ui(&"ui_move")
-		if inp.just_pressed(PlayerInput.Pad.LB) and open_seasoning_picker(slot):
+		if inp.just_pressed(PlayerInput.Pad.LT) and open_seasoning_picker(slot):
 			Audio.play_ui(&"ui_confirm")
 
 
@@ -341,7 +341,7 @@ func picker_of(slot: PlayerSlot) -> SeasoningPicker:
 	return cards[slot.index].picker
 
 
-## Opens [param slot]'s Seasoning picker (LB / Q). Not while the player is ready (the picks are locked like the class),
+## Opens [param slot]'s Seasoning picker (LT / right mouse button). Not while the player is ready (the picks are locked like the class),
 ## for a class the profile has not unlocked, or without a card. True when it opened.
 func open_seasoning_picker(slot: PlayerSlot) -> bool:
 	var picker := picker_of(slot)

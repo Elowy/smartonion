@@ -7,7 +7,7 @@ extends PanelContainer
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
 ## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
 ## description, and without the Ready prompt (Lobby.ready_block_reason). Every class also shows a Seasonings pill on
-## the preview (a socket per slot with the picked Seasoning's icon, the button that opens the picker: Lobby, LB);
+## the preview (a socket per slot with the picked Seasoning's icon, the button that opens the picker: Lobby, LT);
 ## [member picker] is the SeasoningPicker panel that covers the card while it is open.
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
@@ -234,7 +234,7 @@ func _build_joined() -> void:
 	_joined_box.add_child(_prompt_holder)
 
 
-## The Seasonings pill in the top-left corner of the onion preview (M9): "Seasonings", then the picker button's glyph
+## The Seasonings pill on the left of the onion preview (M9): "Seasonings", then the picker button's glyph
 ## and one socket per Seasoning slot (a picked Seasoning's icon, an empty socket, a dim one for a slot the class has
 ## not unlocked). It takes no height of the card, which is already as tall as the 1080p lobby allows, and stays left
 ## of the onion.
@@ -263,7 +263,15 @@ func _make_seasoning_pill() -> PanelContainer:
 	row.add_child(_season_chips)
 	col.add_child(row)
 	pill.add_child(col)
-	pill.position = Vector2(8, 8)
+	# Left side of the preview, in the band between its top row (a level badge) and its bottom edge (the READY ribbon,
+	# a thin bar): clear of both and of the onion.
+	pill.anchor_left = 0.0
+	pill.anchor_right = 0.0
+	pill.anchor_top = 1.0
+	pill.anchor_bottom = 1.0
+	pill.offset_left = 8.0
+	pill.offset_bottom = -44.0
+	pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	return pill
 
 
@@ -485,7 +493,7 @@ func _fill_seasonings(s: PlayerSlot) -> void:
 	var total := Seasonings.slot_count(cid)
 	_season_row.visible = s.class_data != null and _locked_hint(s) == ""
 	if not s.ready:
-		_season_glyph_holder.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.LB, 24.0))
+		_season_glyph_holder.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.LT, 24.0))
 	for i in Seasonings.MAX_SLOTS:
 		var socket := SeasoningIcon.SeasoningSocket.create(picks[i] if i < picks.size() else null, i >= total, SEASONING_CHIP_SIZE)
 		socket.name = "Socket%d" % (i + 1)

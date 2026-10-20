@@ -4,7 +4,7 @@ extends PanelContainer
 ## class – name, the ability it changes (with that ability's icon and a spice badge), what it gives and costs.
 ## Owned ones can be equipped (A) up to the class's slots; the others stay greyed with how to get them. The hero's
 ## own input drives it (the Lobby routes PlayerSlot.input here while it is open): ▲ ▼ move, A equips / removes,
-## B or LB closes. Every change goes through [method Seasonings.toggle], which remembers the choice per class.
+## B or LT closes. Every change goes through [method Seasonings.toggle], which remembers the choice per class.
 ##
 ## The picker holds no state of its own besides the cursor: the choice is [member PlayerSlot.seasonings].
 
@@ -12,7 +12,7 @@ extends PanelContainer
 signal picked(result: StringName, id: StringName)
 signal closed
 
-const ICON_SIZE := 40.0
+const ICON_SIZE := 36.0
 const ROW_HEIGHT := 44.0
 const EQUIPPED_COLOR := Color(0.55, 1.0, 0.5)
 const LOCKED_COLOR := Color(0.62, 0.58, 0.55)
@@ -62,25 +62,38 @@ func _build() -> void:
 	_pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_pips)
 	col.add_child(head)
-	_note = UiTheme.wrapped_label("", UiTheme.DIM, UiTheme.FONT_SMALL)
+	_note = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL - 2)
+	_note.clip_text = true
+	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(_note)
 	col.add_child(UiTheme.divider())
 	_list = UiTheme.vbox(3)
 	col.add_child(_list)
 	col.add_child(UiTheme.spacer(true))
 	var detail := UiTheme.panel(UiTheme.INSET_PANEL)
+	var detail_style := UiTheme.inset_style()
+	detail_style.content_margin_left = 12
+	detail_style.content_margin_right = 12
+	detail_style.content_margin_top = 6
+	detail_style.content_margin_bottom = 6
+	detail.add_theme_stylebox_override(&"panel", detail_style.rebuild())
 	col.add_child(detail)
 	var dbox := UiTheme.vbox(3)
 	detail.add_child(dbox)
 	_detail_name = UiTheme.label("", UiTheme.HEADING, 24, UiTheme.GOLD_BRIGHT)
 	dbox.add_child(_detail_name)
-	_detail_target = UiTheme.wrapped_label("", UiTheme.DIM, UiTheme.FONT_SMALL - 1)
+	_detail_target = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL - 2)
+	_detail_target.clip_text = true
+	_detail_target.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	dbox.add_child(_detail_target)
-	_detail_text = UiTheme.wrapped_label("", &"", UiTheme.FONT_SMALL + 1, UiTheme.TEXT)
-	_detail_text.custom_minimum_size.y = 62
+	# The text (up to three lines) and the status (up to two) keep their room, so the picker never changes height.
+	_detail_text = UiTheme.wrapped_label("", &"", UiTheme.FONT_SMALL, UiTheme.TEXT)
+	_detail_text.custom_minimum_size.y = 66
+	_detail_text.max_lines_visible = 3
 	dbox.add_child(_detail_text)
-	_detail_status = UiTheme.wrapped_label("", &"", UiTheme.FONT_SMALL, UiTheme.TEXT_DIM)
-	_detail_status.custom_minimum_size.y = 26
+	_detail_status = UiTheme.wrapped_label("", &"", UiTheme.FONT_SMALL - 2, UiTheme.TEXT_DIM)
+	_detail_status.custom_minimum_size.y = 40
+	_detail_status.max_lines_visible = 2
 	dbox.add_child(_detail_status)
 	_prompts = CenterContainer.new()
 	_prompts.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -163,7 +176,7 @@ func activate() -> StringName:
 	return last_result
 
 
-## One frame of the owner's input: ▲ ▼ move, A equips / removes, B / LB closes.
+## One frame of the owner's input: ▲ ▼ move, A equips / removes, B / LT closes.
 func handle_input(inp: PlayerInput) -> void:
 	if inp == null:
 		return
@@ -173,7 +186,7 @@ func handle_input(inp: PlayerInput) -> void:
 		Audio.play_ui(&"ui_move")
 	if inp.just_pressed(PlayerInput.Pad.A):
 		activate()
-	elif inp.just_pressed(PlayerInput.Pad.B) or inp.just_pressed(PlayerInput.Pad.LB):
+	elif inp.just_pressed(PlayerInput.Pad.B) or inp.just_pressed(PlayerInput.Pad.LT):
 		Audio.play_ui(&"ui_back")
 		close()
 
@@ -201,7 +214,7 @@ func refresh() -> void:
 	_pips.set_counts(slot.seasonings.size(), total)
 	var who := "%s · %s" % [slot.label(), slot.class_data.display_name]
 	if total <= 0:
-		_note.text = "%s: no slot yet – opens at Class Level %d" % [who, Seasonings.SLOT_LEVELS[0]]
+		_note.text = "%s: first slot at Class Level %d" % [who, Seasonings.SLOT_LEVELS[0]]
 		_note.add_theme_color_override(&"font_color", ERROR_COLOR)
 	else:
 		_note.text = who
@@ -233,8 +246,8 @@ func _make_row(s: SeasoningData, selected_row: bool) -> PanelContainer:
 	style.set_corner_radius_all(4)
 	style.content_margin_left = 6
 	style.content_margin_right = 8
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
+	style.content_margin_top = 1
+	style.content_margin_bottom = 1
 	panel.add_theme_stylebox_override(&"panel", style)
 	var line := UiTheme.hbox(8)
 	panel.add_child(line)
@@ -245,11 +258,11 @@ func _make_row(s: SeasoningData, selected_row: bool) -> PanelContainer:
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var name_color := EQUIPPED_COLOR if state == "Equipped" else (LOCKED_COLOR if locked else UiTheme.TEXT)
-	var name_label := UiTheme.label(s.display_name, &"", UiTheme.FONT_SMALL + 3, name_color)
+	var name_label := UiTheme.label(s.display_name, &"", UiTheme.FONT_SMALL + 1, name_color)
 	name_label.name = "Name"
 	name_label.clip_text = true
 	texts.add_child(name_label)
-	var target := UiTheme.label(s.target_name(), &"", UiTheme.FONT_SMALL - 2, UiTheme.TEXT_DIM if not locked else Color(0.5, 0.47, 0.44))
+	var target := UiTheme.label(s.target_name(), &"", UiTheme.FONT_SMALL - 4, UiTheme.TEXT_DIM if not locked else Color(0.5, 0.47, 0.44))
 	texts.add_child(target)
 	line.add_child(texts)
 	if state == "Equipped":
@@ -267,7 +280,7 @@ func _fill_detail() -> void:
 	_detail_name.text = s.display_name
 	var target := "Changes: %s" % s.target_name()
 	if s.is_dormant_until_learned():
-		target += " (once you have learned it)"
+		target += " · once learned"
 	_detail_target.text = target
 	_detail_text.text = s.text
 	var total := slot_total()
