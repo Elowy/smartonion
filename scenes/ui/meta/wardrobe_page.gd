@@ -10,6 +10,9 @@ extends VBoxContainer
 ## [code]if page.handle_input(slot.input): return[/code] every frame. Controls: ◀ ▶ ▲ ▼ move (the filter row, then the grid), A
 ## buys the selected Dye, X turns the preview. [method handle_input] returns true when it used the input; it leaves B, LB / RB
 ## (the host's back / tab keys) and Up on the filter row (the host's tab bar) alone and returns false for them.
+## A host that routes the buttons itself (the Onion Patch: nobody has joined at the title screen, so no PlayerInput) calls
+## [method handle_nav] / [method handle_accept] / [method handle_turn], hides the page's own prompt row
+## ([method set_prompts_visible]) and shows [method action_text] / [method x_text] in its own, with the glyphs of its driver.
 
 ## A Dye was bought ([param id] is the CosmeticData id).
 signal purchased(id: StringName)
@@ -25,6 +28,8 @@ const FILTERS: Array[Dictionary] = [
 	{"key": &"dyes", "caption": "Dyes"},
 ]
 const PREVIEW_SIZE := Vector2(340, 300)
+## One X press turns the preview this far.
+const TURN_DEGREES := 60.0
 
 var filter := 0
 var focus := Focus.FILTERS
@@ -271,9 +276,15 @@ func handle_input(inp: PlayerInput) -> bool:
 		handle_accept()
 		used = true
 	if inp.just_pressed(PlayerInput.Pad.X):
-		preview.turn(60.0)
+		handle_turn()
 		used = true
 	return used
+
+
+## The X press: turns the preview onion.
+func handle_turn() -> void:
+	if preview != null:
+		preview.turn(TURN_DEGREES)
 
 
 ## One navigation step (a host such as The Onion Patch, which drives pages without a [PlayerInput], calls it directly).
@@ -332,17 +343,35 @@ func last_result() -> StringName:
 	return _last_buy
 
 
+## What A does on the selected entry ("Buy" for a Dye that is for sale and not yet owned, else "").
+func action_text() -> String:
+	var e := grid.selected() if grid != null else null
+	if e != null and e.kind == WardrobeEntry.Kind.COSMETIC and e.price > 0 and not e.owned:
+		return "Buy"
+	return ""
+
+
+## What X does ("Turn": the preview).
+func x_text() -> String:
+	return "Turn"
+
+
+## Shows or hides the page's own prompt row (a host that has its own row hides it).
+func set_prompts_visible(shown: bool) -> void:
+	if _prompts != null:
+		_prompts.visible = shown
+
+
 func _fill_prompts() -> void:
 	if _prompts == null:
 		return
 	for c in _prompts.get_children():
 		_prompts.remove_child(c)
 		c.queue_free()
-	var e := grid.selected() if grid != null else null
 	var items: Array = [[UiGlyph.nav(26.0, false), "Move"]]
-	if e != null and e.kind == WardrobeEntry.Kind.COSMETIC and e.price > 0 and not e.owned:
-		items.append([UiGlyph.pad(PlayerInput.Pad.A, 26.0), "Buy"])
-	items.append([UiGlyph.pad(PlayerInput.Pad.X, 26.0), "Turn"])
+	if action_text() != "":
+		items.append([UiGlyph.pad(PlayerInput.Pad.A, 26.0), action_text()])
+	items.append([UiGlyph.pad(PlayerInput.Pad.X, 26.0), x_text()])
 	var line := UiTheme.prompt_row(items, UiTheme.FONT_SMALL - 2)
 	line.add_theme_constant_override(&"separation", 14)
 	_prompts.add_child(line)

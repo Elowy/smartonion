@@ -91,6 +91,16 @@ func _texts(node: Node) -> String:
 	return out
 
 
+## The text of every button glyph under [param node] ("X", "R" ...).
+func _glyph_texts(node: Node) -> Array[String]:
+	var out: Array[String] = []
+	if node is UiGlyph:
+		out.append((node as UiGlyph).text)
+	for c in node.get_children():
+		out.append_array(_glyph_texts(c))
+	return out
+
+
 func _bar_texts(node: Node) -> Array[String]:
 	var out: Array[String] = []
 	if node is UiBar:
@@ -523,6 +533,105 @@ func test_the_wardrobe_tab_embeds_the_wardrobe_page_when_the_script_exists() -> 
 	page._on_accept()
 	check_eq(tab.page.get("navs"), [Vector2i(1, 0)] as Array[Vector2i], "navigation reaches it")
 	check_eq(tab.page.get("accepts"), 1, "and A")
+
+
+func test_x_reaches_the_wardrobe_tab_from_the_driver_and_from_anyone() -> void:
+	PatchWardrobeTab.wardrobe_page_path = FAKE_WARDROBE
+	var input := _join("p1", &"warrior")
+	var driven := _page(PlayerManager.get_slot(0))
+	driven.set_tab(OnionPatchPage.Tab.WARDROBE)
+	var tab := driven.wardrobe_tab
+	check_eq(tab.page.get("turns"), 0, "no turn yet")
+	UiFakes.tap(driven, input, PlayerInput.Pad.X)
+	check_eq(tab.page.get("turns"), 1, "the driver's X turns the preview")
+	UiFakes.tap(driven, input, PlayerInput.Pad.A)
+	check_eq(tab.page.get("turns"), 1, "A does not")
+	driven.set_tab(OnionPatchPage.Tab.CLASSES)
+	UiFakes.tap(driven, input, PlayerInput.Pad.X)
+	check_eq(tab.page.get("turns"), 1, "X on another tab is not routed to the Wardrobe")
+	check(driven.visible, "and harmless")
+	# Nobody drives it (the title screen): any controller's X, or the R key.
+	var anyone := _page()
+	anyone.set_tab(OnionPatchPage.Tab.WARDROBE)
+	var any_tab := anyone.wardrobe_tab
+	anyone.pads.injected.append(JOY_BUTTON_X)
+	anyone._process(0.016)
+	check_eq(any_tab.page.get("turns"), 1, "any controller's X")
+	anyone._process(0.016)
+	check_eq(any_tab.page.get("turns"), 1, "once per press (not while held)")
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_R
+	key.keycode = KEY_R
+	key.pressed = true
+	Input.parse_input_event(key)
+	Input.flush_buffered_events()
+	check(KeyboardInput.button_key_held(PlayerInput.Pad.X), "the R key is X on the keyboard")
+	anyone._process(0.016)
+	check_eq(any_tab.page.get("turns"), 2, "the R key turns it too")
+	anyone._process(0.016)
+	check_eq(any_tab.page.get("turns"), 2, "once per press")
+	key = key.duplicate()
+	key.pressed = false
+	Input.parse_input_event(key)
+	Input.flush_buffered_events()
+	check(not KeyboardInput.button_key_held(PlayerInput.Pad.X), "released")
+	anyone._process(0.016)
+	check_eq(any_tab.page.get("turns"), 2, "nothing more")
+
+
+func test_the_patch_prompt_row_shows_what_the_wardrobe_tab_does_with_the_hosts_glyphs() -> void:
+	PatchWardrobeTab.wardrobe_page_path = FAKE_WARDROBE
+	var anyone := _page()
+	anyone.set_tab(OnionPatchPage.Tab.WARDROBE)
+	var tab := anyone.wardrobe_tab
+	check(not bool(tab.page.get("prompts_shown")), "the page's own prompt row is hidden: the Patch's shows the buttons")
+	var texts := _texts(anyone._prompts)
+	check(texts.contains("Buy") and texts.contains("Turn") and texts.contains("Tab") and texts.contains("Back"), "A Buy, X Turn, Tab, Back: " + texts)
+	var glyphs := _glyph_texts(anyone._prompts)
+	check("X" in glyphs and "R" in glyphs, "the X button and, beside it, the keyboard's key when anyone drives it: %s" % [glyphs])
+	tab.page.set("a_text", "")
+	anyone._on_nav(Vector2i(1, 0))
+	texts = _texts(anyone._prompts)
+	check(not texts.contains("Buy") and texts.contains("Turn"), "no A prompt without an A action: " + texts)
+	check_eq(anyone.classes_tab.x_text(), "", "the other tabs have no X action")
+	anyone.set_tab(OnionPatchPage.Tab.CLASSES)
+	check(not _texts(anyone._prompts).contains("Turn"), "so no X prompt there")
+	# A driver's own device: its glyphs, no key names.
+	var input := _join("p1", &"mage")
+	var driven := _page(PlayerManager.get_slot(0))
+	driven.set_tab(OnionPatchPage.Tab.WARDROBE)
+	check(_texts(driven._prompts).contains("Turn"), "the driver's row names X too")
+	glyphs = _glyph_texts(driven._prompts)
+	check("X" in glyphs and "R" not in glyphs, "with the driver's own glyph and no key cap: %s" % [glyphs])
+	check(input != null, "joined")
+
+
+func test_x_turns_the_real_wardrobe_preview_and_the_dye_buy_prompt_follows_the_selection() -> void:
+	_profile(1)
+	var anyone := _page()
+	anyone.set_tab(OnionPatchPage.Tab.WARDROBE)
+	var wardrobe := anyone.wardrobe_tab.page as WardrobePage
+	check(wardrobe != null, "the real WardrobePage")
+	check(not wardrobe._prompts.visible, "its own prompt row is hidden inside the Patch")
+	check_eq(anyone.wardrobe_tab.x_text(), "Turn", "X turns")
+	check_eq(anyone.wardrobe_tab.action_text(), "", "nothing to buy under the first look")
+	check(not _texts(anyone._prompts).contains("Buy") and _texts(anyone._prompts).contains("Turn"), "the row says so")
+	var before := wardrobe.preview._turn
+	anyone.pads.injected.append(JOY_BUTTON_X)
+	anyone._process(0.016)
+	check_near(wardrobe.preview._turn - before, deg_to_rad(WardrobePage.TURN_DEGREES), 0.0001, "one X press turned the preview 60 degrees")
+	# The Dyes filter: a Dye that is for sale gets the A Buy prompt.
+	wardrobe.set_filter(WardrobePage.FILTERS.size() - 1)
+	var dye := wardrobe.selected()
+	check(dye != null and dye.price > 0 and not dye.owned, "a Dye for sale")
+	anyone._on_nav(Vector2i(0, 0))
+	check_eq(anyone.wardrobe_tab.action_text(), "Buy", "A buys it")
+	check(_texts(anyone._prompts).contains("Buy") and _texts(anyone._prompts).contains("Turn"), "A Buy and X Turn: " + _texts(anyone._prompts))
+	# Standalone the page keeps its own row.
+	var alone := WardrobePage.create()
+	UiFakes.add_to_root(tree, alone)
+	_nodes.append(alone)
+	check(alone._prompts.visible, "a page outside the Patch shows its own prompts")
 
 
 func test_the_header_follows_seeds_points_and_title() -> void:

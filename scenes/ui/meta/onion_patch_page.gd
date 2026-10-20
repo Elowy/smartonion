@@ -3,7 +3,8 @@ extends MenuPage
 ## The Onion Patch (M9 PATCH, GDD 17): the main menu's meta page. A header with the Seeds wallet, the achievement points
 ## and the chosen title, five tabs – Classes, Seasonings, Heirlooms, Achievements, Wardrobe – and a status line that
 ## says what the last purchase did. Every player may drive it with their own PlayerSlot.input (or "anyone" from the
-## title screen): ▲ ▼ ◀ ▶ move inside the tab, A buys / picks, LB / RB (Q / E) switch tabs, B goes back. Every
+## title screen): ▲ ▼ ◀ ▶ move inside the tab, A buys / picks, X (R) is the tab's second action (the Wardrobe turns its
+## preview), LB / RB (Q / E) switch tabs, B goes back. Every
 ## purchase saves at once ([Meta]). With the dev profile of the automated runs (everything unlocked, no Seeds) the page
 ## opens and shows everything; buying simply is not affordable there. Input rules (driver, swallowed opening press):
 ## [MenuPage]; the tabs are [PatchTab]s.
@@ -40,6 +41,7 @@ var _content: MarginContainer
 var _tab_skip := 0
 var _q_down := false
 var _e_down := false
+var _x_key_down := false
 
 
 static func create(dim_alpha: float = 0.55) -> OnionPatchPage:
@@ -117,6 +119,7 @@ func _on_open() -> void:
 	_tab_skip = 1
 	_q_down = Input.is_physical_key_pressed(KEY_Q)
 	_e_down = Input.is_physical_key_pressed(KEY_E)
+	_x_key_down = KeyboardInput.button_key_held(PlayerInput.Pad.X)
 	set_message("")
 	refresh()
 	tabs[tab].on_open()
@@ -232,6 +235,9 @@ func _process(delta: float) -> void:
 	var step := _tab_step()
 	if step != 0:
 		switch_tab(step)
+	if _x_pressed():
+		tabs[tab].on_x()
+		_fill_prompts()
 
 
 ## LB / RB of the driver, or – when anyone drives the page – any controller's shoulders or the Q / E keys: -1, 0, +1.
@@ -255,12 +261,27 @@ func _tab_step() -> int:
 	return step
 
 
+## X of the driver, or – when anyone drives the page – any controller's X or the R key (the one that [method UiGlyph.keyboard_name]
+## shows for X): true on the frame it goes down.
+func _x_pressed() -> bool:
+	var driver := driver_slot()
+	if driver != null:
+		return driver.input.just_pressed(PlayerInput.Pad.X)
+	var key := KeyboardInput.button_key_held(PlayerInput.Pad.X)
+	var edge := key and not _x_key_down
+	_x_key_down = key
+	return edge or pads.any_just_pressed(JOY_BUTTON_X)
+
+
 func _prompt_items() -> Array:
 	var items: Array = []
 	if tab < tabs.size():
 		var action := tabs[tab].action_text()
 		if action != "":
 			items.append(_glyphs(PlayerInput.Pad.A) + [action])
+		var x_action := tabs[tab].x_text()
+		if x_action != "":
+			items.append(_glyphs(PlayerInput.Pad.X) + [x_action])
 	items.append([UiGlyph.nav(28.0), UiGlyph.nav(28.0, true), "Move"])
 	items.append(_glyphs(PlayerInput.Pad.LB) + _glyphs(PlayerInput.Pad.RB) + ["Tab"])
 	items.append(_glyphs(PlayerInput.Pad.B) + ["Back"])

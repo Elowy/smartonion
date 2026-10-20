@@ -3,7 +3,10 @@ extends PatchTab
 ## The Wardrobe tab of The Onion Patch: WARDROBE's [code]WardrobePage.create()[/code] (res://scenes/ui/meta/wardrobe_page.gd,
 ## a read-only collection browser) embedded when that script exists – loaded with ResourceLoader.exists + load, so this
 ## package builds without it – else a short placeholder. The page's optional [code]handle_nav(dir: Vector2i)[/code],
-## [code]handle_accept()[/code] and [code]refresh()[/code] are called when it has them.
+## [code]handle_accept()[/code], [code]handle_turn()[/code] (X: turns the preview) and [code]refresh()[/code] are called when it
+## has them. The page's own prompt row is hidden ([code]set_prompts_visible(false)[/code], when it has it): the Patch's prompt
+## row shows the buttons – with the driver's glyphs – for what the page says through [code]action_text()[/code] ("Buy" or "")
+## and [code]x_text()[/code] ("Turn").
 
 const WARDROBE_PAGE_PATH := "res://scenes/ui/meta/wardrobe_page.gd"
 const PLACEHOLDER_TEXT := "Coming soon"
@@ -48,6 +51,8 @@ func _build() -> void:
 		page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		add_child(page)
 		placeholder.visible = false
+		if page.has_method(&"set_prompts_visible"):
+			page.call(&"set_prompts_visible", false)
 
 
 func on_open() -> void:
@@ -67,3 +72,22 @@ func on_nav(dir: Vector2i) -> void:
 func on_accept() -> void:
 	if page != null and is_instance_valid(page) and page.has_method(&"handle_accept"):
 		page.call(&"handle_accept")
+
+
+func on_x() -> void:
+	if page != null and is_instance_valid(page) and page.has_method(&"handle_turn"):
+		page.call(&"handle_turn")
+
+
+func action_text() -> String:
+	return _page_text(&"action_text")
+
+
+func x_text() -> String:
+	return _page_text(&"x_text")
+
+
+func _page_text(method: StringName) -> String:
+	if page != null and is_instance_valid(page) and page.has_method(method):
+		return String(page.call(method))
+	return ""

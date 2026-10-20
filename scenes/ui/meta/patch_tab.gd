@@ -1,7 +1,7 @@
 class_name PatchTab
 extends VBoxContainer
 ## Base of the tabs of The Onion Patch ([OnionPatchPage]): a content area the page shows while its tab is selected and
-## feeds with the navigation steps and the A press of whoever drives the page. A tab builds its widgets once, redraws
+## feeds with the navigation steps and the A / X presses of whoever drives the page. A tab builds its widgets once, redraws
 ## itself in [method refresh] (called when the tab opens and after every purchase) and reports what happened as a
 ## status line with [signal message_posted]. Subclasses override the hooks; the shared styles live here.
 
@@ -45,8 +45,18 @@ func on_accept() -> void:
 	pass
 
 
+## X (or the R key): the tab's second action – the Wardrobe turns its preview.
+func on_x() -> void:
+	pass
+
+
 ## What A does on the current selection, for the prompt row ("" = nothing: no A prompt).
 func action_text() -> String:
+	return ""
+
+
+## What X does on this tab, for the prompt row ("" = nothing: no X prompt).
+func x_text() -> String:
 	return ""
 
 
