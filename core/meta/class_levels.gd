@@ -256,6 +256,26 @@ static func on_run_seeds(report: RunReport, profile: Profile, result: Dictionary
 		Meta.seeds_changed.emit(profile.seeds, earned + gifts)
 
 
+## One line for logs: "warrior +22 XP (level 1), mage +25 XP (level 1 -> 2); +6 Seeds" ("" when the result has no Class XP).
+static func summary_text(result: Dictionary) -> String:
+	var parts: Array[String] = []
+	var entries: Variant = result.get("class_xp", [])
+	if entries is Array:
+		for e: Variant in entries:
+			if e is Dictionary:
+				var before := int(e.get("level_before", 1))
+				var after := int(e.get("level_after", 1))
+				parts.append("%s +%d XP (level %s)" % [e.get("class_id", "?"), int(e.get("xp_gained", 0)),
+						str(before) if before == after else "%d -> %d" % [before, after]])
+	if parts.is_empty():
+		return ""
+	var text := ", ".join(parts)
+	var seeds: Variant = result.get("seeds", {})
+	if seeds is Dictionary and int(seeds.get("total", 0)) > 0:
+		text += "; +%d Seeds" % int(seeds["total"])
+	return text
+
+
 # --- The reward path ----------------------------------------------------------------------------
 
 ## The raw rewards of [param level] (table entries).
@@ -402,12 +422,12 @@ static func describe(reward: Dictionary, class_id: StringName) -> Dictionary:
 			var ability := Db.get_ability(id)
 			out["unlock_kind"] = Profile.KIND_ABILITY
 			out["id"] = id
-			out["text"] = "New ability: %s" % (ability.display_name if ability != null else String(id).capitalize())
+			out["text"] = "Ability: %s" % (ability.display_name if ability != null else String(id).capitalize())
 		&"capstone":
 			var tree_id: StringName = path.capstone_trees[index] if path != null and index < path.capstone_trees.size() else &""
 			out["unlock_kind"] = Profile.KIND_CAPSTONE_TREE
 			out["id"] = tree_id
-			out["text"] = "Capstone talent: %s" % _capstone_name(tree_id)
+			out["text"] = "Capstone: %s" % _capstone_name(tree_id)
 		&"seasoning_slot":
 			out["text"] = "Seasoning slot %d" % count_rewards(&"seasoning_slot", int(out["level"]))
 		&"seasoning_tier":

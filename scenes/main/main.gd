@@ -658,7 +658,7 @@ func end_run(p_victory: bool) -> void:
 		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
-		game_over.open(p_victory, board)
+		game_over.open(p_victory, board, meta_result)
 	if _smoke_running:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
@@ -735,6 +735,7 @@ func _record_meta(p_victory: bool, p_abandoned: bool) -> Dictionary:
 		"ranks_trained": ranks_trained, "shop_rerolls": shop_rerolls,
 	})
 	var result := Meta.record_run(report)
+	_log("meta: %s" % ClassLevels.summary_text(result))
 	_log("meta: run recorded (%s), saved %s, achievements %s" % ["abandoned" if p_abandoned else
 			("victory" if p_victory else "defeat"), "ok" if int(result.get("save_error", OK)) == OK else "FAILED",
 			result.get("achievements", [])])

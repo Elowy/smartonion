@@ -17,6 +17,7 @@ var _pivot: Node3D
 var _t := 0.0
 var _class_id: StringName = &""
 var _color := Color(0, 0, 0, 0)
+var _alt := false
 
 
 static func create() -> OnionPreview:
@@ -68,18 +69,20 @@ static func create() -> OnionPreview:
 	return p
 
 
-## Shows [param data]'s onion with its starting weapons and the player's ring colour.
-func show_class(data: ClassData, player_color: Color) -> void:
+## Shows [param data]'s onion with its starting weapons ([param alt]: the alternative ones, M9 Class Level 12) and the
+## player's ring colour.
+func show_class(data: ClassData, player_color: Color, alt: bool = false) -> void:
 	if data == null:
 		return
 	if model == null:
 		model = OnionModel.new()
 		_pivot.add_child(model)
-	if data.id != _class_id or player_color != _color:
+	if data.id != _class_id or player_color != _color or alt != _alt:
 		_class_id = data.id
 		_color = player_color
+		_alt = alt
 		model.setup(data, player_color)
-		model.set_weapons(data.main_hand, data.off_hand)
+		model.set_weapons(ClassLevels.start_main_hand(data, alt), ClassLevels.start_off_hand(data, alt))
 		model.set_facing(Vector3(0.0, 0.0, 1.0))
 		model.set_moving(0.0)
 

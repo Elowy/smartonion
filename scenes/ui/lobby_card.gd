@@ -6,7 +6,10 @@ extends PanelContainer
 ## companion choices (ClassData.companion_choices, the M8 Hunter) also shows a "Companion: <Name>"
 ## row with the button that cycles it (Lobby: RB); every other class has no such row.
 ## M9: a class the main profile has not unlocked is shown dimmed with "Locked" and its unlock hint instead of the
-## description, and without the Ready prompt (Lobby.ready_block_reason).
+## description, and without the Ready prompt (Lobby.ready_block_reason). M9 LEVELS: a profile that records runs also
+## shows the class's level – a small "Lv 12" badge and the Class XP strip with its numbers on the preview – and, once the
+## class has its alternative starting weapon (Class Level 12), the weapons line names the chosen set with the button
+## that switches it (Lobby: LB / Q).
 ## Lobby calls update_from(slot) every frame; the card only rebuilds when something changed.
 
 const PREVIEW_HEIGHT := 150.0
@@ -14,10 +17,19 @@ const ABILITY_ICON_SIZE := 40.0
 ## The Mastery text is cut after this many lines: every class's mastery_text must fit in it
 ## at the 1080p canvas (test_ui_m3_lobby checks all Db classes).
 const MASTERY_MAX_LINES := 3
+## Height of the Class XP strip on the preview's lower edge.
+const XP_BAR_HEIGHT := 11.0
 
 var index := 0
 var slot: PlayerSlot
 var preview: OnionPreview
+
+## M9 LEVELS: the "Lv 12" badge on the preview's corner, the Class XP strip on its lower edge and the XP numbers (hidden for
+## the dev profile).
+var level_badge: PanelContainer
+var level_badge_label: Label
+var xp_bar: UiBar
+var xp_label: Label
 
 var _state_key := ""
 var _was_ready := false
@@ -144,6 +156,31 @@ func _build_joined() -> void:
 	stage.add_child(preview)
 	_ready_ribbon = _make_ready_ribbon()
 	stage.add_child(_ready_ribbon)
+	level_badge = _make_level_badge()
+	stage.add_child(level_badge)
+	# The Class XP bar is a thin strip on the preview's lower edge and its numbers sit in the top-right corner: nothing
+	# of it takes room from the card's layout (the cards of a 1080p lobby have none to spare).
+	xp_bar = UiBar.create(Color(0.62, 0.34, 0.85), XP_BAR_HEIGHT, UiTheme.FONT_SMALL - 2)
+	xp_bar.name = "XpBar"
+	xp_bar.animated = false
+	xp_bar.visible = false
+	xp_bar.custom_minimum_size = Vector2(0, XP_BAR_HEIGHT)
+	xp_bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	xp_bar.offset_top = -XP_BAR_HEIGHT - 3.0
+	xp_bar.offset_bottom = -3.0
+	xp_bar.offset_left = 4.0
+	xp_bar.offset_right = -4.0
+	stage.add_child(xp_bar)
+	xp_label = UiTheme.label("", &"", UiTheme.FONT_SMALL, UiTheme.TEXT)
+	xp_label.name = "XpLabel"
+	xp_label.add_theme_constant_override(&"outline_size", 6)
+	xp_label.add_theme_color_override(&"font_outline_color", UiTheme.OUTLINE)
+	xp_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	xp_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	xp_label.offset_right = -8.0
+	xp_label.offset_top = 6.0
+	xp_label.visible = false
+	stage.add_child(xp_label)
 
 	var class_row := UiTheme.hbox(6)
 	_left_arrow = UiIcon.create(UiIcon.Kind.ARROW_LEFT, Vector2(34, 40), UiTheme.GOLD)
@@ -249,6 +286,26 @@ func _make_ready_ribbon() -> PanelContainer:
 	return ribbon
 
 
+## The small "Lv 12" tag in the top-left corner of the preview (M9 LEVELS).
+func _make_level_badge() -> PanelContainer:
+	var badge := PanelContainer.new()
+	badge.name = "LevelBadge"
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := UiTheme.stone_style(UiTheme.GOLD_BORDER, Color(0.07, 0.05, 0.03, 0.9))
+	style.content_margin_top = 1
+	style.content_margin_bottom = 3
+	style.content_margin_left = 9
+	style.content_margin_right = 9
+	badge.add_theme_stylebox_override(&"panel", style.rebuild())
+	level_badge_label = UiTheme.label("Lv 1", UiTheme.HEADING, 24, UiTheme.GOLD_BRIGHT)
+	badge.add_child(level_badge_label)
+	badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	badge.offset_left = 6
+	badge.offset_top = 6
+	badge.visible = false
+	return badge
+
+
 # --- Updating ------------------------------------------------------------------------
 
 ## Mirrors [param p_slot] (null = empty slot). Cheap when nothing changed.
@@ -257,8 +314,8 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
-		key = "%d:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
-				p_slot.companion_id(), _locked_hint(p_slot)]
+		key = "%d:%s:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
+				p_slot.companion_id(), _locked_hint(p_slot), _level_key(p_slot)]
 	if key == _state_key:
 		return
 	_state_key = key
@@ -313,7 +370,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 
 	_preview_glow.texture = _glow_texture(s.color)
 	if data != null:
-		preview.show_class(data, s.color)
+		preview.show_class(data, s.color, _alt_chosen(s))
 	_ready_ribbon.visible = s.ready
 	_left_arrow.visible = not s.ready
 	_right_arrow.visible = not s.ready
@@ -325,8 +382,9 @@ func _apply_joined(s: PlayerSlot) -> void:
 		_desc_label.text = "Locked: %s" % lock_hint
 	_desc_label.add_theme_color_override(&"font_color", UiTheme.RED if lock_hint != "" else Color(0.9, 0.87, 0.8))
 	preview.modulate = Color(0.45, 0.45, 0.5) if lock_hint != "" else Color.WHITE
+	_fill_level(s)
 	_fill_stats(data)
-	_fill_weapons(data)
+	_fill_weapons(data, s)
 	_fill_companion(s)
 	_fill_abilities(data, s)
 	if data != null:
@@ -351,19 +409,21 @@ func _fill_stats(data: ClassData) -> void:
 		_stats_grid.add_child(l)
 
 
-func _fill_weapons(data: ClassData) -> void:
+func _fill_weapons(data: ClassData, s: PlayerSlot) -> void:
 	for c in _weapons_box.get_children():
 		_weapons_box.remove_child(c)
 		c.queue_free()
 	if data == null:
 		return
-	# One line: "Weapons  Mace + Shield".
+	# One line: "Weapons  Mace + Shield" – the alternative set once the class has unlocked it and the player chose it
+	# (M9 LEVELS), with the switch's button on the right.
 	var line := UiTheme.hbox(6)
 	var slot_label := UiTheme.label("Weapons", UiTheme.SMALL)
 	slot_label.custom_minimum_size.x = 96
 	line.add_child(slot_label)
 	var first := true
-	for w: WeaponData in [data.main_hand, data.off_hand]:
+	var alt := _alt_chosen(s)
+	for w: WeaponData in [ClassLevels.start_main_hand(data, alt), ClassLevels.start_off_hand(data, alt)]:
 		if w == null:
 			continue
 		if not first:
@@ -371,7 +431,48 @@ func _fill_weapons(data: ClassData) -> void:
 		first = false
 		var rarity := clampi(w.rarity, 0, UiTheme.RARITY_COLORS.size() - 1)
 		line.add_child(UiTheme.label(w.display_name, &"", UiTheme.FONT_SMALL + 1, UiTheme.RARITY_COLORS[rarity]))
+	if _alt_available(s):
+		line.add_child(UiTheme.spacer())
+		if not s.ready:
+			line.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.LB, 22.0))
+		var tag := UiTheme.label("Alt" if alt else "Standard", UiTheme.GOLD_LABEL if alt else UiTheme.SMALL, UiTheme.FONT_SMALL)
+		tag.name = "WeaponTag"
+		line.add_child(tag)
 	_weapons_box.add_child(line)
+
+
+## True when [param s]'s class has its alternative starting weapon unlocked (Class Level 12).
+static func _alt_available(s: PlayerSlot) -> bool:
+	return s != null and s.class_data != null and Meta.shows_class_levels() and Meta.alt_weapon_unlocked(s.class_data.id)
+
+
+## True when [param s] chose the alternative weapon and may have it (the lobby shows the set the run will start with).
+static func _alt_chosen(s: PlayerSlot) -> bool:
+	return s != null and s.alt_weapon and s.class_data != null and Meta.alt_weapon_unlocked(s.class_data.id)
+
+
+## M9 LEVELS: the level badge and the Class XP bar of [param s]'s class (hidden for the dev profile of the automated runs).
+func _fill_level(s: PlayerSlot) -> void:
+	var show := s.class_data != null and Meta.shows_class_levels()
+	level_badge.visible = show
+	xp_bar.visible = show
+	xp_label.visible = show
+	_ready_ribbon.offset_bottom = -(XP_BAR_HEIGHT + 9.0) if show else -6.0
+	_ready_ribbon.offset_top = _ready_ribbon.offset_bottom
+	if not show:
+		return
+	var progress := Meta.class_progress(s.class_data.id)
+	level_badge_label.text = "Lv %d" % int(progress["level"])
+	xp_bar.set_values(float(progress["fraction"]), 1.0)
+	xp_label.text = "MAX LEVEL" if progress["max"] else "%s / %s XP" % [UiTheme.format_int(int(progress["into"])), UiTheme.format_int(int(progress["needed"]))]
+
+
+## The part of the card's state key that follows the class level and the weapon choice (a run changes it).
+static func _level_key(s: PlayerSlot) -> String:
+	if s == null or s.class_data == null or not Meta.shows_class_levels():
+		return "-"
+	return "%s:%s:%s" % [Meta.profile.class_xp(s.class_data.id), Meta.profile.class_level(s.class_data.id),
+			_alt_chosen(s) if _alt_available(s) else "x"]
 
 
 ## The "Companion: <Name>" row of a class with companion choices (hidden for every other class), with
