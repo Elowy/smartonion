@@ -121,6 +121,9 @@ func test_weapon_families_pick_their_sounds() -> void:
 	check_eq(AudioIds.swing(Db.weapons[&"two_hand_sword"]), &"swing_heavy", "two-hand sword")
 	check_eq(AudioIds.shot(Db.weapons[&"bow"]), &"shot_bow", "bow")
 	check_eq(AudioIds.shot(Db.weapons[&"gun"]), &"shot_gun", "gun")
+	check_eq(AudioIds.shot(Db.weapons[&"crossbow"]), &"shot_crossbow", "crossbow (M8)")
+	check_eq(AudioIds.swing(Db.weapons[&"fist_weapon"]), &"swing_light", "fist weapon (M8)")
+	check_eq(AudioIds.swing(Db.weapons[&"polearm"]), &"swing_heavy", "polearm (M8: a two-hander)")
 	check_eq(AudioIds.swing(null), &"swing_blade", "no weapon")
 
 

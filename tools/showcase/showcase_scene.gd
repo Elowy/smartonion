@@ -24,6 +24,8 @@ func run() -> void:
 			await _enemies()
 		"weapons":
 			await _weapons()
+		"hands":
+			await _hands()
 		"arena":
 			await _arena_overview()
 		"revive":
@@ -250,7 +252,12 @@ func _equip() -> void:
 
 
 ## The five class tier sets worn complete on their classes, next to the starter look (--back=1).
+## --free=1: the class-independent sets (Db.independent_sets) instead, worn on the heroes of their armour
+## (mail: the warrior's model, whatever its class), next to the same hero in a plain piece of that armour.
 func _sets() -> void:
+	if _arg("free", "0") == "1":
+		await _free_sets()
+		return
 	var stage := _studio()
 	var ids: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
 	var back := _arg("back", "0") == "1"
@@ -269,6 +276,30 @@ func _sets() -> void:
 					EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, 1, rarity, sid),
 					EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, 1, rarity, sid))
 			m.position = Vector3((i - (ids.size() - 1) * 0.5) * 1.7, 0, (r - 0.5) * 2.1)
+			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
+	_close_camera(stage, Vector3(0, 0.6, 0), 12.0, 38.0)
+	await _frames(20)
+
+
+func _free_sets() -> void:
+	var stage := _studio()
+	var sets := Db.independent_sets()
+	var back := _arg("back", "0") == "1"
+	var rarity := int(_arg("rarity", "3"))
+	var models: Dictionary[int, StringName] = {ClassData.ArmorType.CLOTH: &"mage", ClassData.ArmorType.LEATHER: &"rogue",
+		ClassData.ArmorType.MAIL: &"warrior", ClassData.ArmorType.PLATE: &"paladin"}
+	for r in 2:
+		for i in sets.size():
+			var cd := Db.get_class_data(models.get(sets[i].armor_type, &"warrior"))
+			var m := OnionModel.new()
+			stage.add_child(m)
+			m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+			m.set_weapons(cd.main_hand, cd.off_hand)
+			var sid: StringName = sets[i].id if r == 0 else &""
+			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, sets[i].armor_type, 1, rarity, sid),
+				EquipLook.make(EquipLook.Slot.SHOULDERS, sets[i].armor_type, 1, rarity, sid),
+				EquipLook.make(EquipLook.Slot.CHEST, sets[i].armor_type, 1, rarity, sid))
+			m.position = Vector3((i - (sets.size() - 1) * 0.5) * 1.7, 0, (r - 0.5) * 2.1)
 			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
 	_close_camera(stage, Vector3(0, 0.6, 0), 12.0, 38.0)
 	await _frames(20)
@@ -330,19 +361,54 @@ func _enemies() -> void:
 	await _frames(8)
 
 
+## Every weapon model (--ids=a,b,c: only those; --rarity=N, --gap=metres, --yaw=degrees).
 func _weapons() -> void:
 	var stage := _studio()
-	var i := 0
-	var ids := Db.weapons.keys()
+	var ids: Array = Db.weapons.keys()
 	ids.sort()
-	for id: StringName in ids:
-		var w := WeaponModel.build(Db.get_weapon(id))
+	if _arg("ids", "") != "":
+		ids = Array(_arg("ids", "").split(","))
+	var gap := float(_arg("gap", "0.75"))
+	var yaw := float(_arg("yaw", "180"))
+	for i in ids.size():
+		var id := StringName(ids[i])
+		var data := Db.get_weapon(id).duplicate() as WeaponData
+		data.rarity = int(_arg("rarity", "0"))
+		var w := WeaponModel.build(data)
 		stage.add_child(w)
-		w.position = Vector3((i - (ids.size() - 1) * 0.5) * 0.75, 0.6, 0)
-		w.rotation_degrees = Vector3(0, 180, -60 if id == &"gun" else 0)
-		i += 1
-	_close_camera(stage, Vector3(0, 0.75, 0), 9.0, 12.0)
+		w.position = Vector3((i - (ids.size() - 1) * 0.5) * gap, 0.6, 0)
+		w.rotation_degrees = Vector3(0, yaw, -60 if id == &"gun" else 0)
+	_close_camera(stage, Vector3(0, 0.75, 0), 9.0 if _arg("ids", "") == "" else 5.5, 12.0)
 	await _frames(4)
+
+
+## Weapons in hand (M8): one onion per --weapons=a,b,c (default crossbow,polearm,fist_weapon), the class
+## look of --classes=a,b,c (default warrior,mage,rogue; any class does: the weapon is what is shown),
+## a one-hander in both hands with --dual=1 (a fist weapon is always held in both), --back=1,
+## --state=attack|walk, --rarity=N, --turn=degrees (the heroes' yaw away from the camera, 0 = facing it).
+func _hands() -> void:
+	var stage := _studio()
+	var ids: PackedStringArray = _arg("weapons", "crossbow,polearm,fist_weapon").split(",")
+	var classes: PackedStringArray = _arg("classes", "warrior,mage,rogue").split(",")
+	var back := _arg("back", "0") == "1"
+	var state := _arg("state", "")
+	for i in ids.size():
+		var data := Db.get_weapon(StringName(ids[i])).duplicate() as WeaponData
+		data.rarity = int(_arg("rarity", "0"))
+		var cd := Db.get_class_data(StringName(classes[i % classes.size()]))
+		var m := OnionModel.new()
+		stage.add_child(m)
+		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		var dual := data.hand == WeaponData.Hand.ONE_HAND and (_arg("dual", "0") == "1" or data.weapon_type == &"fist_weapon")
+		m.set_weapons(data, data if dual else null)
+		m.position = Vector3((i - (ids.size() - 1) * 0.5) * 2.0, 0, 0)
+		var turn := deg_to_rad(float(_arg("turn", "0")) + (180.0 if back else 0.0))
+		m.set_facing(Vector3(sin(turn), 0, cos(turn)))
+		match state:
+			"attack": m.play_attack(false)
+			"walk": m.set_moving(1.0)
+	_close_camera(stage, Vector3(0, 0.8, 0), 7.0, 28.0)
+	await _frames(4 if state == "attack" else 20)
 
 
 ## Revive scene through the gameplay camera: a paladin channels a resurrection on a

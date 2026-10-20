@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"slipskin_leathers"
+display_name = "Slipskin Leathers"
+class_id = &""
+armor_type = 1
+piece_ids = Array[StringName]([&"set_slipskin_head", &"set_slipskin_shoulders", &"set_slipskin_chest", &"set_slipskin_hands", &"set_slipskin_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{"kind": "stats", "stats": {"dodge": 5.0}}],
+"pieces": 2,
+"text": "Increases your Dodge by 5%."
+}, {
+"effects": [{"kind": "proc", "proc": {"trigger": "on_dodge", "effect": "buff", "icd": 3.0, "duration": 4.0, "stats": {"damage_pct": 10.0, "speed": 15.0}}}],
+"pieces": 4,
+"text": "Dodging an attack grants +10% damage and +15% Speed for 4 sec. Can only occur once every 3 sec."
+}])

@@ -1,9 +1,10 @@
 extends TestCase
-## M8 P0 – class-independent tier sets (SetData.class_id empty): Db.sets_for_class, the generator's
-## set roll over several eligible sets (draw order), the Black Market's candidates, set counting
-## across classes, the tooltip and the generic armour look. No set content ships with P0: the sets
-## here are fixtures built by set_fixtures.gd (a mail set, a plate set ...) and removed after each
-## test. The rules the shipped class-free sets must follow are checked over whatever Db holds.
+## M8 – class-independent tier sets (SetData.class_id empty, SetData.armor_type): Db.sets_for_class, the
+## generator's set roll (native armour only, SET_INDEPENDENT_SHARE of the hits, draw order), the Black
+## Market's tiers, set counting across classes, the tooltip and the generic armour look. The sets here are
+## fixtures built by set_fixtures.gd (a mail set, a plate set ...): every test starts in the world of
+## class sets only (the shipped class-independent sets are taken out) and puts everything back after it.
+## The shipped sets and the rules they follow: test_m8_items_shared.gd and the last tests of this file.
 
 const Fakes := preload("res://tests/player_fakes.gd")
 const Rules := preload("res://tests/content_rules.gd")
@@ -25,6 +26,8 @@ var tip: ItemTooltip
 func before_each() -> void:
 	RunState.start_run(1, 41)
 	fixtures = SetFixtures.new()
+	fixtures.remove_free_sets()
+	ItemGenerator.independent_share_override = -1.0
 	Enemy.invalidate_player_cache()
 
 
@@ -38,6 +41,7 @@ func after_each() -> void:
 		world = null
 	PlayerManager.clear()
 	fixtures.restore()
+	ItemGenerator.independent_share_override = -1.0
 	Enemy.invalidate_player_cache()
 	EnemyGrid.mark_dirty()
 
@@ -115,6 +119,10 @@ func _team(ids: Array[StringName]) -> Array[ClassData]:
 func test_a_class_free_set_belongs_to_no_class() -> void:
 	var s := fixtures.add_free_set(&"zz_free_mail", ClassData.ArmorType.MAIL)
 	check_eq(s.class_id, &"", "SetData.class_id empty = class-independent")
+	check(s.is_independent() and s.armor_type == ClassData.ArmorType.MAIL, "is_independent, with its armour type")
+	check(not Db.set_for_class(Db.class_ids[0]).is_independent(), "a class set is not")
+	check_eq(Db.set_for_class(Db.class_ids[0]).armor_type, -1, "a class set has no armor_type of its own")
+	check_eq(_ids(Db.independent_sets()), [&"zz_free_mail"] as Array[StringName], "Db.independent_sets")
 	check(Db.set_for_class(&"") == null, "set_for_class(\"\") is nobody's own set")
 	check(Db.get_set(&"zz_free_mail") == s, "Db.get_set finds it")
 	for id in Rules.classes_with("set"):
@@ -122,7 +130,7 @@ func test_a_class_free_set_belongs_to_no_class() -> void:
 		check(own != null and own != s and own.class_id == id, "%s: its own set is its class's, not the free one" % id)
 
 
-func test_sets_for_class_lists_the_own_set_then_the_free_sets_the_class_can_collect() -> void:
+func test_sets_for_class_lists_the_own_set_then_the_free_sets_of_its_armour() -> void:
 	_all_armour_sets()
 	for id in [&"warrior", &"mage", &"rogue", &"warlock", &"paladin"]:
 		check_eq(_ids(Db.sets_for_class(id)), _pool_of(id), "%s: its own set, then the free sets it collects, by id" % id)
@@ -132,6 +140,11 @@ func test_sets_for_class_lists_the_own_set_then_the_free_sets_the_class_can_coll
 	for heavier in [&"zz_free_leather", &"zz_free_mail", &"zz_free_plate"]:
 		check(heavier not in _ids(Db.sets_for_class(&"mage")), "cloth: not %s" % heavier)
 	check(&"zz_free_plate" not in _ids(Db.sets_for_class(&"rogue")), "leather: no plate set")
+	# Native armour only: a plate hero could wear the cloth set but never rolls or collects it.
+	for lighter in [&"zz_free_cloth", &"zz_free_leather", &"zz_free_mail"]:
+		check(lighter not in _ids(Db.sets_for_class(&"warrior")), "plate: not %s (wearable, not collected)" % lighter)
+		check(not Db.set_usable_by(Db.get_set(lighter), Db.get_class_data(&"warrior")), "set_usable_by: not %s" % lighter)
+	check(Db.set_usable_by(Db.get_set(&"zz_free_plate"), Db.get_class_data(&"paladin")), "paladin: the plate set")
 	check(Db.sets_for_class(&"zz_no_such_class").is_empty(), "an unknown class has none")
 	for id in Db.class_ids:
 		for s in Db.sets_for_class(id):
@@ -162,58 +175,180 @@ func test_a_class_without_a_set_still_collects_free_sets() -> void:
 
 # --- The set roll -----------------------------------------------------------------------------
 
-func test_set_candidates_are_the_class_sets_then_the_free_sets_the_team_can_collect() -> void:
+func test_independent_sets_for_follow_the_native_armour() -> void:
 	_all_armour_sets()
 	var ids: Array[StringName] = [&"warrior", &"mage"]
-	check_eq(_ids(ItemGenerator.set_candidates(_team(ids))), _team_pool(ids),
-			"class sets in team order, then the free sets any of them collects")
-	check_eq(_ids(ItemGenerator.set_candidates(_team([&"mage"]))), _pool_of(&"mage"), "a lone mage")
-	check(&"zz_free_plate" not in _ids(ItemGenerator.set_candidates(_team([&"mage"]))), "a cloth wearer cannot collect the plate set")
+	check_eq(_ids(Db.independent_sets()), [&"zz_free_cloth", &"zz_free_leather", &"zz_free_mail", &"zz_free_plate"] as Array[StringName],
+			"Db.independent_sets: by id")
+	check_eq(_ids(Db.independent_sets_for_armor(ClassData.ArmorType.MAIL)), [&"zz_free_mail"] as Array[StringName], "by armour")
+	check_eq(_ids(ItemGenerator.independent_sets_for(null, _team(ids))), [&"zz_free_cloth", &"zz_free_plate"] as Array[StringName],
+			"a plate + cloth team: those two sets, by id")
+	check_eq(_ids(ItemGenerator.independent_sets_for(null, _team([&"mage"]))), [&"zz_free_cloth"] as Array[StringName], "a lone mage")
+	check_eq(_ids(ItemGenerator.independent_sets_for(Db.get_class_data(&"rogue"), _team(ids))), [&"zz_free_leather"] as Array[StringName],
+			"the hero alone wins over the team")
+	var every: Array[StringName] = []
+	for id in FREE_ARMOR:
+		for class_id in Db.class_ids:
+			if Rules.free_set_fits(FREE_ARMOR[id], int(Db.get_class_data(class_id).armor_type)) and id not in every:
+				every.append(id)
+	check_eq(_ids(ItemGenerator.independent_sets_for(null, [])), every, "nobody given: the sets of every class's armour, by id")
+	check_eq(_ids(ItemGenerator.independent_sets_for(null, _team([&"warrior", &"paladin"]))), [&"zz_free_plate"] as Array[StringName],
+			"two plate classes: one set")
+	# The class sets are the old rule: one per class with a set, in team order.
+	var class_ids: Array[StringName] = []
+	for cls in ItemGenerator.set_classes(null, _team(ids)):
+		class_ids.append(cls.id)
+	check_eq(class_ids, ids, "set_classes: the team classes that have a class set")
 	fixtures.remove_free_sets()
-	check_eq(_ids(ItemGenerator.set_candidates(_team(ids))), [Db.set_for_class(&"warrior").id, Db.set_for_class(&"mage").id] as Array[StringName],
-			"no free sets: one set per class")
+	check(ItemGenerator.independent_sets_for(null, _team(ids)).is_empty(), "no independent sets: none")
 
 
-func test_set_roll_draws_chance_then_set_then_piece() -> void:
+## Rolls the documented draws of a set hit on [param probe] (already past the chance draw) and returns
+## the piece id the roll must give: [param sets] is the list the set (or class) is drawn from.
+func _expected_piece(probe: RandomNumberGenerator, sets: Array[SetData], users: Array[ClassData]) -> StringName:
+	var set_data := sets[0] if sets.size() == 1 else sets[probe.randi_range(0, sets.size() - 1)]
+	var pool: Array[StringName] = []
+	for piece_id in set_data.piece_ids:
+		for cls in users:
+			if (set_data.class_id == &"" or set_data.class_id == cls.id) and ItemGenerator.unique_usable_by(Db.get_unique(piece_id), cls):
+				pool.append(piece_id)
+				break
+	return pool[probe.randi_range(0, pool.size() - 1)] if pool.size() > 1 else pool[0]
+
+
+func test_set_roll_draws_follow_the_two_bands() -> void:
 	_all_armour_sets()
 	var team := _team([&"mage", &"warrior"])
-	var candidates := ItemGenerator.set_candidates(team)
-	check_eq(candidates.size(), _team_pool([&"mage", &"warrior"]).size(), "two class sets + the free ones")
-	check(candidates.size() > 2, "more than one set to draw from")
+	var class_sets: Array[SetData] = [Db.set_for_class(&"mage"), Db.set_for_class(&"warrior")]
+	var independent: Array[SetData] = [Db.get_set(&"zz_free_cloth"), Db.get_set(&"zz_free_plate")]
+	var chance := ItemGenerator.set_chance(LOOT)
+	var band := chance * ItemGenerator.SET_INDEPENDENT_SHARE
+	check_near(chance, 0.15, 0.0001, "loot chance 15%")
+	check_near(band, 0.045, 0.0001, "the independent band: the first 30% of it")
+	var rng := RandomNumberGenerator.new()
+	var probe := RandomNumberGenerator.new()
+	var seen := {&"independent": 0, &"class": 0}
+	for seed_value in range(1, 400):
+		rng.seed = seed_value
+		probe.seed = seed_value
+		var r := probe.randf()
+		if r >= chance:
+			continue
+		var got := ItemGenerator._roll_set_piece(LOOT, 12, -1, null, team, rng)
+		var want: StringName
+		if r < band:
+			# Independent band: the set (2 candidates), then the piece (5).
+			want = _expected_piece(probe, independent, team)
+			seen[&"independent"] += 1
+			check(got != null and got.class_restriction == &"", "seed %d: an independent piece" % seed_value)
+		else:
+			# Class band: the class (2), then its piece; the same draws as before M8.
+			want = _expected_piece(probe, class_sets, team)
+			seen[&"class"] += 1
+			check(got != null and got.class_restriction != &"", "seed %d: a class piece" % seed_value)
+		check(got != null and got.id == want, "seed %d (r %.3f): piece %s (got %s)" % [seed_value, r, want, got.id if got != null else "-"])
+		check_eq(rng.state, probe.state, "seed %d: exactly the documented draws" % seed_value)
+	check(seen[&"independent"] > 5 and seen[&"class"] > 20, "both bands came up: %s" % [seen])
+
+
+func test_a_miss_draws_exactly_once_whatever_sets_exist() -> void:
+	_all_armour_sets()
+	var miss_seed := _seed_where(func(r: RandomNumberGenerator) -> bool: return r.randf() >= 0.15)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = miss_seed
+	check(ItemGenerator._roll_set_piece(LOOT, 12, -1, null, _team([&"warrior", &"mage"]), rng) == null, "miss")
+	var probe := RandomNumberGenerator.new()
+	probe.seed = miss_seed
+	probe.randf()
+	check_eq(rng.state, probe.state, "one randf")
+	# A forced non-set slot draws nothing at all.
+	rng.seed = miss_seed
+	var state := rng.state
+	check(ItemGenerator._roll_set_piece(LOOT, 12, Items.SlotType.RING, null, _team([&"mage"]), rng) == null, "ring")
+	check_eq(rng.state, state, "no draw for a non-set slot")
+
+
+func test_one_independent_set_and_one_piece_draw_no_set_and_no_piece_draw() -> void:
+	# A class without a class set of its own and a single mail set: the roll is that set at any r.
+	var set_data := fixtures.add_free_set(&"zz_free_mail", ClassData.ArmorType.MAIL)
+	var nobody := ClassData.new()
+	nobody.id = &"zz_set_less"
+	nobody.armor_type = ClassData.ArmorType.MAIL
 	var hit_seed := _seed_where(func(r: RandomNumberGenerator) -> bool: return r.randf() < 0.15)
 	var rng := RandomNumberGenerator.new()
 	var probe := RandomNumberGenerator.new()
-	var seen_free := false
-	var seen_class := false
-	for offset in 60:
-		var seed_value := hit_seed + offset * 7919
+	rng.seed = hit_seed
+	probe.seed = hit_seed
+	probe.randf()
+	var got := ItemGenerator._roll_set_piece(LOOT, 12, -1, null, [nobody], rng)
+	check(got != null and got.set_id == &"zz_free_mail", "a team with no class set rolls the independent set at any r")
+	check_eq(got.id, set_data.piece_ids[probe.randi_range(0, 4)], "chance + piece, no set draw")
+	check_eq(rng.state, probe.state, "exactly those draws")
+	# A forced slot leaves one piece: chance only.
+	rng.seed = hit_seed
+	probe.seed = hit_seed
+	probe.randf()
+	got = ItemGenerator._roll_set_piece(LOOT, 12, Items.SlotType.LEGS, null, [nobody], rng)
+	check(got != null and got.id == &"zz_free_mail_legs", "the Legs piece")
+	check_eq(rng.state, probe.state, "one candidate piece: no piece draw")
+
+
+func test_the_independent_share_is_thirty_percent_of_the_hits() -> void:
+	_all_armour_sets()
+	var team := _team([&"mage", &"warrior"])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260
+	var independent := 0
+	var hits := 0
+	for i in 40000:
+		var got := ItemGenerator._roll_set_piece(LOOT, 12, -1, null, team, rng)
+		if got == null:
+			continue
+		hits += 1
+		if got.class_restriction == &"":
+			independent += 1
+	check(hits > 5000, "hits: %d" % hits)
+	check_near(float(independent) / hits, ItemGenerator.SET_INDEPENDENT_SHARE, 0.03, "30%% independent (%d / %d)" % [independent, hits])
+	# The overall set rate is the chance, share or no share.
+	check_near(float(hits) / 40000.0, 0.15, 0.01, "15% of the rolls are a set piece")
+	# The test hook: 0 = class sets only, 1 = independent sets only.
+	for share in [0.0, 1.0]:
+		ItemGenerator.independent_share_override = share
+		rng.seed = 77
+		var free := 0
+		var total := 0
+		for i in 4000:
+			var got := ItemGenerator._roll_set_piece(LOOT, 12, -1, null, team, rng)
+			if got != null:
+				total += 1
+				free += 1 if got.class_restriction == &"" else 0
+		check(total > 300, "share %.0f: hits %d" % [share, total])
+		check_eq(free, 0 if share == 0.0 else total, "share %.0f: %s" % [share, "class sets only" if share == 0.0 else "independent only"])
+	ItemGenerator.independent_share_override = -1.0
+
+
+func test_without_a_matching_independent_set_the_roll_is_the_old_class_roll() -> void:
+	# Only a mail set exists; a plate / cloth team has no independent set: every hit is a class set,
+	# drawn exactly as in M7 (chance, class, piece).
+	fixtures.add_free_set(&"zz_free_mail", ClassData.ArmorType.MAIL)
+	var team := _team([&"mage", &"warrior"])
+	var class_sets: Array[SetData] = [Db.set_for_class(&"mage"), Db.set_for_class(&"warrior")]
+	var rng := RandomNumberGenerator.new()
+	var probe := RandomNumberGenerator.new()
+	var hits := 0
+	for seed_value in range(1, 200):
 		rng.seed = seed_value
 		probe.seed = seed_value
 		if probe.randf() >= 0.15:
 			continue
+		hits += 1
 		var got := ItemGenerator._roll_set_piece(LOOT, 12, -1, null, team, rng)
-		var set_data := candidates[probe.randi_range(0, candidates.size() - 1)]
-		# Pieces the team can wear, in piece order (all five exist at wave 12).
-		var pool: Array[StringName] = []
-		for piece_id in set_data.piece_ids:
-			var data := Db.get_unique(piece_id)
-			for cls in team:
-				if (set_data.class_id == &"" or set_data.class_id == cls.id) and ItemGenerator.unique_usable_by(data, cls):
-					pool.append(piece_id)
-					break
-		var want := pool[probe.randi_range(0, pool.size() - 1)] if pool.size() > 1 else pool[0]
-		check(got != null and got.id == want, "seed %d: set %s, piece %s (got %s)" % [seed_value, set_data.id, want, got.id if got != null else "-"])
-		check_eq(rng.state, probe.state, "seed %d: exactly the documented draws" % seed_value)
-		if set_data.class_id == &"":
-			seen_free = true
-			check_eq(got.class_restriction, &"", "a free piece has no class")
-		else:
-			seen_class = true
-	check(seen_free and seen_class, "both kinds came up in the sample")
+		check(got != null and got.id == _expected_piece(probe, class_sets, team), "seed %d: class, then piece" % seed_value)
+		check_eq(rng.state, probe.state, "seed %d: three draws" % seed_value)
+	check(hits > 10, "hits: %d" % hits)
 
 
 func test_with_one_eligible_set_there_is_no_set_draw() -> void:
-	fixtures.remove_free_sets()
 	var rng := RandomNumberGenerator.new()
 	var probe := RandomNumberGenerator.new()
 	var hit_seed := _seed_where(func(r: RandomNumberGenerator) -> bool: return r.randf() < 0.15)
@@ -300,7 +435,7 @@ func _heroes(ids: Array[StringName]) -> Array[PlayerSlot]:
 	return out
 
 
-func test_black_market_candidates_include_the_free_sets_a_hero_can_collect() -> void:
+func test_black_market_lists_class_pieces_and_independent_pieces_apart() -> void:
 	_all_armour_sets()
 	var slots := _heroes([&"warrior", &"mage"])
 	var cands := BlackMarket.set_piece_candidates(18, slots)
@@ -309,38 +444,102 @@ func test_black_market_candidates_include_the_free_sets_a_hero_can_collect() -> 
 		var data: UniqueItemData = c["data"]
 		by_set[data.set_id] = by_set.get(data.set_id, 0) + 1
 		check(ItemGenerator.unique_usable_by(data, c["class"]), "%s: usable by the hero it is listed for" % data.id)
+	check_eq(by_set.keys().size(), 2, "set_piece_candidates: the two class sets only")
 	check_eq(by_set.get(Db.set_for_class(&"warrior").id, 0), 5, "the warrior's class set")
 	check_eq(by_set.get(Db.set_for_class(&"mage").id, 0), 5, "the mage's class set")
-	var pool := _team_pool([&"warrior", &"mage"])
+	# The independent pieces: per hero in slot order, the sets of its own armour (native only).
+	var free := BlackMarket.independent_piece_candidates(18, slots)
+	var free_sets := {}
+	for c in free:
+		var data: UniqueItemData = c["data"]
+		free_sets[data.set_id] = free_sets.get(data.set_id, 0) + 1
+		check_eq(data.class_restriction, &"", "%s: a class-free piece" % data.id)
+	check_eq(free.size(), 10, "two native sets x five pieces")
 	for id in FREE_ARMOR:
-		check_eq(by_set.get(id, 0), 5 if id in pool else 0, "%s: five pieces, listed once, when a hero collects it" % id)
-	# Order: slot order, then the hero's own set before the free ones, then piece order.
-	check_eq(cands[0]["data"].set_id, Db.set_for_class(&"warrior").id, "the first hero's own set first")
-	check_eq(cands[5]["data"].set_id, _free_for(&"warrior")[0], "then its free sets by id")
-	var mage_only := BlackMarket.set_piece_candidates(18, [slots[1]] as Array[PlayerSlot])
-	var ids: Array[StringName] = []
-	for c in mage_only:
-		if c["data"].set_id not in ids:
-			ids.append(c["data"].set_id)
-	check_eq(ids, _pool_of(&"mage"), "a lone mage: its own pool")
+		var native := id in _team_pool([&"warrior", &"mage"])
+		check_eq(free_sets.get(id, 0), 5 if native else 0, "%s: five pieces, listed once, when a hero collects it" % id)
+	check_eq(free[0]["data"].set_id, &"zz_free_plate", "the first hero's set first (warrior = plate)")
+	check_eq(free[5]["data"].set_id, &"zz_free_cloth", "then the mage's")
+	var mage_only := BlackMarket.independent_piece_candidates(18, [slots[1]] as Array[PlayerSlot])
+	check_eq(mage_only.size(), 5, "a lone mage: the cloth set")
+	check_eq(mage_only[0]["data"].set_id, &"zz_free_cloth", "its own armour")
+	check(BlackMarket.independent_piece_candidates(3, slots).is_empty(), "before wave 6: nothing")
+
+
+func test_the_set_piece_pool_tiers_class_missing_then_independent_missing_then_all() -> void:
+	_all_armour_sets()
+	var slots := _heroes([&"mage"])
+	var mage := slots[0].player as Player
+	var rng := RandomNumberGenerator.new()
+	var class_ids := Db.set_for_class(&"mage").piece_ids
+	# 1. A class piece is missing: only class pieces, only the missing ones.
+	mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(class_ids[0]), 18, false, rng))
+	var pool := BlackMarket.set_piece_pool(18, slots)
+	check_eq(pool.size(), 4, "tier 1: the four class pieces the mage lacks")
+	for c in pool:
+		check(c["data"].set_id == Db.set_for_class(&"mage").id and c["missing"], "%s: a missing class piece" % c["data"].id)
+	# 2. The class set complete: the missing independent pieces.
+	for piece_id in class_ids:
+		if mage.equipment.backpack.filter(func(it: ItemInstance) -> bool: return it.source_id == piece_id).is_empty():
+			mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(piece_id), 18, false, rng))
+	pool = BlackMarket.set_piece_pool(18, slots)
+	check_eq(pool.size(), 5, "tier 2: the five cloth pieces")
+	for c in pool:
+		check(c["data"].set_id == &"zz_free_cloth" and c["missing"], "%s: a missing independent piece" % c["data"].id)
+	# 3. Everything owned: all candidates of both.
+	for piece_id in Db.get_set(&"zz_free_cloth").piece_ids:
+		mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(piece_id), 18, false, rng))
+	pool = BlackMarket.set_piece_pool(18, slots)
+	check_eq(pool.size(), 10, "tier 3: 5 class + 5 independent pieces")
+	for c in pool:
+		check(not c["missing"], "nothing is missing")
+	# The offer draws one randi_range over the pool (and none for a single entry).
+	var hit := _seed_where(func(r: RandomNumberGenerator) -> bool: return r.randf() >= BlackMarket.MAX_ROLL_CHANCE)
+	rng.seed = hit
+	var probe := RandomNumberGenerator.new()
+	probe.seed = hit
+	probe.randf()
+	var item := BlackMarket.roll(18, slots, rng)
+	check(item != null and item.source_id == pool[probe.randi_range(0, pool.size() - 1)]["data"].id, "the offer is the pool's pick")
+	check_eq(rng.state, probe.state, "from_unique draws nothing for a hand-made piece: chance + pick")
+
+
+func test_dungeon_rewards_use_the_same_pool() -> void:
+	_all_armour_sets()
+	var slots := _heroes([&"mage"])
+	var mage := slots[0].player as Player
+	var rng := RandomNumberGenerator.new()
+	# The class set complete, the independent set missing: the extra piece is a cloth piece.
+	for piece_id in Db.set_for_class(&"mage").piece_ids:
+		mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(piece_id), 18, false, rng))
+	var hit := _seed_where(func(r: RandomNumberGenerator) -> bool: return r.randf() < DungeonRewards.SET_PIECE_CHANCE)
+	rng.seed = hit
+	var piece := DungeonRewards.bonus_set_piece(18, slots, rng)
+	check(piece != null and piece.set_id == &"zz_free_cloth", "an independent piece once the class set is complete")
+	check(piece != null and piece.looted, "a dungeon piece is looted")
+	# A second hero whose class set is incomplete: a class piece comes first.
+	var both: Array[PlayerSlot] = [slots[0], Fakes.spawn_player(world, 1, &"warrior").slot]
+	rng.seed = hit
+	piece = DungeonRewards.bonus_set_piece(18, both, rng)
+	check(piece != null and piece.set_id == Db.set_for_class(&"warrior").id, "class pieces first")
 
 
 func test_black_market_marks_a_free_piece_missing_unless_every_wearer_has_it() -> void:
 	fixtures.add_free_set(&"zz_free_cloth", ClassData.ArmorType.CLOTH)
-	var slots := _heroes([&"warlock", &"mage"])  # two cloth classes: both collect the cloth set under any rule
+	var slots := _heroes([&"warlock", &"mage"])  # two cloth classes: both collect the cloth set
 	var first := slots[0].player as Player
 	var mage := slots[1].player as Player
 	var head := ItemGenerator.from_unique(Db.get_unique(&"zz_free_cloth_head"), 18, false, RandomNumberGenerator.new())
 	first.equipment.add_to_backpack(head)
 	var missing := {}
-	for c in BlackMarket.set_piece_candidates(18, slots):
+	for c in BlackMarket.independent_piece_candidates(18, slots):
 		if c["data"].set_id == &"zz_free_cloth":
 			missing[c["data"].id] = c["missing"]
 	check_eq(missing[&"zz_free_cloth_head"], true, "the second hero lacks it: still missing")
 	check_eq(missing[&"zz_free_cloth_hands"], true, "nobody has it")
 	mage.equipment.add_to_backpack(ItemGenerator.from_unique(Db.get_unique(&"zz_free_cloth_head"), 18, false, RandomNumberGenerator.new()))
 	missing.clear()
-	for c in BlackMarket.set_piece_candidates(18, slots):
+	for c in BlackMarket.independent_piece_candidates(18, slots):
 		if c["data"].set_id == &"zz_free_cloth":
 			missing[c["data"].id] = c["missing"]
 	check_eq(missing[&"zz_free_cloth_head"], false, "both heroes own it: not missing")
@@ -456,12 +655,15 @@ func test_a_set_without_a_look_wears_the_generic_set_colours() -> void:
 # --- Rules for the shipped class-free sets (vacuous until some ship) ----------------------------
 
 func test_every_set_names_a_class_or_none_and_owns_its_pieces() -> void:
+	fixtures.restore()  # the shipped data, class-independent sets included
 	var class_sets := 0
 	for id in Db.sets:
 		var s := Db.sets[id]
 		check(s.class_id == &"" or s.class_id in Db.class_ids, "%s: a class of the game, or class-independent" % id)
 		if s.class_id != &"":
 			class_sets += 1
+			check_eq(s.armor_type, -1, "%s: a class set takes its class's armour" % id)
+		check_eq(s.is_independent(), s.class_id == &"", "%s: is_independent" % id)
 		check_eq(s.piece_ids.size(), Rules.PIECES_PER_SET, "%s: five pieces" % id)
 		var thresholds: Array[int] = []
 		for b in s.bonuses:
@@ -487,7 +689,9 @@ func test_every_set_names_a_class_or_none_and_owns_its_pieces() -> void:
 
 
 func test_shipped_class_free_sets_follow_the_design() -> void:
+	fixtures.restore()  # the shipped data
 	for s in Rules.free_sets():
+		check(s.armor_type >= 0 and s.armor_type <= ClassData.ArmorType.PLATE, "%s: an armour type 0..3" % s.id)
 		var armor := -2
 		for piece_id in s.piece_ids:
 			var u := Db.get_unique(piece_id)
@@ -498,6 +702,7 @@ func test_shipped_class_free_sets_follow_the_design() -> void:
 			if armor == -2:
 				armor = u.armor_type
 			check_eq(u.armor_type, armor, "%s: one armour type per set" % piece_id)
+			check_eq(u.armor_type, s.armor_type, "%s: the set's armor_type" % piece_id)
 		for b in s.bonuses:
 			for e: Dictionary in b["effects"]:
 				check_eq(BonusVocabulary.validate(e), "", "%s %d-piece: %s" % [s.id, b["pieces"], e])

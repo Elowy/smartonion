@@ -210,7 +210,7 @@ func get_set(id: StringName) -> SetData:
 
 ## The class's own tier set (SetData.class_id == [param class_id]; the first by id when there are
 ## several; null = none, and for an empty id: a class-independent set is nobody's own).
-## [method sets_for_class] adds the class-independent sets a class can wear.
+## [method sets_for_class] adds the class-independent sets of its armour type.
 func set_for_class(class_id: StringName) -> SetData:
 	if class_id == &"":
 		return null
@@ -222,10 +222,31 @@ func set_for_class(class_id: StringName) -> SetData:
 	return best
 
 
-## Every tier set a hero of [param class_id] can collect, in roll order: the class's own set
-## ([method set_for_class]) first, then the class-independent sets (SetData.class_id empty) with at
-## least one piece the class can use (armour type, weapon proficiency; ItemGenerator.unique_usable_by),
-## by id. Empty for a class with neither.
+## The class-independent tier sets (SetData.class_id empty), by id.
+func independent_sets() -> Array[SetData]:
+	var ids: Array[StringName] = []
+	ids.assign(sets.keys())
+	ids.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	var out: Array[SetData] = []
+	for id in ids:
+		if sets[id].is_independent():
+			out.append(sets[id])
+	return out
+
+
+## The class-independent sets of armour type [param armor] (ClassData.ArmorType), by id.
+func independent_sets_for_armor(armor: int) -> Array[SetData]:
+	var out: Array[SetData] = []
+	for s in independent_sets():
+		if s.armor_type == armor:
+			out.append(s)
+	return out
+
+
+## Every tier set that can ROLL for a hero of [param class_id], in roll order: the class's own set
+## ([method set_for_class]) first, then the class-independent sets of the class's own armour type
+## (SetData.armor_type; a set rolls only for its native armour, a plate hero never rolls the cloth set
+## though it could wear it), by id. Empty for a class with neither.
 ## [param class_data]: the class resource when it is not one of [member classes] (a fixture); else
 ## the registered one is used.
 func sets_for_class(class_id: StringName, class_data: ClassData = null) -> Array[SetData]:
@@ -236,28 +257,18 @@ func sets_for_class(class_id: StringName, class_data: ClassData = null) -> Array
 	var cls := class_data if class_data != null else get_class_data(class_id)
 	if cls == null:
 		return out
-	var ids: Array[StringName] = []
-	ids.assign(sets.keys())
-	ids.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
-	for id in ids:
-		var s := sets[id]
-		if s.class_id == &"" and set_usable_by(s, cls):
-			out.append(s)
+	out.append_array(independent_sets_for_armor(cls.armor_type))
 	return out
 
 
-## Whether [param set_data] has a piece [param class_data] can use (the class's own set: always;
-## a class-independent set: some piece passes ItemGenerator.unique_usable_by; another class's: never).
+## Whether [param class_data] collects [param set_data]: its own class set, or a class-independent
+## set of its own armour type (SetData.armor_type). Wearing is wider (ItemInstance.can_be_used_by).
 func set_usable_by(set_data: SetData, class_data: ClassData) -> bool:
 	if set_data == null or class_data == null:
 		return false
-	if set_data.class_id != &"":
+	if not set_data.is_independent():
 		return set_data.class_id == class_data.id
-	for piece_id in set_data.piece_ids:
-		var piece := get_unique(piece_id)
-		if piece != null and ItemGenerator.unique_usable_by(piece, class_data):
-			return true
-	return false
+	return set_data.armor_type == class_data.armor_type
 
 
 ## Every companion id some class offers (ClassData.companion_choices), in lobby order of the

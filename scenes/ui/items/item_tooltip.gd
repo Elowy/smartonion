@@ -68,6 +68,11 @@ const OFF_PRIMARY_WEIGHT := 0.15
 const DPS_WEIGHT := 2.5
 const NOMINAL_PRIMARY := 10.0
 const UPGRADE_THRESHOLD := 0.25
+## A piece of a class-independent tier set (M8) has no primary stat, so its stat score alone is only 56-66%
+## of a class set piece's; this flat credit (about a primary stat's worth) puts it back in the range where
+## the bots (and the upgrade badge) wear it, e.g. for its set bonus. Only for a viewer of the set's own
+## armour type (a plate hero gets no credit for a cloth set, though it could wear it). See [method item_score].
+const INDEPENDENT_SET_CREDIT := 8.0
 ## Tier sets (GDD 5.5 "Botok"): a piece that completes a 2- / 4-piece bonus is an upgrade unless
 ## its score is more than this share below the replaced item's; the other way round, an item
 ## that would break an active bonus is an upgrade only when the set piece's score is more than
@@ -78,6 +83,7 @@ const WEAPON_TYPE_NAMES := {
 	&"sword": "Sword", &"axe": "Axe", &"mace": "Mace", &"dagger": "Dagger", &"bow": "Bow",
 	&"gun": "Gun", &"wand": "Wand", &"staff": "Staff", &"shield": "Shield", &"tome": "Tome",
 	&"two_hand_sword": "2H Sword", &"two_hand_mace": "2H Mace", &"orb": "Orb",
+	&"crossbow": "Crossbow", &"polearm": "Polearm", &"fist_weapon": "Fist Weapon",
 }
 
 var item: ItemInstance
@@ -312,11 +318,17 @@ static func stat_weight(stat: StringName, p_viewer: ClassData) -> float:
 	return 1.0
 
 
-## Weighted value of [param p_item] for [param p_viewer] (stats + weapon DPS).
+## Weighted value of [param p_item] for [param p_viewer] (stats + weapon DPS, and the flat
+## [constant INDEPENDENT_SET_CREDIT] for a piece of a class-independent set of the viewer's armour type).
 static func item_score(p_item: ItemInstance, p_viewer: ClassData) -> float:
 	if p_item == null:
 		return 0.0
 	var score := 0.0
+	if p_item.set_id != &"":
+		var set_data := Db.get_set(p_item.set_id)
+		if set_data != null and set_data.is_independent() \
+				and (p_viewer == null or int(p_viewer.armor_type) == set_data.armor_type):
+			score += INDEPENDENT_SET_CREDIT
 	var stats := total_stats(p_item)
 	for stat in stats:
 		score += stats[stat] * stat_weight(stat, p_viewer)

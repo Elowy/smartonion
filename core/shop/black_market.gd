@@ -9,12 +9,13 @@ extends RefCounted
 ##   - with [constant MAX_ROLL_CHANCE] a "max-roll" Epic: the best the generator rolls for the
 ##     wave – the loot budget (+25% stats, one enchant rank more, GDD 5.2 "Loot bonus") and two
 ##     enchants – usable by one of the team's classes;
-##   - otherwise a guaranteed tier-set piece (GDD 5.5) of a set a class in the team can collect (its
-##     own set, or a class-independent one it can wear: Db.sets_for_class), preferably a piece
-##     the hero is still missing (not worn and not in the backpack of a hero who can use it),
-##     else any piece of those sets that exists at the wave; a team without such a piece (no
-##     class with a set, wave before the sets) gets the max-roll Epic instead. A set piece is
-##     NOT looted (no loot budget, no "Looted" tag): it is exactly the shop's piece of that wave.
+##   - otherwise a guaranteed tier-set piece (GDD 5.5) of a set a class in the team can collect
+##     ([method set_piece_pool]): a class-set piece a hero is still missing (not worn and not in the
+##     backpack of a hero who can use it), else a missing piece of a class-independent set of a
+##     hero's armour type (Db.independent_sets_for_armor), else any piece of those sets that exists at
+##     the wave; a team without such a piece (no class with a set, wave before the sets) gets the
+##     max-roll Epic instead. A set piece is NOT looted (no loot budget, no "Looted" tag): it is
+##     exactly the shop's piece of that wave.
 ## Both are Epic: the stall never sells Legendary (GDD 10). The offer's price is
 ## [constant PRICE_MULT] x the Epic shop price of the wave ([method price], about 570 g at wave 15
 ## in the GDD's numbers); the item itself keeps the normal Epic buy price, so selling it back or
@@ -56,12 +57,47 @@ static func roll(wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerator
 	return item
 
 
-## Set pieces the team can use at [param wave]: [{"data": UniqueItemData, "class": ClassData,
-## "missing": bool}] – every piece of every set of every team class (its own, then the
-## class-independent ones it can wear) that exists at the wave and the hero can use, in slot order,
-## set order, then piece order, one entry per piece id ("class": the first hero's). "missing" =
-## some hero who can use it neither wears nor carries it.
+## Class-set pieces the team can use at [param wave]: [{"data": UniqueItemData, "class": ClassData,
+## "missing": bool}] – every piece of every team class's own set that exists at the wave and the hero
+## can use, in slot order then piece order, one entry per piece id. "missing" = some hero who can use it
+## neither wears nor carries it.
 static func set_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[Dictionary]:
+	return _candidates(wave, slots, false)
+
+
+## The same for the class-independent sets (M8): per hero in slot order the pieces of the sets of the
+## hero's armour type ([method Db.independent_sets_for_armor], by id), one entry per piece id; "missing"
+## = some hero of that armour neither wears nor carries it.
+static func independent_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[Dictionary]:
+	return _candidates(wave, slots, true)
+
+
+## The pieces a set offer picks from, in tiers: the class-set pieces some hero still misses; else the
+## missing pieces of the class-independent sets; else every candidate of both. So a hero keeps being
+## offered its class set until it is complete, and only then the independent ones. Empty = nothing.
+static func set_piece_pool(wave: int, slots: Array[PlayerSlot]) -> Array[Dictionary]:
+	var class_pieces := set_piece_candidates(wave, slots)
+	var independent := independent_piece_candidates(wave, slots)
+	var pool := _missing(class_pieces)
+	if pool.is_empty():
+		pool = _missing(independent)
+	if pool.is_empty():
+		pool = class_pieces.duplicate()
+		pool.append_array(independent)
+	return pool
+
+
+static func _missing(entries: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for c in entries:
+		if c["missing"]:
+			out.append(c)
+	return out
+
+
+## The candidate entries of each hero's own class set, or – [param independent] – of the class-independent
+## sets of the hero's armour type.
+static func _candidates(wave: int, slots: Array[PlayerSlot], independent: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var seen: Dictionary[StringName, bool] = {}
 	var ordered := slots.duplicate()
@@ -70,7 +106,12 @@ static func set_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[D
 		if s == null or s.class_data == null:
 			continue
 		var owned := _owned_source_ids(s)
-		for set_data in Db.sets_for_class(s.class_data.id, s.class_data):
+		var sets: Array[SetData] = []
+		if independent:
+			sets = Db.independent_sets_for_armor(s.class_data.armor_type)
+		elif Db.set_for_class(s.class_data.id) != null:
+			sets.append(Db.set_for_class(s.class_data.id))
+		for set_data in sets:
 			for piece_id in set_data.piece_ids:
 				var data := Db.get_unique(piece_id)
 				if not ItemGenerator.set_piece_available(data, ItemGenerator.Source.SHOP, wave) \
@@ -78,8 +119,8 @@ static func set_piece_candidates(wave: int, slots: Array[PlayerSlot]) -> Array[D
 					continue
 				var missing := not owned.has(piece_id)
 				if seen.has(piece_id):
-					# The same piece for a second hero (of the class, or of a class-independent
-					# set): missing for either counts.
+					# The same piece for a second hero (of a class-independent set): missing for
+					# either counts.
 					if missing:
 						for entry in out:
 							if entry["data"] == data:
@@ -107,15 +148,9 @@ static func _owned_source_ids(slot: PlayerSlot) -> Dictionary[StringName, bool]:
 
 
 static func _roll_set_piece(wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerator) -> ItemInstance:
-	var all := set_piece_candidates(wave, slots)
-	if all.is_empty():
-		return null
-	var pool: Array[Dictionary] = []
-	for c in all:
-		if c["missing"]:
-			pool.append(c)
+	var pool := set_piece_pool(wave, slots)
 	if pool.is_empty():
-		pool = all
+		return null
 	var pick := pool[0] if pool.size() == 1 else pool[rng.randi_range(0, pool.size() - 1)]
 	# Not looted: the loot budget (+25% stats, +1 enchant rank, "Looted" tag) belongs to the max-roll
 	# Epic only; a set piece is the same piece the shop sells, the offer is just guaranteed.
