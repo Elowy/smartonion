@@ -1,0 +1,220 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_gentle_current"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_gentle_current"
+display_name = "Gentle Current"
+description = "Increases the healing of your Shaman abilities by {pct}%."
+values = {
+"pct": 4.0
+}
+icon = &"healing_done"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"healing_done": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_weathered_wood"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_weathered_wood"
+display_name = "Weathered Wood"
+description = "Your totems last {pct}% longer."
+values = {
+"pct": 10.0
+}
+column = 1
+icon = &"totem_rite"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shaman_totems"
+},
+"mods": {
+"duration_pct": 10.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_elder_spirits"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_elder_spirits"
+display_name = "Elder Spirits"
+description = "Allies you help revive get up {pct}% faster, and you gain {spirit} Spirit."
+values = {
+"pct": 25.0,
+"spirit": 1.0
+}
+tier = 2
+icon = &"spirit"
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"speed_pct": 25.0
+},
+"script": "res://scenes/talents/shaman/wellspring_elder_spirits.gd"
+}, {
+"kind": "stats",
+"stats": {
+"spirit": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_deepening_rain"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_deepening_rain"
+display_name = "Deepening Rain"
+description = "Soothing Downpour heals {pct}% more and recharges {cd}% faster."
+values = {
+"cd": 5.0,
+"pct": 6.0
+}
+tier = 2
+column = 1
+prerequisite = &"shaman_wellspring_gentle_current"
+icon = &"soothing_downpour"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "soothing_downpour"
+},
+"mods": {
+"cooldown_pct": -5.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_attuned_totems"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_attuned_totems"
+display_name = "Attuned Totems"
+description = "Your totems deal and heal {pct}% more, and your Earth totem slows {slow}% more."
+values = {
+"pct": 8.0,
+"slow": 3.0
+}
+tier = 3
+max_rank = 2
+icon = &"spell_power"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shaman_totems"
+},
+"mods": {
+"earth_slow_add": 3.0,
+"power_pct": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_ancestral_reach"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_ancestral_reach"
+display_name = "Ancestral Reach"
+description = "Totem Rite's Water, Earth and Air fields reach {radius} m farther."
+values = {
+"radius": 2.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"totem_rite"
+icon = &"totem_rite"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "totem_rite"
+},
+"mods": {
+"air_radius_add": 2.0,
+"earth_radius_add": 2.0,
+"water_radius_add": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_gift_of_the_elders"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_gift_of_the_elders"
+display_name = "Gift of the Elders"
+description = "Allies you help revive return with {pct}% more of their Max HP."
+values = {
+"pct": 10.0
+}
+tier = 4
+prerequisite = &"shaman_wellspring_elder_spirits"
+icon = &"stamina"
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"hp_pct": 10.0
+},
+"script": "res://scenes/talents/shaman/wellspring_elder_spirits.gd"
+}])
+
+[sub_resource type="Resource" id="Resource_blessed_rite"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_blessed_rite"
+display_name = "Blessed Rite"
+description = "Totem Rite heals the most wounded hero (you included) for {pct}% of their Max HP."
+values = {
+"pct": 4.0
+}
+tier = 4
+column = 1
+icon = &"leech"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "totem_rite",
+"effect": "heal",
+"label": "",
+"max_hp_pct": 4.0,
+"target": "lowest_ally",
+"trigger": "on_cast"
+},
+"scale": ["max_hp_pct"]
+}])
+
+[sub_resource type="Resource" id="Resource_bond_totem"]
+script = ExtResource("2_talent")
+id = &"shaman_wellspring_bond_totem"
+display_name = "Bond Totem"
+description = "Every {interval_fixed} sec a Bond Totem rises at your feet for {duration_fixed} sec: heroes within {radius_fixed} m even out their health ({equalize_fixed}% of the gap per second) and take {taken_fixed}% less damage."
+values = {
+"duration_fixed": 10.0,
+"equalize_fixed": 10.0,
+"interval_fixed": 25.0,
+"radius_fixed": 6.0,
+"taken_fixed": 20.0
+}
+kind = 2
+tier = 5
+max_rank = 1
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage_taken_pct": 20.0,
+"duration": 10.0,
+"equalize_pct": 10.0,
+"first_at": 8.0,
+"interval": 25.0,
+"radius": 6.0,
+"tick": 0.5
+},
+"script": "res://scenes/talents/shaman/wellspring_bond_totem.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"shaman_wellspring"
+class_id = &"shaman"
+display_name = "Wellspring"
+index = 2
+description = "Healing, totems and co-op support."
+icon = &"soothing_downpour"
+color = Color(0.3, 0.8, 0.75, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_gentle_current"), SubResource("Resource_weathered_wood"), SubResource("Resource_elder_spirits"), SubResource("Resource_deepening_rain"), SubResource("Resource_attuned_totems"), SubResource("Resource_ancestral_reach"), SubResource("Resource_gift_of_the_elders"), SubResource("Resource_blessed_rite"), SubResource("Resource_bond_totem")])

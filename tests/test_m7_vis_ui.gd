@@ -8,6 +8,7 @@ const FONT_PATH := "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
 const ICON_DIR := "res://assets/icons"
 ## Ids that are allowed to have no picture (they keep their procedural glyph). Empty: every shipped id has one.
 const GLYPH_ONLY: Array[StringName] = []
+const Rules := preload("res://tests/content_rules.gd")
 
 var nodes: Array[Node] = []
 
@@ -180,7 +181,7 @@ func test_every_talent_has_its_own_picture_and_a_class_tells_them_apart() -> voi
 				var path := String(map.talents.get(t.id, ""))
 				check(not by_path.has(path), "%s and %s share %s inside %s" % [t.id, by_path.get(path, &""), path, class_id])
 				by_path[path] = t.id
-	check_eq(count, 135, "five classes x three trees x nine talents")
+	check_eq(count, Rules.classes_with("trees").size() * Rules.TREES_PER_CLASS * 9, "every class with trees: three trees x nine talents")
 
 
 func test_abilities_and_trees_tell_themselves_apart_too() -> void:
@@ -199,7 +200,7 @@ func test_abilities_and_trees_tell_themselves_apart_too() -> void:
 
 
 func test_every_tree_consumable_and_shrine_has_a_picture() -> void:
-	check_eq(Db.talent_trees.size(), 15, "fifteen trees")
+	check_eq(Db.talent_trees.size(), Rules.classes_with("trees").size() * Rules.TREES_PER_CLASS, "three trees per class")
 	for id: StringName in Db.talent_trees:
 		check(GameIcons.for_tree(Db.talent_trees[id]) != null, "tree %s has a picture" % id)
 	check_eq(Db.consumables.size(), 7, "seven consumables")
@@ -331,7 +332,7 @@ func test_talent_nodes_carry_the_talents_picture_on_the_existing_frames() -> voi
 		var tex: Texture2D = (g as AbilityIcon).icon_texture if g is AbilityIcon else (g as TalentGlyph).texture
 		check(tex != null and tex == GameIcons.for_talent(t), "%s draws its own picture" % t.id)
 		drawn += 1
-	check_eq(drawn, 135, "every talent")
+	check_eq(drawn, Rules.classes_with("trees").size() * Rules.TREES_PER_CLASS * 9, "every talent")
 	# The glyph source (what the existing tests pin) is unchanged: pictures replace the drawing, not the choice.
 	var t := TalentData.new()
 	t.icon = &"crit"
