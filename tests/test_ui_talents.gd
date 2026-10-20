@@ -9,6 +9,7 @@ extends TestCase
 ## shipped talent content is needed.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
+const Rules := preload("res://tests/content_rules.gd")
 const DT := 1.0 / 60.0
 ## Stat ids the M5 talent designs use as icons (talents_<class>.md): each has its own glyph.
 const DESIGN_STAT_ICONS: Array[StringName] = [
@@ -300,7 +301,7 @@ func test_every_kind_line_fits_the_detail_column() -> void:
 				check(w <= width, "%s: '%s' is %.1f of %.1f px" % [t.id, text, w, width])
 				check(not text.begins_with(tree_data.display_name), "%s: no tree name in '%s'" % [t.id, text])
 				count += 1
-	check_eq(count, 135, "15 trees x 9 talents")
+	check_eq(count, Db.talent_trees.size() * 9, "every tree x 9 talents")
 	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t5"))), "Capstone", "capstone")
 	check_eq(TalentTab.kind_text(_talents(slot).talent(_id("arms", "t2a"))), "Talent · Tier 2", "talent")
 	finished.emit()
@@ -807,7 +808,7 @@ func test_shipped_trees_have_distinct_glyphs() -> void:
 				if capstone != null and t != capstone:
 					check(_drawn_glyph(t) != _drawn_glyph(capstone),
 						"%s: the capstone %s shares its glyph with %s (%s)" % [tree_data.id, capstone.id, t.id, TalentNode.source_for(t)])
-	check_eq(trees, 15, "five classes, three trees each")
+	check_eq(trees, Rules.TREES_PER_CLASS * Rules.classes_with("trees").size(), "three trees for every class with trees")
 
 
 func test_glyph_sources() -> void:

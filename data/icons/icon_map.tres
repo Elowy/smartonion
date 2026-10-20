@@ -69,6 +69,33 @@ abilities = Dictionary[StringName, String]({
 &"word_of_glory": "res://assets/icons/delapouite/healing.svg"
 })
 talents = Dictionary[StringName, String]({
+&"hunter_packlord_alpha_hide": "res://assets/icons/delapouite/fur-shirt.svg",
+&"hunter_packlord_bonded_vigor": "res://assets/icons/lorc/heart-bottle.svg",
+&"hunter_packlord_feral_tempo": "res://assets/icons/delapouite/fast-forward-button.svg",
+&"hunter_packlord_keen_companion": "res://assets/icons/lorc/fox-head.svg",
+&"hunter_packlord_kindred_instinct": "res://assets/icons/lorc/owl.svg",
+&"hunter_packlord_open_wound": "res://assets/icons/lorc/sword-wound.svg",
+&"hunter_packlord_pack_frenzy": "res://assets/icons/lorc/werewolf.svg",
+&"hunter_packlord_piercing_whistle": "res://assets/icons/delapouite/whistle.svg",
+&"hunter_packlord_wild_kinship": "res://assets/icons/lorc/love-howl.svg",
+&"hunter_sharpshot_calm_breath": "res://assets/icons/delapouite/lungs.svg",
+&"hunter_sharpshot_finishing_arrow": "res://assets/icons/lorc/pierced-body.svg",
+&"hunter_sharpshot_fletchers_edge": "res://assets/icons/lorc/feathered-wing.svg",
+&"hunter_sharpshot_heavy_shafts": "res://assets/icons/lorc/arrowhead.svg",
+&"hunter_sharpshot_keen_eyes": "res://assets/icons/delapouite/eagle-head.svg",
+&"hunter_sharpshot_opening_shot": "res://assets/icons/delapouite/crosshair.svg",
+&"hunter_sharpshot_quickening_aim": "res://assets/icons/lorc/fast-arrow.svg",
+&"hunter_sharpshot_skewering_shots": "res://assets/icons/lorc/arrowed.svg",
+&"hunter_sharpshot_steady_aura": "res://assets/icons/lorc/radar-sweep.svg",
+&"hunter_wildcraft_brace_of_snares": "res://assets/icons/lorc/land-mine.svg",
+&"hunter_wildcraft_briar_hide": "res://assets/icons/lorc/thorny-vine.svg",
+&"hunter_wildcraft_close_quarters": "res://assets/icons/lorc/spears.svg",
+&"hunter_wildcraft_firebug_bombs": "res://assets/icons/lorc/cluster-bomb.svg",
+&"hunter_wildcraft_fleet_retreat": "res://assets/icons/lorc/walking-boot.svg",
+&"hunter_wildcraft_powder_lore": "res://assets/icons/lorc/powder.svg",
+&"hunter_wildcraft_snared_prey": "res://assets/icons/lorc/cobweb.svg",
+&"hunter_wildcraft_trailwise": "res://assets/icons/lorc/boot-prints.svg",
+&"hunter_wildcraft_twin_fang_grip": "res://assets/icons/lorc/daggers.svg",
 &"mage_arcane_arcane_celerity": "res://assets/icons/lorc/stopwatch.svg",
 &"mage_arcane_arcane_concentration": "res://assets/icons/lorc/concentration-orb.svg",
 &"mage_arcane_arcane_flows": "res://assets/icons/lorc/hourglass.svg",
@@ -206,6 +233,9 @@ talents = Dictionary[StringName, String]({
 &"warrior_protection_vitality": "res://assets/icons/lorc/templar-heart.svg"
 })
 trees = Dictionary[StringName, String]({
+&"hunter_packlord": "res://assets/icons/lorc/paw-print.svg",
+&"hunter_sharpshot": "res://assets/icons/lorc/archery-target.svg",
+&"hunter_wildcraft": "res://assets/icons/delapouite/forest-camp.svg",
 &"mage_arcane": "res://assets/icons/lorc/magic-swirl.svg",
 &"mage_fire": "res://assets/icons/lorc/fire-silhouette.svg",
 &"mage_frost": "res://assets/icons/lorc/frozen-orb.svg",

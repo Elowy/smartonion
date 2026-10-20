@@ -1,0 +1,226 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_keen_companion"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_keen_companion"
+display_name = "Keen Companion"
+description = "Your companion deals {pct}% more damage."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"source": "pet"
+}])
+
+[sub_resource type="Resource" id="Resource_bonded_vigor"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_bonded_vigor"
+display_name = "Bonded Vigor"
+description = "Your companion's attacks heal you for {pct}% of the damage they deal."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"leech"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunter_companion"
+},
+"mods": {
+"heal_pct_add": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_feral_tempo"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_feral_tempo"
+display_name = "Feral Tempo"
+description = "Your companion attacks {pct}% faster."
+values = {
+"pct": 5.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+prerequisite = &"hunter_packlord_keen_companion"
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunter_companion"
+},
+"mods": {
+"haste_add": 5.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_piercing_whistle"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_piercing_whistle"
+display_name = "Piercing Whistle"
+description = "Hunt Signal strikes for {pct}% more damage and recharges {cd}% faster."
+values = {
+"cd": 6.0,
+"pct": 6.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"hunt_signal"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunt_signal"
+},
+"mods": {
+"cooldown_pct": -6.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_alpha_hide"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_alpha_hide"
+display_name = "Alpha Hide"
+description = "You take {pct}% less damage."
+values = {
+"pct": 4.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"armor"
+effects = Array[Dictionary]([{
+"kind": "damage_taken",
+"pct": -4.0
+}])
+
+[sub_resource type="Resource" id="Resource_open_wound"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_open_wound"
+display_name = "Open Wound"
+description = "Hunt Signal's blow also opens a wound that deals {pct}% of its damage again over {duration_fixed} sec."
+values = {
+"duration_fixed": 4.0,
+"pct": 80.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"hunt_signal"
+icon = &"hunt_signal"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunt_signal"
+},
+"mods": {
+"bleed_pct_add": 80.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_wild_kinship"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_wild_kinship"
+display_name = "Wild Kinship"
+description = "Increases your Mastery by {mastery} (Beastbond: +{bond}% companion damage)."
+values = {
+"bond": 6.0,
+"mastery": 3.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"hunter_packlord_feral_tempo"
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_kindred_instinct"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_kindred_instinct"
+display_name = "Kindred Instinct"
+description = "Your companion's gift grows: Wolf slows {slow}% more, Boar taunts {taunt} sec longer, Owl shoots {range} m farther."
+values = {
+"range": 1.0,
+"slow": 8.0,
+"taunt": 0.3
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+icon = &"spirit"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "hunter_companion"
+},
+"mods": {
+"attack_range_add": 1.0,
+"slow_add": 8.0,
+"taunt_duration_add": 0.3
+}
+}])
+
+[sub_resource type="Resource" id="Resource_pack_frenzy"]
+script = ExtResource("2_talent")
+id = &"hunter_packlord_pack_frenzy"
+display_name = "Pack Frenzy"
+description = "Every {interval} sec your companion enters a frenzy for {duration} sec: +{dmg}% damage and +{haste}% attack speed."
+values = {
+"dmg": 50.0,
+"duration": 10.0,
+"haste": 30.0,
+"interval": 30.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage_pct": 50.0,
+"duration": 10.0,
+"first_at": 5.0,
+"haste_pct": 30.0,
+"interval": 30.0
+},
+"script": "res://scenes/talents/hunter/packlord_pack_frenzy.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"hunter_packlord"
+class_id = &"hunter"
+display_name = "Packlord"
+index = 0
+description = "Your companion, Hunt Signal and Beastbond."
+icon = &"hunt_signal"
+color = Color(0.78, 0.55, 0.25, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_keen_companion"), SubResource("Resource_bonded_vigor"), SubResource("Resource_feral_tempo"), SubResource("Resource_piercing_whistle"), SubResource("Resource_alpha_hide"), SubResource("Resource_open_wound"), SubResource("Resource_wild_kinship"), SubResource("Resource_kindred_instinct"), SubResource("Resource_pack_frenzy")])

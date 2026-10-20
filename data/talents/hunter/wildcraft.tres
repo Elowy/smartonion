@@ -1,0 +1,240 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_trailwise"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_trailwise"
+display_name = "Trailwise"
+description = "Increases your movement Speed by {speed}%."
+values = {
+"speed": 2.0
+}
+kind = 0
+tier = 1
+column = 0
+max_rank = 3
+icon = &"speed"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"speed": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_powder_lore"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_powder_lore"
+display_name = "Powder Lore"
+description = "Blast Snare deals {pct}% more damage and recharges {cd}% faster."
+values = {
+"cd": 6.0,
+"pct": 6.0
+}
+kind = 0
+tier = 1
+column = 1
+max_rank = 3
+icon = &"blast_snare"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blast_snare"
+},
+"mods": {
+"cooldown_pct": -6.0,
+"power_pct": 6.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_twin_fang_grip"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_twin_fang_grip"
+display_name = "Twin Fang Grip"
+description = "While dual wielding, you deal {pct}% more damage and your weapon hits strike again {extra}% of the time."
+values = {
+"extra": 3.0,
+"pct": 4.0
+}
+kind = 0
+tier = 2
+column = 0
+max_rank = 3
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"requires": {
+"weapon": "dual_wield"
+}
+}, {
+"kind": "stats",
+"requires": {
+"weapon": "dual_wield"
+},
+"stats": {
+"extra_attack": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_briar_hide"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_briar_hide"
+display_name = "Briar Hide"
+description = "Increases your Armor by {armor} and your Thorns by {thorns}."
+values = {
+"armor": 2.0,
+"thorns": 2.0
+}
+kind = 0
+tier = 2
+column = 1
+max_rank = 3
+icon = &"thorns"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"armor": 2.0,
+"thorns": 2.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_snared_prey"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_snared_prey"
+display_name = "Snared Prey"
+description = "You deal {pct}% more damage to slowed enemies."
+values = {
+"pct": 6.0
+}
+kind = 0
+tier = 3
+column = 0
+max_rank = 2
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 6.0,
+"target": "slowed"
+}])
+
+[sub_resource type="Resource" id="Resource_brace_of_snares"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_brace_of_snares"
+display_name = "Brace of Snares"
+description = "Blast Snare lays {traps} more snare per cast, and {max} more can be set at once."
+values = {
+"max": 2.0,
+"traps": 1.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"blast_snare"
+icon = &"blast_snare"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blast_snare"
+},
+"mods": {
+"max_traps_add": 2.0,
+"traps_add": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_close_quarters"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_close_quarters"
+display_name = "Close Quarters"
+description = "While you wield a melee weapon, you deal {pct}% more damage and take {dr}% less melee damage."
+values = {
+"dr": 3.0,
+"pct": 4.0
+}
+kind = 0
+tier = 4
+column = 0
+max_rank = 3
+prerequisite = &"hunter_wildcraft_twin_fang_grip"
+icon = &"parry"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"requires": {
+"weapon": "melee"
+}
+}, {
+"kind": "damage_taken",
+"kind_filter": "melee",
+"pct": -3.0,
+"requires": {
+"weapon": "melee"
+}
+}])
+
+[sub_resource type="Resource" id="Resource_fleet_retreat"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_fleet_retreat"
+display_name = "Fleet Retreat"
+description = "Backstep recharges {cd}% faster and slows enemies {slow}% more."
+values = {
+"cd": 8.0,
+"slow": 8.0
+}
+kind = 0
+tier = 4
+column = 1
+max_rank = 3
+prerequisite = &"hunter_wildcraft_trailwise"
+icon = &"backstep"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "backstep"
+},
+"mods": {
+"cooldown_pct": -8.0,
+"slow_add": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_firebug_bombs"]
+script = ExtResource("2_talent")
+id = &"hunter_wildcraft_firebug_bombs"
+display_name = "Firebug Bombs"
+description = "Blast Snare leaves burning ground for {duration} sec ({burn}% weapon damage every half second) and scatters {bombs} smaller bombs."
+values = {
+"bombs": 3.0,
+"burn": 25.0,
+"duration": 4.0
+}
+kind = 2
+tier = 5
+column = 0
+max_rank = 1
+icon = &""
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blast_snare"
+},
+"mods": {
+"ember_duration_add": 4.0,
+"ember_pct_add": 25.0,
+"scatter_add": 3
+}
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"hunter_wildcraft"
+class_id = &"hunter"
+display_name = "Wildcraft"
+index = 2
+description = "Snares, melee weapons and survival: polearm and dual wield."
+icon = &"blast_snare"
+color = Color(0.4, 0.72, 0.3, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_trailwise"), SubResource("Resource_powder_lore"), SubResource("Resource_twin_fang_grip"), SubResource("Resource_briar_hide"), SubResource("Resource_snared_prey"), SubResource("Resource_brace_of_snares"), SubResource("Resource_close_quarters"), SubResource("Resource_fleet_retreat"), SubResource("Resource_firebug_bombs")])

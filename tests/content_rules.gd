@@ -35,7 +35,6 @@ const PENDING: Array[String] = [
 	"hunter:items",
 	"shaman:items",
 	# TALENTS packages: the three talent trees.
-	"hunter:trees",
 	"shaman:trees",
 ]
 
