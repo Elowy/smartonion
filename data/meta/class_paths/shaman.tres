@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ClassPathData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_path_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+class_id = &"shaman"
+deck_abilities = Array[StringName]([&"soothing_downpour", &"spirit_pack"])
+capstone_trees = Array[StringName]([&"shaman_warspirit", &"shaman_stormweaving", &"shaman_wellspring"])
+alt_main_hand = ExtResource("2_mh")
+gift_heirloom = &"heir_pantry_breeches"
+gift_heirloom_name = "Pantry Breeches"
+cosmetics = Array[Dictionary]([{
+"slot": "tabard",
+"id": "cos_shaman_tabard",
+"name": "Totem-Stitch Tabard"
+}, {
+"slot": "hat",
+"id": "cos_shaman_hat",
+"name": "Thunder Mask"
+}, {
+"slot": "glow",
+"id": "cos_shaman_glow",
+"name": "Crackling Sparks"
+}])
+title_id = &"title_shaman"
+title_name = "the Stormleek"

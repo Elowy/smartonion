@@ -22,7 +22,7 @@ extends RefCounted
 ## File (FORMAT_VERSION 1, JSON, [method save_file] / [method load_file]):
 ##   {"version": 1, "created_at": unix, "classes": {id: {"xp": int, "level": int}}, "unlocks": {kind: [ids]},
 ##    "achievements": {id: unix}, "counters": {name: int}, "seeds": int, "seeds_earned": int,
-##    "heirloom_ranks": {id: int}, "loadouts": {class id: {"seasonings": [ids], "heirloom": id, "looks": {slot: id}}},
+##    "heirloom_ranks": {id: int}, "loadouts": {class id: {"seasonings": [ids], "heirloom": id, "looks": {slot: id}, "alt_weapon": bool}},
 ##    "selected_title": id, "all_unlocked": true (only a saved max profile)}
 ## A missing file is a fresh profile; a file that cannot be parsed is moved to "<path>.corrupt" and a fresh profile
 ## is used; a file of a NEWER version is never overwritten (the profile is fresh and read-only); a path that cannot
@@ -270,7 +270,8 @@ func set_heirloom_rank(id: StringName, rank: int) -> void:
 # --- Lobby selections ---------------------------------------------------------------------------
 
 ## The remembered selections of [param class_id]: {"seasonings": Array[StringName], "heirloom": StringName,
-## "looks": {slot name (LOOK_SLOTS): look id}} – a copy, empty values when nothing was remembered.
+## "looks": {slot name (LOOK_SLOTS): look id}, "alt_weapon": bool (the class's alternative starting weapon, Class Level 12)}
+## – a copy, empty values when nothing was remembered.
 func loadout(class_id: StringName) -> Dictionary:
 	return normalize_loadout(loadouts.get(class_id, {}))
 
@@ -296,7 +297,9 @@ static func normalize_loadout(value: Dictionary) -> Dictionary:
 		for slot: Variant in raw_looks:
 			if str(raw_looks[slot]) != "":
 				looks[StringName(str(slot))] = StringName(str(raw_looks[slot]))
-	return {"seasonings": seasonings, "heirloom": StringName(str(value.get("heirloom", ""))), "looks": looks}
+	var alt: Variant = value.get("alt_weapon", false)
+	return {"seasonings": seasonings, "heirloom": StringName(str(value.get("heirloom", ""))), "looks": looks,
+			"alt_weapon": typeof(alt) == TYPE_BOOL and alt}
 
 
 # --- Saving and loading -------------------------------------------------------------------------
@@ -333,7 +336,8 @@ func to_dict() -> Dictionary:
 		var looks := {}
 		for slot: StringName in l["looks"]:
 			looks[String(slot)] = String(l["looks"][slot])
-		loadout_data[String(id)] = {"seasonings": seasonings, "heirloom": String(l["heirloom"]), "looks": looks}
+		loadout_data[String(id)] = {"seasonings": seasonings, "heirloom": String(l["heirloom"]), "looks": looks,
+				"alt_weapon": l["alt_weapon"]}
 	var out := {
 		"version": FORMAT_VERSION,
 		"created_at": created_at,

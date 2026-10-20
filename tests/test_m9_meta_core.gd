@@ -35,6 +35,11 @@ func before_each() -> void:
 	_saved_listeners = Meta._listeners.duplicate()
 	_saved_gates = Db.unlock_gates.duplicate()
 	_saved_achievements = Db.achievements.duplicate()
+	# The mechanism tests run on their own gates and listeners, not the shipped content's (M9 LEVELS: the class / ability /
+	# capstone gates and the Class XP / Seeds listeners; tests/test_m9_levels.gd covers those).
+	Db.unlock_gates.clear()
+	Meta.remove_run_listener(ClassLevels.LISTENER_XP)
+	Meta.remove_run_listener(ClassLevels.LISTENER_SEEDS)
 	Meta.save_count = 0
 	Meta._pending_unlocks.clear()
 	UiFakes.reset_players()

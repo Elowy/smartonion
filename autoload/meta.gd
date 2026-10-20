@@ -118,6 +118,8 @@ func configure(kind: StringName, p_path: String, automated: bool) -> void:
 	if p_path != "" and not profile.is_dev:
 		path = p_path
 		persist = true
+	if not profile.is_dev:
+		ClassLevels.sync_unlocks(profile)  # (M9 LEVELS: what the class levels reached unlock, also after a retuned table)
 	profile_replaced.emit()
 
 
@@ -211,6 +213,89 @@ func raw_power_enabled() -> bool:
 	return profile != null and profile.raw_power
 
 
+# --- Class Levels (M9 LEVELS) -------------------------------------------------------------------
+
+## The level the level-derived rewards (Seasoning slots, the Heirloom slot, the alternative weapon) are read at: the
+## profile's Class Level of [param class_id], the top level for a profile with everything unlocked (the dev and max
+## profiles: the automated runs can use any of them, they select nothing by default).
+func effective_class_level(class_id: StringName) -> int:
+	if profile == null or profile.all_unlocked:
+		return ClassLevels.max_level()
+	return profile.class_level(class_id)
+
+
+## Seasoning slots of [param class_id] (0 .. 3; Class Level 3 / 10 / 20) – the number of Seasonings a hero of the class
+## may take into a run. The SEASONINGS package reads it.
+func seasoning_slots(class_id: StringName) -> int:
+	return ClassLevels.seasoning_slots(effective_class_level(class_id))
+
+
+## Heirloom slots of [param class_id] (0 below Class Level 5, else 1).
+func heirloom_slots(class_id: StringName) -> int:
+	return ClassLevels.heirloom_slots(effective_class_level(class_id))
+
+
+## Whether the Seasonings of [param tier] (1 .. 5) can be bought for [param class_id] (the Class Level reached).
+func seasoning_tier_unlocked(class_id: StringName, tier: int) -> bool:
+	var need := ClassLevels.seasoning_tier_level(tier)
+	return need > 0 and effective_class_level(class_id) >= need
+
+
+## Whether a hero of [param class_id] may start with the class's alternative weapon (Class Level 12; the class has one).
+func alt_weapon_unlocked(class_id: StringName) -> bool:
+	var path := Db.class_path(class_id)
+	return path != null and path.has_alt_weapon() and effective_class_level(class_id) >= ClassLevels.alt_weapon_level()
+
+
+## The small permanent bonuses of a hero of [param class_id]: {"gold", "primary_pct", "rerolls", "backpack"} –
+## all zero unless the profile applies raw power (never in the automated runs).
+func raw_power(class_id: StringName) -> Dictionary:
+	if not raw_power_enabled():
+		return ClassLevels.raw_power(0)
+	return ClassLevels.raw_power(profile.class_level(class_id))
+
+
+## The XP bar of [param class_id]'s level ([method ClassLevels.progress] of the profile; level 1, empty for the dev profile).
+func class_progress(class_id: StringName) -> Dictionary:
+	if profile == null:
+		return ClassLevels.progress(0)
+	return ClassLevels.progress(profile.class_xp(class_id), profile.class_level(class_id))
+
+
+## True when the lobby and the end screen show Class Levels (a profile that really records: not the dev profile).
+func shows_class_levels() -> bool:
+	return records_runs()
+
+
+## Takes the alternative weapon away from every slot of [param slots] whose class has not unlocked it; returns how
+## many were changed (Main.start_run: a locked weapon never reaches a run, whatever put it on the slot).
+func enforce_alt_weapons(slots: Array[PlayerSlot]) -> int:
+	var changed := 0
+	for slot in slots:
+		if slot.alt_weapon and (slot.class_data == null or not alt_weapon_unlocked(slot.class_data.id)):
+			slot.alt_weapon = false
+			changed += 1
+	return changed
+
+
+## Run start (Main.start_run, before the heroes spawn): the pooled bonuses of the Class Levels – each hero's starting gold
+## goes into the shared wallet and each hero's free shop rerolls into the run's pool. Nothing at all for a profile without
+## raw power (the dev profile), so an automated run starts exactly as the base game.
+func apply_run_start(slots: Array[PlayerSlot]) -> void:
+	if not raw_power_enabled():
+		return
+	var gold := 0
+	var rerolls := 0
+	for slot in slots:
+		if slot.class_data == null:
+			continue
+		var power := raw_power(slot.class_data.id)
+		gold += int(power["gold"])
+		rerolls += int(power["rerolls"])
+	RunState.grant_starting_gold(gold)
+	RunState.free_rerolls = rerolls
+
+
 # --- Difficulty (stub) --------------------------------------------------------------------------
 
 ## Whether the difficulty tier [param tier] ([constant DIFFICULTY_TIERS]) is open for [param class_id]: the first tier
@@ -285,6 +370,8 @@ func sanitize_loadout(loadout: Dictionary, class_id: StringName = &"") -> Dictio
 		if is_unlocked(Profile.KIND_LOOK, l["looks"][slot], class_id):
 			looks[slot] = l["looks"][slot]
 	l["looks"] = looks
+	if l["alt_weapon"] and not alt_weapon_unlocked(class_id):
+		l["alt_weapon"] = false
 	return l
 
 
@@ -443,6 +530,7 @@ func _flush_unlocks() -> void:
 func _add_builtin_listeners() -> void:
 	add_run_listener(LISTENER_COUNTERS, _on_counters, PRIORITY_COUNTERS)
 	add_run_listener(LISTENER_ACHIEVEMENTS, _on_achievements, PRIORITY_ACHIEVEMENTS)
+	ClassLevels.register(self)  # (M9 LEVELS: Class XP and Seeds of a finished run)
 
 
 func _on_counters(report: RunReport, p: Profile, _result: Dictionary) -> void:

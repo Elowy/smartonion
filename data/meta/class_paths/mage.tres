@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ClassPathData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_path_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/staff.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+class_id = &"mage"
+deck_abilities = Array[StringName]([&"meteor", &"pyroblast"])
+capstone_trees = Array[StringName]([&"mage_arcane", &"mage_fire", &"mage_frost"])
+alt_main_hand = ExtResource("2_mh")
+gift_heirloom = &"heir_sprout_cap"
+gift_heirloom_name = "Sprout Cap"
+cosmetics = Array[Dictionary]([{
+"slot": "tabard",
+"id": "cos_mage_tabard",
+"name": "Starweave Tabard"
+}, {
+"slot": "hat",
+"id": "cos_mage_hat",
+"name": "Moonpeak Hat"
+}, {
+"slot": "glow",
+"id": "cos_mage_glow",
+"name": "Stardust Halo"
+}])
+title_id = &"title_mage"
+title_name = "the Brightbulb"

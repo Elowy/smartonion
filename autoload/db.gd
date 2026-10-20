@@ -32,6 +32,10 @@ const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"bloo
 const UNLOCK_DIR := "res://data/unlocks/"
 ## data/achievements/<id>.tres (AchievementData, M9).
 const ACHIEVEMENT_DIR := "res://data/achievements/"
+## The Class Level curve and reward list (ClassLevelTable, M9 LEVELS) and one path per class
+## (data/meta/class_paths/<class>.tres, ClassPathData: locked abilities, capstone order, alternative weapon ...).
+const CLASS_LEVELS_PATH := "res://data/meta/class_levels.tres"
+const CLASS_PATH_DIR := "res://data/meta/class_paths/"
 ## Lobby order of the classes; any extra class is appended alphabetically. An id without a
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
@@ -73,6 +77,11 @@ var class_ids: Array[StringName] = []
 var unlock_gates: Dictionary[StringName, UnlockGateData] = {}
 ## Every achievement (M9), by id, in file order.
 var achievements: Dictionary[StringName, AchievementData] = {}
+## The Class Level curve and reward list (M9 LEVELS); null only when the file is missing (ClassLevels then falls
+## back to a bare table with no rewards).
+var class_levels: ClassLevelTable
+## Every class's level path (M9 LEVELS), by class id.
+var class_paths: Dictionary[StringName, ClassPathData] = {}
 
 
 func _ready() -> void:
@@ -172,6 +181,13 @@ func reload() -> void:
 				push_error("Db: duplicate achievement id %s" % res.id)
 			else:
 				achievements[res.id] = res
+	class_levels = null
+	if ResourceLoader.exists(CLASS_LEVELS_PATH):
+		class_levels = load(CLASS_LEVELS_PATH) as ClassLevelTable
+	class_paths.clear()
+	for res in _load_dir(CLASS_PATH_DIR):
+		if res is ClassPathData:
+			class_paths[res.class_id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -186,6 +202,12 @@ func reload() -> void:
 
 func get_class_data(id: StringName) -> ClassData:
 	return classes.get(id)
+
+
+## The level path of [param class_id] (M9 LEVELS: locked abilities, capstone order, alternative weapon ...); null for a
+## class without one.
+func class_path(class_id: StringName) -> ClassPathData:
+	return class_paths.get(class_id)
 
 
 func get_ability(id: StringName) -> AbilityData:
