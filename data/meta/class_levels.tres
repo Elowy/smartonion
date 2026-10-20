@@ -1,0 +1,130 @@
+[gd_resource type="Resource" script_class="ClassLevelTable" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/class_level_table.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+max_level = 30
+xp_to_next = PackedInt32Array(95, 120, 150, 180, 220, 270, 320, 380, 440, 510, 585, 665, 750, 845, 940, 1045, 1155, 1270, 1395, 1520, 1655, 1790, 1935, 2085, 2240, 2405, 2570, 2745, 2925)
+level_gift_base = 5
+empty_level_gift_mult = 2
+wave_xp_base = 6.0
+wave_xp_per_wave = 0.5
+wave_xp_wave_cap = 30
+kill_xp = 0.03
+elite_xp = 1.5
+elite_xp_cap = 60.0
+boss_xp = 40.0
+final_boss_xp = 150.0
+catchup_gap = 10
+catchup_below_level = 20
+catchup_mult = 1.5
+first_win_bonus = Dictionary[StringName, int]({
+&"normal": 250,
+&"pungent": 400,
+&"tear_jerker": 600
+})
+seeds_per_wave = 1.5
+seeds_per_boss = 12.0
+seeds_final_boss = 40.0
+seeds_kills_per = 400
+seeds_cap = 400
+seeds_party_bonus = 0.1
+rewards = Array[Dictionary]([{
+"level": 2,
+"kind": "ability",
+"index": 0
+}, {
+"level": 3,
+"kind": "seasoning_slot"
+}, {
+"level": 3,
+"kind": "seasoning_tier",
+"tier": 1
+}, {
+"level": 4,
+"kind": "ability",
+"index": 1
+}, {
+"level": 5,
+"kind": "heirloom_slot"
+}, {
+"level": 5,
+"kind": "heirloom_gift"
+}, {
+"level": 6,
+"kind": "seasoning_tier",
+"tier": 2
+}, {
+"level": 7,
+"kind": "gold",
+"amount": 10
+}, {
+"level": 8,
+"kind": "capstone",
+"index": 0
+}, {
+"level": 9,
+"kind": "primary_pct",
+"amount": 1.0
+}, {
+"level": 9,
+"kind": "seasoning_tier",
+"tier": 3
+}, {
+"level": 10,
+"kind": "seasoning_slot"
+}, {
+"level": 11,
+"kind": "reroll",
+"amount": 1
+}, {
+"level": 12,
+"kind": "alt_weapon"
+}, {
+"level": 13,
+"kind": "seasoning_tier",
+"tier": 4
+}, {
+"level": 14,
+"kind": "backpack",
+"amount": 1
+}, {
+"level": 15,
+"kind": "cosmetic",
+"slot": "tabard"
+}, {
+"level": 16,
+"kind": "capstone",
+"index": 1
+}, {
+"level": 17,
+"kind": "seasoning_tier",
+"tier": 5
+}, {
+"level": 19,
+"kind": "gold",
+"amount": 10
+}, {
+"level": 20,
+"kind": "seasoning_slot"
+}, {
+"level": 21,
+"kind": "primary_pct",
+"amount": 1.0
+}, {
+"level": 24,
+"kind": "capstone",
+"index": 2
+}, {
+"level": 25,
+"kind": "cosmetic",
+"slot": "hat"
+}, {
+"level": 30,
+"kind": "cosmetic",
+"slot": "glow"
+}, {
+"level": 30,
+"kind": "title"
+}])

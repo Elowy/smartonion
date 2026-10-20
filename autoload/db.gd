@@ -39,6 +39,10 @@ const PRESSURE_DIR := "res://data/pressure/"
 ## Rotation order of the pressure modifiers (the pick draws over this order); any extra one is appended alphabetically.
 const PRESSURE_ORDER: Array[StringName] = [&"prs_salt_rain", &"prs_hardened_peel", &"prs_paring_knives",
 		&"prs_wilting_heat", &"prs_weeping_fog", &"prs_bitter_harvest"]
+## The Class Level curve and reward list (ClassLevelTable, M9 LEVELS) and one path per class
+## (data/meta/class_paths/<class>.tres, ClassPathData: locked abilities, capstone order, alternative weapon ...).
+const CLASS_LEVELS_PATH := "res://data/meta/class_levels.tres"
+const CLASS_PATH_DIR := "res://data/meta/class_paths/"
 ## Lobby order of the classes; any extra class is appended alphabetically. An id without a
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
@@ -86,6 +90,11 @@ var difficulty_ids: Array[StringName] = []
 ## Every Tear-Jerker pressure modifier (M9), by id, and the ids in PRESSURE_ORDER (extras alphabetically).
 var pressures: Dictionary[StringName, PressureData] = {}
 var pressure_ids: Array[StringName] = []
+## The Class Level curve and reward list (M9 LEVELS); null only when the file is missing (ClassLevels then falls
+## back to a bare table with no rewards).
+var class_levels: ClassLevelTable
+## Every class's level path (M9 LEVELS), by class id.
+var class_paths: Dictionary[StringName, ClassPathData] = {}
 
 
 func _ready() -> void:
@@ -209,6 +218,13 @@ func reload() -> void:
 			extra_pressures.append(id)
 	extra_pressures.sort()
 	pressure_ids.append_array(extra_pressures)
+	class_levels = null
+	if ResourceLoader.exists(CLASS_LEVELS_PATH):
+		class_levels = load(CLASS_LEVELS_PATH) as ClassLevelTable
+	class_paths.clear()
+	for res in _load_dir(CLASS_PATH_DIR):
+		if res is ClassPathData:
+			class_paths[res.class_id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -223,6 +239,12 @@ func reload() -> void:
 
 func get_class_data(id: StringName) -> ClassData:
 	return classes.get(id)
+
+
+## The level path of [param class_id] (M9 LEVELS: locked abilities, capstone order, alternative weapon ...); null for a
+## class without one.
+func class_path(class_id: StringName) -> ClassPathData:
+	return class_paths.get(class_id)
 
 
 func get_ability(id: StringName) -> AbilityData:

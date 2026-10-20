@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ClassPathData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_path_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/two_hand_mace.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+class_id = &"paladin"
+deck_abilities = Array[StringName]([&"lay_on_hands", &"divine_shield"])
+capstone_trees = Array[StringName]([&"paladin_retribution", &"paladin_holy", &"paladin_protection"])
+alt_main_hand = ExtResource("2_mh")
+gift_heirloom = &"heir_old_layers"
+gift_heirloom_name = "Mantle of Old Layers"
+cosmetics = Array[Dictionary]([{
+"slot": "tabard",
+"id": "cos_paladin_tabard",
+"name": "Dawnlight Tabard"
+}, {
+"slot": "hat",
+"id": "cos_paladin_hat",
+"name": "Crowned Helm"
+}, {
+"slot": "glow",
+"id": "cos_paladin_glow",
+"name": "Sun Halo"
+}])
+title_id = &"title_paladin"
+title_name = "the Gilded Layer"

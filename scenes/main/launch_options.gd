@@ -13,6 +13,8 @@ extends RefCounted
 ##   --companion=ID       M8: the companion every bot of a class with companion choices takes (an id
 ##                        of Db.companion_ids(), e.g. wolf; default: the class's first choice); an
 ##                        unknown id is an unknown argument
+##   --alt-weapon[=0|1]   M9 LEVELS test hook: every bot starts with its class's alternative starting weapon (Class Level 12;
+##                        the profile must have it unlocked – the dev profile of the automated runs has everything)
 ##   --waves=N            smoke: waves to play (default 3)
 ##   --start-wave=N       first wave of the run (1..25; endless: 1..99)
 ##   --seed=N             RunState / bot seed
@@ -95,6 +97,8 @@ var players := DEFAULT_BOTS
 var classes: Array[StringName] = []
 ## The companion id of --companion (&"" = each bot takes its class's first choice).
 var companion: StringName = &""
+## --alt-weapon: the bots take the alternative starting weapon of their class.
+var alt_weapon := false
 var waves := DEFAULT_SMOKE_WAVES
 var start_wave := 1
 ## -1 = random.
@@ -182,6 +186,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.companion = StringName(value)
 				else:
 					o.unknown.append(arg)
+			"--alt-weapon":
+				o.alt_weapon = _flag_on(value)
 			"--waves":
 				o.waves = maxi(1, value.to_int())
 			"--start-wave":

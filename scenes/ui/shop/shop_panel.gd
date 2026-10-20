@@ -571,7 +571,7 @@ func process_votes() -> bool:
 	shop.prune_votes(voters)
 	var cost := shop.reroll_cost()
 	if shop.try_reroll(voters, RunState.rng):
-		_say("The goblin restocks the stall (–%d g)" % cost, "Rerolled for %d g" % cost)
+		_say("The goblin restocks the stall (%s)" % _reroll_price_text(cost, "–%d g"), "Rerolled %s" % _reroll_price_text(cost, "for %d g"))
 		return true
 	return false
 
@@ -954,7 +954,8 @@ func _update_info() -> void:
 		_reroll_label.text = ""
 		return
 	var cost := shop.reroll_cost()
-	_reroll_label.text = "Reroll: %d g – all players must vote (Y)" % cost
+	_reroll_label.text = "Reroll: %s – all players must vote (Y)" % (
+			"free (%d left)" % RunState.free_rerolls if shop.next_reroll_free() else "%d g" % cost)
 	_reroll_label.add_theme_color_override(&"font_color", UiTheme.TEXT if RunState.gold >= cost else UiTheme.RED.lightened(0.1))
 	_pips.custom_minimum_size = Vector2(maxi(1, _slots.size()) * 22.0, 24.0)
 	_pips.queue_redraw()
@@ -1110,13 +1111,18 @@ func _toggle_ping(slot: PlayerSlot) -> void:
 			"%s wants: [%s] – %d g" % [slot.label(), o.item.display_name, o.price])
 
 
+## A reroll's price in a message: [param gold_format] with the cost, "free" for the Class Level rerolls (cost 0).
+static func _reroll_price_text(cost: int, gold_format: String) -> String:
+	return gold_format % cost if cost > 0 else "free"
+
+
 func _vote(slot: PlayerSlot) -> void:
 	var voters := voter_indices()
 	var cost := shop.reroll_cost()
 	var had := shop.reroll_votes.has(slot.index)
 	if shop.vote_reroll(slot.index, voters, RunState.rng):
 		Audio.play_ui(&"ui_reroll")
-		_say("The goblin restocks the stall (–%d g)" % cost, "Rerolled for %d g" % cost)
+		_say("The goblin restocks the stall (%s)" % _reroll_price_text(cost, "–%d g"), "Rerolled %s" % _reroll_price_text(cost, "for %d g"))
 		return
 	if had:
 		return

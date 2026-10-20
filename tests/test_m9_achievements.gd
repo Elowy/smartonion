@@ -17,6 +17,7 @@ var _saved_path := ""
 var _saved_persist := false
 var _saved_clock := -1
 var _saved_gates: Dictionary[StringName, UnlockGateData] = {}
+var _saved_listeners: Array = []
 var _tmp := "user://m9_achievements_test_%d.json" % OS.get_process_id()
 
 
@@ -26,6 +27,10 @@ func before_each() -> void:
 	_saved_persist = Meta.persist
 	_saved_clock = Meta.clock_override
 	_saved_gates = Db.unlock_gates.duplicate()
+	# The achievement tests count only the achievement Seeds: the Class XP / Seeds listeners of the levels stay out.
+	_saved_listeners = Meta._listeners.duplicate()
+	Meta.remove_run_listener(ClassLevels.LISTENER_XP)
+	Meta.remove_run_listener(ClassLevels.LISTENER_SEEDS)
 	Meta._pending_unlocks.clear()
 	UiFakes.reset_players()
 	RunState.start_run(2, 77)
@@ -42,6 +47,7 @@ func after_each() -> void:
 		UiFakes.free_node(n)
 	nodes.clear()
 	Meta.profile = _saved_profile
+	Meta._listeners = _saved_listeners
 	Meta.path = _saved_path
 	Meta.persist = _saved_persist
 	Meta.clock_override = _saved_clock

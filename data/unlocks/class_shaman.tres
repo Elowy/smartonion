@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="UnlockGateData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/unlock_gate_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+kind = &"class"
+id = &"shaman"
+class_id = &"shaman"
+hint = "Slay 500 enemies in total, or finish 3 runs"

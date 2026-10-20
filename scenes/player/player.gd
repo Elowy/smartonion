@@ -46,6 +46,8 @@ signal wave_ended
 signal consumables_changed
 
 const RADIUS := 0.45
+## The PlayerBonuses source of the Class Level's primary-stat share (M9 LEVELS).
+const META_SOURCE := &"meta"
 ## Height (metres) where projectiles / damage numbers originate.
 const CHEST_HEIGHT := 0.7
 const REVIVE_RADIUS := 1.8
@@ -266,9 +268,10 @@ static func create(p_slot: PlayerSlot) -> Player:
 	p.wave_ended.connect(p._on_wave_ended_consumables)
 	p.abilities.ability_cast.connect(p._on_ability_cast)
 	p.equipment = Equipment.new(p.class_data)
-	p.equipment.equip_starting_weapons()
+	p.equipment.equip_starting_weapons(p_slot != null and p_slot.alt_weapon)  # (M9: the alternative start weapon, Class Level 12)
 	p.apply_equipment()
 	p.equipment.changed.connect(p.apply_equipment)
+	p._apply_meta_power()
 	p.wave_ended.connect(p._on_wave_ended_artifacts)
 	# "P1" nameplate marker above the head (also marks whose ghost it is).
 	p.model.set_tag(p_slot.label() if p_slot != null else "")
@@ -289,6 +292,38 @@ static func create(p_slot: PlayerSlot) -> Player:
 
 func max_hp() -> float:
 	return stats.max_hp()
+
+
+## M9 LEVELS: this hero's permanent Class Level bonuses – the extra backpack slot now, and the share of the primary stat
+## as the [constant META_SOURCE] bonus now and at every wave start (the stat grows with the gear). Only for a profile
+## that applies raw power ([method Meta.raw_power_enabled]): in an automated run (the dev profile) this does nothing, so
+## the base game runs unchanged.
+func _apply_meta_power() -> void:
+	if class_data == null or equipment == null or not Meta.raw_power_enabled():
+		return
+	var power := Meta.raw_power(class_data.id)
+	equipment.backpack_size = Items.BACKPACK_SIZE + int(power["backpack"])
+	if float(power["primary_pct"]) > 0.0:
+		wave_began.connect(refresh_meta_power)
+		refresh_meta_power()
+
+
+## Sets the primary-stat share of the Class Level (power "primary_pct") from the primary stat as it is now, without the
+## share itself. A no-op when the share is unchanged.
+func refresh_meta_power() -> void:
+	if class_data == null or bonuses == null or not Meta.raw_power_enabled():
+		return
+	var pct := float(Meta.raw_power(class_data.id)["primary_pct"])
+	var primary := class_data.primary_stat
+	var held := float(stats.get_source(META_SOURCE).get(primary, 0.0))
+	var base := maxf(0.0, stats.get_stat(primary) - held)
+	var add := snappedf(base * pct / 100.0, Consumables.PCT_STEP)
+	if is_equal_approx(add, held):
+		return
+	var entries: Array[Dictionary] = []
+	if add > 0.0:
+		entries.append({"kind": "stats", "stats": {String(primary): add}, "id": "class_level", "label": "Class Level"})
+	bonuses.set_effects(META_SOURCE, entries)
 
 
 func is_alive() -> bool:

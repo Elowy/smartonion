@@ -30,6 +30,8 @@ extends Control
 ## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
 ##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
 ##   remembered for that class on their slot (Meta.apply_loadout).
+## - M9 LEVELS: once a class reaches Class Level 12 its player can switch to the class's alternative starting weapon with
+##   LB / Q ([method toggle_alt_weapon]; the weapons line of the card shows the choice, the run starts with it).
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
@@ -428,6 +430,8 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
 			Audio.play_ui(&"ui_move")
+		if inp.just_pressed(PlayerInput.Pad.LB) and toggle_alt_weapon(slot):
+			Audio.play_ui(&"ui_toggle")
 
 
 ## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
@@ -436,6 +440,15 @@ func ready_block_reason(slot: PlayerSlot) -> String:
 	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
 		return ""
 	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
+
+
+## Switches [param slot] between the standard and the alternative starting weapon of its class (LB / Q). False (nothing
+## changes) unless the profile records runs and the class has unlocked the weapon (Class Level 12).
+func toggle_alt_weapon(slot: PlayerSlot) -> bool:
+	if slot == null or slot.class_data == null or not Meta.shows_class_levels() or not Meta.alt_weapon_unlocked(slot.class_data.id):
+		return false
+	slot.alt_weapon = not slot.alt_weapon
+	return true
 
 
 ## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class

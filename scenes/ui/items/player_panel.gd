@@ -193,6 +193,8 @@ var enchanter: EnchanterTab
 static var debug_start_tab := ""
 
 var _cells: Array[Cell] = []
+## The backpack capacity the cells were laid out for ([method _refresh_capacity]).
+var _bag_capacity := Items.BACKPACK_SIZE
 var _focused := false
 var _body: HBoxContainer
 var _equipment: Equipment
@@ -450,7 +452,7 @@ func move_selection(dir: Vector2i) -> void:
 	var best_score := INF
 	for pass_i in 2:
 		for i in _cells.size():
-			if i == selected:
+			if i == selected or not _cells[i].icon.visible:
 				continue
 			var off := _cells[i].pos - from
 			var along := off.dot(d)
@@ -1203,8 +1205,12 @@ func _build_side() -> Control:
 	grid.add_theme_constant_override(&"h_separation", int(BAG_GAP))
 	grid.add_theme_constant_override(&"v_separation", int(BAG_GAP))
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	for i in Items.BACKPACK_SIZE:
+	# (M9 LEVELS: the cells of the Class Level backpack slots are built hidden and shown for a hero that has them.)
+	for i in bag_cell_count():
 		grid.add_child(_add_cell(-1, i, BAG_ICON))
+	for cell in _cells:
+		if cell.bag_index >= Items.BACKPACK_SIZE:
+			cell.icon.visible = false
 	side.add_child(grid)
 	return side
 
@@ -1301,7 +1307,8 @@ func _layout_cells() -> void:
 	var side_w := DESIGN_SIZE.x - 28.0 - side_x
 	var bag_w := BAG_COLUMNS * BAG_ICON + (BAG_COLUMNS - 1) * BAG_GAP
 	var body_h := 336.0
-	var bag_top := body_h - 2 * BAG_ICON - BAG_GAP
+	var bag_rows := maxi(2, ceili(float(_bag_capacity) / BAG_COLUMNS))
+	var bag_top := body_h - bag_rows * BAG_ICON - (bag_rows - 1) * BAG_GAP
 	for cell in _cells:
 		if cell.bag_index >= 0:
 			var c := cell.bag_index % BAG_COLUMNS
@@ -1390,10 +1397,29 @@ static func stat_rows(stats: StatBlock, cls: ClassData) -> Array[Array]:
 	return rows
 
 
+## Backpack cells the panel builds: the standard ones plus the most slots the Class Levels can add (M9 LEVELS; the extra
+## ones stay hidden until the hero has them).
+static func bag_cell_count() -> int:
+	return Items.BACKPACK_SIZE + int(ClassLevels.raw_power(ClassLevels.max_level())["backpack"])
+
+
+## Shows the backpack cells the hero has ([member Equipment.backpack_size]) and re-lays the cells out when that changed.
+func _refresh_capacity(eq: Equipment) -> void:
+	var capacity := eq.backpack_size if eq != null else Items.BACKPACK_SIZE
+	for cell in _cells:
+		if cell.bag_index >= 0:
+			cell.icon.visible = cell.bag_index < capacity
+	if capacity != _bag_capacity:
+		_bag_capacity = capacity
+		_layout_cells()
+
+
 func _refresh_side(eq: Equipment, cls: ClassData) -> void:
 	var used := eq.backpack.size() if eq != null else 0
-	_bag_count.text = "%d / %d" % [used, Items.BACKPACK_SIZE]
-	_bag_count.add_theme_color_override(&"font_color", UiTheme.RED if used >= Items.BACKPACK_SIZE else UiTheme.TEXT_DIM)
+	var capacity := eq.backpack_size if eq != null else Items.BACKPACK_SIZE
+	_refresh_capacity(eq)
+	_bag_count.text = "%d / %d" % [used, capacity]
+	_bag_count.add_theme_color_override(&"font_color", UiTheme.RED if used >= capacity else UiTheme.TEXT_DIM)
 	if cls != null and eq != null:
 		var worn := 0
 		for s in [Items.EquipSlot.HEAD, Items.EquipSlot.SHOULDERS, Items.EquipSlot.CHEST, Items.EquipSlot.WRIST,

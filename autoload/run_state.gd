@@ -145,6 +145,9 @@ var dungeon_forced := false
 # Run statistics (end screen).
 var kills := 0
 var gold_earned := 0
+## Free stall rerolls left this run (M9 LEVELS: Class Level 11 gives each hero one; Meta.apply_run_start sets them,
+## Shop.try_reroll uses them up before it takes gold). 0 in every automated run.
+var free_rerolls := 0
 var kills_by_player: Dictionary[int, int] = {}
 var damage_by_player: Dictionary[int, float] = {}
 
@@ -339,6 +342,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	dungeon_rooms_cleared = 0
 	kills = 0
 	gold_earned = 0
+	free_rerolls = 0
 	kills_by_player.clear()
 	damage_by_player.clear()
 	_gold_remainder.clear()
@@ -545,6 +549,15 @@ func add_gold(amount: int) -> void:
 	gold += amount
 	if amount > 0:
 		gold_earned += amount
+	gold_changed.emit(gold, amount)
+
+
+## Puts [param amount] of starting gold into the shared wallet (M9 LEVELS: the Class Level bonus, Meta.apply_run_start). Not
+## earned gold: the run's gold_earned stays as it is.
+func grant_starting_gold(amount: int) -> void:
+	if amount <= 0:
+		return
+	gold += amount
 	gold_changed.emit(gold, amount)
 
 

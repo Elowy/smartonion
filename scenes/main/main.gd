@@ -323,6 +323,7 @@ func start_run() -> void:
 		go_to_lobby()
 		return
 	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
+	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
 	for slot in slots:
 		Meta.remember_loadout(slot)
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id(), _difficulty_for(slots))
@@ -345,6 +346,7 @@ func start_run() -> void:
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
+	Meta.apply_run_start(slots)  # (M9 LEVELS: starting gold and free rerolls of the Class Levels; nothing for the dev profile)
 	first_wave = options.clamp_wave(options.start_wave)  # (the lobby may have changed the mode since the parse)
 	wave = 0
 	waves_completed = 0
@@ -773,6 +775,7 @@ func _record_meta(p_victory: bool, p_abandoned: bool) -> Dictionary:
 	var result := Meta.record_run(report)
 	if result.get("recorded", false):
 		result["achievements"] = run_achievements.duplicate()  # (the run's own, mid-run ones first: the end screen lists all)
+	_log("meta: %s" % ClassLevels.summary_text(result))
 	_log("meta: run recorded (%s), saved %s, achievements %s" % ["abandoned" if p_abandoned else
 			("victory" if p_victory else "defeat"), "ok" if int(result.get("save_error", OK)) == OK else "FAILED",
 			result.get("achievements", [])])
@@ -1417,9 +1420,13 @@ func _add_bots() -> void:
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
+		if bot != null:
+			Meta.apply_loadout(bot)  # (M9: what the profile remembers for the class, as in the lobby; nothing for the dev profile)
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion
+		if bot != null and options.alt_weapon:
+			bot.alt_weapon = true  # (--alt-weapon; Meta.enforce_alt_weapons drops it where the profile has not unlocked it)
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:

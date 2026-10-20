@@ -9,7 +9,10 @@ extends Control
 ## and hero in the class colours and, in co-op, the Awards ([RunSummary]). After INPUT_DELAY, on
 ## any joined player's own device: LB / RB (or left / right) switch the page, X saves the run card
 ## ([method save_card], a 1200 x 630 PNG in user://cards), A / START ->
-## back_to_menu_requested (once per open). Godot's global ui_accept / any controller's A only
+## back_to_menu_requested (once per open). M9 LEVELS: with a profile that records runs a fourth page, Progress, follows
+## the Leaderboard – per class that played: Class Level before -> after, the XP bar, "+N XP", the rewards of the new levels
+## (abilities, capstones, Seasoning slots ...) – and the run's Seeds ([method progress_rows]); its tab appears only then
+## (a run that is not recorded – every automated run – has the three pages above). Godot's global ui_accept / any controller's A only
 ## count when no joined player has a working device (nobody joined, a bot-only demo, or every
 ## human's controller unplugged), so a second device never acts for somebody else's slot.
 ## See docs/ARCHITECTURE.md.
@@ -20,10 +23,12 @@ signal card_saved(path: String)
 
 ## Seconds before input is accepted (players are usually still mashing buttons).
 const INPUT_DELAY := 1.0
-enum Page { SUMMARY, METER, LEADERBOARD }
+enum Page { SUMMARY, METER, LEADERBOARD, PROGRESS }
+## The tabs every run has; the Progress tab ([constant PROGRESS_TAB_NAME]) joins them when the run was recorded in a profile.
 const PAGE_NAMES: Array[String] = ["Summary", "Damage Meter", "Leaderboard"]
+const PROGRESS_TAB_NAME := "Progress"
 ## --end-page values (LaunchOptions).
-const PAGE_IDS: Array[String] = ["summary", "meter", "leaderboard"]
+const PAGE_IDS: Array[String] = ["summary", "meter", "leaderboard", "progress"]
 ## The longest "Saved to ..." line (characters): a longer path keeps its end (folder + file name).
 const MAX_STATUS_CHARS := 72
 
@@ -63,13 +68,22 @@ var difficulty_badge: DifficultyBadge
 var rewards_panel: MetaRewardsPanel
 ## What the main profile made of the run (Meta.record_run's result; {} = it recorded nothing).
 var meta_result: Dictionary = {}
+## M9 LEVELS: the Progress page (its tab exists only when the run was recorded: not in the dev profile of the automated
+## runs), the panel on it, its rows (one per class that played) and the Seeds line at the panel's right.
+var progress_page: Control
+var progress_panel: PanelContainer
+var progress_box: VBoxContainer
+var progress_seeds_label: Label
+## What the profile made of the run ([member Main.meta_result]); {} = nothing recorded.
+var meta: Dictionary = {}
 ## The line under the prompts ("Saved to ..." after X).
 var status_label: Label
-## The tab labels, one per page.
+## The tab labels, one per page (the Progress tab is the last one and only there while [method has_progress]).
 var tab_labels: Array[Label] = []
 ## Controller edges (A on any pad). Public for tests.
 var pads := UiPads.new()
 
+var _tab_row: HBoxContainer
 var _t := 0.0
 var _done := true
 var _saving := false
@@ -87,11 +101,13 @@ static func create() -> GameOverScreen:
 ## Fills in the end-of-run summary from RunState (victory / defeat, waves, kills, gold). [param p_board] is
 ## the run's leaderboard model ([method Leaderboard.screen_model], what Main reads after recording the
 ## run); {} = no board (the leaderboard file is not in use). [param p_meta] (M9) is what the main profile made of the run
-## (Main.meta_result): its new achievements are listed in a block under the table.
+## (Main.meta_result; {} = nothing recorded): its new achievements are listed in a block under the table and its Class
+## XP / Seeds fill the Progress page.
 func open(p_victory: bool, p_board: Dictionary = {}, p_meta: Dictionary = {}) -> void:
 	victory = p_victory
 	board = p_board
 	meta_result = p_meta
+	meta = p_meta
 	_t = 0.0
 	_done = false
 	_set_status("")
@@ -117,25 +133,27 @@ func set_backdrop_opacity(alpha: float) -> void:
 
 ## Shows page [param p_page] (Page.SUMMARY / Page.METER / Page.LEADERBOARD).
 func set_page(p_page: Page) -> void:
-	page = p_page
+	page = Page.SUMMARY if p_page == Page.PROGRESS and not has_progress() else p_page
 	summary_page.visible = page == Page.SUMMARY
 	meter_page.visible = page == Page.METER
 	leaderboard_page.visible = page == Page.LEADERBOARD
+	progress_page.visible = page == Page.PROGRESS
 	for i in tab_labels.size():
 		var active := i == int(page)
-		tab_labels[i].add_theme_color_override(&"font_color", UiTheme.GOLD if active else UiTheme.TEXT_DIM)
+		var idle := UiTheme.GOLD_BRIGHT.lerp(UiTheme.TEXT_DIM, 0.3) if i == int(Page.PROGRESS) and _leveled_up() else UiTheme.TEXT_DIM
+		tab_labels[i].add_theme_color_override(&"font_color", UiTheme.GOLD if active else idle)
 		tab_labels[i].add_theme_font_size_override(&"font_size", UiTheme.FONT_LARGE + (2 if active else -2))
 
 
 ## The next ([param step] +1) / previous (-1) page; the ends do not wrap.
 func switch_page(step: int) -> void:
 	var before := page
-	set_page(clampi(int(page) + signi(step), 0, PAGE_NAMES.size() - 1) as Page)
+	set_page(clampi(int(page) + signi(step), 0, tab_labels.size() - 1) as Page)
 	if page != before:
 		Audio.play_ui(&"ui_tab")
 
 
-## Page index for an --end-page name ("summary" / "meter" / "leaderboard"; anything else: the Summary).
+## Page index for an --end-page name ("summary" / "meter" / "leaderboard" / "progress"; anything else: the Summary).
 static func page_from_name(page_name: String) -> Page:
 	var at := PAGE_IDS.find(page_name)
 	return (at if at >= 0 else Page.SUMMARY) as Page
@@ -285,6 +303,7 @@ func _build() -> void:
 	page_box.add_child(meter_page)
 	leaderboard_page = LeaderboardPage.create()
 	page_box.add_child(leaderboard_page)
+	page_box.add_child(_build_progress_page())
 
 	_prompt = UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.LB), UiGlyph.pad(PlayerInput.Pad.RB), "/", UiGlyph.key("Q"), UiGlyph.key("E"),
@@ -302,15 +321,15 @@ func _build() -> void:
 
 ## "LB  Summary | Damage Meter | Leaderboard  RB": the active page's name is gold.
 func _build_tabs() -> Control:
-	var row := UiTheme.hbox(28)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(UiGlyph.pad(PlayerInput.Pad.LB, 26.0))
+	_tab_row = UiTheme.hbox(28)
+	_tab_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_tab_row.add_child(UiGlyph.pad(PlayerInput.Pad.LB, 26.0))
 	for i in PAGE_NAMES.size():
 		var tab := UiTheme.centered_label(PAGE_NAMES[i], UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE)
 		tab_labels.append(tab)
-		row.add_child(tab)
-	row.add_child(UiGlyph.pad(PlayerInput.Pad.RB, 26.0))
-	return row
+		_tab_row.add_child(tab)
+	_tab_row.add_child(UiGlyph.pad(PlayerInput.Pad.RB, 26.0))
+	return _tab_row
 
 
 func _stat_tile(parent: Control, caption: String, icon: Control) -> Label:
@@ -368,6 +387,7 @@ func _fill() -> void:
 	time_value.text = RunSummary.format_time(RunState.run_time)
 	meter_page.fill(RunSummary.collect(victory))
 	_fill_mode_and_board()
+	_fill_progress()
 
 	for c in rows_box.get_children():
 		rows_box.remove_child(c)
@@ -401,11 +421,158 @@ func _fill_mode_and_board() -> void:
 	best_label.add_theme_color_override(&"font_color", UiTheme.GOLD_BRIGHT if int(board.get("rank", -1)) == 0 else UiTheme.GOLD)
 
 
+# --- M9 LEVELS: Class Progress ---------------------------------------------------------------------
+
+## The Progress page: one panel with a header ("Class progress" and the Seeds of the run) and one block per class.
+func _build_progress_page() -> Control:
+	progress_page = UiTheme.vbox(12)
+	progress_page.name = "ProgressPage"
+	progress_page.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	progress_page.visible = false
+	progress_panel = UiTheme.panel(UiTheme.INSET_PANEL)
+	progress_panel.name = "ProgressPanel"
+	progress_page.add_child(progress_panel)
+	var col := UiTheme.vbox(8)
+	progress_panel.add_child(col)
+	var head := UiTheme.hbox(10)
+	head.add_child(UiTheme.label("Class progress", UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE))
+	head.add_child(UiTheme.spacer())
+	progress_seeds_label = UiTheme.label("", UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE)
+	progress_seeds_label.name = "SeedsLabel"
+	head.add_child(progress_seeds_label)
+	col.add_child(head)
+	progress_box = UiTheme.vbox(10)
+	col.add_child(progress_box)
+	return progress_page
+
+
+## True when the run was recorded in the profile and a class earned XP: the Progress tab and page exist.
+func has_progress() -> bool:
+	return not progress_rows(meta).is_empty()
+
+
+func _leveled_up() -> bool:
+	for row in progress_rows(meta):
+		if row["leveled_up"]:
+			return true
+	return false
+
+
+## One dictionary per class that played, from [param p_meta] (Main.meta_result): {"class_id", "heroes" (shares), "xp_gained",
+## "level_before", "level_after", "leveled_up", "max" (the top level), "from" / "to" (the bar's fraction before / after, 0..1),
+## "into" / "needed" (XP into the level now / its cost), "rewards" (the lines of the new levels' rewards)}. [] when nothing
+## was recorded.
+static func progress_rows(p_meta: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var entries: Variant = p_meta.get("class_xp", [])
+	if not entries is Array:
+		return out
+	for raw: Variant in entries:
+		if not raw is Dictionary:
+			continue
+		var e: Dictionary = raw
+		var before := ClassLevels.progress(int(e.get("xp_before", 0)), int(e.get("level_before", 1)))
+		var after := ClassLevels.progress(int(e.get("xp_after", 0)), int(e.get("level_after", 1)))
+		var texts: Array[String] = []
+		for r: Variant in e.get("rewards", []):
+			if r is Dictionary and str(r.get("text", "")) != "":
+				texts.append(str(r["text"]))
+		out.append({
+			"class_id": StringName(str(e.get("class_id", ""))), "heroes": int(e.get("heroes", 1)),
+			"xp_gained": int(e.get("xp_gained", 0)), "level_before": int(e.get("level_before", 1)),
+			"level_after": int(e.get("level_after", 1)), "leveled_up": int(e.get("level_after", 1)) > int(e.get("level_before", 1)),
+			"max": bool(after["max"]), "from": float(before["fraction"]) if int(e.get("level_after", 1)) == int(e.get("level_before", 1)) else 0.0,
+			"to": float(after["fraction"]), "into": int(after["into"]), "needed": int(after["needed"]), "rewards": texts,
+		})
+	return out
+
+
+## "+87 Seeds" for the run's Seeds including the level gifts ("" when none).
+static func seeds_text(p_meta: Dictionary) -> String:
+	var seeds: Variant = p_meta.get("seeds", {})
+	var total := int(seeds.get("total", 0)) if seeds is Dictionary else 0
+	return "+%d Seeds" % total if total > 0 else ""
+
+
+## Fills the Progress page and adds / removes its tab (the last of [member tab_labels]).
+func _fill_progress() -> void:
+	for c in progress_box.get_children():
+		progress_box.remove_child(c)
+		c.queue_free()
+	var rows := progress_rows(meta)
+	progress_seeds_label.text = seeds_text(meta)
+	for row in rows:
+		progress_box.add_child(_progress_row(row))
+	var has_tab := tab_labels.size() > PAGE_NAMES.size()
+	if rows.is_empty() and has_tab:
+		var tab: Label = tab_labels.pop_back()
+		_tab_row.remove_child(tab)
+		tab.queue_free()
+	elif not rows.is_empty() and not has_tab:
+		var tab := UiTheme.centered_label(PROGRESS_TAB_NAME, UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE)
+		tab_labels.append(tab)
+		_tab_row.add_child(tab)
+		_tab_row.move_child(tab, _tab_row.get_child_count() - 2)  # (before the RB glyph)
+
+
+func _progress_row(row: Dictionary) -> Control:
+	var class_id: StringName = row["class_id"]
+	var data := Db.get_class_data(class_id)
+	var color := Color.WHITE
+	for s in PlayerManager.get_slots():
+		if s.class_data != null and s.class_data.id == class_id:
+			color = s.color
+			break
+	var box := UiTheme.vbox(0)
+	box.name = "Progress_%s" % class_id
+	var line := UiTheme.hbox(10)
+	var portrait := UiPortrait.create(30.0)
+	portrait.setup(color, data)
+	line.add_child(portrait)
+	var heroes := int(row["heroes"])
+	var cls := UiTheme.label(("%s ×%d" % [data.display_name, heroes]) if data != null and heroes > 1 else (data.display_name if data != null else "?"),
+			UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE - 2)
+	cls.custom_minimum_size.x = 190
+	cls.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(cls)
+	var level_text := "Lv %d" % int(row["level_before"])
+	if row["leveled_up"]:
+		level_text = "Lv %d → %d" % [int(row["level_before"]), int(row["level_after"])]
+	var level := UiTheme.label(level_text, &"", UiTheme.FONT_LARGE - 2, UiTheme.GOLD_BRIGHT if row["leveled_up"] else UiTheme.TEXT)
+	level.custom_minimum_size.x = 150
+	level.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(level)
+	var bar := UiBar.create(Color(0.62, 0.34, 0.85), 18.0, UiTheme.FONT_SMALL)
+	bar.name = "XpBar"
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.segments = 0
+	var after_text := "MAX" if row["max"] else "%s / %s" % [UiTheme.format_int(int(row["into"])), UiTheme.format_int(int(row["needed"]))]
+	bar.set_values(float(row["from"]), 1.0, after_text)
+	bar.set_values(float(row["to"]), 1.0, after_text)
+	line.add_child(bar)
+	var gain := UiTheme.label("+%s XP" % UiTheme.format_int(int(row["xp_gained"])), UiTheme.GOLD_LABEL, UiTheme.FONT_LARGE - 2, UiTheme.GREEN)
+	gain.custom_minimum_size.x = 150
+	gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	gain.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(gain)
+	box.add_child(line)
+	var rewards: Array = row["rewards"]
+	if not rewards.is_empty():
+		var text := UiTheme.label("New:  " + "  ·  ".join(rewards), &"", UiTheme.FONT_SMALL, UiTheme.GOLD_BRIGHT.lerp(UiTheme.TEXT, 0.35))
+		text.name = "Rewards"
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.custom_minimum_size.x = 400
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_child(text)
+	return box
+
+
 ## Sizes [member page_box] to the tallest page (the Damage Meter grows by a second row of Awards, the
 ## Summary by more hero rows ...). Hidden pages still know their minimum size.
 func _fit_pages() -> void:
 	page_box.custom_minimum_size = Vector2(0.0, maxf(maxf(summary_page.get_combined_minimum_size().y,
-			meter_page.get_combined_minimum_size().y), leaderboard_page.get_combined_minimum_size().y))
+			meter_page.get_combined_minimum_size().y), maxf(leaderboard_page.get_combined_minimum_size().y,
+			progress_page.get_combined_minimum_size().y if has_progress() else 0.0)))
 
 
 func _player_row(s: PlayerSlot, mvp: bool) -> Control:

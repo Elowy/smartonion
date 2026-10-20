@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ClassPathData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_path_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/crossbow.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+class_id = &"hunter"
+deck_abilities = Array[StringName]([&"long_shot", &"play_dead"])
+capstone_trees = Array[StringName]([&"hunter_packlord", &"hunter_sharpshot", &"hunter_wildcraft"])
+alt_main_hand = ExtResource("2_mh")
+gift_heirloom = &"heir_oven_mitts"
+gift_heirloom_name = "Oven Mitts"
+cosmetics = Array[Dictionary]([{
+"slot": "tabard",
+"id": "cos_hunter_tabard",
+"name": "Trailwear Tabard"
+}, {
+"slot": "hat",
+"id": "cos_hunter_hat",
+"name": "Feathered Hat"
+}, {
+"slot": "glow",
+"id": "cos_hunter_glow",
+"name": "Leaf Swirl"
+}])
+title_id = &"title_hunter"
+title_name = "the Wild Chive"
