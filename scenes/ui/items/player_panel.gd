@@ -639,6 +639,11 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	sell.detail = "+%d gold" % it.sell_value()
 	if last_weapon:
 		_need_weapon(sell)
+	elif it.is_bound():
+		# An Heirloom is never sold (M9 PATCH).
+		sell.enabled = false
+		sell.detail = "Heirloom"
+		sell.reason = Heirlooms.NO_SELL_TEXT
 	elif not it.can_sell():
 		# An Artifact is never sold (GDD 5.5).
 		sell.enabled = false
@@ -652,7 +657,11 @@ func _backpack_entries(it: ItemInstance) -> Array[MenuEntry]:
 	if not _teammates().is_empty():
 		var trade := _entry("Trade")
 		trade.detail = "▸"
-		if last_weapon:
+		if it.is_bound():
+			trade.enabled = false
+			trade.detail = "Heirloom"
+			trade.reason = Heirlooms.NO_TRADE_TEXT
+		elif last_weapon:
 			_need_weapon(trade)
 		else:
 			trade.action = _open_trade_choice.bind(it)
@@ -821,7 +830,7 @@ func _do_sell(it: ItemInstance) -> void:
 	if not eq.backpack.has(it):
 		return
 	if not it.can_sell():
-		_message(ARTIFACT_NO_SELL, "", UiTheme.RED)
+		_message(Heirlooms.NO_SELL_TEXT if it.is_bound() else ARTIFACT_NO_SELL, "", UiTheme.RED)
 		return
 	var value := it.sell_value()
 	if not eq.remove_from_backpack(it):
@@ -856,6 +865,9 @@ func _do_disenchant(it: ItemInstance) -> void:
 func _do_trade(it: ItemInstance, mate: PlayerSlot) -> void:
 	var eq := equipment()
 	var other := _equipment_of(mate)
+	if not it.can_trade():
+		_message(Heirlooms.NO_TRADE_TEXT, "", UiTheme.RED)
+		return
 	if other == null or not other.has_space():
 		_message("%s's backpack is full" % mate.label(), "", UiTheme.RED)
 		return

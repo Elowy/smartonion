@@ -7,6 +7,8 @@ extends PanelContainer
 ## B or LT closes. Every change goes through [method Seasonings.toggle], which remembers the choice per class.
 ##
 ## The picker holds no state of its own besides the cursor: the choice is [member PlayerSlot.seasonings].
+## M9 PATCH: the lobby embeds it as the Seasonings tab of the Loadout screen ([LoadoutScreen], [method set_embedded]):
+## then the screen draws the frame, the title and the button prompts, and the picker is only the list and the detail.
 
 ## The selection changed ([param result] is a Seasonings.RESULT_ constant, [param id] the Seasoning).
 signal picked(result: StringName, id: StringName)
@@ -29,6 +31,9 @@ var last_result: StringName = &""
 
 var _title: Label
 var _pips: _Pips
+var _head: HBoxContainer
+var _note_row: HBoxContainer
+var _divider: Control
 var _note: Label
 var _list: VBoxContainer
 var _detail_name: Label
@@ -37,6 +42,8 @@ var _detail_text: Label
 var _detail_status: Label
 var _prompts: CenterContainer
 var _open := false
+## True inside the Loadout screen (no frame, title or prompt row of its own).
+var embedded := false
 
 
 static func create() -> SeasoningPicker:
@@ -53,20 +60,24 @@ func _build() -> void:
 	add_theme_stylebox_override(&"panel", _frame_style(UiTheme.GOLD_BORDER))
 	var col := UiTheme.vbox(4)
 	add_child(col)
-	var head := UiTheme.hbox(8)
+	_head = UiTheme.hbox(8)
 	_title = UiTheme.label("SEASONINGS", UiTheme.HEADING, 30, UiTheme.GOLD)
-	head.add_child(_title)
-	head.add_child(UiTheme.spacer())
+	_head.add_child(_title)
+	_head.add_child(UiTheme.spacer())
 	_pips = _Pips.new()
 	_pips.custom_minimum_size = Vector2(96, 26)
 	_pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	head.add_child(_pips)
-	col.add_child(head)
+	_head.add_child(_pips)
+	col.add_child(_head)
+	_note_row = UiTheme.hbox(8)
 	_note = UiTheme.label("", UiTheme.DIM, UiTheme.FONT_SMALL - 2)
 	_note.clip_text = true
 	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	col.add_child(_note)
-	col.add_child(UiTheme.divider())
+	_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_note_row.add_child(_note)
+	col.add_child(_note_row)
+	_divider = UiTheme.divider()
+	col.add_child(_divider)
 	_list = UiTheme.vbox(3)
 	col.add_child(_list)
 	col.add_child(UiTheme.spacer(true))
@@ -99,6 +110,26 @@ func _build() -> void:
 	_prompts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_prompts.custom_minimum_size = Vector2(0, 32)
 	col.add_child(_prompts)
+
+
+## Inside the Loadout screen (true): no frame, no title and no prompt row – the screen draws them.
+func set_embedded(on: bool) -> void:
+	embedded = on
+	_head.visible = not on
+	_divider.visible = not on
+	_prompts.visible = not on
+	# The slot pips move next to the player's name, so the tab needs no row of its own.
+	_pips.reparent(_note_row if on else _head)
+	if on:
+		add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
+	else:
+		add_theme_stylebox_override(&"panel", _frame_style(UiTheme.GOLD_BORDER))
+
+
+## The button label of A for the row under the cursor ("Remove" / "Equip").
+func action_label() -> String:
+	var s := selected()
+	return "Remove" if s != null and slot != null and s.id in slot.seasonings else "Equip"
 
 
 static func _frame_style(border: Color) -> UiFrameStyle:
@@ -219,7 +250,8 @@ func refresh() -> void:
 	else:
 		_note.text = who
 		_note.add_theme_color_override(&"font_color", slot.color.lightened(0.35))
-	add_theme_stylebox_override(&"panel", _frame_style(slot.color.lightened(0.15)))
+	if not embedded:
+		add_theme_stylebox_override(&"panel", _frame_style(slot.color.lightened(0.15)))
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
@@ -312,8 +344,7 @@ func _fill_prompts() -> void:
 		_prompts.remove_child(c)
 		c.queue_free()
 	var inp := slot.input if slot != null else null
-	var s := selected()
-	var a_label := "Remove" if s != null and slot != null and s.id in slot.seasonings else "Equip"
+	var a_label := action_label()
 	var items: Array = [
 		[UiGlyph.nav(26.0, true), "Move"],
 		[UiGlyph.for_input(inp, PlayerInput.Pad.A, 26.0) if inp != null else UiGlyph.pad(PlayerInput.Pad.A, 26.0), a_label],

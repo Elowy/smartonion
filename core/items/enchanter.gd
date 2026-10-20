@@ -54,6 +54,7 @@ const BOT_FALLBACK_MIN_RARITY := Items.Rarity.EPIC
 
 const REASON_NO_ITEM := "No item"
 const REASON_ARTIFACT := "Artifacts cannot be changed"
+const REASON_BOUND := "Heirlooms cannot be changed"
 const REASON_NOT_YOURS := "Not one of your items"
 const REASON_COMMON := "Common items hold no enchants"
 const REASON_NO_ENCHANTS := "No enchants to change"
@@ -103,6 +104,8 @@ static func can_disenchant(item: ItemInstance) -> bool:
 static func disenchant_blocked_reason(item: ItemInstance) -> String:
 	if item == null:
 		return REASON_NO_ITEM
+	if item.is_bound():  # (M9 PATCH)
+		return "Heirlooms cannot be disenchanted"
 	if not item.can_disenchant():  # the one rule of the item (ARTIFACTS: an Artifact never)
 		return "Artifacts cannot be disenchanted"
 	return ""
@@ -188,7 +191,7 @@ static func can_imbue(item: ItemInstance) -> bool:
 ## Whether [param item] is one the Enchanter can do anything with now: Reroll / Empower on an
 ## enchant it has or Imbue into a free slot (cost ignored).
 static func is_enchantable(item: ItemInstance) -> bool:
-	if item == null or item.rarity >= Items.Rarity.ARTIFACT:
+	if item == null or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 		return false
 	for i in item.enchants.size():
 		if blocked_reason(item, Action.REROLL, i) == "" or blocked_reason(item, Action.EMPOWER, i) == "":
@@ -201,6 +204,8 @@ static func is_enchantable(item: ItemInstance) -> bool:
 static func blocked_reason(item: ItemInstance, action: Action, index: int = -1) -> String:
 	if item == null:
 		return REASON_NO_ITEM
+	if item.is_bound():  # (M9 PATCH: an Heirloom takes no enchants)
+		return REASON_BOUND
 	if item.rarity >= Items.Rarity.ARTIFACT:
 		return REASON_ARTIFACT
 	match action:

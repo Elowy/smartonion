@@ -30,6 +30,12 @@ const SHRINE_DIR := "res://data/shrines/"
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
 ## data/seasonings/<id>.tres (SeasoningData, M9: the per-class ability side-grades chosen in the lobby).
 const SEASONING_DIR := "res://data/seasonings/"
+## data/heirlooms/<id>.tres (HeirloomData, M9 PATCH: the ten persistent starting items).
+const HEIRLOOM_DIR := "res://data/heirlooms/"
+## Display order of the Heirlooms (The Onion Patch, the Loadout screen); any extra one is appended alphabetically.
+const HEIRLOOM_ORDER: Array[StringName] = [&"heir_sprout_cap", &"heir_old_layers", &"heir_apron", &"heir_oven_mitts",
+		&"heir_pantry_breeches", &"heir_garden_clogs", &"heir_garlic_braid", &"heir_harvest_signet", &"heir_seed_pouch",
+		&"heir_ancestral_peeler"]
 ## data/unlocks/<id>.tres (UnlockGateData, M9: content the main profile has to unlock before it is offered).
 const UNLOCK_DIR := "res://data/unlocks/"
 ## data/achievements/<id>.tres (AchievementData, M9).
@@ -84,6 +90,9 @@ var shrines: Dictionary[StringName, ShrineData] = {}
 var shrine_ids: Array[StringName] = []
 ## Every Seasoning (M9), by id, in file order.
 var seasonings: Dictionary[StringName, SeasoningData] = {}
+## Every Heirloom (M9 PATCH), by id, and the ids in HEIRLOOM_ORDER.
+var heirlooms: Dictionary[StringName, HeirloomData] = {}
+var heirloom_ids: Array[StringName] = []
 var class_ids: Array[StringName] = []
 ## Every unlock gate (M9), by UnlockGateData.key (kind/id): the content the profile has to unlock. Content without a
 ## gate is available from the start. Filled by [method reload]; [method add_unlock_gate] adds one in code.
@@ -198,6 +207,23 @@ func reload() -> void:
 				push_error("Db: duplicate seasoning id %s" % res.id)
 			else:
 				seasonings[res.id] = res
+	heirlooms.clear()
+	for res in _load_dir(HEIRLOOM_DIR):
+		if res is HeirloomData:
+			if heirlooms.has(res.id):
+				push_error("Db: duplicate heirloom id %s" % res.id)
+			else:
+				heirlooms[res.id] = res
+	heirloom_ids.clear()
+	for id in HEIRLOOM_ORDER:
+		if heirlooms.has(id):
+			heirloom_ids.append(id)
+	var extra_heirlooms: Array[StringName] = []
+	for id in heirlooms:
+		if id not in heirloom_ids:
+			extra_heirlooms.append(id)
+	extra_heirlooms.sort()
+	heirloom_ids.append_array(extra_heirlooms)
 	unlock_gates.clear()
 	for res in _load_dir(UNLOCK_DIR):
 		if res is UnlockGateData:
@@ -495,6 +521,11 @@ func remove_unlock_gate(kind: StringName, id: StringName) -> void:
 
 func get_seasoning(id: StringName) -> SeasoningData:
 	return seasonings.get(id)
+
+
+## The Heirloom [param id] (null = unknown).
+func get_heirloom(id: StringName) -> HeirloomData:
+	return heirlooms.get(id)
 
 
 ## The Seasonings of [param class_id] in unlock order (tier, then name) – the lobby picker's list.

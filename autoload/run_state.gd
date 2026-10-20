@@ -414,7 +414,7 @@ func set_wave(value: int) -> void:
 
 ## Adds a looted item to the team loot (waits for the Need / Greed / Pass roll).
 func add_team_loot(item: ItemInstance) -> void:
-	if item == null:
+	if item == null or item.is_bound():  # (M9 PATCH: an Heirloom never enters the shared loot)
 		return
 	team_loot.append(item)
 	team_loot_changed.emit()

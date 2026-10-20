@@ -45,8 +45,8 @@ static func create(p_item: ItemInstance) -> LootRoll:
 
 ## Need is allowed only for a class that can use the item and a backpack with room.
 func can_need(slot: PlayerSlot) -> bool:
-	if slot == null or item == null or not item.can_be_used_by(slot.class_data):
-		return false
+	if slot == null or item == null or not item.can_be_shared() or not item.can_be_used_by(slot.class_data):
+		return false  # (M9 PATCH: a bound Heirloom is never rolled for)
 	var equipment := _equipment_of(slot)
 	return equipment != null and equipment.has_space()
 

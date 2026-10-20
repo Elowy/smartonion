@@ -104,7 +104,7 @@ func configure(kind: StringName, p_path: String, automated: bool) -> void:
 		PROFILE_FRESH:
 			profile = Profile.fresh()
 		PROFILE_MAX:
-			profile = Profile.max_profile(Db.class_ids)
+			profile = Profile.max_profile(Db.class_ids, Db.heirloom_ids)
 		_:
 			if p_path != "":
 				profile = Profile.load_file(p_path)
@@ -593,3 +593,157 @@ func _sorted_listeners() -> Array[Dictionary]:
 	var typed: Array[Dictionary] = []
 	typed.assign(out)
 	return typed
+
+
+# --- Heirlooms and the Onion Patch shop (M9 PATCH) ----------------------------------------------
+
+## An Heirloom reached [param rank] (bought in The Onion Patch; saved).
+signal heirloom_ranked(id: StringName, rank: int)
+## A Seasoning was bought in The Onion Patch (saved).
+signal seasoning_bought(id: StringName)
+
+
+## The rank of the Heirloom [param id] for the current profile: 0 = not owned, 1 .. 5. The dev profile owns every
+## Heirloom at rank 1 (nothing is ranked in an automated run), the max profile at rank 5.
+func heirloom_rank(id: StringName) -> int:
+	if profile == null or Db.get_heirloom(id) == null:
+		return 0
+	return mini(profile.heirloom_rank(id), HeirloomData.MAX_RANK)
+
+
+func owns_heirloom(id: StringName) -> bool:
+	return heirloom_rank(id) > 0
+
+
+## The ids of the Heirlooms the profile owns, in the display order (Db.heirloom_ids).
+func owned_heirloom_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in Db.heirloom_ids:
+		if owns_heirloom(id):
+			out.append(id)
+	return out
+
+
+## Seeds the next rank of [param id] costs (0 = not owned, or already at the top rank).
+func heirloom_rank_price(id: StringName) -> int:
+	var rank := heirloom_rank(id)
+	return HeirloomData.price_for_rank(rank + 1) if rank > 0 and rank < HeirloomData.MAX_RANK else 0
+
+
+## Why the next rank of [param id] cannot be bought now ("" = it can).
+func heirloom_rank_up_reason(id: StringName) -> String:
+	var rank := heirloom_rank(id)
+	if rank <= 0:
+		return "Not owned yet"
+	if rank >= HeirloomData.MAX_RANK:
+		return "Top rank"
+	if profile.read_only:
+		return "The profile cannot be saved"
+	if not can_afford_seeds(heirloom_rank_price(id)):
+		return "Not enough Seeds"
+	return ""
+
+
+## Buys the next rank of [param id] for Seeds: the price is paid and the rank raised ([method Profile.set_heirloom_rank])
+## in ONE save, so a failed write never keeps the Seeds without the rank. False (nothing changes) when
+## [method heirloom_rank_up_reason] says no.
+func rank_up_heirloom(id: StringName) -> bool:
+	if heirloom_rank_up_reason(id) != "":
+		return false
+	var rank := heirloom_rank(id)
+	var price := heirloom_rank_price(id)
+	profile.spend_seeds(price)
+	profile.set_heirloom_rank(id, rank + 1)
+	seeds_changed.emit(profile.seeds, -price)
+	_changed()
+	heirloom_ranked.emit(id, rank + 1)
+	return true
+
+
+## Why [param s] cannot be bought yet ("" = it is buyable, or already owned): the Class Level of its tier or the
+## achievement that opens it.
+func seasoning_lock_reason(s: SeasoningData) -> String:
+	if s == null or is_unlocked(Profile.KIND_SEASONING, s.id, s.class_id):
+		return ""
+	var cls := Db.get_class_data(s.class_id)
+	var who := cls.display_name if cls != null else String(s.class_id).capitalize()
+	match s.tier:
+		&"a":
+			return "" if profile != null and profile.has_achievement(s.unlock_achievement()) else "Win a run with the %s" % who
+		&"aa":
+			return "" if profile != null and profile.has_achievement(s.unlock_achievement()) else "Win a Pungent run with the %s" % who
+	return "" if seasoning_tier_unlocked(s.class_id, s.tier_index() + 1) else "Reach %s level %d" % [who, s.unlock_level()]
+
+
+## What the Onion Patch shows for [param s]: &"owned", &"locked" (see [method seasoning_lock_reason]), &"poor" (open but
+## the wallet is short) or &"buyable".
+func seasoning_state(s: SeasoningData) -> StringName:
+	if s == null:
+		return &"locked"
+	if is_unlocked(Profile.KIND_SEASONING, s.id, s.class_id):
+		return &"owned"
+	if seasoning_lock_reason(s) != "":
+		return &"locked"
+	return &"buyable" if can_afford_seeds(s.price()) else &"poor"
+
+
+## Buys the Seasoning [param id] for Seeds (price and unlock in one save). False when it is unknown, owned, locked or
+## unaffordable.
+func buy_seasoning(id: StringName) -> bool:
+	var s := Db.get_seasoning(id)
+	if s == null or profile == null or profile.read_only or seasoning_state(s) != &"buyable":
+		return false
+	var price := s.price()
+	profile.spend_seeds(price)
+	profile.unlock(Profile.KIND_SEASONING, id, s.class_id)
+	seeds_changed.emit(profile.seeds, -price)
+	_changed()
+	seasoning_bought.emit(id)
+	return true
+
+
+## Puts the Seasoning [param id] into (or takes it out of) the loadout remembered for its class – what the lobby starts a
+## hero of that class with (The Onion Patch, Seasonings tab). Returns a Seasonings.RESULT_ constant (RESULT_INVALID in
+## an automated session: the dev profile selects nothing). Saved.
+func toggle_default_seasoning(id: StringName) -> StringName:
+	var s := Db.get_seasoning(id)
+	if s == null or profile == null or profile.is_dev:
+		return Seasonings.RESULT_INVALID
+	var l := profile.loadout(s.class_id)
+	var list: Array[StringName] = l["seasonings"]
+	var result := Seasonings.RESULT_ADDED
+	if id in list:
+		list.erase(id)
+		result = Seasonings.RESULT_REMOVED
+	elif not Seasonings.owned(s):
+		return Seasonings.RESULT_LOCKED
+	elif list.size() >= Seasonings.slot_count(s.class_id):
+		return Seasonings.RESULT_FULL
+	else:
+		list.append(id)
+	l["seasonings"] = list
+	profile.set_loadout(s.class_id, l)
+	_changed()
+	return result
+
+
+## Flips whether a hero of [param class_id] starts with its alternative weapon by default (Class Level 12, The Onion
+## Patch, Classes tab). Returns the new setting (false when the class has none unlocked, or in an automated session).
+func toggle_default_alt_weapon(class_id: StringName) -> bool:
+	if profile == null or profile.is_dev or not alt_weapon_unlocked(class_id):
+		return false
+	var l := profile.loadout(class_id)
+	l["alt_weapon"] = not bool(l["alt_weapon"])
+	profile.set_loadout(class_id, l)
+	_changed()
+	return bool(l["alt_weapon"])
+
+
+## Picks the title [param id] to show next to the player's name (&"" = none). It must be owned ([method Profile.has_unlock]).
+## Saved. False when it is not owned.
+func select_title(id: StringName) -> bool:
+	if profile == null or (id != &"" and not profile.has_unlock(Profile.KIND_TITLE, id)):
+		return false
+	profile.selected_title = id
+	_changed()
+	return true

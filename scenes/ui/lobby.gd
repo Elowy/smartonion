@@ -15,8 +15,9 @@ extends Control
 ##   not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
-## - M9 SEASONINGS: LT / right mouse button opens the player's Seasoning picker over their card ([method
-##   open_seasoning_picker]); while it is open that player's input drives it (▲ ▼ A B) and nothing else in the lobby.
+## - M9 SEASONINGS / PATCH: LT / right mouse button opens the player's Loadout over their card ([method open_loadout]:
+##   the tabs Seasonings / Heirloom / Look, LB / RB switch them); while it is open that player's input drives it (▲ ▼ A B)
+##   and nothing else in the lobby (LB is the alternative weapon only while it is closed).
 ## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
 ##   and X toggles Hardcore ([method toggle_hardcore]); the header shows the choice ("Mode: Endless ·
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
@@ -361,6 +362,7 @@ func _set_joining(on: bool) -> void:
 func _on_player_joined(slot: PlayerSlot) -> void:
 	Meta.apply_loadout(slot)  # (the selections remembered for the class the player starts on)
 	Seasonings.prune(slot)
+	Heirlooms.prune(slot)
 
 
 func _on_device_disconnected(slot: PlayerSlot) -> void:
@@ -397,12 +399,12 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
 	if inp == null:
 		return
-	# An open Seasoning picker takes everything this player presses.
-	var picker := picker_of(slot)
-	if picker != null and picker.is_open():
-		picker.handle_input(inp)
+	# An open Loadout (M9 PATCH: Seasonings / Heirloom / Look) takes everything this player presses.
+	var loadout := loadout_of(slot)
+	if loadout != null and loadout.is_open():
+		loadout.handle_input(inp)
 		return
-	if inp.just_pressed(PlayerInput.Pad.LT) and open_seasoning_picker(slot):
+	if inp.just_pressed(PlayerInput.Pad.LT) and open_loadout(slot):
 		Audio.play_ui(&"ui_confirm")
 		return
 	# B before START: the keyboard maps Esc to both.
@@ -478,24 +480,37 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 		slot.class_data = next
 		Meta.apply_loadout(slot)
 		Seasonings.prune(slot)  # (what the new class cannot carry: another class's Seasonings, too many for its slots)
+		Heirlooms.prune(slot)  # (M9 PATCH: an Heirloom the new class has no slot for)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
 
 
-## The Seasoning picker on [param slot]'s card (null for a slot without a card).
+## The Seasoning picker on [param slot]'s card (the Seasonings tab of its Loadout; null for a slot without a card).
 func picker_of(slot: PlayerSlot) -> SeasoningPicker:
 	if slot == null or slot.index < 0 or slot.index >= cards.size():
 		return null
 	return cards[slot.index].picker
 
 
-## Opens [param slot]'s Seasoning picker (LT / right mouse button). Not while the player is ready (the picks are locked like the class),
-## for a class the profile has not unlocked, or without a card. True when it opened.
-func open_seasoning_picker(slot: PlayerSlot) -> bool:
-	var picker := picker_of(slot)
-	if picker == null or slot.ready or ready_block_reason(slot) != "":
+## The Loadout screen on [param slot]'s card (null for a slot without a card).
+func loadout_of(slot: PlayerSlot) -> LoadoutScreen:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].loadout
+
+
+## Opens [param slot]'s Loadout (LT / right mouse button) on [param first_tab]. Not while the player is ready (the picks are
+## locked like the class), for a class the profile has not unlocked, or without a card. True when it opened.
+func open_loadout(slot: PlayerSlot, first_tab: LoadoutScreen.Tab = LoadoutScreen.Tab.SEASONINGS) -> bool:
+	var loadout := loadout_of(slot)
+	if loadout == null or slot.ready or ready_block_reason(slot) != "":
 		return false
-	return picker.open(slot)
+	return loadout.open(slot, first_tab)
+
+
+## Opens [param slot]'s Loadout on its Seasonings tab (the M9 SEASONINGS entry point, kept for the callers of the picker).
+func open_seasoning_picker(slot: PlayerSlot) -> bool:
+	return open_loadout(slot, LoadoutScreen.Tab.SEASONINGS)
 
 
 func _update_countdown(delta: float) -> void:

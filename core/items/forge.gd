@@ -45,6 +45,7 @@ const REASON_NOT_WEAPON := "Only weapons can be forged"
 const REASON_HAND_MADE := "Hand-made weapons cannot be forged"
 const REASON_LEGENDARY := "Legendary is the highest rarity"
 const REASON_ARTIFACT := "Artifacts grow on their own"
+const REASON_BOUND := "Heirlooms cannot be forged"
 const REASON_UNKNOWN := "This weapon cannot be forged"
 const REASON_NO_HERO := "No hero to forge for"
 ## "No other Common Dagger" (rarity name, base weapon name).
@@ -65,7 +66,7 @@ static var _legendaries_loaded := false
 
 ## A generated weapon below Legendary whose base is a Db weapon (never hand-made / Artifact).
 static func is_forgeable(item: ItemInstance) -> bool:
-	return item != null and item.is_weapon() and not item.unique \
+	return item != null and item.is_weapon() and not item.unique and not item.is_bound() \
 		and item.rarity >= Items.Rarity.COMMON and item.rarity < Items.Rarity.LEGENDARY \
 		and Db.get_weapon(item.source_id) != null
 
@@ -98,6 +99,8 @@ static func partner_for(eq: Equipment, item: ItemInstance) -> ItemInstance:
 static func blocked_reason(eq: Equipment, item: ItemInstance) -> String:
 	if item == null or not item.is_weapon():
 		return REASON_NOT_WEAPON
+	if item.is_bound():  # (M9 PATCH: an Heirloom stays what it is)
+		return REASON_BOUND
 	if item.rarity >= Items.Rarity.ARTIFACT:
 		return REASON_ARTIFACT
 	if item.rarity >= Items.Rarity.LEGENDARY:

@@ -66,11 +66,11 @@ func add_to_backpack(item: ItemInstance) -> bool:
 	return true
 
 
-## Takes [param item] out of the backpack (sell, trade). False when it is not there or it is
-## the hero's last usable attacking weapon while none is equipped (is_last_weapon).
+## Takes [param item] out of the backpack (sell, trade, disenchant). False when it is not there, it is bound (an
+## Heirloom) or it is the hero's last usable attacking weapon while none is equipped (is_last_weapon).
 func remove_from_backpack(item: ItemInstance) -> bool:
 	var i := backpack.find(item)
-	if i < 0 or is_last_weapon(item):
+	if i < 0 or is_last_weapon(item) or item.is_bound():  # (M9 PATCH: an Heirloom never leaves its hero this way)
 		return false
 	backpack.remove_at(i)
 	settle_off_hand()

@@ -115,12 +115,15 @@ static func dev() -> Profile:
 	return p
 
 
-## A finished player: every class in [param class_ids] at [constant MAX_CLASS_LEVEL], everything unlocked.
-static func max_profile(class_ids: Array[StringName] = []) -> Profile:
+## A finished player: every class in [param class_ids] at [constant MAX_CLASS_LEVEL], everything unlocked, every
+## Heirloom in [param heirloom_ids] at its top rank (M9 PATCH).
+static func max_profile(class_ids: Array[StringName] = [], heirloom_ids: Array[StringName] = []) -> Profile:
 	var p := Profile.fresh()
 	p.all_unlocked = true
 	for id in class_ids:
 		p.set_class_progress(id, p.class_xp(id), MAX_CLASS_LEVEL)
+	for id in heirloom_ids:
+		p.set_heirloom_rank(id, HeirloomData.MAX_RANK)
 	return p
 
 
