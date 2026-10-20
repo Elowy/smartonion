@@ -3800,7 +3800,7 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
   `hunter_companion.gd` (`HunterCompanion`: a Node3D with no body, HP or group, so it is not targetable; `BASE_PARAMS`
   and `KIND_PARAMS` for `wolf`, `boar`, `owl`; pseudo id `hunter_companion`; hidden while the owner is downed, snapped
   back at wave start, teleported home beyond 14 m; Pack Frenzy hooks `frenzy_left`, `frenzy_damage_pct`,
-  `frenzy_haste_pct`). `hunter_companion_model.gd` (procedural Wolf, Boar and Owl).
+  `frenzy_haste_pct`; the bite `slow` is read for the Wolf only, so Kindred Instinct's `slow_add` never slows with a Boar bite). `hunter_companion_model.gd` (procedural Wolf, Boar and Owl).
 - Visuals: `hunter_aim_charge.gd` (Long Shot aim ring), `hunter_arrow_hail_vfx.gd`, `hunter_haste_vfx.gd`;
   look in `onion_armor.gd` (`_head_hunter_hat`, `_chest_hunter`, `hides_sprout`) and `onion_model.gd` (gloves,
   boots, brow tilt, `set_play_dead`, `tip_amount`). Eight new game-icons.net pictures (`icon_map.tres`
@@ -3992,7 +3992,6 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
 ### Known gaps (M8)
 
 - No balance pass: the numbers are the designs' starting values; the final balance is the last step of the project (GDD 9).
-- Kindred Instinct's slow reaches the Boar's bites too: the vocabulary has no companion-kind filter.
 - Bond Totem's silent HP drain is the least conventional rule; it is pinned by tests.
 - Gale Volley's arrows are real projectiles: a Quick Draw Hunter can spawn up to five per second.
 - `Stormweaving` is flush with its tree frame at the minimum name size (cosmetic).

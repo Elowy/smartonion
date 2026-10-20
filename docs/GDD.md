@@ -2038,7 +2038,7 @@ A társ, a Hunt Signal és a Beastbond. A Pack Frenzy a társat rövid, erős ro
 | 3 | Alpha Hide | 2 | −4% elszenvedett sebzés |
 | 3 | *Open Wound* (módosító – Hunt Signal) | 1 | A Hunt Signal csapása a sebzése 80%-át még egyszer okozza 4 mp alatt (pet-forrás) |
 | 4 | Wild Kinship (előfeltétel: Feral Tempo 3/3) | 3 | +3 Mastery (Beastbond: +6% társ-sebzés) |
-| 4 | Kindred Instinct | 3 | A Wolf lassítása +8%-kal erősebb (a Boar harapásai is kapnak rövid lassítást); a Boar gúnya +0,3 mp; az Owl +1 m hatótávot kap |
+| 4 | Kindred Instinct | 3 | A Wolf harapás-lassítása +8%-kal erősebb (csak a Wolf harapása lassít; a Boar és az Owl nem); a Boar gúnya +0,3 mp; az Owl +1 m hatótávot kap |
 | 5 | **Pack Frenzy** (capstone) | 1 | 30 mp-enként (első alkalommal 5 mp-nél) 10 mp-ig a társ +50% sebzést és +30% támadássebességet kap; csak hullám közben |
 
 #### Hunter – Sharpshot fa

@@ -240,6 +240,27 @@ func test_kindred_instinct_is_felt_in_play() -> void:
 	check_near(target.taunt_left, 2.4, 0.05, "for 1.5 + 0.9 s")
 
 
+func test_kindred_instinct_slows_only_with_the_wolfs_bite() -> void:
+	var p := _hunter()
+	_add(p, T, "keen_companion", 3)
+	_add(p, T, "bonded_vigor", 3)
+	_add(p, T, "feral_tempo", 3)
+	_add(p, T, "kindred_instinct", 3)
+	# The slow number is shared by every kind (+24 from the talent) ...
+	var boar := _pet(p, &"boar")
+	check_near(float(boar.current_params()["slow"]), 24.0, 0.0001, "the Boar's params carry the talent's slow")
+	var e := _enemy(Vector3(1.0, 0, 0))
+	_step_pet(boar, 4.5)
+	check(e.fake_hits() >= 1, "the Boar bit")
+	# ... but only the Wolf's bite uses it: the talent text promises a Wolf slow, a Boar taunt and an Owl range (the Owl shoots bolts, no bite).
+	check_eq(e.slow_pct, 0.0, "the Boar's bite slows nobody")
+	_clear_enemies()
+	var wolf := _pet(p, &"wolf")
+	var g := _enemy(Vector3(1.5, 0, 0))
+	_step_pet(wolf, 0.6)
+	check_eq(g.slow_pct, 54.0, "the Wolf's bite still slows (30% + 24%)")
+
+
 # --- Pack Frenzy -------------------------------------------------------------------------------
 
 func test_pack_frenzy_is_a_capstone_that_needs_twelve_points() -> void:

@@ -314,7 +314,8 @@ func _bite(e: Enemy) -> void:
 	var dealt := owner_player.procs.deal_raw(e, hit_damage(float(_params.get("damage_pct", 0.0))),
 			HunterKit.PHYSICAL, true, &"pet")
 	attacks += 1
-	var slow := float(_params.get("slow", 0.0))
+	# The bite slow is the Wolf's gift (Kindred Instinct adds to it): the Boar's heavy bite and the Owl never slow.
+	var slow := float(_params.get("slow", 0.0)) if kind == &"wolf" else 0.0
 	if slow > 0.0 and HunterKit.is_live(e):
 		e.apply_slow(minf(slow, 90.0), float(_params.get("slow_duration", 1.0)))
 	_heal_owner(dealt)
