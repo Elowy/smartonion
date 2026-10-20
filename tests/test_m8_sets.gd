@@ -80,7 +80,7 @@ func test_a_class_free_set_belongs_to_no_class() -> void:
 	check_eq(s.class_id, &"", "SetData.class_id empty = class-independent")
 	check(Db.set_for_class(&"") == null, "set_for_class(\"\") is nobody's own set")
 	check(Db.get_set(&"zz_free_mail") == s, "Db.get_set finds it")
-	for id in Db.class_ids:
+	for id in Rules.classes_with("set"):
 		var own := Db.set_for_class(id)
 		check(own != null and own != s and own.class_id == id, "%s: its own set is its class's, not the free one" % id)
 
@@ -105,6 +105,9 @@ func test_without_free_sets_every_class_has_exactly_its_own_set() -> void:
 	fixtures.remove_free_sets()
 	for id in Db.class_ids:
 		var own := Db.set_for_class(id)
+		if Rules.pending(id, "set"):
+			check(own == null and Db.sets_for_class(id).is_empty(), "%s: its set is still to come, nothing to collect" % id)
+			continue
 		check(own != null, "%s has a class set" % id)
 		check_eq(Db.sets_for_class(id), [own] as Array[SetData], "%s: the list is just that set" % id)
 
