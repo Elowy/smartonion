@@ -3,7 +3,9 @@ extends TalentEffect
 ## Bond Totem – the Shaman Wellspring capstone (design_shaman.md 4.4, M8). While a wave runs and the Shaman is
 ## alive, a Bond Totem (ShamanTotem, element "bond") rises at the Shaman's feet [code]first_at[/code] seconds
 ## after the wave starts and then every [code]interval[/code] seconds, and stands for [code]duration[/code]
-## seconds (ShamanKit.totem_params: Weathered Wood and the set bonus lengthen it). What the totem does is the
+## seconds (ShamanKit.totem_params: Weathered Wood and the set bonus lengthen it; the duration is the ONLY number
+## the "all totems" mods change here, so the Ancestral Chorus aura and the Totem Rite numbers never reach it).
+## What the totem does is the
 ## node's own rule (ShamanTotem._step_bond): heroes within [code]radius[/code] m even out their health
 ## ([code]equalize_pct[/code] % of the gap to the group's average per second) and take
 ## [code]damage_taken_pct[/code] % less damage.
@@ -89,12 +91,14 @@ func describe() -> String:
 func _plant() -> bool:
 	if player == null or not player.is_inside_tree():
 		return false
-	var base: Dictionary = {}
+	var final: Dictionary = {}
 	for key in ["duration", "radius", "equalize_pct", "tick", "damage_taken_pct"]:
 		if params.has(key):
-			base[key] = params[key]
-	var final := ShamanKit.totem_params(player, base)
-	var duration := maxf(1.0, float(final.get("duration", 10.0)))
+			final[key] = params[key]
+	# Only the duration goes through the "all totems" mods (Weathered Wood, the set bonus), like the Thunderpost: the
+	# other Totem Rite mods (Ancestral Chorus aura, Attuned Totems, Ancestral Reach ...) are no Bond Totem numbers.
+	final["duration"] = ShamanKit.totem_params(player, {"duration": float(final.get("duration", 10.0))}).get("duration", 10.0)
+	var duration := maxf(1.0, float(final["duration"]))
 	var t := ShamanTotem.plant(player, &"bond", final, player.global_position, duration, false)
 	if not t.is_inside_tree():
 		t.free()

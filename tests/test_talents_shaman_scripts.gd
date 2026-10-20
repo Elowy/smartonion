@@ -116,6 +116,30 @@ func _bond_ticks(t: ShamanTotem, n: int) -> void:
 		t.step(DT)
 
 
+## Sum of everything the healing meter holds.
+func _healed_total() -> float:
+	var total := 0.0
+	for slot in RunState.healing_by_player:
+		total += float(RunState.healing_by_player[slot])
+	return total
+
+
+## "+N" floating texts standing in the world (a heal's number).
+func _plus_texts() -> int:
+	var n := 0
+	for node in world.find_children("*", "Label3D", true, false):
+		if (node as Label3D).text.begins_with("+"):
+			n += 1
+	return n
+
+
+## Sets [param p]'s Max HP to [param value] and fills it up to [param ratio] of it.
+func _max_hp(p: Player, value: float, ratio: float = 1.0) -> void:
+	p.stats.remove_source(&"test_hp")
+	p.stats.set_source(&"test_hp", {Stats.STAMINA: value - p.max_hp()})
+	p.hp = p.max_hp() * ratio
+
+
 # --- Elemental Surge ---------------------------------------------------------------------------
 
 func test_elemental_surge_grants_three_empowered_casts_8_seconds_into_the_wave_then_every_20() -> void:
@@ -554,6 +578,10 @@ func test_the_bond_totem_evens_out_hp_shares_a_tenth_of_the_gap_per_second() -> 
 	var s := _shaman(Vector3.ZERO, 0)
 	var a := _ally(1, Vector3(2, 0, 0))
 	var b := _ally(2, Vector3(-3, 0, 0), &"mage")
+	# Equal Max HP: the shares move by a tenth of the gap per second and the average share stays (with different
+	# Max HP the HP are conserved instead: test_the_bond_totem_conserves_hp_when_the_max_hp_differ).
+	for hero in [s, a, b]:
+		_max_hp(hero, 100.0)
 	a.hp = a.max_hp() * 0.4
 	var t := _plant_bond(s)
 	var avg := (1.0 + 0.4 + 1.0) / 3.0
@@ -571,12 +599,13 @@ func test_the_bond_totem_evens_out_hp_shares_a_tenth_of_the_gap_per_second() -> 
 	t.dismiss()
 
 
-func test_the_bond_totem_credits_the_heal_and_loses_hp_silently() -> void:
+func test_the_bond_totem_moves_hp_without_a_heal_credit_or_numbers() -> void:
 	var s := _shaman(Vector3.ZERO, 0)
 	var a := _ally(1, Vector3(2, 0, 0))
 	a.hp = a.max_hp() * 0.2
 	var taken_before := float(RunState.damage_taken_by_player.get(1, 0.0)) + float(RunState.damage_taken_by_player.get(0, 0.0))
-	var healed_before := float(RunState.healing_by_player.get(0, 0.0))
+	var healed_before := _healed_total()
+	var plus_before := _plus_texts()
 	var hurt_events := [0]
 	s.damage_taken.connect(func(_d: float, _src: Node3D) -> void: hurt_events[0] += 1)
 	var s_hp := s.hp
@@ -586,11 +615,83 @@ func test_the_bond_totem_credits_the_heal_and_loses_hp_silently() -> void:
 	var gained := a.hp - a_hp
 	var lost := s_hp - s.hp
 	check(gained > 0.0 and lost > 0.0, "HP moved: +%.3f / -%.3f" % [gained, lost])
-	check_near(float(RunState.healing_by_player.get(0, 0.0)) - healed_before, gained, 0.0001, "the gain is the Shaman's healing")
+	check_near(gained, lost, 0.0001, "what the ally gained is what the Shaman gave")
+	check_eq(_healed_total(), healed_before, "a transfer is no healing: nothing on the healing meter")
+	check_eq(_plus_texts(), plus_before, "and no +N number")
 	var taken_after := float(RunState.damage_taken_by_player.get(1, 0.0)) + float(RunState.damage_taken_by_player.get(0, 0.0))
 	check_eq(taken_after, taken_before, "the loss is no damage: nothing on the damage-taken meter")
 	check_eq(hurt_events[0], 0, "no damage event")
 	check_eq(s.invulnerable_left, 0.0, "no invulnerability frames")
+	_bond_ticks(t, 6)
+	check_eq(_healed_total(), healed_before, "still nothing on the meter after a few seconds")
+	check_eq(_plus_texts(), plus_before, "and no numbers")
+	t.dismiss()
+
+
+func test_the_bond_totem_conserves_hp_when_the_max_hp_differ() -> void:
+	# Mage 100 Max HP at 100%, Warrior 300 at 50% (average share 75%): one amount leaves the Mage and enters
+	# the Warrior - the Warrior's own gap is three times bigger, but it gets only what the Mage gave.
+	var s := _shaman(Vector3(30, 0, 0), 0)
+	var mage := _ally(1, Vector3(-2, 0, 0), &"mage")
+	var warrior := _ally(2, Vector3(2, 0, 0))
+	_max_hp(mage, 100.0, 1.0)
+	_max_hp(warrior, 300.0, 0.5)
+	var t := ShamanTotem.plant(s, &"bond", _bond_params(), Vector3.ZERO, 10.0)
+	var total := mage.hp + warrior.hp
+	var healed_before := _healed_total()
+	t.step(DT)
+	check_near(100.0 - mage.hp, 1.25, 0.0001, "the Mage gives 5%% of its 25%% gap: 1.25 HP (%.3f)" % (100.0 - mage.hp))
+	check_near(warrior.hp - 150.0, 1.25, 0.0001, "the Warrior gets exactly that, not 3.75 (%.3f)" % (warrior.hp - 150.0))
+	check_near(mage.hp + warrior.hp, total, 0.0001, "no HP created")
+	check_eq(_healed_total(), healed_before, "nothing on the healing meter")
+	# And the other way round: the big hero is the donor, the small one the receiver.
+	_max_hp(mage, 100.0, 0.5)
+	_max_hp(warrior, 300.0, 1.0)
+	total = mage.hp + warrior.hp
+	t.step(0.5)
+	check_near(mage.hp - 50.0, 1.25, 0.0001, "the Mage takes its 1.25 HP")
+	check_near(300.0 - warrior.hp, 1.25, 0.0001, "the Warrior gives only that, not 3.75 (%.3f)" % (300.0 - warrior.hp))
+	check_near(mage.hp + warrior.hp, total, 0.0001, "no HP lost")
+	t.dismiss()
+
+
+func test_the_bond_totem_keeps_the_total_hp_and_moves_everybody_towards_the_average() -> void:
+	var s := _shaman(Vector3(30, 0, 0), 0)
+	var heroes: Array[Player] = [_ally(1, Vector3(-2, 0, 0), &"mage"), _ally(2, Vector3(2, 0, 0)), _ally(3, Vector3(0, 0, 2), &"rogue")]
+	_max_hp(heroes[0], 80.0, 1.0)
+	_max_hp(heroes[1], 400.0, 0.3)
+	_max_hp(heroes[2], 160.0, 0.9)
+	var t := ShamanTotem.plant(s, &"bond", _bond_params({"equalize_pct": 40.0}), Vector3.ZERO, 30.0)
+	var total := 0.0
+	for h in heroes:
+		total += h.hp
+	for tick in 40:
+		var shares: Array[float] = []
+		var sum := 0.0
+		for h in heroes:
+			shares.append(h.hp / h.max_hp())
+			sum += h.hp / h.max_hp()
+		var average := sum / 3.0
+		t.step(0.5)
+		var now := 0.0
+		for i in 3:
+			now += heroes[i].hp
+			var share := heroes[i].hp / heroes[i].max_hp()
+			check(not heroes[i].downed and heroes[i].hp >= 1.0, "tick %d: hero %d is on its feet" % [tick, i])
+			if shares[i] > average + 0.0001:
+				check(share <= shares[i] + 0.00001 and share >= average - 0.0001, "tick %d: a donor goes down, not below the average" % tick)
+			elif shares[i] < average - 0.0001:
+				check(share >= shares[i] - 0.00001 and share <= average + 0.0001, "tick %d: a receiver goes up, not above the average" % tick)
+		if absf(now - total) > 0.001:
+			check_near(now, total, 0.001, "tick %d: the total HP stays" % tick)
+			break
+	var low := 9.0
+	var high := 0.0
+	for h in heroes:
+		low = minf(low, h.hp / h.max_hp())
+		high = maxf(high, h.hp / h.max_hp())
+	check(high - low < 0.05, "after 20 sec the shares are close (%.3f .. %.3f)" % [low, high])
+	check_eq(_healed_total(), 0.0, "and the meter never saw any of it")
 	t.dismiss()
 
 
@@ -598,6 +699,8 @@ func test_a_donor_never_drops_below_the_average_and_is_never_lethal() -> void:
 	var s := _shaman(Vector3.ZERO, 0)
 	var a := _ally(1, Vector3(2, 0, 0))
 	var b := _ally(2, Vector3(-2, 0, 0))
+	for hero in [s, a, b]:
+		_max_hp(hero, 100.0)  # equal Max HP: the HP shares can all land on the average
 	a.hp = a.max_hp() * 0.2
 	b.hp = b.max_hp() * 0.5
 	# A share of 100%: everybody lands exactly on the average - donors on it, not below it.
@@ -642,6 +745,8 @@ func test_downed_and_distant_heroes_are_not_part_of_the_bond() -> void:
 	var a := _ally(1, Vector3(2, 0, 0))
 	var downed := _ally(2, Vector3(-2, 0, 0))
 	var far := _ally(3, Vector3(7, 0, 0))
+	for hero in [s, a, downed, far]:
+		_max_hp(hero, 100.0)  # equal Max HP: the shares move by the share of the gap
 	a.hp = a.max_hp() * 0.4
 	far.hp = far.max_hp() * 0.1
 	_down(downed)
@@ -857,6 +962,33 @@ func test_weathered_wood_lengthens_the_bond_totem() -> void:
 	var t := b.standing()
 	check(t != null, "it stands")
 	check_near(t.time_left(), 13.0 - 0.1, 0.15, "+30% duration (Weathered Wood 3/3): 13 sec")
+
+
+func test_the_bond_totem_takes_only_the_duration_from_the_totem_mods() -> void:
+	var p := _shaman()
+	var ally := _ally(1, Vector3(2, 0, 0))
+	var b := _to_bond(p)
+	# The Ancestral Chorus aura and other Totem Rite mods land on the pseudo ability "shaman_totems" too.
+	p.bonuses.set_effects(&"test_totem_mods", [{"kind": "ability", "match": {"id": "shaman_totems"}, "rank": 1,
+		"mods": {"aura_damage_pct_add": 10.0, "duration_pct": 30.0, "power_pct": 25.0, "earth_slow_add": 6.0}}])
+	b.begin_wave()
+	_tick(p, 8.1, true)
+	var t := b.standing()
+	check(t != null, "the Bond Totem stands")
+	if t == null:
+		return
+	check_near(t.time_left(), 13.0 - 0.1, 0.15, "the duration mod is in: 10 sec + 30%")
+	check_eq(t.num("aura_damage_pct"), 0.0, "no Ancestral Chorus aura on the Bond Totem")
+	var keys := t.params.keys()
+	keys.sort()
+	check_eq(keys, ["damage_taken_pct", "duration", "equalize_pct", "radius", "tick"], "only the Bond Totem's own numbers (no power / earth_slow / aura)")
+	for i in 60:
+		_tick(p, 0.1, true)
+	check(not p.stats.has_source(&"totem_aura:0") and not ally.stats.has_source(&"totem_aura:0"), "nobody carries the aura source")
+	# A Rite totem with the same mods does carry it (the mod itself works).
+	var rite := ShamanTotem.plant(p, &"fire", ShamanKit.totem_params(p, {"duration": 10.0, "fire_range": 9.0}), Vector3.ZERO, 10.0)
+	check_eq(rite.num("aura_damage_pct"), 10.0, "a Totem Rite totem gets the aura")
+	rite.dismiss()
 
 
 func test_bond_totem_params_and_text() -> void:

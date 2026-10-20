@@ -17,9 +17,12 @@ extends Node3D
 ##          without Storm Echo
 ##   bond   (Bond Totem, the Wellspring capstone plants it; params radius, equalize_pct, tick, damage_taken_pct) every
 ##          FIELD_TICK s the living heroes within radius get the damage-taken multiplier "bond_totem:<slot>"
-##          (1 - damage_taken_pct / 100) and every tick s each moves equalize_pct x tick % of the gap towards the
-##          group's average HP share: below it = a normal heal credited to the owner, above it = a silent HP loss
-##          (Player.drain_hp: never below the average, never lethal, no damage event, no damage meter entry)
+##          (1 - damage_taken_pct / 100) and every tick s each wants to move equalize_pct x tick % of the gap towards
+##          the group's average HP share. That is a TRANSFER, not a heal: the same absolute HP leaves the donors
+##          (above the average: Player.drain_hp, never below the average, never lethal, no damage event, no damage
+##          meter entry) and enters the receivers (Player.fill_hp), whatever their Max HP are, every side scaled by
+##          one factor so each hero still moves towards the average and none passes it. No healing meter credit
+##          for the Shaman (nothing is created) and no "+N" numbers; the beams show who gives and who takes.
 ## Aura (Artifact property, aura_damage_pct > 0): heroes within aura_radius of ANY totem of the owner get
 ## the stat source "totem_aura:<slot>" {damage_pct}. Radii count the owner's Area Size.
 ## [param params] are the final Totem Rite numbers (rank / spec / item mods and the shaman_totems mods in).
@@ -369,8 +372,13 @@ func _refresh_bond() -> void:
 		_bond_buffed[id] = hero
 
 
-## Every hero in the circle moves [code]equalize_pct x tick[/code] % of the gap between its HP share and the
-## group's average towards it. Needs two living heroes; downed heroes and heroes out of range are not part of it.
+## Every hero in the circle wants to move [code]equalize_pct x tick[/code] % of the gap between its HP share and
+## the group's average towards it (a share of its OWN Max HP). The wishes are matched into one transfer: the donors
+## can give what lies above max(1, average share x Max HP), the receivers can take up to their Max HP, the same
+## absolute HP moves from the first to the second group and each side is scaled by one factor, so HP is conserved
+## when the Max HP differ and every hero still moves towards the average without passing it. A pure transfer: no
+## healing meter credit, no numbers (Player.fill_hp). Needs two living heroes; downed heroes and heroes out of range
+## are not part of it.
 func _even_out(tick: float) -> void:
 	var heroes := ShamanKit.heroes_around(get_tree(), global_position, radius_of("radius", 6.0))
 	if heroes.size() < 2:
@@ -380,15 +388,35 @@ func _even_out(tick: float) -> void:
 		sum += ShamanKit.hp_ratio(hero)
 	var average := sum / float(heroes.size())
 	var share := clampf(num("equalize_pct", 10.0) / 100.0 * tick, 0.0, 1.0)
-	var crown := global_position + Vector3.UP * (ShamanTotemModel.CROWN_Y + 0.1)
+	## HP each hero hands over / takes in this tick (index = the hero's).
+	var gives: Array[float] = []
+	var takes: Array[float] = []
+	var give_sum := 0.0
+	var take_sum := 0.0
 	for hero in heroes:
 		var move := (average - ShamanKit.hp_ratio(hero)) * share * hero.max_hp()
-		if absf(move) < MIN_TRANSFER:
-			continue
-		if move > 0.0:
-			hero.heal(move, Player.slot_index_of(owner_player))
+		var give := 0.0
+		var take := 0.0
+		if move >= MIN_TRANSFER:
+			take = clampf(hero.max_hp() - hero.hp, 0.0, move)
+		elif move <= -MIN_TRANSFER:
+			give = clampf(hero.hp - maxf(1.0, average * hero.max_hp()), 0.0, -move)
+		gives.append(give)
+		takes.append(take)
+		give_sum += give
+		take_sum += take
+	var moved := minf(give_sum, take_sum)
+	if moved < MIN_TRANSFER:
+		return
+	var crown := global_position + Vector3.UP * (ShamanTotemModel.CROWN_Y + 0.1)
+	for i in heroes.size():
+		var hero := heroes[i]
+		if gives[i] > 0.0:
+			hero.drain_hp(gives[i] * moved / give_sum, maxf(1.0, average * hero.max_hp()))
+		elif takes[i] > 0.0:
+			hero.fill_hp(takes[i] * moved / take_sum)
 		else:
-			hero.drain_hp(-move, maxf(1.0, average * hero.max_hp()))
+			continue
 		ProcVfx.beam(crown, hero.get_chest_position(), ShamanKit.BOND_COLOR)
 
 

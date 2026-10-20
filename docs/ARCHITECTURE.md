@@ -3950,13 +3950,17 @@ Legendaries, items) passes `tests/test_m7_ip_names.gd` and is unique game-wide.
     `Player.revive_speed_pct` / `revive_hp_pct` in `setup`, subtracts in `teardown`. Gift of the Elders uses the same script.
   - `scenes/talents/shaman/wellspring_bond_totem.gd` (`ShamanWellspringBondTotem`; `interval 25, first_at 8, duration 10, radius 6,
     equalize_pct 10, tick 0.5, damage_taken_pct 20`): plants `ShamanTotem.plant(player, &"bond", ...)`. The Bond Totem is separate
-    from the Totem Rite slot.
+    from the Totem Rite slot. Only `duration` goes through `ShamanKit.totem_params` (like the Thunderpost), so the other
+    `shaman_totems` mods (Ancestral Chorus aura, Attuned Totems, Ancestral Reach) never reach it.
   - Twinned Spirits, Firebug Bombs, Rebounding Arc, Molten Trail, Ancestral Reach and the other talents are data only.
 - Bond Totem behaviour (`ShamanTotem._step_bond`): every 0.25 s the living heroes in range get
-  `Player.damage_taken_mults["bond_totem:<owner slot>"] = 0.8` (two Shamans multiply). Every `tick` each hero moves
-  `equalize_pct / 100 x tick` of the gap towards the group's mean HP share: a hero below the mean is healed with
-  `Player.heal`, a hero above it loses HP with `Player.drain_hp(amount, floor = max(1, average HP))` (no damage event,
-  no number, never below the average). Needs two living heroes in range; downed or distant heroes are not in the average.
+  `Player.damage_taken_mults["bond_totem:<owner slot>"] = 0.8` (two Shamans multiply). Every `tick` each hero WANTS to move
+  `equalize_pct / 100 x tick` of the gap (a share of its own Max HP) towards the group's mean HP share; `_even_out` matches the
+  wishes into one transfer: donors give at most what lies above `max(1, average share x Max HP)`, receivers take at most up to
+  their Max HP, `min(gives, takes)` moves and each side is scaled by one factor, so the absolute HP is conserved (also for
+  different Max HP) and nobody passes the average. Donors use `Player.drain_hp(amount, floor)`, receivers `Player.fill_hp`: no
+  damage event, no "+N" number, no healing meter credit (a transfer creates nothing) and never lethal. Needs two living
+  heroes in range; downed or distant heroes are not in the average.
 - Elder Spirits in the revive: `Player._update_revive` takes speed boost `1 + min(150, sum) / 100` over the living
   revivers in the circle, on top of the 50% per extra reviver rule; the revived HP is `min(1, 0.3 + min(60, sum) / 100)`.
 - Bots: `TalentBot` is unchanged (tree = slot index % 3). Bots never wield two weapons, so the Warspirit dual-wield

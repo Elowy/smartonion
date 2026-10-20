@@ -2165,7 +2165,7 @@ Gyógyítás, totemek és a csapat támogatása: a Soothing Downpour, a totemek 
   - Minden hős a saját kulcsán adja, így két azonos kasztú hős hatása szorzódik, mint két
     Battle Roar-é.
 - **Az M8 döntései** (a játék szabályai miatt): az Elemental Surge a garantált krit helyett +100% sebzést ad a következő 3 sebző képességre, mert a képességek nem kritelnek; a Pack Frenzy a lassíthatatlanság helyett +30% támadássebességet ad, mert a petek nem lassíthatók; a Gale Strike csapásai nem fegyvertalálatok.
-- **Bond Totem:** a totem a 6 m-en belüli hősök HP-arányát másodpercenként a különbség 10%-ával a közös átlag felé mozdítja: az alacsonyabb HP-jű hős gyógyul, a magasabb HP-jű csendben veszít HP-t, de az átlag alá nem megy; a kapott sebzés −20% (nem az okozotté); a totem nem célozható.
+- **Bond Totem:** a totem a 6 m-en belüli hősök HP-arányát másodpercenként a különbség 10%-ával a közös átlag felé mozdítja: az alacsonyabb HP-jű hős kap, a magasabb HP-jű csendben ad HP-t, de az átlag alá nem megy. Ez átvitel, nem gyógyítás: ugyanannyi HP lép ki az adókból, mint amennyi belép a vevőkbe (eltérő Max HP-nál is, nem keletkezik és nem tűnik el HP), a healing meter nem írja jóvá a Shamannek, és nincs „+N” szám; a kapott sebzés −20% (nem az okozotté); a totem nem célozható. Csak a totem időtartamát változtatják a „minden totem” bónuszok (Weathered Wood, set), az Ancestral Chorus aura nem kerül rá.
 - **Mind a 21 capstone kész:** a 15 régi M5-ben, a Hunter és a Shaman hat új capstone-ja M8-ban (Pack Frenzy, Steady Aura, Firebug Bombs, Elemental Surge, Gale Strike, Bond Totem).
 
 ### 7.6 Kapcsolat a többi rendszerrel
