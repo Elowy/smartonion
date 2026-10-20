@@ -575,6 +575,7 @@ func test_shields_keep_their_own_timers() -> void:
 
 
 func test_shield_hp_is_read_only() -> void:
+	expect_error("ProcSystem.shield_hp is read-only")
 	var ps := _hero().procs
 	ps.add_shield(10.0, 3600.0, &"barrier")
 	ps.add_shield(5.0, 4.0)
