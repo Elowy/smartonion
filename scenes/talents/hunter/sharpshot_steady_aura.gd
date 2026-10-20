@@ -15,12 +15,14 @@ extends TalentEffect
 ## Params (not rank-scaled; capstone, rank 1): radius, damage_pct, interval.
 
 const KEY_PREFIX := "hunter_steady_aura"
-const RING_COLOR := Color(0.45, 0.72, 0.98, 0.2)
+const RING_COLOR := Color(0.4, 0.7, 1.0, 0.42)
 const RING_Y := 0.03
-## Ring band as fractions of the quad's half size (a thin edge and a very faint fill).
-const RING_INNER := 0.985
+## Ring band as fractions of the quad's half size (a thin edge of 0.2 m at 8 m and a very faint
+## fill) and the weight of the dark / white edge strokes that keep it readable on any ground.
+const RING_INNER := 0.975
 const RING_OUTER := 1.0
-const RING_FILL := 0.035
+const RING_FILL := 0.1
+const RING_STROKE := 0.4
 
 ## The Player.damage_mults key of this Hunter's aura.
 var key: StringName = &""
@@ -161,3 +163,4 @@ func _show_ring() -> void:
 	_ring.position = Vector3(0.0, RING_Y, 0.0)
 	player.add_child(_ring)
 	Mats.set_ring(_ring, RING_COLOR, RING_INNER, RING_OUTER, RING_FILL)
+	Mats.set_ring_stroke(_ring, RING_STROKE)
