@@ -296,6 +296,9 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	if picker != null and picker.is_open():
 		picker.handle_input(inp)
 		return
+	if inp.just_pressed(PlayerInput.Pad.LT) and open_seasoning_picker(slot):
+		Audio.play_ui(&"ui_confirm")
+		return
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
 		if not slot.ready and ready_block_reason(slot) != "":
@@ -330,8 +333,6 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
 			Audio.play_ui(&"ui_move")
-		if inp.just_pressed(PlayerInput.Pad.LT) and open_seasoning_picker(slot):
-			Audio.play_ui(&"ui_confirm")
 
 
 ## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
@@ -340,22 +341,6 @@ func ready_block_reason(slot: PlayerSlot) -> String:
 	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
 		return ""
 	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
-
-
-## The Seasoning picker on [param slot]'s card (null for a slot without a card).
-func picker_of(slot: PlayerSlot) -> SeasoningPicker:
-	if slot == null or slot.index < 0 or slot.index >= cards.size():
-		return null
-	return cards[slot.index].picker
-
-
-## Opens [param slot]'s Seasoning picker (LT / right mouse button). Not while the player is ready (the picks are locked like the class),
-## for a class the profile has not unlocked, or without a card. True when it opened.
-func open_seasoning_picker(slot: PlayerSlot) -> bool:
-	var picker := picker_of(slot)
-	if picker == null or slot.ready or ready_block_reason(slot) != "":
-		return false
-	return picker.open(slot)
 
 
 ## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class
@@ -376,6 +361,22 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 		Seasonings.prune(slot)  # (what the new class cannot carry: another class's Seasonings, too many for its slots)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
+
+
+## The Seasoning picker on [param slot]'s card (null for a slot without a card).
+func picker_of(slot: PlayerSlot) -> SeasoningPicker:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].picker
+
+
+## Opens [param slot]'s Seasoning picker (LT / right mouse button). Not while the player is ready (the picks are locked like the class),
+## for a class the profile has not unlocked, or without a card. True when it opened.
+func open_seasoning_picker(slot: PlayerSlot) -> bool:
+	var picker := picker_of(slot)
+	if picker == null or slot.ready or ready_block_reason(slot) != "":
+		return false
+	return picker.open(slot)
 
 
 func _update_countdown(delta: float) -> void:
