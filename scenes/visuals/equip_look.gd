@@ -31,7 +31,8 @@ var armor: int = ClassData.ArmorType.CLOTH
 ## Material tier 0..2 (Items.material_tier).
 var tier := 0
 var rarity := 0
-## Tier set id ("" = none); set pieces are Epic, class-restricted pieces of a SetData.
+## Tier set id ("" = none); set pieces are Epic pieces of a SetData (class-restricted, or free of
+## any class for a class-independent set).
 var set_id: StringName
 ## Source id of a hand-made item (unique / set piece / Legendary); "" for a generated one.
 var unique_id: StringName

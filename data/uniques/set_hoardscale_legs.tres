@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"set_hoardscale_legs"
+display_name = "Hoardscale Chausses"
+flavor = "They jingle, and that is the point."
+slot_type = 7
+armor_type = 2
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"haste": 3.0,
+&"mastery": 5.0,
+&"stamina": 8.0
+})
+class_restriction = &""
+set_id = &"hoardscale_mail"
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 6
+weight = 0.0

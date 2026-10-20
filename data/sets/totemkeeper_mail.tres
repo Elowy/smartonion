@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"totemkeeper_mail"
+display_name = "Totemkeeper's Mail"
+class_id = &"shaman"
+piece_ids = Array[StringName]([&"set_shaman_head", &"set_shaman_shoulders", &"set_shaman_chest", &"set_shaman_hands", &"set_shaman_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "shaman_totems"
+},
+"mods": {
+"duration_pct": 30.0
+}
+}],
+"pieces": 2,
+"text": "Your totems last 30% longer."
+}, {
+"effects": [{
+"kind": "ability",
+"match": {
+"id": "forking_bolt"
+},
+"mods": {
+"targets_add": 2.0
+}
+}],
+"pieces": 4,
+"text": "Forking Bolt hits 2 more enemies."
+}])

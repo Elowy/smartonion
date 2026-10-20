@@ -21,6 +21,7 @@ Brotato-szerű, WoW-hangulatú arena survivor Godot 4-ben, 1–4 fős helyi co-o
 |---|---|---|
 | Csatlakozás a lobbyban | A | Enter / Space / F |
 | Kaszt váltása | bal kar / d-pad ◀ ▶ | A / D vagy nyilak |
+| Társ (companion) váltása, ha a kasztnak van | RB | E |
 | Ready / megerősítés | A | Enter / Space / F |
 | Mód váltása (Normal / Endless) | Y | C |
 | Hardcore be / ki | X | R |
@@ -34,10 +35,12 @@ A lobbyban bármelyik csatlakozott játékos átválthatja a módot (Y) és beka
 
 A főmenüben a **Settings** és a **Credits** oldal érhető el, a szünetmenüből a Settings. Az oldalakon a fel / le lépteti a sorokat, a bal / jobb (vagy a d-pad) állítja az értéket, az A (billentyűzeten Enter / Space) választ, a B (Esc) visszalép. A Credits oldalt a bal kar, a d-pad vagy a nyilak görgetik.
 
-### Ami ebben a verzióban van (M0–M7b)
+### Ami ebben a verzióban van (M0–M8)
 
-- **Kör:** főmenü → lobby (1–4 játékos, 5 kaszt, mód és Hardcore) → hullámok (Normal: 25 hullám, Endless: végtelen) → győzelem / vereség → eredmény és ranglista → lobby.
-- **Hősök:** 5 kaszt (Warrior, Mage, Paladin, Rogue, Warlock). Szintlépéskor ability- és stat-kártyát választasz; 36 ability van, auto-cast slotokkal és rangokkal (Trainer). Kasztonként 3 talentfa.
+- **Kör:** főmenü → lobby (1–4 játékos, 7 kaszt, mód és Hardcore) → hullámok (Normal: 25 hullám, Endless: végtelen) → győzelem / vereség → eredmény és ranglista → lobby.
+- **Hősök:** 7 kaszt (Warrior, Mage, Paladin, Rogue, Warlock, Hunter, Shaman). Szintlépéskor ability- és stat-kártyát választasz; 48 ability van, auto-cast slotokkal és rangokkal (Trainer). Kasztonként 3 talentfa.
+- **Hunter és Shaman (M8):** a Hunter Focus-erőforrással, Arrow Fan és Backstep alapképességekkel harcol, és állandó társa van (Wolf, Boar vagy Owl; a lobbyban RB-vel, billentyűzeten E-vel választható). A Shaman Surge-erőforrással, Forking Bolt és Totem Rite alapképességekkel harcol; a totemjei a Fire, Water, Earth és Air elemek között váltanak. Mindkettőnek 3 talentfája, tier setje, Artifactja és 8 kaszt-specifikus itemje van.
+- **Új fegyverek és setek (M8):** Crossbow, Polearm és Fist Weapon, mindegyiknek saját Forge Legendary-vel; öt kaszt-független tier set (egy Cloth, egy Leather, két Mail és egy Plate), amelyet bármelyik kaszt viselhet, aki a páncéltípusát hordhatja.
 - **Itemek és loot:** generált itemek (alaptípus, ritkaság, utótag, enchant és proc), kézzel tervezett Rare / Epic és kaszt-specifikus itemek, trinketek, Legendary-k és setek. Forrás: normál drop, elit, Coin Gremlin és boss; a dobás Need / Greed / Pass.
 - **Kovácsolás és Enchanter:** fegyverkovácsolás (Legendary-hatások), enchantolás a Glimmer Dust kasszából.
 - **Artifact fegyverek:** kasztonként egy; ritka, véletlen loot a 10. hullámtól, hullámonként fejlődnek.
@@ -52,7 +55,7 @@ A főmenüben a **Settings** és a **Credits** oldal érhető el, a szünetmenü
 - **Hang és beállítások (M7a):** UI-, fegyver-, harc- és zenei hangok (CC0-s csomagok); a Settings oldalon hangerők (Master / Music / Effects / Interface), ablakmód, VSync, FPS-limit, képernyőrázkódás, sebzésszámok és FPS-kijelző; a Credits oldal a forrásokat mutatja.
 - **Grafika (M7b):** Cinzel-címek; game-icons.net ikonok a képességeken, talentfákon, fogyóeszközökön és szentélyeken; a hősön látszik a viselt sisak, váll és mellvért (páncéltípus, fokozat, ritkaság, setek); az öt aréna végleges látványa (élő talaj, környezeti részecskék, animált víz és láva) és a kripta-jellegű dungeon; új harci effektek (spawn, hullák, iskolaszínű találatok, kritikus találat, loot-pattanás, arany- és XP-nyomvonal, boss-belépő).
 
-Az M7a (hang, menük, beállítások, IP-tisztítás) és az M7b (grafika) kész; a hátralévő tartalom (M8: Hunter és Shaman, új fegyvertípusok; M9: meta-progresszió) a GDD 16. fejezetében van. A végleges balansz még hátra van.
+Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; a hátralévő tartalom (M9: meta-progresszió) a GDD 16. fejezetében van. A végleges balansz még hátra van.
 
 ## Fejlesztői parancsok
 
@@ -80,6 +83,11 @@ A teljes lista: [scenes/main/launch_options.gd](scenes/main/launch_options.gd). 
 - `--shrine-chance=X` – a szentély esélye minden hullámszünetben (0–1).
 - `--dungeon[=0|1]` – a dungeon-portál a következő hullám után nyílik (`=0`: ki).
 - `--leaderboard=PATH` – a ranglista fájlja; smoke, demo és nézet-futam is ebbe írja az eredményt.
+
+### Fejlesztői kapcsolók (M8)
+
+- `--companion=wolf|boar|owl` – minden bot, amelyiknek a kasztja kínál társat, a megadott társat választja (ha a kaszt nem kínálja, az első választás marad). Ismeretlen értéknél a smoke `bad_args` hibával, exit 1-gyel lép ki. Példa: `godot --headless --path . -- --smoke --waves=3 --classes=hunter,hunter,warrior,mage --companion=owl`.
+- Az ismeretlen kaszt-azonosító a `--classes=` kapcsolóban is `bad_args` (korábban figyelmeztetés és kihagyás volt).
 
 ### Fejlesztői kapcsolók (M7a)
 

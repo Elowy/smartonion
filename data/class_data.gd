@@ -36,10 +36,19 @@ enum ArmorType { CLOTH, LEATHER, MAIL, PLATE }
 @export var onion_color: Color = Color(0.85, 0.55, 0.3)
 ## Accent colour for armour trim / cloth.
 @export var accent_color: Color = Color(0.9, 0.75, 0.3)
-## helm_horned, wizard_hat, paladin_helm, hood, horned_hood
+## helm_horned, wizard_hat, paladin_helm, hood, horned_hood, hunter_hat, tribal_mask. An id the
+## armour and body builders do not know shows a plain circlet (OnionArmor) and the default gloves /
+## boots (OnionModel): never a bare head.
 @export var headgear: StringName
 ## true -> oversized shoulder pads
 @export var big_shoulders: bool = false
+
+@export_group("Companion (M8)")
+## The permanent-pet choices of the class (the Hunter's wolf / boar / owl), by id: the lobby card
+## shows a "Companion" row and lets the player cycle them (PlayerSlot.companion), bots take the
+## first, and the choice reaches the hero as Player.companion_id for the class's kit to read.
+## Empty (every other class) = no companion, no lobby row.
+@export var companion_choices: Array[StringName] = []
 
 
 func can_use(weapon: WeaponData) -> bool:
@@ -48,3 +57,24 @@ func can_use(weapon: WeaponData) -> bool:
 
 func can_dual_wield() -> bool:
 	return &"dual_wield" in proficiencies
+
+
+## Whether the class lets its player choose a companion (companion_choices is not empty).
+func has_companions() -> bool:
+	return not companion_choices.is_empty()
+
+
+## The companion a player gets who picked none (or one this class does not offer): the first
+## choice (&"" without choices).
+func default_companion() -> StringName:
+	return companion_choices[0] if not companion_choices.is_empty() else &""
+
+
+## [param wanted] when this class offers it, else [method default_companion].
+func pick_companion(wanted: StringName) -> StringName:
+	return wanted if wanted != &"" and wanted in companion_choices else default_companion()
+
+
+## UI name of companion [param id] ("wolf" -> "Wolf").
+static func companion_name(id: StringName) -> String:
+	return String(id).capitalize()

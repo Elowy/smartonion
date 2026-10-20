@@ -244,12 +244,20 @@ func test_full_hud_keeps_the_top_plaque_free() -> void:
 
 # --- Glyphs -------------------------------------------------------------------------------------
 
-func test_every_m4_ability_id_has_its_own_glyph() -> void:
+func test_every_learnable_ability_id_has_its_own_glyph() -> void:
 	var seen: Dictionary[int, StringName] = {}
 	var all: Array[StringName] = []
-	all.append_array(CORE_IDS)
-	all.append_array(M4_IDS)
-	check_eq(M4_IDS.size(), 36, "36 learnable abilities in GDD 6.4")
+	var learnable := 0
+	for id in Db.abilities:
+		all.append(id)
+		if Db.abilities[id].is_learned_kind():
+			learnable += 1
+	# GDD 6.4: six learnable abilities per class and six general ones.
+	check_eq(learnable, 6 * Db.class_ids.size() + 6, "6 learnable abilities per class + 6 general")
+	for id in M4_IDS:
+		check(Db.abilities.has(id), "the launch ability %s is still there" % id)
+	for id in CORE_IDS:
+		check(Db.abilities.has(id), "the launch core ability %s is still there" % id)
 	for id in all:
 		var g := AbilityIcon.glyph_for(id, &"physical", id)
 		check(g != AbilityIcon.Glyph.GENERIC, "%s has a real glyph" % id)
@@ -279,9 +287,11 @@ func test_new_glyphs_draw() -> void:
 	tree.root.add_child(box)
 	nodes.append(box)
 	var count := 0
+	var expected := 0
 	for g in AbilityIcon.Glyph.values():
 		if g < AbilityIcon.Glyph.THUNDER_CLAP:
 			continue
+		expected += 3
 		for side: float in [26.0, 42.0, 64.0]:
 			var icon := AbilityIcon.create(side, side != 26.0)
 			icon.set_ability(Fakes.ability(&"x"))
@@ -291,7 +301,8 @@ func test_new_glyphs_draw() -> void:
 			box.add_child(icon)
 			icon.queue_redraw()
 			count += 1
-	check_eq(count, 34 * 3, "34 new glyphs at three sizes")
+	check_eq(count, expected, "every glyph from Thunder Clap on, at three sizes")
+	check(count >= 34 * 3, "at least the 34 glyphs of M4 and the general pool")
 	await tree.process_frame
 	await tree.process_frame
 	finished.emit()

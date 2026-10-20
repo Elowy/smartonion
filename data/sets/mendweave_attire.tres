@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"mendweave_attire"
+display_name = "Mendweave Attire"
+class_id = &""
+armor_type = 0
+piece_ids = Array[StringName]([&"set_mendweave_head", &"set_mendweave_shoulders", &"set_mendweave_chest", &"set_mendweave_hands", &"set_mendweave_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{"kind": "stats", "stats": {"spirit": 8.0}}],
+"pieces": 2,
+"text": "Increases your Spirit by 8."
+}, {
+"effects": [{"kind": "proc", "proc": {"trigger": "periodic", "interval": 8.0, "effect": "heal", "target": "lowest_ally", "max_hp_pct": 10.0}}],
+"pieces": 4,
+"text": "Every 8 sec, the most wounded ally (you, when alone) is healed for 10% of their Max HP."
+}])

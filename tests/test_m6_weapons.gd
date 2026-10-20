@@ -6,6 +6,7 @@ extends TestCase
 const Fakes := preload("res://tests/player_fakes.gd")
 const Content := preload("res://tests/test_items_gen_content.gd")
 const ForgeTests := preload("res://tests/test_forge.gd")
+const Rules := preload("res://tests/content_rules.gd")
 const DT := 1.0 / 60.0
 
 const NEW_IDS: Array[StringName] = [&"two_hand_sword", &"two_hand_mace", &"orb"]
@@ -65,7 +66,9 @@ func _legendary(weapon_id: StringName) -> ItemInstance:
 # --- Data ----------------------------------------------------------------------------------
 
 func test_three_new_weapons_are_loaded_with_valid_fields() -> void:
-	check_eq(Db.weapons.size(), 13, "10 + 3 weapon base types")
+	for id in Rules.LAUNCH_WEAPONS:
+		check(Db.weapons.has(id), "launch weapon %s (10 + the 3 new base types)" % id)
+	check(Db.weapons.size() >= Rules.LAUNCH_WEAPONS.size(), "no weapon base went missing")
 	var proficiencies: Array[StringName] = []
 	for id in Db.class_ids:
 		proficiencies.append_array(Db.get_class_data(id).proficiencies)
@@ -106,7 +109,8 @@ func test_three_new_weapons_are_loaded_with_valid_fields() -> void:
 func test_class_proficiencies_follow_the_gdd() -> void:
 	for id in NEW_IDS:
 		var w := Db.get_weapon(id)
-		for class_id in Db.class_ids:
+		# The launch classes are pinned both ways; a later class (M8) has its proficiencies in its own tests.
+		for class_id in Rules.LAUNCH_CLASSES:
 			var expected: bool = class_id in USERS[id]
 			check_eq(Db.get_class_data(class_id).can_use(w), expected, "%s uses %s: %s" % [class_id, id, expected])
 	# The old types stay as they were.
@@ -242,10 +246,19 @@ func test_procedural_models_build_for_the_new_weapons() -> void:
 # --- Forge Legendaries ----------------------------------------------------------------------
 
 func test_every_new_weapon_has_its_own_legendary() -> void:
-	check_eq(Forge.legendaries().size(), 13, "13 Legendary effects, one per weapon base")
+	# One Legendary effect per weapon base: none missing, none for an unknown weapon, none twice.
+	check_eq(Forge.legendaries().size(), Db.weapons.size(), "one Legendary effect per weapon base")
+	for id in Db.weapons:
+		var legendary := Forge.legendary_for(id)
+		check(legendary != null, "%s has a Legendary" % id)
+		if legendary != null:
+			check_eq(legendary.weapon_id, id, "%s: the Legendary is keyed by its weapon" % id)
+	for id in Forge.legendaries():
+		check(Db.weapons.has(id), "the Legendary of %s belongs to a weapon base" % id)
 	var names: Array[String] = []
 	for id in Db.weapons:
-		names.append(Forge.legendary_for(id).display_name)
+		if Forge.legendary_for(id) != null:
+			names.append(Forge.legendary_for(id).display_name)
 	for id in NEW_IDS:
 		var data := Forge.legendary_for(id)
 		check(data != null, "%s has a Legendary" % id)

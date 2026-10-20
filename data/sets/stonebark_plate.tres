@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sets/set_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"stonebark_plate"
+display_name = "Stonebark Plate"
+class_id = &""
+armor_type = 3
+piece_ids = Array[StringName]([&"set_stonebark_head", &"set_stonebark_shoulders", &"set_stonebark_chest", &"set_stonebark_hands", &"set_stonebark_legs"])
+bonuses = Array[Dictionary]([{
+"effects": [{"kind": "damage_taken", "pct": -5.0}],
+"pieces": 2,
+"text": "You take 5% less damage."
+}, {
+"effects": [{"kind": "proc", "proc": {"trigger": "low_hp", "threshold": 40.0, "per_wave": 1, "effect": "shield", "max_hp_pct": 30.0, "duration": 6.0}}],
+"pieces": 4,
+"text": "When you fall below 40% health, a barrier absorbs damage equal to 30% of your Max HP for 6 sec. Once per wave."
+}])

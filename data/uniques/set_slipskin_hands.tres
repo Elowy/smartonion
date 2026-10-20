@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UniqueItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/items/unique_item_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"set_slipskin_hands"
+display_name = "Slipskin Grips"
+flavor = "Fingers quick enough to catch the draught."
+slot_type = 5
+armor_type = 1
+rarity = 3
+stats = Dictionary[StringName, float]({
+&"crit": 4.0,
+&"haste": 3.0,
+&"stamina": 6.0
+})
+class_restriction = &""
+set_id = &"slipskin_leathers"
+sources = Array[StringName]([&"shop", &"loot", &"elite", &"goblin", &"boss"])
+min_wave = 6
+weight = 0.0

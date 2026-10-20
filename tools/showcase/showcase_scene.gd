@@ -14,6 +14,8 @@ func run() -> void:
 			await _live()
 		"onions":
 			await _onions()
+		"hunter":
+			await _hunter()
 		"equip":
 			await _equip()
 		"sets":
@@ -24,6 +26,8 @@ func run() -> void:
 			await _enemies()
 		"weapons":
 			await _weapons()
+		"hands":
+			await _hands()
 		"arena":
 			await _arena_overview()
 		"revive":
@@ -203,6 +207,37 @@ func _onions() -> void:
 	await _frames(4 if state == "attack" else 20)
 
 
+## The Hunter (M8) close up with the three companions: --back=1 shows the quiver, --state=play_dead the
+## tipped-over pose, --state=frenzy the amber ring, --state=attack the lunge, --dist=N zooms.
+func _hunter() -> void:
+	var stage := _studio()
+	var cd := Db.get_class_data(&"hunter")
+	var back := _arg("back", "0") == "1"
+	var state := _arg("state", "")
+	var facing := Vector3(0, 0, -1) if back else Vector3(0, 0, 1)
+	var m := OnionModel.new()
+	stage.add_child(m)
+	m.setup(cd, PlayerManager.PLAYER_COLORS[0])
+	m.set_weapons(cd.main_hand, cd.off_hand)
+	m.position = Vector3(-1.5, 0, 0)
+	m.set_facing(facing)
+	if state == "play_dead":
+		m.set_play_dead(true)
+	var kinds: Array[StringName] = [&"wolf", &"boar", &"owl"]
+	for i in kinds.size():
+		var c := HunterCompanionModel.new()
+		c.kind = kinds[i]
+		stage.add_child(c)
+		c.position = Vector3(0.0 + 1.35 * i, 0, 0)
+		c.set_facing(facing)
+		match state:
+			"attack": c.play_attack()
+			"frenzy": c.set_frenzy(true)
+			"walk": c.set_moving(1.0)
+	_close_camera(stage, Vector3(0.6, 0.7, 0), 7.5, 22.0)
+	await _frames(40 if state == "play_dead" else 20)
+
+
 ## Worn armour (GDD 13): armour types x material tiers (--axis=tier, default) or rarities of one
 ## armour type (--axis=rarity --armor=0..3 --tier=0..2). --rarity=N sets the rarity of the grid,
 ## --back=1 turns the heroes away, --state=hurt|downed.
@@ -249,10 +284,20 @@ func _equip() -> void:
 	await _frames(20)
 
 
-## The five class tier sets worn complete on their classes, next to the starter look (--back=1).
+## The class tier sets (one per class, the Hunter's and the Shaman's too) worn complete on their classes, next
+## to the starter look (--back=1, --classes=hunter,shaman: only those, --dist=N zooms).
+## --free=1: the class-independent sets (Db.independent_sets) instead, worn on the heroes of their armour
+## (mail: the warrior's model, whatever its class), next to the same hero in a plain piece of that armour.
 func _sets() -> void:
+	if _arg("free", "0") == "1":
+		await _free_sets()
+		return
 	var stage := _studio()
-	var ids: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+	var ids: Array[StringName] = []
+	var only: PackedStringArray = _arg("classes", "").split(",", false)
+	for id in Db.class_ids:
+		if Db.set_for_class(id) != null and (only.is_empty() or String(id) in only):
+			ids.append(id)
 	var back := _arg("back", "0") == "1"
 	var rarity := int(_arg("rarity", "3"))
 	for r in 2:
@@ -269,6 +314,30 @@ func _sets() -> void:
 					EquipLook.make(EquipLook.Slot.SHOULDERS, cd.armor_type, 1, rarity, sid),
 					EquipLook.make(EquipLook.Slot.CHEST, cd.armor_type, 1, rarity, sid))
 			m.position = Vector3((i - (ids.size() - 1) * 0.5) * 1.7, 0, (r - 0.5) * 2.1)
+			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
+	_close_camera(stage, Vector3(0, 0.6, 0), maxf(12.0, 2.4 * ids.size()), 38.0)
+	await _frames(20)
+
+
+func _free_sets() -> void:
+	var stage := _studio()
+	var sets := Db.independent_sets()
+	var back := _arg("back", "0") == "1"
+	var rarity := int(_arg("rarity", "3"))
+	var models: Dictionary[int, StringName] = {ClassData.ArmorType.CLOTH: &"mage", ClassData.ArmorType.LEATHER: &"rogue",
+		ClassData.ArmorType.MAIL: &"warrior", ClassData.ArmorType.PLATE: &"paladin"}
+	for r in 2:
+		for i in sets.size():
+			var cd := Db.get_class_data(models.get(sets[i].armor_type, &"warrior"))
+			var m := OnionModel.new()
+			stage.add_child(m)
+			m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+			m.set_weapons(cd.main_hand, cd.off_hand)
+			var sid: StringName = sets[i].id if r == 0 else &""
+			m.set_looks(EquipLook.make(EquipLook.Slot.HEAD, sets[i].armor_type, 1, rarity, sid),
+				EquipLook.make(EquipLook.Slot.SHOULDERS, sets[i].armor_type, 1, rarity, sid),
+				EquipLook.make(EquipLook.Slot.CHEST, sets[i].armor_type, 1, rarity, sid))
+			m.position = Vector3((i - (sets.size() - 1) * 0.5) * 1.7, 0, (r - 0.5) * 2.1)
 			m.set_facing(Vector3(0, 0, -1) if back else Vector3(0, 0, 1))
 	_close_camera(stage, Vector3(0, 0.6, 0), 12.0, 38.0)
 	await _frames(20)
@@ -330,19 +399,66 @@ func _enemies() -> void:
 	await _frames(8)
 
 
+## Every weapon model (--ids=a,b,c: only those; --rarity=N, --gap=metres, --yaw=degrees).
 func _weapons() -> void:
 	var stage := _studio()
-	var i := 0
-	var ids := Db.weapons.keys()
+	var ids: Array = Db.weapons.keys()
 	ids.sort()
-	for id: StringName in ids:
-		var w := WeaponModel.build(Db.get_weapon(id))
+	if _arg("ids", "") != "":
+		ids = Array(_arg("ids", "").split(","))
+	var gap := float(_arg("gap", "0.75"))
+	var yaw := float(_arg("yaw", "180"))
+	for i in ids.size():
+		var id := StringName(ids[i])
+		var data := Db.get_weapon(id).duplicate() as WeaponData
+		data.rarity = int(_arg("rarity", "0"))
+		var w := WeaponModel.build(data)
 		stage.add_child(w)
-		w.position = Vector3((i - (ids.size() - 1) * 0.5) * 0.75, 0.6, 0)
-		w.rotation_degrees = Vector3(0, 180, -60 if id == &"gun" else 0)
-		i += 1
-	_close_camera(stage, Vector3(0, 0.75, 0), 9.0, 12.0)
+		w.position = Vector3((i - (ids.size() - 1) * 0.5) * gap, 0.6, 0)
+		w.rotation_degrees = Vector3(0, yaw, -60 if id == &"gun" else 0)
+	_close_camera(stage, Vector3(0, 0.75, 0), 9.0 if _arg("ids", "") == "" else 5.5, 12.0)
 	await _frames(4)
+
+
+## Weapons in hand (M8): one onion per --weapons=a,b,c (default crossbow,polearm,fist_weapon), the class
+## look of --classes=a,b,c (default warrior,mage,rogue; any class does: the weapon is what is shown),
+## a one-hander in both hands with --dual=1 (a fist weapon is always held in both), --back=1,
+## --state=attack|walk, --rarity=N, --turn=degrees (the heroes' yaw away from the camera, 0 = facing it).
+## --artifact=1: every hero of --classes holds the Artifact of its class (its tint and rarity; the class's
+## off-hand piece next to a one-hander) instead of a --weapons entry.
+func _hands() -> void:
+	var stage := _studio()
+	var ids: PackedStringArray = _arg("weapons", "crossbow,polearm,fist_weapon").split(",")
+	var classes: PackedStringArray = _arg("classes", "warrior,mage,rogue").split(",")
+	var artifacts := _arg("artifact", "0") == "1"
+	if artifacts:
+		ids = classes
+	var back := _arg("back", "0") == "1"
+	var state := _arg("state", "")
+	for i in ids.size():
+		var cd := Db.get_class_data(StringName(classes[i % classes.size()]))
+		var data: WeaponData
+		var off: WeaponData = null
+		if artifacts:
+			data = ItemGenerator.generate_artifact(cd.id, 12).weapon
+			off = cd.off_hand if data.hand == WeaponData.Hand.ONE_HAND else null
+		else:
+			data = Db.get_weapon(StringName(ids[i])).duplicate() as WeaponData
+			data.rarity = int(_arg("rarity", "0"))
+			var dual := data.hand == WeaponData.Hand.ONE_HAND and (_arg("dual", "0") == "1" or data.weapon_type == &"fist_weapon")
+			off = data if dual else null
+		var m := OnionModel.new()
+		stage.add_child(m)
+		m.setup(cd, PlayerManager.PLAYER_COLORS[i % PlayerManager.PLAYER_COLORS.size()])
+		m.set_weapons(data, off)
+		m.position = Vector3((i - (ids.size() - 1) * 0.5) * 2.0, 0, 0)
+		var turn := deg_to_rad(float(_arg("turn", "0")) + (180.0 if back else 0.0))
+		m.set_facing(Vector3(sin(turn), 0, cos(turn)))
+		match state:
+			"attack": m.play_attack(false)
+			"walk": m.set_moving(1.0)
+	_close_camera(stage, Vector3(0, 0.8, 0), 7.0, 28.0)
+	await _frames(4 if state == "attack" else 20)
 
 
 ## Revive scene through the gameplay camera: a paladin channels a resurrection on a

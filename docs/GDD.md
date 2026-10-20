@@ -3,11 +3,11 @@
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
 > fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
-> Státusz: **M0–M6b kész** (a 16. fejezet szerint), egyetlen kivétellel: a **végleges 25
-> hullámos balansz** az M6b utolsó lépése, és még hátravan. Az M6b (módok, környezetek,
+> Státusz: **M0–M8 kész** (a 16. fejezet szerint), egyetlen kivétellel: a **végleges 25
+> hullámos balansz** az utolsó lépés, és még hátravan. Az M6b (módok, környezetek,
 > események, szentélyek, Dungeon-portál, tartalom-csomagok) megvalósult; ahol a kód
 > pontosít a tervhez képest, a 16.1 „pontosítások” blokkjai és az érintett fejezetek ezt
-> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás) és az M7b (grafika: betűtípus, ikonok, látszó felszerelés, környezetek, harci effektek) kész, a későbbi mérföldkövek még tervezés. Ez a dokumentum a fejlesztés
+> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika: betűtípus, ikonok, látszó felszerelés, környezetek, harci effektek) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; a későbbi mérföldkő (M9) még tervezés. Ez a dokumentum a fejlesztés
 > alapja; minden szám kiinduló érték, a balanszolás során változni fog (az M6b maga nem
 > hangolt: a végleges balansz egyszer, a legvégén készül, lásd 9. és 16. fejezet).
 
@@ -34,7 +34,7 @@
 | Fegyverkovácsolás | Brotato-szerűen: **2 azonos fegyver, azonos ritkaságban → 1, eggyel magasabb ritkaságú** (lásd 4.1) |
 | Loot / erőforrás | **Egyetlen közös pénztárca** és közös XP – bárki költhet belőle, ezért koordinációt igényel (részletek: 10. fejezet) |
 | Grafika | WoW-szerű stilizált low-poly 3D, felülnézeti kamera (részletek: 13. fejezet) |
-| Kasztok (MVP) | Warrior, Mage, Paladin, Rogue, Warlock – adatvezérelten bővíthető |
+| Kasztok | Warrior, Mage, Paladin, Rogue, Warlock (MVP); M8-ban Hunter és Shaman – adatvezérelten bővíthető |
 
 ---
 
@@ -325,89 +325,117 @@ Minden kaszt tartalmaz:
 ### 3.6 Bővíthetőség
 
 Új kaszt (pl. Hunter, Shaman, Priest, Druid, Death Knight) = új **ClassData** adatfájl
-+ a két képesség saját logikája. A Mail páncéltípus már most létezik a Hunter és a
-Shaman miatt.
++ a két képesség saját logikája. Ezt az utat járta be az M8 a Hunter és a Shaman kasztnál (3.7).
 
-### 3.7 Tervezett kasztok (backlog, M8): Hunter és Shaman
+### 3.7 Hunter és Shaman (M8, megvalósítva)
 
-Mindkettő **Mail** páncélt hord, és a többi kaszttal azonos felépítésű:
-- 2 alap képesség,
-- erőforrás,
-- Mastery,
-- 6 saját ability,
-- 3 talentfa,
-- tier set,
-- Artifact.
-
-**M8-as nevek – átnevezendők:** a Hunter és a Shaman tervezett nevei (ez a fejezet, a 7. fejezet M8-as sorai és a 9. fejezet) WoW-ból származnak. Az M7a IP-tisztításban ezeket szándékosan nem neveztük át; az M8 építésekor a következő javaslatok szerint kell cserélni:
-
-- Hunter fák: Beast Mastery / Marksmanship / Survival → **Packlord** / **Sharpshot** / **Wildcraft**.
-- Shaman fák: Elemental / Enhancement / Restoration → **Stormweaving** / **Warspirit** / **Wellspring**.
-- Hunter képességek és Mastery: Multi-Shot, Disengage, Master of Beasts, Aimed Shot, Rapid Fire → **Arrow Fan**, **Backstep**, **Beastbond**, **Long Shot**, **Quick Draw**; a Volley, Explosive Trap, Kill Command és Feign Death javasolt nevei: Blast Snare, Hunt Signal, Play Dead (a megfeleltetést M8-ban kell véglegesíteni).
-- Shaman erőforrás és képességek: Maelstrom → **Surge**; Totemic Call → **Totem Rite**; Elemental Overload → **Storm Echo**; Chain Lightning → **Forking Bolt**; Lava Lash → **Magma Lash**; Healing Rain → **Soothing Downpour**; Thunderstorm → **Stormburst**; Feral Spirit → **Spirit Pack**; Ancestral Spirit → **Elder Spirits**.
-- Capstone-ok (7. fejezet): Bestial Wrath → **Pack Frenzy**; Trueshot Aura → **Steady Aura**; Wildfire Bombs → **Firebug Bombs**; Elemental Mastery → **Elemental Surge**; Stormstrike → **Gale Strike**; Spirit Link Totem → **Bond Totem**.
-- Hunter erőforrás: Focus → **Fervor**.
+Mindkettő **Mail** páncélt hord, és a többi kaszttal azonos felépítésű: 2 alap képesség,
+erőforrás, Mastery, 6 saját ability, 3 talentfa, tier set, Artifact. Mindkettő a játék
+elejétől játszható (a későbbi meta-progresszió zárhatja le, lásd 17. fejezet). Az M8 új nevei
+(fák, képességek, Mastery, erőforrás, capstone-ok, setek, Artifactok) IP-tisztán lettek kiválasztva.
 
 #### Hunter
+
 | | |
 |---|---|
-| Szerep | Távolsági sebző + állandó **pet** |
+| Szerep | Távolsági sebző + állandó **társ** (Wolf / Boar / Owl) |
 | Hagyma | **Salottahagyma** (rézbarna), tollas vadászkalap, szőrmés Mail-vállvért, tegez a hátán |
 | Páncél | Mail |
-| Kezdőfegyver | Bow |
+| Kezdőfegyver | Bow (kétkezes) |
 | Jártasság | Bow, Gun, Crossbow, Polearm, Axe, Sword, Dagger, **Dual Wield** |
-| Alap | +2 Agility, állandó **pet** (a lobbyban választható: farkas / vaddisznó / bagoly), **−3 Max HP** |
-| Erőforrás | **Focus** (0–100), +10 / mp |
-| Képesség 1 | **Multi-Shot** – 40 Focus: 5 nyíl legyezőben |
-| Képesség 2 | **Disengage** – 8 mp CD: hátraugrás, a közeli ellenségek 2 mp-ig lassulnak |
-| Mastery | **Master of Beasts** – +% pet-sebzés pontonként |
-| Pet | Magától támad, a vadász Stamina-jával és Agility-jével skálázódik. Ha meghal, a hullám végén feltámad |
+| Alap | +2 Agility, **−3 Max HP** (Stamina −3) |
+| Elsődleges stat | Agility |
+| Erőforrás | **Focus** (0–100): 100-ról indul, +10 / mp, a Haste-tel nő |
+| Képesség 1 | **Arrow Fan** (RT) – 40 Focus |
+| Képesség 2 | **Backstep** (LT) – 8 mp CD, 1 töltés |
+| Mastery | **Beastbond** – +2% társ-sebzés pontonként (a pet-forrású sebzésre: harapás, Hunt Signal, vaddisznó-roham, bagolylövedék) |
 
-**Ability-készlet:**
+**Képességek** (a két alap és a hat saját; a III. rang +1 extra hatás, az V. rang két specializáció közül egyet ad):
 
-| Ability | Típus | Hatás |
-|---|---|---|
-| Aimed Shot | Active | Rövid célzás, nagy sebzésű, mindent átütő lövés |
-| Volley | Active | Nyílzápor egy területre, 4 mp |
-| Rapid Fire | Active | 4 mp-ig +40% Haste |
-| Explosive Trap | Auto | Csapdát tesz le, ami robban, ha ellenség lép bele |
-| Kill Command | Auto | A pet nagy csapást mér a legerősebb közeli ellenségre |
-| Feign Death | Active | Az ellenségek 2 mp-ig elveszítik a célt (menekülés) |
+| Képesség | Típus, költség / CD | Hatás | III. rang | V. rang (két specializáció) |
+|---|---|---|---|---|
+| **Arrow Fan** (alap) | Active · 40 Focus · 0 mp CD | 5 nyíl 50°-os legyezőben a legközelebbi ellenségre, nyílanként 120% fegyversebzés, 11 m | +2 nyíl | **Skewering Fan**: a nyilak 1 ellenséggel többet átütnek, 3 m-rel tovább repülnek · **Echo Draw**: második legyezés 0,25 mp-cel később |
+| **Backstep** (alap) | Active · 8 mp CD · 1 töltés | 5 m-t ugrik a legközelebbi, előtte lévő ellenségtől (különben hátra); 0,2 mp sebezhetetlenség; az indulási pont 3 m-es körében lévő ellenségek 40%-kal lassulnak 2 mp-ig | +1 töltés | **Caltrop Trail**: a leugrás mentén 3 mp-ig tüskék, amelyek 40%-kal lassítanak · **Parting Volley**: érkezéskor 3 nyíl a legközelebbi ellenségre, nyílanként 100% fegyversebzés |
+| **Long Shot** | Active · 9 mp CD | 0,7 mp célzás (közben mozoghatsz), majd 1 nyíl 320% fegyversebzéssel, ami minden ellenségen átüt a vonalában; 14 m | +1 nyíl a következő legjobb vonalon | **Snap Shot**: nincs célzásidő, a CD 30%-kal rövidebb · **Rending Shaft**: a találatot kapott ellenségek a sebzés 80%-át vérzésként kapják 4 mp alatt |
+| **Arrow Hail** | Active · 12 mp CD | 3 m-es körben 4 mp-ig nyílzápor a legsűrűbb csoportra: 0,5 mp-enként 40% fegyversebzés (képesség, nem krit) | +1 m sugár | **Crossfire Barrage**: második zápor a következő legsűrűbb csoportra · **Pinning Hail**: a zápor alatt az ellenségek 40%-kal lassulnak |
+| **Quick Draw** | Active · 16 mp CD | +40% Haste 4 mp-ig (nincs Focus-költség) | a lövedékek +1 átütést kapnak a hatása alatt | **Hail of Shafts**: a fegyverlövések 2 extra nyilat lőnek legyezőben a hatása alatt · **Focus Rush**: cast-kor +35 Focus |
+| **Play Dead** | Active · 20 mp CD | 2 mp-ig rejtőzöl: az ellenségek elvesztik a célpontot és nem tudnak megütni; a hős elterül | a társ a Play Dead alatt a 4 m-en belüli ellenségeket magára vonja (gúny) | **Patient Predator**: felkelés után a következő 3 fegyvertalálat garantált krit · **Rest and Recover**: a Play Dead alatt visszanyeri a Max HP 30%-át |
+| **Blast Snare** | Auto · 8 mp CD | 3 m-re előre csapda, 0,5 mp után él; ha ellenség lép rá (1,2 m), 220% fegyversebzés Fire sebzésként robban 2,5 m-es körben; legfeljebb 3 él egyszerre, 15 mp-ig | +1 m robbanássugár | **Clinging Net**: a robbanás 60%-kal lassít 3 mp-ig · **Heavy Charge**: +100% sebzés, de 0,5 mp-cel később él |
+| **Hunt Signal** | Auto · 10 mp CD | a társ a 10 m-en belüli legerősebb ellenségre ugrik és 250% fegyversebzést mér (pet-forrás); Wolf: 50% lassítás 2 mp-ig; Boar: 1 mp bénítás; Owl: +25% sebzés | +1 második csapás a következő legerősebb ellenségre | **Mauling Rush**: a csapás robbanása 2,5 m-en belül 60% sebzést ad · **Relentless Pursuit**: a csapással tett ölés után 2 mp múlva újra elérhető |
+
+**Társ (companion):** állandó, a lobbyban választható **RB**-vel (billentyűzeten **E**): Wolf
+(farkas), Boar (vaddisznó) vagy Owl (bagoly). Nem célozható: nincs HP-je, nem hal meg. Ha a
+Hunter elesik, a társ eltűnik, a következő hullám elején visszatér. Nem kritel.
+A Hunter 14 m-nél messzebb kerülve a társ visszaugrik hozzá.
+
+| Társ | Sebzés (a Hunter normált fegyversebzésének %-a) | Támadási idő | Hatótáv | Extra |
+|---|---|---|---|---|
+| **Wolf** | 38% | 1,2 mp | 8 m | harapásonként 30%-os lassítás 1 mp-ig |
+| **Boar** | 50% | 2,0 mp | 7 m | 7 mp-enként 55%-os roham; 4 m-en belül 1,5 mp-ig magára vonja az ellenségeket (gúny) |
+| **Owl** | 20% | 0,6 mp | 9 m (lövés 8 m) | lebeg, tollas lövedékeket lő; kisebb sebzés találatonként |
 
 #### Shaman
+
 | | |
 |---|---|
-| Szerep | Hibrid: elemi varázsló / közelharci / gyógyító **totemekkel** |
-| Hagyma | **Fokhagyma** (fehér-lila), faragott fa maszk, csontgyöngyök, kis totem a hátán |
+| Szerep | Hibrid: villámvarázsló / közelharci / gyógyító **totemekkel** |
+| Hagyma | **Fokhagyma** (fehér, lila csíkokkal), faragott fa maszk, csontgyöngyök, kis totem a hátán |
 | Páncél | Mail |
 | Kezdőfegyver | Mace + Shield |
-| Jártasság | Mace, Axe, Dagger, Staff, Fist Weapon, Shield, Two-Hand Mace / Axe; **Dual Wield csak az Enhancement fa talentjével** |
+| Jártasság | Mace, Axe, Dagger, Staff, Fist Weapon, Shield, Two-Hand Mace; **Dual Wield** csak a Warspirit-fa *Twinned Spirits* talentjével |
 | Alap | +2 Armor, +3 Spirit, **−5% Speed** |
-| Erőforrás | **Maelstrom** (0–100): +5 minden fegyvertalálatnál és varázslatnál |
-| Képesség 1 | **Chain Lightning** – 30 Maelstrom: villám, ami 4 célpont között ugrál |
-| Képesség 2 | **Totemic Call** – 12 mp CD: totemet tesz le a lába elé. Az elemek körben váltják egymást: **Fire** (lövöldöző totem) → **Water** (gyógyít a közelben) → **Earth** (lassít) → **Air** (+Haste a közeli társaknak) |
-| Mastery | **Elemental Overload** – % esély, hogy a villám- és tűzhatások duplán sülnek el |
+| Elsődleges stat | Intellect |
+| Erőforrás | **Surge** (0–100): 0-ról indul; +5 minden fegyvertalálatnál és képesség-castnál; 3 mp gain nélkül után −2 / mp |
+| Képesség 1 | **Forking Bolt** (alap) – 30 Surge, 0,6 mp CD |
+| Képesség 2 | **Totem Rite** (alap) – 12 mp CD |
+| Mastery | **Storm Echo** – a villám- és tűzsebzésű találatok 50%-kal visszhangoznak; 1,5% esély Mastery-pontonként, legfeljebb 60% |
 
-**Ability-készlet:**
+**Képességek** (a két alap és a hat saját):
 
-| Ability | Típus | Hatás |
-|---|---|---|
-| Lightning Bolt | Auto | Erős villámcsapás a legközelebbi ellenségre |
-| Earthquake | Active | Földrengés-terület, sebez és időnként kábít |
-| Lava Lash | Auto | Közelharci tűzcsapás, terjedő égéssel |
-| Healing Rain | Active | Gyógyító eső-terület a társaknak (co-op) |
-| Thunderstorm | Auto | Ha körbeveszik, villámmal hátralöki az ellenségeket |
-| Feral Spirit | Active | 2 szellemfarkas 10 mp-re |
+| Képesség | Típus, költség / CD | Hatás | III. rang | V. rang (két specializáció) |
+|---|---|---|---|---|
+| **Forking Bolt** (alap) | Active · 30 Surge · 0,6 mp CD | villámcsapás a legközelebbi ellenségre, 4 célponton át ugrál (5 m-es ugrás), minden ugrás −15% sebzés; 7 + 1,0 × Int + 1,5 × SP sebzés, Nature, villám-címke | +1 célpont a láncban | **Thunder Web**: az ugrások nem veszítenek sebzésből, +1 célpont · **Static Cling**: minden eltalált ellenség 0,6 mp-re megbénul |
+| **Totem Rite** (alap) | Active · 12 mp CD | totem a lábad elé 10 mp-re; az elemek ciklusa (lásd fent) | +4 mp totem-élettartam | **Twin Totems**: második totem a következő elemből; **Walking Totem**: a totem követ, +2 mp |
+| **Thunderbolt** | Auto · 5 mp CD | 14 + 2,0 × Int + 2,5 × SP villámcsapás a legközelebbi ellenségre (Nature, villám) | +1 csapás a következő legközelebbi ellenségre | **Sundering Bolt**: a csapás 2,5 m-es robbanása a többi közeli ellenségre 50% sebzést ad · **Staggering Bolt**: a célpont 1,2 mp-re megbénul |
+| **Rumbling Earth** | Active · 16 mp CD | a legsűrűbb csoportra 4 m-es földrengés 5 mp-ig; 0,5 mp-enként sebez (2,5 + 0,4 × Int + SP-arány); ellenségenként 25% eséllyel 1,2 mp kábítás | +1 m sugár | **Faultline**: a rengésben lévő ellenségek 50%-kal lassulnak · **Twin Fissures**: második rengés a következő legsűrűbb csoportra |
+| **Magma Lash** | Auto · 6 mp CD | fegyvercsapás a célpontra (a főkéz-ütés 150%-a + 0,5 × SP), Fire; égés a találat 40%-a 4 mp alatt; az égés végén vagy a célpont halálakor a 3 m-en belüli 2 nem égő ellenségre a terjedés 50%-kal | +1 célpont, ahová az égés terjed | **Contagious Flame**: az égés 3 további ellenségre teljes erővel terjed · **Twin Lashes**: két csapás, 0,4 mp különbséggel |
+| **Soothing Downpour** | Active · 16 mp CD | a 10 m-en belüli legsebesültebb hős (te is) köré 4 m-es eső 5 mp-ig: 0,5 mp-enként gyógyítja a benne állókat (0,3 + 2% Max HP + SP-arány) | +2 mp eső | **Following Rain**: az eső követi a hőst · **Thundercloud**: az eső minden tickjénél villám sújt az ellenségekre (2 + 0,3 × Int + 0,5 × SP) |
+| **Stormburst** | Auto · 10 mp CD | 3,5 m-es körben kisülés: 5 + 0,6 × Int + SP-arány sebzés, az ellenségeket 3 m-re lökve; csak ha van ellenség a körben | +1 m sugár | **Echoing Discharge**: második kisülés 0,8 mp-cel később · **Crackling Field**: a kisütött ellenségek 1 mp-re megbénulnak |
+| **Spirit Pack** | Active · 24 mp CD | 2 farkas 10 mp-ig (8 m-es póráz); másodpercenként harapnak: 50% fegyversebzés (pet-forrás), harapásonként +1 Surge | +1 farkas | **Thunder Pack**: minden harapás 40%-os villámívet indít egy másik ellenségre 3 m-en belül · **Pack Guardians**: a farkasok 3 m-en belüli ellenségei 1,5 mp-ig rájuk mennek (gúny) |
 
-**Co-op szerep:** a Shaman totemjei és a *Healing Rain* az egész csapatot segítik. Egy
-talent (*Ancestral Spirit*) a felélesztést is felgyorsítja.
+- A **Surge** a hat sebző képességnél (Forking Bolt, Thunderbolt, Magma Lash, Rumbling Earth,
+  Stormburst, Spirit Pack) a cast elején egy töltést fogyaszthat az Elemental Surge talentből
+  (7.4); a Totem Rite és a Soothing Downpour nem.
+- A **Storm Echo** a Forking Bolt ugrásait, a Thunderbolt, a Stormburst és a Magma Lash első
+  csapását, valamint a Gale Strike csapásait érinti. Nem érinti a totemek lövéseit, az égéseket,
+  a rengés-tickeket, az eső villámait, a Sundering Bolt robbanását és a farkasharapásokat.
+
+**Totemek (Totem Rite).** A Totem Rite a lábad elé tesz egy totemet 10 mp-re (III. rang: +4 mp).
+A kasztnak egyszerre egy totemje van: az új cast lecseréli a régit. Az elemek minden castnál
+lépnek: **Fire** → **Water** → **Earth** → **Air** → Fire; a ciklus a futamon át megmarad.
+- **Fire** (lövöldöző): az első lövés 0,3 mp-cel a lerakás után, majd 1 mp-enként (Haste-tel
+  gyorsul) a legközelebbi ellenségre 9 m-en belül: 4 + 0,7 × Int + 1,0 × SP sebzés, tűz.
+- **Water** (gyógyít): 1 mp-enként a 6 m-en belüli élő hősöket gyógyítja: 0,5 + 2,5% Max HP
+  + 0,5 × SP (másodpercenként).
+- **Earth** (lassít): 5 m-en belül −30% ellenséges mozgássebesség.
+- **Air** (gyorsít): 6 m-en belüli szövetségesek +15% Haste.
+- A totemek nem célozhatók (nincs HP-jük, nem számítanak ellenségnek). A sugarakat az Area Size növeli.
+- Twin Totems (V. rang): második totem a következő elemből, 1,6 m-re jobbra (a játéktéren belül marad: a fal mellett a falhoz 0,5 m-re kerül, a dungeon-teremben is); a ciklus kettővel lép.
+  Walking Totem (V. rang): a totem követ, +2 mp.
+- A Totem Rite CD-je 12 mp, nincs költsége. A Totemkeeper's Mail két darabja +30% totem-élettartamot ad (10 → 13 mp).
+
+A Bond (Bond Totem talent) és a Storm (Thunderpost Artifact) totem a ciklusra nem lép, külön szabállyal működik (7.4, 5.5).
+
+**Co-op szerep:** a Shaman totemjei, a Soothing Downpour és a Bond Totem (7.4) az egész csapatot
+segítik. Egy talent (*Elder Spirits*) a felélesztést is gyorsítja.
+
 
 ---
 
-## 4. Fegyverek (13 db: az MVP 10 + az M6b 3)
+## 4. Fegyverek (16 db: az MVP 10 + az M6b 3 + az M8 3)
 
 Slotok: **Main Hand**, **Off Hand**. Kétkezes (2H) fegyver mindkettőt elfoglalja.
-Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkettő támad.
+Dual Wield (Warrior, Rogue, Hunter; a Shaman a Warspirit-fa talentjével): egykezes fegyver az Off Handbe is tehető; mindkettő támad.
 
 | Fegyver | Típus | Skálázás | Range | Jellemző |
 |---|---|---|---|---|
@@ -425,7 +453,7 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
 - A fegyverek is **ritkaságot** kapnak (lásd 5.2): magasabb ritkaság = nagyobb alapsebzés + bónusz stat.
 - A bolt minden játékosnak **csak olyan fegyvert kínál, amit a kasztja használhat**.
 
-**M6b: három új fegyver** (kész; a Crossbow, a Polearm és a Fist Weapon az M8-cal jön, 3.7):
+**M6b: három új fegyver** (kész):
 
 | Fegyver | Típus | Skálázás | Sebesség / Range | Jellemző | Ki használhatja |
 |---|---|---|---|---|---|
@@ -449,6 +477,29 @@ Dual Wield (Warrior, Rogue): egykezes fegyver az Off Handbe is tehető; mindkett
   wand, neki nincs ilyen korlátja. A generátor az Orbot a Warlocknak is kínálja.
 - A sebzés- és skálázási számok kiinduló értékek, a Two-Hand Axe és a One-Hand Sword / Mace közé
   állítva; az M6b nem hangol (9. fejezet).
+
+**M8: három új fegyver** (kész; a Hunter és a Shaman fegyverei):
+
+| Fegyver | Típus | Skálázás | Sebesség / Range | Jellemző | Ki használhatja |
+|---|---|---|---|---|---|
+| **Crossbow** | 2H távolsági, lövedék | 130% Agi | 1,4 mp, 12 m | alapsebzés 12; lassú és nehéz, a csavar 2 ellenségen átüt (legfeljebb 3 találat) | Hunter |
+| **Polearm** | 2H közelharci | 130% Agi | 1,1 mp, 3,2 m (a legnagyobb közelharci hatótáv), 70°-os ív | alapsebzés 9; keskeny, egyenletes szúrás | Hunter |
+| **Fist Weapon** | 1H közelharci | 70% Int + 40% Agi | 0,6 mp, 1,8 m (a legrövidebb), 80°-os ív | alapsebzés 3,5; gyors, közeli; dual wieldelhető a Shaman talentjével | Shaman |
+
+- A Crossbow és a Polearm kétkezes; a Fist Weapon egykezes. A Shaman a Fist Weapon mellé a pajzsát
+  viheti; a Dual Wield-hez a Warspirit-fa *Twinned Spirits* talentje kell (7.4).
+- Mindhárom saját modellt, ikon-sziluettet, markolat-pózt és hangot kapott. A Crossbow lövedéke saját
+  kinézetű csavar; a lövése az íj hangjait használja, mélyebb hangolással.
+- A kovácsolás, a Legendary és a bolt a többi fegyverrel azonos szabályok szerint működik (4.1).
+
+**Az M8 Forge Legendary hatásai** (fegyvertípusonként egy; kész):
+
+| Fegyver | Legendary | Hatás |
+|---|---|---|
+| Crossbow | **Bindweed** | minden 3. lövedék horgas nyílhegy: 160%-a a lövésnek a célpontra, és 1 mp-re rögzíti |
+| Polearm | **Barberry** | minden 4. találat mély sebet ejt: a találat 140%-a fizikai sebzésként 5 mp alatt, 2 halmozással |
+| Fist Weapon | **Mossknuckle** | minden 5. találat szellemütés: 120% a találat Nature sebzéseként, és a legsebesültebb szövetséges 4 HP-t gyógyul (egyedül a viselő) |
+
 
 ### 4.1 Fegyverkovácsolás (Brotato-szerű egyesítés)
 
@@ -501,7 +552,7 @@ ritkaságban.** Azonos alapfegyver = ugyanaz a fegyvertípus (pl. Dagger, Two-Ha
 | Uncommon | ×1,3 | +1 véletlen stat |
 | Rare | ×1,7 | +2 stat |
 | Epic | ×2,2 | +2 stat és **+10% támadási sebesség** (M6b; a szabály lent) |
-| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (13 van: a 10 mellé az M6b három új fegyvere – Two-Hand Sword, Two-Hand Mace, Orb – hozott 3-at; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
+| Legendary | ×3,0 | +3 stat és a fegyvertípus **egyedi Legendary hatása** – kézzel tervezett hatás, fegyvertípusonként egy (16 van: a 10 mellé az M6b három – Two-Hand Sword, Two-Hand Mace, Orb – és az M8 három – Crossbow, Polearm, Fist Weapon – fegyvere hozott 3-3-at; pl. Dagger: minden 4. találat mérgező pengét dob, a találat 100%-a Nature sebzésként + méreg) |
 
 **Az Epic fegyver +10% támadási sebessége (M6b, megvalósítva):**
 - Az **Epic támadó fegyver** +10% támadási sebességet kap (a cooldown ÷ 1,1). A passzív off-hand
@@ -880,7 +931,7 @@ A Black Market ezeket nem árulja (tier-set darab vagy generált max-roll Epic, 
 Fortune és a dungeon-jutalom Epic itemei viszont kaphatnak ilyet is (a generátor kézzel tervezett
 Epic-sorsolása).
 
-#### Tier setek (kasztonként 1, Epic ritkaság, 5 darab: Head, Shoulders, Chest, Hands, Legs)
+#### Tier setek (kasztonként 1 + 5 kaszt-független, Epic ritkaság, 5 darab: Head, Shoulders, Chest, Hands, Legs)
 
 | Kaszt | Set | 2 darab | 4 darab |
 |---|---|---|---|
@@ -889,12 +940,12 @@ Epic-sorsolása).
 | Paladin | Dawnforged Plate | +3 Armor | A Call of Valor minden hőst gyógyít 8 m-en belül, és a gyógyítás a Max HP további 10%-át adja vissza |
 | Rogue | Shadowstitch Garb | +5% Crit | A Melt Away után 4 mp-ig +50% krit sebzés |
 | Warlock | Hexfire Raiment | +10% pet-sebzés | Az Ember Rain 20%-ban nem fogyaszt Pact Shard-ot |
-| Hunter (M8) | Wildrunner's Garb | +10% pet-sebzés | A Multi-Shot +2 nyilat lő |
-| Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Chain Lightning +2 célpontot ér |
+| Hunter (M8) | Wildtracker's Garb | +10% pet-sebzés | Az Arrow Fan +2 nyilat lő |
+| Shaman (M8) | Totemkeeper's Mail | +30% totem-időtartam | A Forking Bolt +2 célpontot ér |
 
-> **M6b-ből M8-ra tolva:** a **kaszt-független tier setek** (5.8) – ezek a set-rendszer
+> **M6b-ből M8-ra tolva (kész):** a **kaszt-független tier setek** (5.5, 5.8) – ezek a set-rendszer
 > módosítását igénylik (a rendszer ma kasztonként egy setet feltételez), ezért az M8-cal
-> jönnek, nem az M6b-vel. Az M6b-ben a tier setek kasztonként egy-egy marad.
+> készültek el, nem az M6b-vel. Az M6b-ben a tier setek kasztonként egy-egy maradtak.
 
 - **Nevek:** a Paladin, a Rogue és a Warlock setje új nevet kapott (korábban Lightforged
   Plate, Shadowcraft Garb, Felheart Raiment), mert azok WoW-setek, illetve -kifejezések
@@ -912,7 +963,7 @@ Epic-sorsolása).
   - Egy Epic dobás a boltban **5%**, lootból (normál drop, elit, Coin Gremlin, boss) **15%**
     eséllyel set-darab lesz – lootban 3× gyakoribb (5.2).
   - Boltban az első Epic-hullámtól (9.) kaphatók.
-  - A darab mindig a csapat egyik kasztjának szól.
+  - A kaszt-setek darabjai a csapat egyik kasztjának szólnak; a kaszt-független setek darabjai bármelyik kasztnak, aki a páncéltípusukat viselheti (lásd lent).
   - Az adott set darabjai közül egyenlő eséllyel jön egy; duplikátum lehetséges (azt
     Greedelni lehet).
 - **Bónuszok:** halmozódnak (4 darab = a 2- és a 4-darabos bónusz együtt); 5-darabos bónusz
@@ -940,11 +991,38 @@ Epic-sorsolása).
     a hátizsák méretének megfelelő körben), így ami egy későbbi csere után lett fejlesztés, az
     ugyanazon a piacon felkerül.
 
+##### Kaszt-független tier setek (M8, megvalósítva)
+
+Öt Epic set, 5 darab (Head / Shoulders / Chest / Hands / Legs), 2 és 4 darabos bónusz, 5 darabos nincs.
+Nincs kaszt-kötésük és nincs elsődleges statjuk (Stamina + két másodlagos stat), így bármelyik kaszt
+viselheti, aki a páncéltípusukat hordhatja. Mind a négy páncéltípusnak van setje, a Mailnek kettő. Epic,
+6. hullámtól, minden forrásból.
+
+| Set | Páncél | 2 darab | 4 darab |
+|---|---|---|---|
+| **Mendweave Attire** | Cloth | +8 Spirit | 8 mp-enként a legsebesültebb szövetségest gyógyítja 10% Max HP-val |
+| **Slipskin Leathers** | Leather | +5% Dodge | kitérés után +10% sebzés és +15% Speed 4 mp-ig (3 mp-es belső szünet) |
+| **Hoardscale Mail** | Mail | +20% Gold Find, +15 Fortune | ölésnél 6% eséllyel +3 arany |
+| **Redthorn Mail** | Mail | +12% sebzés elitek és bossok ellen | minden ölés +2% sebzés 6 mp-ig, legfeljebb 6 halmozás |
+| **Stonebark Plate** | Plate | 5% kevesebb kapott sebzés | 40% HP alatt 6 mp-re a Max HP 30%-ának megfelelő pajzs, hullámonként egyszer |
+
+- **Sorsolás:** egy set-találat (5.2) **30%-a** kaszt-független set, ha a csapatban van a set páncéltípusát
+  viselő kaszt; ez a 30% a csapat páncéltípusainak kaszt-független setei között oszlik el. A többi 70% a
+  csapat kaszt-setjei között oszlik el, kasztonként egyenlően.
+- **Példák:** Warrior, Mage, Paladin, Rogue csapatban minden kaszt-set 17,5%, a Stonebark Plate, a Mendweave
+  Attire és a Slipskin Leathers 10–10% a set-találatokból. Szóló Hunter vagy Shaman: a saját kaszt-setje 70%,
+  a két Mail-set 15–15%.
+- **Viselés:** a darab bárki viseli, aki a páncéltípusát hordhatja (a Plate-hős viselhet Mail-darabot is és
+  Needelheti), de a sorsolás csak a saját páncéltípusa szerint adja.
+- **Botok:** a kaszt-független darab a viselőjének páncéltípusa szerint +8 pontos becslési bónuszt kap
+  (a bot és a tooltip „upgrade” jelzése egyaránt). Nélküle a darab a tiszta statjai alapján a kaszt-set
+  darabjának 56–66%-át érné el, a botok 70%-os fejlesztési küszöbe alatt; a bónusszal 80–94%.
+
 #### Artifact fegyverek (kasztonként 1)
 
 Az Artifact **ritka, véletlen loot** – senki nem kapja meg automatikusan. Ha leesik, az
-a menet legnagyobb pillanata. (M6a: az öt jelenlegi kasztnak; a Hunter és a Shaman Artifactja
-az M8-cal jön.)
+a menet legnagyobb pillanata. (M6a: az akkori öt kasztnak; az M8 a Hunter és a Shaman Artifactját hozta, így most hét
+Artifact van.)
 
 **Honnan eshet (a 10. hullámtól)**
 
@@ -966,7 +1044,7 @@ Az Artifact-dobás **ölésenként** történik, a normál loot-dobás után, é
 - **Miért osztjuk a normál esélyt a játékosszámmal:** a hullámonkénti ölések száma a
   csapattal nő (spawn-szorzó `1 + 0,6 × (n − 1)`, 9. fejezet), a bossok, a goblinok és az
   elitek száma alig. Osztás nélkül egy 4 fős csapat menetenként átlag 7,1 találatot kapott
-  volna (a szóló hős 2,9-et), és a menetek ≈ 84%-ában mind az öt kaszté leesett. Az osztással a
+  volna (a szóló hős 2,9-et), és a menetek ≈ 57%-ában mind a hét kaszté leesett. Az osztással a
   normál ölésekből várt találat a csapatmérettől alig függ.
 - **Pech-védelem:** csak egy ténylegesen lefutott, de mellément **boss-dobás** növeli (+5
   százalékpont a következő boss-esélyhez; egy boss egyetlen lépés); bármelyik Artifact-drop
@@ -975,17 +1053,17 @@ Az Artifact-dobás **ölésenként** történik, a normál loot-dobás után, é
   40. szintű bot-futások – 1 fő 5, 4 fő 4 Artifact – összhangban vannak vele; egy-egy futás
   nem bizonyíték, a 2 fős futás pedig a 20. hullámon vereséggel ért véget):
 
-  | Játékosok | Normál ölés (10–25. hullám) | Várt találat: normál / elit / boss / goblin | Összesen | Várt Artifact (max. 5) | Osztás nélkül |
+  | Játékosok | Normál ölés (10–25. hullám) | Várt találat: normál / elit / boss / goblin | Összesen | Várt Artifact (max. 7) | Osztás nélkül |
   |---|---|---|---|---|---|
-  | 1 | ≈ 4 220 | 2,11 / 0,39 / 0,32 / 0,05 | 2,9 | 2,8 | 2,9 → 2,8 |
-  | 2 | ≈ 6 760 | 1,69 / 0,53 / 0,32 / 0,05 | 2,6 | 2,5 | 4,3 → 3,8 |
-  | 4 | ≈ 11 830 | 1,48 / 0,81 / 0,32 / 0,05 | 2,7 | 2,6 | 7,1 → 4,7 |
+  | 1 | ≈ 4 220 | 2,11 / 0,39 / 0,32 / 0,05 | 2,9 | 2,9 | 2,9 → 2,9 |
+  | 2 | ≈ 6 760 | 1,69 / 0,53 / 0,32 / 0,05 | 2,6 | 2,6 | 4,3 → 4,2 |
+  | 4 | ≈ 11 830 | 1,48 / 0,81 / 0,32 / 0,05 | 2,7 | 2,7 | 7,1 → 6,0 |
 
-  Mind az öt Artifact leesésének esélye 1 / 2 / 4 játékosnál ≈ 16% / 12% / 13% (osztás nélkül
-  16% / 43% / 84%). A számítás: a 10–25. hullám ölései (a két boss, az elitek és a goblinok
+  Mind a hét Artifact leesésének esélye 1 / 2 / 4 játékosnál ≈ 2,7% / 1,7% / 1,9% (osztás nélkül
+  3% / 14% / 57%). Egy adott kaszt (a saját kasztod) Artifactja a menetek 91 / 77 / 56%-ában esik le. A számítás: a 10–25. hullám ölései (a két boss, az elitek és a goblinok
   nélkül; a 20. hullám „lite” elitjei normál dobást adnak), az elitek `EliteAffixes.
   expected_count` szerint, a boss 15% (a 25. hullámon + pech ≈ 0,32 találat), a goblin ≈ 1 ölés
-  menetenként; a várt Artifact a Poisson-eloszlású találat és az 5-ös kasztlimit minimuma.
+  menetenként; a várt Artifact a Poisson-eloszlású találat és a 7-es kasztlimit minimuma.
 - Debug: `--artifact-chance=X` minden dobás esélyét X-re állítja (osztás és Fortune nélkül; a
   10. hullám és a kasztszabály marad); 0 = soha.
 
@@ -1042,8 +1120,24 @@ dobásra megy (10.1).
 | Paladin | *Dawnbreaker* (Mace) | A Sacred Circle **gyógyítja a benne álló hősöket** (a Paladint is): 0,5 mp-enként a Max HP 1%-át (= 2%/mp) | A Call of Valor a gyógyított / feltámasztott hőst a Max HP-ja 15%-ának megfelelő **pajzzsal** is védi (nem halmozódik 15% fölé) |
 | Rogue | *Fangs of the Shadow* (tőr-pár: Main Hand + Off Hand) | Minden 5. krit támadás **ingyen Knife Bloom**-t lő (támadásonként csak az első találat számít; Combo Pointot használ el, Energiát nem) | A Melt Away után a következő **3 találat krit** |
 | Warlock | *Skull of the Damned* (Staff) | Állandó **második pet**: egy Gloomguard (a Summon Gloomguard paramétereivel, Shared Pain pajzs nélkül; a hullám első tickjén jön, a hullám végén és a hős elestekor elmegy), ami magára vonja az ellenségeket | A petek **+25% sebzést** okoznak, és sebzésük 10%-át a Warlock gyógyulásként kapja |
-| Hunter (M8) | *Galestrike Longbow* (Bow) | Minden 4. lövés nyílzáporrá hasad | az M8-cal készül |
-| Shaman (M8) | *Fist of the Ancestors* (Mace) | A Chain Lightning egy villám-totemet idéz | az M8-cal készül |
+| Hunter (M8) | *Galestrike Longbow* (Bow) | **Gale Volley**: minden 4. lövés 5 nyilas legyezővé hasad | **Rising Gale**: minden kritikus találat +4 Focus |
+| Shaman (M8) | *Fist of the Ancestors* (Fist Weapon) | **Thunderpost**: a Forking Bolt villámoszlopot idéz | **Ancestral Chorus**: a Totem Rite totem +10% sebzés 6 m-en belül |
+
+**Az M8 Artifactjai** (megvalósítva; a tulajdonságok a fenti táblázatban):
+
+- **Galestrike Longbow** (Hunter, Bow, kétkezes): agi 14, crit 7, haste 7; 2 rögzített enchant (III. rang).
+  - *Gale Volley* (1. tulajdonság): a fegyverlövés **első** találata számít; minden 4. lövés 5 nyilas legyezővé
+    hasad (40°, a célpont felé), nyilanként a lövés alapsebzésének 60%-ával. A szabad nyilak nem kritelnek,
+    nem gyógyítanak és nem váltanak ki procot, így nem számítanak újra; 1 mp-enként legfeljebb egy legyezés.
+    Az Arrow Fan és a Long Shot nyilai nem számítanak bele.
+  - *Rising Gale* (2. tulajdonság): minden kritikus fegyvertalálat +4 Focus.
+- **Fist of the Ancestors** (Shaman, Fist Weapon, a Shield marad a másik kézben): int 8, sta 4, mastery 3,
+  haste 2; 2 rögzített enchant (III. rang).
+  - *Thunderpost* (1. tulajdonság, a Forking Bolt kell): ahol a Forking Bolt első találata landol, 4 mp-ig
+    villámoszlop áll: 0,8 mp-enként a 8 m-en belüli legközelebbi ellenséget sújtja a Forking Bolt első
+    találatának 40%-ával. Legfeljebb 2 oszlop; a legrégebbi kiesik. Az oszlop nem célpont.
+  - *Ancestral Chorus* (2. tulajdonság, a Totem Rite kell): a Totem Rite totem álló ideje alatt te és a
+    6 m-en belüli szövetségesek +10% sebzést okoznak.
 
 **Botok:** a bot Needeli a saját kasztja Artifactját, felveszi, sosem adja el; ha a backpackje
 tele van, a loot-dobás előtt eladja az első nem-upgrade itemét (ha minden upgrade, Greedel).
@@ -1114,6 +1208,31 @@ A kasztonkénti 6 új darab:
 | Bracers of the Siphoning Thread | Warlock | Rare / Wrist (Cloth) | +3 Intellect, +3 Crit | Vital Siphon gyógyítás +20% |
 | Leggings of Dread Steps | Warlock | Rare / Legs (Cloth) | +6 Intellect, +5 Stamina | Fear +1 m sugár |
 | Slippers of the Seeded Path | Warlock | Rare / Feet (Cloth) | +5 Intellect, +3 Haste | Blight Seed +1 ugrás |
+
+**M8: a Hunter és a Shaman 16 kaszt-specifikus itemje** (kasztonként 8; kész; mind „*Equip:*” sorral módosít):
+
+| Név | Kaszt | Ritkaság / slot | Statok | Módosítás |
+|---|---|---|---|---|
+| Longbow of Many Feathers | Hunter | Epic / Fegyver (bow) | +8 Agility, +5 Crit | Arrow Fan +2 nyíl |
+| Hood of the Far Mark | Hunter | Epic / Head | +7 Agility, +6 Stamina | Long Shot −3 mp CD |
+| Hauberk of the Loyal Heart | Hunter | Epic / Chest | +8 Agility, +7 Stamina | a társ +30% sebzés, +10% támadássebesség |
+| Legguards of the Arrow Storm | Hunter | Epic / Legs | +7 Agility, +4 Haste | Arrow Hail +1 m sugár, +1 mp tartam |
+| Pauldrons of the Hunt Horn | Hunter | Rare / Shoulders | +4 Agility, +4 Mastery | Hunt Signal −2 mp CD |
+| Gloves of the Steady Draw | Hunter | Rare / Hands | +5 Agility, +3 Haste | Quick Draw +1,5 mp tartam |
+| Snaresmith's Belt | Hunter | Rare / Waist | +4 Agility, +4 Stamina | Blast Snare +0,7 m sugár, 0,2 mp-cel gyorsabban él |
+| Boots of the Quiet Retreat | Hunter | Rare / Feet | +4 Agility, +3 Dodge | Backstep −2 mp CD, 1,5 m-rel hosszabb ugrás |
+| Rootbound Bulwark | Shaman | Rare / Off Hand (Shield) | +4 Intellect, +4 Stamina | a totemjeid +3 mp-ig állnak |
+| Mask of the Gathering Storm | Shaman | Epic / Head | +7 Intellect, +6 Stamina | Forking Bolt −8 Surge költség |
+| Pauldrons of the Static Crown | Shaman | Rare / Shoulders | +4 Intellect, +4 Stamina | Thunderbolt −1,5 mp CD |
+| Hauberk of the Restless Hill | Shaman | Epic / Chest | +7 Intellect, +6 Stamina, +3 Mastery | Rumbling Earth +2 mp tartam, +1 m sugár |
+| Cinderlash Grips | Shaman | Rare / Hands | +4 Intellect, +4 Stamina | Magma Lash égése 1 ellenséggel tovább terjed |
+| Belt of Gathered Thunder | Shaman | Rare / Waist | +4 Intellect, +4 Stamina | Stormburst már 2 ellenségnél, −2 mp CD |
+| Greaves of the Soft Rain | Shaman | Epic / Legs | +6 Intellect, +6 Stamina, +3 Spirit | Soothing Downpour −4 mp CD |
+| Boots of the Howling Kin | Shaman | Epic / Feet | +6 Intellect, +6 Stamina, +3 Haste | Spirit Pack +5 mp tartam, a harapásai +10% fegyversebzés |
+
+- A két kaszt-set (5.5, Tier setek): **Wildtracker's Garb** (Hunter; 2 darab: +10% társ-sebzés; 4 darab:
+  Arrow Fan +2 nyíl) és **Totemkeeper's Mail** (Shaman; 2 darab: +30% totem-élettartam; 4 darab: Forking Bolt
+  +2 célpont). Mindkettő Epic, Mail, 5 darab, 6. hullámtól; az elsődleges statjuk Agility, illetve Intellect.
 
 **Az „Equip:” sor kiszürkülése.** Ha a hős még nem tanulta meg a képességet, az item Equip sora
 szürkén, „(needs <képesség>)” jelzéssel látszik a tooltipben (mint az Artifact-tulajdonságoknál); az
@@ -1351,24 +1470,24 @@ Az **Glimmer Dust** a csapat **második közös pénzneme**: a gold mellett a ka
 
 ### 5.8 Tartalomcél – „sok item”
 
-Az **M6b** adta a teljes item-tartalmat, két kivétellel, amelyek az **M8-ra tolódtak**: a
-Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
+Az **M6b** adta a teljes item-tartalmat, két kivétellel, amelyek az **M8**-ban készültek el: a
+Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek, és a Hunter és a Shaman tartalma.
 
-| Kategória | Állapot (M6a) | Állapot (**M6b, kész**) | M8 után |
+| Kategória | Állapot (M6a) | Állapot (**M6b, kész**) | Állapot (**M8, kész**) |
 |---|---|---|---|
-| Fegyver-alaptípus | 10 | **13** (+ Two-Hand Sword, Two-Hand Mace, Orb) | 16 (+ Crossbow, Polearm, Fist Weapon) |
+| Fegyver-alaptípus | 10 | **13** (+ Two-Hand Sword, Two-Hand Mace, Orb) | **16** (+ Crossbow, Polearm, Fist Weapon) |
 | Páncél-alaptípus (slot × páncéltípus × anyagfokozat) | 32 (csak az I. fokozat) | **96** (3 fokozat × 32) | 96 |
 | Ékszer-alaptípus (Neck, Ring) | 8 (4 + 4) | **20** (10 Neck, 10 Ring) | 20 |
 | Stat-utótag („of the Bear” …) | 18 | **25** | 25 |
 | Enchantment | 24 | **50** (16 Equip, 18 Chance on hit, 8 On kill, 8 When struck) | 50 |
 | Kézzel tervezett, névvel ellátott Rare/Epic itemek | 10 | **40** | 40 |
-| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8) | 60+ (kasztonként 8+, az új kasztokkal) |
+| Kaszt-specifikus itemek | 10 (kasztonként 2) | **40** (kasztonként 8) | **56** (kasztonként 8, mind a 7 kasztnak) |
 | Trinket | 10 | **30** | 30 |
 | Legendary | 8 | **25** (mind a 12 slottípushoz van) | 25 |
-| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (Thistlebrand, Boulderbloom, Tearglass) | 16 |
-| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1; változatlan) | kasztonként 1 + 5 kaszt-független |
-| Kézzel tervezett összesen (`Db.uniques`) | 63 | **160** (63 + 20 trinket + 17 Legendary + 30 névvel ellátott + 30 kaszt-specifikus; ebből 25 tier-set darab) | – |
-| Artifact | 5 | 5 (változatlan) | kasztonként 1 (+ Hunter, Shaman) |
+| Forge Legendary hatás (fegyvertípusonként egy, 4.1) | 10 | **13** (Thistlebrand, Boulderbloom, Tearglass) | **16** (+ Bindweed, Barberry, Mossknuckle) |
+| Tier set | 5 (kasztonként 1) | 5 (kasztonként 1; változatlan) | **12**: 7 kasztonként 1 + 5 kaszt-független |
+| Kézzel tervezett összesen (`Db.uniques`) | 63 | **160** (63 + 20 trinket + 17 Legendary + 30 névvel ellátott + 30 kaszt-specifikus; ebből 25 tier-set darab) | **211** (160 + 16 kaszt-specifikus + 10 Hunter / Shaman tier-set darab + 25 kaszt-független tier-set darab) |
+| Artifact | 5 | 5 (változatlan) | **7** (kasztonként 1) |
 | Epic fegyver +10% támadási sebesség (4.1) | – | kész | – |
 | Alaptípus-fokozat (`min_wave`) és a 70% / 30% fokozat-választás (5.4) | – | kész | – |
 
@@ -1378,7 +1497,7 @@ Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
   Mace** (Paladin, Warrior) és **Orb** (Off Hand a Mage-nek és a Warlocknak: varázserő-jellegű
   statok, nincs automatikus támadás) –, mindegyikhez saját Forge Legendary hatás
   (fegyvertípusonként egy) és procedurális megjelenés (4. fejezet). A Crossbow, a Polearm és a
-  Fist Weapon az M8-cal jön. Az **Epic** fegyverek **+10% támadási sebességet** kapnak (4.1).
+  Fist Weapon az M8-ban készült el. Az **Epic** fegyverek **+10% támadási sebességet** kapnak (4.1).
 - **Páncél:** a két újabb anyag-fokozat minden slotra és páncéltípusra: a II. a 9., a III. a 17.
   hullámtól (az alaptípus `min_wave` adata); a generátor az elérhető legmagasabb fokozatot
   70%-ban, egy alacsonyabbat 30%-ban választja (5.4). Az eredmény **96** alaptípus; a fokozat csak
@@ -1388,12 +1507,12 @@ Crossbow, a Polearm és a Fist Weapon, valamint a kaszt-független tier setek.
   trigger-fajta csak akkor, ha elkerülhetetlen (5.7).
 - **Kézzel tervezett itemek:**
   - névvel ellátott Rare / Epic: 40 (+30);
-  - kaszt-specifikus: kasztonként 8 = 40 (+30), „*Equip:*” sorral módosítják a kaszt
+  - kaszt-specifikus: kasztonként 8 = 40 (+30; az M8-ban a Hunter és a Shaman 8-8 darabja, összesen 56), „*Equip:*” sorral módosítják a kaszt
     képességeit (5.5);
   - trinket: 30 (+20);
   - Legendary: 25 (+17), kézzel tervezett procokkal.
-- **Kaszt-független tier setek:** az **M8-ra tolódtak**, mert a set-rendszer módosítását
-  igénylik (5.5); az M6b-ben a setek kasztonként egy-egy maradnak.
+- **Kaszt-független tier setek:** az **M8-ban készültek el**, mert a set-rendszer módosítását
+  igénylik (5.5); az M6b-ben a setek kasztonként egy-egy maradtak.
 - **Nevek:** az új itemek és enchantok nevei nem Blizzard-nevek; mindet ellenőrizzük a 14.
   fejezet listája szerint, és minden megjelenített név egyedi (a teszt őrzi).
 - **Hol jelennek meg az új itemek:** a generált tartalom (fokozatos alaptípusok, ékszerek, utótagok,
@@ -1566,8 +1685,8 @@ Minden kasztnak **3 fája** van (a WoW-os specializációk szerint):
 | Paladin | Radiance | Vigil | Verdict |
 | Rogue | Toxins | Bladework | Gloaming |
 | Warlock | Hexcraft | Pactcraft | Cinderfall |
-| Hunter (M8) | Beast Mastery | Marksmanship | Survival |
-| Shaman (M8) | Elemental | Enhancement | Restoration |
+| Hunter (M8) | Packlord | Sharpshot | Wildcraft |
+| Shaman (M8) | Stormweaving | Warspirit | Wellspring |
 
 Egy fa **5 szintből (tier)** áll:
 
@@ -1628,7 +1747,7 @@ Egy fa **5 szintből (tier)** áll:
   - A fa betelte után a következő fába költenek; soha nem resetelnek, és véletlen nélkül
     döntenek.
 
-### 7.4 A talentfák (5 kaszt × 3 fa)
+### 7.4 A talentfák (7 kaszt × 3 fa)
 
 **Jelölések:**
 - A számok **pontonként** értendők (3 pont = háromszoros hatás); a módosító és a capstone
@@ -1906,6 +2025,102 @@ Ember Rain-t és az Imp tűzlövedékeit egyszerre erősíti; a Pact Shard-ok t�
 | 4 | Pocketed Shards | 3 | +1 Pact Shard minden hullám elején |
 | 5 | **Lingering Blaze** (capstone) | 1 | Az Ember Rain égő földet hagy: a kör még 3 mp-ig ég 40%-os sebzéssel, és 30%-kal lassít; a kritikus találataid 10% eséllyel +1 Pact Shard-ot adnak |
 
+#### Hunter – Packlord fa
+
+A társ, a Hunt Signal és a Beastbond. A Pack Frenzy a társat rövid, erős rohamokba küldi.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Keen Companion | 3 | A társ +4% sebzést okoz (pet-forrás: harapás, Hunt Signal, vaddisznó-roham, bagolylövedék) |
+| 1 | Bonded Vigor | 3 | A társ találatai a sebzésük +4%-ával gyógyítanak téged |
+| 2 | Feral Tempo (előfeltétel: Keen Companion 3/3) | 3 | Minden társ +5% támadássebesség |
+| 2 | Piercing Whistle | 3 | Hunt Signal +6% sebzés, −6% CD |
+| 3 | Alpha Hide | 2 | −4% elszenvedett sebzés |
+| 3 | *Open Wound* (módosító – Hunt Signal) | 1 | A Hunt Signal csapása a sebzése 80%-át még egyszer okozza 4 mp alatt (pet-forrás) |
+| 4 | Wild Kinship (előfeltétel: Feral Tempo 3/3) | 3 | +3 Mastery (Beastbond: +6% társ-sebzés) |
+| 4 | Kindred Instinct | 3 | A Wolf harapás-lassítása +8%-kal erősebb (csak a Wolf harapása lassít; a Boar és az Owl nem); a Boar gúnya +0,3 mp; az Owl +1 m hatótávot kap |
+| 5 | **Pack Frenzy** (capstone) | 1 | 30 mp-enként (első alkalommal 5 mp-nél) 10 mp-ig a társ +50% sebzést és +30% támadássebességet kap; csak hullám közben |
+
+#### Hunter – Sharpshot fa
+
+A íj, a Long Shot és a kritikus találatok. A Steady Aura a közeli hősöknek ad sebzést.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Keen Eyes | 3 | +2% kritikus találati esély |
+| 1 | Heavy Shafts | 3 | A fegyvertalálataid +3% sebzést okoznak (a nyilak is, pl. Arrow Fan és Long Shot) |
+| 2 | Fletcher's Edge | 3 | A kritikus találataid +8% krit sebzést okoznak |
+| 2 | Calm Breath | 3 | A Focus +1 / mp-vel gyorsabban töltődik |
+| 3 | Opening Shot | 2 | A fegyvertalálataid +5% sebzést okoznak a 70% HP feletti ellenségekre |
+| 3 | *Finishing Arrow* (módosító – Long Shot) | 1 | Long Shot +60% sebzés a 35% HP alatti ellenségekre |
+| 4 | Quickening Aim (előfeltétel: Fletcher's Edge 3/3) | 3 | Kritikus találat után +1% Haste pontonként 4 mp-ig, legfeljebb 5 halmozás |
+| 4 | Skewering Shots (előfeltétel: Heavy Shafts 3/3) | 3 | A nyilaid +1 átütést kapnak pontonként (Arrow Fan és a sima lövés; a Long Shot már mindent átüt) |
+| 5 | **Steady Aura** (capstone) | 1 | A 8 m-en belüli hősök (te is) +5% sebzést kapnak; a Long Shot cooldownja felére csökken |
+
+#### Hunter – Wildcraft fa
+
+Csapdák, közelharci fegyverek és túlélés: a Polearm és a kettős fegyverzet.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Trailwise | 3 | +2% mozgássebesség |
+| 1 | Powder Lore | 3 | Blast Snare +6% sebzés, −6% CD |
+| 2 | Twin Fang Grip | 3 | Kettős fegyverrel +4% sebzés; a fegyvertalálataid +3%-os eséllyel még egyszer ütnek |
+| 2 | Briar Hide | 3 | +2 Armor és +2 Thorns |
+| 3 | Snared Prey | 2 | +6% sebzés a lassított ellenségekre |
+| 3 | *Brace of Snares* (módosító – Blast Snare) | 1 | Blast Snare +1 csapda cast-onként, és +2 csapda lehet egyszerre élesen |
+| 4 | Close Quarters (előfeltétel: Twin Fang Grip 3/3) | 3 | Közelharci fegyverrel +4% sebzés és −3% kapott közelharci sebzés pontonként |
+| 4 | Fleet Retreat (előfeltétel: Trailwise 3/3) | 3 | Backstep −8% CD, és a lassítása +8%-kal erősebb pontonként |
+| 5 | **Firebug Bombs** (capstone) | 1 | A Blast Snare 4 mp-ig égő földet hagy (a fegyversebzés 25%-a fél másodpercenként), és 3 kisebb bombát szór szét |
+
+#### Shaman – Stormweaving fa
+
+Villám, tűz és Storm Echo. A fa a Forking Bolt és a Storm Echo köré épül.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Livewire | 3 | +3% Nature sebzés (Forking Bolt, Thunderbolt, Stormburst, Rumbling Earth, Gale Strike és a farkasok) |
+| 1 | Kindled Spark | 3 | +3% Fire sebzés (Magma Lash és az égései, a Fire totem) |
+| 2 | Charged Mind (előfeltétel: Livewire 3/3) | 3 | +3 Mastery pontonként (a Storm Echo esélye +4,5% pontonként) |
+| 2 | Stormcharged | 3 | Minden hullám 10 Surge-zsal indul pontonként |
+| 3 | Static Veins | 2 | +3 Spell Power és +2 Intellect pontonként |
+| 3 | *Rebounding Arc* (módosító – Forking Bolt) | 1 | Az utolsó ugrás után a Forking Bolt visszaível, és az első ellenséget újra eltalálja a sebzése 60%-ával |
+| 4 | Resounding Echo (előfeltétel: Charged Mind 3/3) | 3 | A Storm Echo a találat 10%-kal több részét ismétli pontonként (alapból 50%), és +1 Mastery pontonként |
+| 4 | Quickening Storm | 3 | Minden Forking Bolt +2% Haste-ot ad pontonként 5 mp-ig, legfeljebb 3 halmozás |
+| 5 | **Elemental Surge** (capstone) | 1 | 20 mp-enként (első alkalommal 8 mp-nél) a következő 3 sebző képességed +100% sebzést okoz |
+
+#### Shaman – Warspirit fa
+
+Két fegyver, ököl-fegyver és Magma Lash. A fa adja a Shaman Dual Wield-jét.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Twinned Spirits | 3 | Megadja a Dual Wield jártasságot (egykezes fegyver az off-kézbe is; a megadás nem skálázódik; ha elvész, az off-kéz fegyver a hátizsákba vagy az üres fő kézbe kerül, teli hátizsáknál addig nem támad, amíg hely nem lesz). Kettős fegyverrel +3% Haste pontonként |
+| 1 | Hardened Knuckles | 3 | A fegyvertalálataid +4% sebzést okoznak |
+| 2 | Mirrored Strikes (előfeltétel: Twinned Spirits 3/3) | 3 | Kettős fegyverrel a fegyvertalálataid pontonként +4% eséllyel azonnal még egyszer lecsapnak |
+| 2 | Spirit Pulse | 3 | A fegyvertalálatok és a képesség-castok +1 Surge-zsal többet adnak pontonként |
+| 3 | Flame Tempering | 2 | Magma Lash +8% sebzés és −8% CD pontonként |
+| 3 | *Molten Trail* (módosító – Magma Lash) | 1 | Magma Lash 3 mp-ig olvadt földet hagy, ami a csapás 15%-át sebzi fél másodpercenként |
+| 4 | Crackling Blows (előfeltétel: Mirrored Strikes 3/3) | 3 | A fegyvertalálatok pontonként 15%-os eséllyel a célpontot is megsokkolják: a találat sebzésének 60%-a Nature sebzés |
+| 4 | Howling Chorus | 3 | Spirit Pack +8% sebzés és −5% CD pontonként |
+| 5 | **Gale Strike** (capstone) | 1 | Minden 5. fegyvertámadás két villámcsapást ad (külön találatok): az első a célpontot éri, a második 0,2 mp-cel később a legközelebbi másik ellenségre (6 m-en belül); mindkettő 3 Surge-öt ad |
+
+#### Shaman – Wellspring fa
+
+Gyógyítás, totemek és a csapat támogatása: a Soothing Downpour, a totemek és a felélesztés.
+
+| Tier | Talent | Pont | Hatás / pont |
+|---|---|---|---|
+| 1 | Gentle Current | 3 | Healing Done +4% pontonként |
+| 1 | Weathered Wood | 3 | A totemjeid +10%-kal tovább állnak pontonként |
+| 2 | Elder Spirits | 3 | A szövetségesek, akiket felélesztesz, 25%-kal gyorsabban kelnek fel pontonként; +1 Spirit pontonként |
+| 2 | Deepening Rain (előfeltétel: Gentle Current 3/3) | 3 | Soothing Downpour +6% gyógyítás és −5% CD pontonként |
+| 3 | Attuned Totems | 2 | A totemjeid +8% sebzést és gyógyítást adnak pontonként; az Earth-totem lassítása +3%-kal erősebb pontonként |
+| 3 | *Ancestral Reach* (módosító – Totem Rite) | 1 | A Totem Rite Water, Earth és Air mezője 2 m-rel nagyobb |
+| 4 | Gift of the Elders (előfeltétel: Elder Spirits 3/3) | 3 | A felélesztett szövetségesek a Max HP +10%-ával térnek vissza pontonként |
+| 4 | Blessed Rite | 3 | Minden Totem Rite cast a legsebesültebb hőst (téged is) gyógyítja a Max HP 4%-ával pontonként |
+| 5 | **Bond Totem** (capstone) | 1 | 25 mp-enként (első alkalommal 8 mp-nél) 10 mp-ig Bond Totem áll a lábad előtt: 6 m-en belül a HP-arányok másodpercenként a különbség 10%-ával a közös átlag felé mozdulnak, és a hősök 20%-kal kevesebb sebzést kapnak |
+
 ### 7.5 Capstone-ok (minden kaszt, minden fa)
 
 | Kaszt | Fa | Capstone | Hatás |
@@ -1925,12 +2140,12 @@ Ember Rain-t és az Imp tűzlövedékeit egyszerre erősíti; a Pact Shard-ok t�
 | Warlock | Hexcraft | Volatile Blight | Ha egy ellenség az átkaid (DoT-jaid) alatt hal meg – bárki ölte meg –, instabil árnyrobbanás sebzi a 3 m-en belüli ellenségeket, és 1 mp-re elkábítja őket (ellenségenként legfeljebb 4 mp-enként) |
 | Warlock | Pactcraft | Soul Tether | A sebzés 20%-át a pet viseli el (−20% elszenvedett sebzés, a pet nem halhat meg); a pet +30% sebzés |
 | Warlock | Cinderfall | Lingering Blaze | Az Ember Rain égő földet hagy: a kör még 3 mp-ig ég 40%-os sebzéssel, és 30%-kal lassít; a kritikus találataid (fegyvertalálat) 10% eséllyel +1 Pact Shard-ot adnak |
-| Hunter | Beast Mastery | Bestial Wrath | 30 mp-enként 10 mp-ig a pet +50% sebzést kap és nem lehet lassítani |
-| Hunter | Marksmanship | Trueshot Aura | A közeli társak +5% sebzést kapnak; az Aimed Shot cooldownja felére csökken |
-| Hunter | Survival | Wildfire Bombs | Az Explosive Trap égő földet hagy, és 3 kisebb bombát szór szét |
-| Shaman | Elemental | Elemental Mastery | 20 mp-enként a következő 3 varázslat garantált krit |
-| Shaman | Enhancement | Stormstrike | Minden 5. fegyvertalálat dupla villámcsapást vált ki |
-| Shaman | Restoration | Spirit Link Totem | Totem, ami kiegyenlíti a közeli társak HP-ját, és 20%-kal csökkenti a sebzésüket (co-op) |
+| Hunter | Packlord | Pack Frenzy | 30 mp-enként (első alkalommal 5 mp-nél) 10 mp-ig a társ +50% sebzést és +30% támadássebességet kap; csak hullám közben |
+| Hunter | Sharpshot | Steady Aura | A 8 m-en belüli hősök (te is) +5% sebzést kapnak; a Long Shot cooldownja felére csökken |
+| Hunter | Wildcraft | Firebug Bombs | A Blast Snare 4 mp-ig égő földet hagy (a fegyversebzés 25%-a fél másodpercenként), és 3 kisebb bombát szór szét |
+| Shaman | Stormweaving | Elemental Surge | 20 mp-enként (első alkalommal 8 mp-nél) a következő 3 sebző képességed +100% sebzést okoz |
+| Shaman | Warspirit | Gale Strike | Minden 5. fegyvertámadás két villámcsapást ad (külön találatok); a második a legközelebbi másik ellenségre megy (6 m-en belül) |
+| Shaman | Wellspring | Bond Totem | 25 mp-enként 10 mp-ig Bond Totem a lábad előtt: 6 m-en belül a HP-k a közös átlag felé húzódnak, és a hősök 20%-kal kevesebb sebzést kapnak |
 
 **Értelmezések (a játék szabályai miatt):**
 - **A képességek nem kritelnek** (csak a Rogue fegyvertalálatos abilityjei), ezért a kritre
@@ -1945,11 +2160,13 @@ Ember Rain-t és az Imp tűzlövedékeit egyszerre erősíti; a Pact Shard-ok t�
   támadásnak számít (Ruinous Strike, Chain Ignition, Sunbrand). Az extra támadás külön
   támadás.
 - **Co-op ráadások:** több capstone a társakat is segíti – Carnage, Unbreakable, Gleaming Shield,
-  Sunbrand, a Steel Nerve lassítása, Crowd Surge, Dusk Waltz.
+  Sunbrand, a Steel Nerve lassítása, Crowd Surge, Dusk Waltz, Steady Aura, Bond Totem.
   - A társakra ható rész mindig kisebb a saját hatásnál.
   - Minden hős a saját kulcsán adja, így két azonos kasztú hős hatása szorzódik, mint két
     Battle Roar-é.
-- **Mind a 15 capstone M5-ben kész** (a Hunter és a Shaman fái M8-ban jönnek).
+- **Az M8 döntései** (a játék szabályai miatt): az Elemental Surge a garantált krit helyett +100% sebzést ad a következő 3 sebző képességre, mert a képességek nem kritelnek; a Pack Frenzy a lassíthatatlanság helyett +30% támadássebességet ad, mert a petek nem lassíthatók; a Gale Strike csapásai nem fegyvertalálatok.
+- **Bond Totem:** a totem a 6 m-en belüli hősök HP-arányát másodpercenként a különbség 10%-ával a közös átlag felé mozdítja: az alacsonyabb HP-jű hős kap, a magasabb HP-jű csendben ad HP-t, de az átlag alá nem megy. Ez átvitel, nem gyógyítás: ugyanannyi HP lép ki az adókból, mint amennyi belép a vevőkbe (eltérő Max HP-nál is, nem keletkezik és nem tűnik el HP), a healing meter nem írja jóvá a Shamannek, és nincs „+N” szám; a kapott sebzés −20% (nem az okozotté); a totem nem célozható. Csak a totem időtartamát változtatják a „minden totem” bónuszok (Weathered Wood, set), az Ancestral Chorus aura nem kerül rá.
+- **Mind a 21 capstone kész:** a 15 régi M5-ben, a Hunter és a Shaman hat új capstone-ja M8-ban (Pack Frenzy, Steady Aura, Firebug Bombs, Elemental Surge, Gale Strike, Bond Totem).
 
 ### 7.6 Kapcsolat a többi rendszerrel
 
@@ -3210,7 +3427,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M5 | Mélység | Talentfák (5 kaszt × 3 fa), fegyverkovácsolás, setek, elitek, Coin Gremlin, közös kassza |
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, módok (Endless, Hardcore, ranglista), környezetek, események, szentélyek, Dungeon-portál, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a (kész) és M6b (a végleges balansz kivételével kész)**, lásd alább |
 | M7 | Csiszolás | **Kész (M7a + M7b).** **M7a:** hangok (UI, harc, zene), főmenü (Settings, Credits), beállítások, IP-tisztítás (az átnevezési tábla a „Kiadás és IP” részben). **M7b:** Cinzel-címek és game-icons.net ikonok, a hősön látszó sisak, váll és mellvért, az öt aréna végleges látványa, harci effektek (13. fejezet) |
-| M8 | Új kasztok | **Hunter** és **Shaman** (3.7): kasztok, petek / totemek, ability-készletek, talentfák, tier setek, Artifactok; új fegyvertípusok: Crossbow, Polearm, Fist Weapon; az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.8) |
+| M8 | Új kasztok | **Kész.** **Hunter** és **Shaman** (3.7): kasztok, társ / totemek, ability-készletek, talentfák, tier setek, Artifactok, 16 kaszt-specifikus item; új fegyvertípusok: Crossbow, Polearm, Fist Weapon (4. fejezet); az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.5) |
 | M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
 
 **Az M6 két részben jön**
@@ -3272,6 +3489,9 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Módválasztás és helyi ranglista** | A lobbyban választható mód (Normal / Endless) és Hardcore-kapcsoló; módonként, létszámonként helyi top 10 | **Kész (M6b)** |
 | **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **Kész (M6b)** |
 | **Item-tartalom csomagok** | 3 új fegyver (Two-Hand Sword, Two-Hand Mace, Orb), 96 páncél- és 20 ékszer-alaptípus (anyag-fokozatok), 25 utótag, 50 enchant, 40 névvel ellátott és 40 kaszt-specifikus item, 30 trinket, 25 Legendary (5.8) | **Kész (M6b)** |
+| **Új kaszt: Hunter és Shaman** | Két Mail-kaszt (3.7): Focus és Surge, 8-8 ability, társ (Wolf / Boar / Owl) és totemek, Storm Echo és Beastbond, 3-3 talentfa (7.4), tier set, Artifact, 8-8 kaszt-specifikus item (5.5) | **Kész (M8)** |
+| **Új fegyvertípusok (M8)** | Crossbow, Polearm, Fist Weapon, és három Forge Legendary: Bindweed, Barberry, Mossknuckle (4. fejezet) | **Kész (M8)** |
+| **Kaszt-független tier setek** | Öt Epic set (Mendweave Attire, Slipskin Leathers, Hoardscale Mail, Redthorn Mail, Stonebark Plate), páncéltípus szerinti sorsolással (5.5) | **Kész (M8)** |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
 | **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
@@ -3516,7 +3736,7 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 
 **Kiadás és IP (M7 / M9)**
 
-- **Állapot (M7a):** az IP-tisztítás kész – a játék, az adatok és a dokumentáció az új neveket használja (kivéve a tervezett M8-as neveket és a Blizzard-márkát), a tiltott nevekre a `tests/test_m7_ip_names.gd` teszt őrködik, az új nevek listáját pedig az alábbi „Átnevezések (M7a)” táblázat adja.
+- **Állapot (M7a):** az IP-tisztítás kész – a játék, az adatok és a dokumentáció az új neveket használja (az M8-as neveket is beleértve, lásd 3.7; a Blizzard-márka kivétel), a tiltott nevekre a `tests/test_m7_ip_names.gd` teszt őrködik, az új nevek listáját pedig az alábbi „Átnevezések (M7a)” táblázat adja.
 - **IP-tisztítás – cél:** a játékban (UI, adat, tooltip, GDD) ne maradjon olyan név, amely
   a Blizzard játékaiból (WoW, Diablo, Hearthstone, Overwatch) egy az egyben átvett tulajdonnév
   vagy jellegzetes kifejezés. A WoW-hangulat maradhat (onion-paródia, általános fantasy
@@ -3710,7 +3930,7 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
     név, ár, a „ki tudja használni” pipák) a fogyóeszköz-sor jobb oldalán –, nem vesz el egy
     item-ajánlatot sem.
   - Tartalma: **40% eséllyel** egy **maximális statdobású Epic**, egyébként garantált tier
-    set-darab a csapat egyik kasztjának. A bolt Legendaryt továbbra sem árul (10).
+    set-darab a csapat egyik kasztjának: előbb a kaszt-setek hiányzó darabja, utána a kaszt-független setek hiányzó darabja, ha egyik sem hiányzik, bármelyik. A bolt Legendaryt továbbra sem árul (10).
     - A **max-roll Epic** a generátor loot-költségvetésével készül (+25% stat, egy enchant-rankkal
       több, +6 Item Level, „Looted” jelzés), 2 enchanttal, a csapat egy kasztjára (nem kézzel
       készített és nem set-darab).
@@ -3891,7 +4111,7 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Zene | Egyelőre nincs |
 | Célzás | Csak automatikus (fegyverek és képességek); nincs kézi célzás |
 | Paladin Call of Valor | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP), kivéve, ha a Grave Tender 1 mp-en belül úgyis feléleszti |
-| Talentfák | Mind a 15 fa kidolgozva (7.4), az M5-ben; a capstone-értelmezések a 7.5 alatt |
+| Talentfák | Mind a 21 fa kidolgozva (7.4): az M5-ben a 15 régi, az M8-ban a Hunter és a Shaman 6 fája; a capstone-értelmezések a 7.5 alatt |
 | Fegyver-jártasság | Szigorú, WoW-szerű: minden kaszt csak a saját fegyvertípusait használhatja (3. fejezet), nincs „büntetéssel bármit” opció |
 | Páncél-jártasság | Szigorú, WoW-szerű: a saját páncéltípus és az annál könnyebbek (5.3) |
 | Kaszt-specifikus itemek | Vannak („Classes: X”), a kaszt képességeit módosítják (5.5) |
@@ -3900,7 +4120,7 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | M6 felosztása | M6a (rendszerek: ellenségek, bossok, Artifactok, Enchanter, goldsinkek, Damage Meter) és M6b (módok, környezetek, események, Dungeon-portál, tartalom-csomagok, végleges balansz) – 16. fejezet |
 | Glimmer Dust | A csapat második közös pénzneme; Disenchantból és a mindenki által Passolt itemekből jön, az Enchanter költi (5.7) |
 | Győzelem | A 25. hullámon Vor'thalax halála (nem az időzítő lejárta) – 8. fejezet |
-| Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,8 / 2,5 / 2,6 menetenként (5.5) |
+| Artifact-kínálat | A normál ölés esélye (0,05%) osztva a játékosszámmal, így a várt Artifact-szám 1 / 2 / 4 játékosnál ≈ 2,9 / 2,6 / 2,7 menetenként, hét kaszttal (5.5) |
 | Vor'thalax | Alap HP 450 (az 1200 elírás volt), érintéses sebzés 4, a boss HP-ja ×(1 + 0,75 × (játékosok − 1)) mint Morvainé; a Flesh Golem érintéses sebzése 4 – a végső balansz az M6b végén, egyszer (8., 9. fejezet) |
 | Módok (M6b) | **Normal** (25 hullám) vagy **Endless** (a 25. hullám után folytatódik, a 30.-tól 5 hullámonként boss; csak vereséggel ér véget), opcionális **Hardcore** (nincs Grave Tender); a lobbyban választható (Y / X); módonként és létszámonként helyi top 10 ranglista (1., 12., 16.1) |
 | Környezetek (M6b) | 5 környezet (Forest Ruin, Cemetery, Swamp, Volcano, Ice Cave), menetenként egy, a „Rolling the arena…” animáció sorsolja; saját veszélyek, az aréna mérete nem változik; a végleges látvány kész (M7b; 13. fejezet) |
@@ -3909,3 +4129,4 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | M6b tartalom | +3 fegyver (Two-Hand Sword, Two-Hand Mace, Orb), a Crossbow, a Polearm és a Fist Weapon az M8-cal; a kaszt-független tier setek az **M8-ra tolva** (set-rendszer módosítás kell) – 5.8; **megvalósítva**: 13 fegyver, 96 páncél- és 20 ékszer-alaptípus, 25 utótag, 50 enchant, 160 kézzel tervezett item |
 | M6b megvalósítás | Kész (a végleges balansz kivételével): az 1–13., 16.1 és 5.8 fejezet írja le, ahogy a kód működik; az Epic fegyverek +10% támadási sebességet kapnak (4.1), a környezet alapból sorsolódik (smoke-ban is) |
 | M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangolt; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |
+| M8 tartalom | Hunter és Shaman (7 kaszt); Crossbow, Polearm, Fist Weapon (16 fegyvertípus, 16 Forge Legendary); 12 tier set (7 kaszt + 5 kaszt-független); 2 Artifact (7); 56 kaszt-specifikus item; 211 kézzel tervezett item; megvalósítva (3.7, 4, 5.5, 5.8, 7). M8-ban nincs balanszolás |

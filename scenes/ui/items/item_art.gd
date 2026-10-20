@@ -3,7 +3,8 @@ extends RefCounted
 ## Procedural item silhouettes drawn in code (no image assets yet), used by ItemIcon:
 ## one shape per Items.SlotType (helm / hood, amulet, pauldrons, breastplate / robe, bracer,
 ## gauntlet, belt, legguards, boot, ring, trinket) and one per weapon_type (sword, axe, mace,
-## dagger, bow, gun, wand, staff, shield, tome, two_hand_sword, two_hand_mace, orb). Armour is coloured by its material (cloth,
+## dagger, bow, gun, wand, staff, shield, tome, two_hand_sword, two_hand_mace, orb, crossbow, polearm,
+## fist_weapon). Armour is coloured by its material (cloth,
 ## leather, mail, plate), gems by the item's rarity. Empty equipment slots use the same shapes
 ## as flat, faint silhouettes. Shapes are authored in a unit square (y down).
 
@@ -45,7 +46,7 @@ const EMPTY_SHAPES := {
 ## Every weapon_type with its own silhouette.
 const WEAPON_SHAPES: Array[StringName] = [
 	&"sword", &"axe", &"mace", &"dagger", &"bow", &"gun", &"wand", &"staff", &"shield", &"tome",
-	&"two_hand_sword", &"two_hand_mace", &"orb",
+	&"two_hand_sword", &"two_hand_mace", &"orb", &"crossbow", &"polearm", &"fist_weapon",
 ]
 
 
@@ -247,6 +248,9 @@ static func draw_shape(ci: CanvasItem, rect: Rect2, shape: StringName, pal: Pale
 		&"two_hand_sword": _greatsword(pen, pal)
 		&"two_hand_mace": _maul(pen, pal)
 		&"orb": _orb(pen, pal)
+		&"crossbow": _crossbow(pen, pal)
+		&"polearm": _polearm(pen, pal)
+		&"fist_weapon": _fist(pen, pal)
 		_: _trinket(pen, pal)
 
 
@@ -605,6 +609,72 @@ static func _gun(pen: Pen, pal: Palette) -> void:
 	if not pen.flat:
 		pen.ci.draw_arc(guard_c, 0.06 * pen.k, 0.0, PI, 10, OUTLINE, maxf(1.5, 0.03 * pen.k), true)
 	pen.gem(Pen.along(o, u, 0.24, 0.05), 0.03, pal.gem)
+
+
+## The crossbow: a stock with a pistol grip, a wide bowed prod across the front, a drawn string and a
+## bolt on the rail (hilt bottom-left, the bolt points to the top right).
+static func _crossbow(pen: Pen, pal: Palette) -> void:
+	var o := Vector2(0.14, 0.86)
+	var u := DIAG
+	pen.poly([Pen.along(o, u, 0.0, 0.045), Pen.along(o, u, 0.74, 0.045), Pen.along(o, u, 0.74, -0.045),
+		Pen.along(o, u, 0.32, -0.045), Pen.along(o, u, 0.3, -0.17), Pen.along(o, u, 0.18, -0.17),
+		Pen.along(o, u, 0.16, -0.045), Pen.along(o, u, 0.0, -0.045)], pen.c(pal.wood))
+	var limb: Array[Vector2] = []
+	for i in 9:
+		var t := lerpf(-1.0, 1.0, i / 8.0)
+		limb.append(Pen.along(o, u, 0.58 + 0.12 * t * t, t * 0.34))
+	if not pen.flat:
+		pen.line(limb[0], Pen.along(o, u, 0.34, 0.0), Color(0.95, 0.92, 0.82), 0.014)
+		pen.line(limb[8], Pen.along(o, u, 0.34, 0.0), Color(0.95, 0.92, 0.82), 0.014)
+	for i in limb.size() - 1:
+		pen.capsule(limb[i], limb[i + 1], 0.036 if i in [3, 4] else 0.03, pal.wood.darkened(0.1))
+	pen.circle(limb[0], 0.03, pal.trim)
+	pen.circle(limb[8], 0.03, pal.trim)
+	pen.capsule(Pen.along(o, u, 0.58, -0.05), Pen.along(o, u, 0.58, 0.05), 0.035, pal.trim)
+	# The bolt on its rail: shaft, steel head, fletching.
+	pen.capsule(Pen.along(o, u, 0.3, 0.0), Pen.along(o, u, 0.88, 0.0), 0.016, pal.wood.lightened(0.2))
+	pen.poly([Pen.along(o, u, 1.0, 0.0), Pen.along(o, u, 0.86, 0.055), Pen.along(o, u, 0.86, -0.055)], pen.c(pal.main), true, 0.2)
+	pen.poly([Pen.along(o, u, 0.3, 0.0), Pen.along(o, u, 0.24, 0.05), Pen.along(o, u, 0.36, 0.05)], pen.c(pal.gem), false)
+	pen.poly([Pen.along(o, u, 0.3, 0.0), Pen.along(o, u, 0.24, -0.05), Pen.along(o, u, 0.36, -0.05)], pen.c(pal.gem), false)
+	pen.gem(Pen.along(o, u, 0.46, 0.0), 0.032, pal.gem)
+
+
+## The polearm: the longest haft of the weapons, a leaf-shaped head with one wing, an iron collar and a
+## small pennant.
+static func _polearm(pen: Pen, pal: Palette) -> void:
+	var o := Vector2(0.08, 0.94)
+	var u := DIAG
+	pen.capsule(Pen.along(o, u, 0.0, 0.0), Pen.along(o, u, 0.9, 0.0), 0.036, pal.wood)
+	pen.capsule(Pen.along(o, u, 0.14, 0.0), Pen.along(o, u, 0.42, 0.0), 0.04, pal.grip)
+	pen.circle(Pen.along(o, u, 0.0, 0.0), 0.05, pal.trim)
+	pen.poly([Pen.along(o, u, 0.62, 0.0), Pen.along(o, u, 0.78, -0.2), Pen.along(o, u, 0.72, 0.0)], pen.c(pal.trim.darkened(0.1)))
+	pen.poly([Pen.along(o, u, 0.9, 0.05), Pen.along(o, u, 0.88, 0.2), Pen.along(o, u, 1.0, 0.22), Pen.along(o, u, 1.06, 0.08)],
+			pen.c(pal.main.darkened(0.08)), true, 0.2)
+	pen.poly([Pen.along(o, u, 1.22, 0.0), Pen.along(o, u, 1.12, 0.07), Pen.along(o, u, 0.99, 0.09), Pen.along(o, u, 0.88, 0.05),
+		Pen.along(o, u, 0.88, -0.05), Pen.along(o, u, 0.99, -0.09), Pen.along(o, u, 1.12, -0.07)], pen.c(pal.main), true, 0.2)
+	pen.line(Pen.along(o, u, 0.92, 0.0), Pen.along(o, u, 1.14, 0.0), Color(0, 0, 0, 0.3), 0.02)
+	pen.capsule(Pen.along(o, u, 0.87, -0.065), Pen.along(o, u, 0.87, 0.065), 0.026, pal.trim)
+	pen.gem(Pen.along(o, u, 0.87, 0.0), 0.03, pal.gem)
+
+
+## The fist weapon: a knuckle plate over a grip bar, three claw spikes with bone tips and a wrist strap.
+static func _fist(pen: Pen, pal: Palette) -> void:
+	var o := Vector2(0.2, 0.8)
+	var u := DIAG
+	pen.capsule(Pen.along(o, u, -0.04, -0.2), Pen.along(o, u, -0.04, 0.2), 0.05, pal.grip)
+	pen.capsule(Pen.along(o, u, 0.12, -0.2), Pen.along(o, u, 0.12, 0.2), 0.035, pal.grip.lightened(0.1))
+	for b: float in [-0.15, 0.0, 0.15]:
+		pen.poly([Pen.along(o, u, 0.4, b - 0.065), Pen.along(o, u, 0.72, b * 1.35), Pen.along(o, u, 0.4, b + 0.065)],
+				pen.c(pal.main), true, 0.2)
+		pen.poly([Pen.along(o, u, 0.6, b * 1.25 - 0.026), Pen.along(o, u, 0.72, b * 1.35), Pen.along(o, u, 0.6, b * 1.25 + 0.026)],
+				pen.c(PAPER), false)
+	var plate: Array = []
+	for i in 9:
+		var a := PI * i / 8.0
+		plate.append(Pen.along(o, u, 0.2 + sin(a) * 0.2, cos(a) * 0.3))
+	pen.poly(plate, pen.c(pal.main.darkened(0.12)), true, 0.25)
+	pen.line(Pen.along(o, u, 0.24, -0.2), Pen.along(o, u, 0.36, -0.16), Color(1, 1, 1, 0.45), 0.02)
+	pen.gem(Pen.along(o, u, 0.26, 0.0), 0.04, pal.gem)
 
 
 static func _wand(pen: Pen, pal: Palette) -> void:

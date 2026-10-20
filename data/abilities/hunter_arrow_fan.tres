@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/hunter/hunter_arrow_fan.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"arrow_fan"
+display_name = "Arrow Fan"
+description = "Looses {arrows} arrows in a {spread} degree fan at the nearest enemy, each for {damage_pct}% weapon damage."
+class_id = &"hunter"
+school = &"physical"
+tags = Array[StringName]([&"aoe", &"projectile", &"weapon"])
+resource = &"focus"
+cost = 40.0
+cooldown = 0.0
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"arrows": 5,
+"damage_pct": 120.0,
+"pierce": 0,
+"range": 11.0,
+"speed": 24.0,
+"spread": 50.0,
+"volley_delay": 0.25,
+"volleys": 1
+}
+icon = &"arrow_fan"
+color = Color(0.95, 0.78, 0.4, 1)
+kind = 0
+card_weight = 1.0
+rank3 = {"arrows_add": 2}
+rank3_text = "+2 arrows"
+specs = Array[Dictionary]([{"name": "Skewering Fan", "text": "Arrows pass through 1 more enemy and fly 3 m further.", "mods": {"pierce_add": 1, "range_add": 3.0}}, {"name": "Echo Draw", "text": "A second fan follows 0.25 sec later.", "mods": {"volleys_add": 1}}])

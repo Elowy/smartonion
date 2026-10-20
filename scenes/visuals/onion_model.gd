@@ -33,6 +33,11 @@ const PEEL_THRESHOLDS: Array[float] = [0.6, 0.4, 0.2]
 ## chest piece is worn so they stay visible on top of the armour (the low-HP cue must not vanish).
 const PEEL_SPOTS: Array[Vector2] = [Vector2(132.0, 0.46), Vector2(-132.0, 0.6), Vector2(48.0, 0.3)]
 const PEEL_GEAR_LIFT := 0.11
+## Play Dead: how fast the body tips over (1/s), how far (radians) and how much it is lifted so
+## that it rests on the ground.
+const TIP_RATE := 6.0
+const TIP_ANGLE := 1.5
+const TIP_LIFT := 0.36
 ## Revive cast bar ("Resurrecting") above a downed onion: height, size (metres).
 const CAST_BAR_Y := 2.0
 const CAST_BAR_SIZE := Vector2(1.6, 0.3)
@@ -171,6 +176,9 @@ var _phase := 0.0
 var _time := 0.0
 var _flash := 0.0
 var _squash := 0.0
+## Play Dead (the Hunter): the body tips over on its side while true; _tip is the smoothed 0..1 pose.
+var play_dead := false
+var _tip := 0.0
 var _attack_t: Array[float] = [1.0, 1.0]
 var _blink := 0.0
 var _next_blink := 2.0
@@ -331,6 +339,16 @@ func play_attack(off_hand: bool) -> void:
 	_attack_t[1 if off_hand else 0] = 0.0
 
 
+## Play Dead (the Hunter): the onion tips over on its side (true) and gets up again (false).
+func set_play_dead(on: bool) -> void:
+	play_dead = on
+
+
+## 0..1 how far the body has tipped over (Play Dead; tests).
+func tip_amount() -> float:
+	return _tip
+
+
 ## White flash + squash when damaged.
 func flash_hit() -> void:
 	_flash = 1.0
@@ -342,7 +360,7 @@ func flash_hit() -> void:
 func set_hp_ratio(ratio: float) -> void:
 	hp_ratio = clampf(ratio, 0.0, 1.0)
 	if _bulb != null and not downed:
-		_bulb.material_override = Mats.onion_skin(_skin_color(), damage_amount(hp_ratio))
+		_bulb.material_override = Mats.onion_skin(_skin_color(), damage_amount(hp_ratio), _is_garlic())
 		if _flash > 0.0:
 			Mats.set_overlay(_bulb, Color(1, 1, 1), _flash * 0.85)
 	for i in _peels.size():
@@ -535,6 +553,18 @@ static func grip_pose(weapon_type: StringName, off_hand: bool) -> Transform3D:
 		&"orb":
 			rot = Vector3(-12, 0, 0)
 			pos = Vector3(0, 0.08, 0.06)
+		&"crossbow":
+			# Gun-like, held a little higher.
+			rot = Vector3(-76, 0, 0)
+			pos = Vector3(0, 0.03, 0.10)
+		&"polearm":
+			# The staff family: slanted forward, the hand low on the haft.
+			rot = Vector3(-22, 0, -10 * side)
+			pos = Vector3(0, 0.12, 0.02)
+		&"fist_weapon":
+			# Claws forward.
+			rot = Vector3(-60, 0, -14 * side)
+			pos = Vector3(0, 0, 0.04)
 	return MeshKit.xf(pos, rot)
 
 
@@ -585,6 +615,11 @@ func _animate_alive(delta: float) -> void:
 	_body.position = Vector3(0, bob, 0)
 	_body.rotation = Vector3(-0.14 * s, 0.0, sin(_phase) * 0.13 * s)
 	_body.scale = Vector3(1.0 + 0.14 * sq - breathe * 0.5, 1.0 - 0.18 * sq + breathe, 1.0 + 0.14 * sq - breathe * 0.5)
+	_tip = move_toward(_tip, 1.0 if play_dead else 0.0, delta * TIP_RATE)
+	if _tip > 0.0:
+		var eased := smoothstep(0.0, 1.0, _tip)
+		_body.rotation.z += eased * TIP_ANGLE
+		_body.position += Vector3(-0.05, TIP_LIFT, 0.0) * eased
 	for i in _feet.size():
 		var p := _phase + PI * i
 		var foot := _feet[i]
@@ -669,6 +704,11 @@ func bulb_damage() -> float:
 
 func _skin_color() -> Color:
 	return class_data.onion_color if class_data != null else Color(0.85, 0.55, 0.3)
+
+
+## The Shaman is a garlic bulb: white-lilac skin with purple streaks (Mats.onion_skin).
+func _is_garlic() -> bool:
+	return class_data != null and class_data.headgear == &"tribal_mask"
 
 
 func _apply_downed_look() -> void:
@@ -1002,9 +1042,10 @@ func _build_body() -> void:
 		var k := MeshKit.new()
 		k.add_lathe(bulb_profile(), Transform3D(), Color.WHITE, 36)
 		return k.build())
-	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio)))
-	# Sprout (long green stalk for the spring-onion rogue, withered for the warlock).
-	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else "normal")
+	_bulb = _mesh("Bulb", _body, bulb_mesh, Mats.onion_skin(skin, damage_amount(hp_ratio), _is_garlic()))
+	# Sprout: long green stalk for the spring-onion rogue, withered for the warlock, pale garlic scapes for the
+	# shaman, "normal" for any other headgear (the hunter's hat covers it).
+	var sprout_kind := "long" if headgear == &"hood" else ("dark" if headgear == &"horned_hood" else ("pale" if headgear == &"tribal_mask" else "normal"))
 	var sprout := MeshKit.cached("onion:sprout:" + sprout_kind, func() -> Mesh: return _sprout_mesh(sprout_kind))
 	_sprout = _mesh("Sprout", _body, sprout, Mats.toon_vc())
 	var roots := MeshKit.cached("onion:roots", func() -> Mesh: return _roots_mesh())
@@ -1048,6 +1089,8 @@ func _build_body() -> void:
 		_feet.append(foot)
 
 
+## Glove colour per headgear. [code]hunter_hat[/code] and [code]tribal_mask[/code] (M8) are hooks the
+## class packages fill; any headgear id without an arm gets the plain look (the onion skin, lighter).
 func _glove_color() -> Color:
 	if class_data == null:
 		return Color(0.85, 0.55, 0.3)
@@ -1057,9 +1100,13 @@ func _glove_color() -> Color:
 		&"wizard_hat": return class_data.onion_color.lightened(0.15)
 		&"hood": return Color(0.28, 0.2, 0.15)
 		&"horned_hood": return Color(0.2, 0.12, 0.24)
+		&"hunter_hat": return Color(0.45, 0.3, 0.18)
+		&"tribal_mask": return Color(0.5, 0.34, 0.2)  # wrapped wooden-brown hands
+		_: pass
 	return class_data.onion_color.lightened(0.1)
 
 
+## Boot colour per headgear (same hooks and default as [method _glove_color]: plain leather).
 func _boot_color() -> Color:
 	if class_data == null:
 		return LEATHER
@@ -1069,6 +1116,9 @@ func _boot_color() -> Color:
 		&"wizard_hat": return class_data.accent_color.darkened(0.35)
 		&"hood": return Color(0.22, 0.16, 0.12)
 		&"horned_hood": return Color(0.16, 0.09, 0.2)
+		&"hunter_hat": return Color(0.3, 0.2, 0.12)
+		&"tribal_mask": return Color(0.33, 0.22, 0.14)
+		_: pass
 	return LEATHER
 
 
@@ -1083,6 +1133,10 @@ static func _sprout_mesh(kind: String) -> Mesh:
 		"dark":
 			c = Color(0.36, 0.42, 0.2)
 			stretch = 0.85
+		"pale":
+			# Garlic scapes: pale green-white stalks.
+			c = Color(0.8, 0.9, 0.62)
+			stretch = 0.95
 	var y0 := 0.97
 	var leaves := [
 		[Vector3(0, 0, 0), Vector3(0.02, 0.14, 0.02), Vector3(0.06, 0.26, 0.06), Vector3(0.13, 0.32, 0.12)],
@@ -1128,6 +1182,9 @@ static func _face_mesh_build(brows: bool, headgear: StringName) -> Mesh:
 				&"horned_hood": tilt = 24.0
 				&"hood": tilt = 14.0 if side > 0 else -6.0
 				&"wizard_hat": tilt = -8.0
+				&"hunter_hat": tilt = 9.0  # a keen, steady look
+				&"tribal_mask": pass  # level brows under the carved mask
+				_: pass  # level brows
 			var bc := center + b * Vector3(0, 0.15, -0.035)
 			var bb := b * Basis.from_euler(Vector3(0, 0, deg_to_rad(tilt * side)))
 			k.add_capsule(0.022, 0.13, Transform3D(bb * Basis.from_euler(Vector3(0, 0, PI / 2)), bc), Color(0.16, 0.1, 0.1), 6, 2)
@@ -1412,10 +1469,47 @@ func _build_starter_extras(parts: Array[OnionArmor.Part]) -> void:
 
 
 ## Class-specific nodes that do not depend on the worn armour: the warlock's fel flame in the empty
-## off hand.
+## off hand, the small totem on the shaman's back.
 func _build_class_extras() -> void:
 	if class_data != null and class_data.headgear == &"horned_hood" and _hands.size() == 2:
 		_fel_flame = _build_flame(_hands[1], class_data.accent_color)
+	if class_data != null and class_data.headgear == &"tribal_mask":
+		var accent := class_data.accent_color
+		var totem := MeshKit.cached("onion:back_totem:" + accent.to_html(), func() -> Mesh: return _back_totem_mesh(accent))
+		_mesh("BackTotem", _body, totem, Mats.toon_vc(), true)
+
+
+## The shaman's small totem strapped to the back: a carved post with two faces and a teal crown, tied on by a
+## leather strap across the body. Back = +Z (the front is -Z).
+static func _back_totem_mesh(accent: Color) -> Mesh:
+	var k := MeshKit.new()
+	var wood := Color(0.55, 0.37, 0.22)
+	var dark := Color(0.27, 0.16, 0.1)
+	var tilt := Vector3(-14.0, 0.0, 0.0)  # leans back a little, away from the bulb
+	var base := Vector3(0.0, 0.24, 0.52)
+	var at := func(local: Vector3) -> Transform3D:
+		return Transform3D(Basis.from_euler(Vector3(deg_to_rad(tilt.x), 0, 0)), base) * Transform3D(Basis(), local)
+	k.add_cylinder(0.052, 0.062, 0.7, at.call(Vector3(0, 0.35, 0)) as Transform3D, wood, 8)
+	for i in 2:
+		var y := 0.28 + 0.24 * float(i)
+		k.add_box(Vector3(0.13, 0.13, 0.1), at.call(Vector3(0, y, 0)) as Transform3D, wood.lightened(0.08 * float(1 - i)))
+		# Face on the side that looks away from the bulb (+Z).
+		for side: float in [-1.0, 1.0]:
+			k.add_box(Vector3(0.032, 0.03, 0.02), at.call(Vector3(0.03 * side, y + 0.02, 0.055)) as Transform3D, IVORY)
+		k.add_box(Vector3(0.07, 0.025, 0.02), at.call(Vector3(0, y - 0.035, 0.055)) as Transform3D, dark)
+	k.add_cylinder(0.0, 0.085, 0.2, at.call(Vector3(0, 0.78, 0)) as Transform3D, accent, 8)
+	k.add_sphere(0.03, at.call(Vector3(0, 0.9, 0)) as Transform3D, accent.lightened(0.4), 8, 4)
+	# Wings.
+	for side: float in [-1.0, 1.0]:
+		k.add_box(Vector3(0.14, 0.04, 0.05), at.call(Vector3(0.1 * side, 0.46, 0)) as Transform3D, dark)
+	# A strap across the back and around the sides (never over the face) and a binding ring on the post.
+	var strap := PackedVector3Array()
+	for step in 11:
+		var a := lerpf(70.0, 290.0, float(step) / 10.0)
+		strap.append(bulb_point(lerpf(0.66, 0.26, float(step) / 10.0), a, 0.025))
+	k.add_tube(strap, 0.022, 0.022, LEATHER.darkened(0.1), 5)
+	k.add_torus(0.045, 0.075, at.call(Vector3(0, 0.12, 0)) as Transform3D, LEATHER, 10, 4)
+	return k.build()
 
 
 ## What the head piece does to the onion body: a closed hat hides the sprout, a mask the mouth,

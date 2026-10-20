@@ -28,8 +28,10 @@ const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swa
 const SHRINE_DIR := "res://data/shrines/"
 ## Pool order of the shrines; any extra one is appended alphabetically.
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
-## Lobby order of the launch classes; any extra class is appended alphabetically.
-const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"]
+## Lobby order of the classes; any extra class is appended alphabetically. An id without a
+## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
+## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
+const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock", &"hunter", &"shaman"]
 
 var classes: Dictionary[StringName, ClassData] = {}
 var weapons: Dictionary[StringName, WeaponData] = {}
@@ -206,14 +208,78 @@ func get_set(id: StringName) -> SetData:
 	return sets.get(id)
 
 
-## The tier set of [param class_id] (the first by id when there are several; null = none).
+## The class's own tier set (SetData.class_id == [param class_id]; the first by id when there are
+## several; null = none, and for an empty id: a class-independent set is nobody's own).
+## [method sets_for_class] adds the class-independent sets of its armour type.
 func set_for_class(class_id: StringName) -> SetData:
+	if class_id == &"":
+		return null
 	var best: SetData = null
 	for id in sets:
 		var s := sets[id]
 		if s.class_id == class_id and (best == null or String(s.id) < String(best.id)):
 			best = s
 	return best
+
+
+## The class-independent tier sets (SetData.class_id empty), by id.
+func independent_sets() -> Array[SetData]:
+	var ids: Array[StringName] = []
+	ids.assign(sets.keys())
+	ids.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	var out: Array[SetData] = []
+	for id in ids:
+		if sets[id].is_independent():
+			out.append(sets[id])
+	return out
+
+
+## The class-independent sets of armour type [param armor] (ClassData.ArmorType), by id.
+func independent_sets_for_armor(armor: int) -> Array[SetData]:
+	var out: Array[SetData] = []
+	for s in independent_sets():
+		if s.armor_type == armor:
+			out.append(s)
+	return out
+
+
+## Every tier set that can ROLL for a hero of [param class_id], in roll order: the class's own set
+## ([method set_for_class]) first, then the class-independent sets of the class's own armour type
+## (SetData.armor_type; a set rolls only for its native armour, a plate hero never rolls the cloth set
+## though it could wear it), by id. Empty for a class with neither.
+## [param class_data]: the class resource when it is not one of [member classes] (a fixture); else
+## the registered one is used.
+func sets_for_class(class_id: StringName, class_data: ClassData = null) -> Array[SetData]:
+	var out: Array[SetData] = []
+	var own := set_for_class(class_id)
+	if own != null:
+		out.append(own)
+	var cls := class_data if class_data != null else get_class_data(class_id)
+	if cls == null:
+		return out
+	out.append_array(independent_sets_for_armor(cls.armor_type))
+	return out
+
+
+## Whether [param class_data] collects [param set_data]: its own class set, or a class-independent
+## set of its own armour type (SetData.armor_type). Wearing is wider (ItemInstance.can_be_used_by).
+func set_usable_by(set_data: SetData, class_data: ClassData) -> bool:
+	if set_data == null or class_data == null:
+		return false
+	if not set_data.is_independent():
+		return set_data.class_id == class_data.id
+	return set_data.armor_type == class_data.armor_type
+
+
+## Every companion id some class offers (ClassData.companion_choices), in lobby order of the
+## classes, without duplicates – what `--companion=` accepts.
+func companion_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for cid in class_ids:
+		for c in classes[cid].companion_choices:
+			if c not in out:
+				out.append(c)
+	return out
 
 
 func get_default_class() -> ClassData:

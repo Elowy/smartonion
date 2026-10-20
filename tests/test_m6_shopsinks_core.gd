@@ -5,6 +5,7 @@ extends TestCase
 ## the side rng that keeps the item offers of a seeded run unchanged.
 
 const Fakes := preload("res://tests/player_fakes.gd")
+const SetFixtures := preload("res://tests/set_fixtures.gd")
 
 const IDS: Array[StringName] = [
 	&"elixir_of_fortune", &"elixir_of_ironskin", &"elixir_of_swiftness", &"flask_of_fury",
@@ -13,6 +14,8 @@ const IDS: Array[StringName] = [
 
 var world: Node3D
 var nodes: Array[Node] = []
+## Lets a test run in the world of class sets only (class-independent sets removed, see test_m8_sets.gd).
+var fixtures := SetFixtures.new()
 
 
 ## A Shop whose consumables row and Black Market are off: what the stall was before M6.
@@ -32,6 +35,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	fixtures.restore()
 	for n in nodes:
 		if n != null and is_instance_valid(n):
 			n.free()
@@ -474,7 +478,12 @@ func test_black_market_content_is_a_team_set_piece_or_a_max_roll_epic() -> void:
 		if item.set_id != &"":
 			sets += 1
 			var set_data := Db.get_set(item.set_id)
-			check(set_data != null and set_data.class_id in team, "the piece is for a team class: %s" % item.set_id)
+			var for_team := set_data != null and set_data.class_id in team
+			if set_data != null and set_data.class_id == &"":
+				# A class-independent set: some team class wears the piece.
+				for c in team:
+					for_team = for_team or item.can_be_used_by(Db.get_class_data(c))
+			check(for_team, "the piece is for a team class: %s" % item.set_id)
 		else:
 			maxed += 1
 			# MAX_ROLL_TRIES looks for two enchants (each try about 40%), then keeps the best: every
@@ -541,6 +550,8 @@ func test_a_max_roll_epic_beats_a_normal_shop_epic() -> void:
 
 
 func test_the_set_piece_prefers_what_the_set_still_misses() -> void:
+	# The class set alone (class-independent sets bring pieces of their own into the pool).
+	fixtures.remove_free_sets()
 	var hero := _hero(&"warrior")
 	var set_data := Db.set_for_class(&"warrior")
 	var slots: Array[PlayerSlot] = [hero.slot]

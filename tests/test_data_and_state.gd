@@ -1,5 +1,7 @@
 extends TestCase
 
+const Rules := preload("res://tests/content_rules.gd")
+
 
 func before_each() -> void:
 	PlayerManager.clear()
@@ -9,9 +11,31 @@ func after_each() -> void:
 	PlayerManager.clear()
 
 
+## Db.class_ids as the rules say: CLASS_ORDER's ids that have data, then the extras alphabetically.
+func _expected_class_order() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in Db.CLASS_ORDER:
+		if Db.classes.has(id):
+			out.append(id)
+	var extra: Array[StringName] = []
+	for id in Db.classes:
+		if id not in out:
+			extra.append(id)
+	extra.sort()
+	out.append_array(extra)
+	return out
+
+
 func test_launch_content_loads() -> void:
-	check_eq(Db.class_ids, [&"warrior", &"mage", &"paladin", &"rogue", &"warlock"] as Array[StringName], "class order")
-	check_eq(Db.weapons.size(), 13, "weapon count")
+	check_eq(Db.class_ids, _expected_class_order(), "class order = CLASS_ORDER, then extras alphabetically")
+	check_eq(Db.class_ids.size(), Db.classes.size(), "every class is listed once")
+	check_eq(Db.class_ids.slice(0, Rules.LAUNCH_CLASSES.size()), Rules.LAUNCH_CLASSES, "the launch classes lead, in order")
+	for id in Db.CLASS_ORDER:
+		if not Db.classes.has(id):
+			check(id not in Db.class_ids, "%s has no data yet: skipped, not listed" % id)
+	for id in Rules.LAUNCH_WEAPONS:
+		check(Db.weapons.has(id), "launch weapon %s" % id)
+	check(Db.weapons.size() >= Rules.LAUNCH_WEAPONS.size(), "no weapon went missing")
 	check(Db.enemies.size() >= 4, "at least 4 enemies")
 	for id in Db.class_ids:
 		var c := Db.get_class_data(id)
@@ -24,8 +48,17 @@ func test_launch_content_loads() -> void:
 
 
 func test_cycle_class_wraps() -> void:
-	check_eq(Db.cycle_class(&"warrior", -1), &"warlock")
-	check_eq(Db.cycle_class(&"warlock", 1), &"warrior")
+	var first: StringName = Db.class_ids[0]
+	var last: StringName = Db.class_ids[Db.class_ids.size() - 1]
+	check_eq(Db.cycle_class(first, -1), last, "back from the first wraps to the last")
+	check_eq(Db.cycle_class(last, 1), first, "forward from the last wraps to the first")
+	check_eq(Db.cycle_class(first, 1), Db.class_ids[1], "forward steps one")
+	var at := first
+	for _i in Db.class_ids.size():
+		at = Db.cycle_class(at, 1)
+	check_eq(at, first, "a full lap of forward steps comes back")
+	for id in Db.class_ids:
+		check_eq(Db.cycle_class(Db.cycle_class(id, 1), -1), id, "%s: forward then back" % id)
 
 
 func test_shared_wallet() -> void:

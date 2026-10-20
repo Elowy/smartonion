@@ -5,6 +5,8 @@ extends RefCounted
 
 ## Weapon families whose swing is slow and heavy.
 const HEAVY_TYPES: Array[StringName] = [&"mace", &"two_hand_mace", &"two_hand_sword", &"axe"]
+## Weapon families whose swing is quick and light (the fast weapons).
+const LIGHT_TYPES: Array[StringName] = [&"dagger", &"fist_weapon"]
 ## Magic schools that have a cast sound (everything else casts as arcane).
 const CAST_SCHOOLS: Array[StringName] = [&"fire", &"frost", &"arcane", &"holy", &"shadow", &"nature"]
 ## Ability schools that have a sound; the rest is physical.
@@ -15,14 +17,14 @@ const ABILITY_SCHOOLS: Array[StringName] = [&"fire", &"frost", &"arcane", &"holy
 static func swing(weapon: WeaponData) -> StringName:
 	if weapon == null:
 		return &"swing_blade"
-	if weapon.weapon_type == &"dagger":
+	if weapon.weapon_type in LIGHT_TYPES:
 		return &"swing_light"
 	if weapon.hand == WeaponData.Hand.TWO_HAND or weapon.weapon_type in HEAVY_TYPES:
 		return &"swing_heavy"
 	return &"swing_blade"
 
 
-## The shot of a projectile weapon: bow and gun have their own, wands / staves / orbs cast their school.
+## The shot of a projectile weapon: bow, crossbow and gun have their own, wands / staves / orbs cast their school.
 static func shot(weapon: WeaponData) -> StringName:
 	if weapon == null:
 		return &"shot_bow"
@@ -31,6 +33,8 @@ static func shot(weapon: WeaponData) -> StringName:
 			return &"shot_bow"
 		&"gun":
 			return &"shot_gun"
+		&"crossbow":
+			return &"shot_crossbow"
 	if weapon.school != &"physical":
 		return cast_for_school(weapon.school)
 	if weapon.weapon_type in [&"wand", &"staff", &"orb", &"tome"]:

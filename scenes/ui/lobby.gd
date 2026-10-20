@@ -10,7 +10,9 @@ extends Control
 ## - Slots whose controller is unplugged are removed when the lobby is shown and every frame
 ##   while it is open (a ghost slot could never ready up and would block the start).
 ## - Joined players use their own PlayerSlot.input: ◀ ▶ changes class (Db.cycle_class),
-##   A toggles ready, START readies, B unreadies or – when not ready – leaves.
+##   RB / E cycles the companion of a class that has choices (ClassData.companion_choices, the
+##   M8 Hunter; [method cycle_companion]), A toggles ready, START readies, B unreadies or – when
+##   not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
 ## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
@@ -304,6 +306,17 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 		if nav.x != 0:
 			_cycle_class(slot, nav.x)
 			Audio.play_ui(&"ui_move")
+		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
+			Audio.play_ui(&"ui_move")
+
+
+## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class
+## without companion choices.
+func cycle_companion(slot: PlayerSlot) -> bool:
+	if slot == null or slot.class_data == null or not slot.class_data.has_companions():
+		return false
+	slot.cycle_companion(1)
+	return true
 
 
 func _cycle_class(slot: PlayerSlot, step: int) -> void:

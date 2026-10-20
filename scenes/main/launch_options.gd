@@ -8,7 +8,11 @@ extends RefCounted
 ##                        an unknown argument: the result is "bad_args", the arguments in "unknown_args")
 ##   --demo               bots at normal speed, endless (for screenshots / attract mode)
 ##   --players=N          bot count (1..4, default 4)
-##   --classes=a,b,...    bot classes in join order (cycled; default: Db.class_ids)
+##   --classes=a,b,...    bot classes in join order (cycled; default: Db.class_ids); an id that is no
+##                        class is an unknown argument ("bad_args" in a smoke run)
+##   --companion=ID       M8: the companion every bot of a class with companion choices takes (an id
+##                        of Db.companion_ids(), e.g. wolf; default: the class's first choice); an
+##                        unknown id is an unknown argument
 ##   --waves=N            smoke: waves to play (default 3)
 ##   --start-wave=N       first wave of the run (1..25; endless: 1..99)
 ##   --seed=N             RunState / bot seed
@@ -79,6 +83,8 @@ var demo := false
 var players := DEFAULT_BOTS
 ## Bot class ids from --classes (empty = cycle through Db.class_ids).
 var classes: Array[StringName] = []
+## The companion id of --companion (&"" = each bot takes its class's first choice).
+var companion: StringName = &""
 var waves := DEFAULT_SMOKE_WAVES
 var start_wave := 1
 ## -1 = random.
@@ -147,8 +153,19 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 			"--players":
 				o.players = clampi(value.to_int(), 1, PlayerManager.MAX_PLAYERS)
 			"--classes":
+				var bad := false
 				for part in value.split(",", false):
-					o.classes.append(StringName(part.strip_edges()))
+					var id := StringName(part.strip_edges())
+					if Db.get_class_data(id) == null:
+						bad = true
+					o.classes.append(id)
+				if bad:
+					o.unknown.append(arg)
+			"--companion":
+				if StringName(value) in Db.companion_ids():
+					o.companion = StringName(value)
+				else:
+					o.unknown.append(arg)
 			"--waves":
 				o.waves = maxi(1, value.to_int())
 			"--start-wave":

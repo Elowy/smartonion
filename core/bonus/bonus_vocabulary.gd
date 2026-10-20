@@ -16,16 +16,22 @@ extends RefCounted
 ##   proc         {"proc": {ProcSystem params: "trigger" (TRIGGERS), "effect" (PROC_BLOCKS) ...},
 ##                "scale": [proc keys multiplied by the rank]}
 ##   script       {"script": "res://scenes/talents/<class>/<tree>_<name>.gd", "params": {...}}
+##   proficiency  {"grant": <GRANTABLE_PROFICIENCIES id>} – a proficiency the class does not have
+##                (the Shaman's dual wield, from a Warspirit talent): PlayerBonuses.has_proficiency
+##                / Equipment.can_dual_wield; the rank does not scale it
 ## Everything here is pure (no Player): [method validate] is the content check of the data
 ## tests, [method resolve] the rank scaling, [method matches] / [method matches_id] the ability
 ## filter of "ability" entries and on_cast / cooldown procs.
 
-const KINDS: Array[StringName] = [&"stats", &"ability", &"damage", &"damage_taken", &"resource", &"proc", &"script"]
+const KINDS: Array[StringName] = [&"stats", &"ability", &"damage", &"damage_taken", &"resource", &"proc", &"script", &"proficiency"]
+## ClassData.proficiencies ids a "proficiency" entry may grant at runtime (Equipment asks
+## PlayerBonuses.has_proficiency besides ClassData.can_dual_wield).
+const GRANTABLE_PROFICIENCIES: Array[StringName] = [&"dual_wield"]
 ## "source" filter of damage entries (Player.outgoing_damage_mult sources).
 const DAMAGE_SOURCES: Array[StringName] = [&"weapon", &"ability", &"dot", &"pet", &"proc"]
 const SCHOOLS: Array[StringName] = [&"physical", &"fire", &"frost", &"arcane", &"holy", &"shadow", &"nature"]
 ## AbilityData.tags values ({"match": {"tag": ...}}).
-const TAGS: Array[StringName] = [&"aoe", &"projectile", &"dot", &"heal", &"shield", &"buff", &"cc", &"movement", &"pet", &"weapon", &"spell", &"ground", &"stealth"]
+const TAGS: Array[StringName] = [&"aoe", &"projectile", &"dot", &"heal", &"shield", &"buff", &"cc", &"movement", &"pet", &"weapon", &"spell", &"ground", &"stealth", &"lightning"]
 ## "target" filter of damage entries (below_pct / above_pct compare with "target_pct").
 const TARGET_CONDITIONS: Array[StringName] = [&"elite", &"boss", &"stunned", &"slowed", &"feared", &"below_pct", &"above_pct"]
 ## {"requires": {"weapon": ...}} conditions.
@@ -45,7 +51,9 @@ const SAFE_GENERIC_MOD_KEYS: Array[String] = ["power_pct", "cooldown_pct", "cool
 const RESOURCE_FIELDS: Array[String] = ["max_value", "start_value", "regen_per_second", "decay_per_second", "gain_on_hit", "gain_on_damage_taken", "gain_on_crit", "gain_per_hits", "gain_per_kills"]
 ## Pseudo ability ids (non-ability numbers read by kits through player.ability_mods). Closed
 ## registry: a new one is an integrator request (talent_vocabulary.md §5).
-const PSEUDO_IDS: Dictionary[StringName, StringName] = {&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock", &"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue"}
+## An id may name a class that has no data yet (M8: hunter_companion, shaman_totems): validation
+## compares the owner's id only, never Db.classes.
+const PSEUDO_IDS: Dictionary[StringName, StringName] = {&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock", &"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue", &"hunter_companion": &"hunter", &"shaman_totems": &"shaman", &"shaman_echo": &"shaman"}
 
 ## Keys every entry may carry besides its kind's fields.
 const META_KEYS: Array[String] = ["kind", "requires", "rank", "id", "label"]
@@ -58,6 +66,7 @@ const KIND_KEYS: Dictionary[StringName, Array] = {
 	&"resource": ["resource"],
 	&"proc": ["proc", "scale"],
 	&"script": ["script", "params"],
+	&"proficiency": ["grant"],
 }
 ## Keys of a "match" filter (exactly one per filter).
 const MATCH_KEYS: Array[String] = ["id", "ids", "school", "tag", "kind", "resource", "class"]
@@ -129,6 +138,8 @@ static func validate(entry: Dictionary, class_id: StringName = &"") -> String:
 			return _validate_proc(entry, class_id)
 		&"script":
 			return _validate_script(entry)
+		&"proficiency":
+			return _validate_proficiency(entry)
 	return ""
 
 
@@ -358,6 +369,13 @@ static func _validate_proc(entry: Dictionary, class_id: StringName) -> String:
 				return "scale lists stats but the proc has none"
 		elif not p.has(k) or not _is_number(p[k]):
 			return "scale lists '%s', which is not a number key of the proc" % k
+	return ""
+
+
+static func _validate_proficiency(entry: Dictionary) -> String:
+	var grant := _name(entry.get("grant"))
+	if grant not in GRANTABLE_PROFICIENCIES:
+		return "grant must be one of %s, not '%s'" % [str(GRANTABLE_PROFICIENCIES), grant]
 	return ""
 
 

@@ -24,7 +24,8 @@ const GLOW_RARITY := 3
 const ORB_RADIUS := 0.15
 const ORB_CENTER := 0.27
 const TYPES: Array[StringName] = [&"sword", &"axe", &"mace", &"dagger", &"bow", &"gun", &"wand",
-	&"staff", &"shield", &"tome", &"two_hand_sword", &"two_hand_mace", &"orb"]
+	&"staff", &"shield", &"tome", &"two_hand_sword", &"two_hand_mace", &"orb", &"crossbow", &"polearm",
+	&"fist_weapon"]
 
 
 ## Builds a small primitive mesh for [param weapon] (by weapon_type, coloured by weapon.color).
@@ -70,6 +71,9 @@ static func reach(weapon_type: StringName) -> float:
 		&"two_hand_sword": return 1.22
 		&"two_hand_mace": return 1.0
 		&"orb": return 0.4
+		&"crossbow": return 0.62
+		&"polearm": return 1.45
+		&"fist_weapon": return 0.30
 	return 0.5
 
 
@@ -139,6 +143,9 @@ static func _build_mesh(type: StringName, c: Color) -> Mesh:
 		&"two_hand_sword": _two_hand_sword(k, c)
 		&"two_hand_mace": _two_hand_mace(k, c)
 		&"orb": _orb(k, c)
+		&"crossbow": _crossbow(k, c)
+		&"polearm": _polearm(k, c)
+		&"fist_weapon": _fist_weapon(k, c)
 		_: _generic(k, c)
 	return k.build()
 
@@ -323,6 +330,71 @@ static func _orb(k: MeshKit, c: Color) -> void:
 			Vector3(0, 0.34, 0) + d * 0.165, Vector3(0, 0.42, 0) + d * 0.08])
 		k.add_tube(prong, 0.014, 0.01, GOLD, 6)
 	k.add_torus(0.2, 0.23, MeshKit.xf(Vector3(0, ORB_CENTER, 0), Vector3(25, 0, 12)), c.lightened(0.2), 16, 5)
+
+
+## The crossbow: a gun-like wooden stock with a pistol grip, a wide bowed prod across the muzzle end, a
+## drawn string, a bolt on the rail and a golden stirrup. Muzzle along +Y, "up" (the bolt side) is +Z,
+## the prod spans X (twice as wide as the gun is long-ish: the silhouette is a T lying on its side).
+static func _crossbow(k: MeshKit, c: Color) -> void:
+	# Stock profile in the YZ plane (outline x = down): flat top, a grip dropping under the handle.
+	var stock := PackedVector2Array([Vector2(-0.035, -0.22), Vector2(-0.035, 0.42), Vector2(0.04, 0.42),
+		Vector2(0.04, 0.10), Vector2(0.15, 0.08), Vector2(0.15, -0.02), Vector2(0.05, -0.04), Vector2(0.05, -0.22)])
+	k.add_extrusion(stock, 0.07, MeshKit.xf(Vector3.ZERO, Vector3(0, 90, 0)), WOOD, 0.9)
+	# The prod: two limbs bowed forward, an iron saddle in the middle.
+	for side: float in [-1.0, 1.0]:
+		var limb := PackedVector3Array()
+		for i in 5:
+			var t := i / 4.0
+			limb.append(Vector3(side * 0.34 * t, 0.40 + 0.1 * t * t, 0.03))
+		k.add_tube(limb, 0.036, 0.018, c, 7)
+		k.add_sphere(0.022, MeshKit.xf(limb[4]), GOLD, 6, 3)
+		k.add_segment(limb[4], Vector3(0, 0.22, 0.05), 0.006, 0.006, Color(0.95, 0.92, 0.82), 4, false)
+	k.add_box(Vector3(0.12, 0.1, 0.07), MeshKit.xf(Vector3(0, 0.40, 0.03)), IRON)
+	# The bolt on its rail.
+	k.add_segment(Vector3(0, 0.10, 0.055), Vector3(0, 0.50, 0.055), 0.012, 0.012, IRON, 6)
+	k.add_segment(Vector3(0, 0.50, 0.055), Vector3(0, 0.6, 0.055), 0.028, 0.0, IRON.lightened(0.25), 6)
+	k.add_torus(0.016, 0.07, MeshKit.xf(Vector3(0, 0.43, -0.02), Vector3(0, 0, 90)), GOLD, 10, 4)
+	# Trigger and a leather wrap on the grip.
+	k.add_box(Vector3(0.02, 0.05, 0.05), MeshKit.xf(Vector3(0, 0.13, -0.065)), IRON)
+	k.add_cylinder(0.034, 0.036, 0.1, MeshKit.xf(Vector3(0, 0.02, -0.095)), LEATHER, 8)
+
+
+## The polearm: a long wooden haft, a leaf-shaped head with one halberd wing, an iron collar, a small
+## golden pennant (it reads from above) and an iron butt cap. The handle is at the origin.
+static func _polearm(k: MeshKit, c: Color) -> void:
+	var haft := PackedVector3Array([Vector3(0, -0.5, 0), Vector3(0.008, 0.2, 0.006), Vector3(-0.006, 0.7, -0.005),
+		Vector3(0, 1.06, 0)])
+	k.add_tube(haft, 0.03, 0.028, WOOD, 8)
+	k.add_cylinder(0.04, 0.042, 0.2, MeshKit.xf(Vector3(0, 0.0, 0)), LEATHER, 8)
+	k.add_cylinder(0.034, 0.0, 0.12, MeshKit.xf(Vector3(0, -0.54, 0)), IRON, 6)
+	k.add_torus(0.032, 0.058, MeshKit.xf(Vector3(0, 1.05, 0)), IRON, 10, 4)
+	var leaf := PackedVector2Array([Vector2(0, 1.40), Vector2(0.07, 1.26), Vector2(0.078, 1.14), Vector2(0.04, 1.06),
+		Vector2(-0.04, 1.06), Vector2(-0.078, 1.14), Vector2(-0.07, 1.26)])
+	k.add_extrusion(leaf, 0.028, Transform3D(), c, 0.8)
+	k.add_box(Vector3(0.016, 0.26, 0.04), MeshKit.xf(Vector3(0, 1.22, 0)), c.darkened(0.3))
+	var wing := PackedVector2Array([Vector2(0.05, 1.10), Vector2(0.20, 1.06), Vector2(0.25, 1.19), Vector2(0.15, 1.22),
+		Vector2(0.05, 1.25)])
+	k.add_extrusion(wing, 0.026, Transform3D(), c, 0.8)
+	var pennant := PackedVector2Array([Vector2(0.0, 1.0), Vector2(-0.26, 0.94), Vector2(0.0, 0.86)])
+	k.add_extrusion(pennant, 0.01, Transform3D(), GOLD)
+
+
+## The fist weapon: a leather wrist strap, an iron knuckle plate over a grip bar and three short claw
+## spikes with bone tips pointing +Y. Held like a handle: the bar sits in the hand.
+static func _fist_weapon(k: MeshKit, c: Color) -> void:
+	k.add_torus(0.04, 0.085, MeshKit.xf(Vector3(0, -0.07, 0)), LEATHER, 12, 5)
+	k.add_cylinder(0.024, 0.024, 0.2, MeshKit.xf(Vector3(0, 0.0, 0), Vector3(0, 0, 90)), LEATHER, 8)
+	var plate := PackedVector2Array()
+	for i in 9:
+		var a := PI * i / 8.0
+		plate.append(Vector2(cos(a) * 0.125, 0.045 + sin(a) * 0.075))
+	k.add_extrusion(plate, 0.045, Transform3D(), IRON, 0.85)
+	for i in 3:
+		var x := (i - 1) * 0.075
+		var base := Vector3(x, 0.10, 0)
+		var tip := Vector3(x * 1.15, 0.27, 0)
+		k.add_segment(base, tip, 0.03, 0.006, c, 6)
+		k.add_segment(base.lerp(tip, 0.55), tip, 0.02, 0.0, BONE, 6)
 
 
 static func _generic(k: MeshKit, c: Color) -> void:

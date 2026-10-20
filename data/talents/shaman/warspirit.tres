@@ -1,0 +1,215 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_twinned_spirits"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_twinned_spirits"
+display_name = "Twinned Spirits"
+description = "You can wield a one-handed weapon in each hand (Dual Wield). While dual wielding, your Haste is increased by {haste}%."
+values = {
+"haste": 3.0
+}
+icon = &"haste"
+effects = Array[Dictionary]([{
+"grant": "dual_wield",
+"kind": "proficiency"
+}, {
+"kind": "stats",
+"requires": {
+"weapon": "dual_wield"
+},
+"stats": {
+"haste": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_hardened_knuckles"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_hardened_knuckles"
+display_name = "Hardened Knuckles"
+description = "Your weapon hits deal {pct}% more damage."
+values = {
+"pct": 4.0
+}
+column = 1
+icon = &"damage_pct"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 4.0,
+"source": "weapon"
+}])
+
+[sub_resource type="Resource" id="Resource_mirrored_strikes"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_mirrored_strikes"
+display_name = "Mirrored Strikes"
+description = "While dual wielding, your weapon hits have a {chance}% chance to strike again at once."
+values = {
+"chance": 4.0
+}
+tier = 2
+prerequisite = &"shaman_warspirit_twinned_spirits"
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"requires": {
+"weapon": "dual_wield"
+},
+"stats": {
+"extra_attack": 4.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_spirit_pulse"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_spirit_pulse"
+display_name = "Spirit Pulse"
+description = "Your weapon hits and ability casts build {surge} more Surge."
+values = {
+"surge": 1.0
+}
+tier = 2
+column = 1
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"gain_on_hit_add": 1.0,
+"kind": "resource",
+"resource": "surge"
+}])
+
+[sub_resource type="Resource" id="Resource_flame_tempering"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_flame_tempering"
+display_name = "Flame Tempering"
+description = "Magma Lash deals {pct}% more damage and recharges {cd}% faster."
+values = {
+"cd": 8.0,
+"pct": 8.0
+}
+tier = 3
+max_rank = 2
+icon = &"magma_lash"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "magma_lash"
+},
+"mods": {
+"cooldown_pct": -8.0,
+"power_pct": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_molten_trail"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_molten_trail"
+display_name = "Molten Trail"
+description = "Magma Lash leaves molten ground for {duration} sec that deals {pct}% of the lash every 0.5 sec."
+values = {
+"duration": 3.0,
+"pct": 15.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"magma_lash"
+icon = &"magma_lash"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "magma_lash"
+},
+"mods": {
+"ground_duration_add": 3.0,
+"ground_pct_add": 15.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_crackling_blows"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_crackling_blows"
+display_name = "Crackling Blows"
+description = "Your weapon hits have a {chance}% chance to also shock the target for {pct_fixed}% of the hit's damage as Nature damage."
+values = {
+"chance": 15.0,
+"pct_fixed": 60.0
+}
+tier = 4
+prerequisite = &"shaman_warspirit_mirrored_strikes"
+icon = &"nature_damage"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"chance": 15.0,
+"effect": "bolt",
+"hit_pct": 60.0,
+"label": "",
+"school": "nature",
+"trigger": "on_hit"
+},
+"scale": ["chance"]
+}])
+
+[sub_resource type="Resource" id="Resource_howling_chorus"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_howling_chorus"
+display_name = "Howling Chorus"
+description = "Spirit Pack deals {pct}% more damage and recharges {cd}% faster."
+values = {
+"cd": 5.0,
+"pct": 8.0
+}
+tier = 4
+column = 1
+icon = &"spirit_pack"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "spirit_pack"
+},
+"mods": {
+"cooldown_pct": -5.0,
+"power_pct": 8.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_gale_strike"]
+script = ExtResource("2_talent")
+id = &"shaman_warspirit_gale_strike"
+display_name = "Gale Strike"
+description = "Every {every_fixed}th weapon attack calls down {strikes_fixed} lightning strikes on the target, each a Nature hit that also builds Surge."
+values = {
+"every_fixed": 5.0,
+"strikes_fixed": 2.0
+}
+kind = 2
+tier = 5
+max_rank = 1
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"damage": 5.0,
+"every": 5,
+"intellect_scale": 0.8,
+"range": 6.0,
+"spell_power_scale": 1.2,
+"strike_delay": 0.2,
+"strikes": 2,
+"surge_per_strike": 3.0
+},
+"script": "res://scenes/talents/shaman/warspirit_gale_strike.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"shaman_warspirit"
+class_id = &"shaman"
+display_name = "Warspirit"
+index = 1
+description = "Fist weapons, Dual Wield, Magma Lash and Gale Strike."
+icon = &"magma_lash"
+color = Color(0.95, 0.55, 0.2, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_twinned_spirits"), SubResource("Resource_hardened_knuckles"), SubResource("Resource_mirrored_strikes"), SubResource("Resource_spirit_pulse"), SubResource("Resource_flame_tempering"), SubResource("Resource_molten_trail"), SubResource("Resource_crackling_blows"), SubResource("Resource_howling_chorus"), SubResource("Resource_gale_strike")])

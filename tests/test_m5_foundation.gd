@@ -286,8 +286,46 @@ func test_talent_data_text_and_tiers() -> void:
 	check(set_data.piece_ids.is_empty() and set_data.bonuses.is_empty(), "SetData defaults")
 
 
+## The six general abilities (AbilityData.class_id empty): every class can learn them.
+const GENERAL_ABILITIES: Array[StringName] = [&"bandage", &"berserking", &"sprint", &"engineers_bomb",
+	&"war_stomp", &"spirit_wolf"]
+## Every ability tagged "pet" (the tag talents and set bonuses match). A new pet ability is added
+## here on purpose: the tag has rules (Pack Command, pet leech ...), so a stray one must not slip in.
+const PET_ABILITIES: Array[StringName] = [&"spirit_wolf", &"spirit_pack", &"summon_infernal", &"summon_voidwalker", &"hunt_signal"]
+
+
+## Per class: 2 core abilities (RT / LT) + 6 learnable ones (Active / Auto-cast, in any mix); the
+## general ones are exactly [constant GENERAL_ABILITIES]; nothing else exists.
+func test_ability_counts_per_class() -> void:
+	var general: Array[StringName] = []
+	var per_class: Dictionary[StringName, Array] = {}
+	for id in Db.abilities:
+		var a := Db.abilities[id]
+		if a.class_id == &"":
+			general.append(id)
+			continue
+		check(a.class_id in Db.class_ids, "%s belongs to a known class (%s)" % [id, a.class_id])
+		if not per_class.has(a.class_id):
+			per_class[a.class_id] = []
+		per_class[a.class_id].append(a)
+	general.sort()
+	var want_general := GENERAL_ABILITIES.duplicate()
+	want_general.sort()
+	check_eq(general, want_general, "the general abilities")
+	var total := general.size()
+	for cid in Db.class_ids:
+		var list: Array = per_class.get(cid, [])
+		var core := 0
+		for a: AbilityData in list:
+			if a.kind == AbilityData.Kind.CORE:
+				core += 1
+		check_eq(core, 2, "%s: two core abilities" % cid)
+		check_eq(list.size() - core, 6, "%s: six learnable abilities" % cid)
+		total += list.size()
+	check_eq(Db.abilities.size(), total, "every ability is a general one or belongs to a class")
+
+
 func test_ability_tags() -> void:
-	check_eq(Db.abilities.size(), 46, "every ability")
 	for id in Db.abilities:
 		var a := Db.abilities[id]
 		check(not a.tags.is_empty(), "%s has tags" % id)
@@ -295,11 +333,14 @@ func test_ability_tags() -> void:
 			check(tag in BonusVocabulary.TAGS, "%s: known tag %s" % [id, tag])
 	check_eq(Db.get_ability(&"fireball").tags, [&"projectile", &"dot", &"spell"] as Array[StringName], "fireball")
 	check_eq(Db.get_ability(&"thunder_clap").tags, [&"aoe", &"cc", &"weapon"] as Array[StringName], "ground slam")
-	var pets := 0
+	var pets: Array[StringName] = []
 	for id in Db.abilities:
 		if &"pet" in Db.abilities[id].tags:
-			pets += 1
-	check_eq(pets, 3, "phantom wolf, cinder brute, gloomguard")
+			pets.append(id)
+	pets.sort()
+	var want_pets := PET_ABILITIES.duplicate()
+	want_pets.sort()
+	check_eq(pets, want_pets, "the pet-tagged abilities are exactly PET_ABILITIES")
 
 
 ## Two "zz_test" trees (index 1 given first) + one of another class, registered in Db like
@@ -704,10 +745,22 @@ func test_validate_rejects_typos() -> void:
 	check_eq(AbilityRunner.apply_mods(ww_params, {"damage_pct_add": 10})["damage_pct"], 160.0, "the _add form adds")
 
 
+## The pseudo ids of the registry by owner class. The M8 classes' ids are registered before their
+## data exists, so the registry may name a class that is not in Db.class_ids yet (Db.CLASS_ORDER does).
+const PSEUDO_ID_OWNERS: Dictionary[StringName, StringName] = {
+	&"warlock_imp": &"warlock", &"warlock_shards": &"warlock", &"warlock_afflictions": &"warlock",
+	&"paladin_aura": &"paladin", &"rogue_deadly_poison": &"rogue",
+	&"hunter_companion": &"hunter", &"shaman_totems": &"shaman",
+}
+
+
 func test_pseudo_ids_only_for_their_class() -> void:
-	check_eq(BonusVocabulary.PSEUDO_IDS.size(), 5, "the closed registry")
+	for id in PSEUDO_ID_OWNERS:
+		check_eq(BonusVocabulary.PSEUDO_IDS.get(id), PSEUDO_ID_OWNERS[id], "%s is registered for %s" % [id, PSEUDO_ID_OWNERS[id]])
 	for id: StringName in BonusVocabulary.PSEUDO_IDS:
 		var owner: StringName = BonusVocabulary.PSEUDO_IDS[id]
+		check(owner in Db.CLASS_ORDER, "%s: its class %s is a class of the game (data or not yet)" % [id, owner])
+		check(not Db.abilities.has(id), "%s is no ability id" % id)
 		var entry := {"kind": "ability", "match": {"id": String(id)}, "mods": {"damage_bonus_add": 10, "anything_pct": 5, "flag": true}}
 		check_eq(BonusVocabulary.validate(entry, owner), "", "%s validates for %s (param keys skipped)" % [id, owner])
 		for other in Db.class_ids:
@@ -792,7 +845,9 @@ func test_vocabulary_constants_match_the_engine() -> void:
 		check(r in ResourceData.new(), "ResourceData has %s" % r)
 	for s in BonusVocabulary.SCHOOLS:
 		check(Stats.SCHOOL_STATS.has(s), "school %s" % s)
-	check_eq(BonusVocabulary.KINDS.size(), 7, "seven kinds")
+	check_eq(BonusVocabulary.KINDS.size(), BonusVocabulary.KIND_KEYS.size(), "every kind has its keys")
+	for kind in BonusVocabulary.KINDS:
+		check(BonusVocabulary.KIND_KEYS.has(kind), "kind %s has a key list" % kind)
 
 
 # --- Stats, caps -------------------------------------------------------------------------------

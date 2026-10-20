@@ -509,7 +509,12 @@ func test_special_drops_roll_set_pieces_for_the_party() -> void:
 		check(bag != null and bag.item.rarity >= Items.Rarity.EPIC, "boss drops are Epic+")
 		if bag != null and bag.item.set_id != &"":
 			pieces += 1
-			classes[bag.item.class_restriction] = true
+			if bag.item.class_restriction != &"":
+				classes[bag.item.class_restriction] = true
+			else:
+				# A class-independent set piece: some party class can wear it.
+				check(bag.item.can_be_used_by(Db.get_class_data(&"warlock")) or bag.item.can_be_used_by(Db.get_class_data(&"paladin")),
+						"a class-free piece fits the party")
 			check(bag.item.looted, "looted")
 		if bag != null:
 			bag.free()

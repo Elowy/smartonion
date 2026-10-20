@@ -1,0 +1,205 @@
+[gd_resource type="Resource" script_class="TalentTreeData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://data/talents/talent_tree_data.gd" id="1_tree"]
+[ext_resource type="Script" path="res://data/talents/talent_data.gd" id="2_talent"]
+
+[sub_resource type="Resource" id="Resource_livewire"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_livewire"
+display_name = "Livewire"
+description = "Increases your Nature damage by {pct}%: Forking Bolt, Thunderbolt, Stormburst, Rumbling Earth, Gale Strike and your wolves."
+values = {
+"pct": 3.0
+}
+icon = &"nature_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "nature"
+}])
+
+[sub_resource type="Resource" id="Resource_kindled_spark"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_kindled_spark"
+display_name = "Kindled Spark"
+description = "Increases your Fire damage by {pct}%: Magma Lash, its burns and your Fire totem."
+values = {
+"pct": 3.0
+}
+column = 1
+icon = &"fire_damage"
+effects = Array[Dictionary]([{
+"kind": "damage",
+"pct": 3.0,
+"school": "fire"
+}])
+
+[sub_resource type="Resource" id="Resource_charged_mind"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_charged_mind"
+display_name = "Charged Mind"
+description = "Increases your Mastery by {mastery}: Storm Echo triggers {echo}% more often."
+values = {
+"echo": 4.5,
+"mastery": 3.0
+}
+tier = 2
+prerequisite = &"shaman_stormweaving_livewire"
+icon = &"mastery"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"mastery": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_stormcharged"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_stormcharged"
+display_name = "Stormcharged"
+description = "You start every wave with {surge} Surge."
+values = {
+"surge": 10.0
+}
+tier = 2
+column = 1
+icon = &"resource_regen"
+effects = Array[Dictionary]([{
+"kind": "resource",
+"resource": "surge",
+"start_value_add": 10.0
+}])
+
+[sub_resource type="Resource" id="Resource_static_veins"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_static_veins"
+display_name = "Static Veins"
+description = "Increases your Spell Power by {sp} and your Intellect by {int}."
+values = {
+"int": 2.0,
+"sp": 3.0
+}
+tier = 3
+max_rank = 2
+icon = &"spell_power"
+effects = Array[Dictionary]([{
+"kind": "stats",
+"stats": {
+"primary": 2.0,
+"spell_power": 3.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_rebounding_arc"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_rebounding_arc"
+display_name = "Rebounding Arc"
+description = "After its last jump, Forking Bolt arcs back and strikes the first enemy again for {pct}% of its damage."
+values = {
+"pct": 60.0
+}
+kind = 1
+tier = 3
+column = 1
+max_rank = 1
+ability = &"forking_bolt"
+icon = &"forking_bolt"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "forking_bolt"
+},
+"mods": {
+"return_pct_add": 60.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_resounding_echo"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_resounding_echo"
+display_name = "Resounding Echo"
+description = "Storm Echo repeats {pct}% more of the hit, and your Mastery is increased by {mastery}."
+values = {
+"mastery": 1.0,
+"pct": 10.0
+}
+tier = 4
+prerequisite = &"shaman_stormweaving_charged_mind"
+icon = &"extra_attack"
+effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shaman_echo"
+},
+"mods": {
+"echo_pct_add": 10.0
+}
+}, {
+"kind": "stats",
+"stats": {
+"mastery": 1.0
+}
+}])
+
+[sub_resource type="Resource" id="Resource_quickening_storm"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_quickening_storm"
+display_name = "Quickening Storm"
+description = "Each Forking Bolt gives you {haste}% Haste for {duration_fixed} sec, stacking up to {stacks_fixed} times."
+values = {
+"duration_fixed": 5.0,
+"haste": 2.0,
+"stacks_fixed": 3.0
+}
+tier = 4
+column = 1
+icon = &"haste"
+effects = Array[Dictionary]([{
+"kind": "proc",
+"proc": {
+"ability": "forking_bolt",
+"duration": 5.0,
+"effect": "buff",
+"label": "",
+"max_stacks": 3,
+"stats": {
+"haste": 2.0
+},
+"trigger": "on_cast"
+},
+"scale": ["stats"]
+}])
+
+[sub_resource type="Resource" id="Resource_elemental_surge"]
+script = ExtResource("2_talent")
+id = &"shaman_stormweaving_elemental_surge"
+display_name = "Elemental Surge"
+description = "Every {interval_fixed} sec, your next {casts_fixed} damaging abilities deal {pct_fixed}% more damage."
+values = {
+"casts_fixed": 3.0,
+"interval_fixed": 20.0,
+"pct_fixed": 100.0
+}
+kind = 2
+tier = 5
+max_rank = 1
+effects = Array[Dictionary]([{
+"kind": "script",
+"params": {
+"casts": 3,
+"first_at": 8.0,
+"interval": 20.0,
+"pct": 100.0
+},
+"script": "res://scenes/talents/shaman/stormweaving_elemental_surge.gd"
+}])
+
+[resource]
+script = ExtResource("1_tree")
+id = &"shaman_stormweaving"
+class_id = &"shaman"
+display_name = "Stormweaving"
+description = "Lightning and fire spells, Storm Echo and Surge."
+icon = &"thunderbolt"
+color = Color(0.45, 0.75, 1, 1)
+talents = Array[ExtResource("2_talent")]([SubResource("Resource_livewire"), SubResource("Resource_kindled_spark"), SubResource("Resource_charged_mind"), SubResource("Resource_stormcharged"), SubResource("Resource_static_veins"), SubResource("Resource_rebounding_arc"), SubResource("Resource_resounding_echo"), SubResource("Resource_quickening_storm"), SubResource("Resource_elemental_surge")])

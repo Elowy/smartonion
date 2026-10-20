@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ForgeLegendaryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/forge/forge_legendary_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+weapon_id = &"fist_weapon"
+display_name = "Mossknuckle"
+unique_effect = &"smite_heal"
+unique_params = {
+"trigger": "on_hit",
+"every": 5,
+"hit_pct": 120.0,
+"school": "nature",
+"heal": 4.0
+}
+unique_text = "Every 5th hit lands a spirit strike: 120% of the hit as Nature damage, and your most wounded ally recovers 4 health."
+flavor = "Soft as moss, until the moment it is not."

@@ -6,6 +6,8 @@ extends TestCase
 ## rng draws).
 
 const Fakes := preload("res://tests/player_fakes.gd")
+const Rules := preload("res://tests/content_rules.gd")
+const SetFixtures := preload("res://tests/set_fixtures.gd")
 
 const SET_IDS: Dictionary[StringName, StringName] = {
 	&"warrior": &"battlegear_of_fury", &"mage": &"regalia_of_the_arcane",
@@ -28,6 +30,8 @@ var world: Node3D
 var nodes: Array[Node] = []
 ## Db.sets before a test injected a fixture (restored in after_each).
 var _saved_sets: Dictionary = {}
+## Lets a test run in the world of class sets only (the class-independent sets removed).
+var fixtures := SetFixtures.new()
 
 
 func before_each() -> void:
@@ -44,6 +48,7 @@ func after_each() -> void:
 	if not _saved_sets.is_empty():
 		Db.sets.assign(_saved_sets)
 		_saved_sets = {}
+	fixtures.restore()
 
 
 # --- Helpers -----------------------------------------------------------------------------------
@@ -84,8 +89,16 @@ static func bonus_effects(set_id: StringName, pieces: int) -> Array:
 
 # --- Content -----------------------------------------------------------------------------------
 
-func test_five_sets_one_per_class() -> void:
-	check_eq(Db.sets.size(), 5, "five tier sets")
+func test_one_class_set_per_class() -> void:
+	# Every class (with its set not pending) has exactly one class set; sets without a class
+	# (class-independent, test_m8_sets.gd) are on top of them.
+	for class_id in Rules.classes_with("set"):
+		check_eq(Rules.class_sets(class_id).size(), 1, "%s: exactly one class set" % class_id)
+	var class_sets := 0
+	for id in Db.sets:
+		if Db.sets[id].class_id != &"":
+			class_sets += 1
+	check_eq(class_sets, Rules.classes_with("set").size(), "no set of a class without one")
 	for class_id in SET_IDS:
 		var data := Db.set_for_class(class_id)
 		check(data != null, "%s has a set" % class_id)
@@ -156,7 +169,7 @@ func test_every_set_piece_belongs_to_its_set() -> void:
 		var data := Db.get_set(u.set_id)
 		check(data != null and id in data.piece_ids, "%s is listed by %s" % [id, u.set_id])
 		check(data != null and data.class_id == u.class_restriction, "%s: the set's class" % id)
-	check_eq(pieces, 25, "25 set pieces")
+	check_eq(pieces, Db.sets.size() * Rules.PIECES_PER_SET, "five pieces per set")
 
 
 func test_bonuses_are_2_and_4_pieces_in_the_vocabulary() -> void:
@@ -505,6 +518,16 @@ func _set_rolls(source: ItemGenerator.Source, wave: int, n: int, options: Dictio
 	return out
 
 
+## The class-restricted pieces among [param items] (a class-independent piece – test_m8_sets.gd – is
+## for no class in particular).
+func _class_pieces(items: Array[ItemInstance]) -> Array[ItemInstance]:
+	var out: Array[ItemInstance] = []
+	for it in items:
+		if it.class_restriction != &"":
+			out.append(it)
+	return out
+
+
 func test_set_chance_per_source() -> void:
 	check_near(ItemGenerator.set_chance(SHOP), 0.05, 0.0001, "shop 5%")
 	for source in [LOOT, ItemGenerator.Source.ELITE, ItemGenerator.Source.GOBLIN, ItemGenerator.Source.BOSS]:
@@ -546,7 +569,7 @@ func test_only_epic_rolls_and_only_from_wave_6() -> void:
 
 
 func test_set_piece_items_are_hand_made_epics() -> void:
-	var items := _set_rolls(LOOT, 17, 400, {&"team_classes": [Db.get_class_data(&"paladin")] as Array[ClassData]})
+	var items := _class_pieces(_set_rolls(LOOT, 17, 400, {&"team_classes": [Db.get_class_data(&"paladin")] as Array[ClassData]}))
 	check(not items.is_empty(), "some pieces")
 	for it in items:
 		var data := Db.get_unique(it.source_id)
@@ -562,35 +585,39 @@ func test_set_piece_items_are_hand_made_epics() -> void:
 func test_the_piece_is_for_a_party_class() -> void:
 	var team: Array[ClassData] = [Db.get_class_data(&"warrior"), Db.get_class_data(&"rogue")]
 	var seen := {}
-	for it in _set_rolls(LOOT, 12, 2500, {&"team_classes": team}):
+	for it in _class_pieces(_set_rolls(LOOT, 12, 2500, {&"team_classes": team})):
 		seen[it.class_restriction] = true
 	check_eq(seen.keys().size(), 2, "both party classes get pieces: %s" % [seen.keys()])
 	check(seen.has(&"warrior") and seen.has(&"rogue"), "only the party's classes")
-	for it in _set_rolls(LOOT, 12, 800, {&"team_classes": [Db.get_class_data(&"mage")] as Array[ClassData]}):
+	for it in _class_pieces(_set_rolls(LOOT, 12, 800, {&"team_classes": [Db.get_class_data(&"mage")] as Array[ClassData]})):
 		check_eq(it.class_restriction, &"mage", "solo mage")
-	for it in _set_rolls(SHOP, 12, 2000, {&"usable_by": Db.get_class_data(&"warlock"), &"team_classes": team}):
+	for it in _class_pieces(_set_rolls(SHOP, 12, 2000, {&"usable_by": Db.get_class_data(&"warlock"), &"team_classes": team})):
 		check_eq(it.class_restriction, &"warlock", "usable_by wins over the team")
-	var biased := _set_rolls(SHOP, 12, 2000, {&"class_data": Db.get_class_data(&"paladin")})
+	var biased := _class_pieces(_set_rolls(SHOP, 12, 2000, {&"class_data": Db.get_class_data(&"paladin")}))
 	check(not biased.is_empty(), "biased shop rolls get pieces")
 	for it in biased:
 		check_eq(it.class_restriction, &"paladin", "the class bias")
 	var anyone := {}
-	for it in _set_rolls(LOOT, 12, 4000):
+	for it in _class_pieces(_set_rolls(LOOT, 12, 4000)):
 		anyone[it.class_restriction] = true
-	check_eq(anyone.keys().size(), 5, "no team given: any class with a set")
+	check_eq(anyone.keys().size(), Rules.classes_with("set").size(), "no team given: any class with a set")
 
 
 func test_a_team_without_a_set_gets_no_piece() -> void:
 	var nobody := ClassData.new()
 	nobody.id = &"zz_test_class"
 	nobody.armor_type = ClassData.ArmorType.PLATE
-	check(_set_rolls(LOOT, 12, 600, {&"team_classes": [nobody] as Array[ClassData]}).is_empty(), "no set for that class")
-	check(_set_rolls(LOOT, 12, 600, {&"usable_by": nobody}).is_empty(), "usable_by without a set")
+	var by_team := _set_rolls(LOOT, 12, 600, {&"team_classes": [nobody] as Array[ClassData]})
+	var by_usable := _set_rolls(LOOT, 12, 600, {&"usable_by": nobody})
+	check(_class_pieces(by_team).is_empty() and _class_pieces(by_usable).is_empty(), "no class set for that class")
+	if Rules.free_sets().is_empty():
+		check(by_team.is_empty(), "no set for that class")
+		check(by_usable.is_empty(), "usable_by without a set")
 
 
 func test_pieces_are_uniform_and_respect_a_forced_slot() -> void:
 	var per_piece := {}
-	var items := _set_rolls(LOOT, 12, 6000, {&"team_classes": [Db.get_class_data(&"rogue")] as Array[ClassData]})
+	var items := _class_pieces(_set_rolls(LOOT, 12, 6000, {&"team_classes": [Db.get_class_data(&"rogue")] as Array[ClassData]}))
 	for it in items:
 		per_piece[it.source_id] = per_piece.get(it.source_id, 0) + 1
 	check_eq(per_piece.keys().size(), 5, "all five pieces drop")
@@ -603,6 +630,9 @@ func test_pieces_are_uniform_and_respect_a_forced_slot() -> void:
 
 
 func test_set_roll_draws_are_documented() -> void:
+	# (The world of class sets only: with class-independent sets there are more candidates to draw
+	# from – test_m8_sets.gd.)
+	fixtures.remove_free_sets()
 	# No draw at all for a forced non-set slot.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99
@@ -665,8 +695,11 @@ func test_loot_drops_roll_pieces_for_the_party() -> void:
 	var seen := {}
 	for i in 1500:
 		var it := LootDrops.generate_item(null)
-		if it.set_id != &"":
+		if it.set_id != &"" and it.class_restriction != &"":
 			seen[it.class_restriction] = true
+		elif it.set_id != &"":
+			check(it.can_be_used_by(Db.get_class_data(&"mage")) or it.can_be_used_by(Db.get_class_data(&"rogue")),
+					"a class-independent piece fits the party")
 	PlayerManager.clear()
 	check(not seen.is_empty(), "loot drops roll set pieces")
 	for c in seen:

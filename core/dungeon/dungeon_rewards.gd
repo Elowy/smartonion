@@ -7,7 +7,7 @@ extends RefCounted
 ##   (usable by its class, a loot-quality item: Source.LOOT, +25% stats) that goes to the team loot,
 ##   i.e. to the Need / Greed / Pass roll after the dungeon; with [constant SET_PIECE_CHANCE] one
 ##   extra tier-set piece of a class in the team (a piece somebody's set is still missing is
-##   preferred, [method BlackMarket.set_piece_candidates]) joins them; and the team's purse gets
+##   preferred, [method BlackMarket.set_piece_pool]) joins them; and the team's purse gets
 ##   [constant GOLD_MULT] x the wave's average enemy gold ([method gold_for], the Loot Goblin's
 ##   average, LootGoblin.average_gold).
 ## - Failure ([method apply_failure]): the purse loses [constant FAIL_PURSE_SHARE] of its gold. The
@@ -44,19 +44,14 @@ static func epic_for(slot: PlayerSlot, wave: int, team: Array[ClassData], rng: R
 
 ## The extra tier-set piece for the team of [param slots] at [param wave], or null: the chance
 ## (SET_PIECE_CHANCE, one randf) misses, or no class of the team has a piece at the wave. A missing
-## piece is preferred ([method BlackMarket.set_piece_candidates]); one randi_range picks among several.
+## class-set piece is preferred, then a missing class-independent one ([method BlackMarket.set_piece_pool]);
+## one randi_range picks among several.
 static func bonus_set_piece(wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerator) -> ItemInstance:
 	if rng.randf() >= SET_PIECE_CHANCE:
 		return null
-	var all := BlackMarket.set_piece_candidates(maxi(1, wave), slots)
-	if all.is_empty():
-		return null
-	var pool: Array[Dictionary] = []
-	for c in all:
-		if c["missing"]:
-			pool.append(c)
+	var pool := BlackMarket.set_piece_pool(maxi(1, wave), slots)
 	if pool.is_empty():
-		pool = all
+		return null
 	var pick := pool[0] if pool.size() == 1 else pool[rng.randi_range(0, pool.size() - 1)]
 	return _finish(ItemGenerator.from_unique(pick["data"], maxi(1, wave), true, rng, pick["class"]), wave)
 

@@ -10,8 +10,12 @@ extends SceneTree
 ##             style and a burst of VFX, through the gameplay CameraRig (default).
 ##   live      A real run: bot Players + WaveDirector. --wave=N --players=1..4 --t=seconds
 ##   onions    Close line-up of the classes. --state=hurt|downed|walk|attack --back=1
+##   hunter    The Hunter with its Wolf, Boar and Owl (M8). --back=1 --state=play_dead|frenzy|attack|walk
 ##   enemies   Enemy line-up. --state=walk|windup|stun|hit
-##   weapons   Every weapon model.
+##   sets      The class tier sets worn on their classes (--back=1); --free=1 the class-independent sets.
+##   hands     Weapons in hand: --weapons=crossbow,polearm,fist_weapon --classes=warrior,mage,rogue
+##             --dual=1 --state=attack|walk --rarity=N --back=1.
+##   weapons   Every weapon model (--ids=a,b,c --rarity=N --yaw=deg --gap=m).
 ##   arena     High overview of the arena and its decoration (--env=<id> --dungeon=1 --frames=N).
 ##   revive    Resurrection visuals: cast bar, channel beam, resurrect column.
 ##   fx        M7b combat juice, --phase=spawn|death|impacts|loot|boss|banner (add the engine flag

@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="AbilityData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/abilities/ability_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/abilities/shaman/shaman_spirit_pack.gd" id="2_effect"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"spirit_pack"
+display_name = "Spirit Pack"
+description = "Calls {wolves} ancestral wolves for {duration} sec that bite for {bite_pct}% weapon damage and feed you Surge."
+class_id = &"shaman"
+school = &"nature"
+tags = Array[StringName]([&"pet"])
+resource = &""
+cost = 0.0
+cooldown = 24.0
+targeting = 1
+cast_range = 9.0
+effect = ExtResource("2_effect")
+params = {
+"arc_pct": 0.0,
+"arc_radius": 3.0,
+"bite_interval": 1.0,
+"bite_pct": 50.0,
+"duration": 10.0,
+"leash": 8.0,
+"slow": 0.0,
+"slow_duration": 1.5,
+"surge_per_bite": 1.0,
+"taunt_duration": 1.5,
+"taunt_radius": 0.0,
+"wolves": 2
+}
+icon = &"spirit_pack"
+color = Color(0.6, 0.9, 0.95, 1)
+kind = 1
+card_weight = 1.0
+rank3 = {"wolves_add": 1}
+rank3_text = "+1 wolf"
+specs = Array[Dictionary]([{"name": "Thunder Pack", "text": "Every bite also arcs lightning to another enemy within 3 m for 40% of the bite.", "mods": {"arc_pct": 40.0}}, {"name": "Pack Guardians", "text": "Enemies within 3 m of a wolf chase it for 1.5 sec.", "mods": {"taunt_radius": 3.0}}])

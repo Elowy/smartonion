@@ -16,7 +16,7 @@ const ENEMY_CORE := Color(1.0, 0.62, 0.2)
 static var _meshes: Dictionary[String, Mesh] = {}
 
 
-## [param style]: &"bolt", &"fireball", &"arrow", &"bullet", &"axe" (anything else = bolt).
+## [param style]: &"bolt", &"fireball", &"arrow", &"bullet", &"quarrel", &"axe" (anything else = bolt).
 static func build(style: StringName, color: Color, is_crit: bool = false, enemy: bool = false) -> Node3D:
 	var root := Node3D.new()
 	var s := 1.25 if is_crit else 1.0
@@ -33,6 +33,8 @@ static func build(style: StringName, color: Color, is_crit: bool = false, enemy:
 			_build_arrow(body, color, s)
 		&"bullet":
 			_build_bullet(body, color, s)
+		&"quarrel":
+			_build_quarrel(body, color, s)
 		&"axe":
 			_build_axe(body, color, enemy)
 		_:
@@ -78,6 +80,20 @@ static func _build_arrow(root: Node3D, color: Color, s: float) -> void:
 	# Faint streak so arrows read from the top-down camera.
 	_add(root, _box(Vector3(0.05, 0.02, 0.9)), Mats.unshaded(Color(color, 0.25)), Vector3(0, 0, 0.45))
 	root.scale = Vector3.ONE * 1.3 * s
+
+
+## The crossbow bolt: shorter and thicker than the arrow – a stubby dark-wood shaft, an iron head and two
+## small vanes – with a short heavy streak so it reads from above.
+static func _build_quarrel(root: Node3D, color: Color, s: float) -> void:
+	var shaft := _add(root, _cylinder(0.035, 0.035, 0.5), Mats.toon(Color(0.32, 0.22, 0.14)), Vector3(0, 0, 0.05))
+	shaft.rotation_degrees = Vector3(90, 0, 0)
+	var head := _add(root, _cylinder(0.0, 0.08, 0.2), Mats.toon(Color(0.62, 0.64, 0.7)), Vector3(0, 0, -0.3))
+	head.rotation_degrees = Vector3(-90, 0, 0)
+	var vane_mat := Mats.unshaded(color)
+	_add(root, _box(Vector3(0.10, 0.01, 0.10)), vane_mat, Vector3(0, 0, 0.28))
+	_add(root, _box(Vector3(0.01, 0.10, 0.10)), vane_mat, Vector3(0, 0, 0.28))
+	_add(root, _box(Vector3(0.07, 0.025, 0.6)), Mats.unshaded(Color(color, 0.28)), Vector3(0, 0, 0.4))
+	root.scale = Vector3.ONE * 1.35 * s
 
 
 static func _build_bullet(root: Node3D, color: Color, s: float) -> void:
