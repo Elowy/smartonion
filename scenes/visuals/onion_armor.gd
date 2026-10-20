@@ -795,10 +795,49 @@ static func _head_hunter_hat(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void
 	_head_plain(k, cd)
 
 
-## SHAMAN package hook: the carved wooden mask (class headgear id tribal_mask). Until the class
-## package draws it the plain circlet shows. Part flags (brows, mouth, extras) go in _build_starter.
+## The Shaman's head piece (class headgear id tribal_mask): a woven band with bone beads, a big carved wooden
+## mask worn on the forehead (teal war paint, white eyes, bone fangs) and three feathers fanned out behind.
+## All in the single Solid mesh. Part flags (brows, mouth, extras) go in _build_starter.
 static func _head_tribal_mask(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
-	_head_plain(k, cd)
+	var acc := cd.accent_color
+	var wood := Color(0.56, 0.38, 0.22)
+	var dark := Color(0.27, 0.16, 0.1)
+	var bone := OnionModel.IVORY
+	# Band around the head, bone beads on it.
+	var by := 0.78
+	var br := OnionModel.bulb_radius(by)
+	k.add_torus(br + 0.0, br + 0.06, MeshKit.xf(Vector3(0, by, 0)), dark, 26, 5)
+	for i in 12:
+		var a := 360.0 * float(i) / 12.0 + 15.0
+		k.add_sphere(0.032, MeshKit.xf(OnionModel.bulb_point(by, a, 0.062)), bone, 8, 4)
+	# The mask: a carved plate lying on the forehead, tilted up with the bulb.
+	var centre := OnionModel.bulb_point(0.865, 0.0, 0.05)
+	var tilt := MeshKit.xf(centre, Vector3(46.0, 0.0, 0.0))
+	var outline := PackedVector2Array([Vector2(-0.16, 0.13), Vector2(-0.12, 0.17), Vector2(0.12, 0.17), Vector2(0.16, 0.13),
+		Vector2(0.15, 0.0), Vector2(0.1, -0.11), Vector2(0.0, -0.16), Vector2(-0.1, -0.11), Vector2(-0.15, 0.0)])
+	k.add_extrusion(outline, 0.045, tilt, wood, 0.9)
+	# Relief on the plate (local x across, y up, z -0.03 = towards the viewer).
+	var front := Vector3(0, 0, -0.03)
+	var relief := func(size: Vector3, at: Vector3, color: Color) -> void:
+		k.add_box(size, tilt * Transform3D(Basis(), front + at), color)
+	relief.call(Vector3(0.28, 0.035, 0.025), Vector3(0.0, 0.115, 0.0), acc)
+	relief.call(Vector3(0.2, 0.02, 0.025), Vector3(0.0, 0.085, 0.0), acc.darkened(0.3))
+	for side: float in [-1.0, 1.0]:
+		relief.call(Vector3(0.075, 0.04, 0.028), Vector3(0.062 * side, 0.035, 0.0), dark)
+		relief.call(Vector3(0.045, 0.022, 0.03), Vector3(0.062 * side, 0.035, 0.004), Color(0.98, 0.98, 0.96))
+		relief.call(Vector3(0.02, 0.07, 0.025), Vector3(0.105 * side, -0.05, 0.0), acc)
+		relief.call(Vector3(0.022, 0.05, 0.03), Vector3(0.04 * side, -0.115, 0.0), bone)
+	relief.call(Vector3(0.035, 0.11, 0.035), Vector3(0.0, -0.0, 0.0), wood.darkened(0.2))
+	relief.call(Vector3(0.1, 0.03, 0.028), Vector3(0.0, -0.085, 0.0), dark)
+	# Three feathers fanned out behind the head.
+	var leaf := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.05, 0.08), Vector2(0.045, 0.2), Vector2(0.0, 0.32),
+		Vector2(-0.045, 0.2), Vector2(-0.05, 0.08)])
+	var feathers := [[150.0, 38.0, acc], [180.0, 28.0, Color(0.96, 0.94, 0.98)], [210.0, 38.0, acc.lightened(0.2)]]
+	for f in feathers:
+		var angle: float = f[0]
+		var lean: float = f[1]
+		var basis := _angled(angle) * Basis.from_euler(Vector3(deg_to_rad(-lean), 0, 0))
+		k.add_extrusion(leaf, 0.014, Transform3D(basis, OnionModel.bulb_point(0.82, angle, 0.04)), f[2] as Color, 0.9)
 
 
 static func _starter_shoulders(k: MeshKit, cd: ClassData) -> void:
@@ -818,6 +857,9 @@ static func _starter_shoulders(k: MeshKit, cd: ClassData) -> void:
 				var dir := b * Vector3((s - 1) * 0.45, 1.0, 0).normalized()
 				var base := c + b * Vector3((s - 1) * 0.09, 0.17, 0)
 				k.add_segment(base, base + dir * 0.17, 0.045, 0.0, OnionModel.IVORY, 8)
+		elif cd.headgear == &"tribal_mask":
+			# A bone fang on each pauldron.
+			k.add_segment(c + b * Vector3(0, 0.17, 0), c + b * Vector3(0, 0.36, 0), 0.05, 0.0, OnionModel.IVORY, 8)
 		else:
 			k.add_sphere(0.05, Transform3D(b, c + b * Vector3(0, 0.2, 0)), Color(0.3, 0.6, 1.0), 8, 4)
 
@@ -874,9 +916,24 @@ static func _chest_hunter(k: MeshKit, _cloth: MeshKit, _cd: ClassData) -> void:
 	_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
 
 
-## SHAMAN package hook: the starter chest (bone beads, totem harness). The default leather belt until then.
-static func _chest_tribal(k: MeshKit, _cloth: MeshKit, _cd: ClassData) -> void:
-	_belt(k, OnionModel.LEATHER, OnionModel.GOLD)
+## The Shaman's starter chest: a dark leather belt with a teal buckle, a ring of bone beads on it and three
+## strands of beads hanging down each side. (The small totem on the back is part of the body, not of this slot:
+## OnionModel._back_totem_mesh.)
+static func _chest_tribal(k: MeshKit, _cloth: MeshKit, cd: ClassData) -> void:
+	_belt(k, OnionModel.LEATHER.darkened(0.12), cd.accent_color)
+	var bone := OnionModel.IVORY
+	for i in 16:
+		var a := 360.0 * float(i) / 16.0 + 11.0
+		k.add_sphere(0.027, MeshKit.xf(OnionModel.bulb_point(0.33, a, 0.045)), bone, 7, 4)
+	for side: float in [-1.0, 1.0]:
+		for strand in 3:
+			var a := side * (34.0 + 24.0 * strand)
+			var top := OnionModel.bulb_point(0.3, a, 0.055)
+			var tip := OnionModel.bulb_point(0.16 - 0.015 * strand, a, 0.05)
+			k.add_segment(top, tip, 0.007, 0.007, OnionModel.LEATHER.darkened(0.2), 5)
+			for b in 3:
+				var at := top.lerp(tip, 0.3 + 0.35 * float(b))
+				k.add_sphere(0.03 if b < 2 else 0.036, MeshKit.xf(at), bone if b < 2 else cd.accent_color.lightened(0.15), 7, 4)
 
 
 static func _helm_dome(k: MeshKit, metal: Color, trim: Color) -> void:
