@@ -26,8 +26,11 @@ extends RefCounted
 ##    "selected_title": id, "all_unlocked": true (only a saved max profile)}
 ## A missing file is a fresh profile; a file that cannot be parsed is moved to "<path>.corrupt" and a fresh profile
 ## is used; a file of a NEWER version is never overwritten (the profile is fresh and read-only); a path that cannot
-## be read as a file is never overwritten either. The write goes through "<path>.tmp" and a rename. Unknown keys and
-## unknown content ids are kept as they are, so removing or adding content never destroys a save.
+## be read as a file is never overwritten either. The write goes through "<path>.tmp" (read back and compared before
+## it replaces anything: a failed write keeps the old file) and a rename; the good file it replaces is copied to
+## "<path>.bak" first. A corrupt or missing file with a readable "<path>.bak" loads that backup instead
+## ([member load_error] [constant LOAD_RECOVERED]). Unknown keys and unknown content ids are kept as they are, so
+## removing or adding content never destroys a save.
 
 const FORMAT_VERSION := 1
 const DEFAULT_PATH := "user://profile.json"
@@ -63,8 +66,15 @@ const LOOK_SLOTS: Array[StringName] = [&"head", &"shoulders", &"chest"]
 ## id picked for the class, &"" = none (CosmeticData.KINDS).
 const COSMETIC_KEYS: Array[StringName] = [&"tabard", &"hat", &"glow", &"dye"]
 
+## Test hook: when >= 0, only this many bytes of the file reach disk in [method save_file] (a full disk).
+static var write_limit := -1
+
+## [member load_error] of a profile read from "<path>.bak" because the file itself was corrupt or missing: the
+## progress is there (up to the last save before the damage), the message is only a warning.
+const LOAD_RECOVERED := "recovered from backup"
+
 ## "" = a good file or none; else why the file was not used: "corrupt", "newer version" or "unreadable"
-## (set by [method load_file]).
+## (set by [method load_file]), or [constant LOAD_RECOVERED] (the backup was used, the profile is fine).
 var load_error := ""
 ## The file was of a newer version, or exists but cannot be read: [method save_file] refuses.
 var read_only := false
@@ -444,11 +454,17 @@ static func _migration_steps() -> Dictionary:
 ## Reads the profile at [param path]. Never null: a missing file gives a fresh profile ([member is_new]); a file that
 ## cannot be parsed is moved to "<path>.corrupt" and a fresh profile is used ([member load_error] "corrupt"); a file
 ## of a newer version gives a fresh read-only profile ("newer version"); a path that exists but cannot be read as a
-## file gives a fresh read-only one ("unreadable"). The cases other than a missing file print a warning.
+## file gives a fresh read-only one ("unreadable"). The cases other than a missing file print a warning. A corrupt or
+## missing file whose "<path>.bak" is a good profile loads the backup instead ([member load_error] [constant
+## LOAD_RECOVERED], writable; a corrupt file is moved to "<path>.corrupt" as above).
 static func load_file(path: String) -> Profile:
 	if DirAccess.dir_exists_absolute(path):
 		return _unusable(path, "unreadable", true)
 	if not FileAccess.file_exists(path):
+		var backup := _from_backup(path)
+		if backup != null:
+			push_warning("Profile: %s is missing, its backup %s.bak was loaded" % [path, path])
+			return backup
 		var p := fresh()
 		p.is_new = true
 		return p
@@ -457,18 +473,26 @@ static func load_file(path: String) -> Profile:
 		return _unusable(path, "unreadable", true)
 	var text := file.get_as_text()
 	file.close()
-	var json := JSON.new()  # (JSON.parse_string would print an engine error for a broken file)
-	if json.parse(text) != OK or not (json.data is Dictionary) or not (json.data as Dictionary).has("version"):
+	var data := _parse(text)
+	if data.is_empty():
+		var backup := _from_backup(path)
+		if backup != null:
+			_set_aside(path)
+			push_warning("Profile: %s is not a profile file, it was moved to %s.corrupt and its backup %s.bak was loaded" % [
+					path, path, path])
+			return backup
 		return _unusable(path, "corrupt", false)
-	var data: Dictionary = json.data
 	if _int(data.get("version", 0)) > FORMAT_VERSION:
 		return _unusable(path, "newer version", true)
 	var p := from_dict(migrate(data))
 	return p
 
 
-## Writes the profile to [param path] through "<path>.tmp" and a rename, so a crash keeps the old file. Refuses a
-## [member read_only] or [member is_dev] profile with ERR_FILE_NO_PERMISSION.
+## Writes the profile to [param path] through "<path>.tmp" and a rename, so a crash keeps the old file. The temporary
+## file is read back first: a write that failed or came out short (a full disk) is dropped and the old file stays
+## (ERR_FILE_CANT_WRITE, or the engine's error). The good file being replaced is copied to "<path>.bak" before the
+## rename (best effort: a backup that cannot be made does not stop the save). Refuses a [member read_only] or
+## [member is_dev] profile with ERR_FILE_NO_PERMISSION.
 func save_file(path: String) -> Error:
 	if read_only or is_dev:
 		return ERR_FILE_NO_PERMISSION
@@ -481,9 +505,52 @@ func save_file(path: String) -> Error:
 	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify(to_dict(), "\t"))
+	var text := JSON.stringify(to_dict(), "\t")
+	var on_disk := text if write_limit < 0 else text.to_utf8_buffer().slice(0, write_limit).get_string_from_utf8()
+	var stored := file.store_string(on_disk)
+	var write_error := file.get_error()
 	file.close()
-	return DirAccess.rename_absolute(tmp, path)
+	if not stored or write_error != OK or FileAccess.get_file_as_string(tmp) != text:
+		DirAccess.remove_absolute(tmp)
+		return write_error if write_error != OK else ERR_FILE_CANT_WRITE
+	if FileAccess.file_exists(path) and not _parse(FileAccess.get_file_as_string(path)).is_empty():
+		var backup := path + ".bak"
+		if DirAccess.copy_absolute(path, backup) != OK:
+			DirAccess.remove_absolute(backup)  # (never keep half a backup)
+	var renamed := DirAccess.rename_absolute(tmp, path)
+	if renamed != OK:
+		DirAccess.remove_absolute(tmp)
+	return renamed
+
+
+## The profile in "<path>.bak" (with [member load_error] [constant LOAD_RECOVERED]); null when there is none or it is
+## not a profile this version can read.
+static func _from_backup(path: String) -> Profile:
+	var backup := path + ".bak"
+	if not FileAccess.file_exists(backup):
+		return null
+	var data := _parse(FileAccess.get_file_as_string(backup))
+	if data.is_empty() or _int(data.get("version", 0)) > FORMAT_VERSION:
+		return null
+	var p := from_dict(migrate(data))
+	p.load_error = LOAD_RECOVERED
+	return p
+
+
+## The profile file's top-level dictionary; {} when [param text] is no JSON object with a "version".
+static func _parse(text: String) -> Dictionary:
+	var json := JSON.new()  # (JSON.parse_string would print an engine error for a broken file)
+	if json.parse(text) != OK or not (json.data is Dictionary) or not (json.data as Dictionary).has("version"):
+		return {}
+	return json.data
+
+
+## Moves the corrupt file at [param path] to "<path>.corrupt" (an older one there is replaced).
+static func _set_aside(path: String) -> void:
+	var corrupt := path + ".corrupt"
+	if FileAccess.file_exists(corrupt):
+		DirAccess.remove_absolute(corrupt)
+	DirAccess.rename_absolute(path, corrupt)
 
 
 ## A fresh profile standing in for the unusable file at [param path]; the file is kept ("<path>.corrupt" for a corrupt
@@ -493,11 +560,8 @@ static func _unusable(path: String, why: String, p_read_only: bool) -> Profile:
 	p.load_error = why
 	p.read_only = p_read_only
 	if why == "corrupt":
-		var backup := path + ".corrupt"
-		if FileAccess.file_exists(backup):
-			DirAccess.remove_absolute(backup)
-		DirAccess.rename_absolute(path, backup)
-		push_warning("Profile: %s is not a profile file, it was moved to %s and a new profile is used" % [path, backup])
+		_set_aside(path)
+		push_warning("Profile: %s is not a profile file, it was moved to %s.corrupt and a new profile is used" % [path, path])
 	else:
 		push_warning("Profile: %s cannot be used (%s), a new profile is used and the file is left alone" % [path, why])
 	return p

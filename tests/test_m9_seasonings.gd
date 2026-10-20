@@ -770,7 +770,7 @@ func test_the_choice_follows_the_class_and_is_saved() -> void:
 	var fresh := PlayerManager.join(UiFakes.HumanInput.new("p9"), Db.get_class_data(&"warrior"))
 	UiFakes.step(lobby)
 	check_eq(fresh.seasonings, [&"ssn_cracked_pepper", &"ssn_smoked_paprika"] as Array[StringName], "a joining Warrior starts with them")
-	for suffix in ["", ".tmp"]:
+	for suffix in ["", ".tmp", ".bak"]:
 		if FileAccess.file_exists(tmp + suffix):
 			DirAccess.remove_absolute(tmp + suffix)
 

@@ -75,7 +75,8 @@ func after_each() -> void:
 	Db.achievements = _saved_achievements
 	for kind in ["test_cond", "test_cond_b"]:
 		AchievementEngine.unregister_condition(StringName(kind))
-	for suffix in ["", ".tmp", ".corrupt"]:
+	Profile.write_limit = -1
+	for suffix in ["", ".tmp", ".corrupt", ".bak"]:
 		if FileAccess.file_exists(_tmp_path + suffix):
 			DirAccess.remove_absolute(_tmp_path + suffix)
 	if DirAccess.dir_exists_absolute(_tmp_path + "_dir"):
@@ -370,6 +371,103 @@ func test_saving_replaces_the_old_file() -> void:
 	check_eq(p.save_file(_tmp_path), OK, "second save over the first")
 	check_eq(Profile.load_file(_tmp_path).seeds, 2, "the newer data")
 	check(not FileAccess.file_exists(_tmp_path + ".tmp"), "the temporary file is gone")
+
+
+func test_saving_keeps_the_previous_good_file_as_the_backup() -> void:
+	var p := Profile.fresh()
+	p.earn_seeds(1)
+	check_eq(p.save_file(_tmp_path), OK, "first save")
+	check(not FileAccess.file_exists(_tmp_path + ".bak"), "nothing to back up yet")
+	p.earn_seeds(1)
+	check_eq(p.save_file(_tmp_path), OK, "second save")
+	check(FileAccess.file_exists(_tmp_path + ".bak"), "the .bak is there")
+	check_eq(Profile.load_file(_tmp_path + ".bak").seeds, 1, "it holds the file the second save replaced")
+	p.earn_seeds(1)
+	p.save_file(_tmp_path)
+	check_eq(Profile.load_file(_tmp_path + ".bak").seeds, 2, "and moves on with every save")
+	check_eq(Profile.load_file(_tmp_path).seeds, 3, "the file is the newest")
+	# A corrupt file is no backup: it never replaces the good .bak.
+	_write(_tmp_path, "{ broken")
+	p.earn_seeds(1)
+	check_eq(p.save_file(_tmp_path), OK, "saved over a corrupt file")
+	check_eq(Profile.load_file(_tmp_path + ".bak").seeds, 2, "the good .bak is kept")
+	check_eq(Profile.load_file(_tmp_path).seeds, 4, "the new file loads")
+
+
+func test_a_failed_write_keeps_the_old_file_and_the_backup() -> void:
+	var p := Profile.fresh()
+	p.earn_seeds(1)
+	p.save_file(_tmp_path)
+	p.earn_seeds(1)
+	p.save_file(_tmp_path)
+	var good := _read(_tmp_path)
+	var backup := _read(_tmp_path + ".bak")
+	p.earn_seeds(10)
+	Profile.write_limit = 40  # the disk is full: a short file reaches the disk
+	check_eq(p.save_file(_tmp_path), ERR_FILE_CANT_WRITE, "the short write is reported")
+	check_eq(_read(_tmp_path), good, "the old file is untouched")
+	check_eq(_read(_tmp_path + ".bak"), backup, "so is the backup")
+	check(not FileAccess.file_exists(_tmp_path + ".tmp"), "the broken temporary file is removed")
+	Profile.write_limit = 0
+	check_eq(p.save_file(_tmp_path), ERR_FILE_CANT_WRITE, "nothing written at all")
+	check_eq(_read(_tmp_path), good, "the old file is untouched")
+	Profile.write_limit = -1
+	check_eq(p.save_file(_tmp_path), OK, "the next save, with room again, works")
+	check_eq(Profile.load_file(_tmp_path).seeds, 12, "and has everything")
+	# A temporary file that cannot even be opened keeps the old file too.
+	DirAccess.remove_absolute(_tmp_path + ".tmp")
+	DirAccess.make_dir_absolute(_tmp_path + ".tmp")
+	var before := _read(_tmp_path)
+	check(p.save_file(_tmp_path) != OK, "the write is refused")
+	check_eq(_read(_tmp_path), before, "the file is untouched")
+	DirAccess.remove_absolute(_tmp_path + ".tmp")
+
+
+func test_a_corrupt_or_missing_file_loads_the_backup() -> void:
+	var p := Profile.fresh()
+	p.earn_seeds(5)
+	p.save_file(_tmp_path)
+	p.earn_seeds(5)
+	p.save_file(_tmp_path)  # (the .bak has 5 Seeds)
+	_write(_tmp_path, "{ the disk lied")
+	var back := Profile.load_file(_tmp_path)
+	check_eq(back.load_error, Profile.LOAD_RECOVERED, "the recovery is reported")
+	check_eq(back.seeds, 5, "the backup's progress, not a fresh profile")
+	check(not back.read_only and not back.is_new, "writable, not new")
+	check(FileAccess.file_exists(_tmp_path + ".corrupt") and not FileAccess.file_exists(_tmp_path), "the corrupt file is set aside")
+	check_eq(back.save_file(_tmp_path), OK, "it can be saved again")
+	check_eq(Profile.load_file(_tmp_path).load_error, "", "and the file is good")
+	check_eq(Profile.load_file(_tmp_path).seeds, 5, "with the recovered progress")
+	# The file is gone (a crash between the steps, a manual delete): the backup is used as well.
+	DirAccess.remove_absolute(_tmp_path)
+	var missing := Profile.load_file(_tmp_path)
+	check_eq(missing.load_error, Profile.LOAD_RECOVERED, "a missing file with a backup is a recovery")
+	check(not missing.is_new, "not a first launch")
+	# No usable backup: a corrupt file is the fresh profile it always was.
+	_write(_tmp_path, "{ broken")
+	_write(_tmp_path + ".bak", "{ broken too")
+	var fresh := Profile.load_file(_tmp_path)
+	check_eq(fresh.load_error, "corrupt", "both are broken")
+	check_eq(fresh.seeds, 0, "a fresh profile")
+	DirAccess.remove_absolute(_tmp_path + ".bak")
+	DirAccess.remove_absolute(_tmp_path + ".corrupt")
+	check(Profile.load_file(_tmp_path).is_new, "neither file: a first launch")
+	# A backup of a newer game is not read either.
+	_write(_tmp_path + ".bak", "{\"version\": 2, \"seeds\": 9}")
+	check(Profile.load_file(_tmp_path).is_new, "a newer backup does not count")
+	# A good file wins over its backup.
+	p.earn_seeds(1)
+	p.save_file(_tmp_path)
+	check_eq(Profile.load_file(_tmp_path).load_error, "", "a good file is loaded as it is")
+
+
+func test_the_dev_profile_never_writes_a_backup() -> void:
+	var dev := Profile.dev()
+	check_eq(dev.save_file(_tmp_path), ERR_FILE_NO_PERMISSION, "refused")
+	check(not FileAccess.file_exists(_tmp_path) and not FileAccess.file_exists(_tmp_path + ".bak"), "nothing on disk")
+	Meta.configure(&"dev", "", true)
+	Meta.save()
+	check(not Meta.persist and Meta.path == "", "no file for an automated run")
 
 
 func test_a_missing_file_is_a_fresh_profile() -> void:

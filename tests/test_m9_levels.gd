@@ -85,7 +85,7 @@ func after_each() -> void:
 	ClassLevels.xp_mult_hook = _saved_xp_hook
 	Db.achievements = _saved_achievements
 	ClassLevels.seeds_mult_hook = _saved_seeds_hook
-	for suffix in ["", ".tmp", ".corrupt"]:
+	for suffix in ["", ".tmp", ".corrupt", ".bak"]:
 		if FileAccess.file_exists(_tmp_path + suffix):
 			DirAccess.remove_absolute(_tmp_path + suffix)
 	RunState.free_rerolls = 0

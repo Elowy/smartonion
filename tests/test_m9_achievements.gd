@@ -55,7 +55,7 @@ func after_each() -> void:
 	Meta._pending_unlocks.clear()
 	Meta._batching = false
 	Db.unlock_gates = _saved_gates
-	for suffix in ["", ".tmp", ".corrupt"]:
+	for suffix in ["", ".tmp", ".corrupt", ".bak"]:
 		if FileAccess.file_exists(_tmp + suffix):
 			DirAccess.remove_absolute(_tmp + suffix)
 	tree.paused = false

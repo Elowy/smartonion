@@ -50,7 +50,7 @@ func after_each() -> void:
 	Meta._pending_unlocks.clear()
 	Meta._batching = false
 	Db.achievements = _saved_achievements
-	for suffix in ["", ".tmp"]:
+	for suffix in ["", ".tmp", ".bak"]:
 		if FileAccess.file_exists(_tmp_path + suffix):
 			DirAccess.remove_absolute(_tmp_path + suffix)
 	UiFakes.reset_players()

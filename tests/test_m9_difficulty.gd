@@ -45,7 +45,7 @@ func after_each() -> void:
 	Meta.profile = _saved_profile
 	Meta.path = _saved_path
 	Meta.persist = _saved_persist
-	for suffix in ["", ".tmp", ".corrupt"]:
+	for suffix in ["", ".tmp", ".corrupt", ".bak"]:
 		if FileAccess.file_exists(_tmp + suffix):
 			DirAccess.remove_absolute(_tmp + suffix)
 	tree.paused = false
