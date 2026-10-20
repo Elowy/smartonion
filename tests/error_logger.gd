@@ -27,6 +27,7 @@ class Entry:
 
 
 const MAX_STACK_FRAMES := 6
+const RUNNER_FILE := "res://tests/run_tests.gd"
 
 var _mutex := Mutex.new()
 var _entries: Array[Entry] = []
@@ -65,10 +66,13 @@ static func _format_stack(backtraces: Array[ScriptBacktrace]) -> String:
 		if bt.is_empty():
 			continue
 		var frames: Array[String] = []
-		for i in mini(bt.get_frame_count(), MAX_STACK_FRAMES):
-			frames.append("%s (%s:%d)" % [bt.get_frame_function(i), bt.get_frame_file(i).get_file(),
-					bt.get_frame_line(i)])
-		if bt.get_frame_count() > MAX_STACK_FRAMES:
-			frames.append("...")
+		for i in bt.get_frame_count():
+			var frame_file := bt.get_frame_file(i)
+			if frame_file == RUNNER_FILE:
+				break  # the runner itself (and whatever resumed it) is not interesting
+			if frames.size() == MAX_STACK_FRAMES:
+				frames.append("...")
+				break
+			frames.append("%s (%s:%d)" % [bt.get_frame_function(i), frame_file.get_file(), bt.get_frame_line(i)])
 		return " < ".join(frames)
 	return ""
