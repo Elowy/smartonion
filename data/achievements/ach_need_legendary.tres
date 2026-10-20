@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_need_legendary"
+display_name = "Need Is Greed"
+description = "Win a Need roll on a Legendary item."
+points = 10
+condition_kind = &"stat_at_least"
+condition_params = {
+"stat": "need_legendary_wins",
+"value": 1
+}

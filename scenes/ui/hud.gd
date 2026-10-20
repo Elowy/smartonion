@@ -67,6 +67,12 @@ var notice_label: Label
 var team_loot_label: Label
 ## M6b: the HARDCORE badge above the wave line (visible in a hardcore run only).
 var hardcore_badge: HardcoreBadge
+## M9: the difficulty tier's pill (Pungent / Tear-Jerker runs only) and, beside it, the chip of the wave's Tear-Jerker
+## pressure (the row keeps its width and height while the chip is empty, so the plaque does not jump).
+var difficulty_badge: DifficultyBadge
+var pressure_chip: DifficultyBadge
+## M9: the toast of a new achievement ([method show_achievement]).
+var toast: AchievementToast
 
 var _banner: Control
 var _banner_tween: Tween
@@ -110,6 +116,24 @@ static func create() -> Hud:
 
 
 # --- Contract ------------------------------------------------------------------------
+
+## M9: the toast of a new achievement slides in on the right edge (several queue up).
+func show_achievement(data: AchievementData) -> void:
+	if toast != null:
+		toast.push(data)
+
+
+## M9: the pressure chip follows RunState (a wave's modifier went live or ended).
+func _refresh_pressure() -> void:
+	if pressure_chip == null:
+		return
+	var text := Pressure.chip_text()
+	var data := Pressure.current()
+	if data != null:
+		pressure_chip.show_text(text, data.color)
+	pressure_chip.modulate.a = 1.0 if data != null else 0.0
+	pressure_chip.visible = difficulty_badge.visible and Difficulty.current().pressure
+
 
 ## Connects the unit frames to the spawned players.
 func bind_players(players: Array[Player]) -> void:
@@ -292,6 +316,8 @@ func _build() -> void:
 	_fx_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_fx_layer)
 	_build_floater()
+	toast = AchievementToast.create()
+	add_child(toast)
 
 
 func _build_top() -> void:
@@ -314,6 +340,7 @@ func _build_top() -> void:
 	var col := UiTheme.vbox(-6)
 	plaque.add_child(col)
 	_build_mode_badge(col)
+	_build_tier_row(col)
 	wave_label = UiTheme.centered_label(RunState.wave_progress_text(1), UiTheme.GOLD_LABEL, 22)
 	col.add_child(wave_label)
 	wave_tag_label = UiTheme.centered_label("", UiTheme.HEADING, 18, UiTheme.RED)
@@ -396,6 +423,27 @@ func _build_mode_badge(col: VBoxContainer) -> void:
 	hardcore_badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	hardcore_badge.visible = RunState.hardcore
 	col.add_child(hardcore_badge)
+
+
+## The difficulty tier's pill (M9; Pungent / Tear-Jerker only) and the pressure chip beside it, under the HARDCORE badge:
+## hidden on a Normal run, where the plaque stays as it was.
+func _build_tier_row(col: VBoxContainer) -> void:
+	var row := UiTheme.hbox(8)
+	row.name = "TierRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	difficulty_badge = DifficultyBadge.create(UiTheme.FONT_SMALL - 2)
+	difficulty_badge.name = "TierBadge"
+	var shown := difficulty_badge.show_tier(RunState.difficulty)  # (the HUD is built for a run after RunState.start_run)
+	row.add_child(difficulty_badge)
+	pressure_chip = DifficultyBadge.create(UiTheme.FONT_SMALL - 2)
+	pressure_chip.name = "PressureChip"
+	pressure_chip.show_text("Pressure", UiTheme.TEXT_DIM)  # (a width to reserve; shown/hidden by _refresh_pressure)
+	pressure_chip.custom_minimum_size.x = 200.0
+	pressure_chip.modulate.a = 0.0
+	pressure_chip.visible = shown and Difficulty.current().pressure
+	row.add_child(pressure_chip)
+	row.visible = shown
+	col.add_child(row)
 
 
 ## The boss frame (hidden until a boss wave): name, HP bar, phase pips and the ENRAGED line.
@@ -618,7 +666,9 @@ func _ready() -> void:
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
 	RunState.shrines_changed.connect(_refresh_shrines)
+	RunState.pressure_changed.connect(_refresh_pressure)
 	_refresh_shrines()
+	_refresh_pressure()
 	_on_wave_changed(RunState.wave)
 	_loot_count = RunState.team_loot.size()
 	_show_team_loot()

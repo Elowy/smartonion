@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_seven_bulbs"
+display_name = "Seven Bulbs"
+description = "Win a run with each of the seven classes, on any difficulty."
+points = 30
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "counter_at_least",
+"counter": "wins:warrior:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:mage:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:paladin:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:rogue:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:warlock:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:hunter:normal",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "wins:shaman:normal",
+"value": 1
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "title",
+"id": "title_seven_layered",
+"name": "Seven-Layered"
+}])

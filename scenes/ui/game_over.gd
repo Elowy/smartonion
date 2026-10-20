@@ -57,6 +57,12 @@ var mode_row: HBoxContainer
 var mode_label: Label
 var hardcore_badge: HardcoreBadge
 var best_label: Label
+## M9: the difficulty pill beside the arena name (Pungent / Tear-Jerker runs only) and the block of the run's new
+## achievements (hidden when it unlocked none: every automated run).
+var difficulty_badge: DifficultyBadge
+var rewards_panel: MetaRewardsPanel
+## What the main profile made of the run (Meta.record_run's result; {} = it recorded nothing).
+var meta_result: Dictionary = {}
 ## The line under the prompts ("Saved to ..." after X).
 var status_label: Label
 ## The tab labels, one per page.
@@ -80,10 +86,12 @@ static func create() -> GameOverScreen:
 
 ## Fills in the end-of-run summary from RunState (victory / defeat, waves, kills, gold). [param p_board] is
 ## the run's leaderboard model ([method Leaderboard.screen_model], what Main reads after recording the
-## run); {} = no board (the leaderboard file is not in use).
-func open(p_victory: bool, p_board: Dictionary = {}) -> void:
+## run); {} = no board (the leaderboard file is not in use). [param p_meta] (M9) is what the main profile made of the run
+## (Main.meta_result): its new achievements are listed in a block under the table.
+func open(p_victory: bool, p_board: Dictionary = {}, p_meta: Dictionary = {}) -> void:
 	victory = p_victory
 	board = p_board
+	meta_result = p_meta
 	_t = 0.0
 	_done = false
 	_set_status("")
@@ -235,6 +243,8 @@ func _build() -> void:
 	environment_label = UiTheme.centered_label("", UiTheme.DIM, UiTheme.FONT_BODY)
 	environment_label.name = "ArenaLabel"
 	mode_row.add_child(environment_label)
+	difficulty_badge = DifficultyBadge.create(UiTheme.FONT_BODY - 2)
+	mode_row.add_child(difficulty_badge)
 	head.add_child(mode_row)
 	col.add_child(UiTheme.divider(700))
 	col.add_child(_build_tabs())
@@ -268,6 +278,8 @@ func _build() -> void:
 	best_label = UiTheme.centered_label(" ", UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
 	best_label.name = "BestLabel"
 	summary_page.add_child(best_label)
+	rewards_panel = MetaRewardsPanel.create()
+	summary_page.add_child(rewards_panel)
 
 	meter_page = MeterPage.create()
 	page_box.add_child(meter_page)
@@ -381,6 +393,8 @@ func _fill_mode_and_board() -> void:
 	mode_label.visible = RunState.is_endless() or RunState.hardcore
 	mode_label.text = "%s mode" % RunState.mode_text(RunState.mode)
 	hardcore_badge.visible = RunState.hardcore
+	difficulty_badge.show_tier(RunState.difficulty)
+	rewards_panel.fill(meta_result)
 	leaderboard_page.fill(board)
 	best_label.visible = not board.is_empty()
 	best_label.text = String(board.get("line", " "))

@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_five_gardens"
+display_name = "Five Gardens"
+description = "Win a run in each of the five arenas."
+points = 20
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "counter_at_least",
+"counter": "env_wins:forest_ruin",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "env_wins:cemetery",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "env_wins:swamp",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "env_wins:volcano",
+"value": 1
+}, {
+"kind": "counter_at_least",
+"counter": "env_wins:ice_cave",
+"value": 1
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "title",
+"id": "title_gardener",
+"name": "the Gardener"
+}])

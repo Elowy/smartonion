@@ -12,7 +12,7 @@ extends RefCounted
 ##    "best_item": ItemInstance or null, "stats": {stat id: float}}
 ## The summary [method build] returns:
 ##   {"victory", "waves_cleared", "total_waves" (0 = endless), "wave", "mode" (RunState.mode_text:
-##    "Endless · Hardcore"), "endless", "hardcore", "environment" (display name), "time", "time_text",
+##    "Endless · Hardcore"), "endless", "hardcore", "environment" (display name), "difficulty" (the tier's name), "time", "time_text",
 ##    "kills", "gold_earned", "level", "coop", "heroes": [hero entries + "awards": Array[StringName]],
 ##    "awards": [{"id", "name", "slot"} in AWARDS order, only the ones somebody won]}
 
@@ -109,6 +109,7 @@ static func collect(p_victory: bool) -> Dictionary:
 		"endless": RunState.is_endless(),
 		"hardcore": RunState.hardcore,
 		"environment": environment_label(RunState.environment),
+		"difficulty": Difficulty.name_of(RunState.difficulty),
 		"time": RunState.run_time,
 		"kills": RunState.kills,
 		"gold_earned": RunState.gold_earned,

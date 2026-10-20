@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="PressureData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/pressure_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"prs_wilting_heat"
+display_name = "Wilting Heat"
+text = "Your ability cooldowns +20%, Haste -10."
+hero_effects = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"class": true
+},
+"mods": {
+"cooldown_pct": 20.0
+}
+}, {
+"kind": "stats",
+"stats": {
+"haste": -10.0
+}
+}])
+color = Color(0.98, 0.55, 0.25, 1)

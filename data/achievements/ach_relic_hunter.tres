@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_relic_hunter"
+display_name = "Relic Hunter"
+description = "Have an Artifact drop."
+points = 10
+condition_kind = &"stat_at_least"
+condition_params = {
+"stat": "artifacts_dropped",
+"value": 1
+}

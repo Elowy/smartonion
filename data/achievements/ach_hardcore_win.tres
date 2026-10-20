@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_hardcore_win"
+display_name = "No Safety Net"
+description = "Win a Hardcore run."
+points = 25
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "run_flag",
+"flag": "final_boss_down"
+}, {
+"kind": "run_flag",
+"flag": "hardcore"
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "legendary",
+"id": "crown_of_ashes"
+}])

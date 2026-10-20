@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_pungent_warlock"
+display_name = "Pungent Hex"
+description = "Win a run on Pungent or higher with the Warlock in the party. Opens Tear-Jerker for the Warlock and a Seasoning in The Onion Patch."
+points = 15
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "run_flag",
+"flag": "final_boss_down"
+}, {
+"kind": "class_in_party",
+"class_id": "warlock"
+}, {
+"kind": "difficulty_at_least",
+"tier": "pungent"
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "difficulty",
+"id": "tear_jerker",
+"class_id": "warlock"
+}])

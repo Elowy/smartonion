@@ -16,19 +16,25 @@ extends RefCounted
 ##                                                    ([constant RunReport.STAT_IDS]); scope "hero": some hero
 ##                                                    (of class_id, when given) has that stat >= value (hero stats:
 ##                                                    damage, healing, absorbed, taken, kills, bosses, revives,
-##                                                    downs, need_wins).
+##                                                    downs, need_wins, capstones, rank5, sets_active).
+##   total_at_least {stat, value}                       the profile's lifetime total of a run stat plus the run in
+##                                                    progress (a report that is not in the counters yet) >= value:
+##                                                    "500 enemies slain in total" fires in the middle of a run.
 ##   stat_at_most   {stat, value, scope?, class_id?}  the same with <= (no hero qualifies in an empty party).
 ##   run_flag       {flag, value?}                     RunReport.flag(flag) == value (default true): victory,
 ##                                                    abandoned, hardcore, endless, solo, full_party, no_downs;
 ##                                                    text flags: mode, environment, difficulty.
 ##   counter_at_least {counter, value}                 the profile's counter >= value. Counters kept by
-##                                                    [method update_counters]: "runs", "wins", "runs:<class>",
-##                                                    "wins:<class>", "total:<stat>", "best:<stat>".
+##                                                    [method update_counters]: "runs", "runs_long", "wins",
+##                                                    "runs:<class>", "wins:<class>", "wins:<class>:<tier>",
+##                                                    "env_wins:<environment>", "total:<stat>", "best:<stat>".
 ##   class_in_party {class_id}                          a hero of that class was in the party.
 ##   class_level_at_least {class_id, value}             the profile's Class Level of the class >= value.
 ##   achievements_at_least {count}                      this many achievements are unlocked.
 ##   points_at_least {value}                            the unlocked achievements' points add up to value.
 ##   unlocked       {unlock_kind, id, class_id?}        the profile has that unlock (Profile.KINDS).
+##   unlock_count_at_least {unlock_kind, count}         the profile holds this many unlocks of that kind ("150 looks").
+##   difficulty_at_least {tier}                         the run was played on that difficulty tier or a higher one.
 ##   all_of / any_of {conditions: [condition...]}       every / at least one (an empty list: all_of true, any_of false).
 ##   not            {condition: condition}              the opposite.
 ## Rewards ([member AchievementData.rewards]): {"kind": a Profile.KINDS entry, "id": content id, "class_id"?}.
@@ -43,25 +49,35 @@ const COND_CLASS_LEVEL_AT_LEAST := &"class_level_at_least"
 const COND_ACHIEVEMENTS_AT_LEAST := &"achievements_at_least"
 const COND_POINTS_AT_LEAST := &"points_at_least"
 const COND_UNLOCKED := &"unlocked"
+const COND_TOTAL_AT_LEAST := &"total_at_least"
+const COND_UNLOCK_COUNT_AT_LEAST := &"unlock_count_at_least"
+const COND_DIFFICULTY_AT_LEAST := &"difficulty_at_least"
 const COND_ALL_OF := &"all_of"
 const COND_ANY_OF := &"any_of"
 const COND_NOT := &"not"
 const CONDITION_KINDS: Array[StringName] = [COND_STAT_AT_LEAST, COND_STAT_AT_MOST, COND_RUN_FLAG,
 		COND_COUNTER_AT_LEAST, COND_CLASS_IN_PARTY, COND_CLASS_LEVEL_AT_LEAST, COND_ACHIEVEMENTS_AT_LEAST,
-		COND_POINTS_AT_LEAST, COND_UNLOCKED, COND_ALL_OF, COND_ANY_OF, COND_NOT]
+		COND_POINTS_AT_LEAST, COND_UNLOCKED, COND_ALL_OF, COND_ANY_OF, COND_NOT, COND_TOTAL_AT_LEAST,
+		COND_UNLOCK_COUNT_AT_LEAST, COND_DIFFICULTY_AT_LEAST]
 
 const SCOPE_RUN := &"run"
 const SCOPE_HERO := &"hero"
 ## The per-hero stats a "hero" scope reads (the keys of a RunReport hero entry).
 const HERO_STATS: Array[StringName] = [&"damage", &"healing", &"absorbed", &"taken", &"kills", &"bosses",
-		&"revives", &"downs", &"need_wins"]
+		&"revives", &"downs", &"need_wins", &"capstones", &"rank5", &"sets_active"]
 
 ## Counters [method update_counters] keeps, besides "total:<stat>" and "best:<stat>".
 const COUNTER_RUNS := &"runs"
 const COUNTER_WINS := &"wins"
+## Runs that reached wave [constant LONG_RUN_WAVE] (a run abandoned in its first fight is not worth counting).
+const COUNTER_RUNS_LONG := &"runs_long"
+const LONG_RUN_WAVE := 3
+## The win counters stop here (design: "cap the stored wins counters at 9999").
+const WIN_COUNTER_CAP := 9999
 ## Prefixes of the counters.
 const COUNTER_TOTAL := "total:"
 const COUNTER_BEST := "best:"
+const COUNTER_ENV_WINS := "env_wins:"
 
 ## Conditions of content packages: kind -> Callable(condition: Dictionary, profile: Profile, report: RunReport,
 ## defs: Array[AchievementData]) -> bool.
@@ -83,24 +99,41 @@ static func unregister_condition(kind: StringName) -> void:
 
 # --- The run's bookkeeping ----------------------------------------------------------------------
 
-## Updates the counters of [param profile] with a finished run: "runs" (+1), "wins" (+1 on a victory), "runs:<class>"
-## and "wins:<class>" (+1 per class in the party, once even when two heroes share it), "total:<stat>" (+ the run's
-## value, rounded) and "best:<stat>" (the highest run value) for every stat of the report that is not 0.
+## Updates the counters of [param profile] with a finished run: "runs" (+1), "runs_long" (+1 when it reached wave
+## [constant LONG_RUN_WAVE]), "wins" (+1 on a win: [method RunReport.won]), "runs:<class>" and "wins:<class>" (+1 per
+## class in the party, once even when two heroes share it), "wins:<class>:<tier>" (a win counts on its difficulty tier AND
+## every lower one, so "Pungent" means Pungent or higher), "env_wins:<environment>", "total:<stat>" (+ the run's value,
+## rounded) and "best:<stat>" (the highest run value) for every stat of the report that is not 0. Marks the report
+## as counted ([member RunReport.counted]).
 static func update_counters(profile: Profile, report: RunReport) -> void:
 	if profile == null or report == null:
 		return
+	report.counted = true
 	profile.add_counter(COUNTER_RUNS, 1)
-	if report.victory:
-		profile.add_counter(COUNTER_WINS, 1)
+	if report.stat(&"wave") >= LONG_RUN_WAVE:
+		profile.add_counter(COUNTER_RUNS_LONG, 1)
+	var won := report.won()
+	if won:
+		_add_win(profile, COUNTER_WINS)
+		if report.environment != &"":
+			_add_win(profile, StringName(COUNTER_ENV_WINS + String(report.environment)))
+	var tiers := Difficulty.ids()
+	var top_tier := maxi(Difficulty.tier_index(report.difficulty), 0)
 	for id in report.classes_played():
 		profile.add_counter(StringName("%s:%s" % [COUNTER_RUNS, id]), 1)
-		if report.victory:
-			profile.add_counter(StringName("%s:%s" % [COUNTER_WINS, id]), 1)
+		if won:
+			_add_win(profile, StringName("%s:%s" % [COUNTER_WINS, id]))
+			for i in mini(top_tier + 1, tiers.size()):
+				_add_win(profile, StringName("%s:%s:%s" % [COUNTER_WINS, id, tiers[i]]))
 	for id in report.stats:
 		var value := roundi(report.stats[id])
 		if value != 0:  # (a zero changes nothing and would only fill the file)
 			profile.add_counter(StringName(COUNTER_TOTAL + String(id)), value)
 			profile.raise_counter(StringName(COUNTER_BEST + String(id)), value)
+
+
+static func _add_win(profile: Profile, name: StringName) -> void:
+	profile.counters[name] = mini(profile.counter(name) + 1, WIN_COUNTER_CAP)
 
 
 # --- Evaluation ---------------------------------------------------------------------------------
@@ -162,6 +195,18 @@ static func check(condition: Dictionary, profile: Profile, report: RunReport, de
 		COND_UNLOCKED:
 			return profile.has_unlock(StringName(str(condition.get("unlock_kind", ""))),
 					StringName(str(condition.get("id", ""))), StringName(str(condition.get("class_id", ""))))
+		COND_TOTAL_AT_LEAST:
+			var stat := StringName(str(condition.get("stat", "")))
+			var lifetime := profile.counter(StringName(COUNTER_TOTAL + String(stat)))
+			var live := 0 if report.counted else roundi(report.stat(stat))
+			return lifetime + live >= int(condition.get("value", 0))
+		COND_UNLOCK_COUNT_AT_LEAST:
+			var unlock_kind := StringName(str(condition.get("unlock_kind", "")))
+			var owned: Dictionary = profile.unlocks.get(Profile.stored_kind(unlock_kind, StringName(str(condition.get("class_id", "")))), {})
+			return owned.size() >= int(condition.get("count", 0))
+		COND_DIFFICULTY_AT_LEAST:
+			var wanted := Difficulty.tier_index(StringName(str(condition.get("tier", ""))))
+			return wanted >= 0 and Difficulty.tier_index(StringName(str(report.flag(&"difficulty")))) >= wanted
 		COND_ALL_OF:
 			for c: Variant in condition.get("conditions", []):
 				if not (c is Dictionary) or not check(c, profile, report, defs):
@@ -249,6 +294,18 @@ static func validate_condition(condition: Dictionary) -> Array[String]:
 			required = ["value"]
 		COND_UNLOCKED:
 			required = ["unlock_kind", "id"]
+		COND_TOTAL_AT_LEAST:
+			required = ["stat", "value"]
+			if StringName(str(condition.get("stat", ""))) not in RunReport.STAT_IDS:
+				problems.append("%s: unknown run stat '%s'" % [kind, condition.get("stat", "")])
+		COND_UNLOCK_COUNT_AT_LEAST:
+			required = ["unlock_kind", "count"]
+			if StringName(str(condition.get("unlock_kind", ""))) not in Profile.KINDS:
+				problems.append("%s: unknown unlock kind '%s'" % [kind, condition.get("unlock_kind", "")])
+		COND_DIFFICULTY_AT_LEAST:
+			required = ["tier"]
+			if not Difficulty.is_valid(StringName(str(condition.get("tier", "")))):
+				problems.append("%s: unknown difficulty '%s'" % [kind, condition.get("tier", "")])
 		COND_ALL_OF, COND_ANY_OF:
 			required = ["conditions"]
 			var list: Variant = condition.get("conditions", [])

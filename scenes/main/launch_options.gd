@@ -55,6 +55,10 @@ extends RefCounted
 ##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
 ##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
 ##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
+##   --difficulty=ID      M9: the run's difficulty tier – normal (default), pungent or tear_jerker (an id of
+##                        Db.difficulties; RunState.difficulty). A human session's lobby selector overrides it and is
+##                        capped by the heroes' unlocked tiers; an automated run (dev profile) plays any tier. An unknown
+##                        id is an unknown argument (a smoke run reports "bad_args")
 ##   --profile=KIND       M9: the meta profile (Meta.configure): dev (everything unlocked, no raw-power bonus, nothing
 ##                        saved – the default of every automated run), fresh (a new player) or max (every class at
 ##                        the top level, everything unlocked). Without --profile-path nothing is read or written
@@ -131,6 +135,8 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
+## The difficulty tier of --difficulty (a Difficulty id; the lobby's selector changes it for the next run).
+var difficulty: StringName = &"normal"
 ## The meta profile of --profile (Meta.PROFILE_KINDS; &"" = the default of the session) and the file of
 ## --profile-path ("" = none).
 var profile_kind: StringName = &""
@@ -247,6 +253,11 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 			"--leaderboard":
 				if value != "":
 					o.leaderboard_path = value
+				else:
+					o.unknown.append(arg)
+			"--difficulty":
+				if Db.difficulties.has(StringName(value)):
+					o.difficulty = StringName(value)
 				else:
 					o.unknown.append(arg)
 			"--profile":

@@ -240,7 +240,8 @@ static func spawn_rate(p_wave: int, coop_mult: float = 1.0) -> float:
 ## it on a boss wave).
 func spawn_budget_per_second() -> float:
 	var rate := spawn_rate(wave, RunState.coop_count_mult())
-	return rate * BOSS_ADD_RATE_MULT if boss_data != null else rate
+	# M9: the tier's density and the wave's pressure scale a normal wave; a boss wave's adds keep their rate.
+	return rate * BOSS_ADD_RATE_MULT if boss_data != null else rate * Difficulty.spawn_mult()
 
 
 ## Enemy types that may appear at [param p_wave] (first_wave <= p_wave, positive weight),

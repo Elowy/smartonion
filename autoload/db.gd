@@ -32,6 +32,13 @@ const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"bloo
 const UNLOCK_DIR := "res://data/unlocks/"
 ## data/achievements/<id>.tres (AchievementData, M9).
 const ACHIEVEMENT_DIR := "res://data/achievements/"
+## data/difficulties/<id>.tres (DifficultyData, M9: Normal, Pungent, Tear-Jerker) and data/pressure/<id>.tres
+## (PressureData, M9: the Tear-Jerker wave modifiers).
+const DIFFICULTY_DIR := "res://data/difficulties/"
+const PRESSURE_DIR := "res://data/pressure/"
+## Rotation order of the pressure modifiers (the pick draws over this order); any extra one is appended alphabetically.
+const PRESSURE_ORDER: Array[StringName] = [&"prs_salt_rain", &"prs_hardened_peel", &"prs_paring_knives",
+		&"prs_wilting_heat", &"prs_weeping_fog", &"prs_bitter_harvest"]
 ## Lobby order of the classes; any extra class is appended alphabetically. An id without a
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
@@ -73,6 +80,12 @@ var class_ids: Array[StringName] = []
 var unlock_gates: Dictionary[StringName, UnlockGateData] = {}
 ## Every achievement (M9), by id, in file order.
 var achievements: Dictionary[StringName, AchievementData] = {}
+## Every difficulty tier (M9), by id, and the ids in tier order (Normal first).
+var difficulties: Dictionary[StringName, DifficultyData] = {}
+var difficulty_ids: Array[StringName] = []
+## Every Tear-Jerker pressure modifier (M9), by id, and the ids in PRESSURE_ORDER (extras alphabetically).
+var pressures: Dictionary[StringName, PressureData] = {}
+var pressure_ids: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -172,6 +185,30 @@ func reload() -> void:
 				push_error("Db: duplicate achievement id %s" % res.id)
 			else:
 				achievements[res.id] = res
+	difficulties.clear()
+	for res in _load_dir(DIFFICULTY_DIR):
+		if res is DifficultyData:
+			difficulties[res.id] = res
+	difficulty_ids.clear()
+	difficulty_ids.append_array(difficulties.keys())
+	difficulty_ids.sort_custom(func(a: StringName, b: StringName) -> bool:
+		var ta := difficulties[a].tier
+		var tb := difficulties[b].tier
+		return ta < tb or (ta == tb and String(a) < String(b)))
+	pressures.clear()
+	for res in _load_dir(PRESSURE_DIR):
+		if res is PressureData:
+			pressures[res.id] = res
+	pressure_ids.clear()
+	for id in PRESSURE_ORDER:
+		if pressures.has(id):
+			pressure_ids.append(id)
+	var extra_pressures: Array[StringName] = []
+	for id in pressures:
+		if id not in pressure_ids:
+			extra_pressures.append(id)
+	extra_pressures.sort()
+	pressure_ids.append_array(extra_pressures)
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -398,6 +435,16 @@ func remove_unlock_gate(kind: StringName, id: StringName) -> void:
 
 func get_achievement(id: StringName) -> AchievementData:
 	return achievements.get(id)
+
+
+## The difficulty tier [param id] (null = unknown).
+func get_difficulty(id: StringName) -> DifficultyData:
+	return difficulties.get(id)
+
+
+## The pressure modifier [param id] (null = unknown).
+func get_pressure(id: StringName) -> PressureData:
+	return pressures.get(id)
 
 
 ## Every achievement in file order.

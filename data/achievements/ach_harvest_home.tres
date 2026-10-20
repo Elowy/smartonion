@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_harvest_home"
+display_name = "Harvest Home"
+description = "Win a run: defeat the final boss."
+points = 15
+condition_kind = &"run_flag"
+condition_params = {
+"flag": "final_boss_down"
+}
+rewards = Array[Dictionary]([{
+"kind": "title",
+"id": "title_harvester",
+"name": "the Harvester"
+}, {
+"kind": "heirloom",
+"id": "heir_harvest_signet",
+"name": "Signet of the First Harvest"
+}])

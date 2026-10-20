@@ -279,12 +279,12 @@ static func _product(field: StringName) -> float:
 
 ## Gold of a pickup.
 static func gold_mult() -> float:
-	return _product(&"gold_pct")
+	return _product(&"gold_pct") * Pressure.gold_mult()  # (M9: the wave's Tear-Jerker pressure rides on the same pickups)
 
 
 ## XP of a pickup (RunState.scale_xp).
 static func xp_mult() -> float:
-	return _product(&"xp_pct")
+	return _product(&"xp_pct") * Pressure.xp_mult()
 
 
 ## Contact and projectile damage of an enemy that spawns now.

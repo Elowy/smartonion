@@ -1,15 +1,18 @@
 class_name Leaderboard
 extends RefCounted
-## The local leaderboard (GDD 16.1, M6b MODES): per category – (mode, hardcore, party size) – the best
+## The local leaderboard (GDD 16.1, M6b MODES): per category – (mode, hardcore, party size, difficulty) – the best
 ## MAX_ENTRIES runs, kept in a small versioned JSON file (user://leaderboard.json). This class is the
 ## pure data model plus the file IO; the end screen's texts and model are [method screen_model] and the
 ## text helpers under "The end screen's board".
 ##
-## File format (FORMAT_VERSION 1):
-##   {"version": 1, "categories": {"normal/standard/2": [entry, ...], "endless/hardcore/4": [...]}}
+## File format (FORMAT_VERSION 2; a version 1 file is migrated on load, see [method migrate]):
+##   {"version": 2, "categories": {"normal/standard/2": [entry, ...], "endless/hardcore/4/pungent": [...]}}
+## The difficulty (M9) is the key's last segment: a Normal run keeps the plain "mode/standard|hardcore/party" key,
+## Pungent and Tear-Jerker append "/pungent" / "/tear_jerker" (so a Normal board never moved).
 ## An entry: {"wave": int (the wave reached: the last wave cleared on a victory, the wave that ended
 ## the run on a defeat), "time": float (seconds of wave play, RunState.run_time), "classes": [class
-## ids in slot order], "date": "YYYY-MM-DD HH:MM:SS", "victory": bool}. Entries of a category are
+## ids in slot order], "date": "YYYY-MM-DD HH:MM:SS", "victory": bool, "difficulty": the tier id (version 2;
+## "normal" when missing)}. Entries of a category are
 ## kept best first ([method better]). A normal run ranks victories by the shortest time, and defeats by the
 ## highest wave, then by the LONGEST time (the longer the party held out on its last wave, the better). An
 ## endless run ranks every entry by the highest wave, then by the longest time.
@@ -27,7 +30,7 @@ extends RefCounted
 ##   smoke / demo / screenshot runs ([method Main.writes_leaderboard]). A test that wants to exercise
 ##   it sets [member path_override] to a temp path and [member writes_enabled] to true, and restores both.
 
-const FORMAT_VERSION := 1
+const FORMAT_VERSION := 2
 const DEFAULT_PATH := "user://leaderboard.json"
 const MAX_ENTRIES := 10
 const PARTY_MIN := 1
@@ -61,11 +64,22 @@ static func default_path() -> String:
 	return path_override if path_override != "" else DEFAULT_PATH
 
 
-## The category of a run: "normal/standard/2", "endless/hardcore/4" (party size clamped to 1..4,
-## an unknown mode counts as normal).
-static func category_key(p_mode: StringName, p_hardcore: bool, p_party: int) -> String:
+## The category of a run: "normal/standard/2", "endless/hardcore/4", "normal/standard/1/pungent" (party size clamped
+## to 1..4, an unknown mode counts as normal, an unknown or Normal difficulty adds nothing).
+static func category_key(p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> String:
 	var mode := p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
-	return "%s/%s/%d" % [mode, "hardcore" if p_hardcore else "standard", clampi(p_party, PARTY_MIN, PARTY_MAX)]
+	var key := "%s/%s/%d" % [mode, "hardcore" if p_hardcore else "standard", clampi(p_party, PARTY_MIN, PARTY_MAX)]
+	if p_difficulty != Difficulty.NORMAL and Difficulty.is_valid(p_difficulty):
+		key += "/" + String(p_difficulty)
+	return key
+
+
+## The difficulty a [method category_key] belongs to (Normal for a key without the last segment).
+static func difficulty_of_key(key: String) -> StringName:
+	var parts := key.split("/")
+	if parts.size() > 3 and Difficulty.is_valid(StringName(parts[3])):
+		return StringName(parts[3])
+	return Difficulty.NORMAL
 
 
 ## The mode a [method category_key] belongs to.
@@ -75,7 +89,8 @@ static func mode_of_key(key: String) -> StringName:
 
 
 ## A well-formed entry. [param p_date] "" = now (system time).
-static func make_entry(p_wave: int, p_time: float, p_classes: Array, p_victory: bool, p_date: String = "") -> Dictionary:
+static func make_entry(p_wave: int, p_time: float, p_classes: Array, p_victory: bool, p_date: String = "",
+		p_difficulty: StringName = Difficulty.NORMAL) -> Dictionary:
 	var classes: Array[String] = []
 	for c in p_classes:
 		classes.append(String(c))
@@ -85,6 +100,7 @@ static func make_entry(p_wave: int, p_time: float, p_classes: Array, p_victory: 
 		"classes": classes,
 		"date": p_date if p_date != "" else Time.get_datetime_string_from_system(false, true),
 		"victory": p_victory,
+		"difficulty": String(p_difficulty),
 	}
 
 
@@ -115,23 +131,23 @@ static func better(a: Dictionary, b: Dictionary, p_mode: StringName) -> bool:
 # --- Reading ----------------------------------------------------------------------------------
 
 ## The entries of a category, best first (a copy; empty = none yet).
-func entries_for(p_mode: StringName, p_hardcore: bool, p_party: int) -> Array[Dictionary]:
+func entries_for(p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for e: Dictionary in categories.get(category_key(p_mode, p_hardcore, p_party), []):
+	for e: Dictionary in categories.get(category_key(p_mode, p_hardcore, p_party, p_difficulty), []):
 		out.append(e.duplicate(true))
 	return out
 
 
 ## The best entry of a category ({} = none yet).
-func best_for(p_mode: StringName, p_hardcore: bool, p_party: int) -> Dictionary:
-	var list := entries_for(p_mode, p_hardcore, p_party)
+func best_for(p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> Dictionary:
+	var list := entries_for(p_mode, p_hardcore, p_party, p_difficulty)
 	return list[0] if not list.is_empty() else {}
 
 
 ## Where [param entry] would land in its category (0 = best), -1 when it would not make the top
 ## MAX_ENTRIES. Changes nothing.
-func rank_of(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> int:
-	var list: Array = categories.get(category_key(p_mode, p_hardcore, p_party), [])
+func rank_of(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> int:
+	var list: Array = categories.get(category_key(p_mode, p_hardcore, p_party, p_difficulty), [])
 	var at := list.size()
 	for i in list.size():
 		if better(entry, list[i], p_mode):
@@ -144,11 +160,11 @@ func rank_of(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: i
 
 ## Adds [param entry] to its category (best first, the list cut to MAX_ENTRIES). Returns its rank
 ## (0 = the new best), -1 when it did not make the board (then nothing changed). Does not save.
-func add_entry(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> int:
-	var at := rank_of(entry, p_mode, p_hardcore, p_party)
+func add_entry(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> int:
+	var at := rank_of(entry, p_mode, p_hardcore, p_party, p_difficulty)
 	if at < 0:
 		return -1
-	var key := category_key(p_mode, p_hardcore, p_party)
+	var key := category_key(p_mode, p_hardcore, p_party, p_difficulty)
 	var list: Array = categories.get(key, [])
 	list.insert(at, entry.duplicate(true))
 	while list.size() > MAX_ENTRIES:
@@ -184,6 +200,7 @@ func load_file() -> Error:
 		read_only = true
 		load_error = "newer version"
 		return OK
+	data = migrate(data)
 	if not (data.get("categories", {}) is Dictionary):
 		_set_corrupt()
 		return ERR_PARSE_ERROR
@@ -215,7 +232,7 @@ func save_file() -> Error:
 ## -1 when it did not make the top MAX_ENTRIES or nothing was written ([member writes_enabled] is false, or the
 ## board is [member read_only]: a newer version, or a file that cannot be read). "save_failed" is true only when
 ## the entry made the board but the file could not be written: then "rank" is -1 too and the file is as it was.
-static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int) -> Dictionary:
+static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> Dictionary:
 	var outcome := {"rank": -1, "save_failed": false}
 	if not writes_enabled:
 		return outcome
@@ -223,7 +240,7 @@ static func record_run(entry: Dictionary, p_mode: StringName, p_hardcore: bool, 
 	board.load_file()
 	if board.read_only:
 		return outcome
-	var rank := board.add_entry(entry, p_mode, p_hardcore, p_party)
+	var rank := board.add_entry(entry, p_mode, p_hardcore, p_party, p_difficulty)
 	if rank < 0:
 		return outcome
 	if board.save_file() != OK:
@@ -268,9 +285,12 @@ static func party_size_text(p_party: int) -> String:
 	return "%d player%s" % [n, "" if n == 1 else "s"]
 
 
-## The title of a category: "Endless · Hardcore · 4 players".
-static func category_text(p_mode: StringName, p_hardcore: bool, p_party: int) -> String:
-	return "%s · %s" % [RunState.mode_text(p_mode, p_hardcore), party_size_text(p_party)]
+## The title of a category: "Endless · Hardcore · 4 players", "Normal · 2 players · Pungent" (Normal adds nothing).
+static func category_text(p_mode: StringName, p_hardcore: bool, p_party: int, p_difficulty: StringName = Difficulty.NORMAL) -> String:
+	var text := "%s · %s" % [RunState.mode_text(p_mode, p_hardcore), party_size_text(p_party)]
+	if p_difficulty != Difficulty.NORMAL and Difficulty.is_valid(p_difficulty):
+		text += " · " + Difficulty.name_of(p_difficulty)
+	return text
 
 
 ## One row of the board: {"rank": "1", "result", "time", "party", "date"} (the end screen's table cells).
@@ -296,15 +316,15 @@ static func best_line(p_best: Dictionary, p_mode: StringName, p_rank: int = -1) 
 	return line
 
 
-## What the end screen shows of the board after a run: {"mode", "hardcore", "party", "key" (the category),
+## What the end screen shows of the board after a run: {"mode", "hardcore", "party", "difficulty", "key" (the category),
 ## "category_text", "entries" (the category on [param board], best first), "rank" (the run's place in
 ## them, -1 = not on the board: it was not written or missed the top 10), "entry" (the run's own entry),
 ## "best" ({} = none yet), "line" (the "Best: ..." text), "error" ("" or why the file was not used),
 ## "save_failed" (the entry made the board but the file could not be written: see [method record_run])}.
 ## [param board] is the board read after the run was recorded ([method load_file]).
 static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringName, p_hardcore: bool,
-		p_party: int, p_rank: int, p_save_failed: bool = false) -> Dictionary:
-	var entries := board.entries_for(p_mode, p_hardcore, p_party)
+		p_party: int, p_rank: int, p_save_failed: bool = false, p_difficulty: StringName = Difficulty.NORMAL) -> Dictionary:
+	var entries := board.entries_for(p_mode, p_hardcore, p_party, p_difficulty)
 	var best: Dictionary = entries[0] if not entries.is_empty() else {}
 	var rank := p_rank if p_rank >= 0 and p_rank < entries.size() and not p_save_failed else -1
 	var line := best_line(best, p_mode, rank)
@@ -314,8 +334,9 @@ static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringNa
 		"mode": p_mode,
 		"hardcore": p_hardcore,
 		"party": clampi(p_party, PARTY_MIN, PARTY_MAX),
-		"key": category_key(p_mode, p_hardcore, p_party),
-		"category_text": category_text(p_mode, p_hardcore, p_party),
+		"difficulty": p_difficulty,
+		"key": category_key(p_mode, p_hardcore, p_party, p_difficulty),
+		"category_text": category_text(p_mode, p_hardcore, p_party, p_difficulty),
 		"entries": entries,
 		"rank": rank,
 		"entry": entry,
@@ -324,6 +345,42 @@ static func screen_model(board: Leaderboard, entry: Dictionary, p_mode: StringNa
 		"error": board.load_error,
 		"save_failed": p_save_failed,
 	}
+
+
+# --- Versions ---------------------------------------------------------------------------------
+
+## [param data] (a parsed file) brought up to [param target] (the current format): each step of [method _migration_steps]
+## turns version n into n + 1. A copy; a version above [param target] is left as it is. [param steps] replaces the table
+## (tests).
+static func migrate(data: Dictionary, target: int = FORMAT_VERSION, steps: Dictionary = {}) -> Dictionary:
+	var table: Dictionary = steps if not steps.is_empty() else _migration_steps()
+	var out: Dictionary = data.duplicate(true)
+	var version := int(out.get("version", 0))
+	while version < target:
+		if table.has(version):
+			var step: Callable = table[version]
+			out = step.call(out)
+		version += 1
+		out["version"] = version
+	return out
+
+
+## {from version: Callable(Dictionary) -> Dictionary}. 1 -> 2 (M9): the difficulty arrived; every entry of a version 1
+## file was a Normal run, so the plain keys stay as they are and each entry gets "difficulty": "normal".
+static func _migration_steps() -> Dictionary:
+	return {1: _migrate_1_to_2}
+
+
+static func _migrate_1_to_2(data: Dictionary) -> Dictionary:
+	var categories_in: Variant = data.get("categories", {})
+	if categories_in is Dictionary:
+		for key: Variant in categories_in:
+			var list: Variant = categories_in[key]
+			if list is Array:
+				for e: Variant in list:
+					if e is Dictionary and not (e as Dictionary).has("difficulty"):
+						(e as Dictionary)["difficulty"] = String(Difficulty.NORMAL)
+	return data
 
 
 # --- Internals --------------------------------------------------------------------------------
@@ -397,4 +454,5 @@ static func _clean_entry(e: Dictionary) -> Dictionary:
 		"classes": classes,
 		"date": String(e.get("date", "")),
 		"victory": bool(e.get("victory", false)),
+		"difficulty": String(e.get("difficulty", Difficulty.NORMAL)),
 	}

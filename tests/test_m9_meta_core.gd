@@ -35,6 +35,7 @@ func before_each() -> void:
 	_saved_listeners = Meta._listeners.duplicate()
 	_saved_gates = Db.unlock_gates.duplicate()
 	_saved_achievements = Db.achievements.duplicate()
+	Db.achievements = {}  # (these tests run the mechanisms on fake data; the real 40 are tested in test_m9_achievements)
 	Meta.save_count = 0
 	Meta._pending_unlocks.clear()
 	UiFakes.reset_players()
@@ -574,7 +575,7 @@ func test_collectibles_are_locked_until_the_profile_owns_them() -> void:
 
 func test_difficulty_tiers_unlock_per_class() -> void:
 	_use_fresh()
-	check_eq(Meta.DIFFICULTY_TIERS, [&"normal", &"pungent", &"tear_jerker"] as Array[StringName], "the three tiers")
+	check_eq(Difficulty.ids(), [&"normal", &"pungent", &"tear_jerker"] as Array[StringName], "the three tiers (data/difficulties)")
 	check(Meta.is_difficulty_unlocked(&"normal", &"warrior"), "Normal is always open")
 	check(not Meta.is_difficulty_unlocked(&"pungent", &"warrior"), "Pungent is locked")
 	check(not Meta.is_unlocked(Profile.KIND_DIFFICULTY, &"pungent", &"warrior"), "through the generic check too")
