@@ -1041,6 +1041,80 @@ func test_the_run_report_collects_what_the_run_kept() -> void:
 	check(r.to_dict().has("stats") and r.to_dict()["party"].size() == 2, "to_dict")
 
 
+func test_a_hero_who_left_mid_run_stays_in_the_run_report() -> void:
+	RunState.start_run(2, 5)
+	PlayerManager.add_bot(&"warrior", 1)
+	PlayerManager.add_bot(&"mage", 2)
+	RunState.record_down(1)
+	RunState.record_revive(0)
+	RunState.kills_by_player[1] = 40
+	RunState.kills_by_player[0] = 10
+	RunState.damage_by_player[0] = 500.0
+	RunState.damage_by_player[1] = 250.0
+	RunState.healing_by_player[1] = 30.0
+	RunState.absorbed_by_player[1] = 20.0
+	RunState.damage_taken_by_player[1] = 90.0
+	RunState.need_wins_by_player[1] = 2
+	var snapshot := RunReport.hero_entry(PlayerManager.get_slot(1))
+	PlayerManager.leave(1)  # (Main.drop_player: "Continue without P2")
+	var extras := {"classes": [&"warrior", &"mage"], "wave": 25, "waves_cleared": 25, "departed_heroes": [snapshot]}
+	var r := RunReport.collect(true, false, extras)
+	check_eq(r.stat(&"downs"), 1.0, "the dropped hero's down counts")
+	check_eq(r.flag(&"no_downs"), false, "so this is no 'no downs' win")
+	check_eq(r.stat(&"revives"), 1.0, "revives")
+	check_eq(r.stat(&"damage"), 750.0, "damage of both")
+	check_eq(r.stat(&"healing"), 30.0, "healing")
+	check_eq(r.stat(&"absorbed"), 20.0, "absorbed")
+	check_eq(r.stat(&"damage_taken"), 90.0, "damage taken")
+	check_eq(r.stat(&"need_wins"), 2.0, "need wins")
+	check_eq(r.stat(&"party_size"), 2.0, "the party was two")
+	check_eq(r.heroes.size(), 2, "both heroes are in the report")
+	check_eq(int(r.heroes[0]["slot"]), 0, "in slot order")
+	check_eq(r.heroes[1]["class_id"], "mage", "the dropped hero's class")
+	check_eq(int(r.heroes[1]["kills"]), 40, "the dropped hero's kills")
+	check_eq(int(r.heroes[1]["downs"]), 1, "the dropped hero's downs")
+	# Numbers that tick on after the hero left are read again at the report.
+	RunState.kills_by_player[1] = 41
+	check_eq(int(RunReport.collect(true, false, extras).heroes[1]["kills"]), 41, "the counters are current")
+	# The class still gets its share of the Class XP (the 0.03-per-kill term).
+	var p := Profile.fresh()
+	var mage_run := ClassLevels.run_xp(r, p).filter(func(e: Dictionary) -> bool: return e["class_id"] == &"mage")
+	check_eq(mage_run.size(), 1, "the mage is paid")
+	check_eq(int(mage_run[0]["kills"]), 40, "with the dropped hero's kills")
+	var without := RunReport.collect(true, false, {"classes": [&"warrior", &"mage"], "wave": 25, "waves_cleared": 25})
+	check_eq(without.stat(&"downs"), 1.0, "the run-wide numbers do not need the snapshot")
+	check_eq(without.heroes.size(), 1, "(only the per-hero entry does)")
+	# The last hero drops: the abandoned run still has its heroes.
+	var first := RunReport.hero_entry(PlayerManager.get_slot(0))
+	PlayerManager.leave(0)
+	var abandoned := RunReport.collect(false, true, {"classes": [&"warrior", &"mage"], "waves_cleared": 3,
+			"departed_heroes": [snapshot, first]})
+	check_eq(abandoned.heroes.size(), 2, "nobody left, two heroes in the report")
+	check_eq(abandoned.stat(&"downs"), 1.0, "downs")
+	check_eq(abandoned.stat(&"party_size"), 2.0, "party size")
+
+
+func test_main_drop_player_snapshots_the_hero_for_the_run_report() -> void:
+	_run_with_bots(2)
+	RunState.record_down(1)
+	RunState.kills_by_player[1] = 12
+	var slot := PlayerManager.get_slot(1)
+	var class_id := String(slot.class_data.id)
+	check(main.departed_heroes.is_empty(), "nobody has left")
+	main.drop_player(slot)
+	check_eq(main.departed_heroes.size(), 1, "the dropped hero is kept")
+	check_eq(int(main.departed_heroes[0]["slot"]), 1, "slot")
+	check_eq(main.departed_heroes[0]["class_id"], class_id, "class")
+	check(not (main.departed_heroes[0]["equipped"] as Array).is_empty(), "with what it wore (taken before the hero was freed)")
+	var r := RunReport.collect(true, false, main._report_extras())
+	check_eq(r.stat(&"downs"), 1.0, "a down of the dropped hero")
+	check_eq(r.flag(&"no_downs"), false, "no Untouched for this run")
+	check_eq(r.heroes.size(), 2, "two hero entries")
+	check_eq(int(r.heroes_of(StringName(class_id))[0]["kills"]), 12, "the kills of the dropped hero")
+	main.start_run()
+	check(main.departed_heroes.is_empty(), "a new run starts clean")
+
+
 # --- Achievements -------------------------------------------------------------------------------
 
 func test_achievement_conditions() -> void:

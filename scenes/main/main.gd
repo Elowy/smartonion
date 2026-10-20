@@ -158,6 +158,9 @@ var run_achievements: Array[StringName] = []
 ## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
 ## player who left mid-run (drop_player), the slots no longer have them.
 var run_classes: Array[StringName] = []
+## The RunReport hero entries of the players who left mid-run (drop_player takes them before the hero goes): the run
+## report counts them as heroes of the run (their downs, kills ... and the Class XP of their class).
+var departed_heroes: Array[Dictionary] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
@@ -367,6 +370,7 @@ func start_run() -> void:
 	_pressure_log.clear()
 	artifact_lines.clear()
 	run_classes.clear()
+	departed_heroes.clear()
 	for slot in slots:
 		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
@@ -825,6 +829,7 @@ func _report_extras() -> Dictionary:
 		"wave": wave, "waves_cleared": waves_completed, "classes": run_classes, "items_bought": items_bought,
 		"items_looted": items_looted, "loot_rolls": loot_rolls, "level_cards": level_cards,
 		"ranks_trained": ranks_trained, "shop_rerolls": shop_rerolls, "difficulty": RunState.difficulty,
+		"departed_heroes": departed_heroes,
 	}
 
 
@@ -885,6 +890,8 @@ func drop_player(slot: PlayerSlot) -> void:
 	if slot == null or PlayerManager.get_slot(slot.index) != slot:
 		return
 	_disconnected.erase(slot.index)
+	if arena != null and RunState.active:
+		departed_heroes.append(RunReport.hero_entry(slot))  # (the run report keeps the hero who left)
 	for p in players.duplicate():
 		if not is_instance_valid(p) or p.slot == slot:
 			players.erase(p)

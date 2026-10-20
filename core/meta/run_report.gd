@@ -12,7 +12,7 @@ extends RefCounted
 ##   party                   - the class ids as the run started, in slot order (duplicates when two heroes share one)
 ##   wave / waves_cleared    - the wave the run ended on / waves cleared this run
 ##   stats                   - run-wide numbers, see [method collect] for the list (stat id -> float)
-##   heroes                  - per hero still in the run: {"slot", "class_id", "alive", "damage", "healing", "absorbed",
+##   heroes                  - per hero of the run (one who left mid-run included, see [method hero_entry]): {"slot", "class_id", "alive", "damage", "healing", "absorbed",
 ##                             "taken", "kills", "bosses", "revives", "downs", "need_wins", "capstones" (capstone talents
 ##                             taken), "rank5" (abilities at Rank V), "sets_active" (set bonuses active), "companion",
 ##                             "equipped": [item summaries: {"source_id", "slot_type", "equip_slot", "armor_type",
@@ -75,8 +75,10 @@ static func make(p_party: Array[StringName], p_victory: bool, p_stats: Dictionar
 
 ## The report of the run that just ended, from RunState and the joined slots. [param p_extras] carries what Main
 ## counts itself: "wave", "waves_cleared", "classes" (the party as the run started), "items_bought", "items_looted",
-## "loot_rolls", "level_cards", "ranks_trained", "shop_rerolls", "difficulty". Draws no random number and changes
-## nothing.
+## "loot_rolls", "level_cards", "ranks_trained", "shop_rerolls", "difficulty", "departed_heroes" (the [method hero_entry]
+## snapshots of the heroes who left mid-run: their slots are gone, but they stay in [member heroes]). The run-wide
+## totals (downs, revives, damage, healing, absorbed, damage taken, need wins) count every hero of the run, a departed
+## one too (RunState keeps the per-player numbers until the next run). Draws no random number and changes nothing.
 static func collect(p_victory: bool, p_abandoned: bool, p_extras: Dictionary = {}) -> RunReport:
 	var r := RunReport.new()
 	r.victory = p_victory
@@ -93,25 +95,18 @@ static func collect(p_victory: bool, p_abandoned: bool, p_extras: Dictionary = {
 	r.wave = int(p_extras.get("wave", RunState.wave))
 	r.waves_cleared = int(p_extras.get("waves_cleared", 0))
 	var slots := PlayerManager.get_slots()
-	var downs := 0
-	var revives := 0
-	var damage := 0.0
-	var healing := 0.0
-	var absorbed := 0.0
-	var taken := 0.0
-	var need_wins := 0
 	var legendaries := 0
 	for slot in slots:
-		var hero := _hero_entry(slot)
-		r.heroes.append(hero)
-		downs += int(hero["downs"])
-		revives += int(hero["revives"])
-		damage += float(hero["damage"])
-		healing += float(hero["healing"])
-		absorbed += float(hero["absorbed"])
-		taken += float(hero["taken"])
-		need_wins += int(hero["need_wins"])
+		r.heroes.append(hero_entry(slot))
 		legendaries += _legendaries_held(slot)
+	_add_departed(r, p_extras.get("departed_heroes", []), slots)
+	var downs := int(_total(RunState.downs_by_player))
+	var revives := int(_total(RunState.revives_by_player))
+	var damage := _total(RunState.damage_by_player)
+	var healing := _total(RunState.healing_by_player)
+	var absorbed := _total(RunState.absorbed_by_player)
+	var taken := _total(RunState.damage_taken_by_player)
+	var need_wins := int(_total(RunState.need_wins_by_player))
 	if r.party.is_empty():
 		for slot in slots:
 			r.party.append(slot.class_data.id if slot.class_data != null else &"")
@@ -252,8 +247,9 @@ func _build_flags() -> void:
 	}
 
 
-## The hero entry of [param slot] (see the class doc).
-static func _hero_entry(slot: PlayerSlot) -> Dictionary:
+## The hero entry of [param slot] (see the class doc). Main takes one of a hero who is about to leave the run
+## (before the hero is freed), so the report still has the hero: [method collect]'s "departed_heroes".
+static func hero_entry(slot: PlayerSlot) -> Dictionary:
 	var i := slot.index
 	var alive := true
 	if RunState.hero_results.has(i):
@@ -262,10 +258,23 @@ static func _hero_entry(slot: PlayerSlot) -> Dictionary:
 		var hero := slot.player as Player
 		if hero != null and is_instance_valid(hero):
 			alive = hero.is_alive()
-	return {
+	var entry := {
 		"slot": i,
 		"class_id": String(slot.class_data.id) if slot.class_data != null else "",
 		"alive": alive,
+		"capstones": _capstones_taken(slot),
+		"rank5": _rank5_abilities(slot),
+		"sets_active": _sets_active(slot),
+		"companion": String(slot.companion_id()),
+		"equipped": _equipped_summaries(slot),
+	}
+	entry.merge(_counters(i))
+	return entry
+
+
+## RunState's per-player numbers of the hero in slot [param i] (the number fields of a hero entry).
+static func _counters(i: int) -> Dictionary:
+	return {
 		"damage": float(RunState.damage_by_player.get(i, 0.0)),
 		"healing": float(RunState.healing_by_player.get(i, 0.0)),
 		"absorbed": float(RunState.absorbed_by_player.get(i, 0.0)),
@@ -275,12 +284,36 @@ static func _hero_entry(slot: PlayerSlot) -> Dictionary:
 		"revives": int(RunState.revives_by_player.get(i, 0)),
 		"downs": int(RunState.downs_by_player.get(i, 0)),
 		"need_wins": int(RunState.need_wins_by_player.get(i, 0)),
-		"capstones": _capstones_taken(slot),
-		"rank5": _rank5_abilities(slot),
-		"sets_active": _sets_active(slot),
-		"companion": String(slot.companion_id()),
-		"equipped": _equipped_summaries(slot),
 	}
+
+
+## The sum of the numbers in a RunState per-player dictionary (every hero of the run, one who left included).
+static func _total(per_player: Dictionary) -> float:
+	var sum := 0.0
+	for value: Variant in per_player.values():
+		sum += float(value)
+	return sum
+
+
+## Adds the snapshots of the heroes who left mid-run to [param r].heroes (slot order). Their numbers are read again
+## from RunState (a totem or a burn of theirs may still score after they left); a slot that is back in the party is
+## the party's entry already.
+static func _add_departed(r: RunReport, departed: Variant, slots: Array[PlayerSlot]) -> void:
+	if not departed is Array or (departed as Array).is_empty():
+		return
+	var joined: Array[int] = []
+	for slot in slots:
+		joined.append(slot.index)
+	for snapshot: Variant in departed:
+		if not snapshot is Dictionary:
+			continue
+		var entry: Dictionary = (snapshot as Dictionary).duplicate(true)
+		var i := int(entry.get("slot", -1))
+		if i < 0 or i in joined:
+			continue
+		entry.merge(_counters(i), true)
+		r.heroes.append(entry)
+	r.heroes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slot", 0)) < int(b.get("slot", 0)))
 
 
 ## Capstone talents [param slot]'s hero has taken (0 once the hero is gone).
