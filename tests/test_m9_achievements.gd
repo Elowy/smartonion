@@ -481,6 +481,10 @@ func test_the_counters_a_run_leaves() -> void:
 	check_eq(p.counter(&"runs"), 2, "a second run")
 	check_eq(p.counter(&"runs_long"), 1, "a run that never reached wave 3 is not a long one")
 	check_eq(p.counter(&"wins"), 1, "and no win")
+	p.counters[&"wins:mage:normal"] = AchievementEngine.WIN_COUNTER_CAP
+	AchievementEngine.update_counters(p, _win(["mage"]))
+	check_eq(p.counter(&"wins:mage:normal"), 9999, "the win counters stop at 9999")
+	p.counters[&"wins:mage:normal"] = 1
 	var endless_win := _report(false, ["warrior"], {"wave": 31, "boss_wave_down": 25}, {"endless": true})
 	endless_win.difficulty = &"tear_jerker"
 	AchievementEngine.update_counters(p, endless_win)
@@ -515,13 +519,13 @@ func _with_counter(name: StringName, value: int) -> Profile:
 
 func test_texts_of_the_rewards() -> void:
 	check_eq(AchievementTexts.reward_line({"kind": "class", "id": "hunter"}), "Class unlocked: Hunter", "a class")
-	check_eq(AchievementTexts.reward_line({"kind": "legendary", "id": "stormcaller"}), "Legendary unlocked: Stormcaller", "a Legendary")
+	check_eq(AchievementTexts.reward_line({"kind": "legendary", "id": "stormcaller"}), "Legendary: Stormcaller", "a Legendary")
 	check_eq(AchievementTexts.reward_line({"kind": "difficulty", "id": "pungent", "class_id": "mage"}), "Pungent unlocked for the Mage", "a tier")
 	check_eq(AchievementTexts.reward_line({"kind": "title", "id": "title_harvester", "name": "the Harvester"}), "Title: the Harvester", "a title")
 	check_eq(AchievementTexts.reward_line({"kind": "heirloom", "id": "heir_x", "name": "Test Signet"}), "Heirloom: Test Signet", "an heirloom")
 	check_eq(AchievementTexts.reward_line({"kind": "cosmetic", "id": "dye_ember", "name": "Ember Orange"}), "Cosmetic: Ember Orange", "a cosmetic")
 	check_eq(AchievementTexts.toast_detail(_ach("green_shoot")), "Class unlocked: Hunter", "one reward: the line itself")
-	check(AchievementTexts.toast_detail(_ach("regular")).ends_with("+1 more"), "two rewards: the first and a count")
+	check(AchievementTexts.toast_detail(_ach("regular")).ends_with("(+1)"), "two rewards: the first and a count")
 	check(AchievementTexts.toast_detail(_ach("relic_hunter")).begins_with("10 points"), "no reward: the payout")
 	check_eq(AchievementTexts.payout_text(_ach("relic_hunter")), "10 points  ·  +50 Seeds", "what the achievement itself pays")
 	for a in Db.achievement_list():
@@ -571,8 +575,28 @@ func test_a_wave_five_clear_unlocks_green_shoot_in_the_middle_of_the_run() -> vo
 	check(Meta.is_class_unlocked(&"hunter"), "and the Hunter is open")
 	check(main.hud.toast.is_showing() or main.hud.toast.pending_ids().has(&"ach_green_shoot"), "the HUD toast pops")
 	check_eq(p.seeds, 25, "the achievement's Seeds are in the wallet")
+	check(&"ach_green_shoot" in main.run_achievements, "the run keeps its list")
 	main.end_run(false)
-	check(&"ach_green_shoot" not in (main.meta_result.get("achievements", []) as Array), "the end of the run does not list it twice")
+	var listed: Array = main.meta_result.get("achievements", [])
+	check(&"ach_green_shoot" in listed, "the end screen lists the mid-run achievement too")
+	check_eq(listed.count(&"ach_green_shoot"), 1, "once")
+	check(main.game_over.rewards_panel.visible, "so the block shows even though nothing new unlocked at the very end")
+
+
+func test_a_toast_waits_for_the_hud_after_a_break() -> void:
+	_fresh()
+	_make_main()
+	_bots(1)
+	main.start_run()
+	main.hud.hide()  # (the market has the screen)
+	main._on_achievement_unlocked(&"ach_relic_hunter")
+	check_eq(main.hud.toast.pending_ids(), [&"ach_relic_hunter"] as Array[StringName], "queued on the HUD")
+	main.hud.toast._process(30.0)
+	check(main.hud.toast.is_showing(), "a hidden HUD does not run the toast out")
+	main.hud.show()
+	main.hud.toast._process(AchievementToast.SLIDE_TIME * 2.0 + AchievementToast.HOLD_TIME + 0.1)
+	check(not main.hud.toast.is_showing(), "it plays once the wave starts")
+	check_eq(main.run_achievements, [&"ach_relic_hunter"] as Array[StringName], "and the run listed it")
 
 
 func test_a_dev_profile_checks_nothing() -> void:
@@ -665,9 +689,12 @@ func test_the_rewards_block_caps_its_lines() -> void:
 	check(panel.visible, "visible")
 	check_eq(panel.row_texts.size(), MetaRewardsPanel.MAX_ROWS, "three lines")
 	check(panel.title_label.text == "6 achievements unlocked", panel.title_label.text)
+	panel.fill({"achievements": [&"ach_green_shoot", &"ach_untouched", &"ach_relic_hunter", &"ach_harvest_home", &"ach_regular"], "achievement_seeds": 325})
+	check(panel.row_texts[0].begins_with("Untouched") and panel.row_texts[1].begins_with("Harvest Home") and panel.row_texts[2].begins_with("Relic Hunter"),
+			"the biggest achievements are listed first: %s" % [panel.row_texts])
 	panel.fill({"achievements": [ids[0]], "achievement_seeds": 25, "point_titles": [&"title_collector"]})
 	check_eq(panel.title_label.text, "Achievement unlocked", "one achievement")
-	check(panel.row_texts.has("Title: the Collector"), "a point title is listed")
+	check(panel.row_texts.has("Title: the Collector") and panel.summary_label.text.contains("Title: the Collector"), "a point title rides on the header")
 	panel.fill({})
 	check(not panel.visible, "an empty result hides the block")
 	panel.fill({"achievements": [&"ach_nonexistent"]})
@@ -681,3 +708,28 @@ func test_a_dev_profile_run_shows_no_block() -> void:
 	main.start_run()
 	main.end_run(true)
 	check(not main.game_over.rewards_panel.visible, "automated runs list nothing")
+
+
+## The end screen with four heroes, an endless hardcore Tear-Jerker header and the block at its fullest still fits 1080.
+func test_the_end_screen_with_the_block_at_its_fullest_fits_the_screen() -> void:
+	for i in 4:
+		PlayerManager.join(UiFakes.HumanInput.new("pad:%d" % i), Db.get_class_data(CLASSES[i]))
+	RunState.start_run(4, 7, RunState.MODE_ENDLESS, true, &"forest_ruin", &"tear_jerker")
+	var ids: Array = []
+	for a in Db.achievement_list().slice(0, 9):
+		ids.append(a.id)
+	var screen := GameOverScreen.create()
+	nodes.append(screen)
+	UiFakes.add_to_root(tree, screen)
+	screen.open(false, {}, {"achievements": ids, "achievement_seeds": 400, "point_titles": [&"title_collector"]})
+	check(screen.rewards_panel.visible and screen.difficulty_badge.visible and screen.hardcore_badge.visible, "everything is up")
+	screen.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	screen.size = Vector2(1920, 1080)
+	UiFakes.step(screen, 0.0)
+	for page in GameOverScreen.PAGE_NAMES.size():
+		screen.set_page(page as GameOverScreen.Page)
+		UiFakes.step(screen, 0.0)
+		var need := screen.panel.get_combined_minimum_size()
+		check(need.y <= 1080.0 - 40.0, "page %d: the panel needs %s px of the 1080" % [page, need.y])
+		var rect := screen.panel.get_global_rect()
+		check(rect.position.y >= 0.0 and rect.end.y <= 1080.0, "page %d: it fits the canvas (%s)" % [page, rect])

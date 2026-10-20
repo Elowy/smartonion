@@ -72,6 +72,8 @@ const COUNTER_WINS := &"wins"
 ## Runs that reached wave [constant LONG_RUN_WAVE] (a run abandoned in its first fight is not worth counting).
 const COUNTER_RUNS_LONG := &"runs_long"
 const LONG_RUN_WAVE := 3
+## The win counters stop here (design: "cap the stored wins counters at 9999").
+const WIN_COUNTER_CAP := 9999
 ## Prefixes of the counters.
 const COUNTER_TOTAL := "total:"
 const COUNTER_BEST := "best:"
@@ -112,22 +114,26 @@ static func update_counters(profile: Profile, report: RunReport) -> void:
 		profile.add_counter(COUNTER_RUNS_LONG, 1)
 	var won := report.won()
 	if won:
-		profile.add_counter(COUNTER_WINS, 1)
+		_add_win(profile, COUNTER_WINS)
 		if report.environment != &"":
-			profile.add_counter(StringName(COUNTER_ENV_WINS + String(report.environment)), 1)
+			_add_win(profile, StringName(COUNTER_ENV_WINS + String(report.environment)))
 	var tiers := Difficulty.ids()
 	var top_tier := maxi(Difficulty.tier_index(report.difficulty), 0)
 	for id in report.classes_played():
 		profile.add_counter(StringName("%s:%s" % [COUNTER_RUNS, id]), 1)
 		if won:
-			profile.add_counter(StringName("%s:%s" % [COUNTER_WINS, id]), 1)
+			_add_win(profile, StringName("%s:%s" % [COUNTER_WINS, id]))
 			for i in mini(top_tier + 1, tiers.size()):
-				profile.add_counter(StringName("%s:%s:%s" % [COUNTER_WINS, id, tiers[i]]), 1)
+				_add_win(profile, StringName("%s:%s:%s" % [COUNTER_WINS, id, tiers[i]]))
 	for id in report.stats:
 		var value := roundi(report.stats[id])
 		if value != 0:  # (a zero changes nothing and would only fill the file)
 			profile.add_counter(StringName(COUNTER_TOTAL + String(id)), value)
 			profile.raise_counter(StringName(COUNTER_BEST + String(id)), value)
+
+
+static func _add_win(profile: Profile, name: StringName) -> void:
+	profile.counters[name] = mini(profile.counter(name) + 1, WIN_COUNTER_CAP)
 
 
 # --- Evaluation ---------------------------------------------------------------------------------

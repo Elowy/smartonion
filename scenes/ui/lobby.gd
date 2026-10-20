@@ -72,6 +72,7 @@ var _footer_prompts: CenterContainer
 var _footer_key := ""
 var _backdrop: TextureRect
 var _mode_prompts: Control
+var _difficulty_prompt: Control
 ## The footer line that explains a locked tier, and the seconds it still shows.
 var _lock_notice := ""
 var _lock_notice_left := 0.0
@@ -297,15 +298,23 @@ func _build_mode_block() -> Control:
 	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_SMALL)
 	hardcore_badge.visible = hardcore
 	row.add_child(hardcore_badge)
+	# M9: the difficulty line carries its own prompt (the Mode / Hardcore prompts below keep their room, clear of the title).
+	var difficulty_row := UiTheme.hbox(12)
+	difficulty_row.name = "DifficultyRow"
+	difficulty_row.size_flags_horizontal = Control.SIZE_SHRINK_END
+	box.add_child(difficulty_row)
 	difficulty_label = UiTheme.centered_label(difficulty_text(), UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
 	difficulty_label.name = "DifficultyLabel"
-	difficulty_label.size_flags_horizontal = Control.SIZE_SHRINK_END
-	box.add_child(difficulty_label)
+	difficulty_row.add_child(difficulty_label)
+	_difficulty_prompt = UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.SELECT, 26.0), "/", UiGlyph.key("Tab", 26.0)]],
+			UiTheme.FONT_SMALL + 2, UiTheme.TEXT_DIM)
+	_difficulty_prompt.name = "DifficultyPrompt"
+	_difficulty_prompt.modulate.a = MODE_PROMPTS_IDLE_ALPHA
+	difficulty_row.add_child(_difficulty_prompt)
 	_refresh_difficulty()
 	_mode_prompts = UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.Y, 26.0), "/", UiGlyph.key("C", 26.0), "Mode"],
 		[UiGlyph.pad(PlayerInput.Pad.X, 26.0), "/", UiGlyph.key("R", 26.0), "Hardcore"],
-		[UiGlyph.pad(PlayerInput.Pad.SELECT, 26.0), "/", UiGlyph.key("Tab", 26.0), "Difficulty"],
 	], UiTheme.FONT_SMALL + 2, UiTheme.TEXT_DIM)
 	_mode_prompts.name = "ModePrompts"
 	_mode_prompts.size_flags_horizontal = Control.SIZE_SHRINK_END
@@ -472,6 +481,7 @@ func _refresh() -> void:
 	var slots := PlayerManager.get_slots()
 	# Only a joined player can change the mode: the key prompts light up with the first one.
 	_mode_prompts.modulate.a = 1.0 if not slots.is_empty() else MODE_PROMPTS_IDLE_ALPHA
+	_difficulty_prompt.modulate.a = _mode_prompts.modulate.a
 	var ready_count := 0
 	for s in slots:
 		if s.ready:

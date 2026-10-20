@@ -3,7 +3,7 @@ extends RefCounted
 ## The words of the achievement UI (M9): the HUD toast and the end screen's block. Pure functions of an
 ## [AchievementData] / a reward dictionary, so a test can read what the player would.
 
-## One reward as a line: "Class unlocked: Hunter", "Legendary unlocked: Stormcaller", "Pungent unlocked for the
+## One reward as a line: "Class unlocked: Hunter", "Legendary: Stormcaller", "Pungent unlocked for the
 ## Warrior", "Title: the Harvester", "Heirloom: Signet of the First Harvest", "Cosmetic: Ember Orange". A reward whose
 ## content is unknown (another package's id) is shown with its readable id.
 static func reward_line(reward: Dictionary) -> String:
@@ -16,7 +16,7 @@ static func reward_line(reward: Dictionary) -> String:
 			return "Class unlocked: %s" % (c.display_name if c != null else String(id).capitalize())
 		Profile.KIND_LEGENDARY:
 			var u := Db.get_unique(id)
-			return "Legendary unlocked: %s" % (u.display_name if u != null else (named if named != "" else String(id).capitalize()))
+			return "Legendary: %s" % (u.display_name if u != null else (named if named != "" else String(id).capitalize()))
 		Profile.KIND_DIFFICULTY:
 			var c2 := Db.get_class_data(StringName(str(reward.get("class_id", ""))))
 			return "%s unlocked for the %s" % [Difficulty.name_of(id), c2.display_name if c2 != null else "class"]
@@ -50,11 +50,11 @@ static func payout_text(data: AchievementData) -> String:
 	return "%d point%s  ·  +%d Seeds" % [data.points, "" if data.points == 1 else "s", data.points * Meta.SEEDS_PER_POINT]
 
 
-## The toast's second line: the first reward line (+ "and N more"), else the payout.
+## The toast's second line: the first reward line (and how many more follow), else the payout.
 static func toast_detail(data: AchievementData) -> String:
 	var lines := reward_lines(data)
 	if lines.is_empty():
 		return payout_text(data)
 	if lines.size() == 1:
 		return lines[0]
-	return "%s  +%d more" % [lines[0], lines.size() - 1]
+	return "%s (+%d)" % [lines[0], lines.size() - 1]

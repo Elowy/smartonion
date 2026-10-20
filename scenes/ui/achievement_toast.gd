@@ -5,7 +5,7 @@ extends Control
 ## and slides out. Several achievements in a row queue up and show one after the other ([method push]). It runs on
 ## the HUD's own clock (it freezes with the game, like the HUD).
 
-const WIDTH := 430.0
+const WIDTH := 540.0
 ## Seconds sliding in, holding, sliding out.
 const SLIDE_TIME := 0.28
 const HOLD_TIME := 3.4
@@ -111,8 +111,8 @@ func _next() -> void:
 
 
 func _process(delta: float) -> void:
-	if current == null:
-		return
+	if current == null or not is_visible_in_tree():
+		return  # (a break hides the HUD: the toast waits for the next wave)
 	_age += delta
 	var total := SLIDE_TIME * 2.0 + HOLD_TIME
 	if _age >= total:

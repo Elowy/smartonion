@@ -217,6 +217,10 @@ func test_spawn_density_follows_the_tier() -> void:
 	_run(&"tear_jerker")
 	check_near(director.spawn_budget_per_second(), base * 1.3, 0.000001, "Tear-Jerker +30%")
 	check(WaveDirector.MAX_ENEMIES == 150, "the enemy cap stays 150")
+	director.boss_data = Db.get_boss(&"lich_commander_morvain")
+	director.wave = 10
+	check_near(director.spawn_budget_per_second(), WaveDirector.spawn_rate(10, RunState.coop_count_mult()) * WaveDirector.BOSS_ADD_RATE_MULT,
+			0.000001, "a boss wave's adds keep their rate")
 
 
 func test_elite_rate_reaches_the_run() -> void:
@@ -601,7 +605,10 @@ func test_the_lobby_selector_cycles_within_the_cap() -> void:
 	check_eq(lobby.difficulty_label.text, "Difficulty: Pungent", "the header follows")
 	UiFakes.tap(lobby, a, PlayerInput.Pad.SELECT)
 	check_eq(lobby.difficulty, &"normal", "Tear-Jerker is locked: the choice wraps to Normal")
-	check(lobby._lock_notice.contains("Tear-Jerker is locked") and lobby._lock_notice.contains("Pungent"), "and says why: %s" % lobby._lock_notice)
+	check(lobby._lock_notice.contains("Tear-Jerker is locked") and lobby._lock_notice.contains("Win a run on Pungent with the Warrior"), "and says why: %s" % lobby._lock_notice)
+	check_eq(Difficulty.lock_reason(&"tear_jerker", [&"mage"] as Array[StringName]), "Win a run on Normal with the Mage", "the first missing step, not the last")
+	check_eq(Difficulty.lock_reason(&"normal", [&"mage"] as Array[StringName]), "", "Normal is never locked")
+	check_eq(Difficulty.lock_reason(&"pungent", [&"warrior"] as Array[StringName]), "", "open for the warrior")
 	Meta.profile.unlock(Profile.KIND_DIFFICULTY, &"tear_jerker", &"warrior")
 	UiFakes.tap(lobby, a, PlayerInput.Pad.SELECT)
 	UiFakes.tap(lobby, a, PlayerInput.Pad.SELECT)

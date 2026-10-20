@@ -47,6 +47,13 @@ extends Node
 ##   [method enter_dungeon] runs a [Dungeon] (State.DUNGEON: the same arena in a 24 x 14 layout, the HUD
 ##   shows "Dungeon – Room n/4"); [method _on_dungeon_finished] pays the reward (DungeonRewards) and gives
 ##   the break back to the Intermission, which rolls the Epics and opens the market.
+## - M9 ACHIEVE-DIFF: the run's difficulty tier ([member LaunchOptions.difficulty] from --difficulty or the lobby's selector,
+##   capped by what the heroes' classes unlocked, [method _difficulty_for]) goes into RunState.start_run; a Tear-Jerker
+##   wave's pressure goes live in [method start_wave] and ends on the break path ([method _begin_pressure] /
+##   [method _end_pressure], the shrines' seams); a boss wave's boss is recorded when the director reports it defeated;
+##   a real profile checks its achievements in the middle of the run ([method _check_achievements_live]: wave cleared,
+##   boss down, Artifact, Coin Gremlin, dungeon over, loot roll), the HUD toasts them and [member run_achievements] keeps
+##   the list the end screen shows.
 ## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
 ## --start-level, --panel-tab, --mode, --hardcore, --env, --event ...): see LaunchOptions. SMOKE_RESULT
 ## keys: see smoke_result().
@@ -143,8 +150,11 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
-## What the main profile made of the last finished run (Meta.record_run's result; {} when it recorded nothing).
+## What the main profile made of the last finished run (Meta.record_run's result; {} when it recorded nothing). Its
+## "achievements" are every one the run unlocked, the mid-run ones included ([member run_achievements]).
 var meta_result: Dictionary = {}
+## The achievements unlocked since the run started, in order (M9; the end screen lists them).
+var run_achievements: Array[StringName] = []
 ## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
 ## player who left mid-run (drop_player), the slots no longer have them.
 var run_classes: Array[StringName] = []
@@ -318,6 +328,7 @@ func start_run() -> void:
 	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id(), _difficulty_for(slots))
 	_roll_seed = -1
 	meta_result = {}
+	run_achievements.clear()
 	_pressure_log.clear()
 	artifact_lines.clear()
 	run_classes.clear()
@@ -760,6 +771,8 @@ func _record_meta(p_victory: bool, p_abandoned: bool) -> Dictionary:
 		return {}
 	var report := RunReport.collect(p_victory, p_abandoned, _report_extras())
 	var result := Meta.record_run(report)
+	if result.get("recorded", false):
+		result["achievements"] = run_achievements.duplicate()  # (the run's own, mid-run ones first: the end screen lists all)
 	_log("meta: run recorded (%s), saved %s, achievements %s" % ["abandoned" if p_abandoned else
 			("victory" if p_victory else "defeat"), "ok" if int(result.get("save_error", OK)) == OK else "FAILED",
 			result.get("achievements", [])])
@@ -784,15 +797,21 @@ func _check_achievements_live() -> void:
 	Meta.check_achievements(RunReport.collect(false, false, _report_extras()))
 
 
-## RunState.special_killed: an elite or the Loot Goblin died (a boss is handled by the director's boss_defeated).
+## RunState.special_killed: the Loot Goblin died (a boss is handled by the director's boss_defeated; no achievement
+## reads the elites).
 func _on_special_killed(kind: StringName, _killer_index: int) -> void:
-	if kind != &"boss":
+	if kind == &"goblin":
 		_check_achievements_live()
 
 
-## Meta.achievement_unlocked: the HUD toast (while a run's HUD is up; the end screen lists the rest).
+## Meta.achievement_unlocked: the run's list for the end screen (every achievement the profile unlocked while this run
+## was on, mid-run ones and the run end's own) and the HUD toast (it waits for the HUD when a break has it hidden).
 func _on_achievement_unlocked(id: StringName) -> void:
-	if hud != null and is_instance_valid(hud) and hud.visible:
+	if arena == null:
+		return
+	if id not in run_achievements:
+		run_achievements.append(id)
+	if hud != null and is_instance_valid(hud):
 		hud.show_achievement(Db.get_achievement(id))
 
 

@@ -97,7 +97,8 @@ static func enemy_damage_mult() -> float:
 	return current().enemy_damage_mult * Pressure.enemy_damage_mult()
 
 
-## The WaveDirector's spawn budget (the tier's density times the wave's pressure).
+## The WaveDirector's spawn budget on a normal wave (the tier's density times the wave's pressure; the adds of a boss
+## wave keep their rate).
 static func spawn_mult() -> float:
 	return current().spawn_density_mult * Pressure.spawn_mult()
 
@@ -140,17 +141,15 @@ static func selectable(class_ids: Array[StringName]) -> Array[StringName]:
 	return out
 
 
-## Why [param tier] is closed to a party of [param class_ids] ("" = open): "Win a run on Pungent with the Mage" – the
-## previous tier and the first class that has not won on it.
+## Why [param tier] is closed to a party of [param class_ids] ("" = open): the first step that is missing, "Win a run on
+## Normal with the Mage" – the tier below the lowest one a class has not opened yet, and that class.
 static func lock_reason(tier: StringName, class_ids: Array[StringName]) -> String:
-	var at := tier_index(tier)
-	if at <= 0:
-		return ""
-	var previous := ids()[at - 1]
-	for id in class_ids:
-		if not Meta.is_difficulty_unlocked(tier, id):
-			var data := Db.get_class_data(id)
-			return "Win a run on %s with the %s" % [name_of(previous), data.display_name if data != null else String(id).capitalize()]
+	var all := ids()
+	for at in range(1, tier_index(tier) + 1):
+		for id in class_ids:
+			if not Meta.is_difficulty_unlocked(all[at], id):
+				var data := Db.get_class_data(id)
+				return "Win a run on %s with the %s" % [name_of(all[at - 1]), data.display_name if data != null else String(id).capitalize()]
 	return ""
 
 
