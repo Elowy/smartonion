@@ -97,9 +97,10 @@ static func voters_of(slots: Array[PlayerSlot]) -> Array[PlayerSlot]:
 	return LevelUpScreen.pickers(slots)
 
 
-## Bots and players whose controller is unplugged vote by the data, without waiting for input.
+## Bots and players whose controller has been missing for the grace (PlayerManager.auto_decide_grace) vote by the
+## data, without waiting for input.
 static func is_automatic(s: PlayerSlot) -> bool:
-	return s.is_bot() or s.input == null or not s.input.is_connected_device()
+	return s.is_bot() or PlayerManager.is_absent(s)
 
 
 ## Opens the vote on [param p_data] for [param p_slots]; false (and nothing shown) without a shrine or a voter.
@@ -492,7 +493,8 @@ func _refresh_chips(force: bool = false) -> void:
 		var chip: PanelContainer = _chips.get(s.index)
 		if chip == null:
 			continue
-		var key := "%d:%d" % [vote.choice_of(s.index), phase]
+		# (missing / absent: "Reconnecting…" and "No controller" replace "Choosing…" while the pad is away)
+		var key := "%d:%d:%s:%s" % [vote.choice_of(s.index), phase, PlayerManager.is_missing(s), PlayerManager.is_absent(s)]
 		if force or _chip_keys.get(s.index, "") != key:
 			_chip_keys[s.index] = key
 			_fill_chip(chip, s)
@@ -537,7 +539,7 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:
 			status.add_child(VoteMark.make(false, 24.0))
 			status.add_child(UiTheme.label("Decline", &"", 22, UiTheme.RED.lightened(0.15)))
 		_:
-			var waiting := "Thinking…" if s.is_bot() else ("No controller" if s.input == null or not s.input.is_connected_device() else "Choosing…")
+			var waiting := "Thinking…" if s.is_bot() else ("No controller" if PlayerManager.is_absent(s) else ("Reconnecting…" if PlayerManager.is_missing(s) else "Choosing…"))
 			if phase == Phase.RESULT:
 				waiting = "–"
 			status.add_child(UiTheme.label(waiting, &"", 19, UiTheme.TEXT_DIM))

@@ -75,12 +75,23 @@ extends RefCounted
 ##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
 ##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
 ##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
+##   --fake-rpt[=N]       RPT dev flag: N (1..3, bare = 2) of the controllers / bots play as Remote Play guests with
+##                        names (FakeRemotePlayBackend: joypad ids 1..N, or bots 2..N+1 in a smoke / view run): the lobby
+##                        cards say "Remote · Mira", the notices name them, the host rules apply to them. --fake-rpt=0 = off
+##   --hotplug-test       RPT smoke hook: needs --smoke, --players>=2 and a run of 2+ waves. During the second wave P2's
+##                        controller is unplugged (fake pads), the run pauses with the take-over prompt, another fake
+##                        pad takes the slot over with A, START resumes and P2 plays on. Adds a "hotplug" block to the
+##                        SMOKE_RESULT; the run fails ("hotplug_failed" / "hotplug_incomplete") when the flow does not.
+##                        With --view=lobby / --view=pause it only shows the state for a screenshot: P2's controller
+##                        is gone (lobby: "Disconnected – press A to take over"; pause: the take-over prompt)
 ##   --heirloom=ID        M9 PATCH: every hero starts with this Heirloom equipped (an id of Db.heirlooms, e.g.
 ##                        heir_sprout_cap), instead of what the profile remembers for the class (a smoke run with
 ##                        the dev profile owns them all at rank 1; --profile=max at rank 5; a real profile must own
 ##                        it). An unknown id is an unknown argument
 
 const DEFAULT_BOTS := 4
+## --fake-rpt without a number.
+const DEFAULT_FAKE_RPT := 2
 const DEFAULT_SMOKE_WAVES := 3
 const SMOKE_TIME_SCALE := 4.0
 ## Smoke runs are seeded (deterministic content rolls) unless --seed is given.
@@ -169,6 +180,10 @@ var profile_path := ""
 var seasonings: Array[StringName] = []
 ## The Heirloom of --heirloom (&"" = none: the heroes take what their slot has).
 var heirloom: StringName = &""
+## --fake-rpt: how many guests the Fake Remote Play backend simulates (0 = none, the normal backends).
+var fake_rpt := 0
+## --hotplug-test: the scripted unplug / take-over / resume of P2 in a smoke run.
+var hotplug_test := false
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -317,6 +332,15 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				seasonings_arg = arg
 				for part in value.split(",", false):
 					o.seasonings.append(StringName(part.strip_edges()))
+			"--fake-rpt":
+				if value == "":
+					o.fake_rpt = DEFAULT_FAKE_RPT
+				elif value.is_valid_int():
+					o.fake_rpt = clampi(value.to_int(), 0, PlayerManager.MAX_PLAYERS - 1)
+				else:
+					o.unknown.append(arg)
+			"--hotplug-test":
+				o.hotplug_test = _flag_on(value)
 			"--heirloom":
 				if Db.heirlooms.has(StringName(value)):
 					o.heirloom = StringName(value)
@@ -332,6 +356,9 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 		if problem != "":
 			o.unknown.append("%s (%s)" % [seasonings_arg, problem])
 			o.seasonings.clear()
+	if o.hotplug_test and not ((o.smoke and o.last_wave() > o.start_wave or o.view in ["lobby", "pause"]) and o.players >= 2):
+		o.unknown.append("--hotplug-test (needs --smoke with --players>=2 and --waves>=2, or --view=lobby / pause)")
+		o.hotplug_test = false
 	if o.profile_kind == Meta.PROFILE_DEV and o.profile_path != "":
 		o.unknown.append("--profile=dev with --profile-path=%s (the dev profile never touches a file)" % o.profile_path)
 	return o

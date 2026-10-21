@@ -17,9 +17,9 @@ var injected: Array[JoyButton] = []
 func poll() -> void:
 	_prev = _cur
 	_cur = {}
-	for device in Input.get_connected_joypads():
+	for device in PadSource.devices():
 		for b in BUTTONS:
-			if Input.is_joy_button_pressed(device, b):
+			if PadSource.is_button_down(device, b):
 				_cur["%d:%d" % [device, b]] = true
 	for b in injected:
 		_cur["-1:%d" % b] = true
@@ -33,6 +33,18 @@ func any_just_pressed(button: JoyButton) -> bool:
 		if key.ends_with(suffix) and not _prev.has(key):
 			return true
 	return false
+
+
+## The joypad ids whose [param button] went down this frame (the injected test press, device -1, is not listed).
+func just_pressed_devices(button: JoyButton) -> Array[int]:
+	var out: Array[int] = []
+	var suffix := ":%d" % button
+	for key in _cur:
+		if key.ends_with(suffix) and not _prev.has(key):
+			var device := int(key.get_slice(":", 0))
+			if device >= 0:
+				out.append(device)
+	return out
 
 
 ## True while [param button] is held on any controller.
@@ -49,7 +61,7 @@ func any_pressed(button: JoyButton) -> bool:
 static func join_button_held() -> bool:
 	if KeyboardInput.join_key_held():
 		return true
-	for device in Input.get_connected_joypads():
-		if Input.is_joy_button_pressed(device, JOY_BUTTON_A):
+	for device in PadSource.devices():
+		if PadSource.is_button_down(device, JOY_BUTTON_A):
 			return true
 	return false

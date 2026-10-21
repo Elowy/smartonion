@@ -57,6 +57,9 @@ var _device_label: Label
 var _preview_frame: PanelContainer
 var _preview_glow: TextureRect
 var _ready_ribbon: PanelContainer
+## RPT-CORE: "Disconnected – press A to take over" over the preview of a slot whose controller is gone.
+var _ghost_banner: PanelContainer
+var _ghost_label: Label
 var _left_arrow: UiIcon
 var _right_arrow: UiIcon
 var _class_label: Label
@@ -181,6 +184,8 @@ func _build_joined() -> void:
 	stage.add_child(_season_row)
 	_ready_ribbon = _make_ready_ribbon()
 	stage.add_child(_ready_ribbon)
+	_ghost_banner = _make_ghost_banner()
+	stage.add_child(_ghost_banner)
 	level_badge = _make_level_badge()
 	stage.add_child(level_badge)
 	# The Class XP bar is a thin strip on the preview's lower edge and its numbers sit in the top-right corner: nothing
@@ -352,6 +357,34 @@ func _make_ready_ribbon() -> PanelContainer:
 	return ribbon
 
 
+## The banner over a disconnected player's preview: the controller is gone, the slot (class, ready flag) waits for
+## it or for a free controller's A (PlayerManager.take_over).
+func _make_ghost_banner() -> PanelContainer:
+	var banner := PanelContainer.new()
+	banner.name = "GhostBanner"
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := UiTheme.stone_style(UiTheme.RED.darkened(0.1), Color(0.16, 0.05, 0.04, 0.94))
+	style.content_margin_top = 8
+	style.content_margin_bottom = 9
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	banner.add_theme_stylebox_override(&"panel", style.rebuild())
+	var box := UiTheme.vbox(2)
+	banner.add_child(box)
+	var head := UiTheme.hbox(8)
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	head.add_child(UiIcon.create(UiIcon.Kind.WARNING, Vector2(26, 26)))
+	head.add_child(UiTheme.label("DISCONNECTED", UiTheme.HEADING, 26, UiTheme.RED.lightened(0.25)))
+	box.add_child(head)
+	_ghost_label = UiTheme.centered_label("Press A to take over", &"", UiTheme.FONT_SMALL, UiTheme.TEXT)
+	box.add_child(_ghost_label)
+	banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	banner.grow_vertical = Control.GROW_DIRECTION_BOTH
+	banner.visible = false
+	return banner
+
+
 ## The small "Lv 12" tag in the top-left corner of the preview (M9 LEVELS).
 func _make_level_badge() -> PanelContainer:
 	var badge := PanelContainer.new()
@@ -387,8 +420,8 @@ func update_from(p_slot: PlayerSlot, keyboard_free: bool = true) -> void:
 	var key := "empty:%s" % keyboard_free
 	if p_slot != null:
 		var cid: StringName = p_slot.class_data.id if p_slot.class_data != null else &""
-		key = "%d:%s:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, p_slot.input.get_device_name(),
-				p_slot.companion_id(), _locked_hint(p_slot), _level_key(p_slot)]
+		key = "%d:%s:%s:%s:%s:%s:%s:%s" % [p_slot.get_instance_id(), cid, p_slot.ready, device_text(p_slot),
+				p_slot.companion_id(), _locked_hint(p_slot), _level_key(p_slot), PlayerManager.is_missing(p_slot)]
 	if key == _state_key:
 		return
 	_state_key = key
@@ -442,14 +475,19 @@ func _apply_joined(s: PlayerSlot) -> void:
 	_header.add_theme_stylebox_override(&"panel", hs)
 	_player_label.text = s.label()
 	_player_label.add_theme_color_override(&"font_color", s.color.lightened(0.35))
-	_device_label.text = s.input.get_device_name()
+	var missing := PlayerManager.is_missing(s)
+	_device_label.text = device_text(s)
+	_device_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.3) if missing else UiTheme.TEXT)
+	_ghost_banner.visible = missing
+	if missing:
+		_ghost_label.text = "Press A to take over" if not s.is_remote() else "Waiting for %s" % RemotePlay.slot_name(s)
 
 	_preview_glow.texture = _glow_texture(s.color)
 	if data != null:
 		preview.show_class(data, s.color, _alt_chosen(s))
-	_ready_ribbon.visible = s.ready
-	_left_arrow.visible = not s.ready
-	_right_arrow.visible = not s.ready
+	_ready_ribbon.visible = s.ready and not missing
+	_left_arrow.visible = not s.ready and not missing
+	_right_arrow.visible = not s.ready and not missing
 	var lock_hint := _locked_hint(s)
 	_class_label.text = data.display_name if data != null else "?"
 	_role_label.text = data.role if data != null else ""
@@ -457,7 +495,7 @@ func _apply_joined(s: PlayerSlot) -> void:
 	if lock_hint != "":
 		_desc_label.text = "Locked: %s" % lock_hint
 	_desc_label.add_theme_color_override(&"font_color", UiTheme.RED if lock_hint != "" else Color(0.9, 0.87, 0.8))
-	preview.modulate = Color(0.45, 0.45, 0.5) if lock_hint != "" else Color.WHITE
+	preview.modulate = Color(0.45, 0.45, 0.5) if (lock_hint != "" or missing) else Color.WHITE
 	_fill_level(s)
 	_fill_stats(data)
 	_fill_weapons(data, s)
@@ -681,7 +719,9 @@ func _fill_prompts(s: PlayerSlot) -> void:
 		c.queue_free()
 	var inp := s.input
 	var items: Array = []
-	if s.ready:
+	if PlayerManager.is_missing(s):
+		items = [[UiGlyph.pad(PlayerInput.Pad.A, 28.0), "Take over"]]
+	elif s.ready:
 		items = [[UiGlyph.for_input(inp, PlayerInput.Pad.B, 28.0), "Not ready"]]
 	elif _locked_hint(s) != "":
 		items = [
@@ -697,6 +737,15 @@ func _fill_prompts(s: PlayerSlot) -> void:
 	var row := UiTheme.prompt_row(items, UiTheme.FONT_SMALL + 1)
 	row.add_theme_constant_override(&"separation", 16)
 	_prompt_holder.add_child(row)
+
+
+## What the card's header says about the device: the controller's name, "Remote · Mira" for a Remote Play guest's
+## slot, "Disconnected" while its controller is gone.
+static func device_text(s: PlayerSlot) -> String:
+	if PlayerManager.is_missing(s):
+		return "Disconnected" if not s.is_remote() else "Remote · %s" % RemotePlay.slot_name(s)
+	var who := RemotePlay.slot_name(s)
+	return "Remote · %s" % who if who != "" else s.input.get_device_name()
 
 
 ## The unlock hint of [param s]'s class when the main profile has not unlocked it ("" = playable).

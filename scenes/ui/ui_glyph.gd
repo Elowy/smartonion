@@ -97,6 +97,8 @@ static func keyboard_name(button: PlayerInput.Pad) -> String:
 			return "P"
 		PlayerInput.Pad.SELECT, PlayerInput.Pad.R3:
 			return "Tab"
+		PlayerInput.Pad.L3:
+			return "I"
 	return "?"
 
 

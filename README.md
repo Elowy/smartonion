@@ -32,6 +32,7 @@ Brotato-szerű, WoW-hangulatú arena survivor Godot 4-ben, 1–4 fős helyi co-o
 | Loadout: Seasoning / Heirloom / Look (lobby, a saját kártyádon) | LT | jobb egérgomb |
 | Alternatív kezdőfegyver (lobby, 12. szint után) | LB | Q |
 | The Onion Patch fülei (főmenü) | LB / RB | Q / E |
+| Meghívás a Steam Remote Play Together-be (lobby, csak a házigazda) | L3 | I |
 
 A fegyverek automatikusan támadnak. Elesett társat úgy lehet feléleszteni, hogy 5 másodpercig mellette állsz. Ha te esel el, a pálya közepén megjelenő Grave Tender-nél térhetsz vissza (Hardcore módban nincs Grave Tender).
 
@@ -59,8 +60,27 @@ A főmenüben a **Settings** és a **Credits** oldal érhető el, a szünetmenü
 - **Hang és beállítások (M7a):** UI-, fegyver-, harc- és zenei hangok (CC0-s csomagok); a Settings oldalon hangerők (Master / Music / Effects / Interface), ablakmód, VSync, FPS-limit, képernyőrázkódás, sebzésszámok és FPS-kijelző; a Credits oldal a forrásokat mutatja.
 - **Grafika (M7b):** Cinzel-címek; game-icons.net ikonok a képességeken, talentfákon, fogyóeszközökön és szentélyeken; a hősön látszik a viselt sisak, váll és mellvért (páncéltípus, fokozat, ritkaság, setek); az öt aréna végleges látványa (élő talaj, környezeti részecskék, animált víz és láva) és a kripta-jellegű dungeon; új harci effektek (spawn, hullák, iskolaszínű találatok, kritikus találat, loot-pattanás, arany- és XP-nyomvonal, boss-belépő).
 - **Meta-progresszió (M9):** egy fő mentés (`user://profile.json`), kasztonként 1–30-as Class Level, szintenként új képességek és jutalmak. 56 Seasoning (kaszt-képesség oldalirányú módosítója), 10 Heirloom (megmaradó tárgy, rangokkal), 40 achievement és a Seeds-pénznem, amit a főmenü **The Onion Patch** pontjában lehet elkölteni; a **Wardrobe** a gyűjtött páncélkinézeteket és kozmetikumokat adja, három nehézség (Normal, Pungent, Tear-Jerker) a Tear-Jerker nyomással. Az automatikus futamok (smoke, demo, nézetek) nem használják a mentést (GDD 17).
+- **Online co-op (RPT):** a helyi co-op a Steam Remote Play Together-en át is játszható. A kiesett játékos helyét bármelyik szabad kontroller átveheti; a vendég nem léphet ki és nem dobhat ki játékost. Részletek lent.
 
 Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; az M9 (meta-progresszió) is kész (GDD 17. fejezet). A végleges balansz még hátra van; a Questek és a háttértörténet a legvégén készül (GDD 17.8).
+
+## Online co-op (Steam Remote Play Together)
+
+A helyi co-op a Steam **Remote Play Together** funkciójával online is játszható: a házigazda a játékot a Steam-könyvtárából indítja, a vendégek a Steamen át csatlakoznak a saját kontrolleruktól. A szabályok (kiesés, átvétel, házigazda-jogok) a GDD 11. fejezetében vannak.
+
+- **Steam nélkül is működik:** a kontroller-kezelés (kiesés, visszacsatlakozás, átvétel a lobbyban és menet közben, türelmi idő) és a szünet ugyanúgy működik. Vendég ilyenkor nincs, így a vendég-funkciók (név a kártyán, meghívó, a vendég jogainak korlátozása) nem aktívak.
+- **GodotSteam (opcionális):** a `tools/steam/fetch_godotsteam.sh` letölti a GodotSteam v4.23.2-gde bővítményt az `addons/godotsteam/` mappába (csak Windows 64 és Linux 64; a letöltött fájl sha256-összegét ellenőrzi). Utána egyszer: `godot --headless --path . --import`. A mappa a `.gitignore`-ban van: a benne lévő Valve-könyvtárak nem kerülhetnek a repóba.
+- **Steam-alkalmazásazonosító:** a `smartonion/steam/app_id` projektbeállítás alapértéke 480 (a Valve tesztalkalmazása, Spacewar), csak fejlesztéshez. A Steamworks-regisztráció után ide kell a saját azonosító. A játékot a Steam-könyvtárból kell indítani, különben a vendégek kontrollerei nem jelennek meg.
+- **Export:** a Steam-es exportban a bővítmény könyvtárai (`libgodotsteam…`, `steam_api64.dll` / `libsteam_api.so`) a futtatható mellé kerülnek; a depotban együtt kell lenniük.
+- **GodotSteam-licenc (MIT):** a Steam-es buildhez tartozik a GodotSteam szerzői jogi és engedélyszövege. A `CREDITS.md` „Libraries” része tartalmazza, és a játékon belüli Credits oldal megmutatja; ezért a `CREDITS.md`-nek (`*.md` az export include-szűrőjében) a Steam-es exportban benne kell lennie. A telepített `addons/godotsteam/license.md` nem kerül a futtatható mellé.
+
+### Fejlesztői kapcsolók (RPT)
+
+- `--fake-rpt[=N]` – N (1–3, alapból 2) vendég szimulálása Steam nélkül: a kontrollerek vagy a botok vendégként játszanak, nevekkel (pl. „Remote · Mira”). Nem változtatja meg, hogy egy futam automatikus-e.
+- `--hotplug-test` – smoke-futamban a 2. hullámban P2 kontrollerének kihúzása, az átvétel és a folytatás végigpróbálása; a `SMOKE_RESULT` egy `hotplug` blokkot kap. Példa: `godot --headless --fixed-fps 60 --path . -- --smoke --waves=3 --seed=5 --hotplug-test`.
+- Képernyőkép a lobbyról vendéggel és kihúzott kontrollerrel: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- --view=lobby --fake-rpt=2 --hotplug-test --screenshot=/tmp/rpt_lobby.png --shot-time=6`.
+
+Az éles, több gépes Steam-próba lépéseit (előfeltételek, a 11 ellenőrzés, mit kell visszajelezni) a [docs/REMOTE_PLAY_TEST.md](docs/REMOTE_PLAY_TEST.md) tartalmazza.
 
 ## Fejlesztői parancsok
 

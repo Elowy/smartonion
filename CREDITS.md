@@ -1,9 +1,10 @@
 # Credits
 
-SmartOnion uses the following third-party assets. The sounds and music are released under CC0 (public
-domain dedication; credit is not required, but it is given here with thanks). The font is released under the
-SIL Open Font License 1.1 and the icons under Creative Commons Attribution 3.0 (credit is required and given
-below).
+SmartOnion uses the following third-party assets and libraries. The sounds and music are released under CC0
+(public domain dedication; credit is not required, but it is given here with thanks). The font is released under
+the SIL Open Font License 1.1 and the icons under Creative Commons Attribution 3.0 (credit is required and given
+below). The GodotSteam library is released under the MIT licence, which asks for its copyright and permission
+notice to ship with every copy (given below).
 
 ## Audio
 
@@ -58,3 +59,34 @@ contributors' list and the licence note of the icon archive are in assets/icons/
 
 - Lorc: https://game-icons.net/tags/lorc.html
 - Delapouite: https://game-icons.net/tags/delapouite.html
+
+## Libraries
+
+### GodotSteam (MIT)
+
+Online co-op through Steam Remote Play Together uses GodotSteam v4.23.2, a Godot GDExtension that wraps Valve's
+Steamworks SDK: https://codeberg.org/godotsteam/godotsteam
+
+Copyright (c) 2015-Current | GP Garcia, Chris Ridenour, and Contributors. Released under the MIT licence:
+
+> MIT License
+>
+> Copyright (c) 2015-Current | GP Garcia, Chris Ridenour, and Contributors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.

@@ -9,7 +9,7 @@ extends RefCounted
 ##   [audio]    master_volume=100  music_volume=70  sfx_volume=80  ui_volume=80   (percent, step 10)
 ##   [video]    window_mode="windowed" | "borderless" | "fullscreen"   vsync=true
 ##              max_fps="30" | "60" | "120" | "144" | "unlimited"
-##   [gameplay] screen_shake="off" | "low" | "full"   damage_numbers=true   show_fps=false
+##   [gameplay] screen_shake="off" | "low" | "full"   damage_numbers=true   show_fps=false   pause_on_focus_loss=true
 ## A missing file, key or a value that is not understood gives the default; nothing here is ever fatal.
 ##
 ## None of these values may change a gameplay outcome: shake and damage numbers are drawn only, volumes and
@@ -27,6 +27,8 @@ const MAX_FPS := &"max_fps"
 const SCREEN_SHAKE := &"screen_shake"
 const DAMAGE_NUMBERS := &"damage_numbers"
 const SHOW_FPS := &"show_fps"
+## RPT: a wave or dungeon pauses when the window loses the focus (a Remote Play guest sees a wait screen then). Real sessions only.
+const PAUSE_ON_FOCUS_LOSS := &"pause_on_focus_loss"
 
 ## Borderless Fullscreen is the desktop-sized window without borders (DisplayServer WINDOW_MODE_FULLSCREEN),
 ## Fullscreen the exclusive mode (WINDOW_MODE_EXCLUSIVE_FULLSCREEN).
@@ -89,6 +91,7 @@ static func _build_options() -> Array[SettingOption]:
 			[Shake.OFF, Shake.LOW, Shake.FULL], ["off", "low", "full"], ["Off", "Low", "Full"]))
 	out.append(SettingOption.toggle(DAMAGE_NUMBERS, "Gameplay", "Damage Numbers", true))
 	out.append(SettingOption.toggle(SHOW_FPS, "Gameplay", "Show FPS", false))
+	out.append(SettingOption.toggle(PAUSE_ON_FOCUS_LOSS, "Gameplay", "Pause when the window loses focus", true))
 	return out
 
 
@@ -182,6 +185,10 @@ func damage_numbers_enabled() -> bool:
 
 func show_fps_enabled() -> bool:
 	return bool(values[SHOW_FPS])
+
+
+func pause_on_focus_loss() -> bool:
+	return bool(values[PAUSE_ON_FOCUS_LOSS])
 
 
 # --- File --------------------------------------------------------------------------------

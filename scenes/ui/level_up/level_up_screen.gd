@@ -132,9 +132,9 @@ func open(slots: Array[PlayerSlot], p_level_ups: int, p_wave: int) -> void:
 		finished.emit.call_deferred()
 
 
-## Bots and players whose device is unplugged pick automatically.
+## Bots and players whose device has been missing for the grace (PlayerManager.auto_decide_grace) pick automatically.
 static func is_automatic(s: PlayerSlot) -> bool:
-	return s.is_bot() or s.input == null or not s.input.is_connected_device()
+	return s.is_bot() or PlayerManager.is_absent(s)
 
 
 func is_active() -> bool:

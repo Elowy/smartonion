@@ -155,11 +155,16 @@ func test_showing_resets_ready_flags() -> void:
 	check(not lobby.is_counting_down(), "no countdown")
 
 
-func test_disconnect_frees_the_slot() -> void:
-	_join("pad:a")
+func test_disconnect_keeps_the_slot_as_a_ghost() -> void:
+	var input := _join("pad:a")
 	var slot := PlayerManager.get_slot(0)
+	input.connected = false
 	PlayerManager.device_disconnected.emit(slot)
-	check_eq(PlayerManager.count(), 0, "unplugged controller leaves the lobby")
+	check_eq(PlayerManager.count(), 1, "RPT-CORE: an unplugged controller's slot waits for its pad or a take-over")
+	check(PlayerManager.is_missing(slot), "it is a ghost")
+	slot.missing_time = PlayerManager.GHOST_TIMEOUT + 1.0
+	UiFakes.step(lobby)
+	check_eq(PlayerManager.count(), 0, "and goes after the long timeout")
 
 
 func test_b_and_start_together_act_as_b() -> void:

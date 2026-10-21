@@ -550,12 +550,12 @@ func cheapest_offer_for(slot: PlayerSlot) -> int:
 	return best
 
 
-## Slot indices whose vote a reroll needs: humans with a working device (bots and unplugged
-## controllers never block it).
+## Slot indices whose vote a reroll needs: humans who are there (bots and controllers missing for longer than the
+## grace never block it).
 func voter_indices() -> Array[int]:
 	var out: Array[int] = []
 	for s in _slots:
-		if not s.is_bot() and s.input != null and s.input.is_connected_device():
+		if not s.is_bot() and not PlayerManager.is_absent(s):
 			out.append(s.index)
 	return out
 
@@ -1577,7 +1577,7 @@ func _draw_pips() -> void:
 	for s in _slots:
 		var c := Vector2(x, cy)
 		var voted: bool = shop != null and shop.reroll_votes.get(s.index, false)
-		var auto: bool = s.is_bot() or s.input == null or not s.input.is_connected_device()
+		var auto: bool = s.is_bot() or PlayerManager.is_absent(s)
 		_pips.draw_circle(c, 9.0, Color(0.05, 0.04, 0.03, 0.95))
 		if voted:
 			_pips.draw_circle(c, 8.0, s.color)

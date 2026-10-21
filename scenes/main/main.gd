@@ -101,7 +101,11 @@ const SMOKE_DUNGEON_ALLOWANCE := 60.0 + 60.0 + Dungeon.SMOKE_BOSS_GRACE + 60.0 +
 ## Game seconds a boss wave of a smoke run may take on top of its nominal duration: the enrage
 ## (90 s), the safety kill after it (WaveDirector.SMOKE_BOSS_GRACE) and the fight's start.
 const SMOKE_BOSS_ALLOWANCE := 90.0 + WaveDirector.SMOKE_BOSS_GRACE + 30.0
-const DISCONNECT_NOTICE := "%s's controller disconnected – plug it back in to continue"
+const DISCONNECT_NOTICE := "%s's controller disconnected – reconnect it or take over with A"
+## The same for a Remote Play guest ("Mira (P3)").
+const REMOTE_DISCONNECT_NOTICE := "%s disconnected – waiting for them to come back"
+## A free pad pressed A during a run.
+const JOIN_LATER_NOTICE := "Joins at the next lobby"
 ## The banner of the endless mode's wave 25 clear (RunState.begins_endless): the run goes on.
 const ENDLESS_BEGINS_TEXT := "Endless begins!"
 
@@ -172,6 +176,8 @@ var _layers: Dictionary[int, CanvasLayer] = {}
 var _state_time := 0.0
 var _disconnected: Dictionary[int, bool] = {}
 var _error_counter: ErrorCounter
+## --hotplug-test (smoke): the scripted unplug / take-over / resume of P2 (null otherwise).
+var _hotplug: HotplugTest
 var _engine_tweaked := false
 var _boot_frame := 0
 var _run_frame := -1
@@ -228,6 +234,8 @@ func _ready() -> void:
 		OS.add_logger(_error_counter)
 	for arg in options.unknown:
 		push_warning("Main: unknown command line argument '%s'" % arg)
+	if options.smoke and options.hotplug_test and options.unknown.is_empty():
+		_hotplug = HotplugTest.new(options.start_wave + 1)
 	if options.smoke and not options.unknown.is_empty():
 		# A typo would play some other run and still exit 0: the smoke ends now as "bad_args" (exit 1).
 		_finish_smoke("bad_args")
@@ -237,6 +245,8 @@ func _ready() -> void:
 	_build_layers()
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
 	PlayerManager.device_reconnected.connect(_on_device_reconnected)
+	PlayerManager.join_refused.connect(_on_join_refused)
+	RemotePlay.overlay_toggled.connect(_on_overlay_toggled)
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
 	RunState.artifact_dropped.connect(_on_artifact_dropped)
@@ -256,6 +266,8 @@ func _ready() -> void:
 		&"lobby":
 			go_to_lobby()
 			_add_bots()
+			if options.hotplug_test:
+				HotplugTest.make_ghost(PlayerManager.get_slot(HotplugTest.SLOT_INDEX))  # (screenshot: P2's controller is gone)
 			if PlayerManager.count() >= 2:
 				PlayerManager.get_slot(0).ready = true
 			if options.view == "roll":
@@ -276,6 +288,12 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	PlayerManager.takeover_enabled = false
+	if _hotplug != null:
+		_hotplug.finish()
+		_hotplug = null
+	elif options != null and options.hotplug_test:
+		PadSource.enable_fake(false)
 	if _error_counter != null:
 		OS.remove_logger(_error_counter)
 		_error_counter = null
@@ -303,9 +321,9 @@ func go_to_menu() -> void:
 func go_to_lobby() -> void:
 	_teardown_run()
 	_free_main_menu()
-	# A controller that died during the run / on the game-over screen must not leave a ghost
-	# slot behind (it could never ready up).
-	PlayerManager.prune_disconnected()
+	# (A controller that died during the run / on the game-over screen leaves a ghost slot: the lobby – new or reused –
+	# restarts its clock and frees it after PlayerManager.GHOST_TIMEOUT in there, Lobby.reset(). Pruning here would
+	# count the whole run and the end screens against the player.)
 	if lobby == null:
 		lobby = Lobby.create()
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
@@ -966,12 +984,12 @@ func _is_in_action() -> bool:
 	return state == State.WAVE or state == State.WAVE_END or state == State.DUNGEON
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not get_tree().paused and _is_in_action():
 		_poll_pause_buttons()
 		if state == State.WAVE:
 			_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
-	_update_harness()
+	_update_harness(delta)
 
 
 func _poll_pause_buttons() -> void:
@@ -1002,7 +1020,7 @@ func _show_disconnect_notice() -> void:
 	for index: int in indices:
 		var other := PlayerManager.get_slot(index)
 		if other != null:
-			hud.show_notice(DISCONNECT_NOTICE % other.label())
+			hud.show_notice(disconnect_notice(other))
 			return
 	hud.hide_notice()
 
@@ -1154,6 +1172,8 @@ static func _free_node(node: Variant) -> void:
 func _set_state(s: State) -> void:
 	state = s
 	_state_time = 0.0
+	# A run is on: a pad nobody plays takes a missing player's slot over with A (PlayerManager.take_over).
+	PlayerManager.takeover_enabled = s in [State.WAVE, State.WAVE_END, State.INTERMISSION, State.DUNGEON]
 	_update_music()
 	state_changed.emit(s)
 
@@ -1418,17 +1438,53 @@ func _revive_all() -> void:
 	_log("party wiped on wave %d – the smoke run revives everybody (wipe %d)" % [wave, wipes])
 
 
+## The HUD line for [param slot]'s missing controller: names a Remote Play guest ("Mira (P3)").
+func disconnect_notice(slot: PlayerSlot) -> String:
+	return (REMOTE_DISCONNECT_NOTICE if slot.is_remote() else DISCONNECT_NOTICE) % RemotePlay.slot_label(slot)
+
+
 func _on_device_disconnected(slot: PlayerSlot) -> void:
 	if hud == null:
 		return  # the lobby handles its own disconnects
 	_disconnected[slot.index] = true
-	hud.show_notice(DISCONNECT_NOTICE % slot.label())
+	hud.show_notice(disconnect_notice(slot))
 	pause_game(null)
 
 
 func _on_device_reconnected(slot: PlayerSlot) -> void:
 	_disconnected.erase(slot.index)
 	_show_disconnect_notice()
+
+
+## A pad nobody plays pressed A during a run (no player is missing): new players join at the next lobby.
+func _on_join_refused(_device: int, reason: StringName) -> void:
+	if reason == &"in_run" and hud != null and (state == State.WAVE or state == State.WAVE_END or state == State.DUNGEON):
+		hud.flash_notice(JOIN_LATER_NOTICE)
+
+
+## The platform overlay (Steam) opened: the run waits.
+func _on_overlay_toggled(active: bool) -> void:
+	if active:
+		_pause_for_platform()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		focus_lost()
+
+
+## The window lost the focus (alt-tab, the Steam overlay, a notification): during a wave or a dungeon the run pauses,
+## because a Remote Play guest sees a wait screen then and cannot play on. The Settings toggle "Pause when the window
+## loses focus" (default on) switches it off; automated runs never do it ([param real_session] is for tests).
+func focus_lost(real_session: bool = Settings.persist) -> void:
+	if real_session and bool(Settings.get_value(GameSettings.PAUSE_ON_FOCUS_LOSS)):
+		_pause_for_platform()
+
+
+## Pauses a running wave or dungeon (nobody paused it: the menu is the slot-less one, any joined START resumes).
+func _pause_for_platform() -> void:
+	if state == State.WAVE or state == State.DUNGEON:
+		pause_game(null)
 
 
 func _on_leveled_up(_level: int) -> void:
@@ -1468,6 +1524,7 @@ func _add_bots() -> void:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
 		if bot != null:
+			bot.session_id = RemotePlay.session_of_bot(i)  # (--fake-rpt: the first bots play as guests)
 			Meta.apply_loadout(bot)  # (M9: what the profile remembers for the class, as in the lobby; nothing for the dev profile)
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
@@ -1621,6 +1678,10 @@ func smoke_result(result: String) -> Dictionary:
 		data["pressures"] = _pressure_log.duplicate()
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
+	if _hotplug != null:
+		data["hotplug"] = _hotplug.summary()  # (--hotplug-test only)
+	if RemotePlay.backend is FakeRemotePlayBackend:
+		data["fake_rpt"] = RemotePlay.session_ids().size()  # (--fake-rpt only)
 	if not options.unknown.is_empty():
 		data["unknown_args"] = options.unknown
 	return data
@@ -1630,7 +1691,11 @@ func smoke_result(result: String) -> Dictionary:
 ## (a typo such as --env=nope would otherwise play a different run, and the run would still exit 0), else
 ## [param result] as the run ended. Only a "completed" result without errors exits 0 (see _finish_smoke).
 func smoke_outcome(result: String) -> String:
-	return "bad_args" if not options.unknown.is_empty() else result
+	if not options.unknown.is_empty():
+		return "bad_args"
+	if result == "completed" and _hotplug != null and not _hotplug.is_done():
+		return "hotplug_incomplete"  # (the run ended before the scripted unplug / take-over / resume finished)
+	return result
 
 
 ## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).
@@ -1655,10 +1720,15 @@ func abilities_learned() -> int:
 	return n
 
 
-func _update_harness() -> void:
+func _update_harness(delta: float) -> void:
 	if _smoke_running and not _smoke_done and Time.get_ticks_msec() > _smoke_deadline_msec:
 		_log("smoke run timed out in state %s" % State.keys()[state])
 		_finish_smoke("timeout")
+	if _hotplug != null and _smoke_running and not _smoke_done:
+		var why := _hotplug.tick(self, delta)
+		if why != "":
+			_log("hotplug test failed: %s" % why)
+			_finish_smoke("hotplug_failed")
 	if not _view_forced and options.view in LaunchOptions.RUN_VIEWS and _run_frame >= 0 \
 			and _game_time() >= options.effective_view_time():
 		_view_forced = true
@@ -1687,8 +1757,11 @@ func _force_view() -> void:
 			end_run(true)
 			_end_screen_extras()
 		"pause":
-			var slots := PlayerManager.get_slots()
-			pause_game(slots[0] if not slots.is_empty() else null)
+			if options.hotplug_test:
+				HotplugTest.make_ghost(PlayerManager.get_slot(HotplugTest.SLOT_INDEX))  # (the next frame pauses, with the take-over prompt)
+			else:
+				var slots := PlayerManager.get_slots()
+				pause_game(slots[0] if not slots.is_empty() else null)
 
 
 ## --end-page / --save-card on the forced end screen (screenshots of the Damage Meter and the card).

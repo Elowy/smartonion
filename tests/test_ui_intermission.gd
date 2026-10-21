@@ -134,6 +134,42 @@ func test_unplugged_player_does_not_block() -> void:
 	check_eq(continues, 1, "continues without the unplugged player")
 
 
+func _chip_text(node: Node) -> String:
+	var out := ""
+	if node is Label:
+		out += (node as Label).text + " "
+	for c in node.get_children():
+		out += _chip_text(c)
+	return out
+
+
+func test_the_chip_follows_a_pad_that_goes_missing_and_comes_back_inside_the_grace() -> void:
+	PlayerManager.auto_decide_grace = 5.0
+	_human("pad:a")
+	var b := _human("pad:b")
+	screen.open(1, 0)
+	UiFakes.step(screen)
+	UiFakes.step(screen)
+	var chip: PanelContainer = screen.chips_row.get_child(1)
+	check(not _chip_text(chip).contains("Reconnecting") and _chip_text(chip).contains("to ready"), "a working pad: 'to ready'")
+	b.connected = false  # a blip, well inside the grace
+	UiFakes.step(screen)
+	check(_chip_text(chip).contains("Reconnecting"), "the chip says so at once: %s" % _chip_text(chip))
+	b.connected = true
+	UiFakes.step(screen)
+	check(not _chip_text(chip).contains("Reconnecting") and _chip_text(chip).contains("to ready"), "and drops it when the pad is back: %s" % _chip_text(chip))
+	# Already missing when the market opens, back before the grace ends.
+	b.connected = false
+	screen.open(2, 0)
+	UiFakes.step(screen)
+	UiFakes.step(screen)
+	chip = screen.chips_row.get_child(1)
+	check(_chip_text(chip).contains("Reconnecting"), "a pad missing at the start reads 'Reconnecting…'")
+	b.connected = true
+	UiFakes.step(screen)
+	check(_chip_text(chip).contains("to ready"), "its return is shown: %s" % _chip_text(chip))
+
+
 func test_b_and_start_together_act_as_b() -> void:
 	var a := _human("pad:a")
 	_human("pad:b")

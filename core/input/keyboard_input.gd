@@ -3,7 +3,7 @@ extends PlayerInput
 ## Keyboard + mouse player (GDD chapter 11).
 ## WASD / arrows move, LMB / RMB = core abilities, Q / E = learned abilities,
 ## Enter / Space / F = confirm, Esc / Backspace = back, R = sell, C = compare,
-## Tab = ping, P / Esc = pause.
+## Tab = ping, P / Esc = pause, I = L3 (lobby: invite friends).
 
 ## The keys that confirm (Pad.A) AND join a new keyboard player in the lobby: one list, so
 ## the join gesture and the confirm gesture can never drift apart.
@@ -19,6 +19,7 @@ const _KEYS := {
 	PlayerInput.Pad.START: [KEY_P, KEY_ESCAPE],
 	PlayerInput.Pad.SELECT: [KEY_TAB],
 	PlayerInput.Pad.R3: [KEY_TAB],
+	PlayerInput.Pad.L3: [KEY_I],
 	PlayerInput.Pad.DPAD_UP: [KEY_UP],
 	PlayerInput.Pad.DPAD_DOWN: [KEY_DOWN],
 	PlayerInput.Pad.DPAD_LEFT: [KEY_LEFT],

@@ -15,20 +15,20 @@ enchants, hand-made items); M7a the sound layer, the Settings and Credits pages,
 
 ```
 autoload/   Db (data registry), PlayerManager (devices / slots), RunState (shared run state), Audio and Settings (M7a),
-            Meta (M9: the main profile, unlocks, the run-end hook)
-core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots);
+            Meta (M9: the main profile, unlocks, the run-end hook), RemotePlay (RPT: the platform backend, Steam optional)
+core/       Stats, StatBlock, CombatMath, PlayerSlot, input/ (PlayerInput + devices + bots + PadSource / PadIdentity, RPT);
             items/ shop/ loot/ (M2), abilities/ (M3), progression/ (M4), bonus/ talents/ (M5);
             run_summary.gd, run_card.gd (M6a); leaderboard.gd, shrines.gd, shrine_vote.gd,
             dungeon/ (M6b); audio_ids.gd, game_settings.gd, setting_option.gd (M7a);
             meta/ (M9: profile, class levels, achievements, run report, Wardrobe); difficulty.gd, pressure.gd,
-            seasonings.gd (M9); items/heirlooms.gd (M9)
+            seasonings.gd (M9); items/heirlooms.gd (M9); host_rules.gd and platform/ (RPT: the Remote Play backends)
 data/       *_data.gd resource classes + classes/ weapons/ enemies/ .tres content; items/
             item_bases/ affixes/ enchants/ uniques/ (M2), abilities/ resources/ (M3),
             talents/ sets/ forge/ (M5), bosses/ consumables/ artifacts/ (M6a),
             environments/ shrines/ (M6b), audio/ (M7a), icons/ (M7b); seasonings/ heirlooms/ cosmetics/ achievements/
             difficulties/ pressure/ unlocks/ meta/ (M9)
 scenes/
-  main/     Main – game flow state machine                         [integration]
+  main/     Main – game flow state machine; HotplugTest (RPT, --hotplug-test)   [integration]
   arena/    Arena – battlefield, walls, entities root; ArenaThemes (M6b); ArenaGround,
             ArenaAmbient, ArenaFx, ArenaBackdrop, ArenaCrypt (M7b)  [visuals]
   camera/   CameraRig                                                [visuals]
@@ -93,11 +93,12 @@ the new screen never sees the button press that closed the old one.
    readies with A, leaves with B. All joined players ready → countdown → `start_requested`
    → (M6b: the "Rolling the arena..." screen, unless smoke / demo / view) → run (a new join, an
    unready or a mode change cancels the countdown). Any joined player's Y / X change the run mode /
-   Hardcore. B with nobody joined → MENU.
+   Hardcore. B with nobody joined (or only ghosts) → MENU.
    The join press is swallowed (`PlayerInput.swallow()`): it never also readies the player,
-   and navigation waits until the stick is neutral. Slots of unplugged pads are pruned
-   (`PlayerManager.prune_disconnected()`) when the lobby opens / resets and every frame
-   while it is open, so a dead controller can never block the countdown or Back.
+   and navigation waits until the stick is neutral. A slot whose pad is unplugged waits as a ghost
+   ("Disconnected", RPT) and is pruned after `PlayerManager.GHOST_TIMEOUT` (60 s): the lobby calls
+   `prune_disconnected(GHOST_TIMEOUT)` when it opens / resets and every frame while it is open, so a dead
+   controller cannot block the countdown or Back for long. See the RPT chapter.
 3. **RUN / WAVE n** – `RunState.start_run(count, seed, mode, hardcore, environment)` (M6b), `Arena.create(environment,
    not hardcore)`,
    `WaveDirector.create(arena)`, one `Player.create(slot)` per slot under `arena.entities`
@@ -164,7 +165,7 @@ the new screen never sees the button press that closed the old one.
    **Disconnects:** `PlayerManager.device_disconnected` during a run → pause + HUD notice;
    a wave never starts while a joined pad is unplugged (`Main.start_wave` pauses at once).
    While any joined pad is unplugged, START / B / Resume do nothing; the PauseMenu offers
-   "Continue without Pn" → `Main.drop_player(slot)` frees that hero, `PlayerManager.leave`,
+   "Continue without Pn" (RPT: two presses; a free pad may take the slot over instead) → `Main.drop_player(slot)` frees that hero, `PlayerManager.leave`,
    rebinds the HUD and resumes (nobody left → LOBBY; the rest all downed → defeat).
    `device_reconnected` → notice hidden (the player resumes with START).
 7. `RunState.leveled_up` during a wave → `Vfx.level_up_burst` on every living player (the HUD
@@ -293,6 +294,8 @@ Parsed by `LaunchOptions` from `OS.get_cmdline_user_args()` (everything after `-
 | `--view=patch`, `--patch-tab=classes\|seasonings\|heirlooms\|achievements\|wardrobe` | M9 dev: opens The Onion Patch from the main menu, on that tab. |
 | `--loadout-tab=seasonings\|heirloom\|look` | M9 dev: with `--view=lobby`, the second player's Loadout opens on that tab. |
 | `--loadout-player=1..4` | M9 dev: with `--loadout-tab`, the player whose Loadout opens instead of the second's (that player is un-readied first). |
+| `--fake-rpt[=N]` | RPT dev: N (1–3; bare = 2; 0 = off) of the controllers, or bots 2..N+1 in smoke, demo and view runs, play as Remote Play guests with names (`FakeRemotePlayBackend`). The lobby cards say "Remote · Mira", the notices name them and the host rules apply to them. It does not change whether the run is automated. `SMOKE_RESULT` gets `fake_rpt` only then. See the RPT chapter. |
+| `--hotplug-test` | RPT smoke hook: needs `--smoke`, `--players>=2` and at least two waves (with `--view=lobby` or `--view=pause` it only stages P2's missing controller for a screenshot). During the second wave P2's bot moves onto a fake pad that is unplugged; the run must pause with the take-over prompt, another fake pad takes the slot over with A, START resumes, and P2 is the bot again. `SMOKE_RESULT` gets a `hotplug` block; a step that fails or a flow that does not finish ends the run `hotplug_failed` / `hotplug_incomplete` (exit 1). Own timers, no `RunState.rng`. See the RPT chapter. |
 | `--seed=N` | `RunState` seed and bot seeds (smoke runs default to seed 1). |
 | `--start-wave=N` | First wave of the run (testing later waves). |
 | `--screenshot=PATH` `--shot-time=S` | Saves the viewport as PNG after S seconds of game time since the run started (since boot for the menu / lobby) and quits. Needs a display: `xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver opengl3 -- ...` |
@@ -332,7 +335,7 @@ over the heroes), `talent_resets`, `set_bonuses` (Σ `SetBonuses.active_count`) 
 `consumables_bought`, `black_market_bought`, `enchants_done`, `dust_earned`, `dust_spent`, `run_time` and `meter`
 (per slot) (see the M6a chapter). M6b adds `mode`, `hardcore`, `environment`, `events_spawned`, `events_completed`,
 `shrines_offered`, `shrines_accepted`, `dungeons_entered`, `dungeons_completed`, `dungeons_failed`,
-`dungeon_rooms_cleared`, `dungeon_time`, `hazards` and (only with a bad command line) `unknown_args` (see the M6b chapter).
+`dungeon_rooms_cleared`, `dungeon_time`, `hazards` and (only with a bad command line) `unknown_args` (see the M6b chapter). RPT adds `fake_rpt` (only with `--fake-rpt`) and `hotplug` (only with `--hotplug-test`); see the RPT chapter.
 Each cleared wave also prints a
 `SMOKE wave n cleared ...` line (M5: `elites killed/spawned, goblin spawned/killed/escaped`),
 and each closed market prints `SMOKE market closed after wave n: G gold carried into wave n+1
@@ -456,7 +459,8 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   ◀ ▶ = `Db.cycle_class`, A toggles ready, START readies, B unreadies or leaves. Everyone
   ready → `COUNTDOWN_TIME` (3 s) countdown, cancelled by an unready or a join →
   `start_requested` (once; joining is switched off). B / Esc with nobody joined →
-  `back_requested`. A controller unplugged in the lobby leaves its slot. Each card has a live
+  `back_requested` (also when only ghosts are joined: they are freed). A controller unplugged in the lobby keeps its
+  slot as a ghost (RPT; freed after `PlayerManager.GHOST_TIMEOUT`). Each card has a live
   `OnionPreview` (SubViewport with its own World3D).
 - `Hud`: listens to `RunState` (wave, gold with a count-up and one "+N" floater right of the
   coin that sums every pickup while it shows – `FLOATER_TIME` 0.6 s after the last one –, XP,
@@ -523,7 +527,8 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
 - `Intermission.open(wave, level_ups)` / `GameOverScreen.open(victory)` / `PauseMenu.open(slot)`
   ignore the input of the frame they were opened on (Game Over: the first
   `INPUT_DELAY` = 1 s) and emit their signal once per `open()`. Intermission: humans ready with
-  A / START, unready with B; bots (`is_bot()`) and unplugged devices are auto-ready.
+  A / START, unready with B; bots (`is_bot()`) and absent players (`PlayerManager.is_absent`: missing for longer
+  than the RPT grace, 5 s) are auto-ready.
   A "Next wave in 42 s" line counts down `Intermission.auto_continue_time` (static setting,
   default 60 s, ≤ 0 = off and hidden – the settings menu comes later); at 0 it emits
   `continue_requested` without the stragglers.
@@ -680,8 +685,8 @@ scenes/ui/shop/    ShopPanel          scenes/ui/loot/   LootRollScreen
     fires when the last missing voter unplugs / leaves or the gold arrives later.
   - **Hold-to-buy** remembers the offer's item uid + price and is cancelled by a reroll
     (`Shop.rerolled`), any change of the offer, B, or the player unplugging / leaving.
-  - **Unplug / leave:** a pad that comes back is un-readied (auto-ready lasts only while it is
-    unplugged); an unplugged player's shop cursor and tooltip are hidden;
+  - **Unplug / leave:** a pad that comes back is un-readied (auto-ready lasts only while the player is
+    absent, i.e. past the RPT grace: `PlayerManager.is_absent`); an unplugged player's shop cursor and tooltip are hidden;
     `PlayerManager.player_left` refreshes panels, chips, the shop cursors and the votes.
 - **Market tooltips** (corner panels, `tooltip_inside`): inside a corner panel the selected
   item's tooltip sits on the panel half away from the selection, scaled down to the panel's
@@ -885,8 +890,8 @@ core/progression/    LevelUpDeck / LevelCard / StatCards / Trainer (the rules; s
   never a card that needs a replacement (other cards are tried if one fails to apply); a
   pending specialisation takes the highlighted one (bots: the first). Bots
   (`PlayerSlot.is_bot()`) pick at once, or after `LevelUpScreen.bot_think_time` per pick with a
-  visible cursor walk (demo: `Main.DEMO_LEVEL_UP_THINK_TIME` 1 s); unplugged pads (also when
-  unplugged mid-phase) pick at once. The countdown `PICK_TIME` 40 s + `EXTRA_PICK_TIME` 20 s per
+  visible cursor walk (demo: `Main.DEMO_LEVEL_UP_THINK_TIME` 1 s); pads absent for longer than the RPT grace
+  (`PlayerManager.is_absent`; also when they go missing mid-phase) pick at once. The countdown `PICK_TIME` 40 s + `EXTRA_PICK_TIME` 20 s per
   further level (`LevelUpScreen.pick_time` ≤ 0 = off) auto-finishes every idle human.
 - **Input hygiene**: the phase swallows every human's held buttons / stick when it opens,
   skips the opening frame and ignores A / Y / B for `LevelUpScreen.INPUT_LOCKOUT` (0.4 s);
@@ -3026,7 +3031,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   a Decline; the clock declines the undecided; `remove_voter` may complete it or end it as "nobody"). `ShrineScreen` (the
   SHRINE phase): the card (`ShrineIcon`, name, duration, flavour, BOON / BANE in green / red), a timer bar, one chip per
   voter, A Accept / B Decline, `INPUT_LOCKOUT` 0.4 s, bots vote by `bot_accepts` (at once; demo: `bot_think_time`; with a
-  human present at least `MIN_BOT_DELAY` 0.9 s), an unplugged pad votes like a bot. The result shows 2.4 s (0 s when only
+  human present at least `MIN_BOT_DELAY` 0.9 s), a pad absent for longer than the RPT grace votes like a bot. The result shows 2.4 s (0 s when only
   bots voted and the screen is not slowed). `Intermission`: `_start_shrine` counts `shrines_offered`, `_on_shrine_decided`
   counts `shrines_accepted`, applies `Shrines.accept` and emits `shrine_resolved(id, accepted, reason)`; the SHRINE phase sits
   between LOOT and LEVEL_UP.
@@ -3047,7 +3052,7 @@ data/weapons/ forge/ item_bases/ affixes/ enchants/ uniques/   +212 content file
   mode, so never after 26+) or after the next wave once with `--dungeon` (`RunState.dungeon_forced`, spent by it,
   `portal_forced` true for that break). `RunState.last_wave_downs` (heroes downed in the wave just cleared) feeds the bots' rule.
 - **PORTAL phase** (`PortalScreen`, `VOTE_TIME` 20 s, `INPUT_LOCKOUT` 0.5 s): all voters accept -> `decided(true)`, any decline /
-  the timeout -> `decided(false)`, nobody left -> skip; an unplugged human abstains, a leaver takes the vote along. Bots
+  the timeout -> `decided(false)`, nobody left -> skip; a human absent for longer than the RPT grace (`PlayerManager.is_absent`) abstains, a leaver takes the vote along. Bots
   (`PortalScreen.bot_accepts(wave, downs, forced)`): yes after 6 and 9 and whenever forced, after 12 / 15 only when nobody was
   downed in that wave; demo `Main.DEMO_PORTAL_THINK_TIME` 1.5 s. Chips: pending = neutral `UiTheme.GOLD_BORDER`, green =
   Accept, red = Decline, the slot colour on the name only; `cast()` refreshes its chip. Accepted: `Intermission` sets
@@ -4483,3 +4488,392 @@ no video is committed. The requirements, the takes and how to change them are in
 - The Endless-mode Heirloom budget has no cap, and bots can swap the Heirloom out of its slot.
 - No one-time grant for players upgrading from earlier builds (the Hunter and the Shaman start locked).
 - The GDD's chapter 17.8 lists the M9 leftovers and the quest and backstory plans for the very end.
+
+## Remote Play Together: hotplug robustness, host rules, the optional Steam layer
+
+Online co-op (GDD 11, "Online co-op (Remote Play Together)"; GDD 16.1) has two layers. The base layer needs
+no Steam: controller identity, a slot that takes its own pad back, the take-over of a missing player in the
+lobby and during a run, the grace before the between-wave screens decide for an absent player, the host rules,
+and the pause on overlay or focus loss. The Steam layer is one optional backend behind a small interface.
+Steam streams the host's window, and a guest's gamepad reaches the host as a Steam Input virtual pad that
+appears and disappears at any time. Most of the work is therefore making hotplug safe, which also helps plain
+local co-op (an unplugged or flat pad).
+
+Three rules hold throughout:
+
+- **Automated runs never get a platform backend.** Smoke, demo, view, screenshot, headless and the unit tests
+  use the Null backend, or the Fake one when `--fake-rpt` asks for it. The Steam backend is not created in them
+  (`Settings.is_automated_run()`).
+- **No RPT code draws from `RunState.rng`.** Hotplug is read from the engine, the scripted `--hotplug-test` uses
+  its own timers, and the default seed-5 smoke stays identical to the base (checked when the package was merged).
+- **No script names the Steam singleton.** The project compiles and runs without the GodotSteam plug-in.
+
+### Modules and files
+
+| Area | Files | Role |
+|---|---|---|
+| Pad seam | `core/input/pad_source.gd` (`PadSource`), `core/input/pad_identity.gd` (`PadIdentity`) | The one place that asks the engine for pads; the per-frame snapshot; the fake table for tests and `--hotplug-test` |
+| Input | `core/input/joypad_input.gd` | `identity` (the fingerprint of the pad the input was made for), `is_connected_device()`; reads nothing while that pad is not on its id |
+| Slots | `core/player_slot.gd` | `session_id` (0 = local), `missing_time`, `connection_reported`, `idle_pads_at_loss`, `identity()`, `is_remote()` |
+| Players | `autoload/player_manager.gd` (`PlayerManager`) | Rebind, take-over, ghost slots and their clocks, free-pad joins, the grace query |
+| Host rules | `core/host_rules.gd` (`HostRules`) | Who may quit, quit to menu, drop a player, change the video settings, or invite |
+| Platform | `autoload/remote_play.gd` (`RemotePlay`); `core/platform/remote_play_backend.gd` (`RemotePlayBackend`, the inert base class), `null_remote_play_backend.gd`, `fake_remote_play_backend.gd`, `steam_remote_play_backend.gd` (`SteamRemotePlayBackend`) | The autoload, the backend interface and the three backends |
+| Main and dev | `scenes/main/main.gd` (disconnect notices, the take-over window, overlay and focus pause), `scenes/main/hotplug_test.gd` (`HotplugTest`), `scenes/main/launch_options.gd` (the flags) | Notices, the scripted hotplug smoke, the command line |
+| Screens | `scenes/ui/lobby.gd`, `lobby_card.gd`, `pause_menu.gd`, `main_menu.gd`, `settings_page.gd`, `ui_pads.gd`, `hud.gd`; `intermission.gd`, `shop/shop_panel.gd`, `loot/loot_roll_screen.gd`, `level_up/level_up_screen.gd`, `shrine/shrine_screen.gd`, `dungeon/portal_screen.gd` | Ghost cards, guest names, the prompts, the host-rule refusals, the grace |
+| Settings | `core/game_settings.gd` (`PAUSE_ON_FOCUS_LOSS`) | "Pause when the window loses focus" (Gameplay, default on) |
+| Steam tooling | `tools/steam/fetch_godotsteam.sh`; `.gitignore` (`/addons/godotsteam/`); `project.godot` (the `RemotePlay` autoload, `[smartonion] steam/app_id`, `[input_devices] joypads/ignore_joypad_on_unfocused_application=false`) | Fetching the pinned plug-in, keeping it out of git, the app id, the unfocused-pad setting |
+| Tests | `tests/test_rpt_core.gd`, `tests/test_rpt_steam.gd`, `tests/fake_steam_singleton.gd` | Core behaviour with fake pads; the Steam backend with a fake singleton |
+
+### PadSource and the identity snapshot
+
+Everything that reads controllers goes through `PadSource`: the join scan in `PlayerManager`, `UiPads` and
+`JoypadInput`. Its functions are `devices()`, `is_pad_connected(device)`, `identity(device)`,
+`is_button_down(device, button)`, `axis_value(device, axis)` and `pad_name(device)`.
+
+- **One snapshot per rendered frame.** The set of pads and each pad's `PadIdentity` are read once per
+  `Engine.get_process_frames()` value. A pad whose fingerprint has not changed keeps its identity object.
+  `invalidate()` forces a re-scan; `PlayerManager` calls it from `Input.joy_connection_changed`, which is
+  deferred and can describe a newer state than the moment it reports.
+- **`PadIdentity`** holds `device`, `pad_name`, `guid`, `vendor_id`, `product_id` and `steam_input_index` (the
+  Steam Input handle, `""` for any other pad). `fingerprint()` leaves the joypad id out, and `same_pad(other)`
+  compares pads, not ids. `PadIdentity.read(device)` reads a pad; `PadIdentity.make(...)` makes a fake one.
+- **Fake mode.** `PadSource.enable_fake(on)` switches the seam to a table the caller fills with
+  `fake_connect(device, identity?)` (without an identity the pad gets the guid `fake-<id>`), `fake_disconnect`,
+  `fake_press` and `fake_axis`. In fake mode the engine is not asked. `HotplugTest` turns it on, and `finish()`
+  turns it off.
+- **Guard test.** `test_no_script_asks_the_engine_for_pads_outside_the_seam` scans `res://scenes`, `res://core`
+  and `res://autoload` for `Input.get_connected_joypads(`, `Input.is_joy_button_pressed(`, `Input.get_joy_axis(`,
+  `Input.get_joy_name(`, `Input.get_joy_guid(` and `Input.get_joy_info(`, and allows only `pad_source.gd` and
+  `pad_identity.gd`. The one known exception is listed under Known gaps.
+
+### Identity: when a slot may take its pad back
+
+A slot never trusts the joypad id. Godot hands out ids lowest free first and reuses them after a disconnect, so
+an id can belong to a different pad later. A slot keeps:
+
+- the fingerprint of its pad at join (`JoypadInput.identity`, read in the constructor), and
+- its Remote Play session (`PlayerSlot.session_id`; 0 for a local pad).
+
+`JoypadInput.is_connected_device()` is true only while the same pad (by fingerprint) sits on its id. A
+`JoypadInput` whose pad is not on its id **reads nothing**: every `Pad` button (LT and RT included) is false and both
+sticks are zero. A ghost slot whose id was handed to somebody else's pad is therefore not driven by it (market
+cursor, ready flag, level-up and shrine panels, the game-over screen); a free pad's first A is seen only by
+`PlayerManager`'s scan.
+
+A connected pad that no working slot is bound to takes a missing slot back by itself only when it is the right pad
+and it **connected after the slot went missing**:
+
+- **the slot is a guest's:** the pad's Remote Play session is the slot's session (a guest keeps the seat whatever
+  virtual pad Steam shows), or
+- **the slot is local:** the fingerprint matches, and
+- **the pad was not already lying around:** when `track_connections` first sees a slot's device missing, it
+  announces the loss (`device_disconnected`: pause and notice) and then notes the pads that were connected and
+  unplayed at the end of the PREVIOUS frame (`PlayerManager._idle_last`) in `PlayerSlot.idle_pads_at_loss` (their
+  `PadIdentity` objects), so pads removed and re-added between two snapshots (a frame stall, SDL / Steam Input
+  re-adding every pad at once) still count as returning. Those pads cannot be the pad that went
+  away, so they never take the slot by themselves (an identical Xbox pad of a spectator, or of a player about to
+  join, would otherwise get P2's hero at once, with no pause and no notice). A pad that (re)connects afterwards is
+  a new `PadIdentity` object and can: the return is announced, so it is visible (`device_disconnected`, then
+  `device_reconnected`).
+
+Any other connected, unbound pad is a free pad: it can take a missing slot over with A (below), and the idle pads of
+the rule above are free pads too. Identical pad models without a Steam handle cannot be told apart; the lower slot
+number wins (a documented limit).
+
+### PlayerManager: rebind, take-over, ghosts and their clocks
+
+- **`rebind(index, input) -> bool`** gives a slot a new input. It refuses when another slot **whose device works**
+  (`is_connected_device()`) already has that device key: a ghost's stale `joy:N` is no claim on the id, because the
+  pad on it now is somebody else's and the ghost reads nothing from it. (Counting ghosts used to block pads that
+  came back on swapped ids from their own slots, and the manual take-over with them.) Otherwise it keeps the class,
+  ready flag, loadout and hero; sets `session_id` from `RemotePlay.session_of_device`; resets `missing_time` and
+  `idle_pads_at_loss`; swallows the press held on the new input; and emits `device_reconnected`.
+- **`take_over(device) -> PlayerSlot`** lets a free pad (`is_pad_free`: connected and bound to no working slot)
+  take over a missing slot: the one the pad provably belongs to (`_is_returning_pad`: same Remote Play session or
+  same fingerprint, e.g. an identical model that was lying around when the pad died), else the lowest
+  (`first_ghost()`). It returns `null` and changes nothing when no slot is missing or the pad is not free. The A
+  press is consumed, so it does not also act in the screen behind.
+- **`track_connections(delta)`** runs once a frame from `_process`, after the inputs are polled and before the
+  free-pad scan. For a slot whose device is missing it counts `missing_time`; on the first miss it emits
+  `device_disconnected` and notes the previous frame's idle pads (`idle_pads_at_loss`); only then does it try to give the slot back
+  to a returning pad (`_rebind_to_returning_pad`, which skips the noted pads and keeps scanning when a rebind
+  fails). `device_reconnected` follows when the slot works again (the engine's signal emits neither).
+- **`_scan_free_pads()`** edge-detects A per pad (the `joy:N` key is only the edge key) and then:
+  - a free pad's A takes the ghost it belongs to, else the lowest, over (`take_over`), if one exists;
+  - otherwise, in the lobby (`joining_enabled`), it joins a new player while the party has room;
+  - a full lobby emits `join_refused(device, &"full")` once per pad (the one-time "party is full" line; the
+    memory clears when a seat frees);
+  - outside the lobby, with `takeover_enabled` off, it emits `join_refused(device, &"in_run")`.
+- **Flags.** `joining_enabled` is on in the lobby. `Main._set_state` sets `takeover_enabled` for `WAVE`,
+  `WAVE_END`, `INTERMISSION` and `DUNGEON` only. `consume_takeover()` tells a menu that reads "any pad's A" to
+  skip the frame after a take-over.
+- **Constants and the grace.** `GHOST_TIMEOUT := 60.0` (seconds): the lobby frees a ghost missing this long.
+  `AUTO_DECIDE_GRACE := 5.0`: the between-wave screens' grace; the live value is `var auto_decide_grace`. Tests set
+  it to 0 in `UiFakes.reset_players()`, so the screen tests written before RPT keep "a missing pad is decided at
+  once"; the grace has its own tests in `test_rpt_core.gd`.
+- **Queries.** `first_ghost()`, `disconnected_slots()`, `is_missing(slot)` (a human whose device is gone),
+  `is_absent(slot)` (no input, or missing for at least `auto_decide_grace`; bots are never absent),
+  `is_pad_free(device)`, `is_pad_bound(device)` and `has_connected_human()`.
+- **Pruning.** `prune_disconnected(min_missing)` removes the human slots missing for at least `min_missing`
+  seconds. The lobby calls `restart_ghost_timers()` and then `prune_disconnected(GHOST_TIMEOUT)` when it resets
+  (`Lobby.reset`) and every frame while it is visible and not started (`Lobby._process`), so a ghost's clock starts
+  when the lobby opens. `Main.go_to_lobby()` does not prune before that (the clock would have counted the whole run
+  and the end screens), so a pad that died on the game-over screen keeps its seat for the lobby's full timeout. With
+  nobody but ghosts joined, B / Esc in the lobby frees them (`prune_disconnected()`) and leaves.
+
+### Take-over, state by state
+
+| State | A controller disappears | It comes back, or a free pad presses A |
+|---|---|---|
+| Main menu | Nothing: there are no slots. | – |
+| Lobby | The slot stays as a **ghost**. Its card reads "Disconnected" with the banner "Press A to take over"; the footer reads "P2 disconnected – press A on a free controller to take over". A ghost cannot ready up, so the countdown waits (a running one is cancelled). Freed after `GHOST_TIMEOUT`. | The same pad (or the same guest session) returns by itself. A free pad's A takes the ghost it belongs to (else the lowest) over, and does not join as a new player while a ghost exists. With only ghosts joined (a lone player whose pad died), B / Esc leaves the lobby and frees them. A fifth pad gets the one-time line "The party is full – a fifth controller cannot join". |
+| Wave, wave end, Dungeon | `Main._on_device_disconnected` pauses at once and shows a HUD notice: "P3's controller disconnected – reconnect it or take over with A", or for a guest "Mira (P3) disconnected – waiting for them to come back". The pause menu names the missing player ("press A on any free controller to take over, or wait for …") and offers "Continue without Pn" (two presses: "Are you sure?  Press again"). Resume is refused while anyone is missing. | The pad, or a free pad's A, fixes it. The game stays paused until START. A free pad's A during a wave or a dungeon while nobody is missing flashes "Joins at the next lobby". |
+| Intermission screens (market, loot roll, level-up, shrine, portal) | The screen waits `auto_decide_grace` before it decides for the player: auto-ready, auto-pass, auto-pick, a vote by the data, or abstain. Chips read "Reconnecting…" meanwhile (the market and shrine chips refresh when a pad goes missing or returns inside the grace). A return inside the grace changes nothing else. | Take-over works here too (`takeover_enabled`). The next wave start still pauses at once when someone is missing (`Main._pause_if_pad_missing`). |
+| Game over | No pause. | The ghost slot goes into the lobby with the party and waits there, as in the lobby row. |
+
+### Host rules (`core/host_rules.gd`)
+
+`HostRules` decides who may do a destructive or shared action. Its `Action` enum: `QUIT_GAME` (main menu),
+`QUIT_TO_MENU` and `DROP_PLAYER` (pause menu, "Continue without Pn"), `VIDEO_SETTINGS` (window mode, VSync, max FPS)
+and `INVITE` (the lobby's "Invite friends").
+
+- `may(action, slot)`: refused for a remote slot; a `null` slot (the keyboard, nobody) is allowed.
+- `may_device(action, device, party_present)`: device -1 (keyboard, mouse, bots, injected presses) is allowed; a
+  remote pad is refused; while a party is present, a pad no slot is bound to (a stray) is refused, except for
+  `INVITE`.
+- `may_any_device(action, devices, party_present)`: allowed when no pad pressed, or when any pad that pressed may act.
+- `is_video_key(key)`: `WINDOW_MODE`, `VSYNC` and `MAX_FPS`. `REFUSED_TEXT` = "Only the host can do that".
+
+Enforced at:
+
+- `MainMenu.activate_focused(devices)`: Quit game (`may_any_device(QUIT_GAME, …)`).
+- `PauseMenu.press_selected(allowed)`: Quit to Menu and "Continue without Pn". The caller passes the result of
+  `HostRules.may` for the driving slot, or `may_any_device` for free pads; a refused press shows the line.
+- `Lobby`: L3 / I "Invite friends" (`may(INVITE, slot)`).
+- `SettingsPage.change_selected(direction, by_mouse)`: the Video rows are refused for a guest's page. On a page
+  nobody in particular drives (the main menu's Settings, a slot-less pause menu) they are locked for pads and keys
+  while `RemotePlay.has_guests()`. The mouse still changes them. **"Reset to defaults"** follows the same rule
+  (`activate_selected(by_mouse)`): when the presser is locked and the reset would change a Video option, the whole
+  reset is refused with the same line (it would otherwise apply window mode, VSync and the FPS cap to the host's
+  window). With the Video rows at their defaults a guest's reset goes through; the host's pad and the mouse reset
+  everything.
+
+Not restricted, by the GDD's rule: mode (Y), Hardcore (X), difficulty (SELECT), Loadout and look. Without a
+backend no device is remote, so local co-op sees only two changes: "Continue without Pn" needs a second press, and
+an unjoined pad in the slot-less pause menu can no longer quit or drop a player while a party exists (it can still
+take a slot over and resume).
+
+### The RemotePlay autoload and the backend interface
+
+`RemotePlay` is an autoload (last in `[autoload]`) with `PROCESS_MODE_ALWAYS` and `process_priority = -1100`;
+`_process` calls `backend.poll()` every frame.
+
+**Backend choice** (`RemotePlay.create_default_backend(fake_count, automated, steam_path)`, run once in `_ready`):
+
+1. `fake_count > 0` (`--fake-rpt`): the Fake backend, also in automated runs.
+2. Not automated, and `ResourceLoader.exists(STEAM_BACKEND_PATH)`: `load()` the script and `call(&"try_create")`.
+   If that returns a `RemotePlayBackend`, it is used.
+3. Otherwise the Null backend.
+
+`set_backend(b)` swaps the backend and rewires the forwarded signals (`null` means Null).
+
+**Interface** (`core/platform/remote_play_backend.gd`, class `RemotePlayBackend`, extends `RefCounted`). The base
+class is the inert backend; `NullRemotePlayBackend` is an empty subclass of it.
+
+| Method | Meaning |
+|---|---|
+| `is_available() -> bool` | The platform layer works (Steam running and initialised; the Fake backend always) |
+| `poll() -> void` | Called once per rendered frame (run callbacks, read events) |
+| `session_of_device(device: int) -> int` | The Remote Play session of a joypad id; 0 = local or unknown |
+| `is_remote_device(device: int) -> bool` | In the base class, `session_of_device(device) != 0` |
+| `guest_name(session_id: int) -> String` | The display name; `""` while unknown |
+| `session_ids() -> Array[int]` | The guest sessions connected now |
+| `can_invite() -> bool`, `show_invite() -> void` | The platform's invite UI |
+
+Signals: `guest_connected(session_id: int, guest_name: String)`, `guest_disconnected(session_id: int)` and
+`overlay_toggled(active: bool)`.
+
+The autoload is what the game calls: `is_available()`, `session_of_device(device)` (a negative id gives 0),
+`session_of_bot(index)` (the Fake backend's bot sessions), `is_remote_device(device)`, `session_ids()`,
+`has_guests()`, `guest_name(session_id)` (0 gives ""; the backend's name, else the last name it gave for that
+session, so a guest who has left keeps their name; a session that never had one gives "Guest N", by place in the
+session list), `slot_name(slot)`, `slot_label(slot)` ("Mira (P3)", or "P3" for a local slot), `can_invite()` and
+`show_invite()` (which does nothing unless the backend can invite). It re-emits the three signals.
+
+| Backend | Class and file | When | Behaviour |
+|---|---|---|---|
+| Null | `RemotePlayBackend` (base) and `NullRemotePlayBackend` | The default; automated runs; no plug-in or no Steam | No guests, nothing invitable |
+| Fake | `FakeRemotePlayBackend` (`core/platform/fake_remote_play_backend.gd`) | Tests; `--fake-rpt=N` | N guests (at most 3 from the flag) named Mira, Tobi and Lena, on sessions 1001 and up (`FAKE_SESSION_BASE` + number). Joypad ids 1..N are theirs; id 0 stays the host's. `session_of_bot(i)` gives the smoke and view bots the same sessions. Scripting: `connect_guest`, `disconnect_guest`, `assign_device(device, session)`, `set_overlay(active)`, and the fields `available`, `invite_available` and `invites_shown`. |
+| Steam | `SteamRemotePlayBackend` (`core/platform/steam_remote_play_backend.gd`) | A real session with the plug-in present and Steam running | See the next subsection. |
+
+### The Steam backend
+
+**Loading.** `RemotePlay` loads the file by path only when it exists, so a checkout without the plug-in compiles and
+runs. Its entry point is `static func try_create(singleton_provider := Callable(), automated_provider := Callable())`.
+It returns `null` when:
+
+- the run is automated (`Settings.is_automated_run()`, reached through the script,
+  `load("res://autoload/settings.gd")`, because the Settings autoload may not exist yet);
+- there is no singleton (`Engine.has_singleton(&"Steam")` is false); or
+- `steamInitEx` fails (one `push_warning`, never an error).
+
+`create_from(steam, app_id)` does the same without the run-kind check; the tests use it. The game calls `try_create`
+once per process.
+
+**No identifier named `Steam`.** The script holds the singleton as an untyped `Object` (`_steam`), gets it with
+`Engine.get_singleton(&"Steam")`, and calls it with `Object.call` and `connect`. Every call is gated behind
+`is_available()`: GodotSteam logs an engine error for any RemotePlay or Input call made before Steam is initialised.
+A test scans the script's code, with comments and strings removed, for the bare identifier, so that it also fails on
+a machine that has the plug-in.
+
+**No static variables, and no self-reference.** The script declares no `static var` and does not name its own class
+(it uses `new()`). In Godot 4.7.2, a script that extends another script class and reads a static variable, or names
+itself, keeps every project script alive at exit ("resources still in use at exit", RID leak errors after a test
+run). The `static func`s are fine.
+
+**Start.** `_start(steam, app_id)`: if `get_current_app_id()` is non-zero, Steam was already initialised (the
+plug-in's own auto-init is on) and `steamInitEx` is not called again. Otherwise `steamInitEx(app_id, false)`; a
+result other than status 0 gives one warning ("Steam did not start (status N: …)"). Then `inputInit(false)`; without
+Steam Input the backend still starts, with one warning, but no guest pad can be mapped. The signals
+`remote_play_session_connected`, `remote_play_session_disconnected` and `overlay_toggled` are connected; a missing
+signal gives one warning.
+
+**App id.** `configured_app_id()` reads the project setting `smartonion/steam/app_id` (default 480; a non-positive or
+non-numeric value falls back to 480).
+
+**Methods used.** `steamInitEx`, `get_current_app_id`, `inputInit`, `run_callbacks`, `getRemotePlaySessionID`,
+`getSessionCount`, `getSessionID`, `getSessionGuestID`, `getSessionSteamID`, `getFriendPersonaName` and
+`showRemotePlayTogetherUI`. Never called: the direct keyboard and mouse API (`getInput`, `createMouseCursor`,
+`enableRemotePlayTogetherDirectInput`); a test checks this.
+
+**Behaviour.**
+
+- `poll()` calls `run_callbacks()` every frame (GodotSteam delivers its signals only then). The first poll reads the
+  session list, so guests that connected before the game started are announced. Every 60 polls
+  (`RECONCILE_EVERY_POLLS`) the list is reconciled with Steam's, and the differences are announced.
+- `session_of_device(device)` needs Steam Input to have started. The handle is
+  `PadSource.identity(device).steam_input_index` as an int (Godot's `get_joy_info` "steam_input_index", read through
+  the seam; 0 for a pad that is not a Steam one), and
+  `getRemotePlaySessionID(handle)` > 0 means a guest. A guest's answer is cached by handle until that session
+  leaves; a "local" answer is asked at most once per frame per handle. The joypad id is never the cache key.
+- `guest_name(session)` is `getFriendPersonaName(getSessionSteamID(session))`. While Steam has no name, it is
+  "Guest N": N is Steam's guest id (1 to 99) or the lowest free number, fixed per session. The device name
+  (`getSessionClientName`) is not used; it names the guest's device, not the player. A resolved persona name is
+  remembered per session (session ids are not reused); for a session that has left, `guest_name` answers from that
+  memory (or `""`) with no Steam call and no new "Guest N" number (Steam knows nothing of an ended session).
+- `session_ids()` is sorted.
+- `remote_play_session_connected` becomes `guest_connected(session, guest_name(session))`;
+  `remote_play_session_disconnected` becomes `guest_disconnected`; `overlay_toggled(active, user_initiated, app_id)`
+  becomes `overlay_toggled(active)`. Every session counts as a guest, including a Steam Link session of the host's
+  own account.
+- `can_invite()` is `is_available()`. `show_invite()` calls `showRemotePlayTogetherUI()`; if Steam refuses (Remote
+  Play Together is not enabled for the app), it warns once.
+- Only `push_warning` is used, never `push_error`, because the smoke runs and the test runner fail on errors.
+
+Probed on Linux, Godot 4.7.2 and GodotSteam 4.23.2, without a Steam client: the plug-in prints nothing on load, and
+`steamInitEx(480)` returns status 1. Valve's library writes a few `[S_API]` lines to stdout, which Godot's logger
+does not see. The game logs one warning and plays on with the Null backend; a second `try_create()` repeats this.
+
+### Steam plug-in: fetch, git, app id, export
+
+- `tools/steam/fetch_godotsteam.sh` fetches the pinned GodotSteam `v4.23.2-gde` (Godot 4.4+, Steamworks SDK 1.65,
+  MIT) from its Codeberg release. It checks the sha256 before anything is unpacked, then extracts only the
+  `.gdextension`, the licence and the `win64` and `linux64` files into `addons/godotsteam/`. Options: `--dest DIR`,
+  `--zip FILE` (an archive downloaded by hand; the hash is still checked) and `--force`. A `.fetched` stamp makes a
+  second run a no-op. macOS is not fetched.
+- The folder is gitignored (`/addons/godotsteam/`). It holds Valve's `steam_api64.dll` and `libsteam_api.so`, which
+  may be redistributed with the game but not in a source repository.
+- The plug-in's own "initialize on startup" setting stays off. The backend initialises Steam itself, with the
+  configured app id.
+- The app id setting `smartonion/steam/app_id` is 480 (Valve's test app, Spacewar), for development only. A release
+  needs the registered Steamworks app id there. No `steam_appid.txt` is used or shipped. `restartAppIfNecessary` is
+  not called (with 480 it would start Spacewar), so until the real id is set the game is started from the Steam
+  library.
+- Export: the export presets (`export_presets.cfg`) are local and gitignored. Export copies the GodotSteam
+  libraries (`libgodotsteam.<platform>.template_<debug|release>.x86_64.<dll|so>`) and Valve's library next to the
+  executable; they must ship in the same folder. Export from a checkout where the plug-in was fetched and imported.
+  Without the plug-in at export time, the game still exports and runs without Steam features.
+- Licence: GodotSteam is MIT, which requires its copyright and permission notice in every copy. `CREDITS.md` has a
+  "Libraries" section with the name, version (4.23.2, as pinned in `fetch_godotsteam.sh`), copyright line, URL and the
+  MIT text of `addons/godotsteam/license.md` (that file is gitignored and not exported), and the in-game Credits page
+  shows it. So a Steam build must carry `CREDITS.md` (the `*.md` include filter, see Menus); a test keeps the section
+  and the version in step.
+
+### Command-line flags and smoke fields
+
+The two flags are in the command-line table above. Behaviour:
+
+- **`--fake-rpt[=N]`** (`LaunchOptions.fake_rpt`; bare = 2; clamped to 0..3): creates the Fake backend with N guests.
+  In interactive runs pads 1..N are the guests; in smoke, demo and view runs bots 2..N+1 are, through
+  `RemotePlay.session_of_bot`.
+- **`--hotplug-test`** (`HotplugTest`, `scenes/main/hotplug_test.gd`): in the second wave (`start_wave + 1`), P2's bot
+  is moved onto fake pad 6 (`PAD_OLD`), which is unplugged after 4 game seconds (`WAIT_SECONDS`). The steps wait for
+  the real flow: `track_connections` → `Main._on_device_disconnected` → the pause menu → `take_over` (fake pad 7,
+  `PAD_NEW`, presses A) → START resumes → P2's bot takes its slot back with `PlayerManager.rebind` and the fake pads
+  leave. Each step has a 20 s real-time limit (`STEP_TIMEOUT`). `SMOKE_RESULT` gets
+  `hotplug: {disconnected, paused_with_prompt, took_over, resumed, done, notice, failure}`. A failed step ends the run
+  `hotplug_failed`; a run that ends before the flow finishes is `hotplug_incomplete`; both exit 1. Because pauses
+  cost rendered frames and the camera follows rendered frames, this run is not bit-identical to the plain smoke.
+- With `--view=lobby` or `--view=pause` the same flag only stages the state for a screenshot (`HotplugTest.make_ghost`):
+  P2's controller is gone, and the lobby card or the pause menu shows it.
+
+### Pause on overlay and focus loss
+
+- `RemotePlay.overlay_toggled(true)` → `Main._on_overlay_toggled` → `_pause_for_platform()`: a running wave or
+  dungeon pauses (through the slot-less pause menu; any joined START resumes).
+- `NOTIFICATION_APPLICATION_FOCUS_OUT` → `Main.focus_lost(real_session := Settings.persist)` → the same pause, if
+  `GameSettings.PAUSE_ON_FOCUS_LOSS` is on and the session is real. The setting is "Pause when the window loses
+  focus", in the Gameplay section, default on; its file key is `pause_on_focus_loss`.
+- `project.godot` pins `[input_devices] joypads/ignore_joypad_on_unfocused_application=false`, so a guest's pad keeps
+  working while the host's window has no focus. The value is set rather than left to the engine default.
+
+### UI strings (English)
+
+Lobby card: header "Remote · <name>" for a guest, "Disconnected" for a ghost; banner "Press A to take over" (or
+"Waiting for <name>" for a guest); lobby footer "<P2> disconnected – press A on a free controller to take over";
+"Invite friends" (L3, keyboard I) once somebody has joined and the backend can invite. Notices: "Joins at the next
+lobby", "The party is full – a fifth controller cannot join", "Reconnecting…" (an intermission chip), "Only the host
+can do that" (also for a guest's "Reset to defaults" that would change the window), and the take-over prompt "Free controller: take over" in the pause menu.
+
+### Tests
+
+- `tests/test_rpt_core.gd` (`extends TestCase`): the seam with fake pads and the guard test; identity and rebind;
+  take-over in the lobby and during a run (swapped ids, stale ids, the matching ghost, an idle identical pad); ghosts
+  and their timeouts (also through `Main.go_to_lobby` and the lone ghost's B); a pad that is not on its id reads
+  nothing; the grace; the host rules (Reset included); guest names after a session ended; the RemotePlay autoload
+  with the Null and Fake backends; the flags; the Settings option; the overlay and focus pause.
+- `tests/test_rpt_steam.gd` (`extends TestCase`): the Steam backend, driven by `tests/fake_steam_singleton.gd`
+  (`FakeSteamSingleton`). It is a stand-in with the plug-in's method and signal names; it records calls made before
+  initialisation and forbidden calls, and forgets a session's Steam id and guest id when the guest leaves, like Steam.
+  No Steam client and no plug-in is needed. It covers the init failures, the automated-run gate, the app id, handles
+  and their cache, guest names (also after the guest left), reconciliation, the invite and the no-identifier check.
+- Existing tests changed on purpose: the lobby tests that expected a missing player's slot to be freed at once now
+  assert that the ghost is kept and freed after the timeout; "Continue without Pn" needs two presses; the Settings
+  test counts the new Gameplay toggle; `UiFakes.reset_players()` sets the grace to 0.
+
+### Known gaps (RPT)
+
+- **Not tested on real Steam hardware.** These Steam behaviours are assumed, not observed: the id reuse order of
+  Steam virtual pads; whether `steam_input_index` stays the same when a guest reconnects; whether the Steam overlay
+  raises `NOTIFICATION_APPLICATION_FOCUS_OUT`; whether Windows caps Steam's emulated pads at four (a fifth remote pad
+  might then never appear); and the name of a link guest without a Steam account. The manual checklist is
+  `docs/REMOTE_PLAY_TEST.md`.
+- **No separate guest keyboard or mouse.** GodotSteam 4.23.2's direct-input bindings are broken: `getInput()` passes
+  a null buffer, `createMouseCursor()` reads through a null pointer, and `remote_play_session_avatar_loaded` is
+  declared with four arguments but emitted with one. The backend never calls them. A guest's merged keyboard or
+  mouse acts as the host's, as far as the game can tell.
+- **Identical pad models** with no Steam handle cannot be told apart (see Identity). An identical idle pad that was
+  already connected (idle in the frame before) when a slot's pad died does not take the slot by itself; its owner
+  takes it over with A. The trade-off: an identical pad that first appears in the very frame the loss is seen counts
+  as returning and may take the slot by itself (the loss and its return are both announced).
+- **Video rows and Reset in unattended pages** are locked for every pad and key while guests are connected; only the
+  mouse changes them then. "Reset to defaults" is refused as a whole (not partly) when it would change a Video row.
+- **Mid-run take-over:** a free pad's A, pressed on the Settings page opened from the slot-less pause menu, can take
+  over a slot and press a row in the same frame (rare).
+- **No mid-run join.** The fifth-pad line exists only in the lobby. `RunState.player_count` is not lowered after a
+  drop (G11, untouched).
+- **Guest names** may read "Guest N" until Steam has loaded the friend data; the next `guest_name` call returns the
+  real name. A guest who left before their name was ever resolved stays "Guest N" (their number is freed for the
+  next link guest, so two people can share a label across time).
+- **Handles above 2^63** would not fit a Godot `int`; Steam handles are small counters in practice.
+- **macOS** is not fetched or supported.
