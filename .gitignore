@@ -2,7 +2,7 @@
 .godot/
 /android/
 *.translation
-export_presets.cfg
+# export_presets.cfg IS committed (tools/build/export.sh); only the credentials file (signing keys) stays local
 export_credentials.cfg
 # Local artifacts
 /build/

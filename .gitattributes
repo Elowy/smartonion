@@ -1,0 +1,3 @@
+# The build scripts run under bash (also Git Bash on Windows): they must keep LF line endings.
+*.sh text eol=lf
+*.ico binary
