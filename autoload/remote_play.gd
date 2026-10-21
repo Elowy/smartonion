@@ -10,6 +10,10 @@ extends Node
 ## - The game asks here: [method is_remote_device] (host rules, HostRules), [method guest_name] / [method slot_label]
 ##   (lobby card, notices), [method can_invite] / [method show_invite] (the lobby's "Invite friends"), and listens to
 ##   [signal overlay_toggled] (Main pauses the run while the platform overlay is open).
+## - Launch through Steam ([method hand_over_to_steam_if_needed]): in a release export with the real app id, started
+##   by double-clicking the executable, the first thing this autoload does is ask Steam to relaunch the game itself
+##   (GodotSteam restartAppIfNecessary) and quit this process - before any Steam initialisation. Everything else
+##   (editor, debug export, automated runs, app id 480, no plug-in) skips it.
 ## - Nothing here draws from RunState.rng.
 ## See docs/ARCHITECTURE.md.
 
@@ -22,6 +26,9 @@ const STEAM_BACKEND_PATH := "res://core/platform/steam_remote_play_backend.gd"
 
 var backend: RemotePlayBackend = NullRemotePlayBackend.new()
 
+## True once this launch was handed to the Steam client and the game is quitting ([method hand_over_to_steam_if_needed]).
+var steam_restart_requested := false
+
 ## The last name the backend gave each guest session (ids are not reused). A backend forgets a guest when the session
 ## ends, but the ghost seat, the pause menu's "Continue without …" and the disconnect notice still call them by name.
 var _names: Dictionary[int, String] = {}
@@ -31,6 +38,9 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -1100
 	var options := LaunchOptions.parse(OS.get_cmdline_user_args())
+	# (--fake-rpt is a development flag: a fake session never hands the launch over.)
+	if options.fake_rpt <= 0 and hand_over_to_steam_if_needed():
+		return  # this process is on its way out: Null backend, and Steam must not be initialised by it
 	set_backend(create_default_backend(options.fake_rpt, Settings.is_automated_run()))
 
 
@@ -49,6 +59,28 @@ static func create_default_backend(fake_count: int, automated: bool, steam_path:
 			if made is RemotePlayBackend:
 				return made
 	return NullRemotePlayBackend.new()
+
+
+## Hands this launch to the Steam client and quits when the executable was not started by it (a release export with the
+## real app id; see [method SteamRemotePlayBackend.restart_through_steam_if_needed] for every condition). Returns true
+## when the game is quitting for that reason ([member steam_restart_requested]). Does nothing, and returns false, when
+## the Steam backend file is missing. The Callables are test seams (singleton, automated run?, release export?), and
+## [param quit_provider] replaces SceneTree.quit().
+func hand_over_to_steam_if_needed(singleton_provider: Callable = Callable(), automated_provider: Callable = Callable(),
+		release_provider: Callable = Callable(), quit_provider: Callable = Callable()) -> bool:
+	if not ResourceLoader.exists(STEAM_BACKEND_PATH):
+		return false
+	var script := load(STEAM_BACKEND_PATH) as GDScript
+	if script == null:
+		return false
+	if not bool(script.call(&"restart_through_steam_if_needed", singleton_provider, automated_provider, release_provider)):
+		return false
+	steam_restart_requested = true
+	if quit_provider.is_valid():
+		quit_provider.call()
+	else:
+		get_tree().quit()
+	return true
 
 
 ## Replaces the backend (null = Null). The signals of the old one stop being forwarded.
