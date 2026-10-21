@@ -22,6 +22,10 @@ const STEAM_BACKEND_PATH := "res://core/platform/steam_remote_play_backend.gd"
 
 var backend: RemotePlayBackend = NullRemotePlayBackend.new()
 
+## The last name the backend gave each guest session (ids are not reused). A backend forgets a guest when the session
+## ends, but the ghost seat, the pause menu's "Continue without …" and the disconnect notice still call them by name.
+var _names: Dictionary[int, String] = {}
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -57,6 +61,9 @@ func set_backend(p_backend: RemotePlayBackend) -> void:
 	backend.guest_connected.connect(_on_guest_connected)
 	backend.guest_disconnected.connect(_on_guest_disconnected)
 	backend.overlay_toggled.connect(_on_overlay_toggled)
+	_names.clear()
+	for session_id in backend.session_ids():  # (guests that were connected before anybody listened)
+		guest_name(session_id)
 
 
 # --- Queries ------------------------------------------------------------------------------
@@ -91,13 +98,17 @@ func has_guests() -> bool:
 	return not backend.session_ids().is_empty()
 
 
-## The name of the guest of [param session_id]: "" for the host (0); "Guest N" while the backend knows no name.
+## The name of the guest of [param session_id]: "" for the host (0); the backend's, else the last one it gave (a guest
+## who has left keeps their name); "Guest N" while no name was ever known.
 func guest_name(session_id: int) -> String:
 	if session_id == 0:
 		return ""
 	var named := backend.guest_name(session_id)
 	if named != "":
+		_names[session_id] = named
 		return named
+	if _names.has(session_id):
+		return _names[session_id]
 	var ids := backend.session_ids()
 	var at := ids.find(session_id)
 	return "Guest %d" % (at + 1 if at >= 0 else 1)
@@ -126,6 +137,8 @@ func show_invite() -> void:
 # --- Forwarding ----------------------------------------------------------------------------
 
 func _on_guest_connected(session_id: int, guest_name_text: String) -> void:
+	if guest_name_text != "":
+		_names[session_id] = guest_name_text
 	guest_connected.emit(session_id, guest_name_text)
 
 

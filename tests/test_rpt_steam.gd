@@ -266,6 +266,29 @@ func test_a_persona_name_that_is_still_loading_falls_back_and_then_arrives() -> 
 	check_eq(backend.guest_name(-4), "", "nor for a bogus id")
 
 
+func test_a_guest_who_left_keeps_the_name_and_costs_no_guest_number() -> void:
+	var backend := _backend()
+	_fake.connect_guest(4, 55, "Mira")
+	check_eq(backend.guest_name(4), "Mira", "resolved while she is here")
+	_fake.disconnect_guest(4)
+	backend.poll()
+	check(backend.session_ids().is_empty(), "the session is gone")
+	var calls_before := _fake.calls.size()
+	check_eq(backend.guest_name(4), "Mira", "still Mira after she left")
+	check_eq(_fake.calls.size(), calls_before, "answered from memory: no Steam call for an ended session")
+	check(not backend._guest_numbers.has(4), "no Guest N number is (re-)allocated for the dead session")
+	# A guest without a Steam account: nothing to remember but no number to leak either.
+	_fake.connect_guest(5, 0, "", 0)
+	check_eq(backend.guest_name(5), "Guest 1", "numbered while here")
+	_fake.disconnect_guest(5)
+	check_eq(backend.guest_name(5), "", "the backend knows no name of the departed link guest")
+	check(not backend._guest_numbers.has(5), "and does not number the dead session again")
+	_fake.connect_guest(6, 0, "", 0)
+	check_eq(backend.guest_name(6), "Guest 1", "the next link guest gets the freed number, not 2")
+	check_eq(backend.guest_name(77), "", "an id Steam never listed has no name (and no number)")
+	check(not backend._guest_numbers.has(77), "")
+
+
 func test_the_device_name_of_a_session_is_never_used_as_the_guests_name() -> void:
 	var backend := _backend()
 	_fake.connect_guest(7, 55, "Frank")

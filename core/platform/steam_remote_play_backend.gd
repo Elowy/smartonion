@@ -43,8 +43,11 @@ var _input_ready := false
 var joy_info_source := Callable()
 ## The live sessions: session id -> true.
 var _sessions: Dictionary[int, bool] = {}
-## The "Guest N" number handed to a session whose name Steam could not resolve: session id -> N.
+## The "Guest N" number handed to a session whose name Steam could not resolve: session id -> N (live sessions only).
 var _guest_numbers: Dictionary[int, int] = {}
+## The persona names Steam resolved: session id -> name. Kept after the session ended (session ids are not reused), so
+## the ghost seat of a guest who left is still called by name; Steam itself forgets an ended session.
+var _names: Dictionary[int, String] = {}
 ## Input handle -> session id, for handles that belong to a guest (kept while that session lives).
 var _session_by_handle: Dictionary[int, int] = {}
 ## Input handle -> poll generation in which Steam said "local" (0), so one frame asks Steam once per pad.
@@ -192,11 +195,16 @@ func is_remote_device(device: int) -> bool:
 func guest_name(session_id: int) -> String:
 	if not is_available() or session_id <= 0:
 		return ""
+	if not _sessions.has(session_id):
+		# A guest who has left (or an id Steam never listed): the name we resolved while they were here, else "" – no
+		# Steam call (it has nothing for an ended session) and no new "Guest N" number that would never be freed.
+		return _names.get(session_id, "")
 	var steam_id := int(_steam.call(&"getSessionSteamID", session_id))
 	if steam_id > 0:
 		# "" while Steam is still loading that user's data; the next call may have it.
 		var persona := String(_steam.call(&"getFriendPersonaName", steam_id)).strip_edges()
 		if persona != "":
+			_names[session_id] = persona
 			return persona
 	return "Guest %d" % _guest_number(session_id)
 

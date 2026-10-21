@@ -63,8 +63,12 @@ func connect_guest(session_id: int, steam_id: int = 0, persona: String = "", gue
 	remote_play_session_connected.emit(session_id)
 
 
+## A guest leaves: Steam drops the session, and with it everything it knew about it (getSessionSteamID and
+## getSessionGuestID answer 0 for an ended session, like for any id it does not list).
 func disconnect_guest(session_id: int) -> void:
 	sessions.erase(session_id)
+	steam_ids.erase(session_id)
+	guest_ids.erase(session_id)
 	remote_play_session_disconnected.emit(session_id)
 
 

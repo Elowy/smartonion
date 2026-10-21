@@ -1042,6 +1042,39 @@ func test_notices_name_the_guest() -> void:
 	check("Mira" in main.hud.notice_label.text, "the HUD line: %s" % main.hud.notice_label.text)
 
 
+func test_a_guest_who_left_keeps_their_name_on_the_ghost_seat() -> void:
+	var fake := _fake_backend(2)
+	_make_main()
+	_join_pad(0)
+	var mira := _join_pad(1)
+	var tobi := _join_pad(2)
+	fake.connect_guest(1003, "Lena")  # joins later: the signal tells the name
+	fake.disconnect_guest(1001)
+	fake.disconnect_guest(1002)
+	fake.disconnect_guest(1003)
+	PadSource.fake_disconnect(1)
+	PadSource.fake_disconnect(2)
+	_frame()
+	check_eq(RemotePlay.slot_name(mira), "Mira", "the ghost seat is still Mira's")
+	check_eq(RemotePlay.slot_label(tobi), "Tobi (P3)", "and Tobi's, not two 'Guest 1'")
+	check_eq(RemotePlay.guest_name(1003), "Lena", "a guest announced by signal too")
+	check("Mira (P2)" in main.disconnect_notice(mira), "the HUD notice names her: %s" % main.disconnect_notice(mira))
+	check_eq(RemotePlay.guest_name(4242), "Guest 1", "a session nobody ever named is Guest N")
+	# The pause menu keeps its entries (and a pending 'Are you sure?') when the session ends after the pad.
+	var menu := PauseMenu.create()
+	UiFakes.add_to_root(tree, menu)
+	_screens.append(menu)
+	menu.open(null)
+	check_eq(menu.button_for(PauseMenu.DROP_BASE + 1).text, "Continue without Mira (P2)", "the entry names her")
+	menu.selected = PauseMenu.DROP_BASE + 1
+	menu.press_selected()
+	check_eq(menu.drop_armed, PauseMenu.DROP_BASE + 1, "armed")
+	menu._refresh_entries()
+	check_eq(menu.drop_armed, PauseMenu.DROP_BASE + 1, "still armed: the label did not change under it")
+	RemotePlay.set_backend(null)
+	check_eq(RemotePlay.guest_name(1001), "Guest 1", "a new backend starts without the old names")
+
+
 func test_the_overlay_pauses_a_wave_and_a_dungeon_only() -> void:
 	var fake := _fake_backend(0)
 	_make_main()

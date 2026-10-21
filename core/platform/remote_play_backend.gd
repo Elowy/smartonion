@@ -36,7 +36,8 @@ func is_remote_device(device: int) -> bool:
 	return session_of_device(device) != 0
 
 
-## The display name of the guest of [param session_id] ("" = unknown).
+## The display name of the guest of [param session_id] ("" = unknown). A backend may forget a guest when the session
+## ends: the RemotePlay autoload keeps the last name it was given for the ghost seat, the pause menu and the notices.
 func guest_name(_session_id: int) -> String:
 	return ""
 
