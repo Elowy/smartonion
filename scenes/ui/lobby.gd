@@ -571,8 +571,8 @@ func _refresh() -> void:
 			_sub_status.text = "%s disconnected – press A on a free controller to take over" % ", ".join(ghosts)
 		if _lock_notice_left > 0.0:
 			_sub_status.text = _lock_notice
-	if RemotePlay.can_invite():
-		footer_key += "+invite"
+	if RemotePlay.can_invite() and not slots.is_empty():
+		footer_key += "+invite"  # (L3 is read from a joined player's pad: the prompt waits for the first one)
 	if footer_key != _footer_key:
 		_footer_key = footer_key
 		for c in _footer_prompts.get_children():
