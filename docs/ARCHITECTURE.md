@@ -4723,7 +4723,8 @@ non-numeric value falls back to 480).
   session list, so guests that connected before the game started are announced. Every 60 polls
   (`RECONCILE_EVERY_POLLS`) the list is reconciled with Steam's, and the differences are announced.
 - `session_of_device(device)` needs Steam Input to have started. The handle is
-  `int(Input.get_joy_info(device)["steam_input_index"])` (0 for a pad that is not a Steam one), and
+  `PadSource.identity(device).steam_input_index` as an int (Godot's `get_joy_info` "steam_input_index", read through
+  the seam; 0 for a pad that is not a Steam one), and
   `getRemotePlaySessionID(handle)` > 0 means a guest. A guest's answer is cached by handle until that session
   leaves; a "local" answer is asked at most once per frame per handle. The joypad id is never the cache key.
 - `guest_name(session)` is `getFriendPersonaName(getSessionSteamID(session))`. While Steam has no name, it is
@@ -4834,6 +4835,3 @@ can do that", and the take-over prompt "Free controller: take over" in the pause
   real name.
 - **Handles above 2^63** would not fit a Godot `int`; Steam handles are small counters in practice.
 - **macOS** is not fetched or supported.
-- **Open: one read outside the seam.** `SteamRemotePlayBackend._input_handle_of` reads `Input.get_joy_info(device)`
-  directly. The guard test does not allow that call in `core/platform/`, so it flags this line. The handle should come
-  from `PadIdentity` (`PadSource.identity(device).steam_input_index`), and this entry should then be removed.
