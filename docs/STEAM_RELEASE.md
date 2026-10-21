@@ -48,6 +48,10 @@ cannot be uploaded to. The same number is used for three things, so it must be r
 - the release export asks Steam to relaunch the game with it when you double-click the exe (section 7, "Launching");
 - `tools/steam/upload.sh` refuses to upload when it is 480, or when `--app-id` disagrees with it.
 
+The id is compiled into the exported game, so **export again after changing it** (section 7): `upload.sh` reads the
+`app_id` that `export.sh` wrote into each `build_info.txt` and refuses content that was built with another id (a build
+made while it was still 480 included).
+
 Run the tests afterwards (`godot --headless --path . -s res://tests/run_tests.gd`): they accept any positive id.
 
 ## 3. Depots, launch options, package (you)
@@ -142,7 +146,8 @@ No Blizzard trademark may appear in any asset or text (project convention).
 
 ## 7. Building the game
 
-You need Godot 4.7.2 and a normal terminal (on Windows: Git Bash). From the repository root:
+You need Godot 4.7.2 and a bash terminal: Linux, or on Windows **WSL** (Ubuntu) with the repository cloned into the Linux
+file system (for example `~/smartonion`, not under `/mnt/c`). From the repository root:
 
 ```bash
 tools/build/install_templates.sh          # once: the 4.7.2 export templates, checksum-verified
@@ -153,6 +158,14 @@ tools/build/export.sh --steam             # both platforms, into build/steam/con
 
 `export.sh` checks that the export templates are installed and runs a headless smoke test of the exported Linux build. The version number is
 `application/config/version` in `project.godot`: change it first, for every upload.
+
+> **Build and upload the Linux depot from Linux or WSL (on the Linux file system), not from Git Bash.** Git Bash (and
+> `/mnt/c` in WSL) is NTFS: `chmod +x` does nothing there, so `SmartOnion.x86_64` loses its Unix executable bit, and a
+> Linux depot without it may not start on Linux or the Steam Deck. `upload.sh` cannot check the bit on Windows (it only
+> warns), and `export.sh` skips the headless smoke test of the Linux build because that binary cannot run on Windows.
+> Both depots go up in one build and must come from the same export (`upload.sh` checks it), so the simple rule is: do
+> sections 7 and 8 entirely in Linux or WSL. The Windows exe is exported there too (Godot writes its icon and version
+> resources itself; no Wine needed). Git Bash is fine for a `--dry-run` or for trying the Windows build.
 
 After a successful `--steam` export the folders look like this (this layout is what the upload script expects):
 
@@ -175,9 +188,10 @@ Delete it again: `upload.sh` refuses to upload content that contains it, and the
 ## 8. Uploading with SteamPipe
 
 `tools/steam/upload.sh` fills the templates in `tools/steam/steampipe/*.vdf.in` and runs **steamcmd**, Valve's command
-line client. It needs bash (Git Bash or WSL on Windows), curl or wget, and on Linux the 32-bit C library
+line client. It needs bash (Linux, or WSL on Windows; see the Linux depot note in section 7 about Git Bash), curl or wget, and on Linux the 32-bit C library
 (Debian / Ubuntu: `sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install lib32gcc-s1`).
-It downloads steamcmd by itself into `build/steamcmd/` (gitignored) if it is missing, or use `--steamcmd PATH`.
+It downloads steamcmd by itself into `build/steamcmd/` (gitignored) if it is missing, or use `--steamcmd PATH`. The
+launcher is `build/steamcmd/steamcmd.sh` on Linux / WSL and `build/steamcmd/steamcmd.exe` under Git Bash.
 
 Set the numbers once per terminal (or pass them as flags, `upload.sh --help` lists both):
 
@@ -207,7 +221,9 @@ The App ID is taken from `project.godot` (section 2). Then, in this order:
    The first time, steamcmd asks for the password and the **Steam Guard** code **in your terminal**. The script never sees
    or stores either. steamcmd then caches a login token (a secret; its `config/config.vdf`), so later runs only need
    `STEAM_USER`. If the login is "denied" because of Steam Guard, read the code from the e-mail Steam sent you and run
-   `build/steamcmd/steamcmd.sh +set_steam_guard_code <code>`, then run the script again. Open the manifest in
+   `<steamcmd> +set_steam_guard_code <code>`, then run the script again. `<steamcmd>` is the one the upload uses:
+   `build/steamcmd/steamcmd.sh` on Linux / WSL, `build/steamcmd/steamcmd.exe` under Git Bash, or the program you gave with
+   `--steamcmd` / `STEAMCMD` (every steamcmd install keeps its own cached login). Open the manifest in
    `build/steam/output/` and check that the file lists make sense (SmartOnion.exe, the libraries; no `.pdb`).
 3. **Upload.**
    ```bash
