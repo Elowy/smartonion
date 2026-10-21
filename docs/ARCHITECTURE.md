@@ -93,7 +93,7 @@ the new screen never sees the button press that closed the old one.
    readies with A, leaves with B. All joined players ready → countdown → `start_requested`
    → (M6b: the "Rolling the arena..." screen, unless smoke / demo / view) → run (a new join, an
    unready or a mode change cancels the countdown). Any joined player's Y / X change the run mode /
-   Hardcore. B with nobody joined → MENU.
+   Hardcore. B with nobody joined (or only ghosts) → MENU.
    The join press is swallowed (`PlayerInput.swallow()`): it never also readies the player,
    and navigation waits until the stick is neutral. A slot whose pad is unplugged waits as a ghost
    ("Disconnected", RPT) and is pruned after `PlayerManager.GHOST_TIMEOUT` (60 s): the lobby calls
@@ -459,8 +459,8 @@ Screenshots of every screen: `docs/screenshots/{menu,lobby,gameplay,intermission
   ◀ ▶ = `Db.cycle_class`, A toggles ready, START readies, B unreadies or leaves. Everyone
   ready → `COUNTDOWN_TIME` (3 s) countdown, cancelled by an unready or a join →
   `start_requested` (once; joining is switched off). B / Esc with nobody joined →
-  `back_requested`. A controller unplugged in the lobby keeps its slot as a ghost (RPT; freed after
-  `PlayerManager.GHOST_TIMEOUT`). Each card has a live
+  `back_requested` (also when only ghosts are joined: they are freed). A controller unplugged in the lobby keeps its
+  slot as a ghost (RPT; freed after `PlayerManager.GHOST_TIMEOUT`). Each card has a live
   `OnionPreview` (SubViewport with its own World3D).
 - `Hud`: listens to `RunState` (wave, gold with a count-up and one "+N" floater right of the
   coin that sums every pickup while it shows – `FLOATER_TIME` 0.6 s after the last one –, XP,
@@ -4513,8 +4513,8 @@ Three rules hold throughout:
 | Area | Files | Role |
 |---|---|---|
 | Pad seam | `core/input/pad_source.gd` (`PadSource`), `core/input/pad_identity.gd` (`PadIdentity`) | The one place that asks the engine for pads; the per-frame snapshot; the fake table for tests and `--hotplug-test` |
-| Input | `core/input/joypad_input.gd` | `identity` (the fingerprint of the pad the input was made for), `is_connected_device()` |
-| Slots | `core/player_slot.gd` | `session_id` (0 = local), `missing_time`, `connection_reported`, `identity()`, `is_remote()` |
+| Input | `core/input/joypad_input.gd` | `identity` (the fingerprint of the pad the input was made for), `is_connected_device()`; reads nothing while that pad is not on its id |
+| Slots | `core/player_slot.gd` | `session_id` (0 = local), `missing_time`, `connection_reported`, `idle_pads_at_loss`, `identity()`, `is_remote()` |
 | Players | `autoload/player_manager.gd` (`PlayerManager`) | Rebind, take-over, ghost slots and their clocks, free-pad joins, the grace query |
 | Host rules | `core/host_rules.gd` (`HostRules`) | Who may quit, quit to menu, drop a player, change the video settings, or invite |
 | Platform | `autoload/remote_play.gd` (`RemotePlay`); `core/platform/remote_play_backend.gd` (`RemotePlayBackend`, the inert base class), `null_remote_play_backend.gd`, `fake_remote_play_backend.gd`, `steam_remote_play_backend.gd` (`SteamRemotePlayBackend`) | The autoload, the backend interface and the three backends |
@@ -4554,30 +4554,50 @@ an id can belong to a different pad later. A slot keeps:
 - the fingerprint of its pad at join (`JoypadInput.identity`, read in the constructor), and
 - its Remote Play session (`PlayerSlot.session_id`; 0 for a local pad).
 
-`JoypadInput.is_connected_device()` is true only while the same pad (by fingerprint) sits on its id. A connected
-pad that no working slot is bound to takes a missing slot back by itself only when:
+`JoypadInput.is_connected_device()` is true only while the same pad (by fingerprint) sits on its id. A
+`JoypadInput` whose pad is not on its id **reads nothing**: every `Pad` button (LT and RT included) is false and both
+sticks are zero. A ghost slot whose id was handed to somebody else's pad is therefore not driven by it (market
+cursor, ready flag, level-up and shrine panels, the game-over screen); a free pad's first A is seen only by
+`PlayerManager`'s scan.
+
+A connected pad that no working slot is bound to takes a missing slot back by itself only when it is the right pad
+and it **connected after the slot went missing**:
 
 - **the slot is a guest's:** the pad's Remote Play session is the slot's session (a guest keeps the seat whatever
   virtual pad Steam shows), or
-- **the slot is local:** the fingerprint matches.
+- **the slot is local:** the fingerprint matches, and
+- **the pad was not already lying around:** when `track_connections` first sees a slot's device missing, it
+  announces the loss (`device_disconnected`: pause and notice) and then notes the connected, unplayed pads of that
+  moment in `PlayerSlot.idle_pads_at_loss` (their `PadIdentity` objects). Those pads cannot be the pad that went
+  away, so they never take the slot by themselves (an identical Xbox pad of a spectator, or of a player about to
+  join, would otherwise get P2's hero at once, with no pause and no notice). A pad that (re)connects afterwards is
+  a new `PadIdentity` object and can: the return is announced, so it is visible (`device_disconnected`, then
+  `device_reconnected`).
 
-Any other connected, unbound pad is a free pad. Identical pad models without a Steam handle cannot be told apart;
-the lower slot number wins (a documented limit).
+Any other connected, unbound pad is a free pad: it can take a missing slot over with A (below), and the idle pads of
+the rule above are free pads too. Identical pad models without a Steam handle cannot be told apart; the lower slot
+number wins (a documented limit).
 
 ### PlayerManager: rebind, take-over, ghosts and their clocks
 
-- **`rebind(index, input) -> bool`** gives a slot a new input. It refuses when another slot already has that device
-  key. Otherwise it keeps the class, ready flag, loadout and hero; sets `session_id` from
-  `RemotePlay.session_of_device`; resets `missing_time`; swallows the press held on the new input; and emits
-  `device_reconnected`.
+- **`rebind(index, input) -> bool`** gives a slot a new input. It refuses when another slot **whose device works**
+  (`is_connected_device()`) already has that device key: a ghost's stale `joy:N` is no claim on the id, because the
+  pad on it now is somebody else's and the ghost reads nothing from it. (Counting ghosts used to block pads that
+  came back on swapped ids from their own slots, and the manual take-over with them.) Otherwise it keeps the class,
+  ready flag, loadout and hero; sets `session_id` from `RemotePlay.session_of_device`; resets `missing_time` and
+  `idle_pads_at_loss`; swallows the press held on the new input; and emits `device_reconnected`.
 - **`take_over(device) -> PlayerSlot`** lets a free pad (`is_pad_free`: connected and bound to no working slot)
-  take over the lowest missing slot (`first_ghost()`). It returns `null` and changes nothing when no slot is
-  missing or the pad is not free. The A press is consumed, so it does not also act in the screen behind.
+  take over a missing slot: the one the pad provably belongs to (`_is_returning_pad`: same Remote Play session or
+  same fingerprint, e.g. an identical model that was lying around when the pad died), else the lowest
+  (`first_ghost()`). It returns `null` and changes nothing when no slot is missing or the pad is not free. The A
+  press is consumed, so it does not also act in the screen behind.
 - **`track_connections(delta)`** runs once a frame from `_process`, after the inputs are polled and before the
-  free-pad scan. It gives a missing slot back to a returning pad (`_rebind_to_returning_pad`), emits
-  `device_disconnected` / `device_reconnected` (the engine's signal does not), and counts `missing_time`.
+  free-pad scan. For a slot whose device is missing it counts `missing_time`; on the first miss it emits
+  `device_disconnected` and notes the idle pads (`idle_pads_at_loss`); only then does it try to give the slot back
+  to a returning pad (`_rebind_to_returning_pad`, which skips the noted pads and keeps scanning when a rebind
+  fails). `device_reconnected` follows when the slot works again (the engine's signal emits neither).
 - **`_scan_free_pads()`** edge-detects A per pad (the `joy:N` key is only the edge key) and then:
-  - a free pad's A takes the lowest ghost over (`take_over`), if one exists;
+  - a free pad's A takes the ghost it belongs to, else the lowest, over (`take_over`), if one exists;
   - otherwise, in the lobby (`joining_enabled`), it joins a new player while the party has room;
   - a full lobby emits `join_refused(device, &"full")` once per pad (the one-time "party is full" line; the
     memory clears when a seat frees);
@@ -4595,16 +4615,18 @@ the lower slot number wins (a documented limit).
 - **Pruning.** `prune_disconnected(min_missing)` removes the human slots missing for at least `min_missing`
   seconds. The lobby calls `restart_ghost_timers()` and then `prune_disconnected(GHOST_TIMEOUT)` when it resets
   (`Lobby.reset`) and every frame while it is visible and not started (`Lobby._process`), so a ghost's clock starts
-  when the lobby opens. `Main` prunes with `GHOST_TIMEOUT` on the way from the game over to the lobby.
+  when the lobby opens. `Main.go_to_lobby()` does not prune before that (the clock would have counted the whole run
+  and the end screens), so a pad that died on the game-over screen keeps its seat for the lobby's full timeout. With
+  nobody but ghosts joined, B / Esc in the lobby frees them (`prune_disconnected()`) and leaves.
 
 ### Take-over, state by state
 
 | State | A controller disappears | It comes back, or a free pad presses A |
 |---|---|---|
 | Main menu | Nothing: there are no slots. | – |
-| Lobby | The slot stays as a **ghost**. Its card reads "Disconnected" with the banner "Press A to take over"; the footer reads "P2 disconnected – press A on a free controller to take over". A ghost cannot ready up, so the countdown waits (a running one is cancelled). Freed after `GHOST_TIMEOUT`. | The same pad (or the same guest session) returns by itself. A free pad's A takes the lowest ghost over, and does not join as a new player while a ghost exists. A fifth pad gets the one-time line "The party is full – a fifth controller cannot join". |
+| Lobby | The slot stays as a **ghost**. Its card reads "Disconnected" with the banner "Press A to take over"; the footer reads "P2 disconnected – press A on a free controller to take over". A ghost cannot ready up, so the countdown waits (a running one is cancelled). Freed after `GHOST_TIMEOUT`. | The same pad (or the same guest session) returns by itself. A free pad's A takes the ghost it belongs to (else the lowest) over, and does not join as a new player while a ghost exists. With only ghosts joined (a lone player whose pad died), B / Esc leaves the lobby and frees them. A fifth pad gets the one-time line "The party is full – a fifth controller cannot join". |
 | Wave, wave end, Dungeon | `Main._on_device_disconnected` pauses at once and shows a HUD notice: "P3's controller disconnected – reconnect it or take over with A", or for a guest "Mira (P3) disconnected – waiting for them to come back". The pause menu names the missing player ("press A on any free controller to take over, or wait for …") and offers "Continue without Pn" (two presses: "Are you sure?  Press again"). Resume is refused while anyone is missing. | The pad, or a free pad's A, fixes it. The game stays paused until START. A free pad's A during a wave or a dungeon while nobody is missing flashes "Joins at the next lobby". |
-| Intermission screens (market, loot roll, level-up, shrine, portal) | The screen waits `auto_decide_grace` before it decides for the player: auto-ready, auto-pass, auto-pick, a vote by the data, or abstain. Chips read "Reconnecting…" meanwhile. A return inside the grace changes nothing. | Take-over works here too (`takeover_enabled`). The next wave start still pauses at once when someone is missing (`Main._pause_if_pad_missing`). |
+| Intermission screens (market, loot roll, level-up, shrine, portal) | The screen waits `auto_decide_grace` before it decides for the player: auto-ready, auto-pass, auto-pick, a vote by the data, or abstain. Chips read "Reconnecting…" meanwhile (the market and shrine chips refresh when a pad goes missing or returns inside the grace). A return inside the grace changes nothing else. | Take-over works here too (`takeover_enabled`). The next wave start still pauses at once when someone is missing (`Main._pause_if_pad_missing`). |
 | Game over | No pause. | The ghost slot goes into the lobby with the party and waits there, as in the lobby row. |
 
 ### Host rules (`core/host_rules.gd`)
@@ -4628,7 +4650,11 @@ Enforced at:
 - `Lobby`: L3 / I "Invite friends" (`may(INVITE, slot)`).
 - `SettingsPage.change_selected(direction, by_mouse)`: the Video rows are refused for a guest's page. On a page
   nobody in particular drives (the main menu's Settings, a slot-less pause menu) they are locked for pads and keys
-  while `RemotePlay.has_guests()`. The mouse still changes them.
+  while `RemotePlay.has_guests()`. The mouse still changes them. **"Reset to defaults"** follows the same rule
+  (`activate_selected(by_mouse)`): when the presser is locked and the reset would change a Video option, the whole
+  reset is refused with the same line (it would otherwise apply window mode, VSync and the FPS cap to the host's
+  window). With the Video rows at their defaults a guest's reset goes through; the host's pad and the mouse reset
+  everything.
 
 Not restricted, by the GDD's rule: mode (Y), Hardcore (X), difficulty (SELECT), Loadout and look. Without a
 backend no device is remote, so local co-op sees only two changes: "Continue without Pn" needs a second press, and
@@ -4667,7 +4693,8 @@ Signals: `guest_connected(session_id: int, guest_name: String)`, `guest_disconne
 
 The autoload is what the game calls: `is_available()`, `session_of_device(device)` (a negative id gives 0),
 `session_of_bot(index)` (the Fake backend's bot sessions), `is_remote_device(device)`, `session_ids()`,
-`has_guests()`, `guest_name(session_id)` (0 gives ""; a backend without a name gives "Guest N", by place in the
+`has_guests()`, `guest_name(session_id)` (0 gives ""; the backend's name, else the last name it gave for that
+session, so a guest who has left keeps their name; a session that never had one gives "Guest N", by place in the
 session list), `slot_name(slot)`, `slot_label(slot)` ("Mira (P3)", or "P3" for a local slot), `can_invite()` and
 `show_invite()` (which does nothing unless the backend can invite). It re-emits the three signals.
 
@@ -4729,7 +4756,9 @@ non-numeric value falls back to 480).
   leaves; a "local" answer is asked at most once per frame per handle. The joypad id is never the cache key.
 - `guest_name(session)` is `getFriendPersonaName(getSessionSteamID(session))`. While Steam has no name, it is
   "Guest N": N is Steam's guest id (1 to 99) or the lowest free number, fixed per session. The device name
-  (`getSessionClientName`) is not used; it names the guest's device, not the player.
+  (`getSessionClientName`) is not used; it names the guest's device, not the player. A resolved persona name is
+  remembered per session (session ids are not reused); for a session that has left, `guest_name` answers from that
+  memory (or `""`) with no Steam call and no new "Guest N" number (Steam knows nothing of an ended session).
 - `session_ids()` is sorted.
 - `remote_play_session_connected` becomes `guest_connected(session, guest_name(session))`;
   `remote_play_session_disconnected` becomes `guest_disconnected`; `overlay_toggled(active, user_initiated, app_id)`
@@ -4802,18 +4831,20 @@ Lobby card: header "Remote · <name>" for a guest, "Disconnected" for a ghost; b
 "Waiting for <name>" for a guest); lobby footer "<P2> disconnected – press A on a free controller to take over";
 "Invite friends" (L3, keyboard I) once somebody has joined and the backend can invite. Notices: "Joins at the next
 lobby", "The party is full – a fifth controller cannot join", "Reconnecting…" (an intermission chip), "Only the host
-can do that", and the take-over prompt "Free controller: take over" in the pause menu.
+can do that" (also for a guest's "Reset to defaults" that would change the window), and the take-over prompt "Free controller: take over" in the pause menu.
 
 ### Tests
 
 - `tests/test_rpt_core.gd` (`extends TestCase`): the seam with fake pads and the guard test; identity and rebind;
-  take-over in the lobby and during a run; ghosts and their timeouts; the grace; the host rules; the RemotePlay
-  autoload with the Null and Fake backends; the flags; the Settings option; the overlay and focus pause.
+  take-over in the lobby and during a run (swapped ids, stale ids, the matching ghost, an idle identical pad); ghosts
+  and their timeouts (also through `Main.go_to_lobby` and the lone ghost's B); a pad that is not on its id reads
+  nothing; the grace; the host rules (Reset included); guest names after a session ended; the RemotePlay autoload
+  with the Null and Fake backends; the flags; the Settings option; the overlay and focus pause.
 - `tests/test_rpt_steam.gd` (`extends TestCase`): the Steam backend, driven by `tests/fake_steam_singleton.gd`
   (`FakeSteamSingleton`). It is a stand-in with the plug-in's method and signal names; it records calls made before
-  initialisation and forbidden calls. No Steam client and no plug-in is needed. It covers the init failures, the
-  automated-run gate, the app id, handles and their cache, guest names, reconciliation, the invite and the
-  no-identifier check.
+  initialisation and forbidden calls, and forgets a session's Steam id and guest id when the guest leaves, like Steam.
+  No Steam client and no plug-in is needed. It covers the init failures, the automated-run gate, the app id, handles
+  and their cache, guest names (also after the guest left), reconciliation, the invite and the no-identifier check.
 - Existing tests changed on purpose: the lobby tests that expected a missing player's slot to be freed at once now
   assert that the ghost is kept and freed after the timeout; "Continue without Pn" needs two presses; the Settings
   test counts the new Gameplay toggle; `UiFakes.reset_players()` sets the grace to 0.
@@ -4829,14 +4860,17 @@ can do that", and the take-over prompt "Free controller: take over" in the pause
   a null buffer, `createMouseCursor()` reads through a null pointer, and `remote_play_session_avatar_loaded` is
   declared with four arguments but emitted with one. The backend never calls them. A guest's merged keyboard or
   mouse acts as the host's, as far as the game can tell.
-- **Identical pad models** with no Steam handle cannot be told apart (see Identity).
-- **Video rows in unattended pages** are locked for every pad and key while guests are connected; only the mouse
-  changes them then.
+- **Identical pad models** with no Steam handle cannot be told apart (see Identity). An identical idle pad that was
+  already connected when a slot's pad died does not take the slot by itself; its owner takes it over with A. A
+  replacement pad that appears in the very same frame as the loss counts as "already there" and needs an A too.
+- **Video rows and Reset in unattended pages** are locked for every pad and key while guests are connected; only the
+  mouse changes them then. "Reset to defaults" is refused as a whole (not partly) when it would change a Video row.
 - **Mid-run take-over:** a free pad's A, pressed on the Settings page opened from the slot-less pause menu, can take
   over a slot and press a row in the same frame (rare).
 - **No mid-run join.** The fifth-pad line exists only in the lobby. `RunState.player_count` is not lowered after a
   drop (G11, untouched).
 - **Guest names** may read "Guest N" until Steam has loaded the friend data; the next `guest_name` call returns the
-  real name.
+  real name. A guest who left before their name was ever resolved stays "Guest N" (their number is freed for the
+  next link guest, so two people can share a label across time).
 - **Handles above 2^63** would not fit a Godot `int`; Steam handles are small counters in practice.
 - **macOS** is not fetched or supported.
