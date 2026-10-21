@@ -818,6 +818,67 @@ func test_video_settings_are_the_hosts() -> void:
 	Settings.set_value(GameSettings.VSYNC, vsync_before)
 
 
+func test_reset_to_defaults_does_not_touch_the_hosts_window_for_a_guest() -> void:
+	_fake_backend(2)
+	var host := _join_pad(0)
+	var guest := _join_pad(1)
+	var page := SettingsPage.create(0.5)
+	UiFakes.add_to_root(tree, page)
+	_screens.append(page)
+	Settings.reset_to_defaults()
+	Settings.step_value(GameSettings.WINDOW_MODE, 1)
+	Settings.step_value(GameSettings.VSYNC, 1)
+	Settings.step_value(GameSettings.MAX_FPS, 1)
+	Settings.step_value(GameSettings.SCREEN_SHAKE, -1)
+	var window: Variant = Settings.get_value(GameSettings.WINDOW_MODE)
+	var vsync: Variant = Settings.get_value(GameSettings.VSYNC)
+	var fps: Variant = Settings.get_value(GameSettings.MAX_FPS)
+	var shake: Variant = Settings.get_value(GameSettings.SCREEN_SHAKE)
+	check(not Settings.data.is_default(), "the test starts from a changed host setup")
+	var reset_at := func() -> int:
+		for i in page.rows.size():
+			if page.rows[i].kind == SettingsPage.RowKind.RESET:
+				return i
+		return -1
+	# A guest's page (the pause menu opened it for the guest who paused).
+	page.open(guest)
+	page.select(reset_at.call())
+	page.activate_selected()
+	check(Settings.get_value(GameSettings.WINDOW_MODE) == window and Settings.get_value(GameSettings.VSYNC) == vsync \
+			and Settings.get_value(GameSettings.MAX_FPS) == fps, "a guest's Reset leaves window mode, VSync and max FPS alone")
+	check_eq(Settings.get_value(GameSettings.SCREEN_SHAKE), shake, "the whole reset is refused")
+	check_eq(page.title_label.text, HostRules.REFUSED_TEXT, "and says why")
+	# A page nobody drives while guests are connected (main menu, slot-less pause menu): a pad could be a guest's.
+	page.open(null)
+	page.select(reset_at.call())
+	page.activate_selected()
+	check(Settings.get_value(GameSettings.WINDOW_MODE) == window and Settings.get_value(GameSettings.VSYNC) == vsync, "an undriven page refuses too")
+	# The host's pad, and the mouse on any page, may.
+	page.open(host)
+	page.select(reset_at.call())
+	page.activate_selected()
+	check(Settings.data.is_default(), "the host's own pad resets everything")
+	Settings.step_value(GameSettings.VSYNC, 1)
+	page.open(null)
+	page.select(reset_at.call())
+	page.activate_selected(true)
+	check(Settings.data.is_default(), "the host's mouse resets everything on an undriven page")
+	# A guest's Reset goes through when no Video row would change (the window is not touched).
+	Settings.step_value(GameSettings.SCREEN_SHAKE, -1)
+	page.open(guest)
+	page.select(reset_at.call())
+	page.activate_selected()
+	check(Settings.data.is_default(), "with the Video rows at their defaults a guest's Reset only changes gameplay rows")
+	# Without guests an undriven page behaves as ever.
+	Settings.step_value(GameSettings.WINDOW_MODE, 1)
+	RemotePlay.set_backend(null)
+	page.open(null)
+	page.select(reset_at.call())
+	page.activate_selected()
+	check(Settings.data.is_default(), "no guests: nothing is locked")
+	check(host != null, "")
+
+
 # --- RemotePlay autoload and backends ---------------------------------------------------------
 
 func test_the_default_backend_is_null_without_the_steam_file_or_in_automated_runs() -> void:

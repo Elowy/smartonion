@@ -209,10 +209,28 @@ func change_selected(direction: int, by_mouse: bool = false) -> void:
 func _video_locked(row: Row, by_mouse: bool) -> bool:
 	if by_mouse or row.kind != RowKind.OPTION or not HostRules.is_video_key(row.key):
 		return false
+	return _video_lock_active()
+
+
+## True when a controller / key press on this page may not touch the host's window: the page is a guest's, or nobody in
+## particular drives it while guests are connected (a controller could be a guest's). The host's mouse is never locked.
+func _video_lock_active() -> bool:
 	var driver := driver_slot()
 	if driver != null:
 		return not HostRules.may(HostRules.Action.VIDEO_SETTINGS, driver)
 	return RemotePlay.has_guests()
+
+
+## True when "Reset to defaults" is refused: the presser may not touch the host's window and the reset would change a
+## Video option. (Refusing the whole reset is simpler than a reset that silently leaves some rows alone; with the Video
+## rows at their defaults a guest's reset changes nothing of the window and goes through.)
+func _reset_locked(by_mouse: bool) -> bool:
+	if by_mouse or not _video_lock_active():
+		return false
+	for o in GameSettings.options():
+		if HostRules.is_video_key(o.key) and Settings.get_value(o.key) != o.default:
+			return true
+	return false
 
 
 func _refuse() -> void:
@@ -223,10 +241,14 @@ func _refuse() -> void:
 
 
 ## A on the highlighted row: flips a toggle, cycles a choice, presses Reset / Back (volumes: nothing).
-func activate_selected() -> void:
+## [param by_mouse]: a click (the host's mouse), not a controller / key.
+func activate_selected(by_mouse: bool = false) -> void:
 	var row := rows[selected]
 	match row.kind:
 		RowKind.RESET:
+			if _reset_locked(by_mouse):
+				_refuse()
+				return
 			Settings.reset_to_defaults()
 			Audio.play_ui(&"ui_confirm")
 		RowKind.BACK:
@@ -335,7 +357,7 @@ func _on_row_input(event: InputEvent, row: Row) -> void:
 		return
 	select(rows.find(row))
 	if row.kind != RowKind.OPTION:
-		activate_selected()
+		activate_selected(true)
 		return
 	var o := GameSettings.option(row.key)
 	var at := row.panel.get_global_transform() * click.position
