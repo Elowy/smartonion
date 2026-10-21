@@ -39,7 +39,7 @@ var _steam: Object
 var _app_id := DEFAULT_APP_ID
 ## Steam Input was started (inputInit returned true): pads can be mapped to sessions.
 var _input_ready := false
-## Source of a pad's description (Input.get_joy_info). Replace it to fake pads in tests.
+## Test seam: a Callable(device) -> Dictionary like Input.get_joy_info; unset, the handle comes from PadSource.
 var joy_info_source := Callable()
 ## The live sessions: session id -> true.
 var _sessions: Dictionary[int, bool] = {}
@@ -270,12 +270,14 @@ func _guest_number(session_id: int) -> int:
 
 
 ## The Steam Input handle of a joypad (0 = not a Steam Input pad). Godot stores the handle, as a string,
-## under "steam_input_index"; the key is missing for a pad that is not a Steam Input device.
+## under "steam_input_index"; the key is missing for a pad that is not a Steam Input device. Read through
+## PadSource (the one place that asks the engine about pads), or [member joy_info_source] in tests.
 func _input_handle_of(device: int) -> int:
-	var info: Dictionary = joy_info_source.call(device) if joy_info_source.is_valid() else Input.get_joy_info(device)
-	if not info.has("steam_input_index"):
-		return 0
-	return str(info["steam_input_index"]).to_int()
+	if joy_info_source.is_valid():
+		var info: Dictionary = joy_info_source.call(device)
+		return str(info.get("steam_input_index", "")).to_int()
+	var pad := PadSource.identity(device)
+	return pad.steam_input_index.to_int() if pad != null else 0
 
 
 # --- Steam callbacks -----------------------------------------------------------------------
