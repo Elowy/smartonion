@@ -46,7 +46,7 @@ func get_device_key() -> String:
 ## pad (an id freed by a disconnect is handed to the next pad that connects, which may be somebody else's).
 func is_connected_device() -> bool:
 	var now := PadSource.identity(device)
-	return now != null and (identity == null or identity.same_pad(now))
+	return now != null and (identity == null or identity == now or identity.same_pad(now))
 
 
 func get_move() -> Vector2:
@@ -58,6 +58,8 @@ func get_aim() -> Vector2:
 
 
 func _stick(axis_x: JoyAxis, axis_y: JoyAxis) -> Vector2:
+	if not is_connected_device():
+		return Vector2.ZERO  # (the id belongs to another pad now, or to none: not this player's stick)
 	var v := Vector2(PadSource.axis_value(device, axis_x), PadSource.axis_value(device, axis_y))
 	var length := v.length()
 	if length < STICK_DEADZONE:
@@ -66,10 +68,13 @@ func _stick(axis_x: JoyAxis, axis_y: JoyAxis) -> Vector2:
 	return v / length * clampf((length - STICK_DEADZONE) / (1.0 - STICK_DEADZONE), 0.0, 1.0)
 
 
+## A pad that is not this input's own (see [method is_connected_device]) presses nothing: a ghost slot whose id was
+## handed to somebody else's pad must not be driven by it (a free pad's first A is seen by PlayerManager's scan only).
 func _read_buttons() -> Dictionary[int, bool]:
 	var out: Dictionary[int, bool] = {}
+	var own := is_connected_device()
 	for b in _BUTTON_MAP:
-		out[b] = PadSource.is_button_down(device, _BUTTON_MAP[b])
-	out[PlayerInput.Pad.LT] = PadSource.axis_value(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_THRESHOLD
-	out[PlayerInput.Pad.RT] = PadSource.axis_value(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER_THRESHOLD
+		out[b] = own and PadSource.is_button_down(device, _BUTTON_MAP[b])
+	out[PlayerInput.Pad.LT] = own and PadSource.axis_value(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_THRESHOLD
+	out[PlayerInput.Pad.RT] = own and PadSource.axis_value(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER_THRESHOLD
 	return out

@@ -124,6 +124,46 @@ func test_a_joypad_input_follows_its_own_pad_not_the_id() -> void:
 	check(input.is_pressed(PlayerInput.Pad.A), "buttons come through the pad source")
 
 
+func test_an_input_whose_pad_is_gone_reads_nothing_even_when_another_pad_has_its_id() -> void:
+	_pad(1, "owner")
+	var input := JoypadInput.new(1)
+	PadSource.fake_disconnect(1)
+	_pad(1, "stranger")  # the freed id goes to somebody else's pad
+	for button in [JOY_BUTTON_A, JOY_BUTTON_B, JOY_BUTTON_X, JOY_BUTTON_START, JOY_BUTTON_DPAD_LEFT]:
+		PadSource.fake_press(1, button, true)
+	PadSource.fake_axis(1, JOY_AXIS_LEFT_X, 1.0)
+	PadSource.fake_axis(1, JOY_AXIS_RIGHT_Y, -1.0)
+	PadSource.fake_axis(1, JOY_AXIS_TRIGGER_LEFT, 1.0)
+	PadSource.fake_axis(1, JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	input.poll(DT)
+	check(not input.is_connected_device(), "not its pad")
+	for button in PlayerInput.Pad.values():
+		check(not input.is_pressed(button) and not input.just_pressed(button), "the stranger's %s is not read" % PlayerInput.Pad.keys()[button])
+	check_eq(input.get_move(), Vector2.ZERO, "no left stick")
+	check_eq(input.get_aim(), Vector2.ZERO, "no right stick")
+	check_eq(input.nav_just_pressed(), Vector2i.ZERO, "no navigation")
+	check_eq(input.nav_held(), Vector2i.ZERO, "none held either")
+	# Its own pad on the id again: everything is read again.
+	_pad(1, "owner")
+	input.poll(DT)
+	check(input.is_connected_device() and input.is_pressed(PlayerInput.Pad.A), "the owner's pad is read")
+	check(input.is_pressed(PlayerInput.Pad.LT) and input.is_pressed(PlayerInput.Pad.RT), "triggers too")
+	check_near(input.get_move().x, 1.0, 0.001, "and the stick")
+
+
+func test_a_ghost_slot_is_not_driven_by_the_pad_that_got_its_id() -> void:
+	_join_pad(0)
+	var ghost := _join_pad(1, &"mage", "owner")
+	PadSource.fake_disconnect(1)
+	_frame()
+	_pad(1, "stranger")
+	PadSource.fake_press(1, JOY_BUTTON_START, true)
+	PadSource.fake_axis(1, JOY_AXIS_LEFT_X, 1.0)
+	_frame()
+	check(PlayerManager.is_missing(ghost), "still a ghost")
+	check(not ghost.input.is_pressed(PlayerInput.Pad.START) and ghost.input.get_move() == Vector2.ZERO, "the stranger does not press for it")
+
+
 func test_pad_identity_fingerprint_ignores_the_id() -> void:
 	var a := PadIdentity.make(0, "Xbox", "guid1", "", "045e", "02ea")
 	var b := PadIdentity.make(3, "Xbox", "guid1", "", "045e", "02ea")
