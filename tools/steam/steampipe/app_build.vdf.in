@@ -1,0 +1,25 @@
+// SteamPipe app build script for SmartOnion.
+// Template: tools/steam/steampipe/app_build.vdf.in. tools/steam/upload.sh fills in the marked values (written between
+// two at-signs) and writes build/steam/scripts/app_build_<AppID>.vdf; that generated file is not meant to be edited.
+// Format reference: https://partner.steamgames.com/doc/sdk/uploading
+"AppBuild"
+{
+	"AppID" "@APP_ID@"
+	// Only visible to you, on the Builds page of the Steamworks app admin.
+	"Desc" "@DESC@"
+	// 1 = preview build: only logs and a file manifest go to BuildOutput, nothing is uploaded.
+	"Preview" "@PREVIEW@"
+	// Beta branch that this build is set live on after a successful upload; empty = none.
+	// Steam cannot set the default branch live automatically, and upload.sh never asks it to.
+	"SetLive" "@SET_LIVE@"
+	// The exported games, build/steam/content; each depot narrows it to its own platform folder.
+	"ContentRoot" "@CONTENT_ROOT@"
+	// Build logs, manifests and the chunk cache (can be deleted at any time; the next upload is then slower).
+	"BuildOutput" "@BUILD_OUTPUT@"
+	"Depots"
+	{
+		// One script per depot, in the same folder as this file.
+		"@DEPOT_WIN@" "depot_build_@DEPOT_WIN@.vdf"
+		"@DEPOT_LINUX@" "depot_build_@DEPOT_LINUX@.vdf"
+	}
+}

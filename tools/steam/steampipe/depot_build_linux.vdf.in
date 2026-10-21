@@ -1,0 +1,26 @@
+// SteamPipe depot build script: the Linux (x86_64) depot of SmartOnion, which also serves the Steam Deck.
+// Template: depot_build_linux.vdf.in, filled in by tools/steam/upload.sh (see app_build.vdf.in).
+// Its content is everything in build/steam/content/linux: SmartOnion.x86_64 and, in a Steam build, the GodotSteam and
+// Steamworks libraries (libsteam_api.so, libgodotsteam*.so) next to it.
+"DepotBuild"
+{
+	"DepotID" "@DEPOT_ID@"
+	// Overrides the ContentRoot of the app build script.
+	"ContentRoot" "@DEPOT_CONTENT_ROOT@"
+	"FileMapping"
+	{
+		// Every file under the content root, into the root of the depot.
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+	// Debug symbols and OS litter never ship.
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "*.debug"
+	"FileExclusion" "*.sym"
+	"FileExclusion" "Thumbs.db"
+	"FileExclusion" ".DS_Store"
+	// A steam_appid.txt next to the executable would stop restartAppIfNecessary from relaunching through Steam
+	// (upload.sh refuses a content folder that has one; this is the second line of defence).
+	"FileExclusion" "steam_appid.txt"
+}
