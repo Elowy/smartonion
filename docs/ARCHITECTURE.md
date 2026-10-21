@@ -4895,6 +4895,13 @@ library (`steam_api64.dll` / `libsteam_api.so`) and GodotSteam's (`libgodotsteam
 and a `build_info.txt`. The version is `application/config/version` in `project.godot`. The owner's step-by-step guide
 (Steamworks setup, store assets, review) is `docs/STEAM_RELEASE.md`.
 
+**`build_info.txt`** (`key=value` lines, written next to each executable by `export.sh`) is how the upload recognises
+what it is about to ship: `product`, `version` (`application/config/version`), `platform`, `git` (`<short hash>`, plus
+`-dirty` for a modified working tree, `unknown` without git), `date`, `steam` (`yes` for `--steam`), **`app_id`**
+(`smartonion/steam/app_id`, 480 when unset) and `godot`. The version and the app id are compiled into the executable
+(the app id is read from the packed `project.godot` at run time and drives `restartAppIfNecessary` and the Steam init),
+so nothing but this file says what a content folder was exported with; `upload.sh` compares it with the project (below).
+
 ### Export
 
 - **Presets** (`export_presets.cfg`, committed; `export_credentials.cfg` stays gitignored for signing secrets): "Windows
@@ -4919,7 +4926,7 @@ and a `build_info.txt`. The version is `application/config/version` in `project.
   checks versions and templates; with `--steam` runs `fetch_godotsteam.sh` so the plug-in and Valve's library land next to
   the executable, without it moves an existing `addons/godotsteam/` aside so a plain build never carries Valve's
   binaries; imports; exports into `build/steam/content/{windows/SmartOnion.exe, linux/SmartOnion.x86_64}` with a
-  `build_info.txt` (version, git hash, date, steam yes/no); verifies each embedded PCK (`tools/build/verify_pack.gd`
+  `build_info.txt` (version, app id, git hash, date, steam yes/no); verifies each embedded PCK (`tools/build/verify_pack.gd`
   run with `--main-pack`: licences present, nothing dev-only, the plug-in present exactly for `--steam`); runs the
   exported Linux binary's headless smoke (`--smoke --waves=1 --seed=5`, exit 0 + `"errors":0`); plain builds also
   write `build/dist/SmartOnion-<version>-windows.zip` / `-linux.tar.gz`. Logs in `build/logs/`. About a minute.
@@ -4946,7 +4953,7 @@ scripts are `tools/steam/steampipe/app_build.vdf.in`, `depot_build_windows.vdf.i
 - **Settings.** Flag, else environment variable, else default: `--app-id`/`APP_ID` (default: `smartonion/steam/app_id` in
   `project.godot`), `--depot-win`/`DEPOT_WIN`, `--depot-linux`/`DEPOT_LINUX` (both required, no default: a guessed depot
   id would upload to the wrong depot), `--user`/`STEAM_USER`, `--branch`/`STEAM_BRANCH`, `--desc`/`BUILD_DESC` (default
-  `v<version> <git short hash>[-dirty]`, version `dev` if `project.godot` has none), `--steamcmd`/`STEAMCMD`.
+  `v<version> <git>` of the *content*, read from its `build_info.txt`, not from the checkout), `--steamcmd`/`STEAMCMD`.
   `--root DIR` moves the project root (project.godot and build/), which is how the tests use a scratch tree.
 - **Refusals.** All problems are collected and printed together, exit code 1, and no VDF is written: missing or malformed
   ids; depot ids equal to each other or to the app id; app id 480 (unless `--allow-test-app`, which only lets a *dry
@@ -4954,8 +4961,17 @@ scripts are `tools/steam/steampipe/app_build.vdf.in`, `depot_build_windows.vdf.i
   project value, so a mismatch ships a game that relaunches the wrong app); a missing/empty content folder; a missing
   `SmartOnion.exe` / `SmartOnion.x86_64`; missing Steam libraries (searched anywhere below the platform folder, since
   GDExtension export may place them in a sub-folder); a `steam_appid.txt` anywhere in the content; no `--user` for a
-  real run. A non-executable Linux binary is only a warning (the checkout may sit on a file system without modes).
-  Usage errors (unknown option) exit 2.
+  real run.
+  **The content must belong to this project:** for each platform `build_info.txt` must exist, say `steam=yes`, carry
+  `version` equal to `application/config/version` and `app_id` equal to the app id being uploaded (so a build exported
+  while the id was still 480, or before a version bump, is refused: the id and the version are baked into the executable
+  and `upload.sh` otherwise only sees the current `project.godot`); and the two platforms must agree on `version` and
+  `git` (`export.sh --platform linux` replaces only its own folder, so a mixed Windows/Linux depot is a real way to go
+  wrong). All of these messages end in "run `tools/build/export.sh --steam` again". Only warnings: a `git` that ends in
+  `-dirty` or is not the current `HEAD` (compared as a prefix of the full hash; no git repository, no comparison), a
+  non-executable Linux binary (the checkout may sit on a file system without modes), and, on a Windows host, that the
+  mode of `SmartOnion.x86_64` cannot be kept at all (build and upload the Linux depot from Linux or WSL with the checkout
+  on the Linux file system; Git Bash also skips the Linux smoke test). Usage errors (unknown option) exit 2.
 - **Modes.** `--dry-run` writes the scripts, validates, prints the steamcmd command it would run and stops before any
   network use (steamcmd is not even installed). `--print-vdf` is a dry run that also prints the scripts. `--preview` sets
   `"Preview" "1"`: steamcmd logs in and validates but nothing is uploaded; `--branch` is ignored for it. `--install-steamcmd`
@@ -5011,6 +5027,10 @@ Valve wants it to be the first Steamworks call, right before the init.
   --severity=error` where installed), the filled VDFs of a dry run (and that it installs and logs in nowhere),
   `--print-vdf`, environment variables, description escaping, every refusal above, the exact steamcmd command line (no
   password), preview, `SetLive` (and the refused `default` / `public`), a failing steamcmd, and the `.gitignore` entries.
+  The fake content carries well-formed `build_info.txt` files; further cases cover a stale version, another app id (the
+  480-then-real-id slip), mixed platforms, a missing file, `steam=no`, a file without `app_id`, CRLF line endings, the
+  default description coming from the content, the dirty / foreign-commit warnings (with a scratch git repository), and
+  the Windows-host warning (a fake `uname`).
   It skips itself where there is no bash. `tests/test_rpt_steam.gd` no longer asserts that `project.godot` holds 480,
   only a positive app id, so the owner can set the real id without breaking the suite.
 

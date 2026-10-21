@@ -2,6 +2,8 @@ extends TestCase
 ## STEAMPIPE: tools/steam/upload.sh and the VDF templates, run for real in a scratch project root (--root) with a
 ## FAKE content folder and a FAKE steamcmd. No Steam account, no login, no network: a dry run never touches steamcmd,
 ## and the fake steamcmd only records the command line it was given.
+## The content folders carry the build_info.txt files tools/build/export.sh writes; upload.sh refuses content that does not
+## belong to this project, this app id and this export run.
 ## Skipped (and said so) where there is no bash, e.g. a plain Windows shell.
 
 const SCRIPT := "res://tools/steam/upload.sh"
@@ -9,11 +11,14 @@ const TEMPLATE_DIR := "res://tools/steam/steampipe/"
 const APP_ID := "2345670"
 const DEPOT_WIN := "2345671"
 const DEPOT_LINUX := "2345672"
+## The commit the fake export claims to come from (a scratch root has no git repository, so it is never compared).
+const CONTENT_GIT := "0123456789"
 
 var _root := ""
 var _have_bash := false
 var _counter := 0
 var _script_path := ""
+var _project_app_id := APP_ID
 
 
 func before_each() -> void:
@@ -44,6 +49,7 @@ func _remove_tree(path: String) -> void:
 	var dir := DirAccess.open(path)
 	if dir == null:
 		return
+	dir.include_hidden = true  # a scratch .git folder
 	for sub in dir.get_directories():
 		_remove_tree(path.path_join(sub))
 	for f in dir.get_files():
@@ -59,24 +65,57 @@ func _read(rel: String) -> String:
 	return FileAccess.get_file_as_string(_root.path_join(rel))
 
 
+## The text of a build_info.txt as tools/build/export.sh writes it; [param overrides] replaces values by key.
+func _build_info(platform: String, app_id: String, overrides: Dictionary = {}) -> String:
+	var values := {
+		"product": "SmartOnion", "version": "0.9.0", "platform": platform, "git": CONTENT_GIT,
+		"date": "2026-10-21T00:00:00Z", "steam": "yes", "app_id": app_id, "godot": "4.7.2.stable.official",
+	}
+	var text := ""
+	for key: String in values:
+		if overrides.has(key):
+			if overrides[key] != null:  # null drops the line
+				text += "%s=%s\n" % [key, overrides[key]]
+		else:
+			text += "%s=%s\n" % [key, values[key]]
+	return text
+
+
+## Rewrites the build_info.txt of [param platform] ("windows" / "linux") with [param overrides] (see _build_info).
+func _set_build_info(platform: String, overrides: Dictionary) -> void:
+	_write(_root.path_join("build/steam/content/%s/build_info.txt" % platform), _build_info(platform, _project_app_id, overrides))
+
+
+## Writes a project.godot with the given version (and the current app id).
+func _set_project_version(version: String) -> void:
+	_write(_root.path_join("project.godot"), _project_godot(_project_app_id, version))
+
+
+func _project_godot(app_id: String, version: String = "0.9.0") -> String:
+	return "config_version=5\n\n[application]\n\nconfig/name=\"SmartOnion\"\nconfig/version=\"%s\"\n\n[smartonion]\n\nsteam/app_id=%s\n" % [version, app_id]
+
+
 ## A scratch project root with a project.godot (app id [param app_id], version 0.9.0) and, if [param content], a
-## complete fake Steam export: exe + Steamworks + GodotSteam libraries + a pdb that must be excluded.
+## complete fake Steam export: exe + Steamworks + GodotSteam libraries + a pdb that must be excluded + a build_info.txt
+## per platform as export.sh writes it (version 0.9.0, steam=yes, the same app id).
 func _make_root(app_id: String = APP_ID, content: bool = true) -> void:
 	_counter += 1
 	_root = ProjectSettings.globalize_path("user://steampipe_test_%d_%d" % [Time.get_ticks_msec(), _counter])
-	_write(_root.path_join("project.godot"), "config_version=5\n\n[application]\n\nconfig/name=\"SmartOnion\"\nconfig/version=\"0.9.0\"\n\n[smartonion]\n\nsteam/app_id=%s\n" % app_id)
+	_project_app_id = app_id
+	_write(_root.path_join("project.godot"), _project_godot(app_id))
 	if content:
 		var win := "build/steam/content/windows/"
 		_write(_root.path_join(win + "SmartOnion.exe"), "exe")
 		_write(_root.path_join(win + "steam_api64.dll"), "dll")
 		_write(_root.path_join(win + "libgodotsteam.windows.template_release.x86_64.dll"), "dll")
 		_write(_root.path_join(win + "SmartOnion.pdb"), "pdb")
-		_write(_root.path_join(win + "build_info.txt"), "version 0.9.0 steam yes")
+		_write(_root.path_join(win + "build_info.txt"), _build_info("windows", app_id))
 		var lin := "build/steam/content/linux/"
 		_write(_root.path_join(lin + "SmartOnion.x86_64"), "elf")
 		FileAccess.set_unix_permissions(_root.path_join(lin + "SmartOnion.x86_64"), 493)  # 0755
 		_write(_root.path_join(lin + "libsteam_api.so"), "so")
 		_write(_root.path_join(lin + "libgodotsteam.linux.template_release.x86_64.so"), "so")
+		_write(_root.path_join(lin + "build_info.txt"), _build_info("linux", app_id))
 
 
 ## Runs upload.sh with [param args] (and [param env] "NAME=value" entries); returns {code, out}.
@@ -191,7 +230,7 @@ func test_a_dry_run_writes_the_filled_vdfs_and_logs_in_nowhere() -> void:
 		check(_exists(rel), "%s is written" % rel)
 	var app := _read("build/steam/scripts/app_build_%s.vdf" % APP_ID)
 	check('"AppID" "%s"' % APP_ID in app, "app id")
-	check('"Desc" "v0.9.0 ' in app, "the description defaults to the version and the git state: %s" % app)
+	check('"Desc" "v0.9.0 %s"' % CONTENT_GIT in app, "the description defaults to the version and the git hash of the content: %s" % app)
 	check('"Preview" "0"' in app, "a normal build is not a preview")
 	check('"SetLive" ""' in app, "nothing is set live by default")
 	check('"ContentRoot" "%s"' % _root.path_join("build/steam/content") in app, "content root (absolute)")
@@ -265,8 +304,10 @@ func test_the_test_app_480_is_refused_unless_allowed() -> void:
 	# A project.godot with no app id at all is the game's default 480 as well.
 	_remove_tree(_root)
 	_make_root("480")
-	_write(_root.path_join("project.godot"), "config_version=5\n\n[application]\n\nconfig/name=\"SmartOnion\"\n")
-	check_eq(_dry()["code"], 1, "no steam/app_id setting = 480 -> refused")
+	_write(_root.path_join("project.godot"), "config_version=5\n\n[application]\n\nconfig/name=\"SmartOnion\"\nconfig/version=\"0.9.0\"\n")
+	var unset := _dry()
+	check_eq(unset["code"], 1, "no steam/app_id setting = 480 -> refused")
+	check("test app" in unset["out"] and "export.sh --steam again" in unset["out"], "the refusal says to export again after setting the real id: %s" % unset["out"])
 
 
 func test_an_app_id_that_differs_from_project_godot_is_refused() -> void:
@@ -356,6 +397,172 @@ func test_a_steam_appid_txt_in_the_content_is_refused() -> void:
 	var r := _dry()
 	check_eq(r["code"], 1, "steam_appid.txt -> refused")
 	check("steam_appid.txt" in r["out"], "named: %s" % r["out"])
+
+
+# --- The content must belong to this project (build_info.txt) -----------------------------------------------
+
+func test_content_of_another_version_is_refused() -> void:
+	if not _have_bash:
+		return
+	# The owner bumped application/config/version and did not export again: both folders are the old build.
+	_make_root()
+	_set_project_version("0.9.1")
+	var r := _dry()
+	check_eq(r["code"], 1, "both platforms exported at 0.9.0, project.godot says 0.9.1 -> refused")
+	check("windows: the content is version 0.9.0" in r["out"] and "linux: the content is version 0.9.0" in r["out"], "both platforms are named with the stale version: %s" % r["out"])
+	check("0.9.1" in r["out"] and "export.sh --steam again" in r["out"], "and the fix is told: %s" % r["out"])
+	check(not _exists("build/steam/scripts"), "no script was written")
+	# Only one platform was exported again (export.sh --platform linux): the other folder is the old build.
+	_remove_tree(_root)
+	_make_root()
+	_set_build_info("linux", {"version": "0.8.0"})
+	var mixed := _dry()
+	check_eq(mixed["code"], 1, "windows 0.9.0 + linux 0.8.0 under project 0.9.0 -> refused")
+	check("linux: the content is version 0.8.0" in mixed["out"], "the stale platform is named: %s" % mixed["out"])
+	check("windows: the content is version" not in mixed["out"], "and the good one is not: %s" % mixed["out"])
+	check("not exported together" in mixed["out"], "the platforms disagree: %s" % mixed["out"])
+
+
+func test_content_exported_for_another_app_id_is_refused() -> void:
+	if not _have_bash:
+		return
+	# The owner exported with the test app 480, then put the real id into project.godot and did not export again.
+	_make_root()
+	_set_build_info("windows", {"app_id": "480"})
+	_set_build_info("linux", {"app_id": "480"})
+	var r := _dry()
+	check_eq(r["code"], 1, "built with app id 480, uploading %s -> refused" % APP_ID)
+	check("exported with app id 480" in r["out"] and APP_ID in r["out"], "both ids are named: %s" % r["out"])
+	check("export.sh --steam again" in r["out"], "and it says to export again: %s" % r["out"])
+	check(not _exists("build/steam/scripts"), "no script was written")
+	# --app-id cannot paper over it: the content still holds the other id.
+	var flag := _dry(["--app-id", APP_ID])
+	check_eq(flag["code"], 1, "the same through --app-id")
+	# The test app is consistent when it is the project's own (a dry run with --allow-test-app).
+	_remove_tree(_root)
+	_make_root("480")
+	check_eq(_dry(["--allow-test-app"])["code"], 0, "480 everywhere + --allow-test-app -> fine")
+	# An export from before app_id was recorded cannot be vouched for.
+	_remove_tree(_root)
+	_make_root()
+	_set_build_info("windows", {"app_id": null})
+	var old := _dry()
+	check_eq(old["code"], 1, "a build_info.txt without app_id -> refused")
+	check("no app_id" in old["out"], "and says so: %s" % old["out"])
+
+
+func test_content_of_two_different_exports_is_refused() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	_set_build_info("linux", {"git": "fedcba9876"})
+	var r := _dry()
+	check_eq(r["code"], 1, "different git hashes on the two platforms -> refused")
+	check("not exported together" in r["out"] and "git" in r["out"] and "0123456789" in r["out"] and "fedcba9876" in r["out"], "the hashes are named: %s" % r["out"])
+	check(not _exists("build/steam/scripts"), "no script was written")
+
+
+func test_missing_build_info_is_refused() -> void:
+	if not _have_bash:
+		return
+	for platform in ["windows", "linux"]:
+		_make_root()
+		DirAccess.remove_absolute(_root.path_join("build/steam/content/%s/build_info.txt" % platform))
+		var r := _dry()
+		check_eq(r["code"], 1, "no %s/build_info.txt -> refused" % platform)
+		check("%s: build_info.txt is missing" % platform in r["out"], "and it is named: %s" % r["out"])
+		check(not _exists("build/steam/scripts"), "no script was written")
+		_remove_tree(_root)
+	_root = ""
+
+
+func test_content_that_is_not_a_steam_export_is_refused() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	_set_build_info("windows", {"steam": "no"})
+	var r := _dry()
+	check_eq(r["code"], 1, "steam=no -> refused")
+	check("windows: build_info.txt says steam=no" in r["out"], "named: %s" % r["out"])
+	_remove_tree(_root)
+	_make_root()
+	_set_build_info("linux", {"steam": null})
+	check_eq(_dry()["code"], 1, "no steam= line at all -> refused")
+
+
+func test_build_info_survives_windows_line_endings() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	for platform in ["windows", "linux"]:
+		_write(_root.path_join("build/steam/content/%s/build_info.txt" % platform), _build_info(platform, APP_ID).replace("\n", "\r\n"))
+	var r := _dry()
+	check_eq(r["code"], 0, "CRLF build_info.txt files are read like LF ones: %s" % r["out"])
+
+
+func test_the_description_comes_from_the_content_not_the_checkout() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	_set_build_info("windows", {"git": "feedface01"})
+	_set_build_info("linux", {"git": "feedface01"})
+	var r := _dry()
+	check_eq(r["code"], 0, "ok: %s" % r["out"])
+	check('"Desc" "v0.9.0 feedface01"' in _read("build/steam/scripts/app_build_%s.vdf" % APP_ID), "the content's version and git hash")
+	var own := _dry(["--desc", "my own"])
+	check_eq(own["code"], 0, "ok")
+	check('"Desc" "my own"' in _read("build/steam/scripts/app_build_%s.vdf" % APP_ID), "--desc still wins")
+
+
+func test_a_dirty_or_foreign_commit_in_the_content_is_only_a_warning() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	_set_build_info("windows", {"git": CONTENT_GIT + "-dirty"})
+	_set_build_info("linux", {"git": CONTENT_GIT + "-dirty"})
+	var dirty := _dry()
+	check_eq(dirty["code"], 0, "a -dirty export still passes: %s" % dirty["out"])
+	check("warning" in dirty["out"] and "uncommitted changes" in dirty["out"], "but it warns: %s" % dirty["out"])
+	check('"Desc" "v0.9.0 %s-dirty"' % CONTENT_GIT in _read("build/steam/scripts/app_build_%s.vdf" % APP_ID), "and the description says so")
+	# A real repository in the scratch root: the content's commit is compared with HEAD.
+	_remove_tree(_root)
+	_make_root()
+	var out: Array = []
+	var git := ["-C", _root]
+	if OS.execute("git", git + ["init", "-q"], out, true) != OK:
+		return  # no git here: nothing to compare with
+	var commit := OS.execute("git", git + ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "x"], out, true)
+	if commit != OK:
+		return
+	out = []
+	OS.execute("git", git + ["rev-parse", "--short=10", "HEAD"], out, true)
+	var head := "".join(out).strip_edges()
+	check_eq(head.length(), 10, "the scratch repository has a HEAD")
+	var other := _dry()
+	check_eq(other["code"], 0, "content of another commit still passes: %s" % other["out"])
+	check("exported from commit %s" % CONTENT_GIT in other["out"] and head in other["out"], "but warns, naming both: %s" % other["out"])
+	_set_build_info("windows", {"git": head})
+	_set_build_info("linux", {"git": head})
+	var same := _dry()
+	check_eq(same["code"], 0, "ok: %s" % same["out"])
+	check("exported from commit" not in same["out"] and "uncommitted" not in same["out"], "content of HEAD gives no warning: %s" % same["out"])
+
+
+func test_a_windows_host_is_warned_about_the_linux_executable_bit() -> void:
+	if not _have_bash:
+		return
+	_make_root()
+	# A uname that says it is Git Bash: upload.sh then runs its Windows paths (steamcmd.exe, no mode check).
+	var fake_bin := _root.path_join("fakebin")
+	_write(fake_bin.path_join("uname"), "#!/bin/sh\nif [ \"$1\" = \"-s\" ]; then echo MINGW64_NT-10.0; else command -p uname \"$@\"; fi\n")
+	FileAccess.set_unix_permissions(fake_bin.path_join("uname"), 493)
+	var args: Array[String] = ["--dry-run", "--depot-win", DEPOT_WIN, "--depot-linux", DEPOT_LINUX]
+	var r := _run(args, ["PATH=%s:%s" % [fake_bin, OS.get_environment("PATH")]])
+	check_eq(r["code"], 0, "a dry run still works: %s" % r["out"])
+	check("Windows host" in r["out"] and "executable bit" in r["out"] and "Linux or WSL" in r["out"], "it warns that the Linux depot's mode cannot be kept: %s" % r["out"])
+	check("steamcmd.exe" in r["out"], "(the fake uname took effect)")
+	var plain := _dry()
+	check("Windows host" not in plain["out"], "no such warning on Linux")
 
 
 # --- steamcmd (a fake) ----------------------------------------------------------------------------------

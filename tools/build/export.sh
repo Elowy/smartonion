@@ -8,7 +8,8 @@
 # (steam_api64.dll / libsteam_api.so + libgodotsteam.*) are exported next to the executables. Without it the
 # plug-in is hidden for the export (a copy in addons/godotsteam is put back afterwards), so a plain build never
 # contains Valve's libraries. The content folders are exactly what tools/steam/upload.sh uploads (SteamPipe
-# ContentRoot) and are emptied before each export of their platform.
+# ContentRoot) and are emptied before each export of their platform. Each holds a build_info.txt (version, app_id, steam
+# yes/no, git hash ...) that tools/steam/upload.sh checks against project.godot, so a stale or mixed build is not uploaded.
 #
 # What is checked: the templates are installed (tools/build/install_templates.sh), the editor is 4.7.2, the
 # version of the Windows exe metadata matches application/config/version, every export is non-empty and
@@ -142,8 +143,9 @@ want_platform() {
 version="$(sed -n 's/^config\/version="\([^"]*\)".*/\1/p' "${root}/project.godot" | head -n 1)"
 [ -n "${version}" ] || die "project.godot has no application/config/version (config/version=\"0.9.0\" in [application])"
 [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "application/config/version must look like 1.2.3, got '${version}'"
+# The Steamworks app id compiled into the build (smartonion/steam/app_id); the game falls back to Valve's test app 480 without it.
 app_id="$(sed -n 's/^steam\/app_id=\([0-9]*\).*/\1/p' "${root}/project.godot" | head -n 1)"
-app_id="${app_id:-0}"
+app_id="${app_id:-480}"
 
 preset_value() {
 	# preset_value KEY: the value of KEY (quotes stripped) in the Windows preset options of export_presets.cfg.
@@ -227,7 +229,8 @@ if [ "${steam}" -eq 1 ]; then
 	"${root}/tools/steam/fetch_godotsteam.sh" --dest "${root}" || die "tools/steam/fetch_godotsteam.sh failed"
 	[ -f "${addon_dir}/godotsteam.gdextension" ] || die "addons/godotsteam/godotsteam.gdextension is missing after the fetch"
 	if [ "${app_id}" = "480" ]; then
-		warn "steam/app_id in project.godot is 480 (Valve's test app): tools/steam/upload.sh refuses it without --allow-test-app"
+		warn "steam/app_id in project.godot is 480 (Valve's test app): tools/steam/upload.sh refuses it without --allow-test-app." \
+			"The id is baked into the exported game, so after you set the real id run this export again"
 	fi
 elif [ -e "${addon_dir}" ]; then
 	log "build without --steam: hiding addons/godotsteam during the export (put back afterwards)"
@@ -314,6 +317,7 @@ export_platform() {
 		echo "git=$(git_info)"
 		echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 		echo "steam=$([ "${steam}" -eq 1 ] && echo yes || echo no)"
+		echo "app_id=${app_id}"
 		echo "godot=${godot_version}"
 	} > "${out_dir}/build_info.txt"
 	if [ "${plat}" = "linux" ]; then

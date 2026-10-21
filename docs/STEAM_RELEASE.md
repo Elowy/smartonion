@@ -193,7 +193,12 @@ The App ID is taken from `project.godot` (section 2). Then, in this order:
    ```
    It refuses, listing every problem, when: App ID is 480 or differs from `project.godot`; a depot id is missing; a content
    folder or its executable is missing; `steam_api64.dll` / `libgodotsteam*.dll` / `libsteam_api.so` /
-   `libgodotsteam*.so` are missing; a `steam_appid.txt` is in the content.
+   `libgodotsteam*.so` are missing; a `steam_appid.txt` is in the content; or a platform's `build_info.txt` (written by
+   `export.sh`) is missing, is not from a `--steam` export, or does not match: its `version` is not the current
+   `application/config/version`, its `app_id` is not the App ID you upload (the id is compiled into the game, so after
+   changing it in `project.godot` you must export again), or Windows and Linux were exported at different versions or
+   commits. Fix: run `tools/build/export.sh --steam` again (both platforms). A build made from a modified or older commit
+   is only a warning, and the default description (`v<version> <git hash>`) is taken from the content, not from your checkout.
 2. **Preview.** Logs in and runs SteamPipe with `"Preview" "1"`: it validates your account, the App ID, the depots and the
    file mappings, and writes the file manifest and logs to `build/steam/output/`, but uploads nothing:
    ```bash
