@@ -262,12 +262,32 @@ func test_two_pads_that_come_back_on_swapped_ids_each_return_to_their_own_slot()
 	check_eq(back.size(), 2, "two returns announced")
 
 
+func test_pads_that_leave_and_come_back_swapped_within_one_frame_still_return_by_themselves() -> void:
+	var one := _join_pad(0, &"mage", "pad-one")
+	var two := _join_pad(1, &"rogue", "pad-two")
+	_frame()
+	# Removed and re-added between two snapshots (a frame stall, SDL / Steam Input re-adding every pad at once).
+	PadSource.fake_disconnect(0)
+	PadSource.fake_disconnect(1)
+	_pad(0, "pad-two")
+	_pad(1, "pad-one")
+	var back: Array[PlayerSlot] = []
+	PlayerManager.device_reconnected.connect(func(s: PlayerSlot) -> void: back.append(s))
+	_frame()
+	_frame()
+	check(PlayerManager.disconnected_slots().is_empty(), "nobody is left missing")
+	check_eq((one.input as JoypadInput).device, 1, "pad-one plays P1 on its new id")
+	check_eq((two.input as JoypadInput).device, 0, "pad-two plays P2 on its new id")
+	check_eq(back.size(), 2, "both returns are announced")
+
+
 func test_an_identical_idle_pad_is_not_given_a_lost_slot_by_itself() -> void:
 	PlayerManager.takeover_enabled = true
 	_join_pad(0, &"warrior", "xbox")
 	var two := _join_pad(1, &"mage", "xbox")
 	_join_pad(2, &"rogue", "xbox")
 	_pad(3, "xbox")  # a fourth, identical pad: lying around, nobody's yet
+	_frame()  # (it has been seen idle, as it always has in the game)
 	var events: Array[String] = []
 	var on_gone := func(s: PlayerSlot) -> void: events.append("gone:%s" % s.label())
 	var on_back := func(s: PlayerSlot) -> void: events.append("back:%s" % s.label())
@@ -291,6 +311,7 @@ func test_a_pad_that_connects_after_the_loss_returns_by_itself_and_is_announced(
 	_join_pad(0, &"warrior", "xbox")
 	var two := _join_pad(1, &"mage", "xbox")
 	_pad(3, "xbox")  # identical, already there and idle
+	_frame()
 	var events: Array[String] = []
 	var on_gone := func(s: PlayerSlot) -> void: events.append("gone:%s" % s.label())
 	var on_back := func(s: PlayerSlot) -> void: events.append("back:%s" % s.label())

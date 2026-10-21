@@ -49,6 +49,10 @@ var _join_prev: Dictionary[String, bool] = {}
 var _full_notified: Dictionary[int, bool] = {}
 ## A free pad took a slot over since the last frame (the pause menu must not read the same A as one of its own).
 var _took_over := false
+## The connected pads nobody played at the end of the previous frame ([method track_connections]): what a slot that
+## goes missing notes as "lying around" – a pad that first shows up in the frame the loss is seen may be the lost one
+## coming back (a remove and re-add between two frames), so it is not on the list.
+var _idle_last: Array[PadIdentity] = []
 
 
 func _init() -> void:
@@ -219,6 +223,7 @@ func leave(index: int) -> void:
 func clear() -> void:
 	for i in MAX_PLAYERS:
 		leave(i)
+	_idle_last.clear()
 
 
 ## Pads nobody plays: connected, and not the working pad of any slot.
@@ -283,7 +288,7 @@ func consume_takeover() -> bool:
 
 ## Once per frame, after the inputs polled: announces a slot's device going away or coming back, and gives a missing
 ## slot back to a pad that is provably its own ([method _rebind_to_returning_pad]). Counts how long each ghost has been
-## missing. The loss is announced first (and the pads lying around at that moment are noted, see
+## missing. The loss is announced first (and the pads that lay around unplayed in the previous frame are noted, see
 ## [member PlayerSlot.idle_pads_at_loss]), so a later automatic return is a visible one.
 func track_connections(delta: float) -> void:
 	for slot in get_slots():
@@ -293,7 +298,7 @@ func track_connections(delta: float) -> void:
 			slot.missing_time += delta
 			if slot.connection_reported:
 				slot.connection_reported = false
-				slot.idle_pads_at_loss = _idle_pads()
+				slot.idle_pads_at_loss = _idle_last.duplicate()
 				device_disconnected.emit(slot)
 			if slot.input is JoypadInput:
 				_rebind_to_returning_pad(slot)
@@ -303,6 +308,7 @@ func track_connections(delta: float) -> void:
 			if not slot.connection_reported:
 				slot.connection_reported = true
 				device_reconnected.emit(slot)
+	_idle_last = _idle_pads()
 
 
 ## The fingerprints of the connected pads nobody plays.

@@ -4567,8 +4567,10 @@ and it **connected after the slot went missing**:
   virtual pad Steam shows), or
 - **the slot is local:** the fingerprint matches, and
 - **the pad was not already lying around:** when `track_connections` first sees a slot's device missing, it
-  announces the loss (`device_disconnected`: pause and notice) and then notes the connected, unplayed pads of that
-  moment in `PlayerSlot.idle_pads_at_loss` (their `PadIdentity` objects). Those pads cannot be the pad that went
+  announces the loss (`device_disconnected`: pause and notice) and then notes the pads that were connected and
+  unplayed at the end of the PREVIOUS frame (`PlayerManager._idle_last`) in `PlayerSlot.idle_pads_at_loss` (their
+  `PadIdentity` objects), so pads removed and re-added between two snapshots (a frame stall, SDL / Steam Input
+  re-adding every pad at once) still count as returning. Those pads cannot be the pad that went
   away, so they never take the slot by themselves (an identical Xbox pad of a spectator, or of a player about to
   join, would otherwise get P2's hero at once, with no pause and no notice). A pad that (re)connects afterwards is
   a new `PadIdentity` object and can: the return is announced, so it is visible (`device_disconnected`, then
@@ -4593,7 +4595,7 @@ number wins (a documented limit).
   press is consumed, so it does not also act in the screen behind.
 - **`track_connections(delta)`** runs once a frame from `_process`, after the inputs are polled and before the
   free-pad scan. For a slot whose device is missing it counts `missing_time`; on the first miss it emits
-  `device_disconnected` and notes the idle pads (`idle_pads_at_loss`); only then does it try to give the slot back
+  `device_disconnected` and notes the previous frame's idle pads (`idle_pads_at_loss`); only then does it try to give the slot back
   to a returning pad (`_rebind_to_returning_pad`, which skips the noted pads and keeps scanning when a rebind
   fails). `device_reconnected` follows when the slot works again (the engine's signal emits neither).
 - **`_scan_free_pads()`** edge-detects A per pad (the `joy:N` key is only the edge key) and then:
@@ -4861,8 +4863,9 @@ can do that" (also for a guest's "Reset to defaults" that would change the windo
   declared with four arguments but emitted with one. The backend never calls them. A guest's merged keyboard or
   mouse acts as the host's, as far as the game can tell.
 - **Identical pad models** with no Steam handle cannot be told apart (see Identity). An identical idle pad that was
-  already connected when a slot's pad died does not take the slot by itself; its owner takes it over with A. A
-  replacement pad that appears in the very same frame as the loss counts as "already there" and needs an A too.
+  already connected (idle in the frame before) when a slot's pad died does not take the slot by itself; its owner
+  takes it over with A. The trade-off: an identical pad that first appears in the very frame the loss is seen counts
+  as returning and may take the slot by itself (the loss and its return are both announced).
 - **Video rows and Reset in unattended pages** are locked for every pad and key while guests are connected; only the
   mouse changes them then. "Reset to defaults" is refused as a whole (not partly) when it would change a Video row.
 - **Mid-run take-over:** a free pad's A, pressed on the Settings page opened from the slot-less pause menu, can take
