@@ -81,8 +81,7 @@ func open(p_slot: PlayerSlot) -> void:
 	slot = p_slot
 	_close_settings()
 	selected = Item.RESUME
-	quit_armed = false
-	drop_armed = -1
+	_disarm()
 	_refusal_left = 0.0
 	_skip_frames = 1
 	_wait_neutral = slot != null and slot.input != null and slot.input.nav_held() != Vector2i.ZERO
@@ -94,14 +93,20 @@ func open(p_slot: PlayerSlot) -> void:
 	show()
 
 
-## Moves the highlight by [param step] (wraps) and cancels a pending quit confirmation.
+## Moves the highlight by [param step] (wraps) and cancels a pending quit / drop confirmation.
 func move_selection(step: int) -> void:
 	var i := entries.find(selected)
 	selected = entries[wrapi(maxi(i, 0) + step, 0, entries.size())]
-	quit_armed = false
-	drop_armed = -1
+	_disarm()
 	Audio.play_ui(&"ui_move")
 	_update_selection()
+
+
+## Cancels a pending "Are you sure?" (Quit to Menu, Continue without Pn): the highlight moved, by the pad, the keys or the
+## mouse. Call [method _update_selection] afterwards to restore the button texts.
+func _disarm() -> void:
+	quit_armed = false
+	drop_armed = -1
 
 
 ## The button of entry [param code] (an Item or DROP_BASE + slot index); null when it is not listed.
@@ -283,8 +288,7 @@ func _refresh_entries() -> void:
 	_add_entry(Item.QUIT, QUIT_TEXT)
 	if not entries.has(selected):
 		selected = Item.RESUME
-	quit_armed = false
-	drop_armed = -1
+	_disarm()
 	_missing_label.visible = not names.is_empty()
 	if not names.is_empty():
 		_missing_label.text = "%s disconnected – press A on any free controller to take over,\nor wait for %s to come back." % [
@@ -306,10 +310,13 @@ func _add_entry(code: int, text: String) -> void:
 	b.mouse_entered.connect(func() -> void:
 		if selected != code:
 			selected = code
-			quit_armed = false
+			_disarm()
 			_update_selection())
 	b.pressed.connect(func() -> void:
-		selected = code
+		if selected != code:
+			selected = code
+			_disarm()
+			_update_selection()
 		press_selected())
 
 

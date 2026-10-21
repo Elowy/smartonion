@@ -786,6 +786,45 @@ func test_continue_without_asks_for_a_second_press() -> void:
 	check(dropped.size() == 1 and dropped[0] == b, "the second press drops P2")
 
 
+func test_hovering_another_entry_cancels_an_armed_confirmation() -> void:
+	_join_pad(0)
+	var b := _join_pad(1)
+	PadSource.fake_disconnect(1)
+	var menu := PauseMenu.create()
+	UiFakes.add_to_root(tree, menu)
+	_screens.append(menu)
+	var dropped: Array[PlayerSlot] = []
+	var quits := [0]
+	menu.drop_player_requested.connect(func(s: PlayerSlot) -> void: dropped.append(s))
+	menu.quit_to_menu_requested.connect(func() -> void: quits[0] += 1)
+	menu.open(null)
+	var drop_code := PauseMenu.DROP_BASE + 1
+	menu.button_for(drop_code).mouse_entered.emit()
+	menu.press_selected()
+	check_eq(menu.drop_armed, drop_code, "armed by the first press")
+	menu.button_for(PauseMenu.Item.RESUME).mouse_entered.emit()  # the mouse wanders off ...
+	check_eq(menu.drop_armed, -1, "hovering another entry cancels it")
+	check_eq(menu.button_for(drop_code).text, "Continue without P2", "and the button reads normally again")
+	menu.button_for(drop_code).mouse_entered.emit()  # ... and comes back
+	menu.press_selected()
+	check(dropped.is_empty() and menu.drop_armed == drop_code, "one press only asks again")
+	menu.press_selected()
+	check(dropped.size() == 1 and dropped[0] == b, "the second one drops P2")
+	# The same for Quit to Menu.
+	menu.open(null)
+	menu.button_for(PauseMenu.Item.QUIT).mouse_entered.emit()
+	menu.press_selected()
+	check(menu.quit_armed and menu.button_for(PauseMenu.Item.QUIT).text == PauseMenu.QUIT_CONFIRM_TEXT, "Quit armed")
+	menu.button_for(PauseMenu.Item.SETTINGS).mouse_entered.emit()
+	check(not menu.quit_armed and menu.button_for(PauseMenu.Item.QUIT).text == PauseMenu.QUIT_TEXT, "hovering Settings cancels it")
+	menu.button_for(PauseMenu.Item.QUIT).mouse_entered.emit()
+	menu.press_selected()
+	check(quits[0] == 0 and menu.quit_armed, "back on Quit, one press only asks again")
+	# A click on another entry (no hover seen) also moves the highlight and cancels.
+	menu.button_for(drop_code).pressed.emit()
+	check(not menu.quit_armed and menu.drop_armed == drop_code, "a click elsewhere cancels Quit and arms its own entry")
+
+
 func test_a_guest_cannot_drop_a_player_but_the_host_can() -> void:
 	_fake_backend(2)
 	var host := _join_pad(0)
