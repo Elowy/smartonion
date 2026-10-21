@@ -241,6 +241,77 @@ func test_the_same_pad_on_a_new_id_takes_the_slot_back_by_itself() -> void:
 	check_eq(PlayerManager.count(), 2, "nobody joined or left")
 
 
+func test_two_pads_that_come_back_on_swapped_ids_each_return_to_their_own_slot() -> void:
+	var one := _join_pad(0, &"mage", "pad-one")
+	var two := _join_pad(1, &"rogue", "pad-two")
+	one.ready = true
+	PadSource.fake_disconnect(0)
+	PadSource.fake_disconnect(1)
+	_frame()
+	check_eq(PlayerManager.disconnected_slots().size(), 2, "both slots are ghosts, each still holding its old joy:N")
+	var back: Array[PlayerSlot] = []
+	PlayerManager.device_reconnected.connect(func(s: PlayerSlot) -> void: back.append(s))
+	_pad(0, "pad-two")  # the dongle hands out the lowest id first: the pads come back in the other order
+	_pad(1, "pad-one")
+	_frame()
+	check(PlayerManager.disconnected_slots().is_empty(), "nobody is missing any more")
+	check_eq((one.input as JoypadInput).device, 1, "pad-one plays P1 again, on its new id")
+	check_eq((two.input as JoypadInput).device, 0, "pad-two plays P2 again")
+	check(one.input.is_connected_device() and two.input.is_connected_device(), "both work")
+	check(one.class_data.id == &"mage" and one.ready and two.class_data.id == &"rogue", "the heroes did not cross over")
+	check_eq(back.size(), 2, "two returns announced")
+
+
+func test_a_returning_pad_whose_new_id_is_another_ghosts_old_id_still_returns() -> void:
+	_join_pad(0)
+	var two := _join_pad(1, &"mage", "pad-two")
+	var three := _join_pad(2, &"rogue", "pad-three")
+	PadSource.fake_disconnect(1)
+	PadSource.fake_disconnect(2)
+	_frame()
+	_pad(1, "pad-three")  # P3's pad is first back and gets the lowest free id: P2's old one
+	_frame()
+	check(three.input.is_connected_device(), "P3 is back by itself although joy:1 was P2's")
+	check_eq((three.input as JoypadInput).device, 1, "on its new id")
+	check(PlayerManager.is_missing(two), "P2 keeps waiting")
+	_pad(2, "pad-two")  # and P2's pad takes P3's old id
+	_frame()
+	check(two.input.is_connected_device() and (two.input as JoypadInput).device == 2, "P2 returns too, onto joy:2")
+	check(two.class_data.id == &"mage" and three.class_data.id == &"rogue", "each with its own hero")
+	check(PlayerManager.disconnected_slots().is_empty(), "nobody is missing")
+
+
+func test_a_free_pad_on_a_ghosts_stale_id_can_take_a_slot_over() -> void:
+	PlayerManager.takeover_enabled = true
+	_join_pad(0)
+	var two := _join_pad(1)
+	var three := _join_pad(2)
+	PadSource.fake_disconnect(1)
+	PadSource.fake_disconnect(2)
+	_frame()
+	_pad(2, "newcomer")  # a pad nobody knows lands on P3's old id
+	_frame()
+	_tap_pad(2)
+	check(two.input.is_connected_device() and (two.input as JoypadInput).device == 2, "the lowest missing slot (P2) is taken over, though joy:2 was P3's")
+	check(PlayerManager.is_missing(three), "P3 still waits")
+
+
+func test_take_over_prefers_the_missing_slot_the_pad_belongs_to() -> void:
+	PlayerManager.takeover_enabled = true
+	_join_pad(0)
+	var two := _join_pad(1, &"warrior", "model-x")
+	var three := _join_pad(2, &"mage", "model-y")
+	PadSource.fake_disconnect(1)
+	PadSource.fake_disconnect(2)
+	_frame()
+	_pad(5, "model-y")  # a pad of P3's fingerprint that is still free (nothing took it in)
+	check(PlayerManager.take_over(5) == three, "it takes P3's seat, not the lowest ghost's")
+	check_eq((three.input as JoypadInput).device, 5, "P3 plays on it")
+	check(PlayerManager.is_missing(two), "P2 still waits")
+	_pad(6, "someone-else")
+	check(PlayerManager.take_over(6) == two, "a pad that matches nobody takes the lowest")
+
+
 func test_a_guest_session_keeps_its_seat_whatever_pad_it_shows_up_as() -> void:
 	var fake := _fake_backend(2)
 	_join_pad(0)

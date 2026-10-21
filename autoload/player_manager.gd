@@ -10,8 +10,9 @@ extends Node
 ## - Hotplug (RPT-CORE): controllers are read through [PadSource] (one snapshot per frame, fakeable). A slot
 ##   remembers its pad's fingerprint ([PadIdentity]) and its Remote Play session; a connected pad takes a missing
 ##   slot back by itself only when session or fingerprint match ("joy:N" alone proves nothing, ids are reused). Any
-##   other free pad takes the lowest missing slot over by pressing A ([method take_over], in the lobby while
-##   [member joining_enabled], during a run while [member takeover_enabled]): [method rebind] swaps the slot's input.
+##   other free pad takes a missing slot over by pressing A – the one it provably belongs to, else the lowest
+##   ([method take_over], in the lobby while [member joining_enabled], during a run while [member takeover_enabled]):
+##   [method rebind] swaps the slot's input.
 
 signal player_joined(slot: PlayerSlot)
 signal player_left(slot: PlayerSlot)
@@ -127,7 +128,8 @@ func has_connected_human() -> bool:
 	return false
 
 
-## The lowest-numbered human slot whose device is missing (the one a free pad takes over); null when none.
+## The lowest-numbered human slot whose device is missing (what a free pad takes over when it matches no slot's pad
+## better, [method take_over]); null when none.
 func first_ghost() -> PlayerSlot:
 	var ghosts := disconnected_slots()
 	return ghosts[0] if not ghosts.is_empty() else null
@@ -234,15 +236,17 @@ func is_pad_bound(device: int) -> bool:
 
 
 ## Gives the slot [param index] to [param input] (the player's controller is gone and another one takes over, or a
-## test / script swaps the device). The new device must not be in use by another slot. The slot keeps its class, ready
-## flag, loadout and hero; the press that is held on the new input is swallowed. Emits [signal device_reconnected].
+## test / script swaps the device). The new device must not be in use by another slot – a slot whose device WORKS: a
+## ghost's stale "joy:N" is no claim on the id (it is whoever's pad is there now; the ghost reads nothing from it).
+## The slot keeps its class, ready flag, loadout and hero; the press that is held on the new input is swallowed.
+## Emits [signal device_reconnected].
 func rebind(index: int, input: PlayerInput) -> bool:
 	var slot := get_slot(index)
 	if slot == null or input == null:
 		return false
 	var key := input.get_device_key()
 	for other in _slots:
-		if other != null and other != slot and other.input.get_device_key() == key:
+		if other != null and other != slot and other.input.get_device_key() == key and other.input.is_connected_device():
 			return false
 	slot.input = input
 	var pad := input as JoypadInput
@@ -255,10 +259,11 @@ func rebind(index: int, input: PlayerInput) -> bool:
 	return true
 
 
-## The free pad on [param device] takes over the lowest missing slot. Returns that slot; null (nothing changes) when
-## no slot is missing or the pad is not free.
+## The free pad on [param device] takes over a missing slot: the one it provably belongs to (same Remote Play session
+## or fingerprint – an identical model that was lying around when the slot's pad died, [method _is_returning_pad]),
+## else the lowest. Returns that slot; null (nothing changes) when no slot is missing or the pad is not free.
 func take_over(device: int) -> PlayerSlot:
-	var ghost := first_ghost()
+	var ghost := _ghost_for_pad(device)
 	if ghost == null or not is_pad_free(device):
 		return null
 	if not rebind(ghost.index, JoypadInput.new(device)):
@@ -298,9 +303,18 @@ func track_connections(delta: float) -> void:
 
 func _rebind_to_returning_pad(slot: PlayerSlot) -> void:
 	for device in PadSource.devices():
-		if not is_pad_bound(device) and _is_returning_pad(slot, device):
-			rebind(slot.index, JoypadInput.new(device))
+		if not is_pad_bound(device) and _is_returning_pad(slot, device) and rebind(slot.index, JoypadInput.new(device)):
 			return
+
+
+## The missing slot the free pad on [param device] takes over: the first one it is [method _is_returning_pad] for, else
+## the lowest ([method first_ghost]); null when nobody is missing.
+func _ghost_for_pad(device: int) -> PlayerSlot:
+	var ghosts := disconnected_slots()
+	for ghost in ghosts:
+		if _is_returning_pad(ghost, device):
+			return ghost
+	return ghosts[0] if not ghosts.is_empty() else null
 
 
 ## True when the free pad on [param device] provably is [param slot]'s: the same Remote Play session (a guest keeps
