@@ -2953,6 +2953,24 @@ A képességek alapból a **legközelebbi ellenségre / a legsűrűbb csoportra*
 (Hailstorm, Ember Rain), a mozgásos képességek (Charge, Blink) pedig **mozgásirányba**
 indulnak.
 
+### Online co-op (Remote Play Together)
+
+A Steam **Remote Play Together** funkcióval a helyi co-op online is játszható: a házigazda gépén fut a játék, a vendégek a Steamen át látják a képet, és a saját kontrolleruket használják. A helyi co-op szabályai változatlanok. A Steam-réteg opcionális: Steam nélkül a játék ugyanúgy megy, a kiesésre és az átvételre vonatkozó szabályok pedig ilyenkor is érvényesek.
+
+- **Csatlakozás:** a vendég a meghívóval csatlakozik (Steam-barátként vagy linkkel). A kontrollerén a lobbyban az **A** csatlakoztatja, ahogy bárki mást. A kártyán „Remote · *név*” áll: a vendég Steam-neve; a linkes vendégnek, akinek nincs Steam-fiókja, „Guest N” a neve.
+- **Meghívás:** amint valaki már csatlakozott, a lobbyban megjelenik az **Invite friends** (L3, billentyűzeten **I**), ami a Steam Remote Play Together meghívó-panelját nyitja meg. Csak a házigazda (a saját kontrollere vagy a billentyűzet) használhatja.
+- **Kiesett játékos a lobbyban:** a kártya „Disconnected” lesz, a helye megmarad, és nem tud készre állni (a visszaszámlálás rá vár). Ha ugyanaz a vendég vagy ugyanaz a kontroller visszajön, magától visszaül a helyére. Más, szabad kontroller **A**-ja átveheti a helyét („Press A to take over”). Ha 60 másodpercig senki nem veszi át, és a játékos sem jön vissza, a hely felszabadul.
+- **Kiesett játékos menet közben:** a hullám vagy a dungeon megáll, a HUD megnevezi a kiesettet („Mira (P3) disconnected – waiting for them to come back”). A szünetmenüben egy szabad kontroller **A**-ja átveszi a hőst (a szint, a felszerelés és a készállapot megmarad), START-tal lehet folytatni. A „Continue without Pn” (játékos kihagyása) két lenyomást kér.
+- **Türelmi idő:** a hullámok közti képernyők (piac, loot-sorsolás, szintlépés, szentély-szavazás, dungeon-portál szavazás) kb. **5 másodpercet** várnak egy kiesett játékosra, mielőtt helyette döntenének. Ha visszajön ezen belül, semmi sem változik. A hullámindítás más: ha valaki hiányzik, a hullám azonnal szünetel.
+- **Csak a házigazda:** a vendég kontrollerével nem lehet kilépni a játékból (főmenü: Quit game), a futamból (Quit to Menu), nem lehet játékost kihagyni („Continue without Pn”), és nem lehet módosítani az ablak- és videó-beállításokat. A tiltott kérésre a felirat: „Only the host can do that”. A mód, a Hardcore és a nehézség továbbra is bármelyik játékos által állítható.
+- **Szünet:** a Steam-overlay megnyitásakor (például Shift+Tab) a hullám vagy a dungeon megáll. Ha az ablak elveszti a fókuszt (például alt-tab), szintén megáll. Ezt a Settings **Gameplay** részében a „Pause when the window loses focus” kapcsoló kapcsolja ki; alapértelmezés: be.
+
+**Korlátok:**
+
+- **Nincs külön vendég-billentyűzet és egér.** Ha a házigazda megosztja a billentyűzetét és egerét a vendéggel, azok a házigazda billentyűzet-játékosaként működnek. A vendégnek kontroller kell (a telefonos Steam Link érintőpadja is kontrollerként jön).
+- **Menet közben nem csatlakozik új játékos.** Egy szabad kontroller **A**-ja futam közben a „Joins at the next lobby” üzenetet kapja, és a következő lobbyban csatlakozhat. A lobbyban legfeljebb négy játékos lehet; az ötödik kontroller a „The party is full” üzenetet kapja.
+- **Állapot:** a helyi rész (kiesés, átvétel, türelmi idő, házigazda-jogok, szünet) kész, és az automatikus tesztek fedik. A Steam-réteg kódja kész, de az éles, több gépes próba a játékos feladata: `docs/REMOTE_PLAY_TEST.md`.
+
 ---
 
 ## 12. Felület (UI)
@@ -3459,6 +3477,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M7 | Csiszolás | **Kész (M7a + M7b).** **M7a:** hangok (UI, harc, zene), főmenü (Settings, Credits), beállítások, IP-tisztítás (az átnevezési tábla a „Kiadás és IP” részben). **M7b:** Cinzel-címek és game-icons.net ikonok, a hősön látszó sisak, váll és mellvért, az öt aréna végleges látványa, harci effektek (13. fejezet) |
 | M8 | Új kasztok | **Kész.** **Hunter** és **Shaman** (3.7): kasztok, társ / totemek, ability-készletek, talentfák, tier setek, Artifactok, 16 kaszt-specifikus item; új fegyvertípusok: Crossbow, Polearm, Fist Weapon (4. fejezet); az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.5) |
 | M9 | Meta-progresszió (utolsó) | **Kész.** Egy fő profil (fájl, verzióval; a dev / fresh / max profilok az automatikus futamoknak és a teszteknek), Class Level 1–30 kasztonként (XP-tábla, szintjutalmak, kis nyers erő, alternatív kezdőfegyver), 56 Seasoning slotokkal és árakkal, 10 Heirloom (szintfüggő skálázás, rangok, kötés), 40 achievement (615 pont, címek, Legendary- és Heirloom-jutalmak), három nehézségi szint Tear-Jerker-nyomással és kasztonkénti zárral, Seeds, The Onion Patch (főmenü, öt fül), a lobbyban Loadout (LT), Wardrobe (256 kinézet, 29 kozmetikum) – 9.1 és 17. fejezet. A Questek és a háttértörténet a 17.8 alatt, a legvégén készül. |
+| RPT | Remote Play Together (online co-op, Steam) | **Kész.** A helyi co-op online is játszható: a vendég a Steamen át, a saját kontrollerével csatlakozik a lobbyban (A); a kiesett játékos helyét a lobbyban és menet közben bármelyik szabad kontroller átveheti; a hullámközi képernyők kb. 5 másodpercet várnak a hiányzóra; a vendég nem léphet ki és nem dobhat ki játékost; a Steam-overlay és a fókuszvesztés megállítja a futamot. A kontroller-kezelés Steam nélkül is működik; a Steam-réteg a GodotSteam bővítményre épül, amelyet a repo nem tartalmaz. Részletek: 11. fejezet („Online co-op”). Az éles, több gépes Steam-próba a játékos feladata (`docs/REMOTE_PLAY_TEST.md`). |
 
 **Az M6 két részben jön**
 
@@ -3525,8 +3544,8 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Kaszt-független tier setek** | Öt Epic set (Mendweave Attire, Slipskin Leathers, Hoardscale Mail, Redthorn Mail, Stonebark Plate), páncéltípus szerinti sorsolással (5.5) | **Kész (M8)** |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
 | **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
-| **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
-| **Meta-progresszió bővítések** | Questek (Quest Board, Story Chapters, menet közbeni mellékküldetések), háttértörténet, és önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
+| **Remote Play Together** | A helyi co-op online is működjön (Steam) | **Kész (RPT)** – 11. fejezet, „Online co-op (Remote Play Together)”; az éles Steam-próba a játékos feladata (`docs/REMOTE_PLAY_TEST.md`) |
+| **Meta-progresszió bővítések** | Questek (Quest Board, Story Chapters, menet közbeni mellékküldetések), háttértörténet, és önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén (a Remote Play Together már kész) |
 | **IP-tisztítás (Blizzard)** | Minden WoW-ból / Blizzard-játékból átvett név lecserélése saját névre, hogy ne legyen IP-ütközés – részletek lent („Kiadás és IP”) | **Kész (M7a)**, a Steam-oldal előtt |
 | **Steam-kiadás** | Early Access az M7 után, teljes kiadás az M8–M9 után – részletek lent („Kiadás és IP”) | M7 (Early Access), M9 (teljes) |
 
@@ -4246,14 +4265,14 @@ Minden hős kártyáján (a játékos saját padjával):
 
 ### 17.8 Bővítések a legeslegvégére
 
-Elfogadott ötletek, amelyek **minden más után** (M9 és a Remote Play Together után) jönnek.
+Elfogadott ötletek, amelyek **minden más után** (M9 és a Remote Play Together után, mindkettő kész) jönnek.
 Ugyanaz az elv, mint a 17. fejezetben: új lehetőségek, nem nyers erő.
 
 - **Önkéntes nehezítések (Heat-szerű):** menet előtt a csapat apró nehezítéseket választhat
   (pl. „+20% ellenség-sebesség”, „nincs Grave Tender”, „1 bolti ajánlattal kevesebb”);
   mindegyik több Seeds-et és Class XP-t ad. Finomabb skála, mint a Pungent / Tear-Jerker.
 - **Heti kihívás:** fix seed, fix környezet, 1–2 előre megadott nehezítés, saját ranglista és
-  plusz Seeds; később online is (Remote Play Together).
+  plusz Seeds; később online is (a Remote Play Together már kész).
 - **Receptkönyv (Cooking / Alchemy):** a menetekben ritka receptek esnek, amelyek véglegesen
   bővítik a bolti fogyóeszköz-sor kínálatát (több választék, nem erősebb hős).
 - **Hagymafajták:** az Onion Patch kertjében a menetekből hozott magok „nőnek”, és új
