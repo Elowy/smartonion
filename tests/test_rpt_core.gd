@@ -472,6 +472,25 @@ func test_showing_the_lobby_restarts_the_ghost_clock() -> void:
 	check_near(b.missing_time, 0.0, 0.001, "clock restarted")
 
 
+func test_going_to_the_lobby_from_a_long_run_keeps_the_ghost_for_its_full_time() -> void:
+	_make_main()
+	_join_pad(0)
+	var b := _join_pad(1, &"mage")
+	PadSource.fake_disconnect(1)
+	_frame(PlayerManager.GHOST_TIMEOUT * 2.0)  # the run and the end screens go on for minutes
+	check(b.missing_time >= PlayerManager.GHOST_TIMEOUT, "the pad has been missing longer than the lobby's timeout")
+	main.go_to_lobby()
+	check_eq(PlayerManager.count(), 2, "the ghost is not pruned on the way: the lobby gives it its full time")
+	check(PlayerManager.get_slot(1) == b and b.class_data.id == &"mage", "class and slot are kept")
+	check_near(b.missing_time, 0.0, 0.001, "the lobby restarted its clock")
+	_frame(PlayerManager.GHOST_TIMEOUT - 1.0)
+	main.lobby._process(DT)
+	check_eq(PlayerManager.count(), 2, "and it still waits a second before the timeout")
+	_frame(2.0)
+	main.lobby._process(DT)
+	check_eq(PlayerManager.count(), 1, "then the lobby frees it")
+
+
 func test_a_fifth_pad_gets_one_party_full_notice() -> void:
 	_make_lobby()
 	for d in 4:

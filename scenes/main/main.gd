@@ -321,9 +321,9 @@ func go_to_menu() -> void:
 func go_to_lobby() -> void:
 	_teardown_run()
 	_free_main_menu()
-	# A controller that died during the run / on the game-over screen must not leave a ghost
-	# slot behind (it could never ready up).
-	PlayerManager.prune_disconnected(PlayerManager.GHOST_TIMEOUT)  # (the lobby holds a missing player's slot for a while)
+	# (A controller that died during the run / on the game-over screen leaves a ghost slot: the lobby – new or reused –
+	# restarts its clock and frees it after PlayerManager.GHOST_TIMEOUT in there, Lobby.reset(). Pruning here would
+	# count the whole run and the end screens against the player.)
 	if lobby == null:
 		lobby = Lobby.create()
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
