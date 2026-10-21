@@ -12,7 +12,8 @@ extends Control
 signal play_pressed
 signal quit_pressed
 
-const VERSION_TEXT := "First playable build"
+## The project setting the version label (bottom right) and the build scripts (tools/build/export.sh) read.
+const VERSION_SETTING := "application/config/version"
 
 var play_button: Button
 var onion_patch_button: Button
@@ -23,6 +24,8 @@ var quit_button: Button
 var buttons: Array[Button] = []
 var emblem: UiIcon
 var title_label: Label
+## The game version in the bottom right corner (application/config/version).
+var version_label: Label
 ## The pages, created the first time they are opened.
 var settings_page: SettingsPage
 var credits_page: CreditsPage
@@ -39,6 +42,12 @@ var _content: Control
 var _hints: Control
 ## The press that closed a page must not also act on the menu (first frame is skipped).
 var _skip_frames := 0
+
+
+## The label text for the game version ("v0.9.0"; "" when the project has no version).
+static func version_text() -> String:
+	var version := str(ProjectSettings.get_setting(VERSION_SETTING, "")).strip_edges()
+	return "v" + version if version != "" else ""
 
 
 static func create() -> MainMenu:
@@ -137,17 +146,17 @@ func _build() -> void:
 	_refusal_label.visible = false
 	add_child(_refusal_label)
 
-	var version := UiTheme.label(VERSION_TEXT, UiTheme.SMALL)
-	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	version.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	version.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	version.offset_right = -28
-	version.offset_bottom = -20
-	version.offset_left = -400
-	version.offset_top = -50
-	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	version.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	add_child(version)
+	version_label = UiTheme.label(version_text(), UiTheme.SMALL)
+	version_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	version_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	version_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	version_label.offset_right = -28
+	version_label.offset_bottom = -20
+	version_label.offset_left = -400
+	version_label.offset_top = -50
+	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	version_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	add_child(version_label)
 
 
 func _make_button(text: String, parent: Control) -> Button:

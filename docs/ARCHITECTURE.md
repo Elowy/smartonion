@@ -4787,9 +4787,10 @@ does not see. The game logs one warning and plays on with the Null backend; a se
   configured app id.
 - The app id setting `smartonion/steam/app_id` is 480 (Valve's test app, Spacewar), for development only. A release
   needs the registered Steamworks app id there. No `steam_appid.txt` is used or shipped. `restartAppIfNecessary` is
-  not called (with 480 it would start Spacewar), so until the real id is set the game is started from the Steam
-  library.
-- Export: the export presets (`export_presets.cfg`) are local and gitignored. Export copies the GodotSteam
+  called at startup only in a release export with a real id (never with 480: it would start Spacewar; see "Builds and
+  Steam upload"), so until then the game is started from the Steam library.
+- Export: the export presets (`export_presets.cfg`) are committed (see "Builds and Steam upload"); `tools/build/export.sh
+  --steam` fetches the plug-in first. Export copies the GodotSteam
   libraries (`libgodotsteam.<platform>.template_<debug|release>.x86_64.<dll|so>`) and Valve's library next to the
   executable; they must ship in the same folder. Export from a checkout where the plug-in was fetched and imported.
   Without the plug-in at export time, the game still exports and runs without Steam features.
@@ -4877,3 +4878,183 @@ can do that" (also for a guest's "Reset to defaults" that would change the windo
   next link guest, so two people can share a label across time).
 - **Handles above 2^63** would not fit a Godot `int`; Steam handles are small counters in practice.
 - **macOS** is not fetched or supported.
+
+## Builds and Steam upload
+
+How the game gets from this repository to players on Steam. Three pieces with one contract between them:
+
+| Piece | Files | Role |
+|---|---|---|
+| Export (BUILD package) | `export_presets.cfg`, `tools/build/*` | Turns the project into release builds, one folder per platform |
+| Upload (STEAMPIPE package) | `tools/steam/upload.sh`, `tools/steam/steampipe/*.vdf.in` | Turns those folders into a Steam build with SteamPipe |
+| Launch through Steam (STEAMPIPE package) | `core/platform/steam_remote_play_backend.gd`, `autoload/remote_play.gd` | A double-clicked release exe hands itself over to the Steam client |
+
+**The contract between export and upload** is the layout of `build/steam/content/` (the whole `build/` folder is
+gitignored): `windows/SmartOnion.exe` and `linux/SmartOnion.x86_64`, each with, in a `--steam` export, Valve's
+library (`steam_api64.dll` / `libsteam_api.so`) and GodotSteam's (`libgodotsteam*.dll` / `.so`) in the same folder tree,
+and a `build_info.txt`. The version is `application/config/version` in `project.godot`. The owner's step-by-step guide
+(Steamworks setup, store assets, review) is `docs/STEAM_RELEASE.md`.
+
+**`build_info.txt`** (`key=value` lines, written next to each executable by `export.sh`) is how the upload recognises
+what it is about to ship: `product`, `version` (`application/config/version`), `platform`, `git` (`<short hash>`, plus
+`-dirty` for a modified working tree, `unknown` without git), `date`, `steam` (`yes` for `--steam`), **`app_id`**
+(`smartonion/steam/app_id`, 480 when unset) and `godot`. The version and the app id are compiled into the executable
+(the app id is read from the packed `project.godot` at run time and drives `restartAppIfNecessary` and the Steam init),
+so nothing but this file says what a content folder was exported with; `upload.sh` compares it with the project (below).
+
+### Export
+
+- **Presets** (`export_presets.cfg`, committed; `export_credentials.cfg` stays gitignored for signing secrets): "Windows
+  Desktop" and "Linux", x86_64, release, PCK embedded in the executable. Include filter `*.md, *.txt` (`CREDITS.md`, the
+  OFL and icon licence texts, and the GodotSteam `license.md` in Steam builds); exclude `tests/*, tools/*, docs/*,
+  build/*, screenshots/*, CLAUDE.md, README.md, steam_appid.txt`. Nothing shipped loads from an excluded folder;
+  `tests/test_build_presets.gd` scans the shipped sources for excluded paths and class names.
+- **Version:** `application/config/version` in `project.godot` (0.9.0), shown as `v0.9.0` in the main menu's corner
+  (`MainMenu.version_text()`). The Windows preset's `file_version` / `product_version` must be `<version>.0`; `export.sh`
+  and a test refuse a mismatch. So a version bump is two edits: `project.godot` and the Windows preset.
+- **Line endings:** the scripts parse `project.godot` and `export_presets.cfg` with sed / awk, and a Git Bash checkout
+  with `core.autocrlf=true` would give them CRLF. `.gitattributes` pins `*.sh`, `export_presets.cfg` and `project.godot` to
+  LF, and the parses strip CR anyway (`preset_value` in `export.sh`, `godot_setting` / `build_info_value` in `upload.sh`).
+  `tests/test_build_presets.gd` runs a copy of `export.sh` on a CRLF scratch root.
+- **Windows metadata:** icon `tools/build/SmartOnion.ico` (16–256 px), product name / description "SmartOnion",
+  company and copyright are `TODO` placeholders the owner fills in (`export.sh` warns). Godot 4.7.2 writes the PE
+  resources itself (no rcedit / wine). No code signing yet: an unsigned exe downloaded outside Steam triggers SmartScreen.
+- **Icon:** `python3 tools/build/make_icon.py` (Pillow) turns the owner's art (`tools/build/icon/smartonion_icon_source.png`,
+  `.gdignore`d, not shipped) into the .ico (≤ 32 px: a rounded crop of the face; ≥ 48 px: the round art with the black
+  background cut away), `tools/build/icon/smartonion_icon_512.png` and `assets/icon/smartonion_icon_256.png`
+  (`application/config/icon`, the window / taskbar icon).
+- **Templates:** `tools/build/install_templates.sh` downloads the 4.7.2 templates from the official godot-builds release,
+  checks the pinned sha512 before unpacking, installs only Windows / Linux x86_64 (≈ 344 MB), idempotent
+  (`--force`, `--tpz FILE`, `--dir DIR`, `--all`).
+- **Build:** `tools/build/export.sh [--steam] [--platform windows|linux|all] [--skip-smoke] [--no-dist] [--godot BIN]`:
+  checks versions and templates; with `--steam` runs `fetch_godotsteam.sh` so the plug-in and Valve's library land next to
+  the executable, without it moves an existing `addons/godotsteam/` aside so a plain build never carries Valve's
+  binaries; imports; exports into `build/steam/content/{windows/SmartOnion.exe, linux/SmartOnion.x86_64}` with a
+  `build_info.txt` (version, app id, git hash, date, steam yes/no); verifies each embedded PCK (`tools/build/verify_pack.gd`
+  run with `--main-pack`: licences present, nothing dev-only, the plug-in present exactly for `--steam`); runs the
+  exported Linux binary's headless smoke (`--smoke --waves=1 --seed=5`, exit 0 + `"errors":0`); plain builds also
+  write `build/dist/SmartOnion-<version>-windows.zip` / `-linux.tar.gz`. Logs in `build/logs/`. About a minute.
+- **Measured here:** exe 123 MB, Linux binary 88 MB (PCK 13.9 MB, 3277 files), zip 48 MB, tar.gz 38 MB. The Linux binary
+  needs glibc ≥ 2.28. The Windows exe was checked statically (PE32+, icon group, version resource) but never run.
+- Build and upload the Linux depot from Linux, or WSL with the repository on the Linux file system, so the executable bit
+  survives: NTFS (Git Bash, `/mnt/c`) cannot keep it, `upload.sh` can only warn there and `export.sh` skips the Linux smoke
+  on a non-Linux host (`docs/STEAM_RELEASE.md` says so to the owner). The Windows / macOS paths of the scripts are untested.
+
+### SteamPipe upload (`tools/steam/upload.sh`)
+
+SteamPipe uploads a build as one or more **depots** described by two kinds of VDF script: an app build script (app id,
+description, preview flag, branch to set live, depots) and one depot script per depot (content root, file mapping, file
+exclusions). SmartOnion has two depots, **Windows** and **Linux** (the Linux one also serves the Steam Deck), so the
+scripts are `tools/steam/steampipe/app_build.vdf.in`, `depot_build_windows.vdf.in` and `depot_build_linux.vdf.in`.
+
+- **Templates and generated files.** The templates hold `@NAME@` placeholders (`APP_ID`, `DESC`, `PREVIEW`, `SET_LIVE`,
+  `CONTENT_ROOT`, `BUILD_OUTPUT`, `DEPOT_WIN`, `DEPOT_LINUX`, `DEPOT_ID`, `DEPOT_CONTENT_ROOT`). `upload.sh` fills them
+  with a literal (no regex, no `&` magic) replacement and writes `build/steam/scripts/app_build_<AppID>.vdf` and
+  `depot_build_<DepotID>.vdf`. A placeholder in a template that the script does not fill is a bug and stops the run
+  (checked on the template, so a description such as `@X@` is harmless). The paths in the generated files are
+  **absolute** (`cygpath -m` form under Git Bash): the documentation does not say what a *relative* depot-level
+  ContentRoot is relative to, so the script does not depend on it. The depot scripts map everything under the platform
+  folder (`LocalPath *`, `DepotPath .`, recursive) and exclude `*.pdb`, `*.debug`, `*.sym`, `Thumbs.db`, `.DS_Store` and
+  `steam_appid.txt`.
+- **Settings.** Flag, else environment variable, else default: `--app-id`/`APP_ID` (default: `smartonion/steam/app_id` in
+  `project.godot`), `--depot-win`/`DEPOT_WIN`, `--depot-linux`/`DEPOT_LINUX` (both required, no default: a guessed depot
+  id would upload to the wrong depot), `--user`/`STEAM_USER`, `--branch`/`STEAM_BRANCH`, `--desc`/`BUILD_DESC` (default
+  `v<version> <git>` of the *content*, read from its `build_info.txt`, not from the checkout), `--steamcmd`/`STEAMCMD`.
+  `--root DIR` moves the project root (project.godot and build/), which is how the tests use a scratch tree.
+- **Refusals.** All problems are collected and printed together, exit code 1, and no VDF is written: missing or malformed
+  ids; depot ids equal to each other or to the app id; app id 480 (unless `--allow-test-app`, which only lets a *dry
+  run* through in practice); `--app-id` different from `project.godot` (the game restarts itself through Steam with the
+  project value, so a mismatch ships a game that relaunches the wrong app); a missing/empty content folder; a missing
+  `SmartOnion.exe` / `SmartOnion.x86_64`; missing Steam libraries (searched anywhere below the platform folder, since
+  GDExtension export may place them in a sub-folder); a `steam_appid.txt` anywhere in the content; no `--user` for a
+  real run.
+  **The content must belong to this project:** for each platform `build_info.txt` must exist, say `steam=yes`, carry
+  `version` equal to `application/config/version` and `app_id` equal to the app id being uploaded (so a build exported
+  while the id was still 480, or before a version bump, is refused: the id and the version are baked into the executable
+  and `upload.sh` otherwise only sees the current `project.godot`); and the two platforms must agree on `version` and
+  `git` (`export.sh --platform linux` replaces only its own folder, so a mixed Windows/Linux depot is a real way to go
+  wrong). All of these messages end in "run `tools/build/export.sh --steam` again". Only warnings: a `git` that ends in
+  `-dirty` or is not the current `HEAD` (compared as a prefix of the full hash; no git repository, no comparison), a
+  non-executable Linux binary (the checkout may sit on a file system without modes), and, on a Windows host, that the
+  mode of `SmartOnion.x86_64` cannot be kept at all (build and upload the Linux depot from Linux or WSL with the checkout
+  on the Linux file system; Git Bash also skips the Linux smoke test). Usage errors (unknown option) exit 2.
+- **Modes.** `--dry-run` writes the scripts, validates, prints the steamcmd command it would run and stops before any
+  network use (steamcmd is not even installed). `--print-vdf` is a dry run that also prints the scripts. `--preview` sets
+  `"Preview" "1"`: steamcmd logs in and validates but nothing is uploaded; `--branch` is ignored for it. `--install-steamcmd`
+  only downloads steamcmd and starts it once. No mode: the real upload.
+- **steamcmd.** Located via `--steamcmd`/`STEAMCMD`, else `build/steamcmd/steamcmd.sh` (`.exe` under Git Bash), downloaded
+  from Valve's installer URL (`steamcdn-a.akamaihd.net/client/installer/`, the Cloudflare mirror as fallback) when
+  missing. Valve publishes no checksum for that rolling installer, so the script prints the sha256 it got and
+  steamcmd updates itself on first start. On Linux steamcmd is a 32-bit program: the script warns when no 32-bit loader exists.
+  The command line is exactly
+  `steamcmd +@ShutdownOnFailedCommand 1 +login <user> +run_app_build <app_build_<AppID>.vdf> +quit`. There is **no password
+  option, argument or variable**: steamcmd prompts in the terminal for the password and Steam Guard code (stdin must be
+  a terminal the first time) and caches a login token itself. A non-zero steamcmd exit fails the script.
+- **`SetLive`.** Only a named branch, never `default` (nor `public`): Steam does not set the default branch live
+  automatically, and the script does not try. Without `--branch` the app script has `"SetLive" ""` (nothing is set live).
+- **Description** is made safe for a VDF string: line breaks and tabs become spaces, `"` becomes `'`, `\` is doubled.
+
+### Launch through Steam (`restartAppIfNecessary`)
+
+A Steam game must be started by the Steam client, or Steam's context (the app id, the overlay, Steam Input, Remote Play
+pads) is missing. Valve's answer is `SteamAPI_RestartAppIfNecessary(app_id)`: it returns false when Steam started the
+exe (or when a `steam_appid.txt` is next to it, Valve's developer bypass), and true when it was started some other way;
+then Steam relaunches the game itself (always the copy installed in the Steam library) and the process must quit at once.
+Valve wants it to be the first Steamworks call, right before the init.
+
+- `SteamRemotePlayBackend.restart_through_steam_if_needed(singleton_provider, automated_provider, release_provider)` is the
+  decision. It calls GodotSteam's `restartAppIfNecessary(app_id)` (through `Object.call` on the singleton, like the rest
+  of the backend: no script names the `Steam` identifier) only when **all** of these hold, and otherwise does nothing,
+  quietly, in this order: not an automated run (`Settings.is_automated_run()`: smoke, demo, view, screenshot, headless,
+  tests); a release export (`OS.has_feature("template_release")`: not the editor, not a debug export); the app id from
+  `smartonion/steam/app_id` is not 480 (with 480 Steam would start Spacewar); the `Steam` singleton exists. A plug-in
+  without the method gives one `push_warning` and no restart. It returns true when Steam asked to restart.
+- `RemotePlay.hand_over_to_steam_if_needed(...)` (autoload) wraps it: on true it sets `steam_restart_requested` and calls
+  `get_tree().quit()` (exit code 0). `RemotePlay._ready` calls it **before** it creates a backend, so it precedes
+  `steamInitEx`, and on true it returns without creating one: the quitting process never initialises Steam, and keeps the
+  Null backend. A `--fake-rpt` run skips it (a development flag). The rest of the main scene still runs its first frame
+  before the quit takes effect; nothing in it writes files.
+- The GodotSteam plug-in's own "initialize on startup" setting must stay **off** (it already is): it would call
+  `SteamAPI_Init` before this check, which GodotSteam's documentation warns can conflict with `restartAppIfNecessary`.
+- A local test of a release build with a real app id: put a `steam_appid.txt` next to the exe. `upload.sh` refuses
+  content that has one, and the depot scripts exclude it.
+- Draws nothing from `RunState.rng`; the default seed-5 smoke is unchanged.
+
+### Tests (STEAMPIPE)
+
+- `tests/test_steam_restart.gd`: the gating with `FakeSteamSingleton` (it gained `restartAppIfNecessary`, `restart_needed`,
+  `restart_requests`): release + real id + not automated asks Steam once with the configured id and returns its answer;
+  app id 480 (also a missing or malformed setting), an automated run, a debug / editor run, no plug-in and a plug-in
+  without the method never call it (the singleton is not even looked up in the first three); `RemotePlay` quits (through
+  a seam) only on true; the restart check is the first Steam call and precedes `steamInitEx`; `_ready` order and the
+  `--fake-rpt` skip are asserted on the autoload's source.
+- `tests/test_steampipe.gd`: runs the real `upload.sh` in a scratch project root (`--root`, under `user://`) with a fake
+  content folder and a fake steamcmd that records its arguments. It covers `--help`, `bash -n` (and `shellcheck
+  --severity=error` where installed), the filled VDFs of a dry run (and that it installs and logs in nowhere),
+  `--print-vdf`, environment variables, description escaping, every refusal above, the exact steamcmd command line (no
+  password), preview, `SetLive` (and the refused `default` / `public`), a failing steamcmd, and the `.gitignore` entries.
+  The fake content carries well-formed `build_info.txt` files; further cases cover a stale version, another app id (the
+  480-then-real-id slip), mixed platforms, a missing file, `steam=no`, a file without `app_id`, CRLF line endings, the
+  default description coming from the content, the dirty / foreign-commit warnings (with a scratch git repository), and
+  the Windows-host warning (a fake `uname`).
+  Every run starts with `env -u APP_ID -u DEPOT_WIN -u DEPOT_LINUX -u STEAM_USER -u STEAM_BRANCH -u BUILD_DESC -u STEAMCMD`
+  (a test checks the list against the variables `upload.sh` reads), so a shell that has them exported, as
+  `docs/STEAM_RELEASE.md` suggests, neither changes the results nor reaches the fake steamcmd.
+  It skips itself where there is no bash. `tests/test_rpt_steam.gd` no longer asserts that `project.godot` holds 480,
+  only a positive app id, so the owner can set the real id without breaking the suite.
+
+### Not verified here (needs the owner's Steamworks account)
+
+- No login happened: no Steam account was available. The generated VDFs follow Valve's SteamPipe documentation and a
+  published working example; the first `--preview` run is the real validation of the format and of the account.
+- steamcmd itself could not be started in the development container (it is 32-bit and the container has no 32-bit C
+  library); only the download, the unpacking and the warning were exercised. `+@ShutdownOnFailedCommand 1` is a steamcmd
+  console variable; that it makes a failed command end steamcmd with a non-zero exit code is assumed, not observed.
+- `restartAppIfNecessary` against a real Steam client was not run. What was run, in a scratch copy of the project with
+  GodotSteam 4.23.2, app id set to a made-up number and a Linux export under Xvfb, with no Steam client installed: the
+  **release** export called the real method, got `true` (Steam tried to start itself: `steam.sh` not found), printed its
+  message and quit with exit code 0 after 3.6 s; with a `steam_appid.txt` next to the exe the call answered `false` and
+  the game went on to the normal Steam init (which failed gracefully with one warning); the **debug** export never made
+  the call. The relaunch itself, and Steam's install prompt for a game the account does not own, are Valve's behaviour.
+- `upload.sh` under Git Bash on Windows (`cygpath -m`, `steamcmd.zip`, `steamcmd.exe`) and macOS (`steamcmd_osx.tar.gz`)
+  is written to the documented layout but was only run on Linux.

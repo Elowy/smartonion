@@ -22,11 +22,11 @@ Together". The Steam layer is optional: without it the game plays exactly as loc
 4. **The GodotSteam plug-in.** In your checkout, run `tools/steam/fetch_godotsteam.sh` (it fetches the Windows 64-bit
    and Linux 64-bit libraries, about 18 MB into `addons/godotsteam/`), then run `godot --headless --path . --import`
    once. The folder is gitignored; do not commit it.
-5. **Export** with the normal export templates (Windows 64-bit and/or Linux x86_64) from that checkout. Export puts
-   the GodotSteam libraries (`libgodotsteam.*`) and Valve's Steamworks library (`steam_api64.dll` on Windows,
-   `libsteam_api.so` on Linux) next to the executable. They must ship in the same folder as the executable in the
-   Steam depot. Check the export folder before you upload it. The export presets are local (`export_presets.cfg` is
-   gitignored).
+5. **Export** with `tools/build/install_templates.sh` (once) and `tools/build/export.sh --steam` (it also runs step 4).
+   The builds land in `build/steam/content/windows/` and `build/steam/content/linux/`, with the GodotSteam libraries
+   (`libgodotsteam.*`) and Valve's Steamworks library (`steam_api64.dll` on Windows, `libsteam_api.so` on Linux) next to
+   the executable; they must ship in the same folder in the Steam depot (`tools/steam/upload.sh` checks it). See
+   `docs/STEAM_RELEASE.md`.
 6. **Launch through Steam.** Start the game from your Steam library, with the Steam client running. Started from the
    Godot editor, from a terminal, or by double-clicking the executable, guests' pads may not appear: a guest then
    connects, but no pad shows up on the host.

@@ -1,0 +1,6 @@
+# The build scripts run under bash (also Git Bash on Windows): they must keep LF line endings.
+*.sh text eol=lf
+# ... and so must the two files they parse with sed / awk, whatever core.autocrlf a Windows checkout has.
+export_presets.cfg text eol=lf
+project.godot text eol=lf
+*.ico binary

@@ -153,7 +153,8 @@ func test_project_godot_declares_the_app_id_setting() -> void:
 	var cfg := ConfigFile.new()
 	check_eq(cfg.load("res://project.godot"), OK, "project.godot loads")
 	check(cfg.has_section_key("smartonion", "steam/app_id"), "the setting is declared in project.godot")
-	check_eq(int(cfg.get_value("smartonion", "steam/app_id", 0)), 480, "and defaults to 480")
+	# 480 (Valve's test app) until the Steamworks registration; then the owner's real id goes there (docs/STEAM_RELEASE.md).
+	check(int(cfg.get_value("smartonion", "steam/app_id", 0)) > 0, "and holds a positive app id")
 
 
 func test_an_already_initialised_steam_is_not_initialised_twice() -> void:

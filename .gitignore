@@ -2,7 +2,7 @@
 .godot/
 /android/
 *.translation
-export_presets.cfg
+# export_presets.cfg IS committed (tools/build/export.sh); only the credentials file (signing keys) stays local
 export_credentials.cfg
 # Local artifacts
 /build/
@@ -15,3 +15,9 @@ export_credentials.cfg
 # GodotSteam plug-in (Steam Remote Play Together): fetched by tools/steam/fetch_godotsteam.sh, never committed
 # (it carries Valve's steam_api64.dll / libsteam_api.so)
 /addons/godotsteam/
+
+# SteamPipe upload (tools/steam/upload.sh): everything it makes is under /build/ (content, scripts, output, steamcmd and its
+# cached login token). A steam_appid.txt must never be committed or shipped (it stops the relaunch through Steam), and
+# Steam Guard sentry files are secrets.
+steam_appid.txt
+ssfn*
