@@ -149,7 +149,8 @@ app_id="${app_id:-480}"
 
 preset_value() {
 	# preset_value KEY: the value of KEY (quotes stripped) in the Windows preset options of export_presets.cfg.
-	sed -n "s|^$1=\"\\(.*\\)\"\$|\\1|p" "${root}/export_presets.cfg" | head -n 1
+	# CR is removed first: a Windows checkout with core.autocrlf has CRLF line ends, and `"$` would not match before the CR.
+	tr -d '\r' < "${root}/export_presets.cfg" | sed -n "s|^$1=\"\\(.*\\)\"\$|\\1|p" | head -n 1
 }
 if want_platform windows; then
 	for key in application/file_version application/product_version; do

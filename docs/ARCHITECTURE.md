@@ -4911,7 +4911,11 @@ so nothing but this file says what a content folder was exported with; `upload.s
   `tests/test_build_presets.gd` scans the shipped sources for excluded paths and class names.
 - **Version:** `application/config/version` in `project.godot` (0.9.0), shown as `v0.9.0` in the main menu's corner
   (`MainMenu.version_text()`). The Windows preset's `file_version` / `product_version` must be `<version>.0`; `export.sh`
-  and a test refuse a mismatch.
+  and a test refuse a mismatch. So a version bump is two edits: `project.godot` and the Windows preset.
+- **Line endings:** the scripts parse `project.godot` and `export_presets.cfg` with sed / awk, and a Git Bash checkout
+  with `core.autocrlf=true` would give them CRLF. `.gitattributes` pins `*.sh`, `export_presets.cfg` and `project.godot` to
+  LF, and the parses strip CR anyway (`preset_value` in `export.sh`, `godot_setting` / `build_info_value` in `upload.sh`).
+  `tests/test_build_presets.gd` runs a copy of `export.sh` on a CRLF scratch root.
 - **Windows metadata:** icon `tools/build/SmartOnion.ico` (16–256 px), product name / description "SmartOnion",
   company and copyright are `TODO` placeholders the owner fills in (`export.sh` warns). Godot 4.7.2 writes the PE
   resources itself (no rcedit / wine). No code signing yet: an unsigned exe downloaded outside Steam triggers SmartScreen.

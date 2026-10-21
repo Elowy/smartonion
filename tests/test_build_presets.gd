@@ -315,6 +315,63 @@ func test_the_scripts_print_their_help() -> void:
 		check("Usage" in str(out), "%s --help prints its usage" % path)
 
 
+func test_git_keeps_lf_in_the_files_the_scripts_parse() -> void:
+	var lines: Array[String] = []
+	for line in FileAccess.get_file_as_string("res://.gitattributes").split("\n"):
+		lines.append(" ".join(line.strip_edges().split(" ", false)))
+	for entry in ["*.sh text eol=lf", "export_presets.cfg text eol=lf", "project.godot text eol=lf"]:
+		check(entry in lines, ".gitattributes pins LF: %s (a Windows checkout with core.autocrlf would otherwise break the scripts)" % entry)
+
+
+## export.sh finds its project from its own path, so the test runs a copy of it in a scratch root whose project.godot and
+## export_presets.cfg have CRLF line ends (a Windows checkout with core.autocrlf=true). No Godot is needed: the run passes
+## the preset checks and stops at the missing editor.
+func test_export_reads_presets_with_windows_line_endings() -> void:
+	if _skip_without_bash():
+		return
+	var root := ProjectSettings.globalize_path("user://export_crlf_%d" % Time.get_ticks_msec())
+	var script := root.path_join("tools/build/export.sh")
+	DirAccess.make_dir_recursive_absolute(script.get_base_dir())
+	var copy := FileAccess.open(script, FileAccess.WRITE)
+	if copy == null:
+		check(false, "cannot write %s" % script)
+		return
+	copy.store_string(FileAccess.get_file_as_string(EXPORT_SCRIPT))
+	copy.close()
+	var project := FileAccess.open(root.path_join("project.godot"), FileAccess.WRITE)
+	project.store_string("config_version=5\r\n\r\n[application]\r\n\r\nconfig/version=\"0.9.1\"\r\n\r\n[smartonion]\r\n\r\nsteam/app_id=2345670\r\n")
+	project.close()
+	var no_editor := root.path_join("no_such_godot")
+	for case: Array in [["0.9.1.0", true], ["0.9.0.0", false]]:
+		var presets := FileAccess.open(root.path_join("export_presets.cfg"), FileAccess.WRITE)
+		presets.store_string("[preset.0]\r\n\r\nname=\"Windows Desktop\"\r\n\r\n[preset.0.options]\r\n\r\n" \
+				+ "application/file_version=\"%s\"\r\napplication/product_version=\"%s\"\r\n" % [case[0], case[0]] \
+				+ "application/company_name=\"TODO Company Name\"\r\n")
+		presets.close()
+		var out: Array = []
+		var code := _run("bash", [script, "--platform", "windows", "--godot", no_editor], out)
+		var text := "".join(out)
+		check(code != 0, "export.sh stops (there is no editor)")
+		if case[1]:
+			check("Godot not found" in text, "version %s in CRLF presets: the preset checks pass and the run goes on to the editor: %s" % [case[0], text])
+			check("file_version" not in text, "no bogus preset error: %s" % text)
+			check("TODO placeholders" in text, "the TODO company still warns: %s" % text)
+		else:
+			check("application/file_version is '0.9.0.0' but application/config/version is 0.9.1" in text, "a real mismatch is reported with the value read: %s" % text)
+	_remove_tree(root)
+
+
+func _remove_tree(path: String) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	for sub in dir.get_directories():
+		_remove_tree(path.path_join(sub))
+	for f in dir.get_files():
+		DirAccess.remove_absolute(path.path_join(f))
+	DirAccess.remove_absolute(path)
+
+
 func test_the_icon_tool_prints_its_help() -> void:
 	var out: Array = []
 	if OS.execute("python3", ["-I", "-c", "import PIL"], out, true) != 0:
