@@ -18,6 +18,8 @@ var init_returns_garbage := false
 var input_init_ok := true
 ## showRemotePlayTogetherUI() result (false = the app is not configured for Remote Play Together).
 var invite_ok := true
+## restartAppIfNecessary() result: true = "this exe was not started by Steam, Steam relaunches it - quit now".
+var restart_needed := false
 
 var initialized := false
 var current_app_id := 0
@@ -44,6 +46,8 @@ var calls_while_uninitialised: Array[String] = []
 var forbidden_calls: Array[String] = []
 ## Arguments of the getFriendPersonaName calls.
 var persona_requests: Array[int] = []
+## Arguments of the restartAppIfNecessary calls.
+var restart_requests: Array[int] = []
 
 
 func count(method: String) -> int:
@@ -93,6 +97,13 @@ func steamInitEx(app_id: int = 0, embed_callbacks: bool = false) -> Variant:
 
 func run_callbacks() -> void:
 	calls.append("run_callbacks")
+
+
+## Like the plug-in's: a static check made BEFORE steamInitEx (so it is not gated on initialisation).
+func restartAppIfNecessary(app_id: int) -> bool:
+	calls.append("restartAppIfNecessary")
+	restart_requests.append(app_id)
+	return restart_needed
 
 
 # --- Gated like the plug-in's (an error while not initialised) ---------------------------------

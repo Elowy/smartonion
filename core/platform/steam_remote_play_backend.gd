@@ -17,6 +17,10 @@ extends RemotePlayBackend
 ## tests), without the plug-in, and when Steam cannot be initialised (no Steam client, wrong app id).
 ## Not used on purpose: GodotSteam's direct keyboard / mouse input of guests (its getInput and createMouseCursor
 ## calls are broken in 4.23.2), so a guest plays with a pad only.
+##
+## The same file also holds the other Steam-at-startup decision, [method restart_through_steam_if_needed]: a release
+## export with the real app id, started by double-clicking the executable, is handed to the Steam client (needed for
+## Steam Input / Remote Play pads), see docs/ARCHITECTURE.md "Builds and Steam upload".
 
 ## Project setting with the Steam app id handed to steamInitEx. 480 is Valve's public test app (Spacewar), for
 ## development only; the real id comes with the game's Steamworks registration.
@@ -32,6 +36,8 @@ const RECONCILE_EVERY_POLLS := 60
 ## "Guest N" uses the guest id Steam reports while it is in this range, else the lowest free number.
 const MAX_GUEST_NUMBER := 99
 const SETTINGS_SCRIPT_PATH := "res://autoload/settings.gd"
+## GodotSteam's wrapper of SteamAPI_RestartAppIfNecessary (it takes the app id, answers "quit now").
+const RESTART_METHOD := &"restartAppIfNecessary"
 
 ## The singleton, an untyped Object (see the class comment). Null when the backend is not usable.
 var _steam: Object
@@ -97,6 +103,46 @@ static func configured_app_id() -> int:
 	if typeof(raw) == TYPE_STRING and String(raw).is_valid_int() and String(raw).to_int() > 0:
 		return String(raw).to_int()
 	return DEFAULT_APP_ID
+
+
+## True when this process must quit because Steam relaunches the game itself: the executable was not started by the
+## Steam client (a double click), so Steam's context (app id, Steam Input, Remote Play pads) is missing. Call it ONCE,
+## at startup, before anything initialises Steam: Valve wants it to be the first Steamworks call, right before the init.
+## It calls GodotSteam's restartAppIfNecessary(app_id) only when ALL of these hold; otherwise it does nothing, quietly:
+## - this is not an automated run (smoke, demo, view, screenshot, headless, the tests: [method Settings.is_automated_run]);
+## - this is a release export (not the editor, not a debug export: [method is_release_build]);
+## - the app id is a real one (not 480, Valve's test app: with it Steam would start Spacewar);
+## - the GodotSteam plug-in is there (the Steam singleton exists and has the method).
+## Valve's own bypass still works: a steam_appid.txt next to the executable makes the call answer false.
+## The three optional Callables are test seams: [param singleton_provider] and [param automated_provider] as in
+## [method try_create], [param release_provider] returns whether this is a release export (unset = [method is_release_build]).
+## (Like [method try_create], it names no singleton identifier: the project compiles without the plug-in.)
+static func restart_through_steam_if_needed(singleton_provider: Callable = Callable(), automated_provider: Callable = Callable(),
+		release_provider: Callable = Callable()) -> bool:
+	if _is_automated(automated_provider):
+		return false
+	var release := bool(release_provider.call()) if release_provider.is_valid() else is_release_build()
+	if not release:
+		return false
+	var app_id := configured_app_id()
+	if app_id == DEFAULT_APP_ID:
+		return false
+	var steam := _find_singleton(singleton_provider)
+	if steam == null:
+		return false
+	if not steam.has_method(RESTART_METHOD):
+		push_warning("SteamRemotePlayBackend: the Steam plug-in has no restartAppIfNecessary (version mismatch?) - starting without the Steam relaunch check")
+		return false
+	if not bool(steam.call(RESTART_METHOD, app_id)):
+		return false
+	print("SteamRemotePlayBackend: not started by the Steam client - Steam relaunches app %d, quitting this process" % app_id)
+	return true
+
+
+## True in an exported release build (a release export template), false in the editor, in a debug export and in
+## a debug run.
+static func is_release_build() -> bool:
+	return OS.has_feature("template_release")
 
 
 static func _is_automated(automated_provider: Callable) -> bool:

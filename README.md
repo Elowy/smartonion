@@ -82,6 +82,26 @@ A helyi co-op a Steam **Remote Play Together** funkciójával online is játszha
 
 Az éles, több gépes Steam-próba lépéseit (előfeltételek, a 11 ellenőrzés, mit kell visszajelezni) a [docs/REMOTE_PLAY_TEST.md](docs/REMOTE_PLAY_TEST.md) tartalmazza.
 
+## Steam-feltöltés (SteamPipe)
+
+A kész játék két depotban kerül a Steamre: egy Windows- és egy Linux-buildben (utóbbi a Steam Decken is fut). A tulajdonos lépésről lépésre útmutatója (angolul): [docs/STEAM_RELEASE.md](docs/STEAM_RELEASE.md); a szkriptek működése: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), „Builds and Steam upload” fejezet.
+
+1. **Steamworks (te intézed):** app és **App ID**, két depot (Windows, Linux) és azok azonosítója, launch optionök (`SmartOnion.exe`, `SmartOnion.x86_64`, mindkettő 64 bites), a depotok bekerülnek a csomagba (package), Steam Input, Remote Play Together, címkék, store-oldal képei.
+2. **App ID a projektben:** a `project.godot` `[smartonion]` szakaszában a `steam/app_id`. Alapértéke 480 (a Valve tesztalkalmazása, Spacewar), ezzel nem lehet feltölteni. Az éles exportban a játék ezzel az azonosítóval indítja újra magát a Steamen át, ha dupla kattintással indították (`restartAppIfNecessary`; a szerkesztőben, debug exportban, automatikus futamban és 480-nál soha).
+3. **Build:** `tools/build/export.sh --steam`, ami a `build/steam/content/windows/` és a `build/steam/content/linux/` mappát készíti el (a futtatható és a Steam-könyvtárak együtt).
+4. **Feltöltés:** `tools/steam/upload.sh`. A depot-azonosítókat és a build-fiókot kapcsolóval vagy környezeti változóval kell megadni (`DEPOT_WIN`, `DEPOT_LINUX`, `STEAM_USER`; `--help` mindent felsorol). Sorrend:
+
+   ```bash
+   tools/steam/upload.sh --dry-run     # a VDF-ek elkészítése és a tartalom ellenőrzése: nincs belépés, nincs hálózat
+   tools/steam/upload.sh --preview     # SteamPipe-előnézet: belép, ellenőriz, de nem tölt fel semmit
+   tools/steam/upload.sh               # a valódi feltöltés (a build még sehol sincs élesítve)
+   tools/steam/upload.sh --branch beta # ugyanez, és a buildet egy meglévő béta-ágon élesíti
+   ```
+
+   A szkript visszautasítja a feltöltést, ha az App ID 480 vagy eltér a `project.godot` értékétől, ha hiányzik egy tartalom-mappa vagy a futtatható, ha hiányoznak a Steam-könyvtárak (`steam_api64.dll`, `libsteam_api.so`, `libgodotsteam*`), vagy ha `steam_appid.txt` van a tartalomban. A steamcmd-t, ha hiányzik, a `build/steamcmd/` mappába tölti le.
+5. **Jelszó és Steam Guard:** a szkript soha nem kér és nem tárol jelszót. Az első belépéskor a steamcmd kéri a jelszót és a Steam Guard-kódot a terminálban, utána eltárolt belépési token kell csak. Az alapértelmezett (default) ágat a Steam nem engedi automatikusan élesíteni: azt a Steamworks Builds oldalán kell kézzel megtenni, ezért a szkript `--branch default` esetén is hibával áll meg.
+6. **Mit ne commitolj:** a `build/` mappát (export, VDF-ek, steamcmd és annak belépési tokenje), az `addons/godotsteam/` mappát (Valve-könyvtárak), a `steam_appid.txt` és az `ssfn*` fájlokat; jelszót vagy Steam Guard-kódot soha. A `.gitignore` mindet lefedi.
+
 ## Fejlesztői parancsok
 
 ```bash
