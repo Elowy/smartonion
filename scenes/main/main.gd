@@ -176,6 +176,8 @@ var _layers: Dictionary[int, CanvasLayer] = {}
 var _state_time := 0.0
 var _disconnected: Dictionary[int, bool] = {}
 var _error_counter: ErrorCounter
+## --hotplug-test (smoke): the scripted unplug / take-over / resume of P2 (null otherwise).
+var _hotplug: HotplugTest
 var _engine_tweaked := false
 var _boot_frame := 0
 var _run_frame := -1
@@ -232,6 +234,8 @@ func _ready() -> void:
 		OS.add_logger(_error_counter)
 	for arg in options.unknown:
 		push_warning("Main: unknown command line argument '%s'" % arg)
+	if options.smoke and options.hotplug_test and options.unknown.is_empty():
+		_hotplug = HotplugTest.new(options.start_wave + 1)
 	if options.smoke and not options.unknown.is_empty():
 		# A typo would play some other run and still exit 0: the smoke ends now as "bad_args" (exit 1).
 		_finish_smoke("bad_args")
@@ -262,6 +266,8 @@ func _ready() -> void:
 		&"lobby":
 			go_to_lobby()
 			_add_bots()
+			if options.hotplug_test:
+				HotplugTest.make_ghost(PlayerManager.get_slot(HotplugTest.SLOT_INDEX))  # (screenshot: P2's controller is gone)
 			if PlayerManager.count() >= 2:
 				PlayerManager.get_slot(0).ready = true
 			if options.view == "roll":
@@ -283,6 +289,11 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	PlayerManager.takeover_enabled = false
+	if _hotplug != null:
+		_hotplug.finish()
+		_hotplug = null
+	elif options != null and options.hotplug_test:
+		PadSource.enable_fake(false)
 	if _error_counter != null:
 		OS.remove_logger(_error_counter)
 		_error_counter = null
@@ -973,12 +984,12 @@ func _is_in_action() -> bool:
 	return state == State.WAVE or state == State.WAVE_END or state == State.DUNGEON
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not get_tree().paused and _is_in_action():
 		_poll_pause_buttons()
 		if state == State.WAVE:
 			_sample_perf(RunPerf.Kind.MONITOR, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
-	_update_harness()
+	_update_harness(delta)
 
 
 func _poll_pause_buttons() -> void:
@@ -1667,6 +1678,8 @@ func smoke_result(result: String) -> Dictionary:
 		data["pressures"] = _pressure_log.duplicate()
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
+	if _hotplug != null:
+		data["hotplug"] = _hotplug.summary()  # (--hotplug-test only)
 	if RemotePlay.backend is FakeRemotePlayBackend:
 		data["fake_rpt"] = RemotePlay.session_ids().size()  # (--fake-rpt only)
 	if not options.unknown.is_empty():
@@ -1678,7 +1691,11 @@ func smoke_result(result: String) -> Dictionary:
 ## (a typo such as --env=nope would otherwise play a different run, and the run would still exit 0), else
 ## [param result] as the run ended. Only a "completed" result without errors exits 0 (see _finish_smoke).
 func smoke_outcome(result: String) -> String:
-	return "bad_args" if not options.unknown.is_empty() else result
+	if not options.unknown.is_empty():
+		return "bad_args"
+	if result == "completed" and _hotplug != null and not _hotplug.is_done():
+		return "hotplug_incomplete"  # (the run ended before the scripted unplug / take-over / resume finished)
+	return result
 
 
 ## The "SMOKE meter ..." log lines: one per hero of [param meter] (RunSummary.meter_dict).
@@ -1703,10 +1720,15 @@ func abilities_learned() -> int:
 	return n
 
 
-func _update_harness() -> void:
+func _update_harness(delta: float) -> void:
 	if _smoke_running and not _smoke_done and Time.get_ticks_msec() > _smoke_deadline_msec:
 		_log("smoke run timed out in state %s" % State.keys()[state])
 		_finish_smoke("timeout")
+	if _hotplug != null and _smoke_running and not _smoke_done:
+		var why := _hotplug.tick(self, delta)
+		if why != "":
+			_log("hotplug test failed: %s" % why)
+			_finish_smoke("hotplug_failed")
 	if not _view_forced and options.view in LaunchOptions.RUN_VIEWS and _run_frame >= 0 \
 			and _game_time() >= options.effective_view_time():
 		_view_forced = true
@@ -1735,8 +1757,11 @@ func _force_view() -> void:
 			end_run(true)
 			_end_screen_extras()
 		"pause":
-			var slots := PlayerManager.get_slots()
-			pause_game(slots[0] if not slots.is_empty() else null)
+			if options.hotplug_test:
+				HotplugTest.make_ghost(PlayerManager.get_slot(HotplugTest.SLOT_INDEX))  # (the next frame pauses, with the take-over prompt)
+			else:
+				var slots := PlayerManager.get_slots()
+				pause_game(slots[0] if not slots.is_empty() else null)
 
 
 ## --end-page / --save-card on the forced end screen (screenshots of the Damage Meter and the card).
