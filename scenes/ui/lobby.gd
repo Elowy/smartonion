@@ -7,8 +7,11 @@ extends Control
 ##   once the button that opened the lobby has been released, so pressing "Play" does not also
 ##   join). The join press is swallowed by PlayerManager (PlayerInput.swallow()): it neither
 ##   readies the new player nor moves its class cursor until the stick has been neutral once.
-## - Slots whose controller is unplugged are removed when the lobby is shown and every frame
-##   while it is open (a ghost slot could never ready up and would block the start).
+## - A slot whose controller is gone (unplugged, a guest who dropped) is KEPT with its class and ready flag as
+##   "Disconnected – press A to take over": its pad coming back, or any free pad's A (PlayerManager.take_over), gives it
+##   back. It cannot ready up, so the start waits for it; it is freed after PlayerManager.GHOST_TIMEOUT.
+## - RPT-CORE: a Remote Play guest's card says "Remote · <name>"; a 5th pad's A shows a one-time "party is full"
+##   line; with a backend that can invite (RemotePlay.can_invite) the footer offers L3 / I "Invite friends" (host only).
 ## - Joined players use their own PlayerSlot.input: ◀ ▶ changes class (Db.cycle_class),
 ##   RB / E cycles the companion of a class that has choices (ClassData.companion_choices, the
 ##   M8 Hunter; [method cycle_companion]), A toggles ready, START readies, B unreadies or – when
@@ -51,6 +54,7 @@ const COUNTDOWN_TIME := 3.0
 const MODE_PROMPTS_IDLE_ALPHA := 0.4
 ## Seconds the footer shows why a difficulty tier is locked.
 const LOCK_NOTICE_TIME := 3.5
+const FULL_NOTICE := "The party is full – a fifth controller cannot join"
 
 ## The run mode (RunState.MODES) and the hardcore flag the next run will use.
 var run_mode: StringName = RunState.MODE_NORMAL
@@ -214,7 +218,8 @@ func is_counting_down() -> bool:
 func reset() -> void:
 	_started = false
 	countdown_left = -1.0
-	PlayerManager.prune_disconnected()
+	PlayerManager.restart_ghost_timers()
+	PlayerManager.prune_disconnected(PlayerManager.GHOST_TIMEOUT)
 	PlayerManager.set_all_ready(false)
 	_set_joining(not UiPads.join_button_held())
 
@@ -331,7 +336,7 @@ func _build_mode_block() -> Control:
 # --- Lifecycle -------------------------------------------------------------------------
 
 func _ready() -> void:
-	PlayerManager.device_disconnected.connect(_on_device_disconnected)
+	PlayerManager.join_refused.connect(_on_join_refused)
 	PlayerManager.player_joined.connect(_on_player_joined)
 	visibility_changed.connect(_on_visibility_changed)
 	_on_visibility_changed()
@@ -365,10 +370,10 @@ func _on_player_joined(slot: PlayerSlot) -> void:
 	Heirlooms.prune(slot)
 
 
-func _on_device_disconnected(slot: PlayerSlot) -> void:
-	# A controller unplugged in the lobby frees its slot (it could never ready up).
-	if is_visible_in_tree() and not _started and PlayerManager.get_slot(slot.index) == slot:
-		PlayerManager.leave(slot.index)
+## A free pad's A got nothing: the one-time "party is full" line.
+func _on_join_refused(_device: int, reason: StringName) -> void:
+	if reason == &"full" and is_visible_in_tree() and not _started:
+		_show_lock_notice(FULL_NOTICE)
 
 
 # --- Frame ---------------------------------------------------------------------------
@@ -380,7 +385,7 @@ func _process(delta: float) -> void:
 		return
 	if not _owns_joining and not UiPads.join_button_held():
 		_set_joining(true)
-	PlayerManager.prune_disconnected()
+	PlayerManager.prune_disconnected(PlayerManager.GHOST_TIMEOUT)
 	var nobody_before := PlayerManager.count() == 0
 	for slot in PlayerManager.get_slots():
 		_handle_slot_input(slot)
@@ -397,8 +402,8 @@ func _process(delta: float) -> void:
 
 func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
-	if inp == null:
-		return
+	if inp == null or PlayerManager.is_missing(slot):
+		return  # (a missing controller presses nothing: the slot waits for it or for a free pad)
 	# An open Loadout (M9 PATCH: Seasonings / Heirloom / Look) takes everything this player presses.
 	var loadout := loadout_of(slot)
 	if loadout != null and loadout.is_open():
@@ -427,6 +432,8 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 		else:
 			slot.ready = true
 			Audio.play_ui(&"ui_confirm")
+	if inp.just_pressed(PlayerInput.Pad.L3) and HostRules.may(HostRules.Action.INVITE, slot):
+		RemotePlay.show_invite()  # (nothing unless the backend can invite)
 	# Any joined player picks the run's mode: Y cycles Normal / Endless, X toggles Hardcore.
 	if inp.just_pressed(PlayerInput.Pad.Y):
 		cycle_mode(slot)
@@ -514,7 +521,8 @@ func open_seasoning_picker(slot: PlayerSlot) -> bool:
 
 
 func _update_countdown(delta: float) -> void:
-	if PlayerManager.all_ready():
+	# (A slot that waits for its controller cannot be ready, whatever its flag says.)
+	if PlayerManager.all_ready() and PlayerManager.disconnected_slots().is_empty():
 		if countdown_left < 0.0:
 			countdown_left = COUNTDOWN_TIME
 		else:
@@ -538,8 +546,11 @@ func _refresh() -> void:
 	_mode_prompts.modulate.a = 1.0 if not slots.is_empty() else MODE_PROMPTS_IDLE_ALPHA
 	_difficulty_prompt.modulate.a = _mode_prompts.modulate.a
 	var ready_count := 0
+	var ghosts: Array[String] = []
 	for s in slots:
-		if s.ready:
+		if PlayerManager.is_missing(s):
+			ghosts.append(RemotePlay.slot_label(s))
+		elif s.ready:
 			ready_count += 1
 	var footer_key := ""
 	if slots.is_empty():
@@ -556,15 +567,24 @@ func _refresh() -> void:
 		_status.add_theme_color_override(&"font_color", UiTheme.GOLD)
 		_sub_status.text = "The run starts when every joined player is ready" if slots.size() < PlayerManager.MAX_PLAYERS \
 			else "The party is full – ready up!"
+		if not ghosts.is_empty():
+			_sub_status.text = "%s disconnected – press A on a free controller to take over" % ", ".join(ghosts)
 		if _lock_notice_left > 0.0:
 			_sub_status.text = _lock_notice
+	if RemotePlay.can_invite():
+		footer_key += "+invite"
 	if footer_key != _footer_key:
 		_footer_key = footer_key
 		for c in _footer_prompts.get_children():
 			_footer_prompts.remove_child(c)
 			c.queue_free()
-		if footer_key == "back":
-			_footer_prompts.add_child(UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.B), "/", UiGlyph.key("Esc"), "Back"]], UiTheme.FONT_BODY, UiTheme.TEXT_DIM))
+		var prompts: Array = []
+		if footer_key.begins_with("back"):
+			prompts.append([UiGlyph.pad(PlayerInput.Pad.B), "/", UiGlyph.key("Esc"), "Back"])
+		if footer_key.ends_with("+invite"):
+			prompts.append([UiGlyph.pad(PlayerInput.Pad.L3), "/", UiGlyph.key(UiGlyph.keyboard_name(PlayerInput.Pad.L3)), "Invite friends"])
+		if not prompts.is_empty():
+			_footer_prompts.add_child(UiTheme.prompt_row(prompts, UiTheme.FONT_BODY, UiTheme.TEXT_DIM))
 	var counting := countdown_left >= 0.0 and not _started
 	_countdown_label.visible = counting
 	if counting:

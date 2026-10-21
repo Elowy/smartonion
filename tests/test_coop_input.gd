@@ -235,7 +235,7 @@ func test_all_keyboard_join_keys_join_and_confirm() -> void:
 
 # --- Ghost slots ---------------------------------------------------------------------
 
-func test_lobby_removes_slots_of_unplugged_controllers() -> void:
+func test_lobby_keeps_the_slot_of_an_unplugged_controller_until_the_timeout() -> void:
 	_make_lobby()
 	var a := _human("pad:a")
 	var b := _human("pad:b")
@@ -243,20 +243,27 @@ func test_lobby_removes_slots_of_unplugged_controllers() -> void:
 	check_eq(PlayerManager.count(), 2, "both joined")
 	b.connected = false
 	_lobby_frame()
-	check_eq(PlayerManager.count(), 1, "the ghost slot is gone on the next frame")
+	check_eq(PlayerManager.count(), 2, "RPT-CORE: the slot waits as 'Disconnected – press A to take over'")
+	UiFakes.tap(lobby, a, PlayerInput.Pad.A)
+	check(not lobby.is_counting_down(), "a ghost cannot ready up: the start waits for it")
+	_lobby_frame(PlayerManager.GHOST_TIMEOUT + 1.0)
+	check_eq(PlayerManager.count(), 1, "freed after the long timeout")
 	check(PlayerManager.get_slot(1) == null, "P2 left")
+	UiFakes.tap(lobby, a, PlayerInput.Pad.A)
 	UiFakes.tap(lobby, a, PlayerInput.Pad.A)
 	check(lobby.is_counting_down(), "P1 alone can start now")
 
 
-func test_lobby_prunes_ghosts_when_shown() -> void:
+func test_lobby_keeps_ghosts_when_shown_and_restarts_their_clock() -> void:
 	_make_lobby()
 	_human("pad:a")
 	var b := _human("pad:b")
 	lobby.hide()
 	b.connected = false
+	PlayerManager.get_slot(1).missing_time = 500.0
 	lobby.show()
-	check_eq(PlayerManager.count(), 1, "reset() removed the slot of the unplugged controller")
+	check_eq(PlayerManager.count(), 2, "reset() keeps the slot of the unplugged controller (its clock restarts)")
+	check_near(PlayerManager.get_slot(1).missing_time, 0.0, 0.001, "clock restarted")
 
 
 func test_prune_keeps_bots_and_working_devices() -> void:
