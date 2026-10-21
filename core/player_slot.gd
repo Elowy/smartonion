@@ -27,6 +27,15 @@ var cosmetics: Dictionary[StringName, StringName] = {}
 ## standard one. The lobby toggles it ([method Lobby.toggle_alt_weapon]); Main drops it for a class that has not
 ## unlocked it (Meta.enforce_alt_weapons).
 var alt_weapon := false
+## --- Remote Play Together / hotplug --- The Remote Play session of the slot's device when it joined or was last
+## rebound (RemotePlay.session_of_device; 0 = a local device). A guest's slot has a session id: the host rules
+## (HostRules) refuse its destructive actions and the lobby card says "Remote · <name>".
+var session_id := 0
+## Seconds the slot's device has been missing (0 while it works), counted by PlayerManager: the lobby frees a ghost slot
+## after PlayerManager.GHOST_TIMEOUT, the between-wave screens decide for it after PlayerManager.auto_decide_grace.
+var missing_time := 0.0
+## What PlayerManager last announced about the device (device_disconnected / device_reconnected).
+var connection_reported := true
 
 
 func _init(p_index: int, p_input: PlayerInput, p_color: Color) -> void:
@@ -41,6 +50,17 @@ func label() -> String:
 
 func is_bot() -> bool:
 	return input is ScriptedInput
+
+
+## The fingerprint of the controller this slot joined with (null for the keyboard and bots).
+func identity() -> PadIdentity:
+	var pad := input as JoypadInput
+	return pad.identity if pad != null else null
+
+
+## True when the slot's device belongs to a Remote Play guest.
+func is_remote() -> bool:
+	return session_id != 0
 
 
 ## The companion this player gets (Player.companion_id): [member companion] when the class offers
