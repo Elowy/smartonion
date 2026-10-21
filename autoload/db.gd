@@ -28,10 +28,35 @@ const ENVIRONMENT_ORDER: Array[StringName] = [&"forest_ruin", &"cemetery", &"swa
 const SHRINE_DIR := "res://data/shrines/"
 ## Pool order of the shrines; any extra one is appended alphabetically.
 const SHRINE_ORDER: Array[StringName] = [&"greed", &"haste", &"learning", &"blood", &"fortune", &"gambler"]
+## data/seasonings/<id>.tres (SeasoningData, M9: the per-class ability side-grades chosen in the lobby).
+const SEASONING_DIR := "res://data/seasonings/"
+## data/heirlooms/<id>.tres (HeirloomData, M9 PATCH: the ten persistent starting items).
+const HEIRLOOM_DIR := "res://data/heirlooms/"
+## Display order of the Heirlooms (The Onion Patch, the Loadout screen); any extra one is appended alphabetically.
+const HEIRLOOM_ORDER: Array[StringName] = [&"heir_sprout_cap", &"heir_old_layers", &"heir_apron", &"heir_oven_mitts",
+		&"heir_pantry_breeches", &"heir_garden_clogs", &"heir_garlic_braid", &"heir_harvest_signet", &"heir_seed_pouch",
+		&"heir_ancestral_peeler"]
+## data/unlocks/<id>.tres (UnlockGateData, M9: content the main profile has to unlock before it is offered).
+const UNLOCK_DIR := "res://data/unlocks/"
+## data/achievements/<id>.tres (AchievementData, M9).
+const ACHIEVEMENT_DIR := "res://data/achievements/"
+## data/difficulties/<id>.tres (DifficultyData, M9: Normal, Pungent, Tear-Jerker) and data/pressure/<id>.tres
+## (PressureData, M9: the Tear-Jerker wave modifiers).
+const DIFFICULTY_DIR := "res://data/difficulties/"
+const PRESSURE_DIR := "res://data/pressure/"
+## Rotation order of the pressure modifiers (the pick draws over this order); any extra one is appended alphabetically.
+const PRESSURE_ORDER: Array[StringName] = [&"prs_salt_rain", &"prs_hardened_peel", &"prs_paring_knives",
+		&"prs_wilting_heat", &"prs_weeping_fog", &"prs_bitter_harvest"]
+## The Class Level curve and reward list (ClassLevelTable, M9 LEVELS) and one path per class
+## (data/meta/class_paths/<class>.tres, ClassPathData: locked abilities, capstone order, alternative weapon ...).
+const CLASS_LEVELS_PATH := "res://data/meta/class_levels.tres"
+const CLASS_PATH_DIR := "res://data/meta/class_paths/"
 ## Lobby order of the classes; any extra class is appended alphabetically. An id without a
 ## class resource (yet) is skipped, so the order may name classes before their data exists (the M8
 ## Hunter and Shaman); the default 4-bot party is the first four ids that exist.
 const CLASS_ORDER: Array[StringName] = [&"warrior", &"mage", &"paladin", &"rogue", &"warlock", &"hunter", &"shaman"]
+## data/cosmetics/<id>.tres (CosmeticData, M9 WARDROBE: the Tabards, Hats, Glows and Dyes of the Wardrobe).
+const COSMETIC_DIR := "res://data/cosmetics/"
 
 var classes: Dictionary[StringName, ClassData] = {}
 var weapons: Dictionary[StringName, WeaponData] = {}
@@ -63,7 +88,30 @@ var environment_ids: Array[StringName] = []
 ## Every shrine, by id (M6b), and the ids in SHRINE_ORDER (extras alphabetically): the roll's pool order.
 var shrines: Dictionary[StringName, ShrineData] = {}
 var shrine_ids: Array[StringName] = []
+## Every Seasoning (M9), by id, in file order.
+var seasonings: Dictionary[StringName, SeasoningData] = {}
+## Every Heirloom (M9 PATCH), by id, and the ids in HEIRLOOM_ORDER.
+var heirlooms: Dictionary[StringName, HeirloomData] = {}
+var heirloom_ids: Array[StringName] = []
 var class_ids: Array[StringName] = []
+## Every unlock gate (M9), by UnlockGateData.key (kind/id): the content the profile has to unlock. Content without a
+## gate is available from the start. Filled by [method reload]; [method add_unlock_gate] adds one in code.
+var unlock_gates: Dictionary[StringName, UnlockGateData] = {}
+## Every achievement (M9), by id, in file order.
+var achievements: Dictionary[StringName, AchievementData] = {}
+## Every difficulty tier (M9), by id, and the ids in tier order (Normal first).
+var difficulties: Dictionary[StringName, DifficultyData] = {}
+var difficulty_ids: Array[StringName] = []
+## Every Tear-Jerker pressure modifier (M9), by id, and the ids in PRESSURE_ORDER (extras alphabetically).
+var pressures: Dictionary[StringName, PressureData] = {}
+var pressure_ids: Array[StringName] = []
+## The Class Level curve and reward list (M9 LEVELS); null only when the file is missing (ClassLevels then falls
+## back to a bare table with no rewards).
+var class_levels: ClassLevelTable
+## Every class's level path (M9 LEVELS), by class id.
+var class_paths: Dictionary[StringName, ClassPathData] = {}
+## Every Wardrobe cosmetic (M9 WARDROBE), by id.
+var cosmetics: Dictionary[StringName, CosmeticData] = {}
 
 
 func _ready() -> void:
@@ -152,6 +200,79 @@ func reload() -> void:
 			extra_shrines.append(id)
 	extra_shrines.sort()
 	shrine_ids.append_array(extra_shrines)
+	seasonings.clear()
+	for res in _load_dir(SEASONING_DIR):
+		if res is SeasoningData:
+			if seasonings.has(res.id):
+				push_error("Db: duplicate seasoning id %s" % res.id)
+			else:
+				seasonings[res.id] = res
+	heirlooms.clear()
+	for res in _load_dir(HEIRLOOM_DIR):
+		if res is HeirloomData:
+			if heirlooms.has(res.id):
+				push_error("Db: duplicate heirloom id %s" % res.id)
+			else:
+				heirlooms[res.id] = res
+	heirloom_ids.clear()
+	for id in HEIRLOOM_ORDER:
+		if heirlooms.has(id):
+			heirloom_ids.append(id)
+	var extra_heirlooms: Array[StringName] = []
+	for id in heirlooms:
+		if id not in heirloom_ids:
+			extra_heirlooms.append(id)
+	extra_heirlooms.sort()
+	heirloom_ids.append_array(extra_heirlooms)
+	unlock_gates.clear()
+	for res in _load_dir(UNLOCK_DIR):
+		if res is UnlockGateData:
+			add_unlock_gate(res)
+	achievements.clear()
+	for res in _load_dir(ACHIEVEMENT_DIR):
+		if res is AchievementData:
+			if achievements.has(res.id):
+				push_error("Db: duplicate achievement id %s" % res.id)
+			else:
+				achievements[res.id] = res
+	difficulties.clear()
+	for res in _load_dir(DIFFICULTY_DIR):
+		if res is DifficultyData:
+			difficulties[res.id] = res
+	difficulty_ids.clear()
+	difficulty_ids.append_array(difficulties.keys())
+	difficulty_ids.sort_custom(func(a: StringName, b: StringName) -> bool:
+		var ta := difficulties[a].tier
+		var tb := difficulties[b].tier
+		return ta < tb or (ta == tb and String(a) < String(b)))
+	pressures.clear()
+	for res in _load_dir(PRESSURE_DIR):
+		if res is PressureData:
+			pressures[res.id] = res
+	pressure_ids.clear()
+	for id in PRESSURE_ORDER:
+		if pressures.has(id):
+			pressure_ids.append(id)
+	var extra_pressures: Array[StringName] = []
+	for id in pressures:
+		if id not in pressure_ids:
+			extra_pressures.append(id)
+	extra_pressures.sort()
+	pressure_ids.append_array(extra_pressures)
+	class_levels = null
+	if ResourceLoader.exists(CLASS_LEVELS_PATH):
+		class_levels = load(CLASS_LEVELS_PATH) as ClassLevelTable
+	class_paths.clear()
+	for res in _load_dir(CLASS_PATH_DIR):
+		if res is ClassPathData:
+			class_paths[res.class_id] = res
+	cosmetics.clear()
+	for res in _load_dir(COSMETIC_DIR):
+		if res is CosmeticData:
+			if cosmetics.has(res.id):
+				push_error("Db: duplicate cosmetic id %s" % res.id)
+			else:
+				cosmetics[res.id] = res
 	class_ids.clear()
 	for id in CLASS_ORDER:
 		if classes.has(id):
@@ -168,17 +289,40 @@ func get_class_data(id: StringName) -> ClassData:
 	return classes.get(id)
 
 
+## The level path of [param class_id] (M9 LEVELS: locked abilities, capstone order, alternative weapon ...); null for a
+## class without one.
+func class_path(class_id: StringName) -> ClassPathData:
+	return class_paths.get(class_id)
+
+
+## The Wardrobe cosmetic [param id] (M9 WARDROBE); null for an unknown id.
+func get_cosmetic(id: StringName) -> CosmeticData:
+	return cosmetics.get(id)
+
+
+## The cosmetics of [param kind] (CosmeticData.KINDS) in list order.
+func cosmetics_of_kind(kind: StringName) -> Array[CosmeticData]:
+	var out: Array[CosmeticData] = []
+	for id in cosmetics:
+		if cosmetics[id].kind == kind:
+			out.append(cosmetics[id])
+	out.sort_custom(func(a: CosmeticData, b: CosmeticData) -> bool:
+		return a.order < b.order or (a.order == b.order and String(a.id) < String(b.id)))
+	return out
+
+
 func get_ability(id: StringName) -> AbilityData:
 	return abilities.get(id)
 
 
 ## Learnable abilities (Active / Auto-cast) offered to [param class_id] on level-up cards:
-## the class's own plus the general ones (AbilityData.class_id empty), unlocked only.
+## the class's own plus the general ones (AbilityData.class_id empty), unlocked only (M9: the main profile's
+## ability unlocks, Meta.is_unlocked).
 func ability_pool(class_id: StringName) -> Array[AbilityData]:
 	var out: Array[AbilityData] = []
 	for id in abilities:
 		var a := abilities[id]
-		if not a.is_learned_kind() or a.card_weight <= 0.0 or not is_unlocked(id):
+		if not a.is_learned_kind() or a.card_weight <= 0.0 or not is_unlocked(id, Profile.KIND_ABILITY, class_id):
 			continue
 		if a.class_id == &"" or a.class_id == class_id:
 			out.append(a)
@@ -351,11 +495,71 @@ func get_unique(id: StringName) -> UniqueItemData:
 	return uniques.get(id)
 
 
-## Content-pool gate for meta-progression (ARCHITECTURE "Forward compatibility"): every
-## player-facing pool (shop, loot, level-up cards, lobby) filters through this. All content is
-## unlocked until milestone M9.
-func is_unlocked(_id: StringName) -> bool:
-	return true
+## Content-pool gate for meta-progression (ARCHITECTURE "Forward compatibility"): every player-facing pool (shop,
+## loot, level-up cards, lobby) filters through this. M9 gates the content kinds of Profile.KINDS: a call with a
+## [param kind] asks the main profile ([method Meta.is_unlocked]); a call without one (the item, enchant, set,
+## consumable and shrine pools) is not gated and answers true.
+func is_unlocked(id: StringName, kind: StringName = &"", class_id: StringName = &"") -> bool:
+	return kind == &"" or Meta.is_unlocked(kind, id, class_id)
+
+
+## The gate of the content [param id] of [param kind] (null = not gated).
+func get_unlock_gate(kind: StringName, id: StringName) -> UnlockGateData:
+	return unlock_gates.get(UnlockGateData.key_for(kind, id))
+
+
+## Registers [param gate] (a gate of the same kind and id is replaced). A content package without a .tres in
+## data/unlocks/ and the tests use it; [method reload] forgets it.
+func add_unlock_gate(gate: UnlockGateData) -> void:
+	if gate != null and gate.kind != &"" and gate.id != &"":
+		unlock_gates[gate.key()] = gate
+
+
+func remove_unlock_gate(kind: StringName, id: StringName) -> void:
+	unlock_gates.erase(UnlockGateData.key_for(kind, id))
+
+
+func get_seasoning(id: StringName) -> SeasoningData:
+	return seasonings.get(id)
+
+
+## The Heirloom [param id] (null = unknown).
+func get_heirloom(id: StringName) -> HeirloomData:
+	return heirlooms.get(id)
+
+
+## The Seasonings of [param class_id] in unlock order (tier, then name) – the lobby picker's list.
+func seasonings_for_class(class_id: StringName) -> Array[SeasoningData]:
+	var out: Array[SeasoningData] = []
+	for id in seasonings:
+		if seasonings[id].class_id == class_id:
+			out.append(seasonings[id])
+	out.sort_custom(func(a: SeasoningData, b: SeasoningData) -> bool:
+		if a.tier_index() != b.tier_index():
+			return a.tier_index() < b.tier_index()
+		return a.display_name < b.display_name)
+	return out
+
+
+func get_achievement(id: StringName) -> AchievementData:
+	return achievements.get(id)
+
+
+## The difficulty tier [param id] (null = unknown).
+func get_difficulty(id: StringName) -> DifficultyData:
+	return difficulties.get(id)
+
+
+## The pressure modifier [param id] (null = unknown).
+func get_pressure(id: StringName) -> PressureData:
+	return pressures.get(id)
+
+
+## Every achievement in file order.
+func achievement_list() -> Array[AchievementData]:
+	var out: Array[AchievementData] = []
+	out.assign(achievements.values())
+	return out
 
 
 ## Next / previous class id in lobby order (wraps around).

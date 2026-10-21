@@ -2,7 +2,7 @@ extends TestCase
 ## M7a SETTINGS: GameSettings (defaults, file round trip, clamping / stepping, volume -> dB), the Settings
 ## autoload (audio buses, shake / damage-number reads, FPS counter, inert in automated runs), the camera and
 ## Vfx hooks, the Settings page (navigation changes a value), the Credits page (Markdown, built-in text),
-## the main menu's four entries and the pause menu's Settings entry.
+## the main menu's five entries and the pause menu's Settings entry.
 
 const UiFakes := preload("res://tests/ui_fakes.gd")
 
@@ -194,6 +194,7 @@ func test_a_hand_edited_file_is_sanitised() -> void:
 
 
 func test_a_corrupt_file_gives_the_defaults_and_an_error() -> void:
+	expect_error("ConfigFile parse error")
 	var f := FileAccess.open(_tmp_path, FileAccess.WRITE)
 	f.store_string("[audio\nthis is = not = a config {{{\n")
 	f.close()
@@ -612,18 +613,19 @@ func test_credits_scroll_with_the_stick() -> void:
 
 # --- Menus -------------------------------------------------------------------------------------
 
-func test_the_main_menu_has_four_entries() -> void:
+func test_the_main_menu_has_five_entries() -> void:
 	var menu := _add(MainMenu.create()) as MainMenu
 	var texts: Array[String] = []
 	for b in menu.buttons:
 		texts.append(b.text)
-	check_eq(texts, ["Play", "Settings", "Credits", "Quit"] as Array[String], "Play / Settings / Credits / Quit")
-	check(menu.buttons[0] == menu.play_button and menu.buttons[3] == menu.quit_button, "named buttons")
-	check(menu.settings_button == menu.buttons[1] and menu.credits_button == menu.buttons[2], "Settings, Credits")
+	check_eq(texts, ["Play", "The Onion Patch", "Settings", "Credits", "Quit"] as Array[String], "Play / The Onion Patch / Settings / Credits / Quit")
+	check(menu.buttons[0] == menu.play_button and menu.buttons[4] == menu.quit_button, "named buttons")
+	check(menu.onion_patch_button == menu.buttons[1], "The Onion Patch (M9 PATCH)")
+	check(menu.settings_button == menu.buttons[2] and menu.credits_button == menu.buttons[3], "Settings, Credits")
 	for i in menu.buttons.size():
 		var b := menu.buttons[i]
-		check(b.get_node(b.focus_neighbor_bottom) == menu.buttons[(i + 1) % 4], "focus down from %s wraps" % b.text)
-		check(b.get_node(b.focus_neighbor_top) == menu.buttons[(i + 3) % 4], "focus up from %s wraps" % b.text)
+		check(b.get_node(b.focus_neighbor_bottom) == menu.buttons[(i + 1) % 5], "focus down from %s wraps" % b.text)
+		check(b.get_node(b.focus_neighbor_top) == menu.buttons[(i + 4) % 5], "focus up from %s wraps" % b.text)
 
 
 func test_the_main_menu_opens_and_closes_its_pages() -> void:

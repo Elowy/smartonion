@@ -47,6 +47,13 @@ extends Node
 ##   [method enter_dungeon] runs a [Dungeon] (State.DUNGEON: the same arena in a 24 x 14 layout, the HUD
 ##   shows "Dungeon – Room n/4"); [method _on_dungeon_finished] pays the reward (DungeonRewards) and gives
 ##   the break back to the Intermission, which rolls the Epics and opens the market.
+## - M9 ACHIEVE-DIFF: the run's difficulty tier ([member LaunchOptions.difficulty] from --difficulty or the lobby's selector,
+##   capped by what the heroes' classes unlocked, [method _difficulty_for]) goes into RunState.start_run; a Tear-Jerker
+##   wave's pressure goes live in [method start_wave] and ends on the break path ([method _begin_pressure] /
+##   [method _end_pressure], the shrines' seams); a boss wave's boss is recorded when the director reports it defeated;
+##   a real profile checks its achievements in the middle of the run ([method _check_achievements_live]: wave cleared,
+##   boss down, Artifact, Coin Gremlin, dungeon over, loot roll), the HUD toasts them and [member run_achievements] keeps
+##   the list the end screen shows.
 ## Command line (--smoke, --demo, --screenshot, --view, --goblin-chance, --elite-mult,
 ## --start-level, --panel-tab, --mode, --hardcore, --env, --event ...): see LaunchOptions. SMOKE_RESULT
 ## keys: see smoke_result().
@@ -143,9 +150,17 @@ var shop_rerolls := 0
 ## last wave's haul, which no shop follows (SMOKE_RESULT "gold_at_last_shop").
 var gold_at_last_shop := 0
 var victory := false
+## What the main profile made of the last finished run (Meta.record_run's result; {} when it recorded nothing). Its
+## "achievements" are every one the run unlocked, the mid-run ones included ([member run_achievements]).
+var meta_result: Dictionary = {}
+## The achievements unlocked since the run started, in order (M9; the end screen lists them).
+var run_achievements: Array[StringName] = []
 ## The party's class ids in slot order as the run started (start_run): the leaderboard entry keeps a
 ## player who left mid-run (drop_player), the slots no longer have them.
 var run_classes: Array[StringName] = []
+## The RunReport hero entries of the players who left mid-run (drop_player takes them before the hero goes): the run
+## report counts them as heroes of the run (their downs, kills ... and the Class XP of their class).
+var departed_heroes: Array[Dictionary] = []
 ## Frame times of the whole run, grouped by enemy count.
 var perf := RunPerf.new()
 
@@ -187,6 +202,8 @@ var _downs_at_wave_start := 0
 ## diagnostics: the SMOKE_RESULT "dungeon_downs"; the wave bands of a matrix leave them out).
 var _downs_at_dungeon_start := 0
 var dungeon_downs := 0
+## The pressure of every wave that had one: {wave as text: modifier id} (SMOKE_RESULT "pressures" of a harder-tier run).
+var _pressure_log: Dictionary = {}
 
 
 ## Main for [param p_options] (null = parse the command line in _ready).
@@ -223,6 +240,8 @@ func _ready() -> void:
 	RunState.leveled_up.connect(_on_leveled_up)
 	RunState.team_loot_changed.connect(_on_team_loot_changed)
 	RunState.artifact_dropped.connect(_on_artifact_dropped)
+	RunState.special_killed.connect(_on_special_killed)
+	Meta.achievement_unlocked.connect(_on_achievement_unlocked)
 	_apply_time_scale(options.effective_time_scale())
 	if options.smoke or options.demo or options.view != "":
 		_clock = PhysicsClock.create()
@@ -241,6 +260,8 @@ func _ready() -> void:
 				PlayerManager.get_slot(0).ready = true
 			if options.view == "roll":
 				begin_roll()
+			if options.loadout_tab != "":
+				_open_loadout_view()
 		_:
 			go_to_menu()
 			match options.view:
@@ -248,6 +269,10 @@ func _ready() -> void:
 					main_menu.open_settings()
 				"credits":
 					main_menu.open_credits()
+				"patch":
+					main_menu.open_onion_patch()
+					if options.patch_tab != "":
+						main_menu.onion_patch_page.set_tab(LaunchOptions.PATCH_TABS.find(options.patch_tab) as OnionPatchPage.Tab)
 
 
 func _exit_tree() -> void:
@@ -286,11 +311,42 @@ func go_to_lobby() -> void:
 		lobby.start_requested.connect(_on_lobby_start, CONNECT_DEFERRED)
 		lobby.back_requested.connect(_on_lobby_back, CONNECT_DEFERRED)
 		lobby.mode_changed.connect(configure_run)  # the mode select (Y / X) stores the run settings at once
+		lobby.difficulty_changed.connect(configure_difficulty)  # the difficulty select (Back / Tab) likewise (M9)
 		_layers[LAYER_MENU].add_child(lobby)
 	else:
 		lobby.reset()
 	lobby.set_run_mode(options.mode, options.hardcore)  # --mode / --hardcore, or what the party chose last time
+	lobby.set_difficulty(options.difficulty)  # --difficulty, or the party's last choice (capped by its classes)
 	_set_state(State.LOBBY)
+
+
+## --loadout-tab (screenshots): opens the Loadout of the second player (the first when alone, --loadout-player picks
+## another) in the lobby.
+func _open_loadout_view() -> void:
+	var slots := PlayerManager.get_slots()
+	if lobby == null or slots.is_empty():
+		return
+	var slot := slots[mini(1 if options.loadout_player == 0 else options.loadout_player - 1, slots.size() - 1)]
+	slot.ready = false  # (the view readies the first player; a ready hero cannot open the Loadout)
+	lobby.open_loadout(slot, LaunchOptions.LOADOUT_TABS.find(options.loadout_tab) as LoadoutScreen.Tab)
+
+
+## --seasonings: every bot carries the flagged Seasonings of its own class, in the order given (instead of what the
+## profile remembers for the class).
+func _apply_seasoning_flag(slots: Array[PlayerSlot]) -> void:
+	if options.seasonings.is_empty():
+		return
+	for slot in slots:
+		if slot.is_bot() and slot.class_data != null:
+			slot.seasonings.assign(options.seasonings_for(slot.class_data.id))
+
+
+## --heirloom: every hero starts with that Heirloom (instead of what the profile remembers for the class).
+func _apply_heirloom_flag(slots: Array[PlayerSlot]) -> void:
+	if options.heirloom == &"":
+		return
+	for slot in slots:
+		slot.heirloom = options.heirloom
 
 
 ## Starts a run with every joined slot: arena, director, players, HUD, run screens, wave 1
@@ -304,10 +360,20 @@ func start_run() -> void:
 		print_verbose("Main: start_run() without any joined player -> lobby")
 		go_to_lobby()
 		return
-	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id())
+	_apply_seasoning_flag(slots)  # (--seasonings: after the lobby / the profile put their selections on the slots)
+	_apply_heirloom_flag(slots)  # (M9 PATCH: --heirloom likewise)
+	Meta.enforce_class_locks(slots)  # (M9: a locked class never reaches a run)
+	Meta.enforce_alt_weapons(slots)  # (M9 LEVELS: nor a locked alternative weapon)
+	for slot in slots:
+		Meta.remember_loadout(slot)
+	RunState.start_run(slots.size(), _run_seed(), options.mode, options.hardcore, _environment_id(), _difficulty_for(slots))
 	_roll_seed = -1
+	meta_result = {}
+	run_achievements.clear()
+	_pressure_log.clear()
 	artifact_lines.clear()
 	run_classes.clear()
+	departed_heroes.clear()
 	for slot in slots:
 		run_classes.append(slot.class_data.id if slot.class_data != null else &"")
 	# Test hooks (start_run reset the statics to their defaults).
@@ -315,12 +381,13 @@ func start_run() -> void:
 	RunState.event_override = options.event
 	RunState.dungeon_forced = options.dungeon
 	GoblinSpawner.chance_override = options.goblin_chance
-	EliteAffixes.rate_mult = options.elite_mult
+	EliteAffixes.rate_mult = options.elite_mult * Difficulty.elite_mult()  # (M9: the tier's elite rate; x1 on Normal)
 	BossData.hp_mult = options.boss_hp
 	LootDrops.artifact_chance_override = options.artifact_chance
 	PlayerPanel.debug_start_tab = options.panel_tab
 	if options.start_level > RunState.START_LEVEL:
 		RunState.set_start_level(options.start_level)
+	Meta.apply_run_start(slots)  # (M9 LEVELS: starting gold and free rerolls of the Class Levels; nothing for the dev profile)
 	first_wave = options.clamp_wave(options.start_wave)  # (the lobby may have changed the mode since the parse)
 	wave = 0
 	waves_completed = 0
@@ -395,9 +462,11 @@ func start_run() -> void:
 	hud.bind_players(players)
 	if _run_frame < 0:
 		_run_frame = Engine.get_physics_frames()
-	_log("run started: %d players (%s), first wave %d, seed %d, mode %s, environment %s" % [
+	_log("run started: %d players (%s), first wave %d, seed %d, mode %s, environment %s, difficulty %s" % [
 		players.size(), _class_list(), first_wave, options.run_seed(), RunState.mode_text(RunState.mode, RunState.hardcore).to_lower(),
-		RunState.environment])
+		RunState.environment, RunState.difficulty])
+	if Meta.records_runs():
+		_log("meta: profile %s" % (Meta.path if Meta.persist else "in memory"))
 	start_wave(first_wave)
 
 
@@ -414,8 +483,12 @@ func start_wave(n: int) -> void:
 	_place_players()
 	for p in players:
 		if is_instance_valid(p):
+			Heirlooms.rescale_player(p, wave)  # (M9 PATCH: an Heirloom grows with the wave; nothing without one)
 			p.begin_wave()
+			for held in Heirlooms.held(p.equipment):
+				_log(Heirlooms.log_line(p.slot.label() if p.slot != null else "", p.class_data.id, held, p.equipment.is_equipped(held), wave))
 	_begin_shrines()
+	_begin_pressure()
 	_downs_at_wave_start = players_downed
 	_set_state(State.WAVE)
 	_wave_perf = RunPerf.new()
@@ -427,7 +500,10 @@ func start_wave(n: int) -> void:
 	if hud != null:
 		hud.show()
 		# The running shrines (M6b) are listed under the title, with the waves they have left.
-		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, Shrines.banner_lines())
+		var banner_lines := Shrines.banner_lines()
+		if Pressure.banner_line() != "":
+			banner_lines.append(Pressure.banner_line())
+		hud.show_banner("Final Wave" if RunState.is_final_wave(wave) else "Wave %d" % wave, UiTheme.GOLD, banner_lines)
 	_pause_if_pad_missing()
 
 
@@ -436,6 +512,25 @@ func start_wave(n: int) -> void:
 func configure_run(p_mode: StringName, p_hardcore: bool) -> void:
 	options.mode = p_mode if p_mode in RunState.MODES else RunState.MODE_NORMAL
 	options.hardcore = p_hardcore
+
+
+## The next run's difficulty tier (the lobby's selector calls this, through Lobby.difficulty_changed; --difficulty sets
+## the same field at launch). An unknown id plays as Normal.
+func configure_difficulty(p_difficulty: StringName) -> void:
+	options.difficulty = Difficulty.sanitize(p_difficulty)
+
+
+## The tier the run on [param slots] plays: the launch option / the lobby's choice, capped by what the heroes' classes
+## have unlocked (Meta.clamp_difficulty; every tier with the dev profile of the automated runs).
+func _difficulty_for(slots: Array[PlayerSlot]) -> StringName:
+	var class_ids: Array[StringName] = []
+	for slot in slots:
+		if slot.class_data != null:
+			class_ids.append(slot.class_data.id)
+	var tier := Meta.clamp_difficulty(options.difficulty, class_ids)
+	if tier != options.difficulty:
+		push_warning("Main: %s is locked for this party – playing %s" % [options.difficulty, tier])
+	return tier
 
 
 ## The environment argument of RunState.start_run: --env when given (and known), else &"" so the run
@@ -613,6 +708,7 @@ func _on_dungeon_finished(success: bool) -> void:
 	else:
 		RunState.dungeons_failed += 1
 		_log("dungeon lost: the purse loses %d gold" % DungeonRewards.apply_failure())
+	_check_achievements_live()
 	if hud != null:
 		hud.clear_boss()
 		hud.clear_dungeon()
@@ -638,6 +734,7 @@ func end_run(p_victory: bool) -> void:
 	RunState.end_run(p_victory)
 	_record_hero_results()
 	var board := _record_leaderboard(p_victory)
+	meta_result = _record_meta(p_victory, false)
 	_set_state(State.GAME_OVER)
 	Audio.play(&"victory" if p_victory else &"defeat")
 	_log("run over: %s on wave %d (%d kills, %d gold, level %d)" % [
@@ -647,7 +744,7 @@ func end_run(p_victory: bool) -> void:
 		_log(boss_standing_text(boss, players_downed))
 	run_finished.emit(p_victory)
 	if game_over != null:
-		game_over.open(p_victory, board)
+		game_over.open(p_victory, board, meta_result)
 	if _smoke_running:
 		_finish_smoke("victory" if p_victory else "defeat")
 	elif options.demo and not options.holds_screens():
@@ -664,17 +761,17 @@ func end_run(p_victory: bool) -> void:
 func _record_leaderboard(p_victory: bool) -> Dictionary:
 	if not Leaderboard.writes_enabled or (options.smoke and not writes_leaderboard()):
 		return {}
-	var entry := Leaderboard.make_entry(wave, RunState.run_time, run_classes, p_victory)
+	var entry := Leaderboard.make_entry(wave, RunState.run_time, run_classes, p_victory, "", RunState.difficulty)
 	var rank := -1
 	var save_failed := false
 	if writes_leaderboard():
-		var outcome := Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count)
+		var outcome := Leaderboard.record_run(entry, RunState.mode, RunState.hardcore, RunState.player_count, RunState.difficulty)
 		rank = int(outcome["rank"])
 		save_failed = bool(outcome["save_failed"])
 	var board := Leaderboard.create()
 	board.load_file()
 	var model := Leaderboard.screen_model(board, entry, RunState.mode, RunState.hardcore, RunState.player_count,
-			rank, save_failed)
+			rank, save_failed, RunState.difficulty)
 	_log("leaderboard %s: %s" % [model["key"], model["line"]])
 	if save_failed:
 		_log("leaderboard: the run made the board but %s could not be written" % board.path)
@@ -707,6 +804,63 @@ func quit_to_menu() -> void:
 func _record_abandoned_run() -> void:
 	if RunState.is_endless() and waves_completed > 0:
 		_record_leaderboard(false)
+	if waves_completed > 0:
+		meta_result = _record_meta(false, true)
+
+
+## The finished run in the main profile (M9, Meta.record_run: Class XP, Seeds, achievements ... through the
+## registered listeners; one save). {} when the profile records nothing – every automated run, which has the dev
+## profile (Meta.records_runs) – otherwise Meta.record_run's result. An abandoned run is reported as such
+## (RunReport.abandoned) and only once a wave was cleared.
+func _record_meta(p_victory: bool, p_abandoned: bool) -> Dictionary:
+	if not Meta.records_runs():
+		return {}
+	var report := RunReport.collect(p_victory, p_abandoned, _report_extras())
+	var result := Meta.record_run(report)
+	if result.get("recorded", false):
+		result["achievements"] = run_achievements.duplicate()  # (the run's own, mid-run ones first: the end screen lists all)
+	_log("meta: %s" % ClassLevels.summary_text(result))
+	_log("meta: run recorded (%s), saved %s, achievements %s" % ["abandoned" if p_abandoned else
+			("victory" if p_victory else "defeat"), "ok" if int(result.get("save_error", OK)) == OK else "FAILED",
+			result.get("achievements", [])])
+	return result
+
+
+## What Main counts itself for a [RunReport] (see RunReport.collect).
+func _report_extras() -> Dictionary:
+	return {
+		"wave": wave, "waves_cleared": waves_completed, "classes": run_classes, "items_bought": items_bought,
+		"items_looted": items_looted, "loot_rolls": loot_rolls, "level_cards": level_cards,
+		"ranks_trained": ranks_trained, "shop_rerolls": shop_rerolls, "difficulty": RunState.difficulty,
+		"departed_heroes": departed_heroes,
+	}
+
+
+## M9: checks the achievements against the run so far (a wave cleared, a boss down, an Artifact dropped, a Loot Goblin
+## killed, a dungeon over, a loot roll resolved): a new one unlocks in the middle of the run and pops a toast.
+## Real profiles only – the dev profile of the automated runs records nothing, so this costs them nothing.
+func _check_achievements_live() -> void:
+	if not Meta.records_runs() or arena == null or not RunState.active:
+		return
+	Meta.check_achievements(RunReport.collect(false, false, _report_extras()))
+
+
+## RunState.special_killed: the Loot Goblin died (a boss is handled by the director's boss_defeated; no achievement
+## reads the elites).
+func _on_special_killed(kind: StringName, _killer_index: int) -> void:
+	if kind == &"goblin":
+		_check_achievements_live()
+
+
+## Meta.achievement_unlocked: the run's list for the end screen (every achievement the profile unlocked while this run
+## was on, mid-run ones and the run end's own) and the HUD toast (it waits for the HUD when a break has it hidden).
+func _on_achievement_unlocked(id: StringName) -> void:
+	if arena == null:
+		return
+	if id not in run_achievements:
+		run_achievements.append(id)
+	if hud != null and is_instance_valid(hud):
+		hud.show_achievement(Db.get_achievement(id))
 
 
 ## Opens the PauseMenu for [param by] (null = no player, e.g. a controller was unplugged).
@@ -739,6 +893,8 @@ func drop_player(slot: PlayerSlot) -> void:
 	if slot == null or PlayerManager.get_slot(slot.index) != slot:
 		return
 	_disconnected.erase(slot.index)
+	if arena != null and RunState.active:
+		departed_heroes.append(RunReport.hero_entry(slot))  # (the run report keeps the hero who left)
 	for p in players.duplicate():
 		if not is_instance_valid(p) or p.slot == slot:
 			players.erase(p)
@@ -855,6 +1011,7 @@ func _after_wave_end() -> void:
 	if RunState.is_final_wave(wave):
 		end_run(true)
 	else:
+		_end_pressure()
 		_roll_shrine()
 		_roll_portal()
 		open_intermission()
@@ -878,6 +1035,19 @@ func _begin_shrines() -> void:
 	Shrines.begin_wave(players)
 	if not RunState.shrine_effects.is_empty():
 		_log("wave %d runs under shrines: %s" % [wave, Shrines.effects_log()])
+
+
+## The wave's Tear-Jerker pressure (M9, Pressure) goes live for the wave that starts (start_wave, after the shrines).
+func _begin_pressure() -> void:
+	Pressure.begin_wave(wave, players)
+	if RunState.pressure_live:
+		_log("wave %d runs under pressure: %s" % [wave, RunState.pressure_current])
+		_pressure_log[str(wave)] = String(RunState.pressure_current)
+
+
+## The wave's pressure ends and the next wave's is rolled (the break path, next to the shrines' wave end).
+func _end_pressure() -> void:
+	Pressure.end_wave(wave, players)
 
 
 ## Intermission.shrine_resolved (the SHRINE phase's vote was decided): the smoke log line.
@@ -1035,6 +1205,7 @@ func _on_wave_cleared(n: int) -> void:
 	if state != State.WAVE or n != wave:
 		return
 	waves_completed += 1
+	_check_achievements_live()
 	RunState.last_wave_downs = players_downed - _downs_at_wave_start
 	_log("wave %d cleared in %.1f s: %d kills, %d gold, level %d, %d / %d standing, %d downs, items: %d looted, %d bought; elites %d/%d, goblin %d/%d/%d; %s" % [
 		n, (Time.get_ticks_msec() - _wave_start_msec) / 1000.0, RunState.kills, RunState.gold,
@@ -1042,8 +1213,12 @@ func _on_wave_cleared(n: int) -> void:
 		RunState.elites_killed, RunState.elites_spawned, RunState.goblins_spawned,
 		RunState.goblins_killed, RunState.goblins_escaped, _wave_perf.summary()])
 	if _smoke_running and n >= options.last_wave():
-		if RunState.is_final_wave(n):
+		var won := RunState.is_final_wave(n)
+		if won:
 			RunState.end_run(true)
+		# (A smoke run stops here without Main.end_run: with a real profile -- --profile-path -- the planned waves
+		# count as the run, a victory on the last wave, else a run the harness stopped.)
+		meta_result = _record_meta(won, not won)
 		_finish_smoke("completed")
 		return
 	if hud != null:
@@ -1122,6 +1297,8 @@ static func format_position(v: Vector3) -> String:
 
 ## WaveDirector.boss_defeated (the wave ends on the next tick): the kill time for the smoke log.
 func _on_boss_defeated(boss: Boss) -> void:
+	RunState.record_boss_wave_down(wave)  # (M9: "Tenth Hour", and wave 25's boss is the win, in the endless mode too)
+	_check_achievements_live()
 	_log("boss %s defeated after %.1f s (phase %d, enrage level %d, %d casts): %d / %d standing, %d downs, %d revives so far" % [
 		boss.boss_data.display_name if boss.boss_data != null else "?", boss.age(), boss.phase,
 		boss.enrage_level, boss.casts_total, living_player_count(), players.size(), players_downed, revives])
@@ -1146,6 +1323,7 @@ func _on_item_bought(_slot_index: int, _item: ItemInstance) -> void:
 ## RunState.artifact_dropped: the "artifact drop" log line.
 func _on_artifact_dropped(item: ItemInstance, source: StringName) -> void:
 	_log_artifact(Artifacts.drop_line(item, source, RunState.wave))
+	_check_achievements_live()
 
 
 ## After [param hero]'s wave end (its Artifacts grew): one "artifact held" line per Artifact it
@@ -1165,6 +1343,7 @@ func _log_artifact(text: String) -> void:
 
 func _on_loot_rolled(_roll: LootRoll) -> void:
 	loot_rolls += 1
+	_check_achievements_live()
 
 
 func _on_level_card_picked(_slot_index: int, _card: LevelCard) -> void:
@@ -1271,7 +1450,8 @@ func _apply_time_scale(scale: float) -> void:
 	Engine.max_physics_steps_per_frame = maxi(8, ceili(8.0 * scale))
 
 
-## Joins --players bots, classes cycling through --classes (default: Db.class_ids); a bot takes
+## Joins --players bots, classes cycling through --classes (default: the classes the profile has unlocked, i.e.
+## all of Db.class_ids with the dev profile); a bot takes
 ## its class's first companion, or --companion where the class offers it.
 func _add_bots() -> void:
 	PlayerManager.clear()
@@ -1282,14 +1462,18 @@ func _add_bots() -> void:
 		else:
 			push_warning("--classes: unknown class '%s'" % id)
 	if ids.is_empty():
-		ids = Db.class_ids
+		ids = Meta.unlocked_class_ids()  # (every class with the dev profile of the automated runs)
 	var base_seed := options.run_seed() if options.run_seed() >= 0 else randi() % 100000
 	for i in options.players:
 		var id: StringName = ids[i % ids.size()] if not ids.is_empty() else &""
 		var bot := PlayerManager.add_bot(id, base_seed * 7919 + i * 101 + 1)
+		if bot != null:
+			Meta.apply_loadout(bot)  # (M9: what the profile remembers for the class, as in the lobby; nothing for the dev profile)
 		# --companion: a class without that choice keeps its first (PlayerSlot.companion_id).
 		if bot != null and options.companion != &"":
 			bot.companion = options.companion
+		if bot != null and options.alt_weapon:
+			bot.alt_weapon = true  # (--alt-weapon; Meta.enforce_alt_weapons drops it where the profile has not unlocked it)
 
 
 func _on_tick_measured(step_ms: float, script_ms: float) -> void:
@@ -1349,7 +1533,9 @@ func _finish_smoke(result: String) -> void:
 ## mode ("normal" / "endless"), hardcore, environment (id), events_spawned, events_completed,
 ## shrines_offered, shrines_accepted, dungeons_entered, dungeons_completed, dungeons_failed (all
 ## counters of the feature packages; 0 until they land), dungeon_rooms_cleared and dungeon_time (seconds
-## inside dungeons), dungeon_downs (heroes downed inside dungeons; players_downed counts them too).
+## inside dungeons), dungeon_downs (heroes downed inside dungeons; players_downed counts them too). M9 keys, only on a
+## Pungent / Tear-Jerker run (a Normal run keeps the base game's keys): difficulty (id) and pressures ({wave as text:
+## the wave's pressure modifier id}).
 func smoke_result(result: String) -> Dictionary:
 	var errors := _error_counter.error_count() if _error_counter != null else 0
 	var outcome := smoke_outcome(result)
@@ -1429,6 +1615,10 @@ func smoke_result(result: String) -> Dictionary:
 		"real_time": snappedf((Time.get_ticks_msec() - _start_msec) / 1000.0, 0.1),
 		"perf": perf.to_dict(),
 	}
+	if RunState.difficulty != Difficulty.NORMAL:
+		# (only a run on a harder tier: a Normal run's result keeps the base game's keys)
+		data["difficulty"] = String(RunState.difficulty)
+		data["pressures"] = _pressure_log.duplicate()
 	if errors > 0:
 		data["error_samples"] = _error_counter.error_samples()
 	if not options.unknown.is_empty():

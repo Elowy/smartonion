@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_ghost_chili"
+class_id = &"rogue"
+ability = &"killing_spree"
+display_name = "Ghost Chili"
+text = "Cutthroat Rush strikes every 0.2 sec, each strike 40 points weaker."
+tier = &"aa"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "killing_spree"
+},
+"mods": {
+"interval_add": -0.05,
+"damage_pct_add": -40
+},
+"requires": {
+"knows": "killing_spree"
+}
+}])

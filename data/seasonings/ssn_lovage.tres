@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_lovage"
+class_id = &"shaman"
+ability = &"totem_rite"
+display_name = "Lovage"
+text = "Water totems heal 2% more max HP per sec; Fire totems fire every 1.5 sec instead of 1."
+tier = &"a"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "totem_rite"
+},
+"mods": {
+"water_heal_max_hp_pct_add": 2.0,
+"fire_interval_add": 0.5
+}
+}])

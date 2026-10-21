@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_dried_chive"
+class_id = &"hunter"
+ability = &"quick_draw"
+display_name = "Dried Chive"
+text = "Quick Draw lasts 2 sec longer but gives 15% less Haste."
+tier = &"t4"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "quick_draw"
+},
+"mods": {
+"duration_add": 2.0,
+"haste_add": -15
+},
+"requires": {
+"knows": "quick_draw"
+}
+}])

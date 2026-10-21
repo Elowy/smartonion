@@ -45,8 +45,8 @@ static func create(p_item: ItemInstance) -> LootRoll:
 
 ## Need is allowed only for a class that can use the item and a backpack with room.
 func can_need(slot: PlayerSlot) -> bool:
-	if slot == null or item == null or not item.can_be_used_by(slot.class_data):
-		return false
+	if slot == null or item == null or not item.can_be_shared() or not item.can_be_used_by(slot.class_data):
+		return false  # (M9 PATCH: a bound Heirloom is never rolled for)
 	var equipment := _equipment_of(slot)
 	return equipment != null and equipment.has_space()
 
@@ -117,6 +117,8 @@ func apply(slots: Array[PlayerSlot]) -> void:
 			var equipment := _equipment_of(_slot_by_index(slots, winner))
 			if equipment != null and equipment.add_to_backpack(item):
 				RunState.need_wins_by_player[winner] = RunState.need_wins_by_player.get(winner, 0) + 1
+				if item.rarity >= Items.Rarity.LEGENDARY:
+					RunState.need_legendary_wins += 1  # (M9: "Need Is Greed")
 			else:
 				# No room any more (or the winner left): sell instead of losing the item.
 				outcome = &"greed"

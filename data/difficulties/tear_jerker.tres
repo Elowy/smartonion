@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="DifficultyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/difficulty_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"tear_jerker"
+display_name = "Tear-Jerker"
+tier = 2
+description = "The harshest harvest: tougher enemies, more elites, dear wares and a new pressure on most waves. Pays the most XP and Seeds."
+enemy_hp_mult = 1.7
+enemy_damage_mult = 1.45
+spawn_density_mult = 1.3
+elite_rate_mult = 2.0
+shop_price_mult = 1.25
+xp_mult = 2.5
+seeds_mult = 2.5
+pressure = true
+color = Color(0.9, 0.24, 0.2, 1)

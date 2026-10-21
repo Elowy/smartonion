@@ -54,6 +54,7 @@ const BOT_FALLBACK_MIN_RARITY := Items.Rarity.EPIC
 
 const REASON_NO_ITEM := "No item"
 const REASON_ARTIFACT := "Artifacts cannot be changed"
+const REASON_BOUND := "Heirlooms cannot be changed"
 const REASON_NOT_YOURS := "Not one of your items"
 const REASON_COMMON := "Common items hold no enchants"
 const REASON_NO_ENCHANTS := "No enchants to change"
@@ -103,6 +104,8 @@ static func can_disenchant(item: ItemInstance) -> bool:
 static func disenchant_blocked_reason(item: ItemInstance) -> String:
 	if item == null:
 		return REASON_NO_ITEM
+	if item.is_bound():  # (M9 PATCH)
+		return "Heirlooms cannot be disenchanted"
 	if not item.can_disenchant():  # the one rule of the item (ARTIFACTS: an Artifact never)
 		return "Artifacts cannot be disenchanted"
 	return ""
@@ -143,7 +146,7 @@ static func gold_price(item: ItemInstance, wave: int = -1) -> int:
 	if item == null:
 		return 0
 	var shop := ItemGenerator.price_for(item.rarity, RunState.wave if wave < 0 else wave)
-	return maxi(1, roundi(shop * GOLD_SHARE * multiplier(item)))
+	return Difficulty.price(maxi(1, roundi(shop * GOLD_SHARE * multiplier(item))))  # (M9: the tier's shop prices)
 
 
 ## Dust of the next action on [param item]: the rarity's Dust x 2^uses.
@@ -188,7 +191,7 @@ static func can_imbue(item: ItemInstance) -> bool:
 ## Whether [param item] is one the Enchanter can do anything with now: Reroll / Empower on an
 ## enchant it has or Imbue into a free slot (cost ignored).
 static func is_enchantable(item: ItemInstance) -> bool:
-	if item == null or item.rarity >= Items.Rarity.ARTIFACT:
+	if item == null or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 		return false
 	for i in item.enchants.size():
 		if blocked_reason(item, Action.REROLL, i) == "" or blocked_reason(item, Action.EMPOWER, i) == "":
@@ -201,6 +204,8 @@ static func is_enchantable(item: ItemInstance) -> bool:
 static func blocked_reason(item: ItemInstance, action: Action, index: int = -1) -> String:
 	if item == null:
 		return REASON_NO_ITEM
+	if item.is_bound():  # (M9 PATCH: an Heirloom takes no enchants)
+		return REASON_BOUND
 	if item.rarity >= Items.Rarity.ARTIFACT:
 		return REASON_ARTIFACT
 	match action:
@@ -373,15 +378,15 @@ static func refresh_name(item: ItemInstance, old_prefix: String) -> void:
 # --- Bots --------------------------------------------------------------------------------------
 
 ## The weapon a bot enchants: its best attacking weapon (higher rarity, then Item Level, then the
-## main hand), equipped. An Artifact is skipped (it can never be enchanted, see
-## [method bot_target] for what the bot works on instead). Null without one.
+## main hand), equipped. An Artifact and a bound Heirloom (the Ancestral Peeler) are skipped (neither
+## can be enchanted, see [method bot_target] for what the bot works on instead). Null without one.
 static func best_weapon(eq: Equipment) -> ItemInstance:
 	if eq == null:
 		return null
 	var best: ItemInstance = null
 	for hand in [Items.EquipSlot.MAIN_HAND, Items.EquipSlot.OFF_HAND]:
 		var item := eq.get_item(hand)
-		if not Equipment.is_attacking_weapon(item) or item.rarity >= Items.Rarity.ARTIFACT:
+		if not Equipment.is_attacking_weapon(item) or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 			continue
 		if best == null or item.rarity > best.rarity or (item.rarity == best.rarity and item.item_level > best.item_level):
 			best = item
@@ -413,7 +418,7 @@ static func bot_target(eq: Equipment) -> ItemInstance:
 ## cannot use (Attack Power on a Spell Power class and the other way round), else Imbue (a free
 ## slot), else Empower of its lowest-ranked enchant. {} when nothing is possible. No randomness.
 static func bot_plan(item: ItemInstance, class_data: ClassData) -> Dictionary:
-	if item == null or item.rarity >= Items.Rarity.ARTIFACT:
+	if item == null or item.rarity >= Items.Rarity.ARTIFACT or item.is_bound():
 		return {}
 	for i in item.enchants.size():
 		var e := item.enchants[i].enchant

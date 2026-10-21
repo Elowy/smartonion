@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_sweet_basil"
+class_id = &"shaman"
+ability = &"shaman_echo"
+display_name = "Sweet Basil"
+text = "Storm Echo repeats 75% of a hit, but its chance is capped at 40%."
+tier = &"t5"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "shaman_echo"
+},
+"mods": {
+"echo_pct_add": 25,
+"max_chance_add": -20
+}
+}])

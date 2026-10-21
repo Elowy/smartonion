@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_allspice"
+class_id = &"warlock"
+ability = &"seed_of_corruption"
+display_name = "Allspice"
+text = "Blight Seed bursts 1.5 m wider but 20% weaker."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "seed_of_corruption"
+},
+"mods": {
+"radius_add": 1.5,
+"power_pct": -20
+},
+"requires": {
+"knows": "seed_of_corruption"
+}
+}])

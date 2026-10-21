@@ -109,6 +109,8 @@ var black_market: Offer = null
 ## Slot index -> voted for a reroll this round (absent = no vote).
 var reroll_votes: Dictionary[int, bool] = {}
 var rerolls_this_round := 0
+## Of [member rerolls_this_round], the ones that cost no gold (RunState.free_rerolls, M9 Class Level 11): they do not raise the price.
+var free_rerolls_this_round := 0
 var wave := 1
 ## The weapon the last [method try_buy] forged (BuyResult.FORGED); null after any other result.
 var last_forged: ItemInstance
@@ -134,6 +136,7 @@ func open_round(p_wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerato
 		if s != null:
 			_slots.append(s)
 	rerolls_this_round = 0
+	free_rerolls_this_round = 0
 	reroll_votes.clear()
 	var count := offer_count(_slots.size() if not _slots.is_empty() else RunState.player_count)
 
@@ -163,9 +166,17 @@ func open_round(p_wave: int, slots: Array[PlayerSlot], rng: RandomNumberGenerato
 	changed.emit()
 
 
-## Cost of the next reroll: wave x 2 + 2, +2 for every reroll already done this round.
+## Cost of the next reroll: wave x 2 + 2, +2 for every paid reroll already done this round; nothing while the run has a
+## free reroll left (RunState.free_rerolls).
 func reroll_cost() -> int:
-	return wave * 2 + 2 + 2 * rerolls_this_round
+	if RunState.free_rerolls > 0:
+		return 0
+	return wave * 2 + 2 + 2 * (rerolls_this_round - free_rerolls_this_round)
+
+
+## True when the next reroll is a free one (RunState.free_rerolls).
+func next_reroll_free() -> bool:
+	return RunState.free_rerolls > 0
 
 
 ## Buys offer [param index] for [param slot] (shared wallet, item into that player's backpack
@@ -211,7 +222,7 @@ func forges_on_buy(index: int, slot: PlayerSlot) -> bool:
 	if player == null or player.equipment == null or player.equipment.has_space():
 		return false
 	var partner := Forge.partner_for(player.equipment, o.item)
-	return partner != null and Forge.can_place(player.equipment, o.item, partner)
+	return partner != null and not Forge.result_locked(o.item) and Forge.can_place(player.equipment, o.item, partner)
 
 
 ## The full-backpack purchase: forges with the partner (Forge.forge_with_offer) or refuses.
@@ -281,7 +292,12 @@ func vote_reroll(slot_index: int, joined: Array[int], rng: RandomNumberGenerator
 ## The between-wave screen calls it every frame while votes are standing, so a reroll also
 ## fires when the last missing voter unplugs or the gold arrives after the last vote.
 func try_reroll(joined: Array[int], rng: RandomNumberGenerator) -> bool:
-	if not reroll_ready(joined) or not RunState.try_spend_for(reroll_cost(), -1, &"shop_reroll", "Stall reroll"):
+	if not reroll_ready(joined):
+		return false
+	if next_reroll_free():
+		RunState.free_rerolls -= 1
+		free_rerolls_this_round += 1
+	elif not RunState.try_spend_for(reroll_cost(), -1, &"shop_reroll", "Stall reroll"):
 		return false
 	var positions := rerollable_positions()
 	var redraw_black_market := black_market_rerollable()
@@ -409,7 +425,7 @@ func _refresh_consumables(rng: RandomNumberGenerator) -> void:
 	for data in Consumables.roll_row(_side(rng)):
 		var c := ConsumableOffer.new()
 		c.data = data
-		c.price = Consumables.price(data, wave)
+		c.price = Difficulty.price(Consumables.price(data, wave))  # (M9: the tier's shop prices)
 		consumables.append(c)
 
 
@@ -429,7 +445,7 @@ func _refresh_black_market(rng: RandomNumberGenerator, keep_locked: bool) -> voi
 		return
 	var o := Offer.new()
 	o.item = item
-	o.price = BlackMarket.price(wave)
+	o.price = Difficulty.price(BlackMarket.price(wave))
 	black_market = o
 
 
@@ -488,8 +504,9 @@ static func _queued(list: Array[ClassData], class_data: ClassData) -> int:
 func _make_offer(class_data: ClassData, rng: RandomNumberGenerator) -> Offer:
 	var o := Offer.new()
 	o.item = _generate_for(class_data, rng)
-	o.price = ItemGenerator.price_for(o.item.rarity, wave)
-	o.item.buy_price = o.price
+	var base_price := ItemGenerator.price_for(o.item.rarity, wave)
+	o.price = Difficulty.price(base_price)  # (M9: the tier's shop prices; the item's own value stays the base price)
+	o.item.buy_price = base_price
 	return o
 
 

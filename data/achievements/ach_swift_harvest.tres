@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_swift_harvest"
+display_name = "Swift Harvest"
+description = "Win a Normal-mode run in 40 minutes of wave play or less."
+points = 20
+condition_kind = &"all_of"
+condition_params = {
+"conditions": [{
+"kind": "run_flag",
+"flag": "final_boss_down"
+}, {
+"kind": "run_flag",
+"flag": "mode",
+"value": "normal"
+}, {
+"kind": "stat_at_most",
+"stat": "run_time",
+"value": 2400
+}]
+}
+rewards = Array[Dictionary]([{
+"kind": "cosmetic",
+"id": "dye_ember",
+"name": "Ember Orange"
+}])

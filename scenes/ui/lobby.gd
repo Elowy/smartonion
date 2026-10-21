@@ -15,11 +15,26 @@ extends Control
 ##   not ready – leaves.
 ## - Everyone joined and ready -> a COUNTDOWN_TIME countdown (cancelled by an unready or a new
 ##   join) -> start_requested. B / Esc while nobody has joined -> back_requested.
+## - M9 SEASONINGS / PATCH: LT / right mouse button opens the player's Loadout over their card ([method open_loadout]:
+##   the tabs Seasonings / Heirloom / Look, LB / RB switch them); while it is open that player's input drives it (▲ ▼ A B)
+##   and nothing else in the lobby (LB is the alternative weapon only while it is closed).
 ## - M6b mode select: any joined player's Y cycles the run mode (Normal / Endless, [method cycle_mode])
 ##   and X toggles Hardcore ([method toggle_hardcore]); the header shows the choice ("Mode: Endless ·
 ##   Hardcore", plus the HARDCORE badge) and [signal mode_changed] tells Main ([method Main.configure_run]).
 ##   A change while the start countdown runs un-readies the player who made it, which cancels the countdown
 ##   (everybody sees the new mode before the run starts).
+## - M9 difficulty select: any joined player's BACK (Tab on the keyboard) cycles the difficulty tier
+##   ([method cycle_difficulty]: Normal -> Pungent -> Tear-Jerker -> Normal ...) among the tiers every joined hero's
+##   class has unlocked (Difficulty.selectable; a tier above the cap shows why it is locked instead, "Win a run on Normal
+##   with the Mage"). The header shows "Difficulty: Pungent" in the tier's colour and [signal difficulty_changed]
+##   tells Main ([method Main.configure_difficulty]). A class change that lowers the party's cap lowers the choice.
+##   Y / X / RB / the d-pad are taken (mode, hardcore, companion, class); the Seasoning picker of the same milestone
+##   uses another button.
+## - M9: a class the main profile has not unlocked is still shown (with its unlock hint, on its card) but its player
+##   cannot ready up ([method ready_block_reason]); a player's class change puts the Seasonings / Heirloom / looks
+##   remembered for that class on their slot (Meta.apply_loadout).
+## - M9 LEVELS: once a class reaches Class Level 12 its player can switch to the class's alternative starting weapon with
+##   LB / Q ([method toggle_alt_weapon]; the weapons line of the card shows the choice, the run starts with it).
 ## See docs/ARCHITECTURE.md.
 
 signal start_requested
@@ -27,10 +42,15 @@ signal back_requested
 ## A player changed the run mode or the hardcore flag ([method cycle_mode] / [method toggle_hardcore], i.e. Y / X);
 ## Main stores it with configure_run. [method set_run_mode] does not emit it.
 signal mode_changed(mode: StringName, hardcore: bool)
+## A player changed the difficulty tier ([method cycle_difficulty]), or the party's cap lowered it; Main stores it with
+## configure_difficulty. [method set_difficulty] does not emit it.
+signal difficulty_changed(difficulty: StringName)
 
 const COUNTDOWN_TIME := 3.0
 ## The mode key prompts' opacity while nobody has joined (nobody can use them yet).
 const MODE_PROMPTS_IDLE_ALPHA := 0.4
+## Seconds the footer shows why a difficulty tier is locked.
+const LOCK_NOTICE_TIME := 3.5
 
 ## The run mode (RunState.MODES) and the hardcore flag the next run will use.
 var run_mode: StringName = RunState.MODE_NORMAL
@@ -38,6 +58,9 @@ var hardcore := false
 ## "Mode: Endless · Hardcore" in the header, and the HARDCORE badge next to it (visible with the flag).
 var mode_label: Label
 var hardcore_badge: HardcoreBadge
+## M9: the difficulty tier (a Difficulty id) the next run will use, and the header line "Difficulty: Pungent".
+var difficulty: StringName = Difficulty.NORMAL
+var difficulty_label: Label
 ## Seconds left of the start countdown; < 0 when not counting down.
 var countdown_left := -1.0
 var cards: Array[LobbyCard] = []
@@ -54,6 +77,10 @@ var _footer_prompts: CenterContainer
 var _footer_key := ""
 var _backdrop: TextureRect
 var _mode_prompts: Control
+var _difficulty_prompt: Control
+## The footer line that explains a locked tier, and the seconds it still shows.
+var _lock_notice := ""
+var _lock_notice_left := 0.0
 
 
 static func create() -> Lobby:
@@ -83,6 +110,75 @@ func cycle_mode(by_slot: PlayerSlot = null) -> void:
 func toggle_hardcore(by_slot: PlayerSlot = null) -> void:
 	hardcore = not hardcore
 	_after_mode_change(by_slot)
+
+
+## Shows tier [param id] (anything else is Normal) in the header without telling anybody (Main sets the stored choice
+## when it opens the lobby). The party's cap still applies on the next frame.
+func set_difficulty(id: StringName) -> void:
+	difficulty = Difficulty.sanitize(id)
+	_refresh_difficulty()
+
+
+## The next tier the joined heroes may play (Normal -> Pungent -> Tear-Jerker -> Normal ...), by [param by_slot] (a
+## joined slot; null = nobody: a test or a script). When the next tier is locked for the party the footer says why and
+## the choice wraps to Normal. Emits [signal difficulty_changed] and returns true when the tier changed.
+func cycle_difficulty(by_slot: PlayerSlot = null) -> bool:
+	var classes := party_classes()
+	var all := Difficulty.ids()
+	if all.is_empty():
+		return false
+	var allowed := Difficulty.selectable(classes)
+	var next := all[(maxi(all.find(difficulty), 0) + 1) % all.size()]
+	if next not in allowed:
+		_show_lock_notice("%s is locked: %s" % [Difficulty.name_of(next), Difficulty.lock_reason(next, classes)])
+		next = all[0]
+	if next == difficulty:
+		return false
+	difficulty = next
+	if by_slot != null and is_counting_down():
+		by_slot.ready = false  # the countdown stops until everybody has seen the new tier and readied again
+		countdown_left = -1.0
+	_refresh_difficulty()
+	difficulty_changed.emit(difficulty)
+	return true
+
+
+## The class ids of the joined heroes (the difficulty cap is the lowest tier they have all unlocked).
+func party_classes() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for slot in PlayerManager.get_slots():
+		if slot.class_data != null:
+			out.append(slot.class_data.id)
+	return out
+
+
+## "Difficulty: Pungent" (the header text of the current choice).
+func difficulty_text() -> String:
+	return "Difficulty: %s" % Difficulty.name_of(difficulty)
+
+
+func _refresh_difficulty() -> void:
+	if difficulty_label != null:
+		difficulty_label.text = difficulty_text()
+		difficulty_label.add_theme_color_override(&"font_color",
+				UiTheme.GOLD if difficulty == Difficulty.NORMAL else Difficulty.color_of(difficulty).lightened(0.15))
+
+
+func _show_lock_notice(text: String) -> void:
+	_lock_notice = text
+	_lock_notice_left = LOCK_NOTICE_TIME
+
+
+## A class change (or a joined hero) can lower the party's cap: the choice follows it down.
+func _enforce_difficulty_cap() -> void:
+	var allowed := Difficulty.selectable(party_classes())
+	if allowed.is_empty() or difficulty in allowed:
+		return
+	var tier := allowed[allowed.size() - 1]
+	_show_lock_notice("%s is locked for this party: %s" % [Difficulty.name_of(difficulty), Difficulty.lock_reason(difficulty, party_classes())])
+	difficulty = tier
+	_refresh_difficulty()
+	difficulty_changed.emit(difficulty)
 
 
 ## "Mode: Endless · Hardcore" (the header text of the current choice).
@@ -207,6 +303,20 @@ func _build_mode_block() -> Control:
 	hardcore_badge = HardcoreBadge.create(UiTheme.FONT_SMALL)
 	hardcore_badge.visible = hardcore
 	row.add_child(hardcore_badge)
+	# M9: the difficulty line carries its own prompt (the Mode / Hardcore prompts below keep their room, clear of the title).
+	var difficulty_row := UiTheme.hbox(12)
+	difficulty_row.name = "DifficultyRow"
+	difficulty_row.size_flags_horizontal = Control.SIZE_SHRINK_END
+	box.add_child(difficulty_row)
+	difficulty_label = UiTheme.centered_label(difficulty_text(), UiTheme.GOLD_LABEL, UiTheme.FONT_BODY)
+	difficulty_label.name = "DifficultyLabel"
+	difficulty_row.add_child(difficulty_label)
+	_difficulty_prompt = UiTheme.prompt_row([[UiGlyph.pad(PlayerInput.Pad.SELECT, 26.0), "/", UiGlyph.key("Tab", 26.0)]],
+			UiTheme.FONT_SMALL + 2, UiTheme.TEXT_DIM)
+	_difficulty_prompt.name = "DifficultyPrompt"
+	_difficulty_prompt.modulate.a = MODE_PROMPTS_IDLE_ALPHA
+	difficulty_row.add_child(_difficulty_prompt)
+	_refresh_difficulty()
 	_mode_prompts = UiTheme.prompt_row([
 		[UiGlyph.pad(PlayerInput.Pad.Y, 26.0), "/", UiGlyph.key("C", 26.0), "Mode"],
 		[UiGlyph.pad(PlayerInput.Pad.X, 26.0), "/", UiGlyph.key("R", 26.0), "Hardcore"],
@@ -222,6 +332,7 @@ func _build_mode_block() -> Control:
 
 func _ready() -> void:
 	PlayerManager.device_disconnected.connect(_on_device_disconnected)
+	PlayerManager.player_joined.connect(_on_player_joined)
 	visibility_changed.connect(_on_visibility_changed)
 	_on_visibility_changed()
 	_refresh()
@@ -248,6 +359,12 @@ func _set_joining(on: bool) -> void:
 		_owns_joining = false
 
 
+func _on_player_joined(slot: PlayerSlot) -> void:
+	Meta.apply_loadout(slot)  # (the selections remembered for the class the player starts on)
+	Seasonings.prune(slot)
+	Heirlooms.prune(slot)
+
+
 func _on_device_disconnected(slot: PlayerSlot) -> void:
 	# A controller unplugged in the lobby frees its slot (it could never ready up).
 	if is_visible_in_tree() and not _started and PlayerManager.get_slot(slot.index) == slot:
@@ -272,6 +389,8 @@ func _process(delta: float) -> void:
 		_set_joining(false)
 		back_requested.emit()
 		return
+	_enforce_difficulty_cap()
+	_lock_notice_left = maxf(0.0, _lock_notice_left - delta)
 	_update_countdown(delta)
 	_refresh()
 
@@ -280,10 +399,21 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	var inp := slot.input
 	if inp == null:
 		return
+	# An open Loadout (M9 PATCH: Seasonings / Heirloom / Look) takes everything this player presses.
+	var loadout := loadout_of(slot)
+	if loadout != null and loadout.is_open():
+		loadout.handle_input(inp)
+		return
+	if inp.just_pressed(PlayerInput.Pad.LT) and open_loadout(slot):
+		Audio.play_ui(&"ui_confirm")
+		return
 	# B before START: the keyboard maps Esc to both.
 	if inp.just_pressed(PlayerInput.Pad.A):
-		slot.ready = not slot.ready
-		Audio.play_ui(&"ui_confirm" if slot.ready else &"ui_back")
+		if not slot.ready and ready_block_reason(slot) != "":
+			Audio.play_ui(&"ui_error")
+		else:
+			slot.ready = not slot.ready
+			Audio.play_ui(&"ui_confirm" if slot.ready else &"ui_back")
 	elif inp.just_pressed(PlayerInput.Pad.B):
 		Audio.play_ui(&"ui_back")
 		if slot.ready:
@@ -292,8 +422,11 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			PlayerManager.leave(slot.index)
 			return
 	elif inp.just_pressed(PlayerInput.Pad.START):
-		slot.ready = true
-		Audio.play_ui(&"ui_confirm")
+		if ready_block_reason(slot) != "":
+			Audio.play_ui(&"ui_error")
+		else:
+			slot.ready = true
+			Audio.play_ui(&"ui_confirm")
 	# Any joined player picks the run's mode: Y cycles Normal / Endless, X toggles Hardcore.
 	if inp.just_pressed(PlayerInput.Pad.Y):
 		cycle_mode(slot)
@@ -301,6 +434,8 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 	elif inp.just_pressed(PlayerInput.Pad.X):
 		toggle_hardcore(slot)
 		Audio.play_ui(&"ui_toggle")
+	elif inp.just_pressed(PlayerInput.Pad.SELECT):
+		Audio.play_ui(&"ui_toggle" if cycle_difficulty(slot) else &"ui_error")
 	if not slot.ready:
 		var nav := inp.nav_just_pressed()
 		if nav.x != 0:
@@ -308,6 +443,25 @@ func _handle_slot_input(slot: PlayerSlot) -> void:
 			Audio.play_ui(&"ui_move")
 		if inp.just_pressed(PlayerInput.Pad.RB) and cycle_companion(slot):
 			Audio.play_ui(&"ui_move")
+		if inp.just_pressed(PlayerInput.Pad.LB) and toggle_alt_weapon(slot):
+			Audio.play_ui(&"ui_toggle")
+
+
+## Why [param slot] cannot ready up ("" = it can): its class is locked in the main profile (M9) – the text is the
+## class's unlock hint. Never the case with the dev profile of the automated runs.
+func ready_block_reason(slot: PlayerSlot) -> String:
+	if slot == null or slot.class_data == null or Meta.is_class_unlocked(slot.class_data.id):
+		return ""
+	return Meta.unlock_hint(Profile.KIND_CLASS, slot.class_data.id)
+
+
+## Switches [param slot] between the standard and the alternative starting weapon of its class (LB / Q). False (nothing
+## changes) unless the profile records runs and the class has unlocked the weapon (Class Level 12).
+func toggle_alt_weapon(slot: PlayerSlot) -> bool:
+	if slot == null or slot.class_data == null or not Meta.shows_class_levels() or not Meta.alt_weapon_unlocked(slot.class_data.id):
+		return false
+	slot.alt_weapon = not slot.alt_weapon
+	return true
 
 
 ## The next companion of [param slot]'s class (RB / E; wraps). False (nothing changes) for a class
@@ -324,8 +478,39 @@ func _cycle_class(slot: PlayerSlot, step: int) -> void:
 	var next := Db.get_class_data(Db.cycle_class(current, step))
 	if next != null:
 		slot.class_data = next
+		Meta.apply_loadout(slot)
+		Seasonings.prune(slot)  # (what the new class cannot carry: another class's Seasonings, too many for its slots)
+		Heirlooms.prune(slot)  # (M9 PATCH: an Heirloom the new class has no slot for)
 	if slot.index >= 0 and slot.index < cards.size():
 		cards[slot.index].kick_arrow(step)
+
+
+## The Seasoning picker on [param slot]'s card (the Seasonings tab of its Loadout; null for a slot without a card).
+func picker_of(slot: PlayerSlot) -> SeasoningPicker:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].picker
+
+
+## The Loadout screen on [param slot]'s card (null for a slot without a card).
+func loadout_of(slot: PlayerSlot) -> LoadoutScreen:
+	if slot == null or slot.index < 0 or slot.index >= cards.size():
+		return null
+	return cards[slot.index].loadout
+
+
+## Opens [param slot]'s Loadout (LT / right mouse button) on [param first_tab]. Not while the player is ready (the picks are
+## locked like the class), for a class the profile has not unlocked, or without a card. True when it opened.
+func open_loadout(slot: PlayerSlot, first_tab: LoadoutScreen.Tab = LoadoutScreen.Tab.SEASONINGS) -> bool:
+	var loadout := loadout_of(slot)
+	if loadout == null or slot.ready or ready_block_reason(slot) != "":
+		return false
+	return loadout.open(slot, first_tab)
+
+
+## Opens [param slot]'s Loadout on its Seasonings tab (the M9 SEASONINGS entry point, kept for the callers of the picker).
+func open_seasoning_picker(slot: PlayerSlot) -> bool:
+	return open_loadout(slot, LoadoutScreen.Tab.SEASONINGS)
 
 
 func _update_countdown(delta: float) -> void:
@@ -351,6 +536,7 @@ func _refresh() -> void:
 	var slots := PlayerManager.get_slots()
 	# Only a joined player can change the mode: the key prompts light up with the first one.
 	_mode_prompts.modulate.a = 1.0 if not slots.is_empty() else MODE_PROMPTS_IDLE_ALPHA
+	_difficulty_prompt.modulate.a = _mode_prompts.modulate.a
 	var ready_count := 0
 	for s in slots:
 		if s.ready:
@@ -370,6 +556,8 @@ func _refresh() -> void:
 		_status.add_theme_color_override(&"font_color", UiTheme.GOLD)
 		_sub_status.text = "The run starts when every joined player is ready" if slots.size() < PlayerManager.MAX_PLAYERS \
 			else "The party is full – ready up!"
+		if _lock_notice_left > 0.0:
+			_sub_status.text = _lock_notice
 	if footer_key != _footer_key:
 		_footer_key = footer_key
 		for c in _footer_prompts.get_children():

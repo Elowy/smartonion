@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_green_shoot"
+display_name = "Green Shoot"
+description = "Clear wave 5 in a single run."
+points = 5
+condition_kind = &"stat_at_least"
+condition_params = {
+"stat": "waves_cleared",
+"value": 5
+}
+rewards = Array[Dictionary]([{
+"kind": "class",
+"id": "hunter"
+}])

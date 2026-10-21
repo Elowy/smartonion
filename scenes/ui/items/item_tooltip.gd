@@ -627,6 +627,8 @@ func _rebuild() -> void:
 			_line("%s (needs %s)" % [item.unique_text, Artifacts.ability_name(needs)], DIM)
 	if item.is_artifact():
 		_artifact_block()
+	if item.is_heirloom():
+		_heirloom_block()
 	if item.set_id != &"":
 		_set_block()
 	if item.flavor != "" and not compact_set() and not compact_artifact():
@@ -668,6 +670,20 @@ func _artifact_block() -> void:
 				status = "(needs %s)" % row["needs"]
 		_pair(str(row["name"]), status, color, DIM if not awake else color)
 		_line(str(row["short"] if compact_artifact() else row["text"]), color, SMALL_SIZE)
+
+
+## The Heirloom lines (M9 PATCH): "Heirloom  ·  Rank N", the rank 3 / rank 5 perks (green once reached, dim with the
+## rank that opens them), and the bound note.
+func _heirloom_block() -> void:
+	var data := Db.get_heirloom(item.source_id)
+	_gap(3)
+	_pair("Heirloom", "Rank %d" % item.heirloom_rank, ARTIFACT_GOLD, ARTIFACT_GOLD)
+	if data != null:
+		for which in [HeirloomData.PERK3_RANK, HeirloomData.PERK5_RANK]:
+			var on := Heirlooms.perk_active(item.heirloom_rank, which)
+			var text := Heirlooms.perk_text(data, which)
+			_line(text if on else "Rank %d: %s" % [which, text], ENCHANT_GREEN if on else DIM, SMALL_SIZE)
+	_line(Heirlooms.BOUND_TEXT, DIM, SMALL_SIZE)
 
 
 ## The hero looking at this tooltip (their equipment is [member viewer_equipment]; else the

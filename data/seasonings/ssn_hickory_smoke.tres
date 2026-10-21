@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_hickory_smoke"
+class_id = &"hunter"
+ability = &"blast_snare"
+display_name = "Hickory Smoke"
+text = "Lays 2 snares at once, each blast 60 points weaker; recharges 25% slower."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blast_snare"
+},
+"mods": {
+"traps_add": 1,
+"damage_pct_add": -60,
+"cooldown_pct": 25
+},
+"requires": {
+"knows": "blast_snare"
+}
+}])

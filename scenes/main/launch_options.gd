@@ -13,14 +13,20 @@ extends RefCounted
 ##   --companion=ID       M8: the companion every bot of a class with companion choices takes (an id
 ##                        of Db.companion_ids(), e.g. wolf; default: the class's first choice); an
 ##                        unknown id is an unknown argument
+##   --alt-weapon[=0|1]   M9 LEVELS test hook: every bot starts with its class's alternative starting weapon (Class Level 12;
+##                        the profile must have it unlocked – the dev profile of the automated runs has everything)
 ##   --waves=N            smoke: waves to play (default 3)
 ##   --start-wave=N       first wave of the run (1..25; endless: 1..99)
 ##   --seed=N             RunState / bot seed
 ##   --screenshot=PATH    saves a PNG after --shot-time seconds of game time, then quits
 ##   --shot-time=S        seconds after the run starts (after boot for menu / lobby views)
-##   --view=NAME          dev: reach a screen for a screenshot – menu, settings and credits (the main
-##                        menu's pages), lobby, roll (the "Rolling the arena..." screen, --env picks the
+##   --view=NAME          dev: reach a screen for a screenshot – menu, settings, credits and patch (the main
+##                        menu's pages; patch = The Onion Patch, --patch-tab picks its tab), lobby, roll (the "Rolling the arena..." screen, --env picks the
 ##                        card it lands on), game, intermission, game_over, victory, pause
+##   --patch-tab=NAME     dev: the tab --view=patch opens on – classes, seasonings, heirlooms, achievements, wardrobe
+##   --loadout-tab=NAME   dev: --view=lobby opens the Loadout of the second player (the first without one) on that tab –
+##                        seasonings, heirloom, look (screenshots)
+##   --loadout-player=N   dev: with --loadout-tab, the player (1..4) whose Loadout opens instead of the second's
 ##   --view-time=S        when the view is forced (default: shot time - 3 s)
 ##   --allow-defeat       smoke: a full party wipe ends the run (default: revive and go on)
 ##   --time-scale=X       overrides the time scale (smoke default 4)
@@ -55,6 +61,24 @@ extends RefCounted
 ##   --leaderboard=PATH   M6b dev / test hook: the leaderboard file (Leaderboard.path_override; "user://x.json"
 ##                        or a file path). Unlike the player's own file, a smoke / demo / --view run
 ##                        writes it (Main.writes_leaderboard), so the end screen's board can be checked
+##   --difficulty=ID      M9: the run's difficulty tier – normal (default), pungent or tear_jerker (an id of
+##                        Db.difficulties; RunState.difficulty). A human session's lobby selector overrides it and is
+##                        capped by the heroes' unlocked tiers; an automated run (dev profile) plays any tier. An unknown
+##                        id is an unknown argument (a smoke run reports "bad_args")
+##   --profile=KIND       M9: the meta profile (Meta.configure): dev (everything unlocked, no raw-power bonus, nothing
+##                        saved – the default of every automated run), fresh (a new player) or max (every class at
+##                        the top level, everything unlocked). Without --profile-path nothing is read or written
+##   --profile-path=FILE  M9 dev / test hook: reads and saves the meta profile in FILE instead of the player's
+##                        user://profile.json (the only way an automated run touches a profile). With --profile=fresh
+##                        or max that profile is the starting point; --profile=dev has no file
+##   --seasonings=a,b,c   M9: the Seasonings the bots carry (ids of Db.seasonings, e.g. ssn_smoked_paprika): every bot
+##                        takes the ones of its own class, in the order given (a smoke run with the dev profile owns
+##                        them all; a real profile must own them). An unknown id, an id of a class no bot plays, a
+##                        repeated id or more than Seasonings.MAX_SLOTS of one class is an unknown argument
+##   --heirloom=ID        M9 PATCH: every hero starts with this Heirloom equipped (an id of Db.heirlooms, e.g.
+##                        heir_sprout_cap), instead of what the profile remembers for the class (a smoke run with
+##                        the dev profile owns them all at rank 1; --profile=max at rank 5; a real profile must own
+##                        it). An unknown id is an unknown argument
 
 const DEFAULT_BOTS := 4
 const DEFAULT_SMOKE_WAVES := 3
@@ -62,9 +86,12 @@ const SMOKE_TIME_SCALE := 4.0
 ## Smoke runs are seeded (deterministic content rolls) unless --seed is given.
 const SMOKE_SEED := 1
 const DEFAULT_SHOT_TIME := 8.0
+## --patch-tab / --loadout-tab values (the lower-case tab names of OnionPatchPage / LoadoutScreen).
+const PATCH_TABS: Array[String] = ["classes", "seasonings", "heirlooms", "achievements", "wardrobe"]
+const LOADOUT_TABS: Array[String] = ["seasonings", "heirloom", "look"]
 ## Views that need a running game (bots are added and a run starts right away).
 const RUN_VIEWS: Array[String] = ["game", "intermission", "game_over", "victory", "pause"]
-const VIEWS: Array[String] = ["menu", "settings", "credits", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
+const VIEWS: Array[String] = ["menu", "settings", "credits", "patch", "lobby", "roll", "game", "intermission", "game_over", "victory", "pause"]
 ## --panel-tab values (PlayerPanel.TAB_IDS).
 const PANEL_TABS: Array[String] = ["character", "trainer", "talents", "enchanter"]
 ## --start-level ceiling (far beyond a full run).
@@ -85,6 +112,8 @@ var players := DEFAULT_BOTS
 var classes: Array[StringName] = []
 ## The companion id of --companion (&"" = each bot takes its class's first choice).
 var companion: StringName = &""
+## --alt-weapon: the bots take the alternative starting weapon of their class.
+var alt_weapon := false
 var waves := DEFAULT_SMOKE_WAVES
 var start_wave := 1
 ## -1 = random.
@@ -107,6 +136,11 @@ var panel_tab := ""
 var boss_hp := 1.0
 ## < 0 = off (the normal Artifact chances); else the chance of every Artifact roll.
 var artifact_chance := -1.0
+## --patch-tab / --loadout-tab (M9 PATCH, screenshots): "" = the default tab.
+var patch_tab := ""
+var loadout_tab := ""
+## --loadout-player (1..4): whose Loadout --loadout-tab opens; 0 = the second player's (the first when alone).
+var loadout_player := 0
 ## "" = the end screen opens on the Summary page (--end-page; GameOverScreen.PAGE_IDS).
 var end_page := ""
 ## --save-card: the forced end screen saves the run card right away.
@@ -125,6 +159,16 @@ var dungeon := false
 ## "" = the player's own leaderboard file (smoke / demo / view runs do not write it); else the file of
 ## --leaderboard, which every run writes.
 var leaderboard_path := ""
+## The difficulty tier of --difficulty (a Difficulty id; the lobby's selector changes it for the next run).
+var difficulty: StringName = &"normal"
+## The meta profile of --profile (Meta.PROFILE_KINDS; &"" = the default of the session) and the file of
+## --profile-path ("" = none).
+var profile_kind: StringName = &""
+var profile_path := ""
+## The Seasonings of --seasonings, in the order given (the bots take the ones of their class).
+var seasonings: Array[StringName] = []
+## The Heirloom of --heirloom (&"" = none: the heroes take what their slot has).
+var heirloom: StringName = &""
 ## Arguments that were not understood, an invalid value included (reported once by Main; a smoke run
 ## reports "bad_args" with them, see Main.smoke_outcome).
 var unknown: Array[String] = []
@@ -137,6 +181,7 @@ static func _flag_on(value: String) -> bool:
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
 	var o := LaunchOptions.new()
+	var seasonings_arg := ""
 	for raw in args:
 		var arg := String(raw)
 		var key := arg
@@ -166,6 +211,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.companion = StringName(value)
 				else:
 					o.unknown.append(arg)
+			"--alt-weapon":
+				o.alt_weapon = _flag_on(value)
 			"--waves":
 				o.waves = maxi(1, value.to_int())
 			"--start-wave":
@@ -207,6 +254,18 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.end_page = value
 				else:
 					o.unknown.append(arg)
+			"--patch-tab":
+				if value in PATCH_TABS:
+					o.patch_tab = value
+				else:
+					o.unknown.append(arg)
+			"--loadout-tab":
+				if value in LOADOUT_TABS:
+					o.loadout_tab = value
+				else:
+					o.unknown.append(arg)
+			"--loadout-player":
+				o.loadout_player = clampi(value.to_int(), 1, PlayerManager.MAX_PLAYERS)
 			"--save-card":
 				o.save_card = true
 			"--mode":
@@ -239,12 +298,91 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					o.leaderboard_path = value
 				else:
 					o.unknown.append(arg)
+			"--difficulty":
+				if Db.difficulties.has(StringName(value)):
+					o.difficulty = StringName(value)
+				else:
+					o.unknown.append(arg)
+			"--profile":
+				if StringName(value) in Meta.PROFILE_KINDS:
+					o.profile_kind = StringName(value)
+				else:
+					o.unknown.append(arg)
+			"--profile-path":
+				if value != "":
+					o.profile_path = value
+				else:
+					o.unknown.append(arg)
+			"--seasonings":
+				seasonings_arg = arg
+				for part in value.split(",", false):
+					o.seasonings.append(StringName(part.strip_edges()))
+			"--heirloom":
+				if Db.heirlooms.has(StringName(value)):
+					o.heirloom = StringName(value)
+				else:
+					o.unknown.append(arg)
 			_:
 				# The unit test runner shares the command line; ignore its flags.
 				if not key.begins_with("--filter"):
 					o.unknown.append(arg)
 	o.start_wave = o.clamp_wave(o.start_wave)
+	if seasonings_arg != "":
+		var problem := o.seasonings_problem()
+		if problem != "":
+			o.unknown.append("%s (%s)" % [seasonings_arg, problem])
+			o.seasonings.clear()
+	if o.profile_kind == Meta.PROFILE_DEV and o.profile_path != "":
+		o.unknown.append("--profile=dev with --profile-path=%s (the dev profile never touches a file)" % o.profile_path)
 	return o
+
+
+## The class ids of the bots a launch with --players / --classes adds, in join order (Main._add_bots: --classes
+## cycled, else every class the profile has unlocked).
+func bot_classes() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id in classes:
+		if Db.get_class_data(id) != null:
+			ids.append(id)
+	if ids.is_empty():
+		ids = Meta.unlocked_class_ids()
+	var out: Array[StringName] = []
+	if ids.is_empty():
+		return out
+	for i in players:
+		out.append(ids[i % ids.size()])
+	return out
+
+
+## What is wrong with --seasonings ("" = fine): an unknown id, a repeated one, one whose class no bot plays, or more
+## ids of a class than it has slots (Seasonings.MAX_SLOTS).
+func seasonings_problem() -> String:
+	var party := bot_classes()
+	var per_class: Dictionary[StringName, int] = {}
+	var seen: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s == null:
+			return "unknown Seasoning '%s'" % id
+		if id in seen:
+			return "'%s' is listed twice" % id
+		seen.append(id)
+		if s.class_id not in party:
+			return "no bot plays the %s, '%s' would do nothing" % [s.class_id, id]
+		per_class[s.class_id] = int(per_class.get(s.class_id, 0)) + 1
+		if per_class[s.class_id] > Seasonings.MAX_SLOTS:
+			return "more than %d Seasonings for the %s" % [Seasonings.MAX_SLOTS, s.class_id]
+	return ""
+
+
+## The --seasonings of [param class_id], in the order given.
+func seasonings_for(class_id: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in seasonings:
+		var s := Db.get_seasoning(id)
+		if s != null and s.class_id == class_id:
+			out.append(id)
+	return out
 
 
 ## A scripted launch (--smoke, --demo, --view, --screenshot): not the player's session, so it never reads or

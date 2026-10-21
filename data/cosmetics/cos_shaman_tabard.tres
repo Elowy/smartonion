@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_shaman_tabard"
+display_name = "Totem-Stitch Tabard"
+kind = &"tabard"
+class_id = &"shaman"
+style = &"bolt"
+color = Color(0.16, 0.55, 0.58, 1)
+trim = Color(0.93, 0.88, 0.72, 1)
+order = 6

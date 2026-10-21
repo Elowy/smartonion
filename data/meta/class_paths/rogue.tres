@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ClassPathData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/class_path_data.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/weapons/gun.tres" id="2_mh"]
+
+[resource]
+script = ExtResource("1_script")
+class_id = &"rogue"
+deck_abilities = Array[StringName]([&"killing_spree", &"shadowstep"])
+capstone_trees = Array[StringName]([&"rogue_combat", &"rogue_assassination", &"rogue_subtlety"])
+alt_main_hand = ExtResource("2_mh")
+gift_heirloom = &"heir_garden_clogs"
+gift_heirloom_name = "Garden Clogs"
+cosmetics = Array[Dictionary]([{
+"slot": "tabard",
+"id": "cos_rogue_tabard",
+"name": "Nightstitch Tabard"
+}, {
+"slot": "hat",
+"id": "cos_rogue_hat",
+"name": "Cutpurse Hood"
+}, {
+"slot": "glow",
+"id": "cos_rogue_glow",
+"name": "Smoke Wisp"
+}])
+title_id = &"title_rogue"
+title_name = "the Silent Sprout"

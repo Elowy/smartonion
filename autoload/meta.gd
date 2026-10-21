@@ -1,0 +1,749 @@
+extends Node
+## Autoload "Meta" (M9): the main profile and the meta-progression mechanisms around it. It owns the current
+## [Profile], answers the unlock questions the content pools ask, and runs the run-end hook. What the profile means
+## (Class Level curve, Seasonings, Heirlooms, achievements, difficulty tiers, Wardrobe) is content: later packages plug
+## in through the listener registry, the unlock gates and the achievement data. See docs/ARCHITECTURE.md.
+##
+## Which profile (decided once at startup, [method configure_from_command_line]):
+##   - a normal session: the player's file user://profile.json (read at startup, saved when something changes);
+##   - an AUTOMATED run (smoke, demo, --view, --screenshot, headless, the unit tests; [method is_automated]): the
+##     dev profile – everything unlocked, no raw-power bonus, nothing selected, Normal – and NO file IO at all, so
+##     every automated run and test plays the base game;
+##   - --profile=dev|fresh|max picks one of those profiles in memory (fresh: a new player; max: every class at the
+##     top level and everything unlocked); --profile-path=FILE reads and saves that file instead of the player's
+##     (the only way an automated run touches a profile file: tests and manual checks). With both, the named profile
+##     is the starting point and FILE is written to; dev never touches a file.
+##
+## The unlock question: [method is_unlocked] (kind, id, class). Content is available unless a gate holds it back:
+## class, ability, capstone_tree and legendary content is locked only when an [UnlockGateData] exists for it
+## (data/unlocks/, or [method Db.add_unlock_gate]) and the profile has not unlocked it; collectibles (seasoning,
+## heirloom, cosmetic, title, look) and the difficulty tiers above Normal are locked until the profile owns them.
+## The pools call it: Db.ability_pool, TalentState (capstones), ItemGenerator / Forge (Legendaries), the lobby and
+## the bots (classes), the difficulty selector ([Difficulty], data/difficulties/).
+##
+## The run-end hook: Main builds a [RunReport] and calls [method record_run] once. It dispatches the report to the
+## registered listeners in priority order (the counters first, the achievement check last, in between whoever
+## registered: Class XP, Seeds, Wardrobe ...), saves ONCE after all of them, then emits the signals. A dev profile
+## records nothing. See [method add_run_listener].
+
+## An achievement unlocked (after the profile was saved). The toast listens.
+signal achievement_unlocked(id: StringName)
+## The Seeds wallet changed by [param delta].
+signal seeds_changed(seeds: int, delta: int)
+## A run was recorded and saved; [param result] is [method record_run]'s result.
+signal run_recorded(report: RunReport, result: Dictionary)
+## [member profile] was replaced ([method configure]).
+signal profile_replaced
+
+const PROFILE_DEV := &"dev"
+const PROFILE_FRESH := &"fresh"
+const PROFILE_MAX := &"max"
+const PROFILE_KINDS: Array[StringName] = [PROFILE_DEV, PROFILE_FRESH, PROFILE_MAX]
+
+## Listener priorities of [method add_run_listener]: lower runs first, ties in registration order.
+const PRIORITY_COUNTERS := -1000
+const PRIORITY_DEFAULT := 0
+const PRIORITY_ACHIEVEMENTS := 1000
+## The built-in listeners: the run counters (AchievementEngine.update_counters) and the achievement check.
+const LISTENER_COUNTERS := &"counters"
+const LISTENER_ACHIEVEMENTS := &"achievements"
+
+## Seeds an achievement pays once for every point it is worth (design: 615 points = 3075 Seeds).
+const SEEDS_PER_POINT := 5
+const LOCKED_HINT := "Locked"
+
+## The current profile (never null after startup).
+var profile: Profile = Profile.dev()
+## The file the profile is saved to ("" = none).
+var path := ""
+## The profile is saved to [member path] when it changes.
+var persist := false
+## Times the profile file was written (a save that attempted IO; tests count them).
+var save_count := 0
+## The result of the last [method record_run].
+var last_result: Dictionary = {}
+## >= 0 replaces the clock of achievement unlock times (tests).
+var clock_override := -1
+
+var _listeners: Array[Dictionary] = []
+var _order := 0
+var _batching := false
+var _pending_unlocks: Array[StringName] = []
+var _warned_read_only := false
+
+
+func _ready() -> void:
+	_add_builtin_listeners()
+	configure_from_command_line()
+
+
+# --- Which profile ------------------------------------------------------------------------------
+
+## True for runs that are not the player's session (smoke, demo, views, screenshots, headless, the test runner):
+## the rule Settings uses.
+func is_automated() -> bool:
+	return Settings.is_automated_run()
+
+
+## Picks the profile from the command line (--profile, --profile-path) and the automated rule.
+func configure_from_command_line() -> void:
+	var options := LaunchOptions.parse(OS.get_cmdline_user_args())
+	configure(options.profile_kind, options.profile_path, is_automated())
+
+
+## Replaces the profile (see the class doc). [param kind]: &"" (the default for this kind of session), or one of
+## [constant PROFILE_KINDS]; [param p_path]: the file to read and save ("" = the player's file in a normal session,
+## none otherwise); [param automated]: the launch is an automated one.
+func configure(kind: StringName, p_path: String, automated: bool) -> void:
+	path = ""
+	persist = false
+	_warned_read_only = false
+	match kind:
+		PROFILE_DEV:
+			profile = Profile.dev()
+		PROFILE_FRESH:
+			profile = Profile.fresh()
+		PROFILE_MAX:
+			profile = Profile.max_profile(Db.class_ids, Db.heirloom_ids)
+		_:
+			if p_path != "":
+				profile = Profile.load_file(p_path)
+			elif automated:
+				profile = Profile.dev()
+			else:
+				profile = Profile.load_file(Profile.DEFAULT_PATH)
+				path = Profile.DEFAULT_PATH
+				persist = true
+	if p_path != "" and not profile.is_dev:
+		path = p_path
+		persist = true
+	if not profile.is_dev:
+		ClassLevels.sync_unlocks(profile)  # (M9 LEVELS: what the class levels reached unlock, also after a retuned table)
+	profile_replaced.emit()
+
+
+## True when a finished run changes the profile (everything but the dev profile).
+func records_runs() -> bool:
+	return profile != null and not profile.is_dev
+
+
+## True for the dev profile of the automated runs.
+func is_dev() -> bool:
+	return profile == null or profile.is_dev
+
+
+# --- Unlock checks ------------------------------------------------------------------------------
+
+## Whether the content [param id] of [param kind] ([constant Profile.KINDS]) is available to the profile:
+## [param class_id] is the class a class-scoped kind (the difficulty tiers) is asked for. The rules are in the class
+## doc: collectibles need the profile's record, other content only when an unlock gate holds it back. The dev and
+## max profiles answer true for everything.
+func is_unlocked(kind: StringName, id: StringName, class_id: StringName = &"") -> bool:
+	if profile == null or profile.all_unlocked:
+		return true
+	if kind == Profile.KIND_DIFFICULTY:
+		return is_difficulty_unlocked(id, class_id)
+	if kind in Profile.COLLECTIBLE_KINDS:
+		return profile.has_unlock(kind, id, class_id)
+	if Db.get_unlock_gate(kind, id) == null:
+		return true
+	return profile.has_unlock(kind, id, class_id)
+
+
+## The text shown where the content is locked (its gate's hint, else "Locked").
+func unlock_hint(kind: StringName, id: StringName) -> String:
+	var gate := Db.get_unlock_gate(kind, id)
+	return gate.hint if gate != null and gate.hint != "" else LOCKED_HINT
+
+
+## Unlocks [param id] of [param kind] in the profile and saves. True when it was new.
+func unlock(kind: StringName, id: StringName, class_id: StringName = &"") -> bool:
+	if profile == null or not profile.unlock(kind, id, class_id):
+		return false
+	_changed()
+	return true
+
+
+# --- Classes ------------------------------------------------------------------------------------
+
+func is_class_unlocked(class_id: StringName) -> bool:
+	return is_unlocked(Profile.KIND_CLASS, class_id)
+
+
+## The class ids the lobby offers as playable, in lobby order (every class with the dev profile; never empty).
+func unlocked_class_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in Db.class_ids:
+		if is_class_unlocked(id):
+			out.append(id)
+	if out.is_empty() and not Db.class_ids.is_empty():
+		out.append(Db.class_ids[0])
+	return out
+
+
+## The class a joining player starts on: the lobby's first class, or the first unlocked one.
+func default_class() -> ClassData:
+	var first := Db.get_default_class()
+	if first != null and is_class_unlocked(first.id):
+		return first
+	var ids := unlocked_class_ids()
+	return Db.get_class_data(ids[0]) if not ids.is_empty() else first
+
+
+## Gives every slot whose class is locked the default class; returns how many were changed (Main.start_run: a
+## locked class never reaches a run, whatever put it on the slot).
+func enforce_class_locks(slots: Array[PlayerSlot]) -> int:
+	var changed := 0
+	for slot in slots:
+		if slot.class_data != null and not is_class_unlocked(slot.class_data.id):
+			push_warning("Meta: %s plays %s, which is locked – using %s" % [slot.label(), slot.class_data.id, default_class().id])
+			slot.class_data = default_class()
+			changed += 1
+	return changed
+
+
+## The Class Level of [param class_id] (1 for the dev profile).
+func class_level(class_id: StringName) -> int:
+	return 1 if profile == null or profile.is_dev else profile.class_level(class_id)
+
+
+## The Class Level raw-power bonuses apply (false in automated runs: the base game).
+func raw_power_enabled() -> bool:
+	return profile != null and profile.raw_power
+
+
+# --- Class Levels (M9 LEVELS) -------------------------------------------------------------------
+
+## The level the level-derived rewards (Seasoning slots, the Heirloom slot, the alternative weapon) are read at: the
+## profile's Class Level of [param class_id], the top level for a profile with everything unlocked (the dev and max
+## profiles: the automated runs can use any of them, they select nothing by default).
+func effective_class_level(class_id: StringName) -> int:
+	if profile == null or profile.all_unlocked:
+		return ClassLevels.max_level()
+	return profile.class_level(class_id)
+
+
+## Seasoning slots of [param class_id] (0 .. 3; Class Level 3 / 10 / 20) – the number of Seasonings a hero of the class
+## may take into a run. The SEASONINGS package reads it.
+func seasoning_slots(class_id: StringName) -> int:
+	return ClassLevels.seasoning_slots(effective_class_level(class_id))
+
+
+## Heirloom slots of [param class_id] (0 below Class Level 5, else 1).
+func heirloom_slots(class_id: StringName) -> int:
+	return ClassLevels.heirloom_slots(effective_class_level(class_id))
+
+
+## Whether the Seasonings of [param tier] (1 .. 5) can be bought for [param class_id] (the Class Level reached).
+func seasoning_tier_unlocked(class_id: StringName, tier: int) -> bool:
+	var need := ClassLevels.seasoning_tier_level(tier)
+	return need > 0 and effective_class_level(class_id) >= need
+
+
+## Whether a hero of [param class_id] may start with the class's alternative weapon (Class Level 12; the class has one).
+func alt_weapon_unlocked(class_id: StringName) -> bool:
+	var path := Db.class_path(class_id)
+	return path != null and path.has_alt_weapon() and effective_class_level(class_id) >= ClassLevels.alt_weapon_level()
+
+
+## The small permanent bonuses of a hero of [param class_id]: {"gold", "primary_pct", "rerolls", "backpack"} –
+## all zero unless the profile applies raw power (never in the automated runs).
+func raw_power(class_id: StringName) -> Dictionary:
+	if not raw_power_enabled():
+		return ClassLevels.raw_power(0)
+	return ClassLevels.raw_power(profile.class_level(class_id))
+
+
+## The XP bar of [param class_id]'s level ([method ClassLevels.progress] of the profile; level 1, empty for the dev profile).
+func class_progress(class_id: StringName) -> Dictionary:
+	if profile == null:
+		return ClassLevels.progress(0)
+	return ClassLevels.progress(profile.class_xp(class_id), profile.class_level(class_id))
+
+
+## True when the lobby and the end screen show Class Levels (a profile that really records: not the dev profile).
+func shows_class_levels() -> bool:
+	return records_runs()
+
+
+## Takes the alternative weapon away from every slot of [param slots] whose class has not unlocked it; returns how
+## many were changed (Main.start_run: a locked weapon never reaches a run, whatever put it on the slot).
+func enforce_alt_weapons(slots: Array[PlayerSlot]) -> int:
+	var changed := 0
+	for slot in slots:
+		if slot.alt_weapon and (slot.class_data == null or not alt_weapon_unlocked(slot.class_data.id)):
+			slot.alt_weapon = false
+			changed += 1
+	return changed
+
+
+## Run start (Main.start_run, before the heroes spawn): the pooled bonuses of the Class Levels – each hero's starting gold
+## goes into the shared wallet and each hero's free shop rerolls into the run's pool. Nothing at all for a profile without
+## raw power (the dev profile), so an automated run starts exactly as the base game.
+func apply_run_start(slots: Array[PlayerSlot]) -> void:
+	if not raw_power_enabled():
+		return
+	var gold := 0
+	var rerolls := 0
+	for slot in slots:
+		if slot.class_data == null:
+			continue
+		var power := raw_power(slot.class_data.id)
+		gold += int(power["gold"])
+		rerolls += int(power["rerolls"])
+	RunState.grant_starting_gold(gold)
+	RunState.free_rerolls = rerolls
+
+
+# --- Difficulty --------------------------------------------------------------------------------
+
+## Whether the difficulty tier [param tier] (a [Difficulty] id, data/difficulties/) is open for [param class_id]: the
+## first tier always, the others once the profile unlocked them for the class (the class-pair achievements do:
+## winning with a class opens the next tier for it).
+func is_difficulty_unlocked(tier: StringName, class_id: StringName) -> bool:
+	if profile == null or profile.all_unlocked:
+		return true
+	var at := Difficulty.tier_index(tier)
+	if at <= 0:
+		return at == 0
+	return profile.has_unlock(Profile.KIND_DIFFICULTY, tier, class_id)
+
+
+## The highest tier every class of [param class_ids] has unlocked: the cap of the party's difficulty select.
+func party_difficulty_cap(class_ids: Array[StringName]) -> StringName:
+	var tiers := Difficulty.ids()
+	if tiers.is_empty():
+		return Difficulty.NORMAL
+	var best := tiers[0]
+	for tier in tiers:
+		var open := true
+		for id in class_ids:
+			if not is_difficulty_unlocked(tier, id):
+				open = false
+		if not open:
+			break
+		best = tier
+	return best
+
+
+## [param tier] when a party of [param class_ids] may play it, else the highest tier it may (Main.start_run: a tier
+## the heroes have not unlocked never reaches a run, whatever put it there).
+func clamp_difficulty(tier: StringName, class_ids: Array[StringName]) -> StringName:
+	var wanted := Difficulty.tier_index(tier)
+	var cap := Difficulty.tier_index(party_difficulty_cap(class_ids))
+	if wanted < 0:
+		return Difficulty.NORMAL
+	return tier if wanted <= cap else Difficulty.ids()[cap]
+
+
+# --- Seeds --------------------------------------------------------------------------------------
+
+func seeds() -> int:
+	return profile.seeds if profile != null else 0
+
+
+func can_afford_seeds(amount: int) -> bool:
+	return profile != null and profile.can_afford(amount)
+
+
+## Adds [param amount] Seeds; returns the wallet. Saved at once (inside [method record_run] with the run).
+func earn_seeds(amount: int) -> int:
+	if profile == null or amount <= 0:
+		return seeds()
+	var total := profile.earn_seeds(amount)
+	seeds_changed.emit(total, amount)
+	_changed()
+	return total
+
+
+## Pays [param amount] Seeds. False (nothing changes) when the wallet holds less.
+func spend_seeds(amount: int) -> bool:
+	if profile == null or amount < 0 or not profile.spend_seeds(amount):
+		return false
+	if amount > 0:
+		seeds_changed.emit(profile.seeds, -amount)
+		_changed()
+	return true
+
+
+# --- Lobby selections ---------------------------------------------------------------------------
+
+## [param loadout] ([method Profile.loadout]) without what the profile has not unlocked (Seasonings, a Heirloom, looks).
+func sanitize_loadout(loadout: Dictionary, class_id: StringName = &"") -> Dictionary:
+	var l := Profile.normalize_loadout(loadout)
+	var seasonings: Array[StringName] = []
+	for s: StringName in l["seasonings"]:
+		if is_unlocked(Profile.KIND_SEASONING, s, class_id):
+			seasonings.append(s)
+	l["seasonings"] = seasonings
+	if l["heirloom"] != &"" and not is_unlocked(Profile.KIND_HEIRLOOM, l["heirloom"], class_id):
+		l["heirloom"] = &""
+	var looks: Dictionary[StringName, StringName] = {}
+	for slot: StringName in l["looks"]:
+		if is_unlocked(Profile.KIND_LOOK, l["looks"][slot], class_id):
+			looks[slot] = l["looks"][slot]
+	l["looks"] = looks
+	if l["alt_weapon"] and not alt_weapon_unlocked(class_id):
+		l["alt_weapon"] = false
+	# --- Wardrobe (M9) --- (a look of another slot, an unknown id or a cosmetic of the wrong kind is dropped as well)
+	l["looks"] = Wardrobe.sanitize_looks(l["looks"], class_id)
+	var cosmetics := Wardrobe.sanitize_cosmetics(l, class_id)
+	for key in Profile.COSMETIC_KEYS:
+		l[key] = cosmetics.get(key, &"")
+	return l
+
+
+## The selections remembered for [param class_id], limited to what is unlocked. Empty for the dev profile (nothing
+## selected in automated runs).
+func remembered_loadout(class_id: StringName) -> Dictionary:
+	if is_dev():
+		return Profile.normalize_loadout({})
+	return sanitize_loadout(profile.loadout(class_id), class_id)
+
+
+## Puts the selections remembered for the class of [param slot] on it (the lobby calls it when a player joins or
+## changes class). A dev profile leaves the slot as it is.
+func apply_loadout(slot: PlayerSlot) -> void:
+	if slot == null or slot.class_data == null or is_dev():
+		return
+	slot.set_meta_loadout(remembered_loadout(slot.class_data.id))
+
+
+## Remembers the selections of [param slot] for its class (Main.start_run). Kept in memory; the run's end saves.
+func remember_loadout(slot: PlayerSlot) -> void:
+	if slot == null or slot.class_data == null or is_dev():
+		return
+	profile.set_loadout(slot.class_data.id, slot.meta_loadout())
+
+
+# --- Achievements -------------------------------------------------------------------------------
+
+## Checks every achievement against the profile and [param report] (null = no run: the report conditions are false),
+## unlocks what holds, saves, and emits [signal achievement_unlocked] for each. Returns the new ids. A dev profile
+## unlocks nothing.
+func check_achievements(report: RunReport = null) -> Array[StringName]:
+	if not records_runs():
+		return []
+	var ids := AchievementEngine.evaluate(profile, report, Db.achievement_list(), now())
+	_pending_unlocks.append_array(ids)
+	_pay_achievements(ids)
+	if not ids.is_empty():
+		_changed()
+	_flush_unlocks()
+	return ids
+
+
+## What new achievements bring besides their rewards: their Seeds ([constant SEEDS_PER_POINT] per point, paid once) and
+## the title the achievement score earns now ([PlayerTitles.POINT_TITLES]). Returns {"seeds": int, "titles":
+## Array[StringName]}.
+func _pay_achievements(ids: Array[StringName]) -> Dictionary:
+	var paid := {"seeds": 0, "titles": [] as Array[StringName]}
+	if ids.is_empty() or profile == null:
+		return paid
+	var seeds_total := 0
+	for id in ids:
+		var data := Db.get_achievement(id)
+		if data != null:
+			seeds_total += data.points * SEEDS_PER_POINT
+	if seeds_total > 0:
+		earn_seeds(seeds_total)
+	paid["seeds"] = seeds_total
+	paid["titles"] = PlayerTitles.grant_for_points(profile, achievement_points())
+	return paid
+
+
+## The profile's achievement score (the points of the unlocked achievements).
+func achievement_points() -> int:
+	return AchievementEngine.points_of(profile, Db.achievement_list()) if profile != null else 0
+
+
+## Unix seconds (the unlock times of the profile).
+func now() -> int:
+	return clock_override if clock_override >= 0 else int(Time.get_unix_time_from_system())
+
+
+# --- The run-end hook ---------------------------------------------------------------------------
+
+## Registers [param callable] to run when a run is recorded: [code]func(report: RunReport, profile: Profile, result:
+## Dictionary) -> void[/code]. [param result] is the dictionary [method record_run] returns – a listener adds its own
+## keys to it (xp gained, Seeds earned, new looks ...). Lower [param priority] runs first, ties in registration order;
+## the counters run at [constant PRIORITY_COUNTERS] and the achievement check at [constant PRIORITY_ACHIEVEMENTS]
+## (so a listener at the default priority sees the run's counters and is seen by the achievements). Registering an
+## id again replaces the listener (and its place in the order).
+func add_run_listener(id: StringName, callable: Callable, priority: int = PRIORITY_DEFAULT) -> void:
+	remove_run_listener(id)
+	_order += 1
+	_listeners.append({"id": id, "callable": callable, "priority": priority, "order": _order})
+
+
+func remove_run_listener(id: StringName) -> void:
+	for i in range(_listeners.size() - 1, -1, -1):
+		if _listeners[i]["id"] == id:
+			_listeners.remove_at(i)
+
+
+## The listener ids in dispatch order.
+func listener_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for l in _sorted_listeners():
+		out.append(l["id"])
+	return out
+
+
+## Records a finished run (Main calls it once at the end of a run, also for an abandoned one): the counters, every
+## listener in order, the achievement check, then ONE save, then the signals. Does nothing (and returns
+## {"recorded": false}) for the dev profile, a null report or a report recorded before. Returns {"recorded": true,
+## "listeners": [ids in the order they ran], "achievements": [ids unlocked by this run], "save_error": Error
+## (OK also when nothing is written)} plus whatever the listeners added.
+func record_run(report: RunReport) -> Dictionary:
+	var result: Dictionary = {"recorded": false}
+	if report == null or report.recorded or not records_runs():
+		last_result = result
+		return result
+	report.recorded = true
+	result = {"recorded": true, "listeners": [] as Array[StringName], "achievements": [] as Array[StringName], "save_error": OK}
+	_batching = true
+	for l in _sorted_listeners():
+		(result["listeners"] as Array[StringName]).append(l["id"])
+		var callable: Callable = l["callable"]
+		if callable.is_valid():
+			callable.call(report, profile, result)
+		else:
+			push_warning("Meta: the run listener '%s' is no longer valid" % l["id"])
+	_batching = false
+	result["save_error"] = _write()
+	var unlocked: Array[StringName] = []
+	unlocked.append_array(_pending_unlocks)
+	result["achievements"] = unlocked
+	last_result = result
+	_flush_unlocks()
+	run_recorded.emit(report, result)
+	return result
+
+
+# --- Saving -------------------------------------------------------------------------------------
+
+## Writes the profile to [member path] now ([member persist] only; a dev profile never). Returns the Error (OK also when
+## nothing is written). Inside [method record_run] the write waits for the end of the dispatch.
+func save() -> Error:
+	if _batching:
+		return OK
+	return _write()
+
+
+func _write() -> Error:
+	if not persist or path == "" or profile == null or profile.is_dev:
+		return OK
+	if profile.read_only:
+		if not _warned_read_only:
+			_warned_read_only = true
+			push_warning("Meta: %s is not saved (%s)" % [path, profile.load_error])
+		return ERR_FILE_NO_PERMISSION
+	save_count += 1
+	var err := profile.save_file(path)
+	if err != OK:
+		push_warning("Meta: could not write %s (%s)" % [path, error_string(err)])
+	return err
+
+
+## A change outside the run-end dispatch is saved at once.
+func _changed() -> void:
+	if not _batching:
+		_write()
+
+
+## Emits [signal achievement_unlocked] for the unlocks waiting (after the save that recorded them; inside the
+## run-end dispatch they wait for its end).
+func _flush_unlocks() -> void:
+	if _batching or _pending_unlocks.is_empty():
+		return
+	var ids := _pending_unlocks.duplicate()
+	_pending_unlocks.clear()
+	for id in ids:
+		achievement_unlocked.emit(id)
+
+
+# --- Built-in listeners -------------------------------------------------------------------------
+
+func _add_builtin_listeners() -> void:
+	add_run_listener(LISTENER_COUNTERS, _on_counters, PRIORITY_COUNTERS)
+	add_run_listener(LISTENER_ACHIEVEMENTS, _on_achievements, PRIORITY_ACHIEVEMENTS)
+	ClassLevels.register(self)  # (M9 LEVELS: Class XP and Seeds of a finished run)
+	Wardrobe.register(self)  # (M9 WARDROBE: the looks the heroes wear are collected at a wave start and at the run's end)
+
+
+func _on_counters(report: RunReport, p: Profile, _result: Dictionary) -> void:
+	AchievementEngine.update_counters(p, report)
+
+
+func _on_achievements(report: RunReport, p: Profile, result: Dictionary) -> void:
+	var ids := AchievementEngine.evaluate(p, report, Db.achievement_list(), now())
+	_pending_unlocks.append_array(ids)
+	var paid := _pay_achievements(ids)
+	result["achievement_seeds"] = paid["seeds"]
+	result["point_titles"] = paid["titles"]
+
+
+func _sorted_listeners() -> Array[Dictionary]:
+	var out := _listeners.duplicate()
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a["priority"] != b["priority"]:
+			return a["priority"] < b["priority"]
+		return a["order"] < b["order"])
+	var typed: Array[Dictionary] = []
+	typed.assign(out)
+	return typed
+
+
+# --- Heirlooms and the Onion Patch shop (M9 PATCH) ----------------------------------------------
+
+## An Heirloom reached [param rank] (bought in The Onion Patch; saved).
+signal heirloom_ranked(id: StringName, rank: int)
+## A Seasoning was bought in The Onion Patch (saved).
+signal seasoning_bought(id: StringName)
+
+
+## The rank of the Heirloom [param id] for the current profile: 0 = not owned, 1 .. 5. The dev profile owns every
+## Heirloom at rank 1 (nothing is ranked in an automated run), the max profile at rank 5.
+func heirloom_rank(id: StringName) -> int:
+	if profile == null or Db.get_heirloom(id) == null:
+		return 0
+	return mini(profile.heirloom_rank(id), HeirloomData.MAX_RANK)
+
+
+func owns_heirloom(id: StringName) -> bool:
+	return heirloom_rank(id) > 0
+
+
+## The ids of the Heirlooms the profile owns, in the display order (Db.heirloom_ids).
+func owned_heirloom_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in Db.heirloom_ids:
+		if owns_heirloom(id):
+			out.append(id)
+	return out
+
+
+## Seeds the next rank of [param id] costs (0 = not owned, or already at the top rank).
+func heirloom_rank_price(id: StringName) -> int:
+	var rank := heirloom_rank(id)
+	return HeirloomData.price_for_rank(rank + 1) if rank > 0 and rank < HeirloomData.MAX_RANK else 0
+
+
+## Why the next rank of [param id] cannot be bought now ("" = it can).
+func heirloom_rank_up_reason(id: StringName) -> String:
+	var rank := heirloom_rank(id)
+	if rank <= 0:
+		return "Not owned yet"
+	if rank >= HeirloomData.MAX_RANK:
+		return "Top rank"
+	if profile.read_only:
+		return "The profile cannot be saved"
+	if not can_afford_seeds(heirloom_rank_price(id)):
+		return "Not enough Seeds"
+	return ""
+
+
+## Buys the next rank of [param id] for Seeds: the price is paid and the rank raised ([method Profile.set_heirloom_rank])
+## in ONE save, so a failed write never keeps the Seeds without the rank. False (nothing changes) when
+## [method heirloom_rank_up_reason] says no.
+func rank_up_heirloom(id: StringName) -> bool:
+	if heirloom_rank_up_reason(id) != "":
+		return false
+	var rank := heirloom_rank(id)
+	var price := heirloom_rank_price(id)
+	profile.spend_seeds(price)
+	profile.set_heirloom_rank(id, rank + 1)
+	seeds_changed.emit(profile.seeds, -price)
+	_changed()
+	heirloom_ranked.emit(id, rank + 1)
+	return true
+
+
+## Why [param s] cannot be bought yet ("" = it is buyable, or already owned): the Class Level of its tier or the
+## achievement that opens it.
+func seasoning_lock_reason(s: SeasoningData) -> String:
+	if s == null or is_unlocked(Profile.KIND_SEASONING, s.id, s.class_id):
+		return ""
+	var cls := Db.get_class_data(s.class_id)
+	var who := cls.display_name if cls != null else String(s.class_id).capitalize()
+	match s.tier:
+		&"a":
+			return "" if profile != null and profile.has_achievement(s.unlock_achievement()) else "Win a run with the %s" % who
+		&"aa":
+			return "" if profile != null and profile.has_achievement(s.unlock_achievement()) else "Win a Pungent run with the %s" % who
+	return "" if seasoning_tier_unlocked(s.class_id, s.tier_index() + 1) else "Reach %s level %d" % [who, s.unlock_level()]
+
+
+## What the Onion Patch shows for [param s]: &"owned", &"locked" (see [method seasoning_lock_reason]), &"poor" (open but
+## the wallet is short) or &"buyable".
+func seasoning_state(s: SeasoningData) -> StringName:
+	if s == null:
+		return &"locked"
+	if is_unlocked(Profile.KIND_SEASONING, s.id, s.class_id):
+		return &"owned"
+	if seasoning_lock_reason(s) != "":
+		return &"locked"
+	return &"buyable" if can_afford_seeds(s.price()) else &"poor"
+
+
+## Buys the Seasoning [param id] for Seeds (price and unlock in one save). False when it is unknown, owned, locked or
+## unaffordable.
+func buy_seasoning(id: StringName) -> bool:
+	var s := Db.get_seasoning(id)
+	if s == null or profile == null or profile.read_only or seasoning_state(s) != &"buyable":
+		return false
+	var price := s.price()
+	profile.spend_seeds(price)
+	profile.unlock(Profile.KIND_SEASONING, id, s.class_id)
+	seeds_changed.emit(profile.seeds, -price)
+	_changed()
+	seasoning_bought.emit(id)
+	return true
+
+
+## Puts the Seasoning [param id] into (or takes it out of) the loadout remembered for its class – what the lobby starts a
+## hero of that class with (The Onion Patch, Seasonings tab). Returns a Seasonings.RESULT_ constant (RESULT_INVALID in
+## an automated session: the dev profile selects nothing). Saved.
+func toggle_default_seasoning(id: StringName) -> StringName:
+	var s := Db.get_seasoning(id)
+	if s == null or profile == null or profile.is_dev:
+		return Seasonings.RESULT_INVALID
+	var l := profile.loadout(s.class_id)
+	var list: Array[StringName] = l["seasonings"]
+	var result := Seasonings.RESULT_ADDED
+	if id in list:
+		list.erase(id)
+		result = Seasonings.RESULT_REMOVED
+	elif not Seasonings.owned(s):
+		return Seasonings.RESULT_LOCKED
+	elif list.size() >= Seasonings.slot_count(s.class_id):
+		return Seasonings.RESULT_FULL
+	else:
+		list.append(id)
+	l["seasonings"] = list
+	profile.set_loadout(s.class_id, l)
+	_changed()
+	return result
+
+
+## Flips whether a hero of [param class_id] starts with its alternative weapon by default (Class Level 12, The Onion
+## Patch, Classes tab). Returns the new setting (false when the class has none unlocked, or in an automated session).
+func toggle_default_alt_weapon(class_id: StringName) -> bool:
+	if profile == null or profile.is_dev or not alt_weapon_unlocked(class_id):
+		return false
+	var l := profile.loadout(class_id)
+	l["alt_weapon"] = not bool(l["alt_weapon"])
+	profile.set_loadout(class_id, l)
+	_changed()
+	return bool(l["alt_weapon"])
+
+
+## Picks the title [param id] to show next to the player's name (&"" = none). It must be owned ([method Profile.has_unlock]).
+## Saved. False when it is not owned.
+func select_title(id: StringName) -> bool:
+	if profile == null or (id != &"" and not profile.has_unlock(Profile.KIND_TITLE, id)):
+		return false
+	profile.selected_title = id
+	_changed()
+	return true

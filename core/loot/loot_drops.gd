@@ -285,7 +285,7 @@ static func drop_item(item: ItemInstance, world_pos: Vector3, fallback: Node = n
 ## A LootBag with [param item] at [param world_pos] (see [method drop_item]; not counted).
 static func _place_bag(item: ItemInstance, world_pos: Vector3, fallback: Node) -> LootBag:
 	var parent := _world_parent(fallback)
-	if item == null or parent == null:
+	if item == null or item.is_bound() or parent == null:  # (M9 PATCH: an Heirloom is never dropped)
 		return null
 	var bag := LootBag.create(item)
 	var parent_3d := parent as Node3D

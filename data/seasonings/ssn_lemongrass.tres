@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_lemongrass"
+class_id = &"rogue"
+ability = &"blade_flurry"
+display_name = "Lemongrass"
+text = "Cleaving Blades strikes 1 more target but lasts 1.5 sec less."
+tier = &"t5"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blade_flurry"
+},
+"mods": {
+"targets_add": 1,
+"duration_add": -1.5
+},
+"requires": {
+"knows": "blade_flurry"
+}
+}])

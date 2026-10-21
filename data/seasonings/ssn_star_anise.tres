@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_star_anise"
+class_id = &"mage"
+ability = &"blizzard"
+display_name = "Star Anise"
+text = "Hailstorm is 1 m wider but lasts 0.5 sec less."
+tier = &"t2"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "blizzard"
+},
+"mods": {
+"radius_add": 1.0,
+"duration_add": -0.5
+}
+}])

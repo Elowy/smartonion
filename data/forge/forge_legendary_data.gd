@@ -21,3 +21,8 @@ extends Resource
 ## Tooltip line of the effect (green).
 @export_multiline var unique_text: String
 @export_multiline var flavor: String
+
+
+## The unlock id of this Legendary effect (Profile.KIND_LEGENDARY): the file name's stem, "legendary_<weapon_id>".
+func unlock_id() -> StringName:
+	return StringName("legendary_%s" % weapon_id)

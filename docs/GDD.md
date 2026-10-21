@@ -3,11 +3,11 @@
 > Felülnézetes, hullámalapú arena survivor (Brotato-szerű) World of Warcraft-hangulatú
 > fantasy stílusban, 1–4 fős helyi co-oppal. A hősök **hagymák WoW-páncélban**.
 >
-> Státusz: **M0–M8 kész** (a 16. fejezet szerint), egyetlen kivétellel: a **végleges 25
+> Státusz: **M0–M9 kész** (a 16. fejezet szerint), egyetlen kivétellel: a **végleges 25
 > hullámos balansz** az utolsó lépés, és még hátravan. Az M6b (módok, környezetek,
 > események, szentélyek, Dungeon-portál, tartalom-csomagok) megvalósult; ahol a kód
 > pontosít a tervhez képest, a 16.1 „pontosítások” blokkjai és az érintett fejezetek ezt
-> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika: betűtípus, ikonok, látszó felszerelés, környezetek, harci effektek) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; a későbbi mérföldkő (M9) még tervezés. Ez a dokumentum a fejlesztés
+> rögzítik. Az M7a (hang, menük, beállítások, IP-tisztítás), az M7b (grafika: betűtípus, ikonok, látszó felszerelés, környezetek, harci effektek) és az M8 (Hunter, Shaman, új fegyvertípusok, kaszt-független setek) kész; az M9 (meta-progresszió, 17. fejezet) is kész. Ez a dokumentum a fejlesztés
 > alapja; minden szám kiinduló érték, a balanszolás során változni fog (az M6b maga nem
 > hangolt: a végleges balansz egyszer, a legvégén készül, lásd 9. és 16. fejezet).
 
@@ -330,8 +330,9 @@ Minden kaszt tartalmaz:
 ### 3.7 Hunter és Shaman (M8, megvalósítva)
 
 Mindkettő **Mail** páncélt hord, és a többi kaszttal azonos felépítésű: 2 alap képesség,
-erőforrás, Mastery, 6 saját ability, 3 talentfa, tier set, Artifact. Mindkettő a játék
-elejétől játszható (a későbbi meta-progresszió zárhatja le, lásd 17. fejezet). Az M8 új nevei
+erőforrás, Mastery, 6 saját ability, 3 talentfa, tier set, Artifact. Mindkettő zárt egy új profilon: a Hunter a *Green Shoot* (5. hullám egy futamban) vagy a *Regular at the Patch*
+(3 futam, amely eléri a 3. hullámot) után nyílik, a Shaman a *Salt of the Earth* (500 ölés) vagy ugyanaz a
+*Regular at the Patch* után (17.5). Az M8 új nevei
 (fák, képességek, Mastery, erőforrás, capstone-ok, setek, Artifactok) IP-tisztán lettek kiválasztva.
 
 #### Hunter
@@ -2662,17 +2663,44 @@ sebzés 4)
 
 ### 9.1 Nehézségi szintek
 
-- **MVP:** csak **Normal**.
-- **Adatvezérelt:** a nehézség egy `DifficultyData` fájl, ami tartalmazza:
-  - ellenség-HP és -sebzés szorzó,
-  - spawn-sűrűség,
-  - elit-esély,
-  - bolti árak szorzója,
-  - extra affixek.
-- **Később tervezett:**
-  - **Heroic:** +HP és +sebzés, több elit.
-  - **Mythic:** hullámonként változó affixek (pl. „Bolstering”, „Volcanic”), és feloldható
-    jutalmak.
+**Megvalósítva (M9).** Három szint van: **Normal**, **Pungent** és **Tear-Jerker** (a Normal
+neve marad). Mindegyik egy `DifficultyData` fájl (`data/difficulties/`). A számok kiinduló
+értékek, a végleges balansz a legvégén készül (9. és 18. fejezet).
+
+| Szint | Ellenség HP | Ellenség sebzés | Spawn-sűrűség | Elit-esély | Bolti árak | XP / Seeds | Extra |
+|---|---|---|---|---|---|---|---|
+| Normal | ×1,00 | ×1,00 | ×1,00 | ×1,0 | ×1,00 | ×1,0 / ×1,0 | – |
+| Pungent | ×1,30 | ×1,20 | ×1,15 | ×1,5 | ×1,10 | ×1,5 / ×1,5 | – |
+| Tear-Jerker | ×1,70 | ×1,45 | ×1,30 | ×2,0 | ×1,25 | ×2,5 / ×2,5 | hullámonként egy „nyomás” |
+
+- **Hatókör:** az ellenség-HP és -sebzés (érintés és lövedék), a spawn-sűrűség (a normál
+  hullámokon; a boss-hullám kísérői nem változnak), az elit-esély, és minden bolti ár (bolt,
+  Trainer, Enchanter, fogyóeszközök, Black Market; a rerollok nem). A gold-bevétel, az XP-görbe,
+  a dropok és a bossmechanikák nem változnak.
+- **Feloldás kasztonként:** a Pungent akkor nyílik egy kasztra, ha a kaszttal a csapatban megnyerték
+  a futamot, bármelyik nehézségen (achievement: *Clear*, 10 pont). A Tear-Jerker akkor
+  nyílik, ha a kasztot Pungenten vagy magasabban nyerték meg vele (*Pungent*, 15 pont). Részletek:
+  17.5.
+- **Lobbyban:** a csapat szintje a tagjai közül a legalacsonyabban nyitott szint. A lobbyban a
+  Difficulty sor (SELECT, billentyűzeten Tab) Normal → Pungent → Tear-Jerker között lépteti a
+  szintet; a zárt szintnél megjelenik az ok, pl. „Win a run on Normal with the Mage”.
+- **Látszik:** a HUD-on színes chip (fehér / borostyán / vörös), a végképernyőn és a futamkártyán
+  a szint és a kapott XP / Seeds, a ranglistán külön kategória (a kulcs `…/pungent`,
+  `…/tear_jerker`).
+
+**Tear-Jerker nyomás (pressure):** a Tear-Jerker hullámainak többjén egy módosító lép életbe, a hat közül egyenletesen sorsolva, az előzőt nem ismételve. Az 1–2. hullám nyugodt. A boss-hullámok
+(10., 25., és az Endless 30., 35. … hullámai) és az elit-hullámok (20., 33., 43. …) kimaradnak. A
+következő nyomás a hullám végén dől el; a szünetképernyő és a hullámbanner mutatja. A dungeon-
+szobákban nincs nyomás.
+
+| Nyomás | Hatás (csak az adott hullámon) |
+|---|---|
+| Salt Rain | Spawn-sűrűség +30%, ellenség-HP −12% |
+| Hardened Peel | Ellenség-HP +35%, ellenség-sebesség −10% |
+| Paring Knives | Ellenség-sebzés +35% |
+| Wilting Heat | A hősök képesség-újratöltése +20%, Haste −10 |
+| Weeping Fog | A hősök Speed −12, ellenség-sebesség +10% |
+| Bitter Harvest | Elit-szám ×2, a pickupok gold- és XP-je +40% |
 
 ---
 
@@ -2900,6 +2928,8 @@ saját jutalma van), de az ölések a sebzésmérőbe és a menet-statisztikába
 
 **Lobbyban** (M6b): Y = mód léptetése (Normal ↔ Endless), X = Hardcore ki / be – bármelyik
 játékos megteheti. **Szentély-szavazáskor:** A = Accept, B = Decline.
+
+**Lobbyban** (M9): LT = a hős Loadout-képernyője (Seasonings, Heirloom, Look fülek; B vagy LT zár), LB = alternatív kezdőfegyver, SELECT (billentyűzeten Tab) = nehézségi szint. A főmenü **The Onion Patch** oldalán LB / RB (Q / E) vált fület; bármelyik játékos vezérelheti.
 
 **Gombfeliratok:** a játék felismeri a kontroller típusát, és ahhoz igazítja a feliratokat:
 - Xbox: A B X Y,
@@ -3194,7 +3224,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 
 **Főmenü, beállítások, Credits (M7a)**
 
-- **Főmenü:** Play / Settings / Credits / Quit, a fókusz körbeér. A Settings és a Credits a címképernyő fölé nyíló oldal; bezáráskor a fókusz visszakerül a gombra. Mivel még nincs csatlakozott játékos, az oldalakat bármelyik játékos vezérelheti (billentyűzet vagy bármelyik kontroller).
+- **Főmenü:** Play / The Onion Patch (M9) / Settings / Credits / Quit, a fókusz körbeér. A Settings és a Credits a címképernyő fölé nyíló oldal; bezáráskor a fókusz visszakerül a gombra. Mivel még nincs csatlakozott játékos, az oldalakat bármelyik játékos vezérelheti (billentyűzet vagy bármelyik kontroller).
 - **Szünetmenü:** Resume, Settings, Quit to Menu (a „Continue without Pn” ajánlatok mellett). A Settings oldalt a szüneteltető játékos kezeli; amíg nyitva van, a játék szünetel, a START nem léptet tovább, a B pedig a szünetmenübe visz vissza (a záró B nem léptet tovább a játékba is).
 - **Settings oldal:** fel / le lép a sorok között, bal / jobb egy értéket állít, az A vált, léptet, illetve a *Reset to Defaults* és a *Back* gombot nyomja meg, a B visszalép. Egérrel az egér alatti sor kiemelődik, a nyilak (vagy az érték bal / jobb fele) állítanak.
 
@@ -3428,7 +3458,7 @@ két oldalból áll, amik között váltani lehet. A képernyő mindig a Summary
 | M6 | Tartalom | Mind a 7 ellenség, 2 boss + elit-hullám, Artifactok, **teljes item-tartalom (5.8)**, Enchanting, módok (Endless, Hardcore, ranglista), környezetek, események, szentélyek, Dungeon-portál, 25 hullám balansza (Normal) – **két részben szállítjuk: M6a (kész) és M6b (a végleges balansz kivételével kész)**, lásd alább |
 | M7 | Csiszolás | **Kész (M7a + M7b).** **M7a:** hangok (UI, harc, zene), főmenü (Settings, Credits), beállítások, IP-tisztítás (az átnevezési tábla a „Kiadás és IP” részben). **M7b:** Cinzel-címek és game-icons.net ikonok, a hősön látszó sisak, váll és mellvért, az öt aréna végleges látványa, harci effektek (13. fejezet) |
 | M8 | Új kasztok | **Kész.** **Hunter** és **Shaman** (3.7): kasztok, társ / totemek, ability-készletek, talentfák, tier setek, Artifactok, 16 kaszt-specifikus item; új fegyvertípusok: Crossbow, Polearm, Fist Weapon (4. fejezet); az M6b-ből átcsúszott **kaszt-független tier setek** (set-rendszer módosítással, 5.5) |
-| M9 | Meta-progresszió (utolsó) | Fő profil, Class Level, glyphek, heirloomok, achievementek, transmog, Valor, The Onion Patch (menü) – 17. fejezet |
+| M9 | Meta-progresszió (utolsó) | **Kész.** Egy fő profil (fájl, verzióval; a dev / fresh / max profilok az automatikus futamoknak és a teszteknek), Class Level 1–30 kasztonként (XP-tábla, szintjutalmak, kis nyers erő, alternatív kezdőfegyver), 56 Seasoning slotokkal és árakkal, 10 Heirloom (szintfüggő skálázás, rangok, kötés), 40 achievement (615 pont, címek, Legendary- és Heirloom-jutalmak), három nehézségi szint Tear-Jerker-nyomással és kasztonkénti zárral, Seeds, The Onion Patch (főmenü, öt fül), a lobbyban Loadout (LT), Wardrobe (256 kinézet, 29 kozmetikum) – 9.1 és 17. fejezet. A Questek és a háttértörténet a 17.8 alatt, a legvégén készül. |
 
 **Az M6 két részben jön**
 
@@ -3490,12 +3520,13 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Dungeon-portál** | Opcionális dungeon a 6., 9., 12. és 15. hullám után (részletek lent) | **Kész (M6b)** |
 | **Item-tartalom csomagok** | 3 új fegyver (Two-Hand Sword, Two-Hand Mace, Orb), 96 páncél- és 20 ékszer-alaptípus (anyag-fokozatok), 25 utótag, 50 enchant, 40 névvel ellátott és 40 kaszt-specifikus item, 30 trinket, 25 Legendary (5.8) | **Kész (M6b)** |
 | **Új kaszt: Hunter és Shaman** | Két Mail-kaszt (3.7): Focus és Surge, 8-8 ability, társ (Wolf / Boar / Owl) és totemek, Storm Echo és Beastbond, 3-3 talentfa (7.4), tier set, Artifact, 8-8 kaszt-specifikus item (5.5) | **Kész (M8)** |
+| **Meta-progresszió (M9)** | Fő profil, Class Level 1–30, Seasoning-ek, Heirloomok, achievementek, Wardrobe, Seeds, The Onion Patch, Pungent és Tear-Jerker nehézség – 9.1 és 17. fejezet | **Kész (M9)** |
 | **Új fegyvertípusok (M8)** | Crossbow, Polearm, Fist Weapon, és három Forge Legendary: Bindweed, Barberry, Mossknuckle (4. fejezet) | **Kész (M8)** |
 | **Kaszt-független tier setek** | Öt Epic set (Mendweave Attire, Slipskin Leathers, Hoardscale Mail, Redthorn Mail, Stonebark Plate), páncéltípus szerinti sorsolással (5.5) | **Kész (M8)** |
 | **Goldsinkek** | Enchanter, fogyóeszközök saját bolti sorral, Black Market a 15. hullámtól – hogy a késői gold is döntést jelentsen (részletek lent) | **Kész (M6a)** |
 | **Végleges 25 hullámos balansz** | Egyetlen hangolási kör az M6b végén (az M6a nehezebbé tette a játékot, és a számok addig kiinduló értékek; **az M6b csomagjai sem hangolnak**); a nyitott pontok a 9. fejezetben | **M6b** (a legvégén) |
 | **Remote Play Together** | A helyi co-op online is működjön (Steam) | A legvégén, M9 után |
-| **Meta-progresszió bővítések** | Önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
+| **Meta-progresszió bővítések** | Questek (Quest Board, Story Chapters, menet közbeni mellékküldetések), háttértörténet, és önkéntes nehezítések, heti kihívás, receptkönyv, hagymafajták, kezdőfegyver-választék, bestiárium, mini-petek, Paragon-szintek – részletek: 17.8 | A legeslegvégén, a Remote Play Together után |
 | **IP-tisztítás (Blizzard)** | Minden WoW-ból / Blizzard-játékból átvett név lecserélése saját névre, hogy ne legyen IP-ütközés – részletek lent („Kiadás és IP”) | **Kész (M7a)**, a Steam-oldal előtt |
 | **Steam-kiadás** | Early Access az M7 után, teljes kiadás az M8–M9 után – részletek lent („Kiadás és IP”) | M7 (Early Access), M9 (teljes) |
 
@@ -3787,6 +3818,15 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 | **Ellenfelek és rendszerek** | Loot Goblin → Coin Gremlin · Troll Axethrower → Troll Hatchet-Hurler · Raise Dead (boss-képesség) → Call the Fallen · Spirit Healer → Grave Tender · Resurrection Sickness → Wilted |
 | **Itemek, setek, enchantok** | Frostweave Cowl → Rimeweave Cowl · Warbringer's Greaves → Vanguard's Greaves · Libram of Devotion → Hymnal of Devotion · Battlegear of Fury (set) → Ragebound Plate · Felfire Raiment (set) → Hexfire Raiment · Bloodlust (enchant-előtag) → Warfever · Shadowflame (enchant-előtag) → Duskflame · Retribution (enchant-előtag) → Reprisal |
 
+**Átnevezések (M9)**
+
+| Kategória | Régi → új |
+|---|---|
+| **Meta-fogalmak** | Glyph (kaszt-képesség módosító) → Seasoning · Valor (meta-pénznem) → Seeds · Transmog (kinézet-gyűjtemény) → Wardrobe |
+| **Nehézségek** | Heroic → Pungent · Mythic → Tear-Jerker (a Normal marad) |
+| **Affixek** | A tervezett Mythic-affixek (Bolstering, Volcanic, Sanguine, Raging, Bursting, Necrotic, Fortified, Tyrannical) nem kerültek a játékba; a nyomás-modifikátorok saját nevet kaptak (Salt Rain, Hardened Peel, Paring Knives, Wilting Heat, Weeping Fog, Bitter Harvest) |
+| **Megmaradt nevek** | Heirloom, Achievement, Class Level, The Onion Patch, cím |
+
 **Megtartott nevek (döntések)**
 
 - Általános szavak: Need / Greed / Pass, Disenchant, Trainer, Enchanter, Skeleton Grunt.
@@ -3965,95 +4005,244 @@ működik; a számok kiinduló értékek, az M6b nem hangolt).
 
 ---
 
-## 17. Meta-progresszió (utolsó mérföldkő, M9)
+## 17. Meta-progresszió (M9, megvalósítva)
 
 **Cél:** a megmaradó fejlődés főleg **új lehetőségeket** ad, nem nyers erőt. A Normal
-nehézség 0 meta-fejlődéssel is végigjátszható és élvezetes marad. A nyers erő-bónusz
-összesen **legfeljebb kb. +10%**.
+nehézség meta-fejlődés nélkül is végigjátszható és élvezetes; a nyers erő-bónusz összesen
+**legfeljebb kb. +10%**.
+
+Ez a fejezet a megvalósított rendszert írja le. Minden szám kiinduló érték (nincs balanszkör,
+lásd 9. és 18. fejezet). Az átnevezések (Glyph → Seasoning, Valor → Seeds, Transmog → Wardrobe)
+a „Kiadás és IP” részben vannak. A kódszintű leírás a `docs/ARCHITECTURE.md` M9 fejezetében van.
 
 ### 17.1 Fő profil
 
-- **Egyetlen fő profil (a játék mentése).** Minden meta-fejlődés ehhez tartozik:
-  - kasztonként a Class Level,
-  - glyphek, heirloomok,
-  - achievementek, transmog, Valor.
+- **Egyetlen fő profil** (`user://profile.json`, verzió 1). Ebben van minden meta-fejlődés:
+  kasztonként a Class XP és a Class Level, a Seeds-egyenleg, a Seasoning-ek és a kasztonkénti
+  választásaik, a Heirloomok és a rangjaik, az achievementek és a címek, a Wardrobe-gyűjtemény,
+  a lobbyban megjegyzett összeállítás (loadout) és a nehézségi szintek nyitása.
 - **Bárki, aki egy kaszttal játszik, a fő profil adott kaszthoz tartozó szintjét és
-  feloldásait kapja.** Ha pl. a fő profilon a Warrior 12-es szintű, akkor a Warriort választó
-  játékos (akár P1, akár P3) a 12-es Warrior minden feloldásával indul.
-- **Class XP:** a menet végén minden kaszt, amivel játszottak, Class XP-t kap a fő profilon.
-  Ha ketten játszottak ugyanazzal a kaszttal, az XP-jük összeadódik.
+  feloldásait kapja.** Ha a fő profil Warrior-ja 12. szintű, a Warriort választó játékos (akár P1,
+  akár P3) a 12-es Warrior minden feloldásával indul. Co-opban minden hős a saját kasztja
+  szintjét kapja.
+- **Mentés:** a futam végén egyetlen mentés (XP, Seeds, győzelmek, achievementek, gyűjtemény,
+  élettartam-statisztikák); vásárláskor és futam közben feloldott achievementnél azonnal. Az írás
+  ideiglenes fájlon át, átnevezéssel történik, és a játék visszaolvasva ellenőrzi: egy sikertelen
+  vagy rövid írás (tele lemez) nem írja felül a régi fájlt. A felülírt jó fájlról minden mentésnél
+  `profile.json.bak` másolat marad. Olvashatatlan fájlt a játék `.corrupt` néven félreteszi; ha
+  van olvasható `.bak`, abból tölt be (figyelmeztetéssel, a haladás megmarad), különben üres
+  profillal indul. Újabb verziójú fájlt a játék csak olvas, és nem írja felül.
+- **Automatizált futamok nem érintik a profilt.** A smoke, a demo, a `--view`, a képernyőkép és
+  a tesztek a **dev profilt** használják: minden nyitva, nincs nyers erő, nincs kiválasztás,
+  Normal nehézség, és nincs fájl-írás. Ezért a meglévő tesztek és a smoke-futamok az alap játékot játsszák.
+  Kézi ellenőrzéshez a `--profile=fresh` (új játékos), a `--profile=max` (minden kaszt 30-as
+  szinten, minden nyitva) és a `--profile-path=FILE` (valódi profil fájlból) adható meg.
 - **Későbbi opció:** több mentési hely (pl. 3 fő profil) a főmenüben.
 
 ### 17.2 Class Level (kasztonként 1–30)
 
-- **Class XP** jár minden menet után. Forrásai:
-  - túlélt hullámok,
-  - ölések,
-  - bossok,
-  - győzelem;
-  - a magasabb nehézség szorzót ad.
-- **Szint-jutalmak (útvonal):**
+**Class XP** minden futam után jár, minden kaszthoz, amellyel a csapat játszott. Két azonos
+kasztú hős két részt ad, az XP összeadódik.
 
-  | Szint | Jutalom |
-  |---|---|
-  | 2, 4, 6, … | Új ability kerül a kaszt húzópaklijába (indulásra 4 van a 6-ból) |
-  | 3, 10, 20 | Glyph-slot (17.3) |
-  | 5 | Első Heirloom (17.4) |
-  | 8, 16, 24 | A talentfák capstone-jai fokozatosan nyílnak meg |
-  | 12 | Alternatív kezdőfegyver |
-  | 15, 25, 30 | Kozmetika (tabard, kalapváltozat, fényhatás) |
-  | 30 | Cím, pl. „*Onion, the Unbreakable*” |
+- **Forrásai:** a túlélt hullámok (hullámonként 6 + 0,5 × a hullám száma, a 30. hullámig), a
+  saját ölések (0,03 / ölés), az elitek (1,5 / elit, futamonként legfeljebb 60), a bossok
+  (40 / boss) és a győzelem (150). A nehézség szorzót ad: Pungent ×1,5, Tear-Jerker ×2,5.
+- **Behozó (catch-up):** ha a kaszt legalább 10 szinttel a fő profil legmagasabb kasztja alatt
+  van, és 20. szint alatt, az XP ×1,5.
+- **Első győzelem:** kasztonként és nehézségenként egyszer 250 (Normal), 400 (Pungent) vagy 600
+  (Tear-Jerker) XP-bónusz jár, szorzók nélkül.
+- **Szintlépési tábla:** az 1. szintről a 2.-ra 95 XP kell, a 29.-ről a 30.-ra 2925; a 30. szint
+  összesen 33 205 XP. Tervezett ütem (papíron számolt, valós adat még nincs): a 10. szint kb.
+  10 futam után, a 30. szint kb. 70 futam után (Pungenten kb. 50).
 
-- **Kis nyers erő** (összesen legfeljebb kb. +10%, főleg kényelem): +1 backpack-hely,
-  +20 kezdő gold, +1 ingyen bolti reroll menetenként, +2% fő stat.
+A szintek jutalmai (a tábla a `data/meta/class_levels.tres` fájlt tükrözi):
 
-### 17.3 Glyphek
+| Szint | Jutalom |
+|---|---|
+| 2, 4 | A kaszt két zárt képessége a húzópaklihoz csatlakozik (indulásra 4 van a 6-ból) |
+| 3 / 10 / 20 | **Seasoning-slot** (1 / 2 / 3, lásd 17.3); a T1 Seasoning-ek a 3. szinttől vásárolhatók |
+| 5 | **Heirloom-slot** (17.4) és a kaszt ajándék-Heirloomja |
+| 6, 9, 13, 17 | Seasoning-szintek: T2, T3, T4, T5 |
+| 7, 19 | +10 kezdő gold (összesen +20) |
+| 8, 16, 24 | Egy-egy talentfa capstone-ja nyílik |
+| 9, 21 | +1% fő stat (összesen +2%) |
+| 11 | +1 ingyenes bolti reroll futamonként |
+| 12 | **Alternatív kezdőfegyver** (LB a lobbyban) |
+| 14 | +1 hátizsák-hely (11 a 10 helyett) |
+| 15 / 25 / 30 | Kozmetika: tabard / kalapváltozat / fényhatás |
+| 30 | **Cím** (kasztonként egy, pl. „the Unbreakable” a Warriornak) |
 
-- **Választás:** menet előtt, a lobbyban legfeljebb **3 glyph** választható (a slotok Class
-  Levellel nyílnak).
-- **Mit tudnak:** a kaszt **képességeit módosítják**, oldalirányú választások. Például:
-  - *Glyph of Whirlwind*: behúzza az ellenségeket.
-  - *Glyph of Blink*: jégcsíkot hagy.
-  - *Glyph of the Imp*: Felhunter jön az Imp helyett.
-- **Mennyiség:** kasztonként kb. 8 glyph, Class Levellel és achievementekkel nyílnak.
+- **Seeds-ajándék:** minden elért szint után 5 + a szint Seeds; a jutalom nélküli szinteken
+  (18, 22, 23, 26–29) duplán. Kasztonként összesen 817 Seeds a 30. szintig.
+- **Zárt képességek:** a kezdő pakli négy, főleg automatikusan használt képességből áll; a két
+  zárt képesség a kaszt kézi vagy pozicionális döntést igénylő tanulható képességei közül való.
+  A capstone-ok az egyszerűbbtől a build-meghatározók felé nyílnak.
+- **Alternatív kezdőfegyver:** kasztonként egy másik kezdőfegyver-készlet (pl. Warrior
+  kétkezes kard, Mage staff, Paladin kétkezes buzogány pajzs nélkül, Rogue gun, Warlock wand +
+  orb, Hunter crossbow, Shaman staff). Mindegyik a kaszt jártasságán belül van: playstyle-váltás,
+  nem erő.
+- **Kis nyers erő** (a jutalmakból, összesen legfeljebb kb. +10%): +20 kezdő gold, +1 reroll,
+  +1 hátizsák-hely és +2% fő stat. Csak a valódi profilon él; az automatizált futamok nélküle
+  futnak.
+
+### 17.3 Seasoning-ek
+
+A Seasoning egy kaszt-képesség **oldalirányú változata**: ad valamit, és ront valamin. Példa:
+a *Smoked Paprika* a Whirlwindet 35%-kal lassítja 2 mp-ig, de 8-cal több Rage-et költ. Nem új
+képesség és nem nyers erő.
+
+- **Mennyiség:** kasztonként 8, összesen 56. Mindegyik ugyanazon kaszt egy képességét
+  módosítja (a számokat, az időt, a távolságot vagy a költséget).
+- **Viselkedés-ellenőrzés:** minden sor tesztelt: a módosított szám tényleg változik, és a
+  képesség tényleg másképp viselkedik.
+- **Alvó Seasoning:** ha a céljául szolgáló tanulható képességet a hős még nem tanulta meg, a
+  Seasoning alszik. Ilyenkor a szintlépési kártyák között az ő képessége ×3 súllyal jön elő; ez
+  az egyetlen segítség, képességet nem ad.
+- **Slotok:** a 3. / 10. / 20. szinten nyíló slotok számánál több Seasoning nem vihető. A lobbyban
+  a hős Loadout-jának Seasonings fülén (LT) lehet választani.
+- **Vásárlás:** a The Onion Patch Seasonings fülén, Seeds-ért. Az A és AA szintet
+  achievement nyitja (lásd lent), nem a Class Level.
+
+| Szint | Tier | Ár (Seeds) | Feltétel |
+|---|---|---|---|
+| 3 | T1 (kasztonként 2) | 60 | Class Level 3 |
+| 6 | T2 | 80 | Class Level 6 |
+| 9 | T3 | 100 | Class Level 9 |
+| 13 | T4 | 140 | Class Level 13 |
+| 17 | T5 | 180 | Class Level 17 |
+| – | A | 160 | Achievement: a kaszt megnyerése, bármely nehézségen |
+| – | AA | 240 | Achievement: a kaszt megnyerése Pungenten vagy magasabban |
+
+Egy kaszt nyolc Seasoning-jának összára 1020 Seeds; mind az 56 együtt 7140 Seeds.
+
+| Kaszt | A nyolc Seasoning (T1-től AA-ig) |
+|---|---|
+| Warrior | Smoked Paprika, Cracked Pepper, Cayenne Rush, Bay Leaf, Horseradish Kick, Sea Salt, Black Garlic, Ginger Snap |
+| Mage | Cinnamon Stick, Mint Leaf, Star Anise, Saffron Thread, Chili Flake, Juniper Berry, Pink Peppercorn, Vanilla Bean |
+| Paladin | Rosemary Sprig, Sage Leaf, Thyme Sprig, Fennel Seed, Cardamom Pod, Nutmeg Dust, Clove Pinch, Golden Turmeric |
+| Rogue | Sichuan Pepper, Dill Sprig, Caraway Seed, Tarragon, Coriander, Lemongrass, Fenugreek, Ghost Chili |
+| Warlock | Cumin Seed, Sumac, Allspice, Wasabi, Tamarind, Five-Spice, Harissa, Ras el Hanout |
+| Hunter | Mustard Seed, Wild Garlic, Hickory Smoke, Pine Needle, Dried Chive, Pickling Brine, Marjoram, Ancho Chile |
+| Shaman | Smoked Salt, Rock Salt, Curry Leaf, Celery Seed, Oregano, Sweet Basil, Lovage, Wolfberry |
 
 ### 17.4 Heirloomok
 
-- **Menetenként 1 heirloom-slot:** egy megmaradó itemmel lehet indulni.
-- **Skálázás:** a hullámmal nő, de gyengébb az Artifactnál; a kényelmes kezdést szolgálja.
-- **Szerzés és fejlesztés:** Class Level mérföldkövekből és achievementekből jönnek, és
-  **Valorért** fejleszthetők.
+Tíz megmaradó tárgy. Kasztonként **egy Heirloom-slot** van (5. szint), a hős a futamba
+**felszerelve** indul vele. A lobbyban a Loadout Heirloom fülén választható; egy hős egyszerre
+egyet visel, és két hős is viselheti ugyanazt.
 
-### 17.5 Fiók-szintű fejlődés
+- **Kötött:** nem adható el, nem cserélhető, nem bontható Disenchant-tal, nem kerül a csapat
+  kasszájába, és nincs rá Need / Greed dobás. Hátizsákba kerülhet és onnan visszatehető a
+  hősre, de csak a viselt darab ad perket.
+- **Páncél:** a páncéldarabok a hős páncéltípusát veszik fel, így a páncél-specializáció is
+  számol velük.
+- **Skálázás:** minden hullám elején újraszámolódik. Az itemszint 5 + 2 × hullám + 2 × (rang − 1).
+  A statok költségvetése: (2,5 + 0,5 × hullám) × slot-szorzó × (1 + 0,08 × (rang − 1)). A
+  slot-szorzó a fejnél, mellnél és lábnál 1,0, a vállnál, kéznél és lábfejnél 0,8, a nyaknál,
+  gyűrűnél és ékszernél 0,7. A statokat a hős elsődleges statjára költik el. A fegyver-Heirloom
+  sebzése hullámonként nő, statok nélkül.
+- **Gyengébb az Artifactnál:** egy R1 fejdarab 3 statpontot ad az 1. hullámon, 7,5-öt a 10-en
+  és 15-öt a 25-ön. Egy 24 pontos Epic és egy Artifact mindig erősebb, és a Heirloomnak
+  nincs a két perken túli tulajdonsága.
+- **Rangok:** R1 a szerzéskor ingyen; R2 60, R3 120, R4 240, R5 480 Seeds. Minden rang +8%
+  költségvetés; R3-tól a 3. perk, R5-től az 5. perk is aktív.
+- **Szerzés:** a kaszt ajándék-Heirloomja az 5. szinten jár; a többi három achievementhez kötött.
 
-- **Achievementek:** pontokkal és címekkel. Például:
-  - „Win without anyone going down”,
-  - „Need-roll a Legendary”,
-  - „Kill 3 Loot Goblins in one run”.
-- **Feloldások achievementekből:**
-  - új kasztok (**Hunter**, **Shaman**),
-  - új Legendaryk a loot-készletbe,
-  - nehézségi szintek kasztonként (Normal megnyerése → Heroic, Heroic → Mythic).
-- **Transmog-gyűjtemény:**
-  - minden valaha felvett item kinézete elmentődik,
-  - a lobbyban kozmetikailag ezekbe lehet öltöztetni a hagymát.
+| Heirloom | Slot | Honnan | R3 perk | R5 perk |
+|---|---|---|---|---|
+| Sprout Cap | Fej | Mage, 5. szint | +3 Haste | Hullám elején +8 Haste 10 mp-ig |
+| Mantle of Old Layers | Váll | Paladin, 5. szint | +4 Armor | Sebzéskor 20% esély 5% Max HP-s pajzsra (4 mp, 8 mp újratöltés) |
+| Grandmother's Apron | Mell | Warrior, 5. szint | +4 Spirit | 30% HP alatt 15% Max HP gyógyulás (hullámonként egyszer) |
+| Oven Mitts | Kéz | Hunter, 5. szint | +2 Crit | +30% felvételi távolság |
+| Pantry Breeches | Láb | Shaman, 5. szint | +3 Armor | −3% kapott sebzés |
+| Garden Clogs | Lábfej | Rogue, 5. szint | +2 Speed | Sebzéskor 25% esély +10 Speed-re 3 mp-ig (6 mp újratöltés) |
+| Garlic Braid | Nyak | Warlock, 5. szint | +1 Leech | Ölésnél 6% esély 3% Max HP gyógyulásra |
+| Signet of the First Harvest | Gyűrű | Achievement: Harvest Home | +2 Mastery | Hullám elején +10% sebzés 10 mp-ig |
+| Lucky Seed Pouch | Ékszer | Achievement: Gremlin Roundup | +5 Gold Find | Hullám elején 3 gold |
+| Ancestral Peeler | Fegyver (a kezdőfegyver típusa) | Achievement: Sharp Palate | +3 Crit | Találatnál 6% esély, hogy a támadás azonnal megismétlődik |
 
-### 17.6 Valor és „The Onion Patch”
+Az Ancestral Peeler a hős kezdőfegyverének típusát követi (a Standard vagy az Alternatív
+készletét), a fő kézbe kerül, és annak típusát és sebzését másolja.
 
-- **Valor:** menetenként kapott megmaradó pénz.
-- **The Onion Patch:** hagymakert-hub, kasztonként egy trainer-NPC-vel. Itt Valorért
-  heirloom-fejlesztés, glyphek és kozmetika vehető.
-- **Megvalósítás:** **először menü**, később bejárható kis kert.
+### 17.5 Achievementek
 
-### 17.7 Amire a fejlesztés közben már most figyelünk
+**40 achievement, összesen 615 pont.** Minden pont 5 Seeds jutalmat ér (az összes 3075 Seeds),
+és címet vagy feloldást is adhat. Az achievement a hullám végén, a futam közben (a kulcs-
+eseményeknél) és a futam végén is ellenőrződik. A feloldást HUD-felugró jelzi; a végképernyő
+listázza.
 
-Az M9 előtti rendszerek úgy épülnek, hogy a meta-progresszió később átírás nélkül
-ráépíthető legyen (részletek: `docs/ARCHITECTURE.md`):
-- stabil tartalom-azonosítók,
-- feloldás-ellenőrzés a tartalom-készletekben,
-- menet-statisztika események,
-- verziózott mentés,
-- profilhoz köthető beállítások.
+- **Pont-címek:** 100 pont: „the Collector”; 250: „the Archivist”; 450: „the Patch Master”;
+  600: „the Completionist”.
+- **Hunter és Shaman:** a **Hunter** a *Green Shoot* (5. hullám teljesítése egy futamban) vagy a
+  *Regular at the Patch* (3 futam, amely eléri a 3. hullámot) után nyílik. A **Shaman** a *Salt of
+  the Earth* (500 ölés összesen) vagy ugyanaz a *Regular at the Patch* után.
+- **Kasztonkénti nehézség:** minden kasztra két achievement van. *Clear* (10 pont): győzelem a
+  kaszttal a csapatban, bármely nehézségen; ez nyitja a Pungent szintet és az A Seasoning-tier-t.
+  *Pungent* (15 pont): győzelem Pungenten vagy magasabban; ez nyitja a Tear-Jerker szintet és
+  az AA Seasoning-tier-t.
+- **Legendary-k:** öt Legendary kerül a loot-készletbe, ha a hozzá tartozó achievement megvan:
+  *Stormcaller* (a 10. hullám bossának legyőzése), *Sash of Twin Souls* (győzelem 4 fővel), *Vial
+  of Distilled Adrenaline* (győzelem úgy, hogy senki nem esett el), *Crown of Ashes* (győzelem
+  Hardcore-ban) és *Tearjerker* (első Tear-Jerker győzelem). A Legendary neve az achievement
+  megszerzéséig rejtett.
+- **Heirloom-jutalom:** a Harvest Home a Signet, a Gremlin Roundup a Lucky Seed Pouch, a Sharp
+  Palate az Ancestral Peeler Heirloomot adja.
+- **Kozmetikum:** pl. a Swift Harvest (win Normalon, 2400 mp alatt) az Ember Orange festéket, az
+  Everbloom (40. hullám Endlessben) a Gilded Gold festéket, a Fully Grown (30. szint) a Moss Green
+  festéket, a Wardrobe Wonder (150 gyűjtött kinézet) a Charcoal Grey festéket; a Dressed to
+  Impress a Gala Tabardot, az Inconsolable a Salt Crystal Glow fényhatást adja.
+- **Címek:** pl. the Harvester, the Lone Bulb, the Untouched, the Gardener (mind az 5 arénát
+  megnyerve), Seven-Layered (mind a 7 kaszttal), the Everlasting, the Tear-Proof, the Inconsolable.
+- **Többi:** több achievement csak pontot és Seeds-et ad, pl. Need Is Greed, Relic Hunter, Peak of
+  the Tree, Master Chef, Cellar Cleaner, Second Chance.
+
+### 17.6 Seeds, The Onion Patch és a Wardrobe
+
+**Seeds** a meta-pénznem. Egy futam után, egyszer:
+`1,5 × hullám + 12 × boss + 40 (a végső boss legyőzése) + (csapat-ölés / 400)`, szorozva a
+nehézség Seeds-szorzójával (Pungent ×1,5, Tear-Jerker ×2,5) és `(1 + 0,1 × (játékosok − 1))`-gyel,
+legfeljebb 400. Tervezett példák (papíron számolt): Normal győzelem solo kb. 114, 4 játékossal kb.
+176; Pungent győzelem solo kb. 170; Tear-Jerker győzelem solo kb. 284; vereség a 9. hullámnál solo
+kb. 15. Az achievementek és a Class Level-ajándékok további Seeds-et adnak (17.2, 17.5).
+
+**The Onion Patch** a főmenü egyik pontja (Play és Settings között). Bármelyik játékos vezérelheti
+a saját padjával; LB / RB (billentyűzeten Q / E) vált fület. A fejlécben a Seeds-egyenleg, az
+achievement-pontok és a választott cím látszik. Minden vásárlás azonnal mentődik.
+
+| Fül | Mit mutat | Mit lehet csinálni |
+|---|---|---|
+| Classes | 7 kaszt: Class Level, XP-sáv, a következő 3 jutalom, legjobb hullám, győzelmek (N / P / T), a zárolási ok | Kasztonként az alternatív kezdőfegyver alapbeállítása |
+| Seasonings | Kaszt-léptető, a 8 Seasoning állapota (zárolt / megvehető / megvett) és ára | Vásárlás Seeds-ért; a megvett Seasoning a kaszt megjegyzett összeállításába tehető |
+| Heirlooms | 10 kártya, rangpöttyök, statok 1. / 10. / 25. hullámon, perkek | Rang-fejlesztés R2–R5 (60 / 120 / 240 / 480 Seeds) |
+| Achievements | 40 sor haladással, pontokkal és jutalommal (a rejtett és a Legendary jutalom „???”, amíg nincs meg) | Cím kiválasztása |
+| Wardrobe | Szűrők (fej, váll, mell, kozmetikum, festék), gyűjtemény-rács, 3D-előnézet, „N / 256” számláló | Festék vásárlása 100 Seeds-ért; X (billentyűzeten R) forgatja az előnézetet |
+
+**Wardrobe (kinézet-gyűjtemény):**
+
+- **Gyűjtés:** ha a hős a futamban viselt egy páncéldarabot (hullámkezdéskor vagy a futam
+  végén), annak kinézete a gyűjteménybe kerül. A gyűjtemény fiókonként (a teljes profilra)
+  közös; csak valódi futamban gyűlik. A Heirloom darabjai is ide tartoznak.
+- **Mennyiség:** 256 kinézet: 180 generált (páncéltípus × fokozat × ritkaság), 36 tier-szett darab
+  és 40 kézzel tervezett egyedi darab (a Legendary-k is). Az Artifact-ritkaságú páncélkinézetek
+  nem gyűjthetők. Ezen felül 29 kozmetikum: 8 tabard, 8 fényhatás, 7 kalap és 6 festék.
+- **Öltöztetés:** a lobbyban a hős Loadout-jának Look fülén: fejen, vállon és mellen bármelyik
+  gyűjtött kinézet (páncéltípustól függetlenül), plusz egy tabard, kalap, fényhatás és festék. Csak
+  kozmetikus: nem ad statot és nem változtat a felszerelésen. A választás kasztonként megmarad.
+
+### 17.7 A lobbyban: a hős összeállítása
+
+Minden hős kártyáján (a játékos saját padjával):
+
+- **LT** nyitja a **Loadout** képernyőt három fülrel: **Seasonings**, **Heirloom**, **Look**.
+  LB / RB (vagy ◀ ▶) vált fület, B vagy LT bezár. A Look fülön a kinézet-választó nyílik
+  (kompakt módban: az élő előnézet a sorok fölött látszik, mert a Loadout eltakarja a hős kártyáját).
+  Minden fül elfér a legkisebb, 1080p-s lobbykártyán.
+- **LB** (Q) kapcsolja az alternatív kezdőfegyvert (12. szint után); a Loadout zárt állapotában.
+- **SELECT** (Tab) lépteti a csapat nehézségi szintjét (9.1).
+- Egy zárt kaszt (pl. a még nem nyitott Hunter) kártyáján az ok látszik, és a kész (Ready) állapot
+  nem engedi.
+- A kasztonkénti választásokat a játék megjegyzi a fő profilban, így a következő futamban
+  ugyanazzal indul a hős. Ami már nem jár (pl. zárt tétel), az a futam elején kiesik.
 
 ### 17.8 Bővítések a legeslegvégére
 
@@ -4062,21 +4251,104 @@ Ugyanaz az elv, mint a 17. fejezetben: új lehetőségek, nem nyers erő.
 
 - **Önkéntes nehezítések (Heat-szerű):** menet előtt a csapat apró nehezítéseket választhat
   (pl. „+20% ellenség-sebesség”, „nincs Grave Tender”, „1 bolti ajánlattal kevesebb”);
-  mindegyik több Valort és Class XP-t ad. Finomabb skála, mint a Heroic / Mythic.
+  mindegyik több Seeds-et és Class XP-t ad. Finomabb skála, mint a Pungent / Tear-Jerker.
 - **Heti kihívás:** fix seed, fix környezet, 1–2 előre megadott nehezítés, saját ranglista és
-  plusz Valor; később online is (Remote Play Together).
+  plusz Seeds; később online is (Remote Play Together).
 - **Receptkönyv (Cooking / Alchemy):** a menetekben ritka receptek esnek, amelyek véglegesen
   bővítik a bolti fogyóeszköz-sor kínálatát (több választék, nem erősebb hős).
 - **Hagymafajták:** az Onion Patch kertjében a menetekből hozott magok „nőnek”, és új
   megjelenést nyitnak (Shallot, Red Onion, Leek, Spring Onion …) – csak kozmetika.
-- **Kezdőfegyver-választék:** Class Level mérföldkövek új indulófegyvereket nyitnak
-  kasztonként (pl. Warrior kétkezes karddal, Mage Orbbal) – új játékstílus, nem erő.
+- **Kezdőfegyver-választék:** Class Level mérföldkövek új indulófegyvereket nyitnak kasztonként
+  (pl. Warrior kétkezes karddal, Mage Orbbal) – új játékstílus, nem erő.
 - **Bestiárium (Onion Almanac):** ellenségenkénti ölésszám, rövid leírás, mérföldkövekért
   címek és keretek; a bossok és az események is bekerülnek.
 - **Mini-petek:** nem harcoló kis kísérők, gyűjthetők a Coin Gremlin-től, bossoktól és
   dungeonokból – kozmetika.
 - **Paragon-szintek:** a 30-as Class Level fölött végtelen szintek, csak kozmetikai
   jutalommal (keretek, portré-díszek).
+
+#### Questek (a legvégére)
+
+A döntés: a questek és a háttértörténet **nem** az M9 része; a legvégén készülnek el. Három
+lehetőség van, az első kettő a The Onion Patch-re épül:
+
+- **Quest Board a The Onion Patch-ben (meta):** mindig 3 forgó feladat (pl. „Win a run with a
+  Shaman”, „Kill 2 bosses without anyone falling”, „Open 3 guarded chests”); jutalom: Seeds és
+  néha kozmetikum. Olcsó, mert az achievement-motorra épül.
+- **Story Chapters (sztori-kampány):** kb. 8 fejezet. Mindegyik egy menet a meglévő aréna-, mód-
+  és nehézségi beállításokkal, és egy céllal (pl. „Chapter 3 – The Root Cellar: survive to wave 15
+  in the Ice Cave”). A teljesítés lore-lapot és kozmetikumot nyit; az utolsó fejezet Vor'thalax
+  legyőzése Pungent nehézségen. Ez hordozza a háttértörténetet.
+- **Menet közbeni mellékküldetések:** a hullámszünetben felajánlott opcionális cél (pl. „védd
+  meg a karavánt”, „ölj meg 3 elitet elesés nélkül”). A hullámon belüli eseményekhez áll közel,
+  ezért a lista végére került.
+
+#### Háttértörténet (vázlat) – támpontok
+
+Nem kész szöveg, hanem támpontok a későbbi kidolgozáshoz.
+
+- **A világ: „The Patch”:** egy elvadult konyhakert-birodalom. Az öt aréna a vidékei: Forest Ruin
+  (az elhagyott gyümölcsös), Cemetery (a komposztmező, ahol a betakarítatlan termés nyugszik),
+  Swamp (a túlöntözött ágyások), Volcano (a felperzselt Burnt Field), Ice Cave (a Root Cellar, a
+  fagyos pince). A hub, a The Onion Patch, az utolsó biztonságos ágyás és a hősök otthona.
+- **Miért hordanak páncélt a hagymák?** Egy goblin kereskedőkaraván („The Goblin's Goods”)
+  borult fel a kert szélén, tele kalandozó-felszereléssel. A hagymák a régi hőstörténetek alapján
+  felöltötték, és komolyan veszik a szerepet: ez a paródia alapja.
+- **A két ellenség:**
+  - **The Rot** – vezetője Lich Commander Morvain; a lekaszált, elfeledett termést támasztja fel
+    (csontvázak, ghoulok, flesh golem). A kultisták a Rot papjai.
+  - **The Ash Court** – vezetője Vor'thalax, a Burning Tyrant; le akarja égetni az egész kertet,
+    hogy „új talajt” csináljon. Morvain csak az előőrse.
+- **A hősök mint hagymafajták:**
+  - Warrior: vöröshagyma, a legkeményebb héj.
+  - Mage: lilahagyma, a pince könyveiből tanult.
+  - Paladin: aranyhagyma, a régi kerti istenek esküjét őrzi.
+  - Rogue: újhagyma, gyors és csípős.
+  - Warlock: sötét mogyoróhagyma, paktumot kötött az Ash Court egy kisebb démonával (belső konfliktus).
+  - Hunter: salottahagyma, a társával, az erdei szél vadásza.
+  - Shaman: fokhagyma, „a távoli unokatestvér”; elűzi az élőholtakat, így a Rot természetes ellensége.
+- **Visszatérő motívumok:** a rétegek (a sebzéskor hámló héj már a játékban van), a könnyek
+  (a Tear-Jerker név is erre utal) és az önironikus, meleg humor.
+- **Mellékszereplők:** a Grave Tender (öreg kertész-szellem, aki a halott hősöket visszaülteti), a
+  Coin Gremlin (komikus tolvaj), és a szentélyek: a Shrine of Greed, Haste, Learning, Blood,
+  Fortune és the Gambler. Régi kerti istenek, kétes ajándékokkal.
+- **Felhasználás:** 3–4 mondatos intro a trailer elejére és a Steam-leírásba; egysoros boss-belépők
+  (pl. Morvain: „Nothing stays buried in my soil.”); feloldható lore-lapok a The Onion Patch-ben.
+
+#### M9 maradékai (a legvégére)
+
+Amit az M9 szándékosan nem vitt be, vagy az építés során talált hiányosság. A számok és a
+funkciók a megvalósított állapotra vonatkoznak.
+
+- **Wardrobe „nem látott” jelölő:** a gyűjtemény jelölné az újonnan szerzett kinézeteket. Ehhez a
+  profilban egy mentett „látott” halmaz kell, ami még nincs.
+- **Kasztonkénti alapértelmezett Heirloom a The Onion Patch-ben:** a terv szerint; ma a lobby jegyzi
+  meg kasztonként, a Patch csak fejleszt.
+- **Kasztonkénti alapértelmezett kinézet a The Onion Patch Wardrobe fülén:** ma a kinézet-választó
+  állítja be a lobbyban.
+- **Heirloom-jelző a lobbykártyán:** a Seasonings-pill foglalja a sávot; a Heirloom csak a
+  Loadout fülén látszik.
+- **Endless-mód Heirloom-költségvetés:** a hullámonként növekvő budget nincs felső korláthoz kötve
+  (a 99. hullámon egy fejdarab kb. 52 statpontot ad); az Artifactoknál is így van.
+- **Botok kicserélhetik a Heirloomot:** a bot a jobb darabot választja, a régi Heirloom a
+  hátizsákba kerül (kötve marad, perk nélkül). Embernek ez szándékos; a smoke-ban a 3. és az 5.
+  rang perkjei csak viselve hatnak.
+- **Seeds és XP újrakalibrálása** valódi futamadatokból (a design 10. fejezete, 4. kockázat): a
+  számok papíron készültek, bot-adat nélkül.
+- **Pungent és Tear-Jerker számok:** a szorzók és a nyomás-modifikátorok helyőrzők; csak a
+  `DifficultyData` és a nyomás-fájlok számait kell hangolni. A Normal sem volt végleg hangolva (M6b).
+- **Veterán-ajándék:** a korábbi buildekről frissülő játékosok a Hunter és a Shaman zárával
+  indulnak; egy egyszeri ajándék (pl. egy régi ranglista-fájl alapján) ezt enyhítené.
+- **Artifact-ritkaságú kinézetek:** a 36 ilyen páncélkinézet ki van zárva a gyűjteményből (256
+  gyűjthető a 292-ből); ezt egyetlen konstans kapcsolja át.
+- **Nehézség csak a munkamenetre:** a lobbyban kiválasztott nehézség nem íródik a profilba; a
+  tervben a beállítások között lett volna.
+- **Kooperatív XP-farmolás:** négy azonos kasztú hős négy XP-részt ad. A 17.2 szerint elfogadott;
+  figyelni kell, ha visszaélnek vele.
+- **Alvó Seasoning:** a még nem tanult képességhez kötött Seasoning csak a ×3 kártya-súllyal segít.
+  Ha ez gyenge, egy „induljon a képesség megtanulva” opció adható.
+- **Alternatív fegyverek:** a kétkezes, gun és staff változatok playstyle-ként működnek, de nincsenek
+  hangolva.
 
 ---
 
@@ -4107,7 +4379,7 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | Hullámok közti időkorlát | 60 mp, beállításokban kikapcsolható |
 | Gombfeliratok | A kontroller típusa szerint (Xbox / PlayStation / Nintendo) |
 | Mentés | Automatikus, minden hullám végén |
-| Meta-progresszió | Egy fő profil (a kaszt szintjét bárki megkapja, aki azzal a kaszttal játszik), Class Level, glyphek, heirloomok, achievementek, transmog, Valor + The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; az utolsó mérföldkő (M9), de a rendszerek már most erre készülnek |
+| Meta-progresszió | Egy fő profil (a kaszt szintjét bárki megkapja, aki azzal a kaszttal játszik): Class Level, Seasoning-ek, Heirloomok, achievementek, Wardrobe, Seeds, The Onion Patch (17. fejezet); nyers erő legfeljebb +10%; **megvalósítva (M9)** |
 | Zene | Egyelőre nincs |
 | Célzás | Csak automatikus (fegyverek és képességek); nincs kézi célzás |
 | Paladin Call of Valor | Azonnal feléleszti a 8 m-en belüli elesett társat (40% HP), kivéve, ha a Grave Tender 1 mp-en belül úgyis feléleszti |
@@ -4130,3 +4402,8 @@ kasszát az M6a goldsinkjei célozták (16.1).
 | M6b megvalósítás | Kész (a végleges balansz kivételével): az 1–13., 16.1 és 5.8 fejezet írja le, ahogy a kód működik; az Epic fegyverek +10% támadási sebességet kapnak (4.1), a környezet alapból sorsolódik (smoke-ban is) |
 | M6b hangolás | **Nincs.** Egyik M6b-csomag sem hangolt; a végleges 25 hullámos balansz egyszer, a legvégén készül (9. fejezet) |
 | M8 tartalom | Hunter és Shaman (7 kaszt); Crossbow, Polearm, Fist Weapon (16 fegyvertípus, 16 Forge Legendary); 12 tier set (7 kaszt + 5 kaszt-független); 2 Artifact (7); 56 kaszt-specifikus item; 211 kézzel tervezett item; megvalósítva (3.7, 4, 5.5, 5.8, 7). M8-ban nincs balanszolás |
+| M9 nevek | Glyph → Seasoning, Valor → Seeds, Transmog → Wardrobe, Heroic / Mythic → Pungent / Tear-Jerker; a Normal marad (Kiadás és IP, „Átnevezések (M9)”) |
+| Nehézségek (M9) | Normal, Pungent, Tear-Jerker (9.1); a két magasabb kasztonként nyílik, achievementhez kötve (9.1, 17.5) |
+| Automatikus futamok (M9) | A smoke, a demo, a `--view` és a képernyőkép a dev profilt használja: minden nyitva, nincs mentés (17.1) |
+| Questek és háttértörténet | A legvégén, nem M9-ben (17.8) |
+| M9 megvalósítás | Kész (9.1, 11, 16., 17. fejezet); az M9 nem hangolt, a végleges balansz a legvégén készül |

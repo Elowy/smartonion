@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_gala_tabard"
+display_name = "Gala Tabard"
+kind = &"tabard"
+style = &"gem"
+color = Color(0.5, 0.08, 0.18, 1)
+trim = Color(1.0, 0.82, 0.35, 1)
+order = 7

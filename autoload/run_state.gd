@@ -30,6 +30,8 @@ signal wants_changed
 ## An elite, the Loot Goblin or a boss died ([param kind] &"elite" / &"goblin" / &"boss");
 ## [param killer_index] = the killer's slot index (-1 = none).
 signal special_killed(kind: StringName, killer_index: int)
+## The Tear-Jerker pressure changed (a wave's modifier went live or ended, the next one was rolled): the HUD chip.
+signal pressure_changed
 ## Arcane Dust (the team's second currency) changed by [param delta] (add_dust,
 ## try_spend_dust_for; start_run emits it with delta 0).
 signal dust_changed(dust: int, delta: int)
@@ -56,6 +58,8 @@ const SALT_ENVIRONMENT := 0x454E56
 const SALT_EVENTS := 0x455654
 const SALT_SHRINES := 0x534852
 const SALT_DUNGEON := 0x44554E
+## M9: the Tear-Jerker pressure rotation's generator (Pressure).
+const SALT_PRESSURE := 0x505245
 ## The normal run's boss waves and elite wave (the endless mode adds its own beyond wave 25, see the
 ## ENDLESS_* constants and [method is_boss_wave] / [method is_elite_wave]).
 const BOSS_WAVES: Array[int] = [10, 25]
@@ -113,6 +117,23 @@ var event_rng := RandomNumberGenerator.new()
 var shrine_rng := RandomNumberGenerator.new()
 var dungeon_rng := RandomNumberGenerator.new()
 
+# M9: the difficulty tier of the run (Difficulty, data/difficulties/) and the Tear-Jerker pressure rotation (Pressure).
+## The tier id (&"normal" / &"pungent" / &"tear_jerker"); set by start_run.
+var difficulty: StringName = &"normal"
+## The generator of the pressure rotation (sub_rng(SALT_PRESSURE): never draws from [member rng]).
+var pressure_rng := RandomNumberGenerator.new()
+## The modifier of the wave in progress (&"" = none) and whether its effects are live (a wave is on, see Pressure).
+var pressure_current: StringName = &""
+var pressure_live := false
+## The modifier rolled for the NEXT wave ([member pressure_next_wave]; &"" = a calm wave): the break screen shows it.
+var pressure_next: StringName = &""
+var pressure_next_wave := 0
+## The highest boss wave whose boss the party killed (0 = none; the Dungeon Warden is no wave boss). 25 = the final
+## boss: a win, also in the endless mode (Main records it when the director reports the boss defeated).
+var boss_wave_down := 0
+## Need rolls won on a Legendary item (LootRoll's Need branch).
+var need_legendary_wins := 0
+
 # M6b debug overrides (reset by start_run, applied by Main from the launch options).
 ## --shrine-chance: the chance of a shrine at every break (0..1; < 0 = the normal chance).
 var shrine_chance_override := -1.0
@@ -124,6 +145,9 @@ var dungeon_forced := false
 # Run statistics (end screen).
 var kills := 0
 var gold_earned := 0
+## Free stall rerolls left this run (M9 LEVELS: Class Level 11 gives each hero one; Meta.apply_run_start sets them,
+## Shop.try_reroll uses them up before it takes gold). 0 in every automated run.
+var free_rerolls := 0
 var kills_by_player: Dictionary[int, int] = {}
 var damage_by_player: Dictionary[int, float] = {}
 
@@ -264,9 +288,10 @@ static var environment_roller: Callable
 
 ## [param p_mode] (MODE_NORMAL / MODE_ENDLESS; anything else plays as normal), [param p_hardcore]
 ## and [param p_environment] (an id of Db.environments, or &"" = rolled by [method roll_environment]
-## once the run seed and [member environment_rng] are set) are the M6b run settings.
+## once the run seed and [member environment_rng] are set) are the M6b run settings; [param p_difficulty] (M9, a
+## Difficulty tier id; anything else plays as Normal) is the tier.
 func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = MODE_NORMAL,
-		p_hardcore: bool = false, p_environment: StringName = &"") -> void:
+		p_hardcore: bool = false, p_environment: StringName = &"", p_difficulty: StringName = &"normal") -> void:
 	active = true
 	victory = false
 	wave = 0
@@ -286,6 +311,14 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	event_rng = sub_rng(SALT_EVENTS)
 	shrine_rng = sub_rng(SALT_SHRINES)
 	dungeon_rng = sub_rng(SALT_DUNGEON)
+	difficulty = Difficulty.sanitize(p_difficulty)
+	pressure_rng = sub_rng(SALT_PRESSURE)
+	pressure_current = &""
+	pressure_live = false
+	pressure_next = &""
+	pressure_next_wave = 0
+	boss_wave_down = 0
+	need_legendary_wins = 0
 	environment = p_environment if p_environment != &"" else roll_environment()
 	shrine_chance_override = -1.0
 	event_override = &""
@@ -309,6 +342,7 @@ func start_run(p_player_count: int, seed_value: int = -1, p_mode: StringName = M
 	dungeon_rooms_cleared = 0
 	kills = 0
 	gold_earned = 0
+	free_rerolls = 0
 	kills_by_player.clear()
 	damage_by_player.clear()
 	_gold_remainder.clear()
@@ -380,7 +414,7 @@ func set_wave(value: int) -> void:
 
 ## Adds a looted item to the team loot (waits for the Need / Greed / Pass roll).
 func add_team_loot(item: ItemInstance) -> void:
-	if item == null:
+	if item == null or item.is_bound():  # (M9 PATCH: an Heirloom never enters the shared loot)
 		return
 	team_loot.append(item)
 	team_loot_changed.emit()
@@ -515,6 +549,15 @@ func add_gold(amount: int) -> void:
 	gold += amount
 	if amount > 0:
 		gold_earned += amount
+	gold_changed.emit(gold, amount)
+
+
+## Puts [param amount] of starting gold into the shared wallet (M9 LEVELS: the Class Level bonus, Meta.apply_run_start). Not
+## earned gold: the run's gold_earned stays as it is.
+func grant_starting_gold(amount: int) -> void:
+	if amount <= 0:
+		return
+	gold += amount
 	gold_changed.emit(gold, amount)
 
 
@@ -875,6 +918,26 @@ func coop_hp_mult() -> float:
 ## [constant COOP_DAMAGE_MULTS].
 func coop_damage_mult() -> float:
 	return COOP_DAMAGE_MULTS[clampi(player_count, 1, COOP_DAMAGE_MULTS.size()) - 1]
+
+
+## The Class XP / Seeds multiplier of the run's difficulty tier (1.0 on Normal): what the Class Level package scales a
+## run's reward by.
+func difficulty_xp_mult() -> float:
+	return Difficulty.xp_mult_of(difficulty)
+
+
+func difficulty_seeds_mult() -> float:
+	return Difficulty.seeds_mult_of(difficulty)
+
+
+## The party killed the boss of boss wave [param w] (Main, from the director's boss_defeated): keeps the highest.
+func record_boss_wave_down(w: int) -> void:
+	boss_wave_down = maxi(boss_wave_down, w)
+
+
+## The final boss (wave 25's) is down: the run is won, in the endless mode too.
+func final_boss_down() -> bool:
+	return boss_wave_down >= TOTAL_WAVES
 
 
 ## Wave [param w] is a boss wave: 10 and 25, and in the endless mode (the only way to reach them) every

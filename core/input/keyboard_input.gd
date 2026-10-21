@@ -34,6 +34,15 @@ static func join_key_held() -> bool:
 	return false
 
 
+## True while a key of [param button] is held (physical keys, any layout; R for X, Q / E for LB / RB ...): for the screens
+## that read "anyone's" input before anybody has joined.
+static func button_key_held(button: PlayerInput.Pad) -> bool:
+	for key: Key in _KEYS.get(button, []):
+		if Input.is_physical_key_pressed(key):
+			return true
+	return false
+
+
 ## LMB / RMB = core slots, Q = learned slot 1 (slot 2), E = learned slot 2 (slot 3), GDD 11 –
 ## Q / E keep their menu meaning (LB / RB = tab left / right).
 func ability_button(index: int) -> Pad:

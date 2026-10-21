@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_warlock_hat"
+display_name = "Imp-Horn Hood"
+kind = &"hat"
+class_id = &"warlock"
+style = &"imp_horn"
+color = Color(0.36, 0.17, 0.44, 1)
+trim = Color(0.86, 0.79, 0.7, 1)
+order = 4

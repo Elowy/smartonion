@@ -17,8 +17,11 @@ extends RefCounted
 ## bonus entries (PlayerBonuses.set_effects(&"talents", effects())). commit() changes no effect,
 ## so it emits nothing.
 ##
-## Block reasons are UI texts (the Talents tab shows them); add: unknown → level → max rank →
-## gate → prerequisite → free points; remove: pending → dependent prerequisite → gate break.
+## M9: a capstone is locked until the main profile unlocks its tree's capstone (kind capstone_tree,
+## [method capstone_locked]): it takes no points, the Talents tab shows it locked and the bots skip it.
+##
+## Block reasons are UI texts (the Talents tab shows them); add: unknown → capstone locked → level →
+## max rank → gate → prerequisite → free points; remove: pending → dependent prerequisite → gate break.
 
 signal changed
 
@@ -114,6 +117,8 @@ func add_block_reason(talent_id: StringName) -> String:
 	var t := talent(talent_id)
 	if t == null:
 		return "Unknown talent"
+	if capstone_locked(t):
+		return capstone_lock_text(t)
 	if RunState.level < RunState.TALENT_START_LEVEL:
 		return "Talent points from level %d" % RunState.TALENT_START_LEVEL
 	if rank_of(talent_id) >= t.max_rank:
@@ -129,6 +134,22 @@ func add_block_reason(talent_id: StringName) -> String:
 	if points_free() <= 0:
 		return "No talent points"
 	return ""
+
+
+## True when [param t] is a capstone whose tree's capstone the main profile has not unlocked (M9; never with the
+## dev profile of the automated runs).
+func capstone_locked(t: TalentData) -> bool:
+	if t == null or not t.is_capstone():
+		return false
+	var tree := tree_of(t.id)
+	return tree != null and not Meta.is_unlocked(Profile.KIND_CAPSTONE_TREE, tree.id, class_id)
+
+
+## "Capstone locked" plus the gate's hint ("Capstone locked: win a run with ...").
+func capstone_lock_text(t: TalentData) -> String:
+	var tree := tree_of(t.id)
+	var hint := Meta.unlock_hint(Profile.KIND_CAPSTONE_TREE, tree.id) if tree != null else Meta.LOCKED_HINT
+	return "Capstone locked" if hint == Meta.LOCKED_HINT else "Capstone locked: %s" % hint
 
 
 func can_add(talent_id: StringName) -> bool:

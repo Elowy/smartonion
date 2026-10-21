@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="HeirloomData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/heirloom_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"heir_seed_pouch"
+display_name = "Lucky Seed Pouch"
+slot_type = 10
+armor_rule = &"any"
+weights = Dictionary[StringName, float]({&"fortune": 0.4, &"gold_find": 0.3, &"xp_gain": 0.3})
+perk3 = Array[Dictionary]([{"kind": "stats", "stats": {"gold_find": 5}}])
+perk3_text = "+5 Gold Find"
+perk5 = Array[Dictionary]([{"kind": "proc", "proc": {"trigger": "wave_start", "effect": "gold", "amount": 3}}])
+perk5_text = "At the start of every wave: find 3 gold."
+source_text = "Achievement: Gremlin Roundup"
+gift_class = &""
+achievement = &"ach_gremlin_roundup"
+flavor = "Rattles when a goblin is near."

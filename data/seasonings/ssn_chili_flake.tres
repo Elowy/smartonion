@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_chili_flake"
+class_id = &"mage"
+ability = &"pyroblast"
+display_name = "Chili Flake"
+text = "Magma Bolt burns for 70% of its hit instead of 30%, but takes 0.4 sec longer to gather."
+tier = &"t4"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "pyroblast"
+},
+"mods": {
+"burn_pct_add": 40,
+"windup_add": 0.4
+},
+"requires": {
+"knows": "pyroblast"
+}
+}])

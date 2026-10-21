@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasoningData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasoning_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ssn_celery_seed"
+class_id = &"shaman"
+ability = &"stormburst"
+display_name = "Celery Seed"
+text = "Stormburst triggers when 2 enemies crowd you but hits 25% weaker."
+tier = &"t3"
+entries = Array[Dictionary]([{
+"kind": "ability",
+"match": {
+"id": "stormburst"
+},
+"mods": {
+"min_enemies": 2,
+"power_pct": -25
+},
+"requires": {
+"knows": "stormburst"
+}
+}])

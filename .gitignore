@@ -8,3 +8,6 @@ export_credentials.cfg
 /build/
 /screenshots/
 *.tmp
+
+# Trailer tooling (tools/trailer): the temporary Movie Maker override and the work directory
+/override.cfg

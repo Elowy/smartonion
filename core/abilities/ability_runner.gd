@@ -238,7 +238,7 @@ func set_spec(ability_id: StringName, index: int) -> bool:
 
 ## Gold for the next rank of [param ability_id] at the current wave (0 = max rank).
 func trainer_price(ability_id: StringName) -> int:
-	return AbilityRanks.trainer_price(rank_of(ability_id), RunState.wave) if knows(ability_id) else 0
+	return Difficulty.price(AbilityRanks.trainer_price(rank_of(ability_id), RunState.wave)) if knows(ability_id) else 0
 
 
 ## Full cooldown: the "cooldown" param (after item mods, from [param ctx] when given), then

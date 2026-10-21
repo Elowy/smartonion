@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="AchievementData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/achievement_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"ach_dressed_up"
+display_name = "Dressed to Impress"
+description = "Have two set bonuses active on one hero."
+points = 10
+condition_kind = &"stat_at_least"
+condition_params = {
+"stat": "sets_active",
+"value": 2,
+"scope": "hero"
+}
+rewards = Array[Dictionary]([{
+"kind": "cosmetic",
+"id": "cos_gala_tabard",
+"name": "Gala Tabard"
+}])

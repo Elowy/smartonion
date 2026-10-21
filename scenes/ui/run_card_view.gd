@@ -58,6 +58,9 @@ func _build() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
 	var mode_line := "%s mode" % card_model.get("mode", "Normal")
+	var difficulty_name := String(card_model.get("difficulty", "Normal"))
+	if difficulty_name not in ["", "Normal"]:  # (a Normal card keeps its line as it was)
+		mode_line += "  ·  %s" % difficulty_name
 	if String(card_model.get("environment", "")) != "":
 		mode_line += "  ·  %s" % card_model["environment"]
 	top.add_child(UiTheme.label(mode_line, UiTheme.DIM, 26))

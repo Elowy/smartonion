@@ -155,6 +155,12 @@ var _weapon_data: Array[WeaponData] = [null, null]
 ## piece) and their change-detection key. The gear is rebuilt only when the key changes.
 var _looks: Array[EquipLook] = [null, null, null]
 var _looks_key := "-|-|-"
+## --- Wardrobe (M9) --- The looks of the worn items (set_looks), the cosmetic dress on top of them (set_dress: look overrides,
+## Tabard, Hat, Glow, Dye) and the key of its cosmetics. [member _looks] holds what is SHOWN (a look override wins over the worn one).
+var _worn: Array[EquipLook] = [null, null, null]
+var _dress: OnionDress
+var _cosmetic_key := ""
+var _glow_node: Node3D
 var _gear: Node3D
 var _gear_meshes: Array[MeshInstance3D] = []
 ## Nodes of the class starter pieces (hat star, horn flames, fel trim): freed with the gear.
@@ -297,22 +303,46 @@ func set_equipment(head: ItemInstance, shoulders: ItemInstance, chest: ItemInsta
 ## [method set_equipment] with ready-made looks (showcase, tests). A look of the wrong slot is
 ## ignored.
 func set_looks(head: EquipLook, shoulders: EquipLook, chest: EquipLook) -> void:
-	var next: Array[EquipLook] = [head, shoulders, chest]
+	_worn = [head, shoulders, chest]
+	_refresh_looks()
+
+
+## --- Wardrobe (M9) --- Dresses the onion for show (see [OnionDress]): look overrides replace the worn items' models per slot,
+## a Tabard / Glow are added, a Hat replaces the head piece, a Dye tints the Tabard and the Glow. null or an empty dress shows
+## the worn gear alone. Only a change rebuilds the gear.
+func set_dress(dress: OnionDress) -> void:
+	_dress = dress if dress != null and not dress.is_empty() else null
+	_refresh_looks()
+
+
+## The dress in use (null = none).
+func dress() -> OnionDress:
+	return _dress
+
+
+func _refresh_looks() -> void:
+	var next: Array[EquipLook] = [null, null, null]
 	var keys := PackedStringArray()
 	for i in EquipLook.SLOT_COUNT:
-		if next[i] != null and next[i].slot != i:
-			next[i] = null
-		keys.append(next[i].key() if next[i] != null else "-")
+		var look: EquipLook = _worn[i]
+		if _dress != null and _dress.looks[i] != null:
+			look = _dress.looks[i]
+		if look != null and look.slot != i:
+			look = null
+		next[i] = look
+		keys.append(look.key() if look != null else "-")
 	var key := "|".join(keys)
-	if key == _looks_key:
+	var cosmetic_key := _dress.key() if _dress != null else ""
+	if key == _looks_key and cosmetic_key == _cosmetic_key:
 		return
 	_looks = next
 	_looks_key = key
+	_cosmetic_key = cosmetic_key
 	if _body != null:
 		_build_gear()
 
 
-## The worn look of an EquipLook.Slot (null = the class starter piece shows).
+## The look shown in an EquipLook.Slot: the worn item's, or the Wardrobe override over it (null = the class starter piece shows).
 func worn_look(slot: int) -> EquipLook:
 	return _looks[slot] if slot >= 0 and slot < _looks.size() else null
 
@@ -620,6 +650,8 @@ func _animate_alive(delta: float) -> void:
 		var eased := smoothstep(0.0, 1.0, _tip)
 		_body.rotation.z += eased * TIP_ANGLE
 		_body.position += Vector3(-0.05, TIP_LIFT, 0.0) * eased
+	if _glow_node != null:
+		_glow_node.rotation.y = _time * 0.8  # (Wardrobe Glow: turns slowly)
 	for i in _feet.size():
 		var p := _phase + PI * i
 		var foot := _feet[i]
@@ -1051,7 +1083,7 @@ func _build_body() -> void:
 	var roots := MeshKit.cached("onion:roots", func() -> Mesh: return _roots_mesh())
 	_mesh("Roots", _body, roots, Mats.toon_vc(false))
 	# Face: big eyes (+ brows unless the head piece is a helm; _apply_head_effects keeps them in sync).
-	var head := OnionArmor.part(EquipLook.Slot.HEAD, _looks[EquipLook.Slot.HEAD], class_data)
+	var head := _part_for(EquipLook.Slot.HEAD)
 	_face = _node("Face", _body)
 	_face.position.y = EYE_Y
 	_mesh("Eyes", _face, _eyes_mesh(head.brows if head != null else true), Mats.toon_vc())
@@ -1339,10 +1371,14 @@ func _build_gear() -> void:
 	_gear = _node("Gear", _body)
 	var parts: Array[OnionArmor.Part] = []
 	for slot in EquipLook.SLOT_COUNT:
-		parts.append(OnionArmor.part(slot, _looks[slot], class_data))
+		parts.append(_part_for(slot))
+	# --- Wardrobe (M9) --- the Tabard is drawn with the three slot parts (merged by material).
+	var drawn: Array[OnionArmor.Part] = parts.duplicate()
+	if _dress != null and _dress.tabard != null:
+		drawn.append(OnionCosmetics.tabard_part(_dress.tabard, _dress.dye_color()))
 	# Solid toon meshes grouped by material (plain / one glow material per rarity colour).
 	var groups: Dictionary[String, Array] = {}
-	for p in parts:
+	for p in drawn:
 		if p != null and p.solid != null:
 			var group: Array = groups.get(p.material_key(), [])
 			group.append(p)
@@ -1363,7 +1399,7 @@ func _build_gear() -> void:
 	# Cloth (double-sided, no outline) of every slot in one mesh.
 	var cloths: Array[Mesh] = []
 	var cloth_key := "onion:gear:cloth"
-	for p in parts:
+	for p in drawn:
 		if p != null and p.cloth != null:
 			cloths.append(p.cloth)
 			cloth_key += "|" + p.key
@@ -1372,7 +1408,7 @@ func _build_gear() -> void:
 			Mats.toon_cloth_vc(), true)
 	# Glowing accents (Legendary / set gems and rings): one unshaded mesh per glow colour.
 	var accent_groups: Dictionary[String, Array] = {}
-	for p in parts:
+	for p in drawn:
 		if p != null and p.accent != null:
 			var group: Array = accent_groups.get(p.accent_color.to_html(false), [])
 			group.append(p)
@@ -1394,11 +1430,35 @@ func _build_gear() -> void:
 		_accents.append(node)
 	_build_starter_extras(parts)
 	_apply_head_effects(parts[EquipLook.Slot.HEAD])
+	_build_cosmetic_glow()
 	_place_peels()
 	if downed:
 		_apply_downed_look()
 	elif _flash > 0.0:
 		_apply_flash()
+
+
+## The part drawn for an EquipLook.Slot: the Hat variant of the dress on the head, else the shown look or the class starter piece.
+func _part_for(slot: int) -> OnionArmor.Part:
+	if slot == EquipLook.Slot.HEAD and _dress != null and _dress.hat != null:
+		return OnionCosmetics.hat_part(_dress.hat)
+	return OnionArmor.part(slot, _looks[slot], class_data)
+
+
+## --- Wardrobe (M9) --- The Glow cosmetic: one unshaded mesh (a ring of light, a halo, orbiting sparks ...) that turns slowly.
+func _build_cosmetic_glow() -> void:
+	if _dress == null or _dress.glow == null:
+		return
+	var color := _dress.glow.color
+	if _dress.dye != null:
+		color = _dress.dye.color.lightened(0.15)
+	var mesh := OnionCosmetics.glow_mesh(_dress.glow)
+	var node := _mesh("CosmeticGlow", _body, mesh, Mats.glow(color, OnionArmor.ACCENT_ENERGY), false)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.visible = not downed
+	_glow_node = node
+	_gear_extras.append(node)
+	_accents.append(node)
 
 
 func _gear_mesh_node(n: String, mesh: Mesh, material: Material, skin: bool) -> MeshInstance3D:
@@ -1415,6 +1475,7 @@ func _clear_gear() -> void:
 	_gear_meshes.clear()
 	_accents.clear()
 	_flames.clear()
+	_glow_node = null
 	for n in _gear_extras:
 		if is_instance_valid(n):
 			n.get_parent().remove_child(n)

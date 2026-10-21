@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"cos_shaman_hat"
+display_name = "Thunder Mask"
+kind = &"hat"
+class_id = &"shaman"
+style = &"thunder_mask"
+color = Color(0.56, 0.38, 0.22, 1)
+trim = Color(0.4, 0.85, 1.0, 1)
+order = 6
