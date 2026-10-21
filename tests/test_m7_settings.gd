@@ -79,7 +79,7 @@ func test_defaults() -> void:
 	check(s.damage_numbers_enabled(), "damage numbers on")
 	check(not s.show_fps_enabled(), "FPS counter off")
 	check(s.is_default(), "is_default")
-	check_eq(GameSettings.options().size(), 10, "ten options")
+	check_eq(GameSettings.options().size(), 11, "eleven options (RPT: Pause when the window loses focus)")
 	var sections: Array[String] = []
 	for o in GameSettings.options():
 		if sections.is_empty() or sections[-1] != o.section:

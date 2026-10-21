@@ -278,7 +278,7 @@ func test_prune_keeps_bots_and_working_devices() -> void:
 	check_eq(PlayerManager.count(), 2, "bot and the working pad stay")
 
 
-func test_game_over_to_lobby_drops_the_ghost_slot() -> void:
+func test_game_over_to_lobby_keeps_the_ghost_slot_waiting() -> void:
 	_make_main()
 	var a := _human("pad:a")
 	var b := _human("pad:b")
@@ -288,9 +288,12 @@ func test_game_over_to_lobby_drops_the_ghost_slot() -> void:
 	PlayerManager.device_disconnected.emit(PlayerManager.get_slot(1))
 	main._on_game_over_back()
 	check_eq(main.state, Main.State.LOBBY, "lobby")
-	check_eq(PlayerManager.count(), 1, "the ghost slot did not come along")
+	check_eq(PlayerManager.count(), 2, "the ghost slot comes along and waits for its player")
 	UiFakes.tap(main.lobby, a, PlayerInput.Pad.A)
-	check(main.lobby.is_counting_down(), "P1 can ready up and start")
+	check(not main.lobby.is_counting_down(), "the start waits for the missing player")
+	PlayerManager.get_slot(1).missing_time = PlayerManager.GHOST_TIMEOUT + 1.0
+	UiFakes.step(main.lobby)
+	check_eq(PlayerManager.count(), 1, "after the timeout the slot is freed")
 
 
 # --- Pause menu: held stick, quit confirmation ------------------------------------------

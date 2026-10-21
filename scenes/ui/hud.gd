@@ -77,6 +77,8 @@ var toast: AchievementToast
 var _banner: Control
 var _banner_tween: Tween
 var _notice: PanelContainer
+## Seconds a flash_notice() still shows (0 = none, or a notice that stays).
+var _notice_left := 0.0
 var _coin: UiIcon
 var _loot_row: HBoxContainer
 var _loot_bag: LootBagIcon
@@ -272,14 +274,22 @@ func is_banner_visible() -> bool:
 	return _banner.visible
 
 
-## e.g. "Controller disconnected – P2: reconnect or press A on another controller".
+## e.g. "P2's controller disconnected – plug it back in or press A on a free controller" (stays until hidden).
 func show_notice(text: String) -> void:
 	notice_label.text = text
 	_notice.visible = true
+	_notice_left = 0.0
+
+
+## A notice that hides itself after [param seconds] ("Joins at the next lobby").
+func flash_notice(text: String, seconds: float = 3.0) -> void:
+	show_notice(text)
+	_notice_left = seconds
 
 
 func hide_notice() -> void:
 	_notice.visible = false
+	_notice_left = 0.0
 
 
 func is_notice_visible() -> bool:
@@ -785,6 +795,10 @@ static func _floater_text(amount: int) -> String:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if _notice_left > 0.0:
+		_notice_left -= delta
+		if _notice_left <= 0.0:
+			_notice.visible = false
 	if _boss != null:
 		_update_boss_frame()
 	if _floater.visible:
