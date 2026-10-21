@@ -386,11 +386,14 @@ func _process(delta: float) -> void:
 	if not _owns_joining and not UiPads.join_button_held():
 		_set_joining(true)
 	PlayerManager.prune_disconnected(PlayerManager.GHOST_TIMEOUT)
-	var nobody_before := PlayerManager.count() == 0
+	# (Nobody who can press a button is joined: an empty lobby, or only ghosts – a missing player's seat cannot press B
+	# for itself, so it must not keep the lobby from being left. Leaving frees the ghosts.)
+	var nobody_before := _only_ghosts_joined()
 	for slot in PlayerManager.get_slots():
 		_handle_slot_input(slot)
-	if nobody_before and PlayerManager.count() == 0 \
+	if nobody_before and _only_ghosts_joined() \
 			and (Input.is_action_just_pressed(&"ui_cancel") or pads.any_just_pressed(JOY_BUTTON_B)):
+		PlayerManager.prune_disconnected()
 		_set_joining(false)
 		back_requested.emit()
 		return
@@ -398,6 +401,11 @@ func _process(delta: float) -> void:
 	_lock_notice_left = maxf(0.0, _lock_notice_left - delta)
 	_update_countdown(delta)
 	_refresh()
+
+
+## True when no joined slot has a working device: nobody is joined, or every slot is a ghost.
+func _only_ghosts_joined() -> bool:
+	return PlayerManager.count() == PlayerManager.disconnected_slots().size()
 
 
 func _handle_slot_input(slot: PlayerSlot) -> void:

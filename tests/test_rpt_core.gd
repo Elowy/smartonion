@@ -472,6 +472,40 @@ func test_showing_the_lobby_restarts_the_ghost_clock() -> void:
 	check_near(b.missing_time, 0.0, 0.001, "clock restarted")
 
 
+func test_a_lone_ghost_does_not_keep_the_lobby_from_being_left() -> void:
+	_make_lobby()
+	var backs := [0]
+	lobby.back_requested.connect(func() -> void: backs[0] += 1)
+	_join_pad(0)
+	lobby._process(DT)
+	lobby.pads.injected.append(JOY_BUTTON_B)
+	lobby._process(DT)
+	check_eq(backs[0], 0, "no back while a working player is joined")
+	PadSource.fake_disconnect(0)
+	_frame()
+	lobby._process(DT)
+	check_eq(PlayerManager.count(), 1, "the lobby keeps the lone player's seat as a ghost")
+	lobby.pads.injected.append(JOY_BUTTON_B)  # B on some other controller
+	lobby._process(DT)
+	check_eq(backs[0], 1, "B leaves the lobby although the ghost still counts as a seat")
+	check_eq(PlayerManager.count(), 0, "and the ghost is freed with it")
+
+
+func test_ghosts_with_a_working_player_still_need_that_player_to_leave_first() -> void:
+	_make_lobby()
+	var backs := [0]
+	lobby.back_requested.connect(func() -> void: backs[0] += 1)
+	_join_pad(0)
+	_join_pad(1)
+	PadSource.fake_disconnect(1)
+	_frame()
+	lobby._process(DT)
+	lobby.pads.injected.append(JOY_BUTTON_B)
+	lobby._process(DT)
+	check_eq(backs[0], 0, "P1 works: B is P1's (it unreadies / leaves), not the lobby's")
+	check_eq(PlayerManager.count(), 2, "the ghost stays while somebody plays")
+
+
 func test_going_to_the_lobby_from_a_long_run_keeps_the_ghost_for_its_full_time() -> void:
 	_make_main()
 	_join_pad(0)
