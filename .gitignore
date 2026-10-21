@@ -11,3 +11,7 @@ export_credentials.cfg
 
 # Trailer tooling (tools/trailer): the temporary Movie Maker override and the work directory
 /override.cfg
+
+# GodotSteam plug-in (Steam Remote Play Together): fetched by tools/steam/fetch_godotsteam.sh, never committed
+# (it carries Valve's steam_api64.dll / libsteam_api.so)
+/addons/godotsteam/
