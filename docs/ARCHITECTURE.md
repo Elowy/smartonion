@@ -4789,7 +4789,8 @@ does not see. The game logs one warning and plays on with the Null backend; a se
   needs the registered Steamworks app id there. No `steam_appid.txt` is used or shipped. `restartAppIfNecessary` is
   called at startup only in a release export with a real id (never with 480: it would start Spacewar; see "Builds and
   Steam upload"), so until then the game is started from the Steam library.
-- Export: the export presets (`export_presets.cfg`) are local and gitignored. Export copies the GodotSteam
+- Export: the export presets (`export_presets.cfg`) are committed (see "Builds and Steam upload"); `tools/build/export.sh
+  --steam` fetches the plug-in first. Export copies the GodotSteam
   libraries (`libgodotsteam.<platform>.template_<debug|release>.x86_64.<dll|so>`) and Valve's library next to the
   executable; they must ship in the same folder. Export from a checkout where the plug-in was fetched and imported.
   Without the plug-in at export time, the game still exports and runs without Steam features.
@@ -4896,11 +4897,35 @@ and a `build_info.txt`. The version is `application/config/version` in `project.
 
 ### Export
 
-<!-- BUILD package: this subsection is yours. Keep the line below as the pointer and describe the presets, the version
-     label, the Windows metadata, the templates, what is excluded and the smoke test of the exported build here. -->
-
-`tools/build/export.sh [--steam] [--platform windows|linux|all] [--skip-smoke]` makes the release builds in
-`build/steam/content/{windows,linux}/`; `tools/build/install_templates.sh` installs the export templates.
+- **Presets** (`export_presets.cfg`, committed; `export_credentials.cfg` stays gitignored for signing secrets): "Windows
+  Desktop" and "Linux", x86_64, release, PCK embedded in the executable. Include filter `*.md, *.txt` (`CREDITS.md`, the
+  OFL and icon licence texts, and the GodotSteam `license.md` in Steam builds); exclude `tests/*, tools/*, docs/*,
+  build/*, screenshots/*, CLAUDE.md, README.md, steam_appid.txt`. Nothing shipped loads from an excluded folder;
+  `tests/test_build_presets.gd` scans the shipped sources for excluded paths and class names.
+- **Version:** `application/config/version` in `project.godot` (0.9.0), shown as `v0.9.0` in the main menu's corner
+  (`MainMenu.version_text()`). The Windows preset's `file_version` / `product_version` must be `<version>.0`; `export.sh`
+  and a test refuse a mismatch.
+- **Windows metadata:** icon `tools/build/SmartOnion.ico` (16–256 px), product name / description "SmartOnion",
+  company and copyright are `TODO` placeholders the owner fills in (`export.sh` warns). Godot 4.7.2 writes the PE
+  resources itself (no rcedit / wine). No code signing yet: an unsigned exe downloaded outside Steam triggers SmartScreen.
+- **Icon:** `python3 tools/build/make_icon.py` (Pillow) turns the owner's art (`tools/build/icon/smartonion_icon_source.png`,
+  `.gdignore`d, not shipped) into the .ico (≤ 32 px: a rounded crop of the face; ≥ 48 px: the round art with the black
+  background cut away), `tools/build/icon/smartonion_icon_512.png` and `assets/icon/smartonion_icon_256.png`
+  (`application/config/icon`, the window / taskbar icon).
+- **Templates:** `tools/build/install_templates.sh` downloads the 4.7.2 templates from the official godot-builds release,
+  checks the pinned sha512 before unpacking, installs only Windows / Linux x86_64 (≈ 344 MB), idempotent
+  (`--force`, `--tpz FILE`, `--dir DIR`, `--all`).
+- **Build:** `tools/build/export.sh [--steam] [--platform windows|linux|all] [--skip-smoke] [--no-dist] [--godot BIN]`:
+  checks versions and templates; with `--steam` runs `fetch_godotsteam.sh` so the plug-in and Valve's library land next to
+  the executable, without it moves an existing `addons/godotsteam/` aside so a plain build never carries Valve's
+  binaries; imports; exports into `build/steam/content/{windows/SmartOnion.exe, linux/SmartOnion.x86_64}` with a
+  `build_info.txt` (version, git hash, date, steam yes/no); verifies each embedded PCK (`tools/build/verify_pack.gd`
+  run with `--main-pack`: licences present, nothing dev-only, the plug-in present exactly for `--steam`); runs the
+  exported Linux binary's headless smoke (`--smoke --waves=1 --seed=5`, exit 0 + `"errors":0`); plain builds also
+  write `build/dist/SmartOnion-<version>-windows.zip` / `-linux.tar.gz`. Logs in `build/logs/`. About a minute.
+- **Measured here:** exe 123 MB, Linux binary 88 MB (PCK 13.9 MB, 3277 files), zip 48 MB, tar.gz 38 MB. The Linux binary
+  needs glibc ≥ 2.28. The Windows exe was checked statically (PE32+, icon group, version resource) but never run.
+- Upload the Linux depot from Linux so the executable bit survives; the Windows / macOS paths of the scripts are untested.
 
 ### SteamPipe upload (`tools/steam/upload.sh`)
 
