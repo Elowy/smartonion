@@ -262,6 +262,52 @@ func test_two_pads_that_come_back_on_swapped_ids_each_return_to_their_own_slot()
 	check_eq(back.size(), 2, "two returns announced")
 
 
+func test_an_identical_idle_pad_is_not_given_a_lost_slot_by_itself() -> void:
+	PlayerManager.takeover_enabled = true
+	_join_pad(0, &"warrior", "xbox")
+	var two := _join_pad(1, &"mage", "xbox")
+	_join_pad(2, &"rogue", "xbox")
+	_pad(3, "xbox")  # a fourth, identical pad: lying around, nobody's yet
+	var events: Array[String] = []
+	var on_gone := func(s: PlayerSlot) -> void: events.append("gone:%s" % s.label())
+	var on_back := func(s: PlayerSlot) -> void: events.append("back:%s" % s.label())
+	PlayerManager.device_disconnected.connect(on_gone)
+	PlayerManager.device_reconnected.connect(on_back)
+	PadSource.fake_disconnect(1)
+	for i in 3:
+		_frame()
+	PlayerManager.device_disconnected.disconnect(on_gone)
+	PlayerManager.device_reconnected.disconnect(on_back)
+	check_eq(events, ["gone:P2"] as Array[String], "P2's loss is announced (pause / notice) and nothing returns silently")
+	check(PlayerManager.is_missing(two), "P2 is a ghost")
+	check(PlayerManager.is_pad_free(3), "the idle pad was not bound to it")
+	# The idle pad's owner presses A: that is the (visible) way to take the seat.
+	_tap_pad(3)
+	check(two.input.is_connected_device() and (two.input as JoypadInput).device == 3, "A on the idle pad takes P2 over")
+	check(two.class_data.id == &"mage", "with P2's hero")
+
+
+func test_a_pad_that_connects_after_the_loss_returns_by_itself_and_is_announced() -> void:
+	_join_pad(0, &"warrior", "xbox")
+	var two := _join_pad(1, &"mage", "xbox")
+	_pad(3, "xbox")  # identical, already there and idle
+	var events: Array[String] = []
+	var on_gone := func(s: PlayerSlot) -> void: events.append("gone:%s" % s.label())
+	var on_back := func(s: PlayerSlot) -> void: events.append("back:%s" % s.label())
+	PlayerManager.device_disconnected.connect(on_gone)
+	PlayerManager.device_reconnected.connect(on_back)
+	PadSource.fake_disconnect(1)
+	_frame()
+	_pad(5, "xbox")  # an identical pad (re)connects now
+	_frame()
+	PlayerManager.device_disconnected.disconnect(on_gone)
+	PlayerManager.device_reconnected.disconnect(on_back)
+	check_eq(events, ["gone:P2", "back:P2"] as Array[String], "a visible loss, then a visible return")
+	check_eq((two.input as JoypadInput).device, 5, "to the pad that connected after the loss, not the idle one on 3")
+	check(PlayerManager.is_pad_free(3), "the idle pad stays free")
+	check(two.idle_pads_at_loss.is_empty(), "the note of the idle pads is dropped")
+
+
 func test_a_returning_pad_whose_new_id_is_another_ghosts_old_id_still_returns() -> void:
 	_join_pad(0)
 	var two := _join_pad(1, &"mage", "pad-two")

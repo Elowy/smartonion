@@ -254,6 +254,7 @@ func rebind(index: int, input: PlayerInput) -> bool:
 		slot.session_id = RemotePlay.session_of_device(pad.device)
 	slot.missing_time = 0.0
 	slot.connection_reported = true
+	slot.idle_pads_at_loss.clear()
 	input.swallow()
 	device_reconnected.emit(slot)
 	return true
@@ -281,28 +282,44 @@ func consume_takeover() -> bool:
 
 
 ## Once per frame, after the inputs polled: announces a slot's device going away or coming back, and gives a missing
-## slot back to a connected pad that is provably its own ([method _is_returning_pad]). Counts how long each ghost
-## has been missing.
+## slot back to a pad that is provably its own ([method _rebind_to_returning_pad]). Counts how long each ghost has been
+## missing. The loss is announced first (and the pads lying around at that moment are noted, see
+## [member PlayerSlot.idle_pads_at_loss]), so a later automatic return is a visible one.
 func track_connections(delta: float) -> void:
 	for slot in get_slots():
 		if slot.is_bot():
 			continue
-		if not slot.input.is_connected_device() and slot.input is JoypadInput:
-			_rebind_to_returning_pad(slot)
-		if slot.input.is_connected_device():
-			slot.missing_time = 0.0
-			if not slot.connection_reported:
-				slot.connection_reported = true
-				device_reconnected.emit(slot)
-		else:
+		if not slot.input.is_connected_device():
 			slot.missing_time += delta
 			if slot.connection_reported:
 				slot.connection_reported = false
+				slot.idle_pads_at_loss = _idle_pads()
 				device_disconnected.emit(slot)
+			if slot.input is JoypadInput:
+				_rebind_to_returning_pad(slot)
+		if slot.input.is_connected_device():
+			slot.missing_time = 0.0
+			slot.idle_pads_at_loss.clear()
+			if not slot.connection_reported:
+				slot.connection_reported = true
+				device_reconnected.emit(slot)
 
 
+## The fingerprints of the connected pads nobody plays.
+func _idle_pads() -> Array[PadIdentity]:
+	var out: Array[PadIdentity] = []
+	for device in PadSource.devices():
+		if not is_pad_bound(device):
+			out.append(PadSource.identity(device))
+	return out
+
+
+## Gives [param slot] the first pad that provably is its own and CONNECTED AFTER the slot went missing: a pad that was
+## already there and idle (an identical model of a spectator, a spare) cannot be the one that went away.
 func _rebind_to_returning_pad(slot: PlayerSlot) -> void:
 	for device in PadSource.devices():
+		if slot.idle_pads_at_loss.has(PadSource.identity(device)):
+			continue
 		if not is_pad_bound(device) and _is_returning_pad(slot, device) and rebind(slot.index, JoypadInput.new(device)):
 			return
 

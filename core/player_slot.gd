@@ -36,6 +36,10 @@ var session_id := 0
 var missing_time := 0.0
 ## What PlayerManager last announced about the device (device_disconnected / device_reconnected).
 var connection_reported := true
+## The pads that were connected and played by nobody at the moment the slot's device went missing (their PadIdentity
+## objects; PadSource keeps one object per unchanged pad). They cannot be the pad that went away, so PlayerManager never
+## gives the slot to one of them by itself – they can still take it over with A. Empty while the device works.
+var idle_pads_at_loss: Array[PadIdentity] = []
 
 
 func _init(p_index: int, p_input: PlayerInput, p_color: Color) -> void:
