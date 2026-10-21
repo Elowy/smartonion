@@ -318,9 +318,10 @@ func _has_voters() -> bool:
 	return false
 
 
-## Bots and players whose device is unplugged never block the next wave.
+## Bots and players whose device has been missing for the grace (PlayerManager.auto_decide_grace: ~5 s – a blip
+## changes nothing) never block the next wave.
 static func is_auto_ready(slot: PlayerSlot) -> bool:
-	return slot.is_bot() or slot.input == null or not slot.input.is_connected_device()
+	return slot.is_bot() or PlayerManager.is_absent(slot)
 
 
 func is_open() -> bool:
@@ -885,9 +886,11 @@ func _fill_chip(chip: PanelContainer, s: PlayerSlot) -> void:
 		var text := "Ready"
 		if s.is_bot():
 			text = "Ready (bot)"
-		elif s.input == null or not s.input.is_connected_device():
+		elif PlayerManager.is_absent(s):
 			text = "Unplugged"
 		status.add_child(UiTheme.label(text, &"", 15, UiTheme.GREEN))
+	elif PlayerManager.is_missing(s):
+		status.add_child(UiTheme.label("Reconnecting…", &"", 15, UiTheme.RED.lightened(0.3)))  # (within the grace)
 	else:
 		status.add_child(UiGlyph.for_input(s.input, PlayerInput.Pad.START, 20.0))
 		var where := "in panel" if has_panel_focus(s.index) else "to ready"

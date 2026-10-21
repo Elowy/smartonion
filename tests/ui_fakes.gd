@@ -36,10 +36,12 @@ class HumanInput extends PlayerInput:
 		return held.duplicate()
 
 
-## Resets PlayerManager (no slots, joining off).
+## Resets PlayerManager (no slots, joining off, no grace: an unplugged HumanInput is "absent" for the between-wave
+## screens at once, as these tests assume – the grace has its own tests in test_rpt_core.gd).
 static func reset_players() -> void:
 	PlayerManager.clear()
 	PlayerManager.joining_enabled = false
+	PlayerManager.auto_decide_grace = 0.0
 
 
 ## One frame: polls every slot's input (what PlayerManager does) then runs the screen.

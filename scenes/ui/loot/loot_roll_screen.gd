@@ -245,8 +245,8 @@ func _next_item() -> void:
 			_bot_wait[s.index] = _bot_delay(s.index)
 		elif greed_all.get(s.index, false):
 			_choose(s, LootRoll.Choice.GREED)
-		elif s.input == null or not s.input.is_connected_device():
-			_choose(s, LootRoll.Choice.PASS)
+		elif PlayerManager.is_absent(s):
+			_choose(s, LootRoll.Choice.PASS)  # (missing for the grace)
 	_fill_item()
 	_refresh_chips(true)
 
@@ -429,8 +429,8 @@ func _process_choosing(delta: float) -> void:
 				if c == LootRoll.Choice.UNDECIDED or (c == LootRoll.Choice.NEED and not roll.can_need(s)):
 					c = LootRoll.Choice.GREED
 				_choose(s, c)
-		elif s.input == null or not s.input.is_connected_device():
-			_choose(s, LootRoll.Choice.PASS)
+		elif PlayerManager.is_absent(s):
+			_choose(s, LootRoll.Choice.PASS)  # (missing for the grace)
 	if _skip_frames > 0:
 		_skip_frames -= 1
 	else:

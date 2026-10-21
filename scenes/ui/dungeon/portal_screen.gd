@@ -106,9 +106,9 @@ static func voters(slots: Array[PlayerSlot]) -> Array[PlayerSlot]:
 	return out
 
 
-## A human whose controller is unplugged does not vote (nor block).
+## A human whose controller has been missing for the grace (PlayerManager.auto_decide_grace) does not vote (nor block).
 static func is_abstaining(s: PlayerSlot) -> bool:
-	return not s.is_bot() and (s.input == null or not s.input.is_connected_device())
+	return not s.is_bot() and PlayerManager.is_absent(s)
 
 
 ## The pure decision of a set of votes: ACCEPT-all = true, any DECLINE = false, otherwise still open
