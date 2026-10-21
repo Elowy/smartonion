@@ -11,6 +11,10 @@ const TEMPLATE_DIR := "res://tools/steam/steampipe/"
 const APP_ID := "2345670"
 const DEPOT_WIN := "2345671"
 const DEPOT_LINUX := "2345672"
+## The settings upload.sh reads from the environment. Every run starts without them: the owner guide has the owner
+## `export DEPOT_WIN=... DEPOT_LINUX=... STEAM_USER=...` in the shell that may also run this suite, and a test must not
+## depend on (or upload with) what happens to be exported there.
+const SCRIPT_ENV: Array[String] = ["APP_ID", "DEPOT_WIN", "DEPOT_LINUX", "STEAM_USER", "STEAM_BRANCH", "BUILD_DESC", "STEAMCMD"]
 ## The commit the fake export claims to come from (a scratch root has no git repository, so it is never compared).
 const CONTENT_GIT := "0123456789"
 
@@ -118,10 +122,18 @@ func _make_root(app_id: String = APP_ID, content: bool = true) -> void:
 		_write(_root.path_join(lin + "build_info.txt"), _build_info("linux", app_id))
 
 
-## Runs upload.sh with [param args] (and [param env] "NAME=value" entries); returns {code, out}.
+## The leading `env` arguments that remove SCRIPT_ENV from a child's environment ("-u NAME" each).
+func _unset_script_env() -> Array[String]:
+	var args: Array[String] = []
+	for name in SCRIPT_ENV:
+		args.append_array(["-u", name])
+	return args
+
+
+## Runs upload.sh with [param args] (and [param env] "NAME=value" entries, set after SCRIPT_ENV is cleared); returns {code, out}.
 func _run(args: Array[String], env: Array[String] = []) -> Dictionary:
 	var out: Array = []
-	var full: Array[String] = []
+	var full: Array[String] = _unset_script_env()
 	full.append_array(env)
 	full.append_array(["bash", _script_path, "--root", _root])
 	full.append_array(args)
@@ -199,6 +211,19 @@ func test_there_is_no_password_anywhere() -> void:
 	var r := _run(["--dry-run", "--password", "hunter2"])
 	check_eq(r["code"], 2, "--password is an unknown option (usage error)")
 	check("unknown option" in r["out"], "and says so")
+
+
+func test_the_tests_clear_every_setting_the_script_reads_from_the_environment() -> void:
+	# A setting added to upload.sh as "${NAME:-}" must also be cleared here, or it leaks in from the caller's shell.
+	var source := FileAccess.get_file_as_string(SCRIPT)
+	var read_names: Array[String] = []
+	for m in RegEx.create_from_string("\\$\\{([A-Z][A-Z_]*):-\\}").search_all(source):
+		read_names.append(m.get_string(1))
+	check(read_names.size() >= 7, "upload.sh reads its settings from the environment: %s" % str(read_names))
+	for name in read_names:
+		check(name in SCRIPT_ENV, "%s is cleared before the script runs" % name)
+	for name in SCRIPT_ENV:
+		check(name in read_names, "%s is something upload.sh reads" % name)
 
 
 func test_the_templates_exist_and_only_use_known_placeholders() -> void:
@@ -283,7 +308,9 @@ func test_the_description_is_made_safe_for_a_vdf() -> void:
 	var wrapper := _root.path_join("describe.sh")
 	_write(wrapper, "#!/usr/bin/env bash\nbash \"$1\" --root \"$2\" --dry-run --depot-win %s --depot-linux %s --desc 'Tom & \"Jerry\" \\ 100%%'\n" % [DEPOT_WIN, DEPOT_LINUX])
 	var out: Array = []
-	check_eq(OS.execute("bash", [wrapper, _script_path, _root], out, true), 0, "ok: %s" % ["".join(out)])
+	var wrapped: Array[String] = _unset_script_env()
+	wrapped.append_array(["bash", wrapper, _script_path, _root])
+	check_eq(OS.execute("env", wrapped, out, true), 0, "ok: %s" % ["".join(out)])
 	var app := _read("build/steam/scripts/app_build_%s.vdf" % APP_ID)
 	check('"Desc" "Tom & \'Jerry\' \\\\ 100%"' in app, "quotes and backslashes cannot break the VDF: %s" % app)
 

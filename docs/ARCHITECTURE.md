@@ -5035,6 +5035,9 @@ Valve wants it to be the first Steamworks call, right before the init.
   480-then-real-id slip), mixed platforms, a missing file, `steam=no`, a file without `app_id`, CRLF line endings, the
   default description coming from the content, the dirty / foreign-commit warnings (with a scratch git repository), and
   the Windows-host warning (a fake `uname`).
+  Every run starts with `env -u APP_ID -u DEPOT_WIN -u DEPOT_LINUX -u STEAM_USER -u STEAM_BRANCH -u BUILD_DESC -u STEAMCMD`
+  (a test checks the list against the variables `upload.sh` reads), so a shell that has them exported, as
+  `docs/STEAM_RELEASE.md` suggests, neither changes the results nor reaches the fake steamcmd.
   It skips itself where there is no bash. `tests/test_rpt_steam.gd` no longer asserts that `project.godot` holds 480,
   only a positive app id, so the owner can set the real id without breaking the suite.
 
