@@ -23,14 +23,18 @@ const _BUTTON_MAP := {
 }
 
 var device: int
+## The fingerprint of the pad that was on [member device] when this input was made (null when none was connected).
+## Joypad ids are reused, so "joy:N is connected" does not mean "MY pad is connected": see [method is_connected_device].
+var identity: PadIdentity
 
 
 func _init(p_device: int) -> void:
 	device = p_device
+	identity = PadSource.identity(p_device)
 
 
 func get_device_name() -> String:
-	var joy_name := Input.get_joy_name(device)
+	var joy_name := PadSource.pad_name(device)
 	return "Controller %d" % (device + 1) if joy_name.is_empty() else joy_name
 
 
@@ -38,8 +42,11 @@ func get_device_key() -> String:
 	return "joy:%d" % device
 
 
+## True while the pad this input was made for is connected: the id must be connected AND still be the same
+## pad (an id freed by a disconnect is handed to the next pad that connects, which may be somebody else's).
 func is_connected_device() -> bool:
-	return device in Input.get_connected_joypads()
+	var now := PadSource.identity(device)
+	return now != null and (identity == null or identity.same_pad(now))
 
 
 func get_move() -> Vector2:
@@ -51,7 +58,7 @@ func get_aim() -> Vector2:
 
 
 func _stick(axis_x: JoyAxis, axis_y: JoyAxis) -> Vector2:
-	var v := Vector2(Input.get_joy_axis(device, axis_x), Input.get_joy_axis(device, axis_y))
+	var v := Vector2(PadSource.axis_value(device, axis_x), PadSource.axis_value(device, axis_y))
 	var length := v.length()
 	if length < STICK_DEADZONE:
 		return Vector2.ZERO
@@ -62,7 +69,7 @@ func _stick(axis_x: JoyAxis, axis_y: JoyAxis) -> Vector2:
 func _read_buttons() -> Dictionary[int, bool]:
 	var out: Dictionary[int, bool] = {}
 	for b in _BUTTON_MAP:
-		out[b] = Input.is_joy_button_pressed(device, _BUTTON_MAP[b])
-	out[PlayerInput.Pad.LT] = Input.get_joy_axis(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_THRESHOLD
-	out[PlayerInput.Pad.RT] = Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER_THRESHOLD
+		out[b] = PadSource.is_button_down(device, _BUTTON_MAP[b])
+	out[PlayerInput.Pad.LT] = PadSource.axis_value(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_THRESHOLD
+	out[PlayerInput.Pad.RT] = PadSource.axis_value(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER_THRESHOLD
 	return out
