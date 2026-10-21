@@ -1199,6 +1199,27 @@ func test_the_chips_follow_the_votes() -> void:
 	check(_chip_text(chip0).contains("Accept"), "the human accepted")
 
 
+func test_a_chip_follows_a_pad_that_goes_missing_and_comes_back() -> void:
+	PlayerManager.auto_decide_grace = 5.0
+	_human("pad:a")
+	var b := _human("pad:b", &"mage")
+	_screen()
+	screen.open(_shrine(&"greed"), PlayerManager.get_slots())
+	_step()
+	var chip: PanelContainer = screen.chips_row.get_child(1)
+	check(_chip_text(chip).contains("Choosing"), "choosing")
+	b.connected = false
+	_step()
+	check(_chip_text(chip).contains("Reconnecting"), "inside the grace the chip says Reconnecting…: %s" % _chip_text(chip))
+	b.connected = true
+	_step()
+	check(_chip_text(chip).contains("Choosing"), "and Choosing… again when the pad is back: %s" % _chip_text(chip))
+	b.connected = false
+	PlayerManager.get_slot(1).missing_time = 6.0  # past the grace: the screen votes for the absent player
+	_step()
+	check(not _chip_text(chip).contains("Reconnecting") and not _chip_text(chip).contains("Choosing"), "past the grace the chip shows the automatic vote: %s" % _chip_text(chip))
+
+
 ## Four heroes with full backpacks accept Fortune at 1920 x 1080: the result (the purse line and ONE sale line) ends
 ## above the voter chips. Before the sale lines were merged, each full backpack wrapped to two lines and the last
 ## hero's line ran behind the chips.

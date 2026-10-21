@@ -493,7 +493,8 @@ func _refresh_chips(force: bool = false) -> void:
 		var chip: PanelContainer = _chips.get(s.index)
 		if chip == null:
 			continue
-		var key := "%d:%d" % [vote.choice_of(s.index), phase]
+		# (missing / absent: "Reconnecting…" and "No controller" replace "Choosing…" while the pad is away)
+		var key := "%d:%d:%s:%s" % [vote.choice_of(s.index), phase, PlayerManager.is_missing(s), PlayerManager.is_absent(s)]
 		if force or _chip_keys.get(s.index, "") != key:
 			_chip_keys[s.index] = key
 			_fill_chip(chip, s)

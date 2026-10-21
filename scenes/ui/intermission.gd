@@ -840,8 +840,9 @@ func _refresh_chips(force: bool = false) -> void:
 			chips_row.add_child(chip)
 			_chips[s.index] = chip
 	for s in slots:
-		var key := "%s:%s:%s:%s:%d" % [s.ready, is_auto_ready(s), s.class_data.id if s.class_data != null else &"",
-			has_panel_focus(s.index), talent_points_free(s)]
+		# (is_missing: "Reconnecting…" inside the grace is a state of its own, before is_auto_ready flips at the end of it)
+		var key := "%s:%s:%s:%s:%s:%d" % [s.ready, is_auto_ready(s), PlayerManager.is_missing(s),
+			s.class_data.id if s.class_data != null else &"", has_panel_focus(s.index), talent_points_free(s)]
 		if _chip_keys.get(s.index, "") != key:
 			_chip_keys[s.index] = key
 			_fill_chip(_chips[s.index], s)
