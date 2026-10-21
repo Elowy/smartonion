@@ -7,6 +7,8 @@ extends MenuPage
 ## works too: hover highlights a row, the arrows (or a click on the left / right half of the value) change it.
 ## Every change goes through the Settings autoload (applied and saved at once); the page just shows it.
 ## Input rules (driver, swallowed opening press): MenuPage.
+## Host rules (HostRules): the Video rows are the host's window – a Remote Play guest cannot change them, and while
+## guests are connected neither can the pads of a page nobody in particular drives (the keyboard and the mouse still can).
 
 enum RowKind { OPTION, RESET, BACK }
 
@@ -23,6 +25,7 @@ var rows: Array[Row] = []
 ## Index into [member rows] of the highlighted row.
 var selected := 0
 
+var _refusal_left := 0.0
 var _selected_style: StyleBoxFlat
 var _plain_style: StyleBoxFlat
 var _last_mouse := Vector2(-1.0, -1.0)
@@ -190,11 +193,33 @@ func move_selection(step: int) -> void:
 
 
 ## Left / right on the highlighted row: changes an option's value one step ([param direction] -1 / 1).
-func change_selected(direction: int) -> void:
+## [param by_mouse]: a click (the host's mouse), not a controller / key.
+func change_selected(direction: int, by_mouse: bool = false) -> void:
 	var row := rows[selected]
 	if row.kind == RowKind.OPTION and direction != 0:
+		if _video_locked(row, by_mouse):
+			_refuse()
+			return
 		Settings.step_value(row.key, direction)
 		Audio.play_ui(&"ui_toggle")
+
+
+## True when the presser may not change [param row]: a Video row (the host's window) of a guest's page, or of a page
+## nobody in particular drives while guests are connected (a controller could be a guest's).
+func _video_locked(row: Row, by_mouse: bool) -> bool:
+	if by_mouse or row.kind != RowKind.OPTION or not HostRules.is_video_key(row.key):
+		return false
+	var driver := driver_slot()
+	if driver != null:
+		return not HostRules.may(HostRules.Action.VIDEO_SETTINGS, driver)
+	return RemotePlay.has_guests()
+
+
+func _refuse() -> void:
+	Audio.play_ui(&"ui_error")
+	_refusal_left = 2.5
+	title_label.text = HostRules.REFUSED_TEXT
+	title_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.25))
 
 
 ## A on the highlighted row: flips a toggle, cycles a choice, presses Reset / Back (volumes: nothing).
@@ -208,6 +233,9 @@ func activate_selected() -> void:
 			close()
 		_:
 			if GameSettings.option(row.key).kind != SettingOption.Kind.PERCENT:
+				if _video_locked(row, false):
+					_refuse()
+					return
 				Settings.step_value(row.key, 1)
 				Audio.play_ui(&"ui_toggle")
 
@@ -248,6 +276,9 @@ func _on_setting_changed(_key: StringName) -> void:
 
 func _on_open() -> void:
 	selected = 0
+	_refusal_left = 0.0
+	title_label.text = "Settings"
+	title_label.remove_theme_color_override(&"font_color")
 	# (a mouse resting on the page does not take the highlight: only moving it does)
 	_last_mouse = get_viewport().get_mouse_position() if is_inside_tree() else Vector2(-1.0, -1.0)
 	refresh()
@@ -277,6 +308,11 @@ func _process(delta: float) -> void:
 	super(delta)
 	if not is_visible_in_tree():
 		return
+	if _refusal_left > 0.0:
+		_refusal_left -= delta
+		if _refusal_left <= 0.0:
+			title_label.text = "Settings"
+			title_label.remove_theme_color_override(&"font_color")
 	# The highlight follows the mouse only while it moves (a controller keeps the highlight otherwise).
 	var mouse := get_viewport().get_mouse_position()
 	if mouse != _last_mouse:
@@ -290,7 +326,7 @@ func _process(delta: float) -> void:
 
 func _on_arrow(row: Row, direction: int) -> void:
 	select(rows.find(row))
-	change_selected(direction)
+	change_selected(direction, true)
 
 
 func _on_row_input(event: InputEvent, row: Row) -> void:
@@ -306,9 +342,9 @@ func _on_row_input(event: InputEvent, row: Row) -> void:
 	var box := row.value_box.get_global_rect()
 	if o.kind == SettingOption.Kind.PERCENT:
 		if box.has_point(at):
-			change_selected(1 if at.x > box.get_center().x else -1)
+			change_selected(1 if at.x > box.get_center().x else -1, true)
 	else:
-		change_selected(1 if not box.has_point(at) or at.x > box.get_center().x else -1)
+		change_selected(1 if not box.has_point(at) or at.x > box.get_center().x else -1, true)
 
 
 # --- Widgets -------------------------------------------------------------------------------

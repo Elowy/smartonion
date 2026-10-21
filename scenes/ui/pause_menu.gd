@@ -11,8 +11,11 @@ extends Control
 ##   case); the menu waits meanwhile (START does not resume) and B / Back return to it.
 ## - "Quit to Menu" asks for a second press ("Are you sure?"); moving the highlight cancels.
 ## - While a joined player's controller is unplugged the game cannot be resumed (START / B /
-##   Resume do nothing); the menu offers "Continue without Pn" for each of them instead
-##   (drop_player_requested – Main removes that player and goes on).
+##   Resume do nothing); the menu says "P3 disconnected – press A on any free controller to take over" (the
+##   take-over itself is PlayerManager's: a pad nobody plays presses A) and offers "Continue without Pn" for each of
+##   them (asks "Are you sure?" first; drop_player_requested – Main removes that player and goes on).
+## - Host rules (HostRules): a Remote Play guest's slot, a guest's pad and a pad nobody plays cannot Quit to Menu or
+##   drop a player; the menu says "Only the host can do that".
 ## See docs/ARCHITECTURE.md.
 
 signal resume_requested
@@ -28,6 +31,9 @@ const DROP_BASE := 10
 const SETTINGS_TEXT := "Settings"
 const QUIT_TEXT := "Quit to Menu"
 const QUIT_CONFIRM_TEXT := "Are you sure?  Press again"
+const DROP_CONFIRM_TEXT := QUIT_CONFIRM_TEXT
+## Seconds the "Only the host can do that" line stays.
+const REFUSAL_TIME := 2.5
 
 var slot: PlayerSlot
 ## Code of the highlighted entry: an Item, or DROP_BASE + slot index.
@@ -38,6 +44,8 @@ var entries: Array[int] = []
 var buttons: Array[Button] = []
 ## "Quit to Menu" was pressed once; the next press quits.
 var quit_armed := false
+## The "Continue without Pn" entry (DROP_BASE + index) that was pressed once; the next press drops the player. -1 = none.
+var drop_armed := -1
 ## Controller edges for the slot-less fallback. Public for tests.
 var pads := UiPads.new()
 ## The Settings page, created the first time it is opened.
@@ -45,6 +53,8 @@ var settings_page: SettingsPage
 
 var _by_label: Label
 var _missing_label: Label
+var _refusal_label: Label
+var _refusal_left := 0.0
 var _list: VBoxContainer
 var _prompts: CenterContainer
 ## The panel with the entries: hidden while the Settings page is open.
@@ -72,6 +82,8 @@ func open(p_slot: PlayerSlot) -> void:
 	_close_settings()
 	selected = Item.RESUME
 	quit_armed = false
+	drop_armed = -1
+	_refusal_left = 0.0
 	_skip_frames = 1
 	_wait_neutral = slot != null and slot.input != null and slot.input.nav_held() != Vector2i.ZERO
 	_entries_key = ""
@@ -87,6 +99,7 @@ func move_selection(step: int) -> void:
 	var i := entries.find(selected)
 	selected = entries[wrapi(maxi(i, 0) + step, 0, entries.size())]
 	quit_armed = false
+	drop_armed = -1
 	Audio.play_ui(&"ui_move")
 	_update_selection()
 
@@ -102,15 +115,31 @@ func is_settings_open() -> bool:
 	return settings_page != null and settings_page.visible
 
 
-## What A / a click does: like [method activate_selected], but "Quit to Menu" first asks
-## "Are you sure?" and only quits on the second press.
-func press_selected() -> void:
+## What A / a click does: like [method activate_selected], but "Quit to Menu" and "Continue without Pn" first ask
+## "Are you sure?" and only act on the second press. [param allowed] false: the presser may not do destructive things
+## (HostRules) – Quit and Continue-without are refused with a line of text instead.
+func press_selected(allowed: bool = true) -> void:
+	var destructive := selected == Item.QUIT or selected >= DROP_BASE
+	if destructive and not allowed:
+		_refuse()
+		return
 	if selected == Item.QUIT and not quit_armed:
 		quit_armed = true
 		Audio.play_ui(&"ui_confirm")
 		_update_selection()
 		return
+	if selected >= DROP_BASE and drop_armed != selected:
+		drop_armed = selected
+		Audio.play_ui(&"ui_confirm")
+		_update_selection()
+		return
 	activate_selected()
+
+
+func _refuse() -> void:
+	Audio.play_ui(&"ui_error")
+	_refusal_left = REFUSAL_TIME
+	_refusal_label.visible = true
 
 
 ## Runs the highlighted entry at once (no confirmation).
@@ -167,6 +196,10 @@ func _build() -> void:
 	col.add_child(_missing_label)
 	_list = UiTheme.vbox(14)
 	col.add_child(_list)
+	_refusal_label = UiTheme.centered_label(HostRules.REFUSED_TEXT, UiTheme.DIM, UiTheme.FONT_BODY)
+	_refusal_label.add_theme_color_override(&"font_color", UiTheme.RED.lightened(0.25))
+	_refusal_label.visible = false
+	col.add_child(_refusal_label)
 	_refresh_entries()
 	var gap2 := Control.new()
 	gap2.custom_minimum_size = Vector2(0, 4)
@@ -184,11 +217,14 @@ func _fill_prompts() -> void:
 	var inp: PlayerInput = slot.input if slot != null else null
 	var a := UiGlyph.for_input(inp, PlayerInput.Pad.A, 28.0) if inp != null else UiGlyph.pad(PlayerInput.Pad.A, 28.0)
 	var b := UiGlyph.for_input(inp, PlayerInput.Pad.B, 28.0) if inp != null else UiGlyph.pad(PlayerInput.Pad.B, 28.0)
-	_prompts.add_child(UiTheme.prompt_row([
+	var items: Array = [
 		[UiGlyph.nav(28.0, true), "Choose"],
 		[a, "Select"],
 		[b, "/", UiGlyph.pad(PlayerInput.Pad.START, 28.0), "Resume"],
-	], UiTheme.FONT_BODY - 1, UiTheme.TEXT_DIM))
+	]
+	if not PlayerManager.disconnected_slots().is_empty():
+		items.append([UiGlyph.pad(PlayerInput.Pad.A, 28.0), "Free controller: take over"])
+	_prompts.add_child(UiTheme.prompt_row(items, UiTheme.FONT_BODY - 1, UiTheme.TEXT_DIM))
 
 
 func _update_selection() -> void:
@@ -200,6 +236,8 @@ func _update_selection() -> void:
 		b.add_theme_color_override(&"font_color", UiTheme.GOLD_BRIGHT if on else UiTheme.TEXT)
 		if code == Item.QUIT:
 			b.text = QUIT_CONFIRM_TEXT if quit_armed else QUIT_TEXT
+		elif code >= DROP_BASE:
+			b.text = DROP_CONFIRM_TEXT if drop_armed == code else _drop_text(code - DROP_BASE)
 
 
 ## Rebuilds the entry list when the set of unplugged players changed, and the header line.
@@ -218,11 +256,16 @@ func _refresh() -> void:
 		_by_label.add_theme_color_override(&"font_color", UiTheme.TEXT_DIM)
 
 
+func _drop_text(slot_index: int) -> String:
+	var target := PlayerManager.get_slot(slot_index)
+	return "Continue without %s" % (RemotePlay.slot_label(target) if target != null else "P%d" % (slot_index + 1))
+
+
 func _refresh_entries() -> void:
 	var missing := PlayerManager.disconnected_slots()
 	var key := ""
 	for m in missing:
-		key += "%d," % m.index
+		key += "%d:%s," % [m.index, RemotePlay.slot_name(m)]
 	if key == _entries_key and not buttons.is_empty():
 		return
 	_entries_key = key
@@ -234,18 +277,21 @@ func _refresh_entries() -> void:
 	_add_entry(Item.RESUME, "Resume")
 	var names: Array[String] = []
 	for m in missing:
-		_add_entry(DROP_BASE + m.index, "Continue without %s" % m.label())
-		names.append(m.label())
+		_add_entry(DROP_BASE + m.index, _drop_text(m.index))
+		names.append(RemotePlay.slot_label(m))
 	_add_entry(Item.SETTINGS, SETTINGS_TEXT)
 	_add_entry(Item.QUIT, QUIT_TEXT)
 	if not entries.has(selected):
 		selected = Item.RESUME
 	quit_armed = false
+	drop_armed = -1
 	_missing_label.visible = not names.is_empty()
 	if not names.is_empty():
-		_missing_label.text = "%s: controller%s unplugged.\nReconnect to resume, or continue without." % [
-			", ".join(names), "s" if names.size() > 1 else ""]
+		_missing_label.text = "%s disconnected – press A on any free controller to take over,\nor wait for %s to come back." % [
+			", ".join(names), "them" if names.size() > 1 else ("them" if missing[0].is_remote() else "the controller")]
 	_update_selection()
+	if _prompts != null and visible:
+		_fill_prompts()
 
 
 func _add_entry(code: int, text: String) -> void:
@@ -278,11 +324,17 @@ func _driver() -> PlayerSlot:
 
 # --- Frame ---------------------------------------------------------------------------
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	pads.poll()
 	if not visible:
 		return
 	_refresh()
+	if _refusal_left > 0.0:
+		_refusal_left -= delta
+		_refusal_label.visible = _refusal_left > 0.0
+	if PlayerManager.consume_takeover():
+		_header_key = ""  # (a free pad just took a missing slot over: its A is not a press of this menu)
+		return
 	if is_settings_open():
 		return  # (the page reads its driver's input itself)
 	if _skip_frames > 0:
@@ -306,7 +358,7 @@ func _process(_delta: float) -> void:
 			if nav.y != 0:
 				move_selection(nav.y)
 		if inp.just_pressed(PlayerInput.Pad.A):
-			press_selected()
+			press_selected(HostRules.may(_selected_action(), driver))
 		return
 	# Fallback without a (working) pausing player: keyboard actions and any controller.
 	if Input.is_action_just_pressed(&"ui_cancel") or pads.any_just_pressed(JOY_BUTTON_B) \
@@ -317,8 +369,16 @@ func _process(_delta: float) -> void:
 		move_selection(-1)
 	elif Input.is_action_just_pressed(&"ui_down"):
 		move_selection(1)
-	if Input.is_action_just_pressed(&"ui_accept") or pads.any_just_pressed(JOY_BUTTON_A):
-		press_selected()
+	var kb_accept := Input.is_action_just_pressed(&"ui_accept")
+	if kb_accept or pads.any_just_pressed(JOY_BUTTON_A):
+		# (Pads: a guest's or a free pad's A cannot Quit / drop – the keyboard and the mouse are the host's.)
+		press_selected(kb_accept or HostRules.may_any_device(_selected_action(), pads.just_pressed_devices(JOY_BUTTON_A),
+				PlayerManager.count() > 0))
+
+
+## The host rule of the highlighted entry (only destructive ones are checked).
+func _selected_action() -> HostRules.Action:
+	return HostRules.Action.QUIT_TO_MENU if selected == Item.QUIT else HostRules.Action.DROP_PLAYER
 
 
 ## Shows the Settings page over the menu, driven by the player who paused (anyone without a working one).

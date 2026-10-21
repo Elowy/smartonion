@@ -6,7 +6,8 @@ extends Control
 ## buttons). Settings, Credits and The Onion Patch (M9 PATCH: the meta page: Seasonings, Heirlooms, achievements ...) open a
 ## [MenuPage] over the title (the menu's own content is hidden
 ## meanwhile and the page is driven by "anyone"); closing it gives the focus back to the button that
-## opened it. See docs/ARCHITECTURE.md.
+## opened it. Host rules (HostRules): a Remote Play guest's pad cannot press Quit ("Only the host can do that").
+## See docs/ARCHITECTURE.md.
 
 signal play_pressed
 signal quit_pressed
@@ -29,6 +30,8 @@ var onion_patch_page: OnionPatchPage
 
 var _pads := UiPads.new()
 var _t := 0.0
+var _refusal_label: Label
+var _refusal_left := 0.0
 var _backdrop: TextureRect
 var _embers: _Embers
 ## The title column and the prompts: hidden while a page is open.
@@ -124,6 +127,15 @@ func _build() -> void:
 	hints.offset_right = 400
 	add_child(hints)
 	_hints = hints
+	_refusal_label = UiTheme.centered_label(HostRules.REFUSED_TEXT, &"", UiTheme.FONT_BODY, UiTheme.RED.lightened(0.25))
+	_refusal_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_refusal_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_refusal_label.offset_top = -124
+	_refusal_label.offset_bottom = -90
+	_refusal_label.offset_left = -400
+	_refusal_label.offset_right = 400
+	_refusal_label.visible = false
+	add_child(_refusal_label)
 
 	var version := UiTheme.label(VERSION_TEXT, UiTheme.SMALL)
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -179,21 +191,32 @@ func _process(delta: float) -> void:
 	emblem.position.y = sin(_t * 1.6) * 6.0
 	emblem.rotation = sin(_t * 0.9) * 0.025
 	emblem.pivot_offset = emblem.size * Vector2(0.5, 1.0)
+	if _refusal_left > 0.0:
+		_refusal_left -= delta
+		_refusal_label.visible = _refusal_left > 0.0
 	if is_page_open():
 		return  # (the page reads the controllers itself)
 	if _skip_frames > 0:
 		_skip_frames -= 1
 		return
 	if _pads.any_just_pressed(JOY_BUTTON_A) or _pads.any_just_pressed(JOY_BUTTON_START):
-		activate_focused()
+		var devices := _pads.just_pressed_devices(JOY_BUTTON_A)
+		devices.append_array(_pads.just_pressed_devices(JOY_BUTTON_START))
+		activate_focused(devices)
 	elif _pads.any_just_pressed(JOY_BUTTON_B):
 		quit_button.grab_focus()
 
 
-## Presses the focused button (Play when nothing is focused). Controllers' A lands here.
-func activate_focused() -> void:
+## Presses the focused button (Play when nothing is focused). Controllers' A lands here: [param devices] are the pads
+## that pressed (none = the keyboard / the mouse / a test: the host). Quit is the host's: a guest's pad cannot press it.
+func activate_focused(devices: Array[int] = []) -> void:
 	var focus := get_viewport().gui_get_focus_owner() if is_inside_tree() else null
 	if focus == quit_button:
+		if not HostRules.may_any_device(HostRules.Action.QUIT_GAME, devices):
+			_refusal_left = PauseMenu.REFUSAL_TIME
+			_refusal_label.visible = true
+			Audio.play_ui(&"ui_error")
+			return
 		_on_quit()
 	elif focus == onion_patch_button:
 		open_onion_patch()

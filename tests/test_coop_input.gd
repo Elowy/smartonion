@@ -457,7 +457,11 @@ func test_pausing_players_own_pad_dying_leaves_the_menu_usable() -> void:
 	var dropped: Array[PlayerSlot] = []
 	main.pause_menu.drop_player_requested.connect(func(s: PlayerSlot) -> void: dropped.append(s))
 	_menu_frame()
-	check_eq(dropped.size(), 1, "the fallback (any connected pad's A) can choose it")
+	check(dropped.is_empty() and main.pause_menu.drop_armed == PauseMenu.DROP_BASE, "the first A only asks 'Are you sure?'")
+	_menu_frame()  # (the press is released)
+	main.pause_menu.pads.injected.append(JOY_BUTTON_A)
+	_menu_frame()
+	check_eq(dropped.size(), 1, "the fallback (any connected pad's A) can choose it with a second press")
 
 
 func test_continue_without_removes_the_player_and_keeps_the_run_going() -> void:
@@ -502,7 +506,11 @@ func test_continue_without_through_the_menu() -> void:
 	check_eq(menu.selected, PauseMenu.DROP_BASE + 1, "Continue without P2 highlighted")
 	menu.pads.injected.append(JOY_BUTTON_A)
 	_menu_frame()
-	check_eq(dropped.size(), 1, "A on the entry requests the drop")
+	check(dropped.is_empty(), "the first A on the entry only asks 'Are you sure?'")
+	_menu_frame()  # (the press is released)
+	menu.pads.injected.append(JOY_BUTTON_A)
+	_menu_frame()
+	check_eq(dropped.size(), 1, "the second A on the entry requests the drop")
 	check(dropped.size() == 1 and dropped[0] == PlayerManager.get_slot(1), "for P2's slot")
 	check(menu.visible, "the menu stays up until Main has handled it")
 	# Main's connection is deferred (the new state never sees the press): run what it queues.
