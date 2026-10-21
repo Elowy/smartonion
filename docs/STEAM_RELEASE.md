@@ -169,6 +169,15 @@ tools/build/export.sh --steam             # both platforms, into build/steam/con
 `export.sh` checks that the export templates are installed and runs a headless smoke test of the exported Linux build. The version number is
 `application/config/version` in `project.godot`: change it first, for every upload.
 
+**A version bump is two edits, and the TODOs are a third.**
+
+- `project.godot`: `application/config/version` (the number shown in the main menu), e.g. `0.9.1`.
+- `export_presets.cfg`, preset **Windows Desktop**: `application/file_version` and `application/product_version`, both
+  the same number plus `.0`, e.g. `0.9.1.0` (the version in the exe's Properties dialog). `export.sh` stops with the
+  line to fix when they differ from `application/config/version`, and so does the test suite.
+- Before the first upload also replace `TODO Company Name` in the same preset (`application/company_name` and
+  `application/copyright`): they are shown in the exe's Properties dialog, and `export.sh` only warns about them.
+
 > **Build and upload the Linux depot from Linux or WSL (on the Linux file system), not from Git Bash.** Git Bash (and
 > `/mnt/c` in WSL) is NTFS: `chmod +x` does nothing there, so `SmartOnion.x86_64` loses its Unix executable bit, and a
 > Linux depot without it may not start on Linux or the Steam Deck. `upload.sh` cannot check the bit on Windows (it only
@@ -252,7 +261,9 @@ The App ID is taken from `project.godot` (section 2). Then, in this order:
    beta build is good, set that same build live on **default** on the Builds page, by hand. Before release, the default
    branch is what the review team looks at (section 9).
 
-A new version later is the same loop: bump `application/config/version`, export (`--steam`), `--preview`, upload with a
+A new version later is the same loop: bump the version (`application/config/version` in `project.godot` **and**
+`application/file_version` / `application/product_version` = `<version>.0` in the Windows preset of `export_presets.cfg`,
+section 7), export (`--steam`), `--preview`, upload with a
 new `--desc`, test on `beta`, then move it to default. (If you changed a depot, launch option, package or Steam Input
 setting in between, publish in Steamworks first.) Only changed parts are uploaded; `build/steam/output/` holds the
 chunk cache that makes this fast, and may be deleted (the next upload is then slower).
