@@ -4762,6 +4762,11 @@ does not see. The game logs one warning and plays on with the Null backend; a se
   libraries (`libgodotsteam.<platform>.template_<debug|release>.x86_64.<dll|so>`) and Valve's library next to the
   executable; they must ship in the same folder. Export from a checkout where the plug-in was fetched and imported.
   Without the plug-in at export time, the game still exports and runs without Steam features.
+- Licence: GodotSteam is MIT, which requires its copyright and permission notice in every copy. `CREDITS.md` has a
+  "Libraries" section with the name, version (4.23.2, as pinned in `fetch_godotsteam.sh`), copyright line, URL and the
+  MIT text of `addons/godotsteam/license.md` (that file is gitignored and not exported), and the in-game Credits page
+  shows it. So a Steam build must carry `CREDITS.md` (the `*.md` include filter, see Menus); a test keeps the section
+  and the version in step.
 
 ### Command-line flags and smoke fields
 

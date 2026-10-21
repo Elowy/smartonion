@@ -407,6 +407,26 @@ func _collect(dir: String, out: Array[String]) -> void:
 		_collect(dir + "/" + d, out)
 
 
+func test_the_credits_carry_the_godotsteam_mit_notice() -> void:
+	var credits := FileAccess.get_file_as_string("res://CREDITS.md")
+	check("## Libraries" in credits and "GodotSteam" in credits, "a Libraries section naming GodotSteam")
+	check("https://codeberg.org/godotsteam/godotsteam" in credits, "its home")
+	check("Copyright (c) 2015-Current | GP Garcia, Chris Ridenour, and Contributors" in credits, "the copyright line")
+	check("Permission is hereby granted, free of charge" in credits and "shall be included in all" in credits, "the MIT permission notice")
+	check("THE SOFTWARE IS PROVIDED \"AS IS\"" in credits, "and the warranty disclaimer")
+	# The version credited is the version the fetch script pins.
+	var fetch := FileAccess.get_file_as_string("res://tools/steam/fetch_godotsteam.sh")
+	var pinned := RegEx.create_from_string("(?m)^VERSION=\"([0-9.]+)\"").search(fetch)
+	check(pinned != null and ("GodotSteam v%s" % pinned.get_string(1)) in credits, "the credited version is the pinned one")
+	# ... and the in-game Credits page shows it.
+	var texts: Array[String] = []
+	for line in CreditsPage.parse(CreditsPage.page_markdown()):
+		texts.append(String(line["text"]))
+	check("GodotSteam (MIT)" in texts and "Libraries" in texts, "the page has the section")
+	var shown := " ".join(texts)
+	check("Permission is hereby granted, free of charge" in shown, "and the licence text")
+
+
 func test_the_credits_name_the_font_and_the_icon_authors() -> void:
 	var credits := FileAccess.get_file_as_string("res://CREDITS.md")
 	check("## Fonts" in credits and "## Icons" in credits, "a Fonts and an Icons section")

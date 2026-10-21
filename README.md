@@ -72,6 +72,7 @@ A helyi co-op a Steam **Remote Play Together** funkciójával online is játszha
 - **GodotSteam (opcionális):** a `tools/steam/fetch_godotsteam.sh` letölti a GodotSteam v4.23.2-gde bővítményt az `addons/godotsteam/` mappába (csak Windows 64 és Linux 64; a letöltött fájl sha256-összegét ellenőrzi). Utána egyszer: `godot --headless --path . --import`. A mappa a `.gitignore`-ban van: a benne lévő Valve-könyvtárak nem kerülhetnek a repóba.
 - **Steam-alkalmazásazonosító:** a `smartonion/steam/app_id` projektbeállítás alapértéke 480 (a Valve tesztalkalmazása, Spacewar), csak fejlesztéshez. A Steamworks-regisztráció után ide kell a saját azonosító. A játékot a Steam-könyvtárból kell indítani, különben a vendégek kontrollerei nem jelennek meg.
 - **Export:** a Steam-es exportban a bővítmény könyvtárai (`libgodotsteam…`, `steam_api64.dll` / `libsteam_api.so`) a futtatható mellé kerülnek; a depotban együtt kell lenniük.
+- **GodotSteam-licenc (MIT):** a Steam-es buildhez tartozik a GodotSteam szerzői jogi és engedélyszövege. A `CREDITS.md` „Libraries” része tartalmazza, és a játékon belüli Credits oldal megmutatja; ezért a `CREDITS.md`-nek (`*.md` az export include-szűrőjében) a Steam-es exportban benne kell lennie. A telepített `addons/godotsteam/license.md` nem kerül a futtatható mellé.
 
 ### Fejlesztői kapcsolók (RPT)
 
