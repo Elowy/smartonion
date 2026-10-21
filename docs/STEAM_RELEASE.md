@@ -10,7 +10,8 @@ The whole path, in order:
 1. Register the app in Steamworks and note the **App ID** (section 1).
 2. Put the App ID into `project.godot` (section 2).
 3. Create two **depots** (Windows, Linux), their **launch options** and the **package** that owns them (section 3).
-4. Set up Steam Input, Remote Play Together, tags and the store page (sections 4 to 6).
+4. Set up Steam Input and then **publish** all those Steamworks settings (section 4); Remote Play Together, tags and the
+   store page (sections 5 and 6).
 5. **Build** the game (section 7).
 6. **Upload** it: dry run, preview, real upload, test on a beta branch, then the default branch (section 8).
 7. Submit the store page and the build for review, then release (section 9).
@@ -62,7 +63,8 @@ build are different files (`docs/ARCHITECTURE.md`, "Builds and Steam upload").
 ### 3.1 Depots
 
 Steamworks → your app → **SteamPipe → Depots** (the page can also be reached as "Edit Steamworks Settings").
-A default depot may already exist. Make two (rename the default one), then **Save** and **Publish**:
+A default depot may already exist. Make two (rename the default one) and **Save**. Nothing is live until you publish,
+which comes after the launch options, the package and Steam Input (end of section 4):
 
 | Depot name (free text) | Language | OS | Architecture | Depot ID |
 |---|---|---|---|---|
@@ -83,8 +85,8 @@ path is relative to the install folder, with no leading slash or dot (both execu
 | Linux (the entry may be called "Linux + SteamOS") | `SmartOnion.x86_64` | 64-bit | (none) |
 
 Do not tick "Supported Operating Systems" on the General tab until you are ready to release (Valve does it last);
-the store page's own OS checkboxes come with the release checklist (section 9). Source: "Uploading to Steam",
-"Initial Setup for New SteamPipe Apps"; "Platforms".
+the store page's own OS checkboxes come with the release checklist (section 9). **Save** here too; publishing is at the
+end of section 4. Source: "Uploading to Steam", "Initial Setup for New SteamPipe Apps"; "Platforms".
 
 ### 3.3 Package
 
@@ -93,7 +95,8 @@ developer comp package (and, later, the package that is sold) → **Add/Remove D
 this, the build uploads fine, but nobody (not even you) can install it, or only one of the two systems can. Source:
 "Uploading to Steam" ("My Mac and/or Linux Builds aren't installing any files"); "Testing On Steam", "Dev Comp
 Packages". If a download does not start, open Steam with `-dev`, go to the console and run
-`licenses_for_app <AppID>`: it lists the package and its depots.
+`licenses_for_app <AppID>`: it lists the package and its depots. **Save** the package too; publishing is at the end of
+section 4.
 
 ## 4. Steam Input and controllers (you)
 
@@ -105,6 +108,13 @@ exe may not see it (hence section 7, "Launching").
   ("Prerequisites", point 2) and pick the premade **Gamepad** template.
 - Local co-op needs several pads at once: do not turn Steam Input off for the app.
 - The game has no text input fields, so Valve's on-screen-keyboard rule for the Steam Deck does not apply.
+
+**Publish all of it now.** Sections 3 and 4 only *saved* your settings: Steam (and SteamPipe) sees none of them until you
+publish. Steamworks → your app → **Publish** (the Publish page, also linked from the app's landing page): check the list
+of pending changes (depots, launch options, packages, Steam Input configuration) and publish them. Do this **again after
+every later change** to the depots, launch options, packages or Steam Input settings. Unpublished launch options or
+depots look correct in the app admin, but an install of the build then fails with "Invalid content configuration" (see
+the table in section 8). The store page is not published this way: it has its own review (section 9).
 
 ## 5. Remote Play Together, co-op tags and the store features (you)
 
@@ -243,19 +253,20 @@ The App ID is taken from `project.godot` (section 2). Then, in this order:
    branch is what the review team looks at (section 9).
 
 A new version later is the same loop: bump `application/config/version`, export (`--steam`), `--preview`, upload with a
-new `--desc`, test on `beta`, then move it to default. Only changed parts are uploaded; `build/steam/output/` holds the
+new `--desc`, test on `beta`, then move it to default. (If you changed a depot, launch option, package or Steam Input
+setting in between, publish in Steamworks first.) Only changed parts are uploaded; `build/steam/output/` holds the
 chunk cache that makes this fast, and may be deleted (the next upload is then slower).
 
 ### If something goes wrong
 
 | Message or symptom | Usual cause |
 |---|---|
-| `Failed to get application info for app NNN (check login and subscription)` | Wrong App ID, or the Steamworks changes were never **published**, or the build account does not belong to the app |
+| `Failed to get application info for app NNN (check login and subscription)` | Wrong App ID, or the Steamworks changes were never **published** (section 4), or the build account does not belong to the app |
 | `Failed 'DepotBuild for ...' - status = 6` | The account lacks the permissions (section 1), or steamcmd cannot find the content (look at `build/steam/scripts/*.vdf`: the ContentRoot paths) |
 | `Login Failure: Account Login Denied` | Steam Guard: see step 2 |
 | `steamcmd.sh: ... cannot execute: required file not found` (Linux) | The 32-bit C library is missing (section 8, intro) |
 | The upload works, nothing installs on a test machine, or only one OS | The depots are not in the package (section 3.3), or the branch has no build set live |
-| `An error occurred while installing (Invalid content configuration)` | No build live on the branch, wrong launch options, or the depots are not owned |
+| `An error occurred while installing (Invalid content configuration)` | The depots, launch options or package were saved but **not published** (publish them, section 4; again after every later change), no build live on the branch, wrong launch options, or the depots are not owned |
 | The game quits at once when double-clicked | Intended with a real App ID in a release export (section 7); use the Steam library, or a `steam_appid.txt` for local tests |
 
 Every `upload.sh` problem message says what to fix. Valve's own reference: "Uploading to Steam" (SteamPipe), including its

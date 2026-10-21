@@ -4936,7 +4936,9 @@ so nothing but this file says what a content folder was exported with; `upload.s
   write `build/dist/SmartOnion-<version>-windows.zip` / `-linux.tar.gz`. Logs in `build/logs/`. About a minute.
 - **Measured here:** exe 123 MB, Linux binary 88 MB (PCK 13.9 MB, 3277 files), zip 48 MB, tar.gz 38 MB. The Linux binary
   needs glibc ≥ 2.28. The Windows exe was checked statically (PE32+, icon group, version resource) but never run.
-- Upload the Linux depot from Linux so the executable bit survives; the Windows / macOS paths of the scripts are untested.
+- Build and upload the Linux depot from Linux, or WSL with the repository on the Linux file system, so the executable bit
+  survives: NTFS (Git Bash, `/mnt/c`) cannot keep it, `upload.sh` can only warn there and `export.sh` skips the Linux smoke
+  on a non-Linux host (`docs/STEAM_RELEASE.md` says so to the owner). The Windows / macOS paths of the scripts are untested.
 
 ### SteamPipe upload (`tools/steam/upload.sh`)
 
